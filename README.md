@@ -11,7 +11,7 @@ A modern, production-ready virtual machine management daemon built with Rust - a
 - **Web UI**: Modern React dashboard with real-time updates
 - **systemd-vmspawn integration**: Native systemd VM management
 
-### ✨ Advanced Features (NEW!)
+### ✨ Advanced Features
 - **WebSocket Console**: Real-time browser-based terminal access
 - **VNC Support**: Graphical console via noVNC integration
 - **cloud-init**: Automated VM initialization and configuration
@@ -19,6 +19,14 @@ A modern, production-ready virtual machine management daemon built with Rust - a
 - **Kubernetes Operator**: Native K8s integration with CRD
 - **Terraform Provider**: Infrastructure as Code support
 - **Prometheus Metrics**: Production monitoring and alerting
+
+### 🚀 Enterprise Features (NEW!)
+- **GPU Passthrough**: NVIDIA/AMD GPU passthrough with VFIO
+- **Live Migration**: Zero-downtime VM migration between nodes
+- **Backup & Restore**: Full and incremental VM backups
+- **Advanced Scheduler**: 4 scheduling algorithms with affinity rules
+- **High Availability**: etcd-based clustering with leader election
+- **Security**: JWT auth, RBAC, audit logging, TLS support
 
 ## 🏗️ Architecture
 
