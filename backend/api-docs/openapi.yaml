@@ -1,0 +1,251 @@
+openapi: 3.0.0
+info:
+  title: vmspawnd API
+  description: Modern VM management daemon API
+  version: 0.1.0
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/vms:
+    get:
+      summary: List all VMs
+      responses:
+        '200':
+          description: List of VMs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VM'
+
+    post:
+      summary: Create a new VM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVMRequest'
+      responses:
+        '201':
+          description: VM created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VM'
+
+  /api/vms/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      summary: Get VM details
+      responses:
+        '200':
+          description: VM details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VM'
+        '404':
+          description: VM not found
+
+    delete:
+      summary: Delete a VM
+      responses:
+        '204':
+          description: VM deleted
+        '404':
+          description: VM not found
+
+  /api/vms/{name}/start:
+    post:
+      summary: Start a VM
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: started
+
+  /api/vms/{name}/stop:
+    post:
+      summary: Stop a VM
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM stopped
+
+  /api/vms/{name}/restart:
+    post:
+      summary: Restart a VM
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM restarted
+
+  /api/vms/{name}/metrics:
+    get:
+      summary: Get VM metrics
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMMetrics'
+
+  /api/vms/{name}/cloud-init:
+    post:
+      summary: Configure cloud-init for a VM
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudInitConfig'
+      responses:
+        '200':
+          description: cloud-init configured
+
+components:
+  schemas:
+    VM:
+      type: object
+      properties:
+        name:
+          type: string
+        state:
+          type: string
+          enum: [running, stopped, paused, unknown]
+        cpus:
+          type: integer
+        memory:
+          type: integer
+          description: Memory in MB
+        image:
+          type: string
+        ip:
+          type: string
+          nullable: true
+        pid:
+          type: integer
+          nullable: true
+
+    CreateVMRequest:
+      type: object
+      required:
+        - name
+        - image
+      properties:
+        name:
+          type: string
+        image:
+          type: string
+        cpus:
+          type: integer
+          default: 2
+        memory:
+          type: integer
+          default: 2048
+          description: Memory in MB
+
+    VMMetrics:
+      type: object
+      properties:
+        cpu_usage:
+          type: number
+          format: double
+        memory_usage:
+          type: integer
+        disk_usage:
+          type: integer
+        network_rx:
+          type: integer
+        network_tx:
+          type: integer
+
+    CloudInitConfig:
+      type: object
+      required:
+        - instance_id
+        - hostname
+      properties:
+        instance_id:
+          type: string
+        hostname:
+          type: string
+        user_data:
+          type: string
+          nullable: true
+        meta_data:
+          type: object
+          nullable: true
+        network_config:
+          type: object
+          nullable: true
