@@ -1,0 +1,12 @@
+[Unit]
+Description=Virtual Machine %i
+After=vmspawnd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/systemd-vmspawn --machine=%i --boot
+ExecStop=/usr/bin/machinectl stop %i
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[package]
+name = "vmctl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vmctl"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { version = "0.12", features = ["json"] }
+tokio.workspace = true
+tabled = "0.16"
+vm-model = { path = "../vm-model" }

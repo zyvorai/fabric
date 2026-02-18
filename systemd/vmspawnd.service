@@ -1,0 +1,25 @@
+[Unit]
+Description=vmspawnd - Virtual Machine Spawn Daemon
+Documentation=https://github.com/youruser/vmspawnd
+After=network.target systemd-machined.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vmspawnd
+Restart=on-failure
+RestartSec=5s
+User=root
+Group=root
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/vmspawnd /etc/vmspawnd
+NoNewPrivileges=true
+PrivateTmp=yes
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

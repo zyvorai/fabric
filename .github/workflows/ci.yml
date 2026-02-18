@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Check formatting
+      run: cd backend && cargo fmt -- --check
+
+    - name: Lint
+      run: cd backend && cargo clippy -- -D warnings
+
+    - name: Test
+      run: cd backend && cargo test
+
+    - name: Build
+      run: cd backend && cargo build --release
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: cd web && npm install
+
+    - name: Build
+      run: cd web && npm run build

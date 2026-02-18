@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  vmspawnd:
+    build: .
+    container_name: vmspawnd
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/lib/vmspawnd:/var/lib/vmspawnd
+      - /etc/vmspawnd:/etc/vmspawnd
+    privileged: true
+    restart: unless-stopped

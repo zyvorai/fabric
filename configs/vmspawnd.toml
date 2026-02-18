@@ -1,0 +1,13 @@
+[daemon]
+# Listen address for REST API
+listen = "0.0.0.0:8080"
+
+[storage]
+# Path to store VM state
+path = "/var/lib/vmspawnd"
+# Path to store VM images
+image_path = "/var/lib/vmspawnd/images"
+
+[network]
+# Default network bridge
+bridge = "br0"
