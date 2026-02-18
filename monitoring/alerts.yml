@@ -1,0 +1,30 @@
+groups:
+  - name: vmspawnd
+    interval: 30s
+    rules:
+      - alert: VMSpawndDown
+        expr: up{job="vmspawnd"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vmspawnd is down"
+          description: "vmspawnd has been down for more than 1 minute"
+
+      - alert: HighVMCount
+        expr: vmspawnd_vms_total > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of VMs"
+          description: "VM count ({{ $value }}) is above 100"
+
+      - alert: NoRunningVMs
+        expr: vmspawnd_vms_running == 0 and vmspawnd_vms_total > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No VMs are running"
+          description: "All VMs are stopped"

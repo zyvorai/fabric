@@ -1,0 +1,54 @@
+import { useEffect, useRef } from 'react'
+
+interface VNCViewerProps {
+  vmName: string
+}
+
+export default function VNCViewer({ vmName }: VNCViewerProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+
+    // Connect to VNC WebSocket proxy
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${vmName}`
+    const ws = new WebSocket(wsUrl)
+
+    ws.binaryType = 'arraybuffer'
+
+    ws.onopen = () => {
+      console.log('VNC WebSocket connected')
+    }
+
+    ws.onmessage = (event) => {
+      // Handle VNC protocol data
+      // For production, integrate noVNC library here
+      console.log('Received VNC data:', event.data)
+    }
+
+    ws.onerror = (error) => {
+      console.error('VNC WebSocket error:', error)
+    }
+
+    ws.onclose = () => {
+      console.log('VNC WebSocket closed')
+    }
+
+    wsRef.current = ws
+
+    return () => {
+      ws.close()
+    }
+  }, [vmName])
+
+  return (
+    <div className="bg-black rounded flex items-center justify-center" style={{ minHeight: '500px' }}>
+      <canvas ref={canvasRef} className="border border-gray-700" />
+      <div className="absolute text-gray-500">
+        VNC Viewer (integrate noVNC for full functionality)
+      </div>
+    </div>
+  )
+}

@@ -1,29 +1,26 @@
-mod api;
-mod config;
-mod daemon;
-mod routes;
-mod server;
-mod websocket;
+mod crd;
+mod controller;
+mod reconcile;
 
 use anyhow::Result;
-use daemon::Daemon;
+use kube::Client;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "vmspawnd=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "vmspawnd_operator=info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Starting vmspawnd");
+    tracing::info!("Starting vmspawnd Kubernetes operator");
 
-    let daemon = Daemon::new().await?;
-    daemon.start().await?;
+    let client = Client::try_default().await?;
+
+    controller::run(client).await?;
 
     Ok(())
 }

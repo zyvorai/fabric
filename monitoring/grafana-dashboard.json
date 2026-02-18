@@ -1,0 +1,63 @@
+{
+  "dashboard": {
+    "title": "vmspawnd Dashboard",
+    "panels": [
+      {
+        "title": "Total VMs",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "vmspawnd_vms_total",
+            "legendFormat": "Total VMs"
+          }
+        ]
+      },
+      {
+        "title": "Running VMs",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "vmspawnd_vms_running",
+            "legendFormat": "Running"
+          }
+        ]
+      },
+      {
+        "title": "VM States",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "vmspawnd_vms_running",
+            "legendFormat": "Running"
+          },
+          {
+            "expr": "vmspawnd_vms_stopped",
+            "legendFormat": "Stopped"
+          }
+        ]
+      },
+      {
+        "title": "VM Operations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(vmspawnd_vm_starts_total[5m])",
+            "legendFormat": "Starts"
+          },
+          {
+            "expr": "rate(vmspawnd_vm_stops_total[5m])",
+            "legendFormat": "Stops"
+          },
+          {
+            "expr": "rate(vmspawnd_vm_creates_total[5m])",
+            "legendFormat": "Creates"
+          },
+          {
+            "expr": "rate(vmspawnd_vm_deletes_total[5m])",
+            "legendFormat": "Deletes"
+          }
+        ]
+      }
+    ]
+  }
+}

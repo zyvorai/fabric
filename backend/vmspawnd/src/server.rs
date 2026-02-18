@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
-use crate::{config::Config, routes};
+use crate::{config::Config, routes, websocket};
 
 pub struct AppState {
     pub store: StateStore,
@@ -38,11 +38,19 @@ impl Server {
             .route("/vms/:name/stop", post(routes::stop_vm))
             .route("/vms/:name/restart", post(routes::restart_vm))
             .route("/vms/:name/metrics", get(routes::get_metrics))
+            .route("/vms/:name/cloud-init", post(routes::configure_cloud_init))
+            .with_state(self.state.clone());
+
+        let ws_routes = Router::new()
+            .route("/console/:name", get(websocket::console_handler))
+            .route("/vnc/:name", get(vnc_proxy::vnc_handler))
             .with_state(self.state.clone());
 
         let app = Router::new()
             .nest("/api", api_routes)
+            .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
+            .route("/metrics", get(prometheus_exporter::metrics_handler))
             .fallback_service(ServeDir::new("../web/dist"))
             .layer(cors);
 

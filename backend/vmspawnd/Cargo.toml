@@ -20,8 +20,13 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 toml.workspace = true
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs", "cors"] }
+futures.workspace = true
 
 vm-model = { path = "../vm-model" }
 state-store = { path = "../state-store" }
 vmspawn-driver = { path = "../vmspawn-driver" }
 systemd-driver = { path = "../systemd-driver" }
+vnc-proxy = { path = "../vnc-proxy" }
+cloud-init = { path = "../cloud-init" }
+tpm-support = { path = "../tpm-support" }
+prometheus-exporter = { path = "../prometheus-exporter" }
