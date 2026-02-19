@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getVM, startVM, stopVM, restartVM, deleteVM, VM } from '../api/vm'
 import {
   Play, Square, RotateCw, Trash2, ArrowLeft, Info, Activity, HardDrive,
-  Network, Camera, Terminal, Cpu, Memory, Clock
+  Network, Camera, Terminal, Cpu, MemoryStick, Clock
 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -263,7 +263,7 @@ function OverviewTab({ vm }: { vm: VM }) {
           </div>
           <div className="flex items-center justify-between">
             <dt className="text-sm text-gray-400 flex items-center gap-2">
-              <Memory className="w-4 h-4" />
+              <MemoryStick className="w-4 h-4" />
               Memory
             </dt>
             <dd className="text-white font-medium">{vm.memory} MB</dd>
@@ -288,7 +288,7 @@ function OverviewTab({ vm }: { vm: VM }) {
   )
 }
 
-function MetricsTab({ vm }: { vm: VM }) {
+function MetricsTab({ vm: _vm }: { vm: VM }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -317,7 +317,7 @@ function MetricsTab({ vm }: { vm: VM }) {
   )
 }
 
-function DisksTab({ vm }: { vm: VM }) {
+function DisksTab({ vm: _vm }: { vm: VM }) {
   const disks = [
     { name: 'vda', path: '/var/lib/vmspawnd/images/vm1.qcow2', size: '20 GB', format: 'qcow2' },
   ]
@@ -354,7 +354,7 @@ function DisksTab({ vm }: { vm: VM }) {
   )
 }
 
-function NetworkTab({ vm }: { vm: VM }) {
+function NetworkTab({ vm: _vm }: { vm: VM }) {
   const interfaces = [
     { name: 'eth0', mac: '52:54:00:12:34:56', ip: '192.168.100.10', bridge: 'br0', state: 'UP' },
   ]
@@ -394,7 +394,7 @@ function NetworkTab({ vm }: { vm: VM }) {
   )
 }
 
-function SnapshotsTab({ vm }: { vm: VM }) {
+function SnapshotsTab({ vm: _vm }: { vm: VM }) {
   const snapshots = [
     { name: 'before-update', created: '2024-02-18 10:30:00', size: '2.5 GB' },
     { name: 'initial', created: '2024-02-15 14:30:00', size: '1.8 GB' },
@@ -446,7 +446,7 @@ function SnapshotsTab({ vm }: { vm: VM }) {
   )
 }
 
-function LogsTab({ vm }: { vm: VM }) {
+function LogsTab({ vm: _vm }: { vm: VM }) {
   const logs = [
     { time: '14:35:22', level: 'INFO', message: 'VM started successfully' },
     { time: '14:35:15', level: 'INFO', message: 'Initializing network interface eth0' },

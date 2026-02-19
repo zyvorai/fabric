@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ChevronRight } from 'lucide-react'
 
@@ -41,7 +41,7 @@ export default function CommandPalette() {
     { id: 'action-help', label: 'Show Keyboard Shortcuts', action: () => {}, category: 'Actions', keywords: ['?', 'shortcuts', 'keys'] },
 
     // Quick VM Actions (examples - in real app, would be dynamic based on VMs)
-    { id: 'vm-search', label: 'Search VMs', action: () => { navigate('/vms'); setTimeout(() => document.querySelector('input[type="text"]')?.focus(), 100) }, category: 'VMs', keywords: ['find', 'filter'] },
+    { id: 'vm-search', label: 'Search VMs', action: () => { navigate('/vms'); setTimeout(() => (document.querySelector('input[type="text"]') as HTMLElement)?.focus(), 100) }, category: 'VMs', keywords: ['find', 'filter'] },
     { id: 'vm-tags', label: 'Filter VMs by Tags', action: () => navigate('/vms'), category: 'VMs', keywords: ['tag', 'label', 'organize'] },
   ]
 

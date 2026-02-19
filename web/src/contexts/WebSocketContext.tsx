@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode, useEffect, useState } from 'react'
+import { createContext, useContext, ReactNode, useState } from 'react'
 import { useWebSocket, WebSocketMessage } from '../hooks/useWebSocket'
 import { VM } from '../api/vm'
 

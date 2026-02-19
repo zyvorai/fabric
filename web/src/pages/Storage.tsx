@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { HardDrive, Plus, Trash2, Copy, RefreshCw, Database } from 'lucide-react'
 
 interface StoragePool {
@@ -21,7 +21,7 @@ interface Volume {
 }
 
 export default function Storage() {
-  const [pools, setPools] = useState<StoragePool[]>([
+  const [pools] = useState<StoragePool[]>([
     {
       name: 'default',
       path: '/var/lib/vmspawnd/images',
@@ -42,7 +42,7 @@ export default function Storage() {
     },
   ])
 
-  const [volumes, setVolumes] = useState<Volume[]>([
+  const [volumes] = useState<Volume[]>([
     { name: 'web-01.qcow2', pool: 'default', size: 20, format: 'qcow2', vm: 'web-01', snapshots: 2 },
     { name: 'db-01.qcow2', pool: 'default', size: 50, format: 'qcow2', vm: 'db-01', snapshots: 1 },
     { name: 'test-vm.qcow2', pool: 'ssd-pool', size: 30, format: 'qcow2', vm: 'test-vm', snapshots: 0 },

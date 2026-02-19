@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Network as NetworkIcon, Plus, Edit, Trash2, Activity } from 'lucide-react'
 
 interface NetworkBridge {
@@ -17,13 +17,13 @@ interface VLAN {
 }
 
 export default function Network() {
-  const [bridges, setBridges] = useState<NetworkBridge[]>([
+  const [bridges] = useState<NetworkBridge[]>([
     { name: 'br0', ip: '192.168.100.1/24', status: 'UP', type: 'bridge', vms: 5 },
     { name: 'br1', ip: '192.168.200.1/24', status: 'UP', type: 'bridge', vms: 3 },
     { name: 'virbr0', ip: '192.168.122.1/24', status: 'UP', type: 'nat', vms: 2 },
   ])
 
-  const [vlans, setVLANs] = useState<VLAN[]>([
+  const [vlans] = useState<VLAN[]>([
     { id: 100, name: 'vlan100', bridge: 'br0', vms: 2 },
     { id: 200, name: 'vlan200', bridge: 'br0', vms: 3 },
     { id: 300, name: 'vlan300', bridge: 'br1', vms: 1 },

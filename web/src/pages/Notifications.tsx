@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, Plus, Edit, Trash2, Power, PowerOff, Send, Mail, MessageSquare, Webhook } from 'lucide-react'
+import { Bell, Plus, Trash2, Power, PowerOff, Send, Mail, MessageSquare, Webhook } from 'lucide-react'
 import {
   listChannels,
   listRules,
@@ -12,7 +12,6 @@ import {
   NotificationChannel,
   NotificationRule,
   NotificationHistory,
-  EVENT_TYPES
 } from '../api/notifications'
 import { useToastContext } from '../contexts/ToastContext'
 

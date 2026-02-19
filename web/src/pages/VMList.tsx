@@ -41,7 +41,7 @@ export default function VMList() {
 
     const matchesTags =
       selectedTags.length === 0 ||
-      (vm.tags && selectedTags.every(tag => vm.tags.includes(tag)))
+      (vm.tags && selectedTags.every(tag => vm.tags!.includes(tag)))
 
     return matchesSearch && matchesTags
   })

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { listVMs, getMetrics, VM, VMMetrics } from '../api/vm'
-import { Activity, Cpu, HardDrive, Server, TrendingUp } from 'lucide-react'
+import { Activity, Cpu, HardDrive, Server } from 'lucide-react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
 import { SkeletonDashboard } from '../components/Skeleton'

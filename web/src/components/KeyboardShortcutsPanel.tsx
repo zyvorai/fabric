@@ -30,7 +30,7 @@ const shortcuts: Shortcut[] = [
 export default function KeyboardShortcutsPanel() {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
-  const [pressedKeys, setPressedKeys] = useState<string[]>([])
+  const [, setPressedKeys] = useState<string[]>([])
 
   const handleNavigation = useCallback(
     (path: string) => {
