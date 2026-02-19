@@ -119,6 +119,9 @@ impl Cli {
                     image,
                     cpus,
                     memory,
+                    disk: 20, // Default 20GB
+                    hostname: None,
+                    tags: None,
                 };
 
                 client

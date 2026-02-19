@@ -3,7 +3,7 @@ use std::process::Command;
 use vm_model::{CreateVMRequest, VM, VMMetrics, VMState};
 
 pub fn create_vm(req: &CreateVMRequest) -> Result<VM> {
-    let vm = VM::new(req.name.clone(), req.image.clone(), req.cpus, req.memory);
+    let vm = VM::from_request(req);
     Ok(vm)
 }
 

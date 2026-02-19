@@ -443,23 +443,23 @@ async fn calculate_quota_usage(state: &AppState, quota: &mut ResourceQuota) {
 
     // Calculate usage from VMs matching this quota
     for vm in vms {
-        // For now, match all VMs to this quota since VM struct doesn't have tags yet
-        // TODO: Add tags field to VM struct for tag-based quota matching
-        let matches = if quota.tags.is_none() {
-            // Quota has no tags - applies to all VMs
-            true
+        // Check if VM matches this quota's tags
+        let matches = if let Some(quota_tags) = &quota.tags {
+            // Quota has tags - check if VM has matching tags
+            if let Some(vm_tags) = &vm.tags {
+                vm_tags.iter().any(|tag| quota_tags.contains(tag))
+            } else {
+                false // VM has no tags, doesn't match tag-based quota
+            }
         } else {
-            // Quota has tags but VMs don't support tags yet
-            // Apply to all VMs for now
+            // Quota has no tags - applies to all VMs
             true
         };
 
         if matches {
             quota.used_cpus += vm.cpus;
             quota.used_memory += vm.memory;
-            // TODO: VM struct doesn't have disk field yet - estimate based on memory
-            // Assume 2GB disk per 1GB RAM as a rough estimate
-            quota.used_disk += (vm.memory / 1024) * 2;
+            quota.used_disk += vm.disk;
             quota.used_vms += 1;
         }
     }
