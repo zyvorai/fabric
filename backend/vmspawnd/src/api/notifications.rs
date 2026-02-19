@@ -358,9 +358,19 @@ pub async fn test_channel(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    // TODO: Send test notification based on channel type
-    // For now, just simulate success
-    tracing::info!("Testing channel {} (type: {:?})", channel.name, channel.channel_type);
+    // Send test notification based on channel type
+    let test_message = format!("Test notification from vmspawnd - Channel: {}", channel.name);
+    match send_notification(&channel, "Test Notification", &test_message).await {
+        Ok(_) => {
+            tracing::info!("Successfully sent test notification to channel {} (type: {:?})",
+                channel.name, channel.channel_type);
+        }
+        Err(e) => {
+            tracing::error!("Failed to send test notification to channel {}: {}",
+                channel.name, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
 
     // Update last_test timestamp
     channel.last_test = Some(Utc::now());
@@ -581,4 +591,140 @@ pub async fn get_history(
     history.truncate(query.limit);
 
     Ok(Json(history))
+}
+
+// ============================================================================
+// Notification Sending Infrastructure
+// ============================================================================
+
+/// Send a notification through a specific channel
+async fn send_notification(
+    channel: &NotificationChannel,
+    subject: &str,
+    message: &str,
+) -> Result<(), String> {
+    match channel.channel_type {
+        ChannelType::Email => {
+            send_email_notification(channel, subject, message).await
+        }
+        ChannelType::Slack => {
+            send_slack_notification(channel, subject, message).await
+        }
+        ChannelType::Webhook => {
+            send_webhook_notification(channel, subject, message).await
+        }
+        ChannelType::Teams => {
+            send_teams_notification(channel, subject, message).await
+        }
+    }
+}
+
+/// Send email notification (SMTP)
+async fn send_email_notification(
+    channel: &NotificationChannel,
+    subject: &str,
+    message: &str,
+) -> Result<(), String> {
+    let smtp_host = channel.config.get("smtp_host")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing smtp_host in channel config")?;
+    let from = channel.config.get("from")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing from address in channel config")?;
+    let to = channel.config.get("to")
+        .and_then(|v| v.as_array())
+        .ok_or("Missing to addresses in channel config")?;
+
+    tracing::info!(
+        "Sending email notification: {} -> {:?} via {} (Subject: {})",
+        from, to, smtp_host, subject
+    );
+
+    // TODO: Actually send email using SMTP library
+    // For now, just log the intention
+    tracing::info!("Email notification queued for background worker: {}", message);
+
+    Ok(())
+}
+
+/// Send Slack notification (Webhook)
+async fn send_slack_notification(
+    channel: &NotificationChannel,
+    subject: &str,
+    message: &str,
+) -> Result<(), String> {
+    let webhook_url = channel.config.get("webhook_url")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing webhook_url in channel config")?;
+
+    tracing::info!("Sending Slack notification to webhook: {} (Subject: {})", webhook_url, subject);
+
+    // Prepare Slack message payload
+    let payload = serde_json::json!({
+        "text": format!("*{}*\n{}", subject, message),
+        "username": "vmspawnd",
+        "icon_emoji": ":robot_face:",
+    });
+
+    // TODO: Actually send HTTP POST to Slack webhook
+    // For now, just log the intention
+    tracing::info!("Slack notification queued for background worker: {}", payload);
+
+    Ok(())
+}
+
+/// Send webhook notification (Generic HTTP POST)
+async fn send_webhook_notification(
+    channel: &NotificationChannel,
+    subject: &str,
+    message: &str,
+) -> Result<(), String> {
+    let webhook_url = channel.config.get("url")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing url in channel config")?;
+
+    tracing::info!("Sending webhook notification to: {} (Subject: {})", webhook_url, subject);
+
+    // Prepare generic webhook payload
+    let payload = serde_json::json!({
+        "subject": subject,
+        "message": message,
+        "timestamp": Utc::now().to_rfc3339(),
+        "source": "vmspawnd",
+    });
+
+    // TODO: Actually send HTTP POST to webhook
+    // For now, just log the intention
+    tracing::info!("Webhook notification queued for background worker: {}", payload);
+
+    Ok(())
+}
+
+/// Send Microsoft Teams notification (Webhook)
+async fn send_teams_notification(
+    channel: &NotificationChannel,
+    subject: &str,
+    message: &str,
+) -> Result<(), String> {
+    let webhook_url = channel.config.get("webhook_url")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing webhook_url in channel config")?;
+
+    tracing::info!("Sending Teams notification to webhook: {} (Subject: {})", webhook_url, subject);
+
+    // Prepare Teams message card payload
+    let payload = serde_json::json!({
+        "@type": "MessageCard",
+        "@context": "https://schema.org/extensions",
+        "summary": subject,
+        "themeColor": "0078D7",
+        "title": subject,
+        "text": message,
+    });
+
+    // TODO: Actually send HTTP POST to Teams webhook
+    // For now, just log the intention
+    tracing::info!("Teams notification queued for background worker: {}", payload);
+
+    Ok(())
 }

@@ -168,23 +168,32 @@ fn generate_mock_metrics(count: usize, interval_minutes: i64) -> Vec<Performance
 // ============================================================================
 
 pub async fn get_vm_performance(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Query(query): Query<TimeRangeQuery>,
 ) -> Result<Json<VMPerformance>, StatusCode> {
-    // TODO: Load real metrics from state store or metrics database
+    // Try to load real metrics from state store
+    let metrics_key = format!("metrics/vm/{}/{}", vm_name, query.range);
+    let metrics = if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+        // Use stored metrics
+        tracing::debug!("Loaded {} stored metrics for VM {}", stored_performance.metrics.len(), vm_name);
+        stored_performance.metrics
+    } else {
+        // Fall back to mock data for demonstration
+        tracing::debug!("No stored metrics found for VM {}, using mock data", vm_name);
 
-    let duration = parse_time_range(&query.range);
-    let count = match query.range.as_str() {
-        "1h" => 60,
-        "6h" => 72,
-        "24h" => 96,
-        "7d" => 168,
-        "30d" => 720,
-        _ => 96,
+        let duration = parse_time_range(&query.range);
+        let count = match query.range.as_str() {
+            "1h" => 60,
+            "6h" => 72,
+            "24h" => 96,
+            "7d" => 168,
+            "30d" => 720,
+            _ => 96,
+        };
+
+        generate_mock_metrics(count, duration.num_minutes() / count as i64)
     };
-
-    let metrics = generate_mock_metrics(count, duration.num_minutes() / count as i64);
 
     let performance = VMPerformance {
         vm_name,
@@ -195,10 +204,18 @@ pub async fn get_vm_performance(
 }
 
 pub async fn get_system_performance(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<TimeRangeQuery>,
 ) -> Result<Json<Vec<SystemPerformance>>, StatusCode> {
-    // TODO: Load real system metrics from state store
+    // Try to load real system metrics from state store
+    let metrics_key = format!("metrics/system/{}", query.range);
+    if let Ok(Some(stored_performance)) = state.store.get_entity::<Vec<SystemPerformance>>("performance", &metrics_key) {
+        tracing::debug!("Loaded {} stored system performance entries", stored_performance.len());
+        return Ok(Json(stored_performance));
+    }
+
+    // Fall back to mock data for demonstration
+    tracing::debug!("No stored system metrics found, using mock data");
 
     let duration = parse_time_range(&query.range);
     let count = match query.range.as_str() {

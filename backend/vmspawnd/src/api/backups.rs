@@ -232,7 +232,20 @@ pub async fn create_backup(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupRequest>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
-    // TODO: Validate VM exists (check with VM API)
+    // Validate VM exists
+    match state.store.get_vm(&req.vm_name) {
+        Ok(Some(_)) => {
+            // VM exists, proceed
+        }
+        Ok(None) => {
+            tracing::warn!("Cannot create backup: VM '{}' not found", req.vm_name);
+            return Err(StatusCode::NOT_FOUND);
+        }
+        Err(e) => {
+            tracing::error!("Failed to check VM existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
 
     // Create backup job
     let job = BackupJob {
@@ -263,11 +276,35 @@ pub async fn delete_backup(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove actual backup files from storage
+    // Get backup info before deleting (need storage_location)
+    let backup = match state.store.get_entity::<Backup>("backups", &id) {
+        Ok(Some(b)) => b,
+        Ok(None) => {
+            tracing::warn!("Backup {} not found", id);
+            return Err(StatusCode::NOT_FOUND);
+        }
+        Err(e) => {
+            tracing::error!("Failed to load backup: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Remove actual backup files from storage
+    let storage_path = std::path::Path::new(&backup.storage_location);
+    if storage_path.exists() {
+        if let Err(e) = std::fs::remove_file(storage_path) {
+            tracing::error!("Failed to delete backup file {}: {}", backup.storage_location, e);
+            // Don't fail the request if file deletion fails - continue to remove from state store
+        } else {
+            tracing::info!("Deleted backup file: {}", backup.storage_location);
+        }
+    } else {
+        tracing::warn!("Backup file not found: {}", backup.storage_location);
+    }
 
     // Remove from state store
     if let Err(e) = state.store.delete_entity("backups", &id) {
-        tracing::error!("Failed to delete backup: {}", e);
+        tracing::error!("Failed to delete backup from state store: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 

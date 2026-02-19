@@ -456,16 +456,91 @@ pub async fn get_all_quota_usage(
 
 /// Check if creating a new VM would exceed quota
 pub async fn check_quota_enforcement(
-    _state: &AppState,
-    _cpus: u32,
-    _memory: u64,
-    _disk: u64,
-    _tags: &[String],
+    state: &AppState,
+    cpus: u32,
+    memory: u64,
+    disk: u64,
+    tags: &[String],
 ) -> Result<(), String> {
-    // TODO: Implement actual quota enforcement
-    // 1. Find all quotas that apply to the given tags
-    // 2. Check if adding the requested resources would exceed any quota
-    // 3. Return error if any quota would be exceeded
+    // Load all enabled quotas
+    let quotas = state.store.list_entities::<ResourceQuota>("quotas")
+        .unwrap_or_default();
+
+    let enabled_quotas: Vec<ResourceQuota> = quotas
+        .into_iter()
+        .filter(|q| q.enabled)
+        .collect();
+
+    // Find quotas that apply to the given tags
+    let mut applicable_quotas = Vec::new();
+
+    for quota in enabled_quotas {
+        if let Some(quota_tags) = &quota.tags {
+            // Check if any of the VM's tags match the quota's tags
+            if tags.iter().any(|tag| quota_tags.contains(tag)) {
+                applicable_quotas.push(quota);
+            }
+        } else {
+            // Quota with no tags applies to all VMs
+            applicable_quotas.push(quota);
+        }
+    }
+
+    // Check each applicable quota
+    for quota in applicable_quotas {
+        let mut violations = Vec::new();
+
+        // Check CPU quota
+        if quota.used_cpus + cpus > quota.max_cpus {
+            violations.push(format!(
+                "CPU quota exceeded: would use {} CPUs but limit is {} (current: {})",
+                quota.used_cpus + cpus,
+                quota.max_cpus,
+                quota.used_cpus
+            ));
+        }
+
+        // Check memory quota
+        if quota.used_memory + memory > quota.max_memory {
+            violations.push(format!(
+                "Memory quota exceeded: would use {} MB but limit is {} MB (current: {} MB)",
+                quota.used_memory + memory,
+                quota.max_memory,
+                quota.used_memory
+            ));
+        }
+
+        // Check disk quota
+        if quota.used_disk + disk > quota.max_disk {
+            violations.push(format!(
+                "Disk quota exceeded: would use {} GB but limit is {} GB (current: {} GB)",
+                quota.used_disk + disk,
+                quota.max_disk,
+                quota.used_disk
+            ));
+        }
+
+        // Check VM count quota
+        if quota.used_vms + 1 > quota.max_vms {
+            violations.push(format!(
+                "VM count quota exceeded: would have {} VMs but limit is {} (current: {})",
+                quota.used_vms + 1,
+                quota.max_vms,
+                quota.used_vms
+            ));
+        }
+
+        // If any violations, return error
+        if !violations.is_empty() {
+            let error_msg = format!(
+                "Quota '{}' would be exceeded:\n  - {}",
+                quota.name,
+                violations.join("\n  - ")
+            );
+            tracing::warn!("{}", error_msg);
+            return Err(error_msg);
+        }
+    }
 
     Ok(())
 }
