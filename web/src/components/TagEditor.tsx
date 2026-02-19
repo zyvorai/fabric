@@ -52,7 +52,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
       toast.success('Tags updated successfully')
       onSuccess()
       onClose()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update tags')
     } finally {
       setSaving(false)

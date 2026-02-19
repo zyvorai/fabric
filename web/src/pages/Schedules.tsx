@@ -25,6 +25,7 @@ export default function Schedules() {
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadData = async () => {
@@ -50,7 +51,7 @@ export default function Schedules() {
       await deleteSchedule(id)
       toast.success('Schedule deleted successfully')
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to delete schedule')
     }
   }
@@ -65,7 +66,7 @@ export default function Schedules() {
         toast.success('Schedule enabled')
       }
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to ${schedule.enabled ? 'disable' : 'enable'} schedule`)
     }
   }
@@ -77,7 +78,7 @@ export default function Schedules() {
       await runScheduleNow(schedule.id)
       toast.success('Schedule executed successfully')
       setTimeout(loadData, 1000) // Refresh after execution
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to run schedule')
     }
   }

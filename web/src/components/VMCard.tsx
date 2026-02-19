@@ -23,7 +23,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
       await startVM(vm.name)
       toast.success(`VM '${vm.name}' started successfully`)
       onUpdate()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to start VM '${vm.name}'`)
     }
   }
@@ -33,7 +33,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
       await stopVM(vm.name)
       toast.success(`VM '${vm.name}' stopped successfully`)
       onUpdate()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to stop VM '${vm.name}'`)
     }
   }
@@ -48,7 +48,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
       await deleteVM(vm.name)
       toast.success(`VM '${vm.name}' deleted successfully`)
       onUpdate()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to delete VM '${vm.name}'`)
     }
   }

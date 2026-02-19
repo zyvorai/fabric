@@ -49,7 +49,7 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
       toast.success('Schedule updated successfully')
       onSuccess()
       onClose()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update schedule')
     } finally {
       setSaving(false)

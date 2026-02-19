@@ -27,6 +27,7 @@ export default function Notifications() {
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadData = async () => {
@@ -54,7 +55,7 @@ export default function Notifications() {
       await deleteChannel(id)
       toast.success('Channel deleted')
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to delete channel')
     }
   }
@@ -63,7 +64,7 @@ export default function Notifications() {
     try {
       await testChannel(id)
       toast.success(`Test notification sent to ${name}`)
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to send test notification')
     }
   }
@@ -75,7 +76,7 @@ export default function Notifications() {
       await deleteRule(id)
       toast.success('Rule deleted')
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to delete rule')
     }
   }
@@ -90,7 +91,7 @@ export default function Notifications() {
         toast.success('Rule enabled')
       }
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to ${rule.enabled ? 'disable' : 'enable'} rule`)
     }
   }

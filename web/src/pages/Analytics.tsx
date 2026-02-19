@@ -30,6 +30,7 @@ export default function Analytics() {
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange])
 
   const loadData = async () => {
@@ -67,7 +68,7 @@ export default function Analytics() {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
       toast.success(`Report exported as ${format.toUpperCase()}`)
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to export report')
     } finally {
       setExporting(false)

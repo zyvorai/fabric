@@ -41,7 +41,7 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
       toast.success('Quota created successfully')
       onSuccess()
       onClose()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to create quota')
     } finally {
       setCreating(false)

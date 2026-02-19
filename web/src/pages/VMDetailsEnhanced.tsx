@@ -25,6 +25,7 @@ export default function VMDetailsEnhanced() {
       const interval = setInterval(loadVM, 5000)
       return () => clearInterval(interval)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name])
 
   const loadVM = async () => {
@@ -45,7 +46,7 @@ export default function VMDetailsEnhanced() {
       await startVM(name)
       toast.success(`VM '${name}' started successfully`)
       loadVM()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to start VM '${name}'`)
     }
   }
@@ -56,7 +57,7 @@ export default function VMDetailsEnhanced() {
       await stopVM(name)
       toast.success(`VM '${name}' stopped successfully`)
       loadVM()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to stop VM '${name}'`)
     }
   }
@@ -67,7 +68,7 @@ export default function VMDetailsEnhanced() {
       await restartVM(name)
       toast.success(`VM '${name}' restarted successfully`)
       loadVM()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to restart VM '${name}'`)
     }
   }
@@ -84,7 +85,7 @@ export default function VMDetailsEnhanced() {
       await deleteVM(name)
       toast.success(`VM '${name}' deleted successfully`)
       navigate('/vms')
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to delete VM '${name}'`)
     }
   }
@@ -288,7 +289,7 @@ function OverviewTab({ vm }: { vm: VM }) {
   )
 }
 
-function MetricsTab({ vm: _vm }: { vm: VM }) {
+function MetricsTab(_: { vm: VM }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -317,7 +318,7 @@ function MetricsTab({ vm: _vm }: { vm: VM }) {
   )
 }
 
-function DisksTab({ vm: _vm }: { vm: VM }) {
+function DisksTab(_: { vm: VM }) {
   const disks = [
     { name: 'vda', path: '/var/lib/vmspawnd/images/vm1.qcow2', size: '20 GB', format: 'qcow2' },
   ]
@@ -354,7 +355,7 @@ function DisksTab({ vm: _vm }: { vm: VM }) {
   )
 }
 
-function NetworkTab({ vm: _vm }: { vm: VM }) {
+function NetworkTab(_: { vm: VM }) {
   const interfaces = [
     { name: 'eth0', mac: '52:54:00:12:34:56', ip: '192.168.100.10', bridge: 'br0', state: 'UP' },
   ]
@@ -394,7 +395,7 @@ function NetworkTab({ vm: _vm }: { vm: VM }) {
   )
 }
 
-function SnapshotsTab({ vm: _vm }: { vm: VM }) {
+function SnapshotsTab(_: { vm: VM }) {
   const snapshots = [
     { name: 'before-update', created: '2024-02-18 10:30:00', size: '2.5 GB' },
     { name: 'initial', created: '2024-02-15 14:30:00', size: '1.8 GB' },
@@ -446,7 +447,7 @@ function SnapshotsTab({ vm: _vm }: { vm: VM }) {
   )
 }
 
-function LogsTab({ vm: _vm }: { vm: VM }) {
+function LogsTab(_: { vm: VM }) {
   const logs = [
     { time: '14:35:22', level: 'INFO', message: 'VM started successfully' },
     { time: '14:35:15', level: 'INFO', message: 'Initializing network interface eth0' },

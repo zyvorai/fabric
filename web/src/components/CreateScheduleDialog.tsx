@@ -73,7 +73,7 @@ export default function CreateScheduleDialog({ onClose, onSuccess }: CreateSched
       toast.success('Schedule created successfully')
       onSuccess()
       onClose()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to create schedule')
     } finally {
       setCreating(false)

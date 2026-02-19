@@ -41,7 +41,7 @@ export default function EditQuotaDialog({ quota, onClose, onSuccess }: EditQuota
       toast.success('Quota updated successfully')
       onSuccess()
       onClose()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update quota')
     } finally {
       setSaving(false)

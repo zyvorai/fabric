@@ -60,7 +60,7 @@ export default function Backups() {
       toast.success('Backup job started')
       setShowCreateDialog(false)
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to create backup')
     }
   }
@@ -72,7 +72,7 @@ export default function Backups() {
       await deleteBackup(id)
       toast.success('Backup deleted')
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to delete backup')
     }
   }
@@ -91,7 +91,7 @@ export default function Backups() {
       toast.success('Restore job started')
       setShowRestoreDialog(null)
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to restore backup')
     }
   }

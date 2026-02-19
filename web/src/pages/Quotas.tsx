@@ -23,6 +23,7 @@ export default function Quotas() {
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadData = async () => {
@@ -48,7 +49,7 @@ export default function Quotas() {
       await deleteQuota(id)
       toast.success('Quota deleted successfully')
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to delete quota')
     }
   }
@@ -63,7 +64,7 @@ export default function Quotas() {
         toast.success('Quota enabled')
       }
       loadData()
-    } catch (error) {
+    } catch (_error) {
       toast.error(`Failed to ${quota.enabled ? 'disable' : 'enable'} quota`)
     }
   }

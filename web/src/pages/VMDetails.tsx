@@ -15,6 +15,7 @@ export default function VMDetails() {
       const interval = setInterval(loadVM, 5000)
       return () => clearInterval(interval)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name])
 
   const loadVM = async () => {

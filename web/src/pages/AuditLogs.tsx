@@ -22,6 +22,7 @@ export default function AuditLogs() {
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters])
 
   const loadData = async () => {
@@ -62,7 +63,7 @@ export default function AuditLogs() {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
       toast.success(`Audit logs exported as ${format.toUpperCase()}`)
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to export audit logs')
     } finally {
       setExporting(false)

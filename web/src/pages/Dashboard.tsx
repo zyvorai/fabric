@@ -87,7 +87,7 @@ export default function Dashboard() {
         const data = await res.json()
         setActivityFeed(data)
       }
-    } catch (error) {
+    } catch (_error) {
       // Audit logs may not be available, fall back silently
     }
   }, [])

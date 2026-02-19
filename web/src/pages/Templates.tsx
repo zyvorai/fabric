@@ -33,7 +33,7 @@ export default function Templates() {
         await deleteTemplate(name)
         toast.success(`Template '${name}' deleted successfully`)
         loadTemplates()
-      } catch (error) {
+      } catch (_error) {
         toast.error(`Failed to delete template '${name}'`)
       }
     }
