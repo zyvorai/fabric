@@ -27,6 +27,7 @@ reqwest = { version = "0.12", features = ["json"] }
 lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
 
 vm-model = { path = "../vm-model" }
+security = { path = "../security" }
 state-store = { path = "../state-store" }
 vmspawn-driver = { path = "../vmspawn-driver" }
 systemd-driver = { path = "../systemd-driver" }

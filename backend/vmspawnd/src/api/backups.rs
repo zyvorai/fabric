@@ -266,24 +266,37 @@ pub async fn create_backup(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // Start backup process in background worker
+    // Start backup process in supervised background worker
     let job_id = job.id.clone();
     let vm_name = req.vm_name.clone();
     let state_clone = state.clone();
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         tracing::info!("Starting backup job {} for VM {} in background", job_id, vm_name);
 
         let state_ref = state_clone.clone();
         if let Err(e) = process_backup_job(state_clone, job_id.clone(), vm_name).await {
             tracing::error!("Backup job {} failed: {}", job_id, e);
-
-            // Update job status to failed
             if let Ok(Some(mut job)) = state_ref.store.get_entity::<BackupJob>("backup_jobs", &job_id) {
                 job.status = JobStatus::Failed;
                 job.error = Some(e.to_string());
                 job.completed_at = Some(Utc::now());
                 let _ = state_ref.store.save_entity("backup_jobs", &job_id, &job);
+            }
+        }
+    });
+
+    // Monitor the spawned task for panics
+    let job_id_monitor = job.id.clone();
+    let state_monitor = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = handle.await {
+            tracing::error!("Backup worker for job {} panicked: {}", job_id_monitor, e);
+            if let Ok(Some(mut job)) = state_monitor.store.get_entity::<BackupJob>("backup_jobs", &job_id_monitor) {
+                job.status = JobStatus::Failed;
+                job.error = Some("Internal error: worker panicked".to_string());
+                job.completed_at = Some(Utc::now());
+                let _ = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job);
             }
         }
     });
@@ -363,25 +376,38 @@ pub async fn restore_backup(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // Start restore process in background worker
+    // Start restore process in supervised background worker
     let job_id = job.id.clone();
     let backup_id = req.backup_id.clone();
     let target_vm_clone = target_vm.clone();
     let state_clone = state.clone();
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         tracing::info!("Starting restore job {} from backup {} in background", job_id, backup_id);
 
         let state_ref = state_clone.clone();
         if let Err(e) = process_restore_job(state_clone, job_id.clone(), backup_id, target_vm_clone).await {
             tracing::error!("Restore job {} failed: {}", job_id, e);
-
-            // Update job status to failed
             if let Ok(Some(mut job)) = state_ref.store.get_entity::<BackupJob>("backup_jobs", &job_id) {
                 job.status = JobStatus::Failed;
                 job.error = Some(e.to_string());
                 job.completed_at = Some(Utc::now());
                 let _ = state_ref.store.save_entity("backup_jobs", &job_id, &job);
+            }
+        }
+    });
+
+    // Monitor the spawned task for panics
+    let job_id_monitor = job.id.clone();
+    let state_monitor = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = handle.await {
+            tracing::error!("Restore worker for job {} panicked: {}", job_id_monitor, e);
+            if let Ok(Some(mut job)) = state_monitor.store.get_entity::<BackupJob>("backup_jobs", &job_id_monitor) {
+                job.status = JobStatus::Failed;
+                job.error = Some("Internal error: worker panicked".to_string());
+                job.completed_at = Some(Utc::now());
+                let _ = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job);
             }
         }
     });

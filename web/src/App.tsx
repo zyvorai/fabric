@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import Navbar from './components/Navbar'
 import KeyboardShortcutsPanel from './components/KeyboardShortcutsPanel'
 import CommandPalette from './components/CommandPalette'
@@ -22,6 +23,7 @@ import Backups from './pages/Backups'
 import Notifications from './pages/Notifications'
 import StoragePools from './pages/StoragePools'
 import SystemResources from './pages/SystemResources'
+import NotFound from './pages/NotFound'
 
 function App() {
   return (
@@ -33,26 +35,29 @@ function App() {
           <KeyboardShortcutsPanel />
           <CommandPalette />
           <main className="container mx-auto px-4 py-8">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/vms" element={<VMList />} />
-              <Route path="/vms/:name" element={<VMDetails />} />
-              <Route path="/vms/:name/console" element={<Console />} />
-              <Route path="/create" element={<CreateVM />} />
-              <Route path="/logs" element={<Logs />} />
-              <Route path="/network" element={<Network />} />
-              <Route path="/storage" element={<Storage />} />
-              <Route path="/templates" element={<Templates />} />
-              <Route path="/quotas" element={<Quotas />} />
-              <Route path="/schedules" element={<Schedules />} />
-              <Route path="/audit" element={<AuditLogs />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/backups" element={<Backups />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/storage-pools" element={<StoragePools />} />
-              <Route path="/system" element={<SystemResources />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/vms" element={<VMList />} />
+                <Route path="/vms/:name" element={<VMDetails />} />
+                <Route path="/vms/:name/console" element={<Console />} />
+                <Route path="/create" element={<CreateVM />} />
+                <Route path="/logs" element={<Logs />} />
+                <Route path="/network" element={<Network />} />
+                <Route path="/storage" element={<Storage />} />
+                <Route path="/templates" element={<Templates />} />
+                <Route path="/quotas" element={<Quotas />} />
+                <Route path="/schedules" element={<Schedules />} />
+                <Route path="/audit" element={<AuditLogs />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/backups" element={<Backups />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/storage-pools" element={<StoragePools />} />
+                <Route path="/system" element={<SystemResources />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
           </main>
         </div>
         </BrowserRouter>

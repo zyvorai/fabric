@@ -6,7 +6,7 @@ use axum::{
 use state_store::StateStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use vmspawnd_storage::StorageManager;
 
@@ -16,6 +16,26 @@ pub struct AppState {
     pub store: StateStore,
     pub config: Config,
     pub storage_manager: Arc<RwLock<StorageManager>>,
+    pub http_client: reqwest::Client,
+    pub quota_cache: Arc<std::sync::RwLock<QuotaCache>>,
+}
+
+pub struct QuotaCache {
+    pub usage: std::collections::HashMap<String, crate::api::quotas::QuotaUsage>,
+    pub last_updated: std::time::Instant,
+}
+
+impl QuotaCache {
+    pub fn new() -> Self {
+        Self {
+            usage: std::collections::HashMap::new(),
+            last_updated: std::time::Instant::now(),
+        }
+    }
+
+    pub fn is_stale(&self) -> bool {
+        self.last_updated.elapsed() > std::time::Duration::from_secs(30)
+    }
 }
 
 pub struct Server {
@@ -29,20 +49,47 @@ impl Server {
         let storage_manager = StorageManager::new(&storage_path)
             .map_err(|e| anyhow::anyhow!("Failed to initialize storage manager: {}", e))?;
 
+        let http_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(10)
+            .build()
+            .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
+
         let state = Arc::new(AppState {
             store,
             config,
             storage_manager: Arc::new(RwLock::new(storage_manager)),
+            http_client,
+            quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
         });
 
         Ok(Self { state })
     }
 
     pub async fn run(self) -> Result<()> {
-        let cors = CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods(Any)
-            .allow_headers(Any);
+        let cors = {
+            use axum::http::{HeaderValue, Method, header};
+
+            let origins: Vec<HeaderValue> = self
+                .state
+                .config
+                .daemon
+                .cors_origins
+                .iter()
+                .filter_map(|o| o.parse::<HeaderValue>().ok())
+                .collect();
+
+            CorsLayer::new()
+                .allow_origin(origins)
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::DELETE,
+                    Method::OPTIONS,
+                ])
+                .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+        };
 
         let api_routes = Router::new()
             // VM management routes
@@ -147,6 +194,8 @@ impl Server {
             .route("/backups/policies/:id/enable", post(api::backups::enable_backup_policy))
             .route("/backups/policies/:id/disable", post(api::backups::disable_backup_policy))
             .route("/backups/stats", get(api::backups::get_backup_stats))
+            // Settings routes
+            .route("/settings", get(api::settings::get_settings).put(api::settings::update_settings))
             .with_state(self.state.clone());
 
         let ws_routes = Router::new()
@@ -167,8 +216,115 @@ impl Server {
 
         tracing::info!("Listening on {}", addr);
 
+        // Start background scheduler for automated schedule execution
+        let scheduler_state = self.state.clone();
+        tokio::spawn(async move {
+            run_schedule_checker(scheduler_state).await;
+        });
+
         axum::serve(listener, app).await?;
 
         Ok(())
+    }
+}
+
+/// Background task that checks and executes due schedules every 30 seconds
+async fn run_schedule_checker(state: Arc<AppState>) {
+    use crate::api::schedules::{Schedule, ScheduleHistory, ExecutionStatus};
+    use chrono::Utc;
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(5)); // max 5 concurrent schedule executions
+
+    loop {
+        interval.tick().await;
+
+        let schedules = match state.store.list_entities::<Schedule>("schedules") {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("Schedule checker: failed to load schedules: {}", e);
+                continue;
+            }
+        };
+
+        let now = Utc::now();
+
+        for schedule in schedules {
+            if !schedule.enabled {
+                continue;
+            }
+
+            let should_run = match schedule.next_run {
+                Some(next_run) => next_run <= now,
+                None => false,
+            };
+
+            if !should_run {
+                continue;
+            }
+
+            let permit = match semaphore.clone().try_acquire_owned() {
+                Ok(p) => p,
+                Err(_) => {
+                    tracing::warn!("Schedule checker: too many concurrent executions, skipping '{}'", schedule.name);
+                    continue;
+                }
+            };
+
+            let state_clone = state.clone();
+            let schedule_clone = schedule.clone();
+
+            tokio::spawn(async move {
+                let _permit = permit;
+                tracing::info!("Auto-executing schedule '{}': {:?} on VM '{}'",
+                    schedule_clone.name, schedule_clone.action, schedule_clone.vm_name);
+
+                let result = match schedule_clone.action {
+                    crate::api::schedules::VMAction::Start => vmspawn_driver::start_vm(&schedule_clone.vm_name),
+                    crate::api::schedules::VMAction::Stop => vmspawn_driver::stop_vm(&schedule_clone.vm_name),
+                    crate::api::schedules::VMAction::Restart => vmspawn_driver::restart_vm(&schedule_clone.vm_name),
+                    crate::api::schedules::VMAction::Snapshot => {
+                        tracing::warn!("Snapshot action not implemented");
+                        Ok(())
+                    }
+                };
+
+                let executed_at = Utc::now();
+                let (success, error) = match result {
+                    Ok(_) => (true, None),
+                    Err(e) => (false, Some(e.to_string())),
+                };
+
+                // Update schedule's last_run and recalculate next_run
+                if let Ok(Some(mut sched)) = state_clone.store.get_entity::<Schedule>("schedules", &schedule_clone.id) {
+                    sched.last_run = Some(executed_at);
+                    sched.next_run = crate::api::schedules::calculate_next_run_pub(
+                        &sched.schedule_type, &sched.time, &sched.days_of_week
+                    );
+                    let _ = state_clone.store.save_entity("schedules", &sched.id, &sched);
+                }
+
+                // Record history
+                let action_str = match schedule_clone.action {
+                    crate::api::schedules::VMAction::Start => "start",
+                    crate::api::schedules::VMAction::Stop => "stop",
+                    crate::api::schedules::VMAction::Restart => "restart",
+                    crate::api::schedules::VMAction::Snapshot => "snapshot",
+                };
+
+                let history = ScheduleHistory {
+                    schedule_id: schedule_clone.id.clone(),
+                    schedule_name: schedule_clone.name.clone(),
+                    vm_name: schedule_clone.vm_name.clone(),
+                    action: action_str.to_string(),
+                    executed_at,
+                    status: if success { ExecutionStatus::Success } else { ExecutionStatus::Failed },
+                    error,
+                };
+
+                let history_id = uuid::Uuid::new_v4().to_string();
+                let _ = state_clone.store.save_entity("schedule_history", &history_id, &history);
+            });
+        }
     }
 }

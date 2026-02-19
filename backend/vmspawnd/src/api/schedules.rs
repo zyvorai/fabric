@@ -152,6 +152,15 @@ fn validate_schedule(req: &CreateScheduleRequest) -> Result<(), String> {
 // Helper Functions
 // ============================================================================
 
+/// Public wrapper for background scheduler use
+pub fn calculate_next_run_pub(
+    schedule_type: &ScheduleType,
+    time: &str,
+    days_of_week: &Option<Vec<u8>>,
+) -> Option<DateTime<Utc>> {
+    calculate_next_run(schedule_type, time, days_of_week)
+}
+
 fn calculate_next_run(
     schedule_type: &ScheduleType,
     time: &str,

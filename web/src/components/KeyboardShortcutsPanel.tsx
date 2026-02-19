@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, Keyboard } from 'lucide-react'
 
 interface Shortcut {
@@ -23,11 +24,20 @@ const shortcuts: Shortcut[] = [
   // Actions
   { keys: ['r'], description: 'Refresh current page', category: 'Actions' },
   { keys: ['?'], description: 'Show/hide this help', category: 'Actions' },
+  { keys: ['Ctrl+K'], description: 'Open command palette', category: 'Actions' },
 ]
 
 export default function KeyboardShortcutsPanel() {
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [pressedKeys, setPressedKeys] = useState<string[]>([])
+
+  const handleNavigation = useCallback(
+    (path: string) => {
+      navigate(path)
+    },
+    [navigate]
+  )
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,7 +47,7 @@ export default function KeyboardShortcutsPanel() {
       }
 
       // Toggle panel with '?'
-      if (e.key === '?' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
         setIsOpen((prev) => !prev)
         return
@@ -58,33 +68,27 @@ export default function KeyboardShortcutsPanel() {
         if (newKeys.length === 2 && newKeys[0] === 'g') {
           switch (newKeys[1]) {
             case 'd':
-              window.location.href = '/'
+              handleNavigation('/')
               return []
             case 'v':
-              window.location.href = '/vms'
+              handleNavigation('/vms')
               return []
             case 'l':
-              window.location.href = '/logs'
+              handleNavigation('/logs')
               return []
             case 'n':
-              window.location.href = '/network'
+              handleNavigation('/network')
               return []
             case 's':
-              window.location.href = '/storage'
+              handleNavigation('/storage')
               return []
             case 'c':
-              window.location.href = '/create'
+              handleNavigation('/create')
               return []
           }
         }
 
         // Single key shortcuts
-        if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
-          e.preventDefault()
-          window.location.reload()
-          return []
-        }
-
         if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault()
           const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement
@@ -103,7 +107,7 @@ export default function KeyboardShortcutsPanel() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen])
+  }, [isOpen, handleNavigation])
 
   if (!isOpen) return null
 

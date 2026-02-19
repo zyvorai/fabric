@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { TrendingUp, AlertTriangle, Download, Clock, Activity } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import {
   getSystemPerformance,
   getPerformanceInsights,
@@ -328,17 +329,47 @@ export default function Analytics() {
           </h2>
           <p className="text-sm text-gray-400">{timeRange.toUpperCase()}</p>
         </div>
-        <div className="h-64 flex items-center justify-center bg-gray-900 rounded border border-gray-700">
-          <div className="text-center">
-            <Activity className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-            <p className="text-gray-500">
-              Performance chart visualization
-            </p>
-            <p className="text-xs text-gray-600 mt-1">
-              {systemPerf.length} data points collected
-            </p>
+        {systemPerf.length > 0 ? (
+          <ResponsiveContainer width="100%" height={256}>
+            <AreaChart data={systemPerf}>
+              <defs>
+                <linearGradient id="colorSysCpu" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorSysMem" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis
+                dataKey="timestamp"
+                stroke="#9ca3af"
+                fontSize={12}
+                tickFormatter={(v) => new Date(v).toLocaleTimeString()}
+              />
+              <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 100]} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1f2937',
+                  border: '1px solid #374151',
+                  borderRadius: '0.5rem',
+                }}
+                labelFormatter={(v) => new Date(v).toLocaleString()}
+              />
+              <Area type="monotone" dataKey="total_cpu_usage" name="CPU %" stroke="#3b82f6" fillOpacity={1} fill="url(#colorSysCpu)" />
+              <Area type="monotone" dataKey="total_memory_usage" name="Memory %" stroke="#a855f7" fillOpacity={1} fill="url(#colorSysMem)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-64 flex items-center justify-center bg-gray-900 rounded border border-gray-700">
+            <div className="text-center">
+              <Activity className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500">No performance data available</p>
+            </div>
           </div>
-        </div>
+        )}
         <div className="grid grid-cols-4 gap-4 mt-4 text-center text-sm">
           <div>
             <p className="text-gray-400">Avg CPU</p>

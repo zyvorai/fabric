@@ -14,14 +14,16 @@ pub struct StateStore {
 
 /// Generic entity storage helper
 impl StateStore {
-    /// Save any serializable entity to a subdirectory
+    /// Save any serializable entity to a subdirectory (atomic write)
     pub fn save_entity<T: Serialize>(&self, subdir: &str, id: &str, entity: &T) -> Result<()> {
         let dir = self.path.join(subdir);
         fs::create_dir_all(&dir)?;
 
         let file_path = dir.join(format!("{}.json", id));
+        let tmp_path = dir.join(format!("{}.json.tmp", id));
         let content = serde_json::to_string_pretty(entity)?;
-        fs::write(file_path, content)?;
+        fs::write(&tmp_path, content)?;
+        fs::rename(&tmp_path, &file_path)?;
 
         Ok(())
     }
@@ -104,8 +106,10 @@ impl StateStore {
         vms.insert(vm.name.clone(), vm.clone());
 
         let vm_file = self.path.join(format!("{}.json", vm.name));
+        let tmp_file = self.path.join(format!("{}.json.tmp", vm.name));
         let content = serde_json::to_string_pretty(vm)?;
-        fs::write(vm_file, content)?;
+        fs::write(&tmp_file, content)?;
+        fs::rename(&tmp_file, &vm_file)?;
 
         Ok(())
     }
@@ -130,5 +134,177 @@ impl StateStore {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn test_store() -> (StateStore, TempDir) {
+        let dir = TempDir::new().unwrap();
+        let store = StateStore::new(dir.path()).unwrap();
+        (store, dir)
+    }
+
+    #[test]
+    fn test_save_and_load_vm() {
+        let (store, _dir) = test_store();
+        let vm = VM::new("test-vm".to_string(), "ubuntu.img".to_string(), 2, 1024);
+
+        store.save_vm(&vm).unwrap();
+        let loaded = store.get_vm("test-vm").unwrap();
+        assert!(loaded.is_some());
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.name, "test-vm");
+        assert_eq!(loaded.cpus, 2);
+        assert_eq!(loaded.memory, 1024);
+    }
+
+    #[test]
+    fn test_list_vms() {
+        let (store, _dir) = test_store();
+        store.save_vm(&VM::new("vm1".to_string(), "img".to_string(), 1, 512)).unwrap();
+        store.save_vm(&VM::new("vm2".to_string(), "img".to_string(), 2, 1024)).unwrap();
+
+        let vms = store.list_vms().unwrap();
+        assert_eq!(vms.len(), 2);
+    }
+
+    #[test]
+    fn test_delete_vm() {
+        let (store, _dir) = test_store();
+        store.save_vm(&VM::new("to-delete".to_string(), "img".to_string(), 1, 512)).unwrap();
+        assert!(store.get_vm("to-delete").unwrap().is_some());
+
+        store.delete_vm("to-delete").unwrap();
+        assert!(store.get_vm("to-delete").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_get_nonexistent_vm() {
+        let (store, _dir) = test_store();
+        assert!(store.get_vm("nonexistent").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_atomic_write_creates_file() {
+        let (store, dir) = test_store();
+        let vm = VM::new("atomic-test".to_string(), "img".to_string(), 1, 512);
+        store.save_vm(&vm).unwrap();
+
+        let file = dir.path().join("atomic-test.json");
+        assert!(file.exists());
+        // Ensure no .tmp file remains
+        let tmp = dir.path().join("atomic-test.json.tmp");
+        assert!(!tmp.exists());
+    }
+
+    #[test]
+    fn test_save_and_load_entity() {
+        let (store, _dir) = test_store();
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+        struct TestEntity {
+            id: String,
+            value: i32,
+        }
+
+        let entity = TestEntity {
+            id: "test-1".to_string(),
+            value: 42,
+        };
+
+        store.save_entity("test_entities", "test-1", &entity).unwrap();
+        let loaded: Option<TestEntity> = store.get_entity("test_entities", "test-1").unwrap();
+        assert!(loaded.is_some());
+        assert_eq!(loaded.unwrap().value, 42);
+    }
+
+    #[test]
+    fn test_list_entities() {
+        let (store, _dir) = test_store();
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize)]
+        struct Item { name: String }
+
+        store.save_entity("items", "a", &Item { name: "alpha".to_string() }).unwrap();
+        store.save_entity("items", "b", &Item { name: "beta".to_string() }).unwrap();
+
+        let items: Vec<Item> = store.list_entities("items").unwrap();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn test_delete_entity() {
+        let (store, _dir) = test_store();
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize)]
+        struct Item { name: String }
+
+        store.save_entity("items", "x", &Item { name: "x".to_string() }).unwrap();
+        store.delete_entity("items", "x").unwrap();
+
+        let loaded: Option<Item> = store.get_entity("items", "x").unwrap();
+        assert!(loaded.is_none());
+    }
+
+    #[test]
+    fn test_corrupted_json_skipped() {
+        let (store, dir) = test_store();
+
+        // Write a valid entity
+        store.save_entity("test", "good", &serde_json::json!({"id": "good"})).unwrap();
+
+        // Write a corrupted file directly
+        let bad_path = dir.path().join("test").join("bad.json");
+        fs::write(&bad_path, "not valid json {{{").unwrap();
+
+        // list_entities should skip the bad file
+        let items: Vec<serde_json::Value> = store.list_entities("test").unwrap();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_concurrent_access() {
+        let (store, _dir) = test_store();
+        let store = Arc::new(store);
+
+        let mut handles = vec![];
+        for i in 0..10 {
+            let store = store.clone();
+            let handle = std::thread::spawn(move || {
+                let vm = VM::new(format!("vm-{}", i), "img".to_string(), 1, 512);
+                store.save_vm(&vm).unwrap();
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let vms = store.list_vms().unwrap();
+        assert_eq!(vms.len(), 10);
+    }
+
+    #[test]
+    fn test_persistence_across_instances() {
+        let dir = TempDir::new().unwrap();
+
+        // First instance writes
+        {
+            let store = StateStore::new(dir.path()).unwrap();
+            store.save_vm(&VM::new("persistent".to_string(), "img".to_string(), 4, 2048)).unwrap();
+        }
+
+        // Second instance reads
+        {
+            let store = StateStore::new(dir.path()).unwrap();
+            let vm = store.get_vm("persistent").unwrap();
+            assert!(vm.is_some());
+            assert_eq!(vm.unwrap().cpus, 4);
+        }
     }
 }

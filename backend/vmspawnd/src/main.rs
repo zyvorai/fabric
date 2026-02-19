@@ -3,6 +3,7 @@ mod config;
 mod daemon;
 mod routes;
 mod server;
+pub mod validation;
 mod websocket;
 
 use anyhow::Result;

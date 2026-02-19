@@ -4,6 +4,7 @@ import { Play, Square, Trash2, Terminal, Cpu, HardDrive, Copy, Tag } from 'lucid
 import { VM, startVM, stopVM, deleteVM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import CloneVMDialog from './CloneVMDialog'
+import ConfirmDialog from './ConfirmDialog'
 import TagEditor, { getTagColor } from './TagEditor'
 
 interface VMCardProps {
@@ -15,6 +16,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
   const toast = useToastContext()
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [showTagEditor, setShowTagEditor] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleStart = async () => {
     try {
@@ -37,14 +39,17 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
   }
 
   const handleDelete = async () => {
-    if (confirm(`Delete VM ${vm.name}?`)) {
-      try {
-        await deleteVM(vm.name)
-        toast.success(`VM '${vm.name}' deleted successfully`)
-        onUpdate()
-      } catch (error) {
-        toast.error(`Failed to delete VM '${vm.name}'`)
-      }
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false)
+    try {
+      await deleteVM(vm.name)
+      toast.success(`VM '${vm.name}' deleted successfully`)
+      onUpdate()
+    } catch (error) {
+      toast.error(`Failed to delete VM '${vm.name}'`)
     }
   }
 
@@ -160,6 +165,17 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
           currentTags={vm.tags || []}
           onClose={() => setShowTagEditor(false)}
           onSuccess={onUpdate}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Virtual Machine"
+          message={`Are you sure you want to delete VM '${vm.name}'? This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
     </div>

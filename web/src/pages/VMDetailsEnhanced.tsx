@@ -6,6 +6,7 @@ import {
   Network, Camera, Terminal, Cpu, Memory, Clock
 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs'
 
@@ -16,6 +17,7 @@ export default function VMDetailsEnhanced() {
   const [vm, setVM] = useState<VM | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (name) {
@@ -70,16 +72,20 @@ export default function VMDetailsEnhanced() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!name) return
-    if (confirm(`Delete VM ${name}? This action cannot be undone.`)) {
-      try {
-        await deleteVM(name)
-        toast.success(`VM '${name}' deleted successfully`)
-        navigate('/vms')
-      } catch (error) {
-        toast.error(`Failed to delete VM '${name}'`)
-      }
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!name) return
+    setShowDeleteConfirm(false)
+    try {
+      await deleteVM(name)
+      toast.success(`VM '${name}' deleted successfully`)
+      navigate('/vms')
+    } catch (error) {
+      toast.error(`Failed to delete VM '${name}'`)
     }
   }
 
@@ -203,6 +209,17 @@ export default function VMDetailsEnhanced() {
         {activeTab === 'snapshots' && <SnapshotsTab vm={vm} />}
         {activeTab === 'logs' && <LogsTab vm={vm} />}
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Virtual Machine"
+          message={`Are you sure you want to delete VM '${name}'? This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   )
 }

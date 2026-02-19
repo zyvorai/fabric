@@ -6,5 +6,6 @@ pub mod firmware;
 pub mod notifications;
 pub mod quotas;
 pub mod schedules;
+pub mod settings;
 pub mod storage;
 pub mod system;

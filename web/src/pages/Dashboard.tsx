@@ -1,35 +1,118 @@
-import { useEffect, useState } from 'react'
-import { listVMs, VM } from '../api/vm'
-import { Activity, Cpu, HardDrive, Network, Server, TrendingUp } from 'lucide-react'
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { useEffect, useState, useCallback } from 'react'
+import { listVMs, getMetrics, VM, VMMetrics } from '../api/vm'
+import { Activity, Cpu, HardDrive, Server, TrendingUp } from 'lucide-react'
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
+import { SkeletonDashboard } from '../components/Skeleton'
+import { Link } from 'react-router-dom'
+
+interface MetricsPoint {
+  time: string
+  cpu: number
+  memory: number
+}
+
+interface AuditEntry {
+  timestamp: string
+  action: string
+  resource: string
+  status: string
+  user_id: string
+}
 
 export default function Dashboard() {
   const [vms, setVMs] = useState<VM[]>([])
   const [loading, setLoading] = useState(true)
-  const [cpuData, setCpuData] = useState<any[]>([])
-  const [memoryData, setMemoryData] = useState<any[]>([])
+  const [metricsHistory, setMetricsHistory] = useState<MetricsPoint[]>([])
+  const [activityFeed, setActivityFeed] = useState<AuditEntry[]>([])
   const { subscribe, vmUpdates } = useWebSocketContext()
+
+  const loadVMs = useCallback(async () => {
+    try {
+      const data = await listVMs()
+      setVMs(data)
+    } catch (error) {
+      console.error('Failed to load VMs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      const currentVMs = await listVMs()
+      const runningVMs = currentVMs.filter((vm) => vm.state === 'running')
+
+      if (runningVMs.length === 0) {
+        setMetricsHistory((prev) => [
+          ...prev.slice(-19),
+          { time: new Date().toLocaleTimeString(), cpu: 0, memory: 0 },
+        ])
+        return
+      }
+
+      // Fetch real metrics from running VMs
+      const metricsResults = await Promise.allSettled(
+        runningVMs.map((vm) => getMetrics(vm.name))
+      )
+
+      const metrics = metricsResults
+        .filter((r): r is PromiseFulfilledResult<VMMetrics> => r.status === 'fulfilled')
+        .map((r) => r.value)
+
+      const avgCpu = metrics.length > 0
+        ? metrics.reduce((sum, m) => sum + m.cpu_usage, 0) / metrics.length
+        : 0
+      const avgMemory = metrics.length > 0
+        ? metrics.reduce((sum, m) => sum + m.memory_usage, 0) / metrics.length
+        : 0
+
+      setMetricsHistory((prev) => [
+        ...prev.slice(-19),
+        {
+          time: new Date().toLocaleTimeString(),
+          cpu: parseFloat(avgCpu.toFixed(1)),
+          memory: parseFloat(avgMemory.toFixed(1)),
+        },
+      ])
+    } catch (error) {
+      console.error('Failed to load metrics:', error)
+    }
+  }, [])
+
+  const loadActivityFeed = useCallback(async () => {
+    try {
+      const res = await fetch('/api/audit/logs?limit=5')
+      if (res.ok) {
+        const data = await res.json()
+        setActivityFeed(data)
+      }
+    } catch (error) {
+      // Audit logs may not be available, fall back silently
+    }
+  }, [])
 
   useEffect(() => {
     loadVMs()
     loadMetrics()
-    const interval = setInterval(() => {
-      loadMetrics()
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [])
+    loadActivityFeed()
+    const metricsInterval = setInterval(loadMetrics, 10000)
+    const activityInterval = setInterval(loadActivityFeed, 30000)
+    return () => {
+      clearInterval(metricsInterval)
+      clearInterval(activityInterval)
+    }
+  }, [loadVMs, loadMetrics, loadActivityFeed])
 
   // Subscribe to WebSocket updates
   useEffect(() => {
     const unsubscribe = subscribe((message) => {
       if (message.type === 'vm_state_changed' || message.type === 'vm_created' || message.type === 'vm_deleted') {
-        loadVMs() // Reload VM list on changes
+        loadVMs()
       }
     })
-
     return unsubscribe
-  }, [subscribe])
+  }, [subscribe, loadVMs])
 
   // Apply WebSocket updates to VM list
   useEffect(() => {
@@ -43,29 +126,6 @@ export default function Dashboard() {
     }
   }, [vmUpdates])
 
-  const loadVMs = async () => {
-    try {
-      const data = await listVMs()
-      setVMs(data)
-    } catch (error) {
-      console.error('Failed to load VMs:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMetrics = () => {
-    // Simulate metrics data
-    const now = new Date()
-    const data = Array.from({ length: 20 }, (_, i) => ({
-      time: new Date(now.getTime() - (19 - i) * 3000).toLocaleTimeString(),
-      cpu: Math.random() * 100,
-      memory: Math.random() * 100,
-    }))
-    setCpuData(data)
-    setMemoryData(data)
-  }
-
   const stats = {
     total: vms.length,
     running: vms.filter((vm) => vm.state === 'running').length,
@@ -76,11 +136,7 @@ export default function Dashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    )
+    return <SkeletonDashboard />
   }
 
   return (
@@ -92,14 +148,12 @@ export default function Dashboard() {
           title="Total VMs"
           value={stats.total}
           color="blue"
-          trend="+2.5%"
         />
         <StatCard
           icon={<Activity className="w-8 h-8" />}
           title="Running"
           value={stats.running}
           color="green"
-          trend="+5.0%"
         />
         <StatCard
           icon={<Cpu className="w-8 h-8" />}
@@ -124,10 +178,14 @@ export default function Dashboard() {
               <Cpu className="w-5 h-5 text-blue-500" />
               CPU Usage
             </h3>
-            <span className="text-sm text-gray-400">Last 60 seconds</span>
+            <span className="text-sm text-gray-400">
+              {metricsHistory.length > 0
+                ? `${metricsHistory[metricsHistory.length - 1].cpu}%`
+                : 'No data'}
+            </span>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={cpuData}>
+            <AreaChart data={metricsHistory}>
               <defs>
                 <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
@@ -136,7 +194,7 @@ export default function Dashboard() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="time" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
+              <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 100]} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#1f2937',
@@ -156,13 +214,17 @@ export default function Dashboard() {
               <HardDrive className="w-5 h-5 text-green-500" />
               Memory Usage
             </h3>
-            <span className="text-sm text-gray-400">Last 60 seconds</span>
+            <span className="text-sm text-gray-400">
+              {metricsHistory.length > 0
+                ? `${metricsHistory[metricsHistory.length - 1].memory}%`
+                : 'No data'}
+            </span>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={memoryData}>
+            <LineChart data={metricsHistory}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="time" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
+              <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 100]} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#1f2937',
@@ -195,29 +257,26 @@ export default function Dashboard() {
           Recent Activity
         </h2>
         <div className="space-y-3">
-          <ActivityItem
-            time="2 minutes ago"
-            type="success"
-            message="VM 'web-server-01' started successfully"
-          />
-          <ActivityItem
-            time="5 minutes ago"
-            type="warning"
-            message="High memory usage on 'db-server': 95%"
-          />
-          <ActivityItem
-            time="10 minutes ago"
-            type="info"
-            message="Network bridge 'br0' configured"
-          />
+          {activityFeed.length > 0 ? (
+            activityFeed.map((entry, idx) => (
+              <ActivityItem
+                key={idx}
+                time={new Date(entry.timestamp).toLocaleString()}
+                type={entry.status === 'success' ? 'success' : 'error'}
+                message={`${entry.action} on ${entry.resource}`}
+              />
+            ))
+          ) : (
+            <p className="text-gray-500 text-sm">No recent activity</p>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function StatCard({ icon, title, value, color, trend }: any) {
-  const colors = {
+function StatCard({ icon, title, value, color }: any) {
+  const colors: Record<string, string> = {
     blue: 'text-blue-500',
     green: 'text-green-500',
     purple: 'text-purple-500',
@@ -228,12 +287,6 @@ function StatCard({ icon, title, value, color, trend }: any) {
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
       <div className="flex items-center justify-between">
         <div className={colors[color]}>{icon}</div>
-        {trend && (
-          <div className="flex items-center gap-1 text-green-500 text-sm">
-            <TrendingUp className="w-4 h-4" />
-            {trend}
-          </div>
-        )}
       </div>
       <div className="mt-4">
         <div className="text-3xl font-bold">{value}</div>
@@ -244,7 +297,7 @@ function StatCard({ icon, title, value, color, trend }: any) {
 }
 
 function VMRow({ vm }: { vm: VM }) {
-  const stateColors = {
+  const stateColors: Record<string, string> = {
     running: 'bg-green-500',
     stopped: 'bg-red-500',
     paused: 'bg-yellow-500',
@@ -252,25 +305,25 @@ function VMRow({ vm }: { vm: VM }) {
   }
 
   return (
-    <div className="p-4 hover:bg-gray-700 transition cursor-pointer">
+    <Link to={`/vms/${vm.name}`} className="block p-4 hover:bg-gray-700 transition cursor-pointer">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className={`w-3 h-3 rounded-full ${stateColors[vm.state]}`}></div>
           <div>
             <div className="font-medium">{vm.name}</div>
             <div className="text-sm text-gray-400">
-              {vm.cpus} vCPUs • {vm.memory}MB RAM
+              {vm.cpus} vCPUs &middot; {vm.memory}MB RAM
             </div>
           </div>
         </div>
         <div className="text-sm text-gray-400 capitalize">{vm.state}</div>
       </div>
-    </div>
+    </Link>
   )
 }
 
 function ActivityItem({ time, type, message }: any) {
-  const typeColors = {
+  const typeColors: Record<string, string> = {
     success: 'text-green-500',
     warning: 'text-yellow-500',
     info: 'text-blue-500',

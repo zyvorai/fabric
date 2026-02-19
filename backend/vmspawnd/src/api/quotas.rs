@@ -404,11 +404,19 @@ pub async fn get_quota_usage(
 pub async fn get_all_quota_usage(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<QuotaUsage>>, StatusCode> {
-    // Load all quotas from state store
+    // Check cache first
+    {
+        let cache = state.quota_cache.read().unwrap();
+        if !cache.is_stale() && !cache.usage.is_empty() {
+            let usage: Vec<QuotaUsage> = cache.usage.values().cloned().collect();
+            return Ok(Json(usage));
+        }
+    }
+
+    // Cache miss or stale - recalculate
     let mut quotas = state.store.list_entities::<ResourceQuota>("quotas")
         .unwrap_or_default();
 
-    // Calculate real usage from VMs for each quota
     for quota in &mut quotas {
         calculate_quota_usage(&state, quota).await;
     }
@@ -416,6 +424,16 @@ pub async fn get_all_quota_usage(
     let usage: Vec<QuotaUsage> = quotas.iter()
         .map(QuotaUsage::from_quota)
         .collect();
+
+    // Update cache
+    {
+        let mut cache = state.quota_cache.write().unwrap();
+        cache.usage.clear();
+        for u in &usage {
+            cache.usage.insert(u.quota_id.clone(), u.clone());
+        }
+        cache.last_updated = std::time::Instant::now();
+    }
 
     Ok(Json(usage))
 }

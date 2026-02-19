@@ -12,6 +12,12 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonConfig {
     pub listen: String,
+    #[serde(default = "default_cors_origins")]
+    pub cors_origins: Vec<String>,
+}
+
+fn default_cors_origins() -> Vec<String> {
+    vec!["http://127.0.0.1:8080".to_string()]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,7 +54,8 @@ impl Config {
         // Default config
         Ok(Config {
             daemon: DaemonConfig {
-                listen: "0.0.0.0:8080".to_string(),
+                listen: "127.0.0.1:8080".to_string(),
+                cors_origins: default_cors_origins(),
             },
             storage: StorageConfig {
                 path: "/var/lib/vmspawnd".to_string(),

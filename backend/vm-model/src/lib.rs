@@ -105,3 +105,81 @@ impl VM {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vm_new() {
+        let vm = VM::new("test".to_string(), "img.qcow2".to_string(), 4, 2048);
+        assert_eq!(vm.name, "test");
+        assert_eq!(vm.cpus, 4);
+        assert_eq!(vm.memory, 2048);
+        assert_eq!(vm.disk, 20); // default
+        assert_eq!(vm.state, VMState::Stopped);
+        assert!(vm.ip.is_none());
+    }
+
+    #[test]
+    fn test_vm_with_disk() {
+        let vm = VM::with_disk("db".to_string(), "img.qcow2".to_string(), 8, 4096, 100);
+        assert_eq!(vm.disk, 100);
+    }
+
+    #[test]
+    fn test_vm_from_request() {
+        let req = CreateVMRequest {
+            name: "web-01".to_string(),
+            image: "ubuntu.img".to_string(),
+            cpus: 2,
+            memory: 1024,
+            disk: 50,
+            hostname: Some("web-server".to_string()),
+            tags: Some(vec!["production".to_string()]),
+        };
+        let vm = VM::from_request(&req);
+        assert_eq!(vm.name, "web-01");
+        assert_eq!(vm.hostname, Some("web-server".to_string()));
+        assert_eq!(vm.tags, Some(vec!["production".to_string()]));
+    }
+
+    #[test]
+    fn test_serialization_roundtrip() {
+        let vm = VM::new("roundtrip".to_string(), "test.img".to_string(), 2, 1024);
+        let json = serde_json::to_string(&vm).unwrap();
+        let deserialized: VM = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.name, "roundtrip");
+        assert_eq!(deserialized.cpus, 2);
+        assert_eq!(deserialized.memory, 1024);
+    }
+
+    #[test]
+    fn test_vmstate_serialization() {
+        let json = serde_json::to_string(&VMState::Running).unwrap();
+        assert_eq!(json, "\"running\"");
+
+        let state: VMState = serde_json::from_str("\"stopped\"").unwrap();
+        assert_eq!(state, VMState::Stopped);
+    }
+
+    #[test]
+    fn test_optional_fields_omitted() {
+        let vm = VM::new("minimal".to_string(), "img".to_string(), 1, 512);
+        let json = serde_json::to_string(&vm).unwrap();
+        assert!(!json.contains("\"ip\""));
+        assert!(!json.contains("\"pid\""));
+        assert!(!json.contains("\"tags\""));
+    }
+
+    #[test]
+    fn test_default_disk_size() {
+        let req: CreateVMRequest = serde_json::from_str(r#"{
+            "name": "test",
+            "image": "img",
+            "cpus": 1,
+            "memory": 512
+        }"#).unwrap();
+        assert_eq!(req.disk, 20); // default
+    }
+}

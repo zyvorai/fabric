@@ -1,4 +1,4 @@
-use crate::app::{App, View};
+use crate::app::{App, PendingAction, StatusLevel, View};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -17,6 +17,7 @@ impl View {
             View::Network => "Network",
             View::Storage => "Storage",
             View::Help => "Help",
+            View::VMDetail => "VM Detail",
         }
     }
 
@@ -55,9 +56,49 @@ pub fn render_tabs(f: &mut Frame, app: &App, area: Rect) {
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title(" vmspawnd TUI "))
         .highlight_style(Style::default().fg(Color::Yellow))
-        .select(app.current_view as usize);
+        .select(match app.current_view {
+            View::VMDetail => 1, // Highlight VMs tab when in detail view
+            other => other as usize,
+        });
 
     f.render_widget(tabs, area);
+}
+
+pub fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
+    // If there's a pending action, show confirmation prompt
+    if let Some(ref action) = app.pending_action {
+        let msg = match action {
+            PendingAction::DeleteVM(name) => format!("Delete VM '{}'? [y/N]", name),
+            PendingAction::BulkDelete(names) => format!("Delete {} VMs? [y/N]", names.len()),
+        };
+        let paragraph = Paragraph::new(Line::from(vec![
+            Span::styled(" CONFIRM ", Style::default().fg(Color::Black).bg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::raw(" "),
+            Span::styled(msg, Style::default().fg(Color::Yellow)),
+        ]));
+        f.render_widget(paragraph, area);
+        return;
+    }
+
+    // Show latest status message
+    if let Some(msg) = app.status_messages.back() {
+        let color = match msg.level {
+            StatusLevel::Success => Color::Green,
+            StatusLevel::Warning => Color::Yellow,
+            StatusLevel::Error => Color::Red,
+        };
+        let paragraph = Paragraph::new(Line::from(Span::styled(
+            &msg.text,
+            Style::default().fg(color),
+        )));
+        f.render_widget(paragraph, area);
+    } else {
+        let paragraph = Paragraph::new(Line::from(Span::styled(
+            " q:Quit  ?:Help  R:Refresh  /:Search  v:Bulk  1-6:Views",
+            Style::default().fg(Color::DarkGray),
+        )));
+        f.render_widget(paragraph, area);
+    }
 }
 
 pub fn render_dashboard(f: &mut Frame, app: &App, area: Rect) {
@@ -89,7 +130,12 @@ pub fn render_dashboard(f: &mut Frame, app: &App, area: Rect) {
     let stopped = app.vms.iter().filter(|v| v.state == vm_model::VMState::Stopped).count();
     render_stat_box(f, "Stopped", &stopped.to_string(), Color::Red, stats_chunks[2]);
 
-    render_stat_box(f, "CPU Usage", "45%", Color::Yellow, stats_chunks[3]);
+    let cpu = if !app.cpu_history.is_empty() {
+        format!("{:.0}%", app.cpu_history.last().unwrap_or(&0.0))
+    } else {
+        "N/A".to_string()
+    };
+    render_stat_box(f, "CPU Usage", &cpu, Color::Yellow, stats_chunks[3]);
 
     // VM List
     render_vm_list_compact(f, app, chunks[1]);
@@ -339,6 +385,10 @@ fn render_vm_details(f: &mut Frame, vm: &vm_model::VM, area: Rect) {
             Span::raw(format!("{} MB", vm.memory)),
         ]),
         Line::from(vec![
+            Span::styled("Disk:     ", Style::default().fg(Color::Cyan)),
+            Span::raw(format!("{} GB", vm.disk)),
+        ]),
+        Line::from(vec![
             Span::styled("Image:    ", Style::default().fg(Color::Cyan)),
             Span::raw(&vm.image),
         ]),
@@ -346,7 +396,7 @@ fn render_vm_details(f: &mut Frame, vm: &vm_model::VM, area: Rect) {
         Line::from(Span::styled("Actions:", Style::default().add_modifier(Modifier::BOLD))),
         Line::from("  [s] Start    [t] Stop"),
         Line::from("  [r] Restart  [d] Delete"),
-        Line::from("  [c] Console  [m] Metrics"),
+        Line::from("  [m] Metrics  [Enter] Detail"),
     ];
 
     let paragraph = Paragraph::new(details)
@@ -354,6 +404,84 @@ fn render_vm_details(f: &mut Frame, vm: &vm_model::VM, area: Rect) {
         .style(Style::default());
 
     f.render_widget(paragraph, area);
+}
+
+pub fn render_vm_detail_view(f: &mut Frame, app: &App, area: Rect) {
+    let filtered = app.filtered_vms();
+    let vm = match filtered.get(app.selected) {
+        Some(vm) => vm,
+        None => {
+            let p = Paragraph::new("No VM selected")
+                .block(Block::default().borders(Borders::ALL).title(" VM Detail "));
+            f.render_widget(p, area);
+            return;
+        }
+    };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(10),
+            Constraint::Min(5),
+        ])
+        .split(area);
+
+    // VM Info
+    let info = vec![
+        Line::from(vec![
+            Span::styled("Name:       ", Style::default().fg(Color::Cyan)),
+            Span::styled(&vm.name, Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("State:      ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{:?}", vm.state),
+                Style::default().fg(match vm.state {
+                    vm_model::VMState::Running => Color::Green,
+                    vm_model::VMState::Stopped => Color::Red,
+                    _ => Color::Yellow,
+                }),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("CPUs:       ", Style::default().fg(Color::Cyan)),
+            Span::raw(vm.cpus.to_string()),
+        ]),
+        Line::from(vec![
+            Span::styled("Memory:     ", Style::default().fg(Color::Cyan)),
+            Span::raw(format!("{} MB", vm.memory)),
+        ]),
+        Line::from(vec![
+            Span::styled("Disk:       ", Style::default().fg(Color::Cyan)),
+            Span::raw(format!("{} GB", vm.disk)),
+        ]),
+        Line::from(vec![
+            Span::styled("Image:      ", Style::default().fg(Color::Cyan)),
+            Span::raw(&vm.image),
+        ]),
+        Line::from(vec![
+            Span::styled("IP:         ", Style::default().fg(Color::Cyan)),
+            Span::raw(vm.ip.as_deref().unwrap_or("N/A")),
+        ]),
+        Line::from(vec![
+            Span::styled("Tags:       ", Style::default().fg(Color::Cyan)),
+            Span::raw(vm.tags.as_ref().map(|t| t.join(", ")).unwrap_or_else(|| "none".to_string())),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(info)
+        .block(Block::default().borders(Borders::ALL).title(format!(" VM: {} ", vm.name)));
+    f.render_widget(paragraph, chunks[0]);
+
+    // Actions footer
+    let actions = vec![
+        Line::from(Span::styled("Actions:", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from("  [s] Start    [t] Stop    [r] Restart    [d] Delete"),
+        Line::from("  [Esc] Back to VM list"),
+    ];
+    let actions_p = Paragraph::new(actions)
+        .block(Block::default().borders(Borders::ALL).title(" Actions "));
+    f.render_widget(actions_p, chunks[1]);
 }
 
 pub fn render_help(f: &mut Frame, area: Rect) {
@@ -366,23 +494,30 @@ pub fn render_help(f: &mut Frame, area: Rect) {
         )),
         Line::from(""),
         Line::from(Span::styled("Navigation:", Style::default().add_modifier(Modifier::BOLD))),
-        Line::from("  [1-6]       Switch views (Dashboard, VMs, Logs, etc.)"),
+        Line::from("  [1-6]       Switch views (Dashboard, VMs, Logs, Metrics, Network, Storage)"),
         Line::from("  [↑/k]       Move up"),
         Line::from("  [↓/j]       Move down"),
         Line::from("  [Tab]       Next view"),
         Line::from("  [Shift+Tab] Previous view"),
+        Line::from("  [Enter]     Open VM detail view"),
+        Line::from("  [Esc]       Back / Clear search"),
         Line::from(""),
         Line::from(Span::styled("VM Actions:", Style::default().add_modifier(Modifier::BOLD))),
         Line::from("  [s]         Start selected VM"),
         Line::from("  [t]         Stop selected VM"),
         Line::from("  [r]         Restart selected VM"),
-        Line::from("  [d]         Delete selected VM"),
-        Line::from("  [c]         Open console"),
-        Line::from("  [m]         Show metrics"),
+        Line::from("  [d]         Delete selected VM (with confirmation)"),
+        Line::from("  [m]         Switch to Metrics view"),
+        Line::from(""),
+        Line::from(Span::styled("Bulk Mode:", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from("  [v]         Toggle bulk selection mode"),
+        Line::from("  [Space]     Toggle VM selection (in bulk mode)"),
+        Line::from("  [a/A]       Select all / Deselect all"),
+        Line::from("  [S/T/D]     Bulk Start / Stop / Delete"),
         Line::from(""),
         Line::from(Span::styled("General:", Style::default().add_modifier(Modifier::BOLD))),
         Line::from("  [R]         Refresh data"),
-        Line::from("  [/]         Search"),
+        Line::from("  [/]         Search / Filter VMs"),
         Line::from("  [?]         Show this help"),
         Line::from("  [q]         Quit"),
     ];

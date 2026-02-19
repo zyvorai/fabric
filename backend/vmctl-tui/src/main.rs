@@ -6,7 +6,7 @@ mod views;
 use anyhow::Result;
 use app::{App, View};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -15,10 +15,10 @@ use std::io;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Setup terminal
+    // Setup terminal (no mouse capture - cleaner terminal interaction)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -32,8 +32,7 @@ async fn main() -> Result<()> {
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
+        LeaveAlternateScreen
     )?;
     terminal.show_cursor()?;
 
@@ -48,11 +47,31 @@ async fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
 ) -> Result<()> {
+    let mut last_refresh = std::time::Instant::now();
+    let refresh_interval = std::time::Duration::from_secs(5);
+
     loop {
+        // Clear expired status messages
+        app.clear_expired_status();
+
         terminal.draw(|f| ui::ui(f, app))?;
 
         if event::poll(std::time::Duration::from_millis(250))? {
             if let Event::Key(key) = event::read()? {
+                // Handle pending confirmation first
+                if app.pending_action.is_some() {
+                    match key.code {
+                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                            app.confirm_pending_action().await?;
+                        }
+                        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                            app.cancel_pending_action();
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 if app.search_mode {
                     // Handle search mode input
                     match key.code {
@@ -71,7 +90,13 @@ async fn run_app<B: ratatui::backend::Backend>(
                         KeyCode::Char('R') => app.refresh().await?,
                         KeyCode::Char('?') => app.switch_to_view(View::Help),
                         KeyCode::Char('/') => app.enter_search_mode(),
-                        KeyCode::Esc => app.clear_search(),
+                        KeyCode::Esc => {
+                            if app.current_view == View::VMDetail {
+                                app.switch_to_view(View::VMs);
+                            } else {
+                                app.clear_search();
+                            }
+                        }
 
                         // View navigation
                         KeyCode::Char('1') => app.switch_to_view(View::Dashboard),
@@ -125,18 +150,26 @@ async fn run_app<B: ratatui::backend::Backend>(
                         KeyCode::Char('t') if !app.bulk_mode => app.stop_selected().await?,
                         KeyCode::Char('r') if !app.bulk_mode => app.restart_selected().await?,
                         KeyCode::Char('d') if !app.bulk_mode => app.delete_selected().await?,
+                        KeyCode::Char('m') if !app.bulk_mode => app.switch_to_view(View::Metrics),
 
-                        KeyCode::Enter => {
-                            // Could open details view
-                        }
+                        // Enter opens detail view
+                        KeyCode::Enter => app.open_selected_detail(),
 
                         _ => {}
                     }
                 }
             }
-        } else {
-            // Auto-refresh every 5 seconds
-            app.refresh().await?;
+        }
+
+        // Auto-refresh every 5 seconds
+        if last_refresh.elapsed() >= refresh_interval {
+            if let Err(e) = app.refresh().await {
+                app.add_status(
+                    format!("Refresh failed: {}", e),
+                    app::StatusLevel::Error,
+                );
+            }
+            last_refresh = std::time::Instant::now();
         }
     }
 }

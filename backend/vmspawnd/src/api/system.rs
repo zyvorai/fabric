@@ -11,6 +11,7 @@ use vmspawnd_system::{
 };
 
 use crate::server::AppState;
+use crate::validation::validate_vm_name;
 
 // Request/Response types
 #[derive(Debug, Deserialize)]
@@ -146,6 +147,7 @@ pub async fn set_cpu_pinning(
     Path(vm_name): Path<String>,
     Json(req): Json<SetCpuPinningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
     // Implement CPU pinning via systemd
     tracing::info!(
         "Setting CPU pinning for VM '{}': {:?}",
@@ -208,6 +210,7 @@ pub async fn set_cpu_pinning(
 pub async fn remove_cpu_pinning(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
     tracing::info!("Removing CPU pinning for VM '{}'", vm_name);
     Ok(StatusCode::OK)
 }
@@ -216,6 +219,7 @@ pub async fn remove_cpu_pinning(
 pub async fn get_cpu_affinity(
     Path(vm_name): Path<String>,
 ) -> Result<Json<Vec<u32>>, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
     // Read CPU affinity from systemd service
     tracing::info!("Getting CPU affinity for VM '{}'", vm_name);
 
@@ -262,6 +266,7 @@ pub async fn set_memory_limit(
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryLimitRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
     let controller = MemoryController::new(&vm_name);
 
     if !controller.exists() {
@@ -294,6 +299,7 @@ pub async fn set_memory_limit(
 pub async fn get_memory_usage(
     Path(vm_name): Path<String>,
 ) -> Result<Json<vmspawnd_system::MemoryStats>, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
     let controller = MemoryController::new(&vm_name);
 
     if !controller.exists() {
@@ -318,6 +324,7 @@ pub async fn set_memory_ballooning(
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryBallooningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
     // Implement memory ballooning control via QEMU monitor
     tracing::info!(
         "Setting memory ballooning for VM '{}': enabled={}, target={:?}",

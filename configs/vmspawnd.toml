@@ -1,6 +1,8 @@
 [daemon]
 # Listen address for REST API
-listen = "0.0.0.0:8080"
+listen = "127.0.0.1:8080"
+# CORS allowed origins (default: ["http://127.0.0.1:8080"])
+# cors_origins = ["http://127.0.0.1:8080", "https://myhost.example.com"]
 
 [storage]
 # Path to store VM state

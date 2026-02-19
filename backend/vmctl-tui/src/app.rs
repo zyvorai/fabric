@@ -1,5 +1,7 @@
 use anyhow::Result;
 use reqwest::Client;
+use std::collections::VecDeque;
+use std::time::Instant;
 use vm_model::VM;
 
 const API_BASE: &str = "http://localhost:8080/api";
@@ -13,6 +15,27 @@ pub enum View {
     Network,
     Storage,
     Help,
+    VMDetail,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StatusLevel {
+    Success,
+    Warning,
+    Error,
+}
+
+#[derive(Debug, Clone)]
+pub struct StatusMessage {
+    pub text: String,
+    pub level: StatusLevel,
+    pub created: Instant,
+}
+
+#[derive(Debug, Clone)]
+pub enum PendingAction {
+    DeleteVM(String),
+    BulkDelete(Vec<String>),
 }
 
 pub struct App {
@@ -28,6 +51,8 @@ pub struct App {
     pub network_tx_history: Vec<f64>,
     pub bulk_mode: bool,
     pub selected_vms: Vec<usize>,
+    pub status_messages: VecDeque<StatusMessage>,
+    pub pending_action: Option<PendingAction>,
     client: Client,
 }
 
@@ -46,8 +71,31 @@ impl App {
             network_tx_history: vec![0.0; 60],
             bulk_mode: false,
             selected_vms: Vec::new(),
-            client: Client::new(),
+            status_messages: VecDeque::new(),
+            pending_action: None,
+            client: Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_default(),
         }
+    }
+
+    pub fn add_status(&mut self, text: String, level: StatusLevel) {
+        self.status_messages.push_back(StatusMessage {
+            text,
+            level,
+            created: Instant::now(),
+        });
+        // Keep at most 5 messages
+        while self.status_messages.len() > 5 {
+            self.status_messages.pop_front();
+        }
+    }
+
+    pub fn clear_expired_status(&mut self) {
+        let now = Instant::now();
+        self.status_messages
+            .retain(|m| now.duration_since(m.created).as_secs() < 5);
     }
 
     pub fn toggle_bulk_mode(&mut self) {
@@ -79,50 +127,140 @@ impl App {
 
     pub async fn bulk_start(&mut self) -> Result<()> {
         let filtered = self.filtered_vms();
-        for &idx in &self.selected_vms {
+        let mut success = 0;
+        let mut failed = Vec::new();
+        for &idx in &self.selected_vms.clone() {
             if let Some(vm) = filtered.get(idx) {
                 let vm_name = vm.name.clone();
-                let _ = self.client
+                match self.client
                     .post(format!("{}/vms/{}/start", API_BASE, vm_name))
                     .send()
-                    .await;
+                    .await
+                {
+                    Ok(res) if res.status().is_success() => success += 1,
+                    Ok(res) => failed.push(format!("{} ({})", vm_name, res.status())),
+                    Err(e) => failed.push(format!("{} ({})", vm_name, e)),
+                }
             }
         }
         self.refresh().await?;
         self.selected_vms.clear();
+
+        if failed.is_empty() {
+            self.add_status(format!("Started {} VMs", success), StatusLevel::Success);
+        } else {
+            self.add_status(
+                format!("Started {} VMs, {} failed: {}", success, failed.len(), failed.join(", ")),
+                StatusLevel::Warning,
+            );
+        }
         Ok(())
     }
 
     pub async fn bulk_stop(&mut self) -> Result<()> {
         let filtered = self.filtered_vms();
-        for &idx in &self.selected_vms {
+        let mut success = 0;
+        let mut failed = Vec::new();
+        for &idx in &self.selected_vms.clone() {
             if let Some(vm) = filtered.get(idx) {
                 let vm_name = vm.name.clone();
-                let _ = self.client
+                match self.client
                     .post(format!("{}/vms/{}/stop", API_BASE, vm_name))
                     .send()
-                    .await;
+                    .await
+                {
+                    Ok(res) if res.status().is_success() => success += 1,
+                    Ok(res) => failed.push(format!("{} ({})", vm_name, res.status())),
+                    Err(e) => failed.push(format!("{} ({})", vm_name, e)),
+                }
             }
         }
         self.refresh().await?;
         self.selected_vms.clear();
+
+        if failed.is_empty() {
+            self.add_status(format!("Stopped {} VMs", success), StatusLevel::Success);
+        } else {
+            self.add_status(
+                format!("Stopped {} VMs, {} failed: {}", success, failed.len(), failed.join(", ")),
+                StatusLevel::Warning,
+            );
+        }
         Ok(())
     }
 
     pub async fn bulk_delete(&mut self) -> Result<()> {
         let filtered = self.filtered_vms();
-        for &idx in &self.selected_vms {
-            if let Some(vm) = filtered.get(idx) {
-                let vm_name = vm.name.clone();
-                let _ = self.client
-                    .delete(format!("{}/vms/{}", API_BASE, vm_name))
+        let names: Vec<String> = self.selected_vms.iter()
+            .filter_map(|&idx| filtered.get(idx).map(|vm| vm.name.clone()))
+            .collect();
+        self.pending_action = Some(PendingAction::BulkDelete(names));
+        Ok(())
+    }
+
+    pub async fn confirm_pending_action(&mut self) -> Result<()> {
+        let action = match self.pending_action.take() {
+            Some(a) => a,
+            None => return Ok(()),
+        };
+
+        match action {
+            PendingAction::DeleteVM(name) => {
+                match self.client
+                    .delete(format!("{}/vms/{}", API_BASE, name))
                     .send()
-                    .await;
+                    .await
+                {
+                    Ok(res) if res.status().is_success() => {
+                        self.add_status(format!("Deleted VM '{}'", name), StatusLevel::Success);
+                    }
+                    Ok(res) => {
+                        self.add_status(
+                            format!("Failed to delete '{}': {}", name, res.status()),
+                            StatusLevel::Error,
+                        );
+                    }
+                    Err(e) => {
+                        self.add_status(
+                            format!("Failed to delete '{}': {}", name, e),
+                            StatusLevel::Error,
+                        );
+                    }
+                }
+            }
+            PendingAction::BulkDelete(names) => {
+                let mut success = 0;
+                let mut failed = Vec::new();
+                for name in &names {
+                    match self.client
+                        .delete(format!("{}/vms/{}", API_BASE, name))
+                        .send()
+                        .await
+                    {
+                        Ok(res) if res.status().is_success() => success += 1,
+                        Ok(res) => failed.push(format!("{} ({})", name, res.status())),
+                        Err(e) => failed.push(format!("{} ({})", name, e)),
+                    }
+                }
+                self.selected_vms.clear();
+                if failed.is_empty() {
+                    self.add_status(format!("Deleted {} VMs", success), StatusLevel::Success);
+                } else {
+                    self.add_status(
+                        format!("Deleted {} VMs, {} failed: {}", success, failed.len(), failed.join(", ")),
+                        StatusLevel::Warning,
+                    );
+                }
             }
         }
+
         self.refresh().await?;
-        self.selected_vms.clear();
         Ok(())
+    }
+
+    pub fn cancel_pending_action(&mut self) {
+        self.pending_action = None;
+        self.add_status("Action cancelled".to_string(), StatusLevel::Warning);
     }
 
     pub fn filtered_vms(&self) -> Vec<&VM> {
@@ -172,28 +310,56 @@ impl App {
             self.selected = self.vms.len() - 1;
         }
 
-        // Update metrics history (simulated for now)
-        self.update_metrics_history();
+        self.update_metrics_history().await;
 
         Ok(())
     }
 
-    fn update_metrics_history(&mut self) {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+    async fn update_metrics_history(&mut self) {
+        // Try to fetch real system performance data from the API
+        match self.client
+            .get(format!("{}/analytics/system", API_BASE))
+            .send()
+            .await
+        {
+            Ok(res) if res.status().is_success() => {
+                if let Ok(data) = res.json::<Vec<serde_json::Value>>().await {
+                    if let Some(latest) = data.last() {
+                        let cpu = latest.get("total_cpu_usage")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.0);
+                        let mem = latest.get("total_memory_usage")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.0);
 
-        // Shift history and add new values
+                        self.cpu_history.rotate_left(1);
+                        self.cpu_history[59] = cpu;
+                        self.memory_history.rotate_left(1);
+                        self.memory_history[59] = mem;
+                        return;
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Fallback: calculate from VM count (basic approximation)
+        let running = self.vms.iter()
+            .filter(|v| v.state == vm_model::VMState::Running)
+            .count() as f64;
+        let total = self.vms.len().max(1) as f64;
+        let cpu_estimate = (running / total) * 50.0;
+        let mem_estimate = (running / total) * 60.0;
+
         self.cpu_history.rotate_left(1);
-        self.cpu_history[59] = rng.gen_range(20.0..80.0);
-
+        self.cpu_history[59] = cpu_estimate;
         self.memory_history.rotate_left(1);
-        self.memory_history[59] = rng.gen_range(30.0..70.0);
+        self.memory_history[59] = mem_estimate;
 
         self.network_rx_history.rotate_left(1);
-        self.network_rx_history[59] = rng.gen_range(0.0..100.0);
-
+        self.network_rx_history[59] = running * 10.0;
         self.network_tx_history.rotate_left(1);
-        self.network_tx_history[59] = rng.gen_range(0.0..100.0);
+        self.network_tx_history[59] = running * 5.0;
     }
 
     pub fn next(&mut self) {
@@ -223,6 +389,7 @@ impl App {
             View::Network => View::Storage,
             View::Storage => View::Help,
             View::Help => View::Dashboard,
+            View::VMDetail => View::VMs,
         };
     }
 
@@ -235,6 +402,7 @@ impl App {
             View::Metrics => View::Logs,
             View::Logs => View::VMs,
             View::VMs => View::Dashboard,
+            View::VMDetail => View::VMs,
         };
     }
 
@@ -242,14 +410,37 @@ impl App {
         self.current_view = view;
     }
 
+    pub fn open_selected_detail(&mut self) {
+        if !self.filtered_vms().is_empty() {
+            self.current_view = View::VMDetail;
+        }
+    }
+
     pub async fn start_selected(&mut self) -> Result<()> {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            self.client
+            match self.client
                 .post(format!("{}/vms/{}/start", API_BASE, vm_name))
                 .send()
-                .await?;
+                .await
+            {
+                Ok(res) if res.status().is_success() => {
+                    self.add_status(format!("Started VM '{}'", vm_name), StatusLevel::Success);
+                }
+                Ok(res) => {
+                    self.add_status(
+                        format!("Failed to start '{}': {}", vm_name, res.status()),
+                        StatusLevel::Error,
+                    );
+                }
+                Err(e) => {
+                    self.add_status(
+                        format!("Failed to start '{}': {}", vm_name, e),
+                        StatusLevel::Error,
+                    );
+                }
+            }
             self.refresh().await?;
         }
         Ok(())
@@ -259,10 +450,27 @@ impl App {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            self.client
+            match self.client
                 .post(format!("{}/vms/{}/stop", API_BASE, vm_name))
                 .send()
-                .await?;
+                .await
+            {
+                Ok(res) if res.status().is_success() => {
+                    self.add_status(format!("Stopped VM '{}'", vm_name), StatusLevel::Success);
+                }
+                Ok(res) => {
+                    self.add_status(
+                        format!("Failed to stop '{}': {}", vm_name, res.status()),
+                        StatusLevel::Error,
+                    );
+                }
+                Err(e) => {
+                    self.add_status(
+                        format!("Failed to stop '{}': {}", vm_name, e),
+                        StatusLevel::Error,
+                    );
+                }
+            }
             self.refresh().await?;
         }
         Ok(())
@@ -272,10 +480,27 @@ impl App {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            self.client
+            match self.client
                 .post(format!("{}/vms/{}/restart", API_BASE, vm_name))
                 .send()
-                .await?;
+                .await
+            {
+                Ok(res) if res.status().is_success() => {
+                    self.add_status(format!("Restarted VM '{}'", vm_name), StatusLevel::Success);
+                }
+                Ok(res) => {
+                    self.add_status(
+                        format!("Failed to restart '{}': {}", vm_name, res.status()),
+                        StatusLevel::Error,
+                    );
+                }
+                Err(e) => {
+                    self.add_status(
+                        format!("Failed to restart '{}': {}", vm_name, e),
+                        StatusLevel::Error,
+                    );
+                }
+            }
             self.refresh().await?;
         }
         Ok(())
@@ -285,11 +510,7 @@ impl App {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            self.client
-                .delete(format!("{}/vms/{}", API_BASE, vm_name))
-                .send()
-                .await?;
-            self.refresh().await?;
+            self.pending_action = Some(PendingAction::DeleteVM(vm_name));
         }
         Ok(())
     }

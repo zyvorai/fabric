@@ -45,15 +45,52 @@ export default function CommandPalette() {
     { id: 'vm-tags', label: 'Filter VMs by Tags', action: () => navigate('/vms'), category: 'VMs', keywords: ['tag', 'label', 'organize'] },
   ]
 
-  const filteredCommands = commands.filter((cmd) => {
-    const searchStr = query.toLowerCase()
-    return (
-      cmd.label.toLowerCase().includes(searchStr) ||
-      cmd.description?.toLowerCase().includes(searchStr) ||
-      cmd.keywords?.some((k) => k.toLowerCase().includes(searchStr)) ||
-      cmd.category.toLowerCase().includes(searchStr)
-    )
-  })
+  const fuzzyMatch = (text: string, pattern: string): number => {
+    const t = text.toLowerCase()
+    const p = pattern.toLowerCase()
+
+    // Exact substring match gets high score
+    if (t.includes(p)) return 100
+
+    // Fuzzy match: all pattern chars must appear in order
+    let score = 0
+    let pi = 0
+    let consecutive = 0
+
+    for (let ti = 0; ti < t.length && pi < p.length; ti++) {
+      if (t[ti] === p[pi]) {
+        score += 10
+        consecutive++
+        score += consecutive * 5 // Bonus for consecutive chars
+        // Bonus for matching at word boundaries
+        if (ti === 0 || t[ti - 1] === ' ' || t[ti - 1] === '-' || t[ti - 1] === '_') {
+          score += 15
+        }
+        pi++
+      } else {
+        consecutive = 0
+      }
+    }
+
+    return pi === p.length ? score : 0
+  }
+
+  const filteredCommands = query
+    ? commands
+        .map((cmd) => {
+          const searchStr = query.toLowerCase()
+          const labelScore = fuzzyMatch(cmd.label, searchStr)
+          const keywordScore = Math.max(
+            ...(cmd.keywords?.map((k) => fuzzyMatch(k, searchStr)) || [0])
+          )
+          const categoryScore = fuzzyMatch(cmd.category, searchStr)
+          const score = Math.max(labelScore, keywordScore, categoryScore)
+          return { cmd, score }
+        })
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ cmd }) => cmd)
+    : commands
 
   const groupedCommands = filteredCommands.reduce((acc, cmd) => {
     if (!acc[cmd.category]) {

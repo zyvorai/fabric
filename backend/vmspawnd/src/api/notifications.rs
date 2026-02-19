@@ -360,7 +360,7 @@ pub async fn test_channel(
 
     // Send test notification based on channel type
     let test_message = format!("Test notification from vmspawnd - Channel: {}", channel.name);
-    match send_notification(&channel, "Test Notification", &test_message).await {
+    match send_notification(&state.http_client, &channel, "Test Notification", &test_message).await {
         Ok(_) => {
             tracing::info!("Successfully sent test notification to channel {} (type: {:?})",
                 channel.name, channel.channel_type);
@@ -597,26 +597,55 @@ pub async fn get_history(
 // Notification Sending Infrastructure
 // ============================================================================
 
-/// Send a notification through a specific channel
+/// Send a notification through a specific channel with retry logic
 async fn send_notification(
+    client: &reqwest::Client,
     channel: &NotificationChannel,
     subject: &str,
     message: &str,
 ) -> Result<(), String> {
-    match channel.channel_type {
-        ChannelType::Email => {
-            send_email_notification(channel, subject, message).await
-        }
-        ChannelType::Slack => {
-            send_slack_notification(channel, subject, message).await
-        }
-        ChannelType::Webhook => {
-            send_webhook_notification(channel, subject, message).await
-        }
-        ChannelType::Teams => {
-            send_teams_notification(channel, subject, message).await
+    let max_retries = 3u32;
+    let mut last_err = String::new();
+
+    for attempt in 0..max_retries {
+        let result = match channel.channel_type {
+            ChannelType::Email => {
+                send_email_notification(channel, subject, message).await
+            }
+            ChannelType::Slack => {
+                send_slack_notification(client, channel, subject, message).await
+            }
+            ChannelType::Webhook => {
+                send_webhook_notification(client, channel, subject, message).await
+            }
+            ChannelType::Teams => {
+                send_teams_notification(client, channel, subject, message).await
+            }
+        };
+
+        match result {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = e;
+                if attempt < max_retries - 1 {
+                    let delay = tokio::time::Duration::from_secs(1 << attempt); // 1s, 2s, 4s
+                    tracing::warn!(
+                        "Notification attempt {} failed for channel '{}': {}. Retrying in {:?}",
+                        attempt + 1,
+                        channel.name,
+                        last_err,
+                        delay,
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+            }
         }
     }
+
+    Err(format!(
+        "Failed after {} attempts: {}",
+        max_retries, last_err
+    ))
 }
 
 /// Send email notification (SMTP)
@@ -665,20 +694,33 @@ async fn send_email_notification(
             .body(message.to_string())
             .map_err(|e| format!("Failed to build email: {}", e))?;
 
-        // Create SMTP transport
-        let mut mailer = SmtpTransport::builder_dangerous(smtp_host)
-            .port(smtp_port);
+        // Check if TLS verification is disabled via config
+        let tls_verify = channel.config.get("tls_verify")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
 
-        // Add authentication if provided
-        if let (Some(user), Some(pass)) = (username, password) {
+        // Create SMTP transport with TLS by default
+        let mailer = if let (Some(user), Some(pass)) = (username, password) {
             let creds = Credentials::new(user.to_string(), pass.to_string());
-            mailer = SmtpTransport::relay(smtp_host)
+            SmtpTransport::relay(smtp_host)
                 .map_err(|e| format!("Failed to create SMTP relay: {}", e))?
                 .port(smtp_port)
-                .credentials(creds);
-        }
-
-        let mailer = mailer.build();
+                .credentials(creds)
+                .build()
+        } else if tls_verify {
+            SmtpTransport::relay(smtp_host)
+                .map_err(|e| format!("Failed to create SMTP relay: {}", e))?
+                .port(smtp_port)
+                .build()
+        } else {
+            tracing::warn!(
+                "SMTP TLS verification disabled for channel '{}' - this is insecure",
+                channel.name
+            );
+            SmtpTransport::builder_dangerous(smtp_host)
+                .port(smtp_port)
+                .build()
+        };
 
         // Send the email
         match mailer.send(&email) {
@@ -697,6 +739,7 @@ async fn send_email_notification(
 
 /// Send Slack notification (Webhook)
 async fn send_slack_notification(
+    client: &reqwest::Client,
     channel: &NotificationChannel,
     subject: &str,
     message: &str,
@@ -715,7 +758,6 @@ async fn send_slack_notification(
     });
 
     // Send HTTP POST to Slack webhook
-    let client = reqwest::Client::new();
     let response = client
         .post(webhook_url)
         .json(&payload)
@@ -736,6 +778,7 @@ async fn send_slack_notification(
 
 /// Send webhook notification (Generic HTTP POST)
 async fn send_webhook_notification(
+    client: &reqwest::Client,
     channel: &NotificationChannel,
     subject: &str,
     message: &str,
@@ -755,7 +798,6 @@ async fn send_webhook_notification(
     });
 
     // Send HTTP POST to webhook
-    let client = reqwest::Client::new();
     let response = client
         .post(webhook_url)
         .json(&payload)
@@ -776,6 +818,7 @@ async fn send_webhook_notification(
 
 /// Send Microsoft Teams notification (Webhook)
 async fn send_teams_notification(
+    client: &reqwest::Client,
     channel: &NotificationChannel,
     subject: &str,
     message: &str,
@@ -797,7 +840,6 @@ async fn send_teams_notification(
     });
 
     // Send HTTP POST to Teams webhook
-    let client = reqwest::Client::new();
     let response = client
         .post(webhook_url)
         .json(&payload)

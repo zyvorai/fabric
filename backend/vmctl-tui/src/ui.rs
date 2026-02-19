@@ -30,10 +30,20 @@ pub fn ui(f: &mut Frame, app: &App) {
         View::Network => render_network_view(f, chunks[1]),
         View::Storage => render_storage_view(f, chunks[1]),
         View::Help => views::render_help(f, chunks[1]),
+        View::VMDetail => views::render_vm_detail_view(f, app, chunks[1]),
     }
 
-    // Render footer
-    render_footer(f, app, chunks[2]);
+    // Render footer with status bar
+    let footer_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),  // Status bar
+            Constraint::Length(2),  // Footer
+        ])
+        .split(chunks[2]);
+
+    views::render_status_bar(f, app, footer_chunks[0]);
+    render_footer(f, app, footer_chunks[1]);
 }
 
 fn render_logs_view(f: &mut Frame, area: Rect) {
