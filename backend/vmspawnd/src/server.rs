@@ -208,7 +208,13 @@ impl Server {
             .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
             .route("/metrics", get(prometheus_exporter::metrics_handler))
-            .fallback_service(ServeDir::new("../web/dist"))
+            .fallback_service(ServeDir::new(
+                if std::path::Path::new("/usr/share/vmspawnd/web").exists() {
+                    "/usr/share/vmspawnd/web"
+                } else {
+                    "../web/dist"
+                },
+            ))
             .layer(cors);
 
         let addr: std::net::SocketAddr = self.state.config.daemon.listen.parse()?;
