@@ -280,23 +280,13 @@ pub async fn list_schedules(
 }
 
 pub async fn get_schedule(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Schedule>, StatusCode> {
-    // TODO: Load from state store
-    let schedule = Schedule {
-        id,
-        name: "Nightly Shutdown".to_string(),
-        vm_name: "web-server".to_string(),
-        action: VMAction::Stop,
-        schedule_type: ScheduleType::Daily,
-        time: "22:00".to_string(),
-        days_of_week: None,
-        enabled: true,
-        created: Utc::now(),
-        last_run: Some(Utc::now() - Duration::days(1)),
-        next_run: calculate_next_run(&ScheduleType::Daily, "22:00", &None),
-    };
+    // Load from state store
+    let schedule = state.store.get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(schedule))
 }
@@ -341,39 +331,69 @@ pub async fn create_schedule(
 }
 
 pub async fn update_schedule(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateScheduleRequest>,
 ) -> Result<Json<Schedule>, StatusCode> {
-    // TODO: Load existing schedule from state store
-    // TODO: Update fields
-    // TODO: Recalculate next_run if time/schedule_type changed
-    // TODO: Save to state store
+    // Load existing schedule from state store
+    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    let schedule_type = req.schedule_type.unwrap_or(ScheduleType::Daily);
-    let time = req.time.unwrap_or_else(|| "22:00".to_string());
-    let days_of_week = req.days_of_week;
-    let enabled = req.enabled.unwrap_or(true);
+    let mut recalculate_next_run = false;
 
-    let next_run = if enabled {
-        calculate_next_run(&schedule_type, &time, &days_of_week)
-    } else {
-        None
-    };
+    // Update fields if provided
+    if let Some(name) = req.name {
+        if name.trim().is_empty() {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        schedule.name = name;
+    }
+    if let Some(vm_name) = req.vm_name {
+        if vm_name.trim().is_empty() {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        schedule.vm_name = vm_name;
+    }
+    if let Some(action) = req.action {
+        schedule.action = action;
+    }
+    if let Some(schedule_type) = req.schedule_type {
+        schedule.schedule_type = schedule_type;
+        recalculate_next_run = true;
+    }
+    if let Some(time) = req.time {
+        // Validate time format
+        let parts: Vec<&str> = time.split(':').collect();
+        if parts.len() != 2 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        schedule.time = time;
+        recalculate_next_run = true;
+    }
+    if let Some(days_of_week) = req.days_of_week {
+        schedule.days_of_week = Some(days_of_week);
+        recalculate_next_run = true;
+    }
+    if let Some(enabled) = req.enabled {
+        schedule.enabled = enabled;
+        recalculate_next_run = true;
+    }
 
-    let schedule = Schedule {
-        id,
-        name: req.name.unwrap_or_else(|| "Updated Schedule".to_string()),
-        vm_name: req.vm_name.unwrap_or_else(|| "web-server".to_string()),
-        action: req.action.unwrap_or(VMAction::Stop),
-        schedule_type,
-        time,
-        days_of_week,
-        enabled,
-        created: Utc::now(),
-        last_run: None,
-        next_run,
-    };
+    // Recalculate next_run if time/schedule_type changed
+    if recalculate_next_run {
+        schedule.next_run = if schedule.enabled {
+            calculate_next_run(&schedule.schedule_type, &schedule.time, &schedule.days_of_week)
+        } else {
+            None
+        };
+    }
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+        tracing::error!("Failed to update schedule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(Json(schedule))
 }
@@ -392,36 +412,75 @@ pub async fn delete_schedule(
 }
 
 pub async fn enable_schedule(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load schedule from state store
-    // TODO: Set enabled = true
-    // TODO: Calculate next_run
-    // TODO: Save to state store
+    // Load schedule from state store
+    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = true
+    schedule.enabled = true;
+
+    // Calculate next_run
+    schedule.next_run = calculate_next_run(&schedule.schedule_type, &schedule.time, &schedule.days_of_week);
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+        tracing::error!("Failed to enable schedule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
 
 pub async fn disable_schedule(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load schedule from state store
-    // TODO: Set enabled = false
-    // TODO: Clear next_run
-    // TODO: Save to state store
+    // Load schedule from state store
+    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = false
+    schedule.enabled = false;
+
+    // Clear next_run
+    schedule.next_run = None;
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+        tracing::error!("Failed to disable schedule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
 
 pub async fn run_schedule_now(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load schedule from state store
-    // TODO: Execute the scheduled action immediately
-    // TODO: Update last_run
+    // Load schedule from state store
+    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // TODO: Execute the scheduled action immediately (call VM API)
+    tracing::info!("Executing schedule {} immediately: {:?} on VM {}",
+                   schedule.name, schedule.action, schedule.vm_name);
+
+    // Update last_run
+    schedule.last_run = Some(Utc::now());
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+        tracing::error!("Failed to update schedule last_run: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
     // TODO: Add entry to history
 
     Ok(StatusCode::OK)

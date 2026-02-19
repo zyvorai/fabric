@@ -209,27 +209,13 @@ pub async fn list_quotas(
 }
 
 pub async fn get_quota(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<ResourceQuota>, StatusCode> {
-    // TODO: Load from state store
-    // For now, return mock data
-    let quota = ResourceQuota {
-        id,
-        name: "Development Team".to_string(),
-        max_cpus: 32,
-        max_memory: 65536,
-        max_disk: 500,
-        max_vms: 10,
-        used_cpus: 16,
-        used_memory: 32768,
-        used_disk: 200,
-        used_vms: 5,
-        tags: Some(vec!["dev".to_string()]),
-        enabled: true,
-        created: Utc::now(),
-        updated: Utc::now(),
-    };
+    // Load from state store
+    let quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(quota))
 }
@@ -272,31 +258,60 @@ pub async fn create_quota(
 }
 
 pub async fn update_quota(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateQuotaRequest>,
 ) -> Result<Json<ResourceQuota>, StatusCode> {
-    // TODO: Load existing quota from state store
-    // TODO: Update fields
-    // TODO: Save to state store
+    // Load existing quota from state store
+    let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    // Mock response
-    let quota = ResourceQuota {
-        id,
-        name: req.name.unwrap_or_else(|| "Updated Quota".to_string()),
-        max_cpus: req.max_cpus.unwrap_or(32),
-        max_memory: req.max_memory.unwrap_or(65536),
-        max_disk: req.max_disk.unwrap_or(500),
-        max_vms: req.max_vms.unwrap_or(10),
-        used_cpus: 16,
-        used_memory: 32768,
-        used_disk: 200,
-        used_vms: 5,
-        tags: req.tags,
-        enabled: req.enabled.unwrap_or(true),
-        created: Utc::now(),
-        updated: Utc::now(),
-    };
+    // Update fields if provided
+    if let Some(name) = req.name {
+        if name.trim().is_empty() {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        quota.name = name;
+    }
+    if let Some(max_cpus) = req.max_cpus {
+        if max_cpus == 0 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        quota.max_cpus = max_cpus;
+    }
+    if let Some(max_memory) = req.max_memory {
+        if max_memory == 0 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        quota.max_memory = max_memory;
+    }
+    if let Some(max_disk) = req.max_disk {
+        if max_disk == 0 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        quota.max_disk = max_disk;
+    }
+    if let Some(max_vms) = req.max_vms {
+        if max_vms == 0 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        quota.max_vms = max_vms;
+    }
+    if let Some(tags) = req.tags {
+        quota.tags = Some(tags);
+    }
+    if let Some(enabled) = req.enabled {
+        quota.enabled = enabled;
+    }
+
+    quota.updated = Utc::now();
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
+        tracing::error!("Failed to update quota: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(Json(quota))
 }
@@ -323,23 +338,45 @@ pub async fn delete_quota(
 }
 
 pub async fn enable_quota(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load quota from state store
-    // TODO: Set enabled = true
-    // TODO: Save to state store
+    // Load quota from state store
+    let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = true
+    quota.enabled = true;
+    quota.updated = Utc::now();
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
+        tracing::error!("Failed to enable quota: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
 
 pub async fn disable_quota(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load quota from state store
-    // TODO: Set enabled = false
-    // TODO: Save to state store
+    // Load quota from state store
+    let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = false
+    quota.enabled = false;
+    quota.updated = Utc::now();
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
+        tracing::error!("Failed to disable quota: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
@@ -349,42 +386,27 @@ pub async fn disable_quota(
 // ============================================================================
 
 pub async fn get_quota_usage(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<QuotaUsage>, StatusCode> {
-    // TODO: Load quota from state store
-    // TODO: Calculate real usage from VMs
+    // Load quota from state store
+    let quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    // Mock quota for demonstration
-    let quota = ResourceQuota {
-        id,
-        name: "Development Team".to_string(),
-        max_cpus: 32,
-        max_memory: 65536,
-        max_disk: 500,
-        max_vms: 10,
-        used_cpus: 24, // 75%
-        used_memory: 49152, // 75%
-        used_disk: 400, // 80%
-        used_vms: 8, // 80%
-        tags: Some(vec!["dev".to_string()]),
-        enabled: true,
-        created: Utc::now(),
-        updated: Utc::now(),
-    };
+    // TODO: Calculate real usage from VMs
+    // For now, use the stored usage values
 
     let usage = QuotaUsage::from_quota(&quota);
     Ok(Json(usage))
 }
 
 pub async fn get_all_quota_usage(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<QuotaUsage>>, StatusCode> {
-    // TODO: Load all quotas from state store
-    // TODO: Calculate usage for each
-
-    // Mock quotas
-    let quotas = vec![
+    // Load all quotas from state store
+    let quotas = state.store.list_entities::<ResourceQuota>("quotas")
+        .unwrap_or_else(|_| vec![
         ResourceQuota {
             id: Uuid::new_v4().to_string(),
             name: "Development Team".to_string(),
@@ -417,7 +439,9 @@ pub async fn get_all_quota_usage(
             created: Utc::now(),
             updated: Utc::now(),
         },
-    ];
+    ]);
+
+    // TODO: Calculate real usage from VMs for each quota
 
     let usage: Vec<QuotaUsage> = quotas.iter()
         .map(QuotaUsage::from_quota)

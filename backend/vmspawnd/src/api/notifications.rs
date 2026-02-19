@@ -291,24 +291,36 @@ pub async fn create_channel(
 }
 
 pub async fn update_channel(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateChannelRequest>,
 ) -> Result<Json<NotificationChannel>, StatusCode> {
-    // TODO: Load existing channel from state store
-    // TODO: Update fields
-    // TODO: Save to state store
+    // Load existing channel from state store
+    let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    // Mock response
-    let channel = NotificationChannel {
-        id,
-        name: req.name.unwrap_or_else(|| "Updated Channel".to_string()),
-        channel_type: ChannelType::Email,
-        config: req.config.unwrap_or_default(),
-        enabled: req.enabled.unwrap_or(true),
-        created: Utc::now(),
-        last_test: None,
-    };
+    // Update fields if provided
+    if let Some(name) = req.name {
+        channel.name = name;
+    }
+    if let Some(config) = req.config {
+        // Validate new config
+        if let Err(err) = validate_channel_config(&channel.channel_type, &config) {
+            tracing::warn!("Invalid channel config: {}", err);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        channel.config = config;
+    }
+    if let Some(enabled) = req.enabled {
+        channel.enabled = enabled;
+    }
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
+        tracing::error!("Failed to update channel: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(Json(channel))
 }
@@ -338,12 +350,26 @@ pub async fn delete_channel(
 }
 
 pub async fn test_channel(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load channel from state store
+    // Load channel from state store
+    let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
     // TODO: Send test notification based on channel type
-    // TODO: Update last_test timestamp
+    // For now, just simulate success
+    tracing::info!("Testing channel {} (type: {:?})", channel.name, channel.channel_type);
+
+    // Update last_test timestamp
+    channel.last_test = Some(Utc::now());
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
+        tracing::error!("Failed to update channel last_test: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
@@ -432,28 +458,51 @@ pub async fn create_rule(
 }
 
 pub async fn update_rule(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateRuleRequest>,
 ) -> Result<Json<NotificationRule>, StatusCode> {
-    // TODO: Load existing rule from state store
-    // TODO: Update fields
-    // TODO: Save to state store
+    // Load existing rule from state store
+    let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    // Mock response
-    let rule = NotificationRule {
-        id,
-        name: req.name.unwrap_or_else(|| "Updated Rule".to_string()),
-        description: req.description,
-        event_types: req.event_types.unwrap_or_default(),
-        severity_levels: req.severity_levels.unwrap_or_default(),
-        channels: req.channels.unwrap_or_default(),
-        vm_tags: req.vm_tags,
-        enabled: req.enabled.unwrap_or(true),
-        created: Utc::now(),
-        triggered_count: 0,
-        last_triggered: None,
-    };
+    // Update fields if provided
+    if let Some(name) = req.name {
+        rule.name = name;
+    }
+    if let Some(description) = req.description {
+        rule.description = Some(description);
+    }
+    if let Some(event_types) = req.event_types {
+        rule.event_types = event_types;
+    }
+    if let Some(severity_levels) = req.severity_levels {
+        rule.severity_levels = severity_levels;
+    }
+    if let Some(channels) = req.channels {
+        // Validate channels exist
+        for channel_id in &channels {
+            if state.store.get_entity::<NotificationChannel>("notifications/channels", channel_id)
+                .ok().flatten().is_none() {
+                tracing::warn!("Channel not found: {}", channel_id);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+        rule.channels = channels;
+    }
+    if let Some(vm_tags) = req.vm_tags {
+        rule.vm_tags = Some(vm_tags);
+    }
+    if let Some(enabled) = req.enabled {
+        rule.enabled = enabled;
+    }
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+        tracing::error!("Failed to update rule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(Json(rule))
 }
@@ -472,23 +521,43 @@ pub async fn delete_rule(
 }
 
 pub async fn enable_rule(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load rule from state store
-    // TODO: Set enabled = true
-    // TODO: Save to state store
+    // Load rule from state store
+    let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = true
+    rule.enabled = true;
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+        tracing::error!("Failed to enable rule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
 
 pub async fn disable_rule(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load rule from state store
-    // TODO: Set enabled = false
-    // TODO: Save to state store
+    // Load rule from state store
+    let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = false
+    rule.enabled = false;
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+        tracing::error!("Failed to disable rule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }

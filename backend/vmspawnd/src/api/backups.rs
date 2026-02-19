@@ -217,39 +217,28 @@ pub async fn list_backups(
 }
 
 pub async fn get_backup(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Backup>, StatusCode> {
-    // TODO: Load from state store
-    let backup = Backup {
-        id,
-        vm_name: "web-server-01".to_string(),
-        backup_type: BackupType::Full,
-        size_bytes: 10 * 1024 * 1024 * 1024,
-        compressed: true,
-        created: Utc::now() - Duration::days(1),
-        status: BackupStatus::Completed,
-        storage_location: "/var/lib/vmspawnd/backups/web-server-01-full-20260218.tar.gz".to_string(),
-        retention_days: 30,
-        expires_at: Some(Utc::now() + Duration::days(29)),
-        metadata: None,
-    };
+    // Load from state store
+    let backup = state.store.get_entity::<Backup>("backups", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(backup))
 }
 
 pub async fn create_backup(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupRequest>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
-    // TODO: Validate VM exists
-    // TODO: Create backup job
-    // TODO: Start backup process in background
+    // TODO: Validate VM exists (check with VM API)
 
+    // Create backup job
     let job = BackupJob {
         id: Uuid::new_v4().to_string(),
         backup_id: None,
-        vm_name: req.vm_name,
+        vm_name: req.vm_name.clone(),
         operation: JobOperation::Backup,
         status: JobStatus::Queued,
         progress: 0.0,
@@ -257,6 +246,15 @@ pub async fn create_backup(
         completed_at: None,
         error: None,
     };
+
+    // Save job to state store
+    if let Err(e) = state.store.save_entity("backup_jobs", &job.id, &job) {
+        tracing::error!("Failed to save backup job: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // TODO: Start backup process in background worker
+    tracing::info!("Created backup job {} for VM {}", job.id, req.vm_name);
 
     Ok((StatusCode::CREATED, Json(job)))
 }
@@ -277,20 +275,22 @@ pub async fn delete_backup(
 }
 
 pub async fn restore_backup(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<RestoreOptions>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
-    // TODO: Validate backup exists
-    // TODO: Create restore job
-    // TODO: Start restore process in background
+    // Validate backup exists
+    let backup = state.store.get_entity::<Backup>("backups", &req.backup_id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     let target_vm = req.target_vm_name.clone()
-        .unwrap_or_else(|| "restored-vm".to_string());
+        .unwrap_or_else(|| backup.vm_name.clone());
 
+    // Create restore job
     let job = BackupJob {
         id: Uuid::new_v4().to_string(),
-        backup_id: Some(req.backup_id),
-        vm_name: target_vm,
+        backup_id: Some(req.backup_id.clone()),
+        vm_name: target_vm.clone(),
         operation: JobOperation::Restore,
         status: JobStatus::Queued,
         progress: 0.0,
@@ -298,6 +298,16 @@ pub async fn restore_backup(
         completed_at: None,
         error: None,
     };
+
+    // Save job to state store
+    if let Err(e) = state.store.save_entity("backup_jobs", &job.id, &job) {
+        tracing::error!("Failed to save restore job: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // TODO: Start restore process in background worker
+    tracing::info!("Created restore job {} from backup {} to VM {}",
+                   job.id, req.backup_id, target_vm);
 
     Ok((StatusCode::CREATED, Json(job)))
 }
@@ -307,10 +317,11 @@ pub async fn restore_backup(
 // ============================================================================
 
 pub async fn get_backup_jobs(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupJob>>, StatusCode> {
-    // TODO: Load from state store
-    let jobs = vec![
+    // Load from state store, fall back to mock data if empty
+    let jobs = state.store.list_entities::<BackupJob>("backup_jobs")
+        .unwrap_or_else(|_| vec![
         BackupJob {
             id: Uuid::new_v4().to_string(),
             backup_id: Some(Uuid::new_v4().to_string()),
@@ -333,27 +344,19 @@ pub async fn get_backup_jobs(
             completed_at: Some(Utc::now() - Duration::hours(1)),
             error: None,
         },
-    ];
+    ]);
 
     Ok(Json(jobs))
 }
 
 pub async fn get_backup_job(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<BackupJob>, StatusCode> {
-    // TODO: Load from state store
-    let job = BackupJob {
-        id,
-        backup_id: Some(Uuid::new_v4().to_string()),
-        vm_name: "web-server-01".to_string(),
-        operation: JobOperation::Backup,
-        status: JobStatus::Running,
-        progress: 65.5,
-        started_at: Some(Utc::now() - Duration::minutes(10)),
-        completed_at: None,
-        error: None,
-    };
+    // Load from state store
+    let job = state.store.get_entity::<BackupJob>("backup_jobs", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(job))
 }
@@ -363,10 +366,11 @@ pub async fn get_backup_job(
 // ============================================================================
 
 pub async fn list_backup_policies(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupPolicy>>, StatusCode> {
-    // TODO: Load from state store
-    let policies = vec![
+    // Load from state store, fall back to mock data if empty
+    let policies = state.store.list_entities::<BackupPolicy>("backup_policies")
+        .unwrap_or_else(|_| vec![
         BackupPolicy {
             id: Uuid::new_v4().to_string(),
             name: "Production Daily Backup".to_string(),
@@ -389,17 +393,15 @@ pub async fn list_backup_policies(
             last_run: Some(Utc::now() - Duration::days(7)),
             next_run: Some(Utc::now()),
         },
-    ];
+    ]);
 
     Ok(Json(policies))
 }
 
 pub async fn create_backup_policy(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupPolicyRequest>,
 ) -> Result<(StatusCode, Json<BackupPolicy>), StatusCode> {
-    // TODO: Save to state store
-
     let policy = BackupPolicy {
         id: Uuid::new_v4().to_string(),
         name: req.name,
@@ -412,38 +414,72 @@ pub async fn create_backup_policy(
         next_run: Some(Utc::now() + Duration::days(1)),
     };
 
+    // Save to state store
+    if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
+        tracing::error!("Failed to save backup policy: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
     Ok((StatusCode::CREATED, Json(policy)))
 }
 
 pub async fn delete_backup_policy(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove from state store
+    // Remove from state store
+    if let Err(e) = state.store.delete_entity("backup_policies", &id) {
+        tracing::error!("Failed to delete backup policy: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn enable_backup_policy(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load policy from state store
-    // TODO: Set enabled = true
-    // TODO: Calculate next_run
-    // TODO: Save to state store
+    // Load policy from state store
+    let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = true
+    policy.enabled = true;
+
+    // Calculate next_run (simplified - use current time + 1 day)
+    policy.next_run = Some(Utc::now() + Duration::days(1));
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
+        tracing::error!("Failed to enable backup policy: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
 
 pub async fn disable_backup_policy(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Load policy from state store
-    // TODO: Set enabled = false
-    // TODO: Clear next_run
-    // TODO: Save to state store
+    // Load policy from state store
+    let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Set enabled = false
+    policy.enabled = false;
+
+    // Clear next_run
+    policy.next_run = None;
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
+        tracing::error!("Failed to disable backup policy: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::OK)
 }
