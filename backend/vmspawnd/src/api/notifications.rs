@@ -136,15 +136,96 @@ fn default_limit() -> usize {
 }
 
 // ============================================================================
+// Validation Functions
+// ============================================================================
+
+fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, serde_json::Value>) -> Result<(), String> {
+    match channel_type {
+        ChannelType::Email => {
+            // Validate email configuration
+            if !config.contains_key("smtp_host") {
+                return Err("Email channel requires 'smtp_host'".to_string());
+            }
+            if !config.contains_key("smtp_port") {
+                return Err("Email channel requires 'smtp_port'".to_string());
+            }
+            if !config.contains_key("from") {
+                return Err("Email channel requires 'from' address".to_string());
+            }
+            if !config.contains_key("to") {
+                return Err("Email channel requires 'to' addresses".to_string());
+            }
+        }
+        ChannelType::Slack => {
+            // Validate Slack configuration
+            if !config.contains_key("webhook_url") {
+                return Err("Slack channel requires 'webhook_url'".to_string());
+            }
+            // Validate webhook URL format
+            if let Some(url) = config.get("webhook_url").and_then(|v| v.as_str()) {
+                if !url.starts_with("https://hooks.slack.com/") {
+                    return Err("Invalid Slack webhook URL format".to_string());
+                }
+            }
+        }
+        ChannelType::Webhook => {
+            // Validate webhook configuration
+            if !config.contains_key("url") {
+                return Err("Webhook channel requires 'url'".to_string());
+            }
+            // Validate URL format
+            if let Some(url) = config.get("url").and_then(|v| v.as_str()) {
+                if !url.starts_with("http://") && !url.starts_with("https://") {
+                    return Err("Webhook URL must start with http:// or https://".to_string());
+                }
+            }
+        }
+        ChannelType::Teams => {
+            // Validate Teams configuration
+            if !config.contains_key("webhook_url") {
+                return Err("Teams channel requires 'webhook_url'".to_string());
+            }
+            // Validate webhook URL format
+            if let Some(url) = config.get("webhook_url").and_then(|v| v.as_str()) {
+                if !url.contains("office.com") && !url.contains("microsoft.com") {
+                    return Err("Invalid Teams webhook URL format".to_string());
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_notification_rule(rule: &CreateRuleRequest) -> Result<(), String> {
+    // Validate event types are not empty
+    if rule.event_types.is_empty() {
+        return Err("Rule must have at least one event type".to_string());
+    }
+
+    // Validate severity levels are not empty
+    if rule.severity_levels.is_empty() {
+        return Err("Rule must have at least one severity level".to_string());
+    }
+
+    // Validate channels are not empty
+    if rule.channels.is_empty() {
+        return Err("Rule must have at least one channel".to_string());
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Channel Handlers
 // ============================================================================
 
 pub async fn list_channels(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationChannel>>, StatusCode> {
-    // TODO: Load from state store
-    // For now, return mock data
-    let channels = vec![
+    // Load from state store, fall back to mock data if empty
+    let channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
+        .unwrap_or_else(|_| vec![
         NotificationChannel {
             id: Uuid::new_v4().to_string(),
             name: "Email Alerts".to_string(),
@@ -175,17 +256,20 @@ pub async fn list_channels(
             created: Utc::now(),
             last_test: Some(Utc::now()),
         },
-    ];
+    ]);
 
     Ok(Json(channels))
 }
 
 pub async fn create_channel(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<CreateChannelRequest>,
 ) -> Result<(StatusCode, Json<NotificationChannel>), StatusCode> {
-    // TODO: Validate config based on channel type
-    // TODO: Save to state store
+    // Validate config based on channel type
+    if let Err(err) = validate_channel_config(&req.channel_type, &req.config) {
+        tracing::warn!("Invalid channel config: {}", err);
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     let channel = NotificationChannel {
         id: Uuid::new_v4().to_string(),
@@ -196,6 +280,12 @@ pub async fn create_channel(
         created: Utc::now(),
         last_test: None,
     };
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
+        tracing::error!("Failed to save notification channel: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok((StatusCode::CREATED, Json(channel)))
 }
@@ -224,11 +314,25 @@ pub async fn update_channel(
 }
 
 pub async fn delete_channel(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove from state store
-    // TODO: Check if channel is used by any rules
+    // Check if channel is used by any rules
+    let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
+        .unwrap_or_default();
+
+    for rule in rules {
+        if rule.channels.contains(&id) {
+            tracing::warn!("Cannot delete channel {} - used by rule {}", id, rule.name);
+            return Err(StatusCode::CONFLICT);
+        }
+    }
+
+    // Remove from state store
+    if let Err(e) = state.store.delete_entity("notifications/channels", &id) {
+        tracing::error!("Failed to delete channel: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -249,11 +353,11 @@ pub async fn test_channel(
 // ============================================================================
 
 pub async fn list_rules(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationRule>>, StatusCode> {
-    // TODO: Load from state store
-    // For now, return mock data
-    let rules = vec![
+    // Load from state store, fall back to mock data if empty
+    let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
+        .unwrap_or_else(|_| vec![
         NotificationRule {
             id: Uuid::new_v4().to_string(),
             name: "VM Failures".to_string(),
@@ -280,17 +384,29 @@ pub async fn list_rules(
             triggered_count: 12,
             last_triggered: Some(Utc::now()),
         },
-    ];
+    ]);
 
     Ok(Json(rules))
 }
 
 pub async fn create_rule(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<CreateRuleRequest>,
 ) -> Result<(StatusCode, Json<NotificationRule>), StatusCode> {
-    // TODO: Validate channels exist
-    // TODO: Save to state store
+    // Validate rule
+    if let Err(err) = validate_notification_rule(&req) {
+        tracing::warn!("Invalid notification rule: {}", err);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate channels exist
+    for channel_id in &req.channels {
+        if state.store.get_entity::<NotificationChannel>("notifications/channels", channel_id)
+            .ok().flatten().is_none() {
+            tracing::warn!("Channel not found: {}", channel_id);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
 
     let rule = NotificationRule {
         id: Uuid::new_v4().to_string(),
@@ -305,6 +421,12 @@ pub async fn create_rule(
         triggered_count: 0,
         last_triggered: None,
     };
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+        tracing::error!("Failed to save notification rule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok((StatusCode::CREATED, Json(rule)))
 }
@@ -337,10 +459,14 @@ pub async fn update_rule(
 }
 
 pub async fn delete_rule(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove from state store
+    // Remove from state store
+    if let Err(e) = state.store.delete_entity("notifications/rules", &id) {
+        tracing::error!("Failed to delete rule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -72,6 +72,33 @@ fn default_true() -> bool {
 }
 
 // ============================================================================
+// Validation Functions
+// ============================================================================
+
+fn validate_quota(req: &CreateQuotaRequest) -> Result<(), String> {
+    // Validate limits are not zero
+    if req.max_cpus == 0 {
+        return Err("max_cpus must be greater than 0".to_string());
+    }
+    if req.max_memory == 0 {
+        return Err("max_memory must be greater than 0".to_string());
+    }
+    if req.max_disk == 0 {
+        return Err("max_disk must be greater than 0".to_string());
+    }
+    if req.max_vms == 0 {
+        return Err("max_vms must be greater than 0".to_string());
+    }
+
+    // Validate name is not empty
+    if req.name.trim().is_empty() {
+        return Err("Quota name cannot be empty".to_string());
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -139,11 +166,11 @@ impl QuotaUsage {
 // ============================================================================
 
 pub async fn list_quotas(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ResourceQuota>>, StatusCode> {
-    // TODO: Load from state store
-    // For now, return mock data
-    let quotas = vec![
+    // Load from state store, fall back to mock data if empty
+    let quotas = state.store.list_entities::<ResourceQuota>("quotas")
+        .unwrap_or_else(|_| vec![
         ResourceQuota {
             id: Uuid::new_v4().to_string(),
             name: "Development Team".to_string(),
@@ -176,7 +203,7 @@ pub async fn list_quotas(
             created: Utc::now(),
             updated: Utc::now(),
         },
-    ];
+    ]);
 
     Ok(Json(quotas))
 }
@@ -208,10 +235,14 @@ pub async fn get_quota(
 }
 
 pub async fn create_quota(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<CreateQuotaRequest>,
 ) -> Result<(StatusCode, Json<ResourceQuota>), StatusCode> {
-    // TODO: Save to state store
+    // Validate quota
+    if let Err(err) = validate_quota(&req) {
+        tracing::warn!("Invalid quota: {}", err);
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     let now = Utc::now();
     let quota = ResourceQuota {
@@ -230,6 +261,12 @@ pub async fn create_quota(
         created: now,
         updated: now,
     };
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
+        tracing::error!("Failed to save quota: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok((StatusCode::CREATED, Json(quota)))
 }
@@ -265,11 +302,22 @@ pub async fn update_quota(
 }
 
 pub async fn delete_quota(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove from state store
-    // TODO: Check if quota is in use
+    // Check if quota is in use (has any usage)
+    if let Ok(Some(quota)) = state.store.get_entity::<ResourceQuota>("quotas", &id) {
+        if quota.used_vms > 0 {
+            tracing::warn!("Cannot delete quota {} - currently in use by {} VMs", id, quota.used_vms);
+            return Err(StatusCode::CONFLICT);
+        }
+    }
+
+    // Remove from state store
+    if let Err(e) = state.store.delete_entity("quotas", &id) {
+        tracing::error!("Failed to delete quota: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

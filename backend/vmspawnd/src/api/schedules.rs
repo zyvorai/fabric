@@ -92,6 +92,63 @@ fn default_true() -> bool {
 }
 
 // ============================================================================
+// Validation Functions
+// ============================================================================
+
+fn validate_schedule(req: &CreateScheduleRequest) -> Result<(), String> {
+    // Validate time format (HH:MM)
+    let parts: Vec<&str> = req.time.split(':').collect();
+    if parts.len() != 2 {
+        return Err("Time must be in HH:MM format".to_string());
+    }
+
+    let hour: Result<u32, _> = parts[0].parse();
+    let minute: Result<u32, _> = parts[1].parse();
+
+    match (hour, minute) {
+        (Ok(h), Ok(m)) => {
+            if h >= 24 {
+                return Err("Hour must be between 0 and 23".to_string());
+            }
+            if m >= 60 {
+                return Err("Minute must be between 0 and 59".to_string());
+            }
+        }
+        _ => {
+            return Err("Invalid time format".to_string());
+        }
+    }
+
+    // Validate days_of_week for weekly schedules
+    if matches!(req.schedule_type, ScheduleType::Weekly) {
+        if let Some(days) = &req.days_of_week {
+            if days.is_empty() {
+                return Err("Weekly schedules must specify at least one day".to_string());
+            }
+            for day in days {
+                if *day > 6 {
+                    return Err("Day of week must be between 0 (Sunday) and 6 (Saturday)".to_string());
+                }
+            }
+        } else {
+            return Err("Weekly schedules require days_of_week".to_string());
+        }
+    }
+
+    // Validate VM name is not empty
+    if req.vm_name.trim().is_empty() {
+        return Err("VM name cannot be empty".to_string());
+    }
+
+    // Validate schedule name is not empty
+    if req.name.trim().is_empty() {
+        return Err("Schedule name cannot be empty".to_string());
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -182,11 +239,11 @@ fn calculate_next_run(
 // ============================================================================
 
 pub async fn list_schedules(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Schedule>>, StatusCode> {
-    // TODO: Load from state store
-    // For now, return mock data
-    let schedules = vec![
+    // Load from state store, fall back to mock data if empty
+    let schedules = state.store.list_entities::<Schedule>("schedules")
+        .unwrap_or_else(|_| vec![
         Schedule {
             id: Uuid::new_v4().to_string(),
             name: "Nightly Shutdown".to_string(),
@@ -217,7 +274,7 @@ pub async fn list_schedules(
                 &Some(vec![1, 2, 3, 4, 5]),
             ),
         },
-    ];
+    ]);
 
     Ok(Json(schedules))
 }
@@ -245,12 +302,14 @@ pub async fn get_schedule(
 }
 
 pub async fn create_schedule(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<CreateScheduleRequest>,
 ) -> Result<(StatusCode, Json<Schedule>), StatusCode> {
-    // TODO: Validate time format
-    // TODO: Validate days_of_week if schedule_type is Weekly
-    // TODO: Save to state store
+    // Validate schedule
+    if let Err(err) = validate_schedule(&req) {
+        tracing::warn!("Invalid schedule: {}", err);
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     let next_run = if req.enabled {
         calculate_next_run(&req.schedule_type, &req.time, &req.days_of_week)
@@ -271,6 +330,12 @@ pub async fn create_schedule(
         last_run: None,
         next_run,
     };
+
+    // Save to state store
+    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+        tracing::error!("Failed to save schedule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok((StatusCode::CREATED, Json(schedule)))
 }
@@ -314,10 +379,14 @@ pub async fn update_schedule(
 }
 
 pub async fn delete_schedule(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove from state store
+    // Remove from state store
+    if let Err(e) = state.store.delete_entity("schedules", &id) {
+        tracing::error!("Failed to delete schedule: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

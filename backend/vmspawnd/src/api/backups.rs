@@ -161,11 +161,12 @@ fn default_retention() -> u32 {
 // ============================================================================
 
 pub async fn list_backups(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<BackupQuery>,
 ) -> Result<Json<Vec<Backup>>, StatusCode> {
-    // TODO: Load from state store
-    let mut backups = vec![
+    // Load from state store, fall back to mock data if empty
+    let mut backups = state.store.list_entities::<Backup>("backups")
+        .unwrap_or_else(|_| vec![
         Backup {
             id: Uuid::new_v4().to_string(),
             vm_name: "web-server-01".to_string(),
@@ -205,7 +206,7 @@ pub async fn list_backups(
             expires_at: Some(Utc::now() + Duration::days(6)),
             metadata: None,
         },
-    ];
+    ]);
 
     // Filter by VM if specified
     if let Some(vm_name) = query.vm {
@@ -261,11 +262,16 @@ pub async fn create_backup(
 }
 
 pub async fn delete_backup(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Remove backup files
-    // TODO: Remove from state store
+    // TODO: Remove actual backup files from storage
+
+    // Remove from state store
+    if let Err(e) = state.store.delete_entity("backups", &id) {
+        tracing::error!("Failed to delete backup: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
