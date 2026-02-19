@@ -17,3 +17,4 @@ serde_json.workspace = true
 reqwest = { version = "0.12", features = ["json"] }
 tokio.workspace = true
 vm-model = { path = "../vm-model" }
+rand = "0.8"

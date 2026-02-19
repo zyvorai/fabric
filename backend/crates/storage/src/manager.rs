@@ -1,0 +1,424 @@
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+use crate::nfs::{NfsConfig, NfsError, NfsHealth, NfsPool, NfsStats};
+use crate::pool::{PoolState, StoragePool, StoragePoolType};
+
+#[derive(Debug, Error)]
+pub enum StorageError {
+    #[error("Pool not found: {0}")]
+    PoolNotFound(String),
+
+    #[error("Pool already exists: {0}")]
+    PoolExists(String),
+
+    #[error("NFS error: {0}")]
+    Nfs(#[from] NfsError),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+
+    #[error("Pool is not active: {0}")]
+    PoolNotActive(String),
+
+    #[error("Invalid pool type: {0}")]
+    InvalidPoolType(String),
+}
+
+pub struct StorageManager {
+    pools: Arc<RwLock<HashMap<String, StoragePool>>>,
+    nfs_pools: Arc<RwLock<HashMap<String, NfsPool>>>,
+    state_file: PathBuf,
+}
+
+impl StorageManager {
+    pub fn new(state_dir: &Path) -> Result<Self, StorageError> {
+        let state_file = state_dir.join("storage_pools.json");
+
+        let manager = Self {
+            pools: Arc::new(RwLock::new(HashMap::new())),
+            nfs_pools: Arc::new(RwLock::new(HashMap::new())),
+            state_file,
+        };
+
+        // Load existing pools
+        if manager.state_file.exists() {
+            manager.load_state()?;
+        }
+
+        Ok(manager)
+    }
+
+    /// Create a new local storage pool
+    pub async fn create_local_pool(
+        &self,
+        name: String,
+        path: PathBuf,
+        auto_start: bool,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        // Create directory if it doesn't exist
+        if !path.exists() {
+            fs::create_dir_all(&path)?;
+        }
+
+        let mut pool = StoragePool::new(name.clone(), StoragePoolType::Local, path.clone());
+        pool.auto_start = auto_start;
+        pool.state = PoolState::Active;
+
+        // Get disk stats
+        self.update_pool_stats(&mut pool)?;
+
+        pools.insert(name.clone(), pool.clone());
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
+    /// Create a new directory storage pool
+    pub async fn create_directory_pool(
+        &self,
+        name: String,
+        path: PathBuf,
+        auto_start: bool,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        if !path.exists() {
+            fs::create_dir_all(&path)?;
+        }
+
+        let mut pool = StoragePool::new(
+            name.clone(),
+            StoragePoolType::Directory { path: path.clone() },
+            path.clone(),
+        );
+        pool.auto_start = auto_start;
+        pool.state = PoolState::Active;
+
+        self.update_pool_stats(&mut pool)?;
+
+        pools.insert(name.clone(), pool.clone());
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
+    /// Create a new NFS storage pool
+    pub async fn create_nfs_pool(
+        &self,
+        name: String,
+        config: NfsConfig,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+        let mut nfs_pools = self.nfs_pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        // Create and mount NFS pool
+        let mut nfs_pool = NfsPool::new(config.clone())?;
+
+        // Check if server is reachable
+        if !nfs_pool.check_server()? {
+            return Err(StorageError::Nfs(NfsError::ServerUnreachable(
+                config.server.clone(),
+            )));
+        }
+
+        // Mount the NFS share
+        nfs_pool.mount()?;
+
+        // Create storage pool entry
+        let pool_type = StoragePoolType::NFS {
+            server: config.server.clone(),
+            export_path: config.export_path.clone(),
+            mount_options: config.mount_options.clone(),
+        };
+
+        let mut pool = StoragePool::new(name.clone(), pool_type, config.mount_path.clone());
+        pool.auto_start = config.auto_start;
+        pool.state = PoolState::Active;
+
+        // Get NFS stats
+        if let Ok(stats) = nfs_pool.get_stats() {
+            pool.update_stats(
+                stats.total_kb * 1024,
+                stats.available_kb * 1024,
+            );
+        }
+
+        pools.insert(name.clone(), pool.clone());
+        nfs_pools.insert(name.clone(), nfs_pool);
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
+    /// Delete a storage pool
+    pub async fn delete_pool(&self, name: &str) -> Result<(), StorageError> {
+        let mut pools = self.pools.write().await;
+        let mut nfs_pools = self.nfs_pools.write().await;
+
+        let pool = pools.get(name)
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
+
+        // If it's an NFS pool, unmount it first
+        if pool.is_nfs() {
+            if let Some(mut nfs_pool) = nfs_pools.remove(name) {
+                nfs_pool.unmount()?;
+            }
+        }
+
+        pools.remove(name);
+        self.save_state(&pools)?;
+
+        Ok(())
+    }
+
+    /// Start a storage pool
+    pub async fn start_pool(&self, name: &str) -> Result<(), StorageError> {
+        let mut pools = self.pools.write().await;
+        let mut nfs_pools = self.nfs_pools.write().await;
+
+        let pool = pools.get_mut(name)
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
+
+        if pool.state == PoolState::Active {
+            return Ok(());
+        }
+
+        pool.state = PoolState::Starting;
+
+        // If it's an NFS pool, mount it
+        if pool.is_nfs() {
+            if let Some(nfs_pool) = nfs_pools.get_mut(name) {
+                nfs_pool.mount()?;
+
+                // Update stats
+                if let Ok(stats) = nfs_pool.get_stats() {
+                    pool.update_stats(
+                        stats.total_kb * 1024,
+                        stats.available_kb * 1024,
+                    );
+                }
+            }
+        }
+
+        pool.state = PoolState::Active;
+        self.save_state(&pools)?;
+
+        Ok(())
+    }
+
+    /// Stop a storage pool
+    pub async fn stop_pool(&self, name: &str) -> Result<(), StorageError> {
+        let mut pools = self.pools.write().await;
+        let mut nfs_pools = self.nfs_pools.write().await;
+
+        let pool = pools.get_mut(name)
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
+
+        if pool.state == PoolState::Inactive {
+            return Ok(());
+        }
+
+        pool.state = PoolState::Stopping;
+
+        // If it's an NFS pool, unmount it
+        if pool.is_nfs() {
+            if let Some(nfs_pool) = nfs_pools.get_mut(name) {
+                nfs_pool.unmount()?;
+            }
+        }
+
+        pool.state = PoolState::Inactive;
+        self.save_state(&pools)?;
+
+        Ok(())
+    }
+
+    /// Get a storage pool
+    pub async fn get_pool(&self, name: &str) -> Result<StoragePool, StorageError> {
+        let pools = self.pools.read().await;
+        pools.get(name)
+            .cloned()
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))
+    }
+
+    /// List all storage pools
+    pub async fn list_pools(&self) -> Vec<StoragePool> {
+        let pools = self.pools.read().await;
+        pools.values().cloned().collect()
+    }
+
+    /// Get NFS pool health
+    pub async fn get_nfs_health(&self, name: &str) -> Result<NfsHealth, StorageError> {
+        let nfs_pools = self.nfs_pools.read().await;
+        let nfs_pool = nfs_pools.get(name)
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
+
+        Ok(nfs_pool.health_check()?)
+    }
+
+    /// Get NFS pool stats
+    pub async fn get_nfs_stats(&self, name: &str) -> Result<NfsStats, StorageError> {
+        let nfs_pools = self.nfs_pools.read().await;
+        let nfs_pool = nfs_pools.get(name)
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
+
+        Ok(nfs_pool.get_stats()?)
+    }
+
+    /// Update pool statistics
+    pub async fn refresh_pool_stats(&self, name: &str) -> Result<(), StorageError> {
+        let mut pools = self.pools.write().await;
+        let nfs_pools = self.nfs_pools.read().await;
+
+        let pool = pools.get_mut(name)
+            .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
+
+        if pool.is_nfs() {
+            if let Some(nfs_pool) = nfs_pools.get(name) {
+                if let Ok(stats) = nfs_pool.get_stats() {
+                    pool.update_stats(
+                        stats.total_kb * 1024,
+                        stats.available_kb * 1024,
+                    );
+                }
+            }
+        } else {
+            self.update_pool_stats(pool)?;
+        }
+
+        Ok(())
+    }
+
+    fn update_pool_stats(&self, pool: &mut StoragePool) -> Result<(), StorageError> {
+        let output = std::process::Command::new("df")
+            .args(&["-k", pool.path.to_str().unwrap()])
+            .output()?;
+
+        let df_output = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = df_output.lines().collect();
+
+        if lines.len() >= 2 {
+            let parts: Vec<&str> = lines[1].split_whitespace().collect();
+            if parts.len() >= 4 {
+                let total_kb: u64 = parts[1].parse().unwrap_or(0);
+                let available_kb: u64 = parts[3].parse().unwrap_or(0);
+
+                pool.update_stats(total_kb * 1024, available_kb * 1024);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn save_state(&self, pools: &HashMap<String, StoragePool>) -> Result<(), StorageError> {
+        let json = serde_json::to_string_pretty(pools)?;
+        fs::write(&self.state_file, json)?;
+        Ok(())
+    }
+
+    fn load_state(&self) -> Result<(), StorageError> {
+        let json = fs::read_to_string(&self.state_file)?;
+        let pools: HashMap<String, StoragePool> = serde_json::from_str(&json)?;
+
+        // TODO: Restore NFS pools on startup
+        // For now, just load the pool metadata
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_create_local_pool() {
+        let temp_dir = tempdir().unwrap();
+        let state_dir = temp_dir.path().to_path_buf();
+        let pool_path = state_dir.join("pool1");
+
+        let manager = StorageManager::new(&state_dir).unwrap();
+
+        let result = manager.create_local_pool(
+            "test-pool".to_string(),
+            pool_path.clone(),
+            true,
+        ).await;
+
+        assert!(result.is_ok());
+        let pool = result.unwrap();
+        assert_eq!(pool.name, "test-pool");
+        assert!(pool.is_active());
+        assert!(pool_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_pool() {
+        let temp_dir = tempdir().unwrap();
+        let state_dir = temp_dir.path().to_path_buf();
+        let pool_path = state_dir.join("pool1");
+
+        let manager = StorageManager::new(&state_dir).unwrap();
+
+        manager.create_local_pool(
+            "test-pool".to_string(),
+            pool_path.clone(),
+            true,
+        ).await.unwrap();
+
+        let result = manager.create_local_pool(
+            "test-pool".to_string(),
+            pool_path,
+            true,
+        ).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_list_pools() {
+        let temp_dir = tempdir().unwrap();
+        let state_dir = temp_dir.path().to_path_buf();
+
+        let manager = StorageManager::new(&state_dir).unwrap();
+
+        manager.create_local_pool(
+            "pool1".to_string(),
+            state_dir.join("pool1"),
+            true,
+        ).await.unwrap();
+
+        manager.create_directory_pool(
+            "pool2".to_string(),
+            state_dir.join("pool2"),
+            true,
+        ).await.unwrap();
+
+        let pools = manager.list_pools().await;
+        assert_eq!(pools.len(), 2);
+    }
+}
