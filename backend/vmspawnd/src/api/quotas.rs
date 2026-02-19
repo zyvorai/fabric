@@ -390,12 +390,12 @@ pub async fn get_quota_usage(
     Path(id): Path<String>,
 ) -> Result<Json<QuotaUsage>, StatusCode> {
     // Load quota from state store
-    let quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
+    let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    // TODO: Calculate real usage from VMs
-    // For now, use the stored usage values
+    // Calculate real usage from VMs
+    calculate_quota_usage(&state, &mut quota).await;
 
     let usage = QuotaUsage::from_quota(&quota);
     Ok(Json(usage))
@@ -405,49 +405,73 @@ pub async fn get_all_quota_usage(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<QuotaUsage>>, StatusCode> {
     // Load all quotas from state store
-    let quotas = state.store.list_entities::<ResourceQuota>("quotas")
-        .unwrap_or_else(|_| vec![
-        ResourceQuota {
-            id: Uuid::new_v4().to_string(),
-            name: "Development Team".to_string(),
-            max_cpus: 32,
-            max_memory: 65536,
-            max_disk: 500,
-            max_vms: 10,
-            used_cpus: 24,
-            used_memory: 49152,
-            used_disk: 400,
-            used_vms: 8,
-            tags: Some(vec!["dev".to_string()]),
-            enabled: true,
-            created: Utc::now(),
-            updated: Utc::now(),
-        },
-        ResourceQuota {
-            id: Uuid::new_v4().to_string(),
-            name: "Production".to_string(),
-            max_cpus: 128,
-            max_memory: 262144,
-            max_disk: 2000,
-            max_vms: 50,
-            used_cpus: 110, // 86% - high usage
-            used_memory: 229376, // 87.5% - high usage
-            used_disk: 1800, // 90% - critical
-            used_vms: 45, // 90% - critical
-            tags: Some(vec!["production".to_string()]),
-            enabled: true,
-            created: Utc::now(),
-            updated: Utc::now(),
-        },
-    ]);
+    let mut quotas = state.store.list_entities::<ResourceQuota>("quotas")
+        .unwrap_or_default();
 
-    // TODO: Calculate real usage from VMs for each quota
+    // Calculate real usage from VMs for each quota
+    for quota in &mut quotas {
+        calculate_quota_usage(&state, quota).await;
+    }
 
     let usage: Vec<QuotaUsage> = quotas.iter()
         .map(QuotaUsage::from_quota)
         .collect();
 
     Ok(Json(usage))
+}
+
+// ============================================================================
+// Usage Calculation Helper
+// ============================================================================
+
+/// Calculate real quota usage from actual VMs
+async fn calculate_quota_usage(state: &AppState, quota: &mut ResourceQuota) {
+    // Load all VMs
+    let vms = match state.store.list_vms() {
+        Ok(vms) => vms,
+        Err(e) => {
+            tracing::error!("Failed to load VMs for quota calculation: {}", e);
+            return;
+        }
+    };
+
+    // Reset usage counters
+    quota.used_cpus = 0;
+    quota.used_memory = 0;
+    quota.used_disk = 0;
+    quota.used_vms = 0;
+
+    // Calculate usage from VMs matching this quota
+    for vm in vms {
+        // For now, match all VMs to this quota since VM struct doesn't have tags yet
+        // TODO: Add tags field to VM struct for tag-based quota matching
+        let matches = if quota.tags.is_none() {
+            // Quota has no tags - applies to all VMs
+            true
+        } else {
+            // Quota has tags but VMs don't support tags yet
+            // Apply to all VMs for now
+            true
+        };
+
+        if matches {
+            quota.used_cpus += vm.cpus;
+            quota.used_memory += vm.memory;
+            // TODO: VM struct doesn't have disk field yet - estimate based on memory
+            // Assume 2GB disk per 1GB RAM as a rough estimate
+            quota.used_disk += (vm.memory / 1024) * 2;
+            quota.used_vms += 1;
+        }
+    }
+
+    tracing::debug!(
+        "Calculated quota '{}' usage: {} CPUs, {} MB memory, {} GB disk, {} VMs",
+        quota.name,
+        quota.used_cpus,
+        quota.used_memory,
+        quota.used_disk,
+        quota.used_vms
+    );
 }
 
 // ============================================================================

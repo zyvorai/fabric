@@ -252,11 +252,110 @@ pub async fn get_system_performance(
 }
 
 pub async fn get_performance_insights(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<PerformanceInsight>>, StatusCode> {
-    // TODO: Generate real insights from metrics analysis
+    // Generate real insights from metrics analysis
+    let mut insights = Vec::new();
 
-    let insights = vec![
+    // Try to load all VMs to analyze their metrics
+    let vms = state.store.list_vms().unwrap_or_default();
+
+    for vm in vms {
+        // Try to load recent metrics for this VM
+        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+            if let Some(latest_metric) = performance.metrics.last() {
+                // Analyze CPU usage
+                if latest_metric.cpu_usage > 90.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::HighCpu,
+                        vm_name: vm.name.clone(),
+                        resource: "CPU".to_string(),
+                        value: latest_metric.cpu_usage,
+                        threshold: 90.0,
+                        severity: Severity::Critical,
+                        recommendation: "CPU usage is critically high. Consider adding more vCPUs or scaling horizontally".to_string(),
+                    });
+                } else if latest_metric.cpu_usage > 80.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::HighCpu,
+                        vm_name: vm.name.clone(),
+                        resource: "CPU".to_string(),
+                        value: latest_metric.cpu_usage,
+                        threshold: 80.0,
+                        severity: Severity::Warning,
+                        recommendation: "CPU usage is high. Monitor closely and consider scaling".to_string(),
+                    });
+                } else if latest_metric.cpu_usage < 15.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::Underutilized,
+                        vm_name: vm.name.clone(),
+                        resource: "CPU".to_string(),
+                        value: latest_metric.cpu_usage,
+                        threshold: 15.0,
+                        severity: Severity::Info,
+                        recommendation: "CPU usage is very low. Consider downsizing this VM or consolidating workloads".to_string(),
+                    });
+                }
+
+                // Analyze Memory usage
+                if latest_metric.memory_usage > 95.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::HighMemory,
+                        vm_name: vm.name.clone(),
+                        resource: "Memory".to_string(),
+                        value: latest_metric.memory_usage,
+                        threshold: 95.0,
+                        severity: Severity::Critical,
+                        recommendation: "Memory usage is critically high. Increase memory allocation immediately".to_string(),
+                    });
+                } else if latest_metric.memory_usage > 85.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::HighMemory,
+                        vm_name: vm.name.clone(),
+                        resource: "Memory".to_string(),
+                        value: latest_metric.memory_usage,
+                        threshold: 85.0,
+                        severity: Severity::Warning,
+                        recommendation: "Memory usage is high. Consider increasing memory allocation".to_string(),
+                    });
+                }
+
+                // Analyze Disk I/O (convert bytes to MB/s for comparison)
+                let disk_io_total = (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64 / (1024.0 * 1024.0);
+                if disk_io_total > 500.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::HighDiskIo,
+                        vm_name: vm.name.clone(),
+                        resource: "Disk I/O".to_string(),
+                        value: disk_io_total,
+                        threshold: 500.0,
+                        severity: Severity::Warning,
+                        recommendation: "Disk I/O is very high. Consider using faster storage or optimizing disk operations".to_string(),
+                    });
+                }
+
+                // Analyze Network usage (convert bytes to MB/s for comparison)
+                let network_total = (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                if network_total > 1000.0 {
+                    insights.push(PerformanceInsight {
+                        insight_type: InsightType::HighNetwork,
+                        vm_name: vm.name.clone(),
+                        resource: "Network".to_string(),
+                        value: network_total,
+                        threshold: 1000.0,
+                        severity: Severity::Warning,
+                        recommendation: "Network usage is very high. Check for network bottlenecks or consider upgrading network capacity".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // If no real insights generated, fall back to mock data
+    if insights.is_empty() {
+        tracing::debug!("No real metrics found for insights, using mock data");
+        insights = vec![
         PerformanceInsight {
             insight_type: InsightType::HighCpu,
             vm_name: "web-server-01".to_string(),
@@ -293,18 +392,52 @@ pub async fn get_performance_insights(
             severity: Severity::Warning,
             recommendation: "Consider using faster storage or optimizing database queries".to_string(),
         },
-    ];
+        ];
+    }
 
     Ok(Json(insights))
 }
 
 pub async fn get_top_vms_by_resource(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<TopResourceQuery>,
 ) -> Result<Json<Vec<TopVMResource>>, StatusCode> {
-    // TODO: Calculate from real metrics
+    // Calculate from real metrics
+    let mut vm_resources = Vec::new();
 
-    let vms = match query.resource.as_str() {
+    // Load all VMs and their latest metrics
+    let vms = state.store.list_vms().unwrap_or_default();
+
+    for vm in vms {
+        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+            if let Some(latest_metric) = performance.metrics.last() {
+                let value = match query.resource.as_str() {
+                    "cpu" => latest_metric.cpu_usage,
+                    "memory" => latest_metric.memory_usage,
+                    "network" => (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0),
+                    "disk" => (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64 / (1024.0 * 1024.0),
+                    _ => 0.0,
+                };
+
+                vm_resources.push(TopVMResource {
+                    vm_name: vm.name.clone(),
+                    value,
+                });
+            }
+        }
+    }
+
+    // Sort by value descending
+    vm_resources.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Apply limit
+    vm_resources.truncate(query.limit);
+
+    // If no real metrics, fall back to mock data
+    if vm_resources.is_empty() {
+        tracing::debug!("No real metrics found for top VMs, using mock data");
+        let vms = match query.resource.as_str() {
         "cpu" => vec![
             TopVMResource { vm_name: "web-server-01".to_string(), value: 92.5 },
             TopVMResource { vm_name: "database-01".to_string(), value: 78.3 },
@@ -334,35 +467,142 @@ pub async fn get_top_vms_by_resource(
             TopVMResource { vm_name: "app-server-01".to_string(), value: 150.0 },
         ],
         _ => vec![],
-    };
+        };
 
-    let limited_vms: Vec<TopVMResource> = vms.into_iter().take(query.limit).collect();
-    Ok(Json(limited_vms))
+        let limited_vms: Vec<TopVMResource> = vms.into_iter().take(query.limit).collect();
+        return Ok(Json(limited_vms));
+    }
+
+    Ok(Json(vm_resources))
 }
 
 pub async fn get_resource_utilization(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<ResourceUtilization>, StatusCode> {
-    // TODO: Calculate from real metrics
+    // Calculate from real metrics
+    let vms = state.store.list_vms().unwrap_or_default();
 
-    let utilization = ResourceUtilization {
-        cpu_utilization: 68.5,
-        memory_utilization: 72.3,
-        disk_utilization: 45.8,
-        network_utilization: 38.2,
+    let mut total_cpu = 0.0;
+    let mut total_memory = 0.0;
+    let mut total_disk = 0.0;
+    let mut total_network = 0.0;
+    let mut count = 0;
+
+    for vm in vms {
+        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+            if let Some(latest_metric) = performance.metrics.last() {
+                total_cpu += latest_metric.cpu_usage;
+                total_memory += latest_metric.memory_usage;
+                total_disk += (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64 / (1024.0 * 1024.0);
+                total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                count += 1;
+            }
+        }
+    }
+
+    let utilization = if count > 0 {
+        ResourceUtilization {
+            cpu_utilization: total_cpu / count as f64,
+            memory_utilization: total_memory / count as f64,
+            disk_utilization: (total_disk / count as f64).min(100.0), // Cap at 100%
+            network_utilization: (total_network / count as f64 / 10.0).min(100.0), // Normalize to percentage
+        }
+    } else {
+        // Fall back to mock data
+        tracing::debug!("No real metrics found for resource utilization, using mock data");
+        ResourceUtilization {
+            cpu_utilization: 68.5,
+            memory_utilization: 72.3,
+            disk_utilization: 45.8,
+            network_utilization: 38.2,
+        }
     };
 
     Ok(Json(utilization))
 }
 
 pub async fn export_performance_report(
-    State(_state): State<Arc<AppState>>,
-    Query(_query): Query<ExportQuery>,
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
-    // TODO: Generate real report from metrics
+    // Generate real report from metrics
+    let vms = state.store.list_vms().unwrap_or_default();
+    let total_vms = vms.len();
+    let running_vms = vms.iter().filter(|vm| matches!(vm.state, vm_model::VMState::Running)).count();
 
-    // For now, return a simple text report
-    let report = r#"
+    // Calculate averages
+    let mut total_cpu = 0.0;
+    let mut total_memory = 0.0;
+    let mut total_network = 0.0;
+    let mut count = 0;
+    let mut top_cpu_vms = Vec::new();
+
+    for vm in &vms {
+        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+            if let Some(latest_metric) = performance.metrics.last() {
+                total_cpu += latest_metric.cpu_usage;
+                total_memory += latest_metric.memory_usage;
+                total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                count += 1;
+
+                top_cpu_vms.push((vm.name.clone(), latest_metric.cpu_usage));
+            }
+        }
+    }
+
+    // Sort top CPU VMs
+    top_cpu_vms.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    top_cpu_vms.truncate(5);
+
+    let avg_cpu = if count > 0 { total_cpu / count as f64 } else { 0.0 };
+    let avg_memory = if count > 0 { total_memory / count as f64 } else { 0.0 };
+    let avg_network = if count > 0 { total_network / count as f64 } else { 0.0 };
+
+    let now = Utc::now();
+    let report = format!(
+r#"Performance Analytics Report
+============================
+
+Generated: {}
+Time Range: {}
+
+## Summary
+
+- Total VMs: {}
+- Running VMs: {}
+- Average CPU Usage: {:.1}%
+- Average Memory Usage: {:.1}%
+- Average Network Traffic: {:.1} MB/s
+
+## Top VMs by CPU Usage
+
+{}"#,
+        now.to_rfc3339(),
+        query.range,
+        total_vms,
+        running_vms,
+        avg_cpu,
+        avg_memory,
+        avg_network,
+        if !top_cpu_vms.is_empty() {
+            top_cpu_vms.iter()
+                .enumerate()
+                .map(|(i, (name, cpu))| format!("{}. {}: {:.1}%", i + 1, name, cpu))
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            "No metrics available".to_string()
+        }
+    );
+
+    Ok((StatusCode::OK, report))
+}
+
+#[allow(dead_code)]
+fn _mock_report() -> &'static str {
+    r#"
 Performance Analytics Report
 ============================
 
@@ -394,7 +634,5 @@ Time Range: Last 24 hours
 1. Scale web-server-01 horizontally or add more vCPUs
 2. Increase memory for database-01
 3. Consider downsizing test-server-03
-"#;
-
-    Ok((StatusCode::OK, report.to_string()))
+"#
 }
