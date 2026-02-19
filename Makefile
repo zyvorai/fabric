@@ -22,7 +22,7 @@ build-web:
 
 install: install-bin install-conf install-systemd install-web
 
-install-bin: build-backend
+install-bin:
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 0755 backend/target/release/vmspawnd  $(DESTDIR)$(BINDIR)/vmspawnd
 	install -m 0755 backend/target/release/vmctl      $(DESTDIR)$(BINDIR)/vmctl
@@ -38,7 +38,7 @@ install-systemd:
 	install -m 0644 systemd/vmspawnd.service $(DESTDIR)$(UNITDIR)/vmspawnd.service
 	install -m 0644 systemd/vm@.service      $(DESTDIR)$(UNITDIR)/vm@.service
 
-install-web: build-web
+install-web:
 	install -d $(DESTDIR)$(DATADIR)/vmspawnd/web
 	cp -r web/dist/* $(DESTDIR)$(DATADIR)/vmspawnd/web/
 
