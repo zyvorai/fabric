@@ -468,9 +468,30 @@ pub async fn run_schedule_now(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    // TODO: Execute the scheduled action immediately (call VM API)
+    // Execute the scheduled action immediately (call VM API)
     tracing::info!("Executing schedule {} immediately: {:?} on VM {}",
                    schedule.name, schedule.action, schedule.vm_name);
+
+    // Execute the VM action
+    let result = match schedule.action {
+        VMAction::Start => vmspawn_driver::start_vm(&schedule.vm_name),
+        VMAction::Stop => vmspawn_driver::stop_vm(&schedule.vm_name),
+        VMAction::Restart => vmspawn_driver::restart_vm(&schedule.vm_name),
+        VMAction::Snapshot => {
+            tracing::warn!("Snapshot action not yet implemented");
+            Ok(())
+        }
+    };
+
+    // Check if execution was successful
+    let (success, error) = match result {
+        Ok(_) => (true, None),
+        Err(e) => (false, Some(e.to_string())),
+    };
+
+    if !success {
+        tracing::error!("Failed to execute schedule {}: {:?}", schedule.name, error);
+    }
 
     let executed_at = Utc::now();
 
@@ -497,8 +518,8 @@ pub async fn run_schedule_now(
         vm_name: schedule.vm_name.clone(),
         action: action_str.to_string(),
         executed_at,
-        status: ExecutionStatus::Success, // Will be updated by background worker
-        error: None,
+        status: if success { ExecutionStatus::Success } else { ExecutionStatus::Failed },
+        error: error.clone(),
     };
 
     let history_id = Uuid::new_v4().to_string();

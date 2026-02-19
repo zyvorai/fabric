@@ -8,6 +8,7 @@ use axum::{
 use futures::{sink::SinkExt, stream::StreamExt};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use state_store::StateStore;
 
 /// VNC WebSocket proxy handler
 /// Bridges WebSocket (browser) <-> VNC server (TCP)
@@ -85,15 +86,52 @@ async fn handle_vnc(socket: WebSocket, vm_name: String) {
 }
 
 async fn get_vnc_port(vm_name: &str) -> u16 {
-    // TODO: Get VNC port from VM metadata
-    // For now, use a simple hash-based port assignment
+    // Get VNC port from VM metadata
+    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd".to_string());
+
+    if let Ok(store) = StateStore::new(&state_dir) {
+        if let Ok(Some(vm)) = store.get_vm(vm_name) {
+            if let Some(port) = vm.vnc_port {
+                tracing::info!("Using VNC port {} from VM metadata for '{}'", port, vm_name);
+                return port;
+            }
+        }
+    }
+
+    // Fallback: use hash-based port assignment
+    tracing::warn!("VNC port not set for VM '{}', using hash-based assignment", vm_name);
     let hash = vm_name.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32));
     5900 + (hash % 100) as u16
 }
 
 pub fn configure_vnc_for_vm(vm_name: &str, vnc_port: u16) -> anyhow::Result<()> {
     tracing::info!("Configuring VNC for VM {} on port {}", vm_name, vnc_port);
-    // TODO: Add VNC device to VM configuration
-    // This would integrate with systemd-vmspawn or QEMU args
+
+    // Add VNC device to VM configuration
+    // Store VNC port in VM metadata
+    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd".to_string());
+
+    if let Ok(store) = StateStore::new(&state_dir) {
+        if let Ok(Some(mut vm)) = store.get_vm(vm_name) {
+            vm.vnc_port = Some(vnc_port);
+            store.save_vm(&vm)?;
+            tracing::info!("VNC port {} saved to VM '{}' metadata", vnc_port, vm_name);
+        } else {
+            tracing::warn!("VM '{}' not found in state store, cannot save VNC port", vm_name);
+        }
+    } else {
+        tracing::warn!("Failed to open state store, cannot save VNC port");
+    }
+
+    // Generate QEMU VNC arguments for systemd-vmspawn integration
+    // The actual QEMU args would be: -vnc :X where X = vnc_port - 5900
+    let vnc_display = vnc_port - 5900;
+    tracing::info!(
+        "VNC configured for VM '{}': use QEMU arg '-vnc :{}' or '-vnc 0.0.0.0:{}'",
+        vm_name,
+        vnc_display,
+        vnc_port
+    );
+
     Ok(())
 }

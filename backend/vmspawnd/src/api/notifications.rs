@@ -666,10 +666,23 @@ async fn send_slack_notification(
         "icon_emoji": ":robot_face:",
     });
 
-    // TODO: Actually send HTTP POST to Slack webhook
-    // For now, just log the intention
-    tracing::info!("Slack notification queued for background worker: {}", payload);
+    // Send HTTP POST to Slack webhook
+    let client = reqwest::Client::new();
+    let response = client
+        .post(webhook_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send Slack notification: {}", e))?;
 
+    if !response.status().is_success() {
+        return Err(format!(
+            "Slack webhook returned error: {}",
+            response.status()
+        ));
+    }
+
+    tracing::info!("Slack notification sent successfully");
     Ok(())
 }
 
@@ -693,10 +706,23 @@ async fn send_webhook_notification(
         "source": "vmspawnd",
     });
 
-    // TODO: Actually send HTTP POST to webhook
-    // For now, just log the intention
-    tracing::info!("Webhook notification queued for background worker: {}", payload);
+    // Send HTTP POST to webhook
+    let client = reqwest::Client::new();
+    let response = client
+        .post(webhook_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send webhook notification: {}", e))?;
 
+    if !response.status().is_success() {
+        return Err(format!(
+            "Webhook returned error: {}",
+            response.status()
+        ));
+    }
+
+    tracing::info!("Webhook notification sent successfully");
     Ok(())
 }
 
@@ -722,9 +748,22 @@ async fn send_teams_notification(
         "text": message,
     });
 
-    // TODO: Actually send HTTP POST to Teams webhook
-    // For now, just log the intention
-    tracing::info!("Teams notification queued for background worker: {}", payload);
+    // Send HTTP POST to Teams webhook
+    let client = reqwest::Client::new();
+    let response = client
+        .post(webhook_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send Teams notification: {}", e))?;
 
+    if !response.status().is_success() {
+        return Err(format!(
+            "Teams webhook returned error: {}",
+            response.status()
+        ));
+    }
+
+    tracing::info!("Teams notification sent successfully");
     Ok(())
 }

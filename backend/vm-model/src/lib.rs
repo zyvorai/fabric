@@ -19,6 +19,8 @@ pub struct VM {
     pub hostname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vnc_port: Option<u16>,
     pub created: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated: Option<DateTime<Utc>>,
@@ -78,6 +80,7 @@ impl VM {
             mac_address: None,
             hostname: None,
             tags: None,
+            vnc_port: None,
             created: Utc::now(),
             updated: None,
         }
@@ -96,6 +99,7 @@ impl VM {
             mac_address: None,
             hostname: req.hostname.clone(),
             tags: req.tags.clone(),
+            vnc_port: None,
             created: Utc::now(),
             updated: None,
         }

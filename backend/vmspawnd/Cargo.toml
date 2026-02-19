@@ -23,6 +23,7 @@ tower-http = { version = "0.6", features = ["fs", "cors"] }
 futures.workspace = true
 uuid.workspace = true
 chrono.workspace = true
+reqwest = { version = "0.12", features = ["json"] }
 
 vm-model = { path = "../vm-model" }
 state-store = { path = "../state-store" }
