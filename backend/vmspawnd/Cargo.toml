@@ -21,6 +21,8 @@ toml.workspace = true
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs", "cors"] }
 futures.workspace = true
+uuid.workspace = true
+chrono.workspace = true
 
 vm-model = { path = "../vm-model" }
 state-store = { path = "../state-store" }
@@ -30,3 +32,6 @@ vnc-proxy = { path = "../vnc-proxy" }
 cloud-init = { path = "../cloud-init" }
 tpm-support = { path = "../tpm-support" }
 prometheus-exporter = { path = "../prometheus-exporter" }
+vmspawnd-storage = { path = "../crates/storage" }
+vmspawnd-system = { path = "../crates/system" }
+vmspawnd-vm = { path = "../crates/vm" }

@@ -1,0 +1,222 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+use vmspawnd_storage::{
+    NfsConfig, NfsVersion, PoolState, StorageManager, StoragePool, StoragePoolType,
+};
+
+use crate::server::AppState;
+
+// Request/Response types
+#[derive(Debug, Deserialize)]
+pub struct CreateLocalPoolRequest {
+    pub name: String,
+    pub path: String,
+    pub auto_start: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateNfsPoolRequest {
+    pub name: String,
+    pub config: NfsConfigDto,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NfsConfigDto {
+    pub server: String,
+    pub export_path: String,
+    pub mount_path: String,
+    pub mount_options: Vec<String>,
+    pub auto_start: bool,
+    pub nfs_version: NfsVersionDto,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum NfsVersionDto {
+    V3,
+    V4,
+    #[serde(rename = "V4_1")]
+    V4_1,
+    #[serde(rename = "V4_2")]
+    V4_2,
+}
+
+impl From<NfsVersionDto> for NfsVersion {
+    fn from(dto: NfsVersionDto) -> Self {
+        match dto {
+            NfsVersionDto::V3 => NfsVersion::V3,
+            NfsVersionDto::V4 => NfsVersion::V4,
+            NfsVersionDto::V4_1 => NfsVersion::V4_1,
+            NfsVersionDto::V4_2 => NfsVersion::V4_2,
+        }
+    }
+}
+
+impl From<NfsVersion> for NfsVersionDto {
+    fn from(version: NfsVersion) -> Self {
+        match version {
+            NfsVersion::V3 => NfsVersionDto::V3,
+            NfsVersion::V4 => NfsVersionDto::V4,
+            NfsVersion::V4_1 => NfsVersionDto::V4_1,
+            NfsVersion::V4_2 => NfsVersionDto::V4_2,
+        }
+    }
+}
+
+// API Handlers
+
+/// GET /api/storage/pools - List all storage pools
+pub async fn list_pools(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<StoragePool>>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+    let pools = manager.list_pools().await;
+    Ok(Json(pools))
+}
+
+/// GET /api/storage/pools/:name - Get storage pool details
+pub async fn get_pool(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.get_pool(&name).await {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((StatusCode::NOT_FOUND, format!("Pool not found: {}", e))),
+    }
+}
+
+/// POST /api/storage/pools/local - Create local storage pool
+pub async fn create_local_pool(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateLocalPoolRequest>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    let path = std::path::PathBuf::from(&req.path);
+
+    match manager.create_local_pool(req.name, path, req.auto_start).await {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to create pool: {}", e))),
+    }
+}
+
+/// POST /api/storage/pools/nfs - Create NFS storage pool
+pub async fn create_nfs_pool(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateNfsPoolRequest>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    let nfs_config = NfsConfig {
+        server: req.config.server,
+        export_path: req.config.export_path,
+        mount_path: std::path::PathBuf::from(&req.config.mount_path),
+        mount_options: req.config.mount_options,
+        auto_start: req.config.auto_start,
+        nfs_version: req.config.nfs_version.into(),
+    };
+
+    match manager.create_nfs_pool(req.name, nfs_config).await {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to create NFS pool: {}", e))),
+    }
+}
+
+/// DELETE /api/storage/pools/:name - Delete storage pool
+pub async fn delete_pool(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.delete_pool(&name).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to delete pool: {}", e))),
+    }
+}
+
+/// POST /api/storage/pools/:name/start - Start storage pool
+pub async fn start_pool(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.start_pool(&name).await {
+        Ok(_) => Ok(StatusCode::OK),
+        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to start pool: {}", e))),
+    }
+}
+
+/// POST /api/storage/pools/:name/stop - Stop storage pool
+pub async fn stop_pool(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.stop_pool(&name).await {
+        Ok(_) => Ok(StatusCode::OK),
+        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to stop pool: {}", e))),
+    }
+}
+
+/// GET /api/storage/pools/:name/health - Get NFS pool health
+pub async fn get_pool_health(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.get_nfs_health(&name).await {
+        Ok(health) => Ok(Json(health)),
+        Err(e) => Err((StatusCode::NOT_FOUND, format!("Failed to get health: {}", e))),
+    }
+}
+
+/// GET /api/storage/pools/:name/stats - Get NFS pool stats
+pub async fn get_pool_stats(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.get_nfs_stats(&name).await {
+        Ok(stats) => Ok(Json(stats)),
+        Err(e) => Err((StatusCode::NOT_FOUND, format!("Failed to get stats: {}", e))),
+    }
+}
+
+/// POST /api/storage/pools/:name/refresh - Refresh pool statistics
+pub async fn refresh_pool_stats(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager.refresh_pool_stats(&name).await {
+        Ok(_) => Ok(StatusCode::OK),
+        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to refresh stats: {}", e))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_nfs_version_conversion() {
+        let v4 = NfsVersionDto::V4;
+        let nfs_version: NfsVersion = v4.into();
+        assert!(matches!(nfs_version, NfsVersion::V4));
+    }
+}

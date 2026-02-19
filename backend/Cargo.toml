@@ -12,6 +12,9 @@ members = [
     "cloud-init",
     "tpm-support",
     "prometheus-exporter",
+    "crates/storage",
+    "crates/system",
+    "crates/vm",
 ]
 
 [workspace.package]
@@ -35,9 +38,8 @@ crossterm = "0.28"
 tui-input = "0.10"
 toml = "0.8"
 futures = "0.3"
-
-[dependencies]
 uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 regex = "1.11"
 tar = "0.4"
 flate2 = "1.0"
