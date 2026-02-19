@@ -567,28 +567,18 @@ pub async fn disable_rule(
 // ============================================================================
 
 pub async fn get_history(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<HistoryQuery>,
 ) -> Result<Json<Vec<NotificationHistory>>, StatusCode> {
-    // TODO: Load from state store with limit
-    // For now, return mock data
-    let mut history = vec![];
+    // Load from state store
+    let mut history = state.store.list_entities::<NotificationHistory>("notification_history")
+        .unwrap_or_default();
 
-    for i in 0..std::cmp::min(query.limit, 10) {
-        history.push(NotificationHistory {
-            id: Uuid::new_v4().to_string(),
-            rule_id: Uuid::new_v4().to_string(),
-            rule_name: format!("Rule {}", i + 1),
-            event_type: "vm.failed".to_string(),
-            severity: if i % 3 == 0 { Severity::Critical } else { Severity::Warning },
-            channel: "email".to_string(),
-            vm_name: Some(format!("vm-{}", i + 1)),
-            message: format!("VM vm-{} failed to start", i + 1),
-            sent_at: Utc::now(),
-            status: if i % 5 == 0 { NotificationStatus::Failed } else { NotificationStatus::Sent },
-            error: if i % 5 == 0 { Some("SMTP connection timeout".to_string()) } else { None },
-        });
-    }
+    // Sort by sent_at (most recent first)
+    history.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
+
+    // Apply limit
+    history.truncate(query.limit);
 
     Ok(Json(history))
 }

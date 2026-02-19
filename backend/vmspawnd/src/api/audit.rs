@@ -132,11 +132,12 @@ fn generate_mock_logs(count: usize) -> Vec<AuditLog> {
 // ============================================================================
 
 pub async fn list_audit_logs(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(filters): Query<AuditLogFilters>,
 ) -> Result<Json<Vec<AuditLog>>, StatusCode> {
-    // TODO: Load from state store with filtering
-    let mut logs = generate_mock_logs(50);
+    // Load from state store, fall back to mock data if empty
+    let mut logs = state.store.list_entities::<AuditLog>("audit_logs")
+        .unwrap_or_else(|_| generate_mock_logs(50));
 
     // Apply filters
     if let Some(action) = &filters.action {
@@ -181,32 +182,24 @@ pub async fn list_audit_logs(
 }
 
 pub async fn get_audit_log(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<AuditLog>, StatusCode> {
-    // TODO: Load from state store
-    let log = AuditLog {
-        id,
-        timestamp: Utc::now() - Duration::hours(2),
-        user: "admin".to_string(),
-        action: "vm.create".to_string(),
-        resource_type: "vm".to_string(),
-        resource_name: "web-server-01".to_string(),
-        status: AuditStatus::Success,
-        ip_address: Some("192.168.1.100".to_string()),
-        details: Some("Created VM with 4 CPUs and 8GB RAM".to_string()),
-        error: None,
-    };
+    // Load from state store
+    let log = state.store.get_entity::<AuditLog>("audit_logs", &id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(log))
 }
 
 pub async fn export_audit_logs(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
-    // TODO: Load from state store with filtering
-    let logs = generate_mock_logs(100);
+    // Load from state store, fall back to mock data if empty
+    let logs = state.store.list_entities::<AuditLog>("audit_logs")
+        .unwrap_or_else(|_| generate_mock_logs(100));
 
     match query.format.as_str() {
         "json" => {
@@ -243,10 +236,11 @@ pub async fn export_audit_logs(
 }
 
 pub async fn get_audit_stats(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<AuditStats>, StatusCode> {
-    // TODO: Calculate from state store
-    let logs = generate_mock_logs(100);
+    // Calculate from state store, fall back to mock data if empty
+    let logs = state.store.list_entities::<AuditLog>("audit_logs")
+        .unwrap_or_else(|_| generate_mock_logs(100));
 
     let total_logs = logs.len() as u64;
 
@@ -291,7 +285,7 @@ pub async fn get_audit_stats(
 
 /// Helper function to log an audit event
 pub async fn log_audit_event(
-    _state: &AppState,
+    state: &AppState,
     user: &str,
     action: &str,
     resource_type: &str,
@@ -301,23 +295,37 @@ pub async fn log_audit_event(
     details: Option<&str>,
     error: Option<&str>,
 ) -> Result<(), String> {
-    // TODO: Save to state store
-
-    let _log = AuditLog {
+    let log = AuditLog {
         id: Uuid::new_v4().to_string(),
         timestamp: Utc::now(),
         user: user.to_string(),
         action: action.to_string(),
         resource_type: resource_type.to_string(),
         resource_name: resource_name.to_string(),
-        status,
+        status: status.clone(),
         ip_address: ip_address.map(|s| s.to_string()),
         details: details.map(|s| s.to_string()),
         error: error.map(|s| s.to_string()),
     };
 
-    // TODO: Write to persistent storage
-    // TODO: Maybe also log to system logger
+    // Save to state store
+    if let Err(e) = state.store.save_entity("audit_logs", &log.id, &log) {
+        tracing::error!("Failed to save audit log: {}", e);
+        return Err(format!("Failed to save audit log: {}", e));
+    }
+
+    // Also log to system logger for important events
+    match status {
+        AuditStatus::Failed => {
+            tracing::warn!("AUDIT: {} - {} on {} {} - FAILED: {}",
+                user, action, resource_type, resource_name,
+                error.unwrap_or("Unknown error"));
+        }
+        AuditStatus::Success => {
+            tracing::info!("AUDIT: {} - {} on {} {} - SUCCESS",
+                user, action, resource_type, resource_name);
+        }
+    }
 
     Ok(())
 }

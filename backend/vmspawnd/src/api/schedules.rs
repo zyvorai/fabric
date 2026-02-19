@@ -472,8 +472,10 @@ pub async fn run_schedule_now(
     tracing::info!("Executing schedule {} immediately: {:?} on VM {}",
                    schedule.name, schedule.action, schedule.vm_name);
 
+    let executed_at = Utc::now();
+
     // Update last_run
-    schedule.last_run = Some(Utc::now());
+    schedule.last_run = Some(executed_at);
 
     // Save to state store
     if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
@@ -481,7 +483,29 @@ pub async fn run_schedule_now(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // TODO: Add entry to history
+    // Add entry to history
+    let action_str = match schedule.action {
+        VMAction::Start => "start",
+        VMAction::Stop => "stop",
+        VMAction::Restart => "restart",
+        VMAction::Snapshot => "snapshot",
+    };
+
+    let history_entry = ScheduleHistory {
+        schedule_id: schedule.id.clone(),
+        schedule_name: schedule.name.clone(),
+        vm_name: schedule.vm_name.clone(),
+        action: action_str.to_string(),
+        executed_at,
+        status: ExecutionStatus::Success, // Will be updated by background worker
+        error: None,
+    };
+
+    let history_id = Uuid::new_v4().to_string();
+    if let Err(e) = state.store.save_entity("schedule_history", &history_id, &history_entry) {
+        tracing::error!("Failed to save schedule history: {}", e);
+        // Don't fail the request if history fails
+    }
 
     Ok(StatusCode::OK)
 }
@@ -491,67 +515,39 @@ pub async fn run_schedule_now(
 // ============================================================================
 
 pub async fn get_schedule_history(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(schedule_id): Path<String>,
 ) -> Result<Json<Vec<ScheduleHistory>>, StatusCode> {
-    // TODO: Load history for specific schedule from state store
-    let history = vec![
-        ScheduleHistory {
-            schedule_id: schedule_id.clone(),
-            schedule_name: "Nightly Shutdown".to_string(),
-            vm_name: "web-server".to_string(),
-            action: "stop".to_string(),
-            executed_at: Utc::now() - Duration::days(1),
-            status: ExecutionStatus::Success,
-            error: None,
-        },
-        ScheduleHistory {
-            schedule_id,
-            schedule_name: "Nightly Shutdown".to_string(),
-            vm_name: "web-server".to_string(),
-            action: "stop".to_string(),
-            executed_at: Utc::now() - Duration::days(2),
-            status: ExecutionStatus::Success,
-            error: None,
-        },
-    ];
+    // Load history for specific schedule from state store
+    let all_history = state.store.list_entities::<ScheduleHistory>("schedule_history")
+        .unwrap_or_default();
+
+    // Filter by schedule_id and sort by execution time (most recent first)
+    let mut history: Vec<ScheduleHistory> = all_history
+        .into_iter()
+        .filter(|h| h.schedule_id == schedule_id)
+        .collect();
+
+    history.sort_by(|a, b| b.executed_at.cmp(&a.executed_at));
+
+    // Limit to last 100 entries
+    history.truncate(100);
 
     Ok(Json(history))
 }
 
 pub async fn get_all_schedule_history(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ScheduleHistory>>, StatusCode> {
-    // TODO: Load all history from state store (limit to last 100 entries)
-    let history = vec![
-        ScheduleHistory {
-            schedule_id: Uuid::new_v4().to_string(),
-            schedule_name: "Nightly Shutdown".to_string(),
-            vm_name: "web-server".to_string(),
-            action: "stop".to_string(),
-            executed_at: Utc::now() - Duration::hours(2),
-            status: ExecutionStatus::Success,
-            error: None,
-        },
-        ScheduleHistory {
-            schedule_id: Uuid::new_v4().to_string(),
-            schedule_name: "Weekday Startup".to_string(),
-            vm_name: "web-server".to_string(),
-            action: "start".to_string(),
-            executed_at: Utc::now() - Duration::hours(14),
-            status: ExecutionStatus::Success,
-            error: None,
-        },
-        ScheduleHistory {
-            schedule_id: Uuid::new_v4().to_string(),
-            schedule_name: "Daily Snapshot".to_string(),
-            vm_name: "database".to_string(),
-            action: "snapshot".to_string(),
-            executed_at: Utc::now() - Duration::hours(26),
-            status: ExecutionStatus::Failed,
-            error: Some("Insufficient disk space".to_string()),
-        },
-    ];
+    // Load all history from state store
+    let mut history = state.store.list_entities::<ScheduleHistory>("schedule_history")
+        .unwrap_or_default();
+
+    // Sort by execution time (most recent first)
+    history.sort_by(|a, b| b.executed_at.cmp(&a.executed_at));
+
+    // Limit to last 100 entries
+    history.truncate(100);
 
     Ok(Json(history))
 }

@@ -489,27 +489,54 @@ pub async fn disable_backup_policy(
 // ============================================================================
 
 pub async fn get_backup_stats(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<BackupStats>, StatusCode> {
-    // TODO: Calculate from state store
+    // Calculate from state store
+    let backups = state.store.list_entities::<Backup>("backups")
+        .unwrap_or_default();
 
-    let mut by_type = HashMap::new();
-    by_type.insert("full".to_string(), 5);
-    by_type.insert("incremental".to_string(), 15);
+    let total_backups = backups.len() as u64;
+    let total_size_bytes: u64 = backups.iter().map(|b| b.size_bytes).sum();
 
-    let mut by_vm = HashMap::new();
-    by_vm.insert("web-server-01".to_string(), 8);
-    by_vm.insert("database-01".to_string(), 6);
-    by_vm.insert("app-server-01".to_string(), 4);
-    by_vm.insert("cache-server".to_string(), 2);
+    let mut by_type: HashMap<String, u64> = HashMap::new();
+    let mut by_vm: HashMap<String, u64> = HashMap::new();
+
+    let mut oldest_backup = Utc::now();
+    let mut newest_backup = Utc::now() - Duration::days(365);
+
+    for backup in &backups {
+        // Count by type
+        let type_key = match backup.backup_type {
+            BackupType::Full => "full",
+            BackupType::Incremental => "incremental",
+        };
+        *by_type.entry(type_key.to_string()).or_insert(0) += 1;
+
+        // Count by VM
+        *by_vm.entry(backup.vm_name.clone()).or_insert(0) += 1;
+
+        // Track oldest and newest
+        if backup.created < oldest_backup {
+            oldest_backup = backup.created;
+        }
+        if backup.created > newest_backup {
+            newest_backup = backup.created;
+        }
+    }
+
+    // If no backups, use reasonable defaults
+    if total_backups == 0 {
+        oldest_backup = Utc::now() - Duration::days(30);
+        newest_backup = Utc::now();
+    }
 
     let stats = BackupStats {
-        total_backups: 20,
-        total_size_bytes: 500 * 1024 * 1024 * 1024, // 500GB
+        total_backups,
+        total_size_bytes,
         by_type,
         by_vm,
-        oldest_backup: Utc::now() - Duration::days(30),
-        newest_backup: Utc::now(),
+        oldest_backup,
+        newest_backup,
     };
 
     Ok(Json(stats))
