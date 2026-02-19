@@ -194,11 +194,32 @@ impl MemoryController {
             (current_bytes as f64 / limit_bytes as f64) * 100.0
         };
 
+        // Read swap max from memory.swap.max
+        let swap_max_bytes = {
+            let swap_max_path = self.cgroup_path.join("memory.swap.max");
+            if swap_max_path.exists() {
+                match fs::read_to_string(&swap_max_path) {
+                    Ok(content) => {
+                        let value = content.trim();
+                        if value == "max" {
+                            // "max" means unlimited
+                            u64::MAX
+                        } else {
+                            value.parse::<u64>().unwrap_or(0)
+                        }
+                    }
+                    Err(_) => 0,
+                }
+            } else {
+                0
+            }
+        };
+
         Ok(MemoryStats {
             current_bytes,
             max_bytes: limit_bytes,
             swap_current_bytes,
-            swap_max_bytes: 0, // TODO: Read from memory.swap.max
+            swap_max_bytes,
             limit_bytes,
             usage_percent,
         })

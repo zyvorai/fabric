@@ -341,10 +341,50 @@ impl StorageManager {
 
     fn load_state(&self) -> Result<(), StorageError> {
         let json = fs::read_to_string(&self.state_file)?;
-        let pools: HashMap<String, StoragePool> = serde_json::from_str(&json)?;
+        let saved_pools: HashMap<String, StoragePool> = serde_json::from_str(&json)?;
 
-        // TODO: Restore NFS pools on startup
-        // For now, just load the pool metadata
+        // Restore NFS pools on startup
+        for (name, pool) in saved_pools {
+            tracing::info!("Restoring storage pool: {}", name);
+
+            match &pool.pool_type {
+                StoragePoolType::NFS { server, export_path, mount_options } => {
+                    // Create NfsConfig from saved pool data
+                    let nfs_config = NfsConfig {
+                        server: server.clone(),
+                        export_path: export_path.clone(),
+                        mount_path: pool.path.clone(),
+                        mount_options: mount_options.clone(),
+                        auto_start: true, // Assume auto-start for restored pools
+                        nfs_version: crate::nfs::NfsVersion::V4, // Default to NFSv4
+                    };
+
+                    match NfsPool::new(nfs_config) {
+                        Ok(mut nfs_pool) => {
+                            // Attempt to mount the NFS pool
+                            match nfs_pool.mount() {
+                                Ok(_) => {
+                                    tracing::info!("NFS pool '{}' mounted successfully on startup", name);
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to mount NFS pool '{}' on startup: {}", name, e);
+                                    // Continue loading other pools even if one fails
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to create NFS pool '{}': {}", name, e);
+                        }
+                    }
+                }
+                StoragePoolType::Local | StoragePoolType::Directory { .. } => {
+                    tracing::info!("Local storage pool '{}' restored", name);
+                }
+                StoragePoolType::Ceph { .. } => {
+                    tracing::info!("Ceph storage pool '{}' metadata restored (mount not yet implemented)", name);
+                }
+            }
+        }
 
         Ok(())
     }
