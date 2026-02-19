@@ -625,25 +625,73 @@ async fn send_email_notification(
     subject: &str,
     message: &str,
 ) -> Result<(), String> {
+    use lettre::{Message, SmtpTransport, Transport};
+    use lettre::message::header::ContentType;
+    use lettre::transport::smtp::authentication::Credentials;
+
     let smtp_host = channel.config.get("smtp_host")
         .and_then(|v| v.as_str())
         .ok_or("Missing smtp_host in channel config")?;
+    let smtp_port = channel.config.get("smtp_port")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(587) as u16;
     let from = channel.config.get("from")
         .and_then(|v| v.as_str())
         .ok_or("Missing from address in channel config")?;
-    let to = channel.config.get("to")
+    let to_addrs = channel.config.get("to")
         .and_then(|v| v.as_array())
         .ok_or("Missing to addresses in channel config")?;
 
+    // Optional SMTP authentication
+    let username = channel.config.get("username").and_then(|v| v.as_str());
+    let password = channel.config.get("password").and_then(|v| v.as_str());
+
     tracing::info!(
-        "Sending email notification: {} -> {:?} via {} (Subject: {})",
-        from, to, smtp_host, subject
+        "Sending email notification: {} -> {:?} via {}:{} (Subject: {})",
+        from, to_addrs, smtp_host, smtp_port, subject
     );
 
-    // TODO: Actually send email using SMTP library
-    // For now, just log the intention
-    tracing::info!("Email notification queued for background worker: {}", message);
+    // Send email to each recipient
+    for to_value in to_addrs {
+        let to = to_value.as_str()
+            .ok_or("Invalid to address format")?;
 
+        // Build email message
+        let email = Message::builder()
+            .from(from.parse().map_err(|e| format!("Invalid from address: {}", e))?)
+            .to(to.parse().map_err(|e| format!("Invalid to address: {}", e))?)
+            .subject(subject)
+            .header(ContentType::TEXT_PLAIN)
+            .body(message.to_string())
+            .map_err(|e| format!("Failed to build email: {}", e))?;
+
+        // Create SMTP transport
+        let mut mailer = SmtpTransport::builder_dangerous(smtp_host)
+            .port(smtp_port);
+
+        // Add authentication if provided
+        if let (Some(user), Some(pass)) = (username, password) {
+            let creds = Credentials::new(user.to_string(), pass.to_string());
+            mailer = SmtpTransport::relay(smtp_host)
+                .map_err(|e| format!("Failed to create SMTP relay: {}", e))?
+                .port(smtp_port)
+                .credentials(creds);
+        }
+
+        let mailer = mailer.build();
+
+        // Send the email
+        match mailer.send(&email) {
+            Ok(_) => {
+                tracing::info!("Email sent successfully to {}", to);
+            }
+            Err(e) => {
+                return Err(format!("Failed to send email to {}: {}", to, e));
+            }
+        }
+    }
+
+    tracing::info!("All email notifications sent successfully");
     Ok(())
 }
 

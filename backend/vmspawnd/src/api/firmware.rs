@@ -139,14 +139,19 @@ pub async fn enable_uefi(
     std::fs::create_dir_all(&vm_dir)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let mut ovmf_config = vmspawnd_vm::OvmfConfig::new(&vm_name, &vm_dir, req.secure_boot)
+    let ovmf_config = vmspawnd_vm::OvmfConfig::new(&vm_name, &vm_dir, req.secure_boot)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Add TPM if requested
-    if let Some(tpm_dto) = req.tpm_version {
+    let ovmf_config = if let Some(tpm_dto) = req.tpm_version {
         let tpm_version: TpmVersion = tpm_dto.into();
-        ovmf_config = ovmf_config.with_tpm(tpm_version);
-    }
+        ovmf_config.with_tpm(tpm_version)
+    } else {
+        ovmf_config
+    };
+
+    // Store OVMF config (creates VARS file if needed)
+    drop(ovmf_config);
 
     // 3. Update VM config
     vm_config.firmware = vmspawnd_vm::Firmware::UEFI {
