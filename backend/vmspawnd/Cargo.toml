@@ -38,3 +38,15 @@ prometheus-exporter = { path = "../prometheus-exporter" }
 vmspawnd-storage = { path = "../crates/storage" }
 vmspawnd-system = { path = "../crates/system" }
 vmspawnd-vm = { path = "../crates/vm" }
+datacenter = { path = "../datacenter" }
+resource-pools = { path = "../resource-pools" }
+predictive-drs = { path = "../predictive-drs" }
+distributed-storage = { path = "../distributed-storage" }
+encryption = { path = "../encryption" }
+distributed-firewall = { path = "../distributed-firewall" }
+fault-tolerance = { path = "../fault-tolerance" }
+replication = { path = "../replication" }
+site-recovery = { path = "../site-recovery" }
+content-library = { path = "../content-library" }
+lifecycle-manager = { path = "../lifecycle-manager" }
+certificate-manager = { path = "../certificate-manager" }

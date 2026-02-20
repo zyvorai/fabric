@@ -23,6 +23,18 @@ import Backups from './pages/Backups'
 import Notifications from './pages/Notifications'
 import StoragePools from './pages/StoragePools'
 import SystemResources from './pages/SystemResources'
+import Datacenters from './pages/Datacenters'
+import ResourcePools from './pages/ResourcePools'
+import DRS from './pages/DRS'
+import DistributedStorage from './pages/DistributedStorage'
+import Encryption from './pages/Encryption'
+import SDNNetworking from './pages/SDNNetworking'
+import FaultTolerance from './pages/FaultTolerance'
+import Replication from './pages/Replication'
+import SiteRecovery from './pages/SiteRecovery'
+import ContentLibrary from './pages/ContentLibrary'
+import LifecycleManager from './pages/LifecycleManager'
+import Certificates from './pages/Certificates'
 import NotFound from './pages/NotFound'
 
 function App() {
@@ -55,6 +67,18 @@ function App() {
                 <Route path="/storage-pools" element={<StoragePools />} />
                 <Route path="/system" element={<SystemResources />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/datacenters" element={<Datacenters />} />
+                <Route path="/resource-pools" element={<ResourcePools />} />
+                <Route path="/drs" element={<DRS />} />
+                <Route path="/distributed-storage" element={<DistributedStorage />} />
+                <Route path="/encryption" element={<Encryption />} />
+                <Route path="/sdn-networking" element={<SDNNetworking />} />
+                <Route path="/fault-tolerance" element={<FaultTolerance />} />
+                <Route path="/replication" element={<Replication />} />
+                <Route path="/site-recovery" element={<SiteRecovery />} />
+                <Route path="/content-library" element={<ContentLibrary />} />
+                <Route path="/lifecycle" element={<LifecycleManager />} />
+                <Route path="/certificates" element={<Certificates />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </ErrorBoundary>

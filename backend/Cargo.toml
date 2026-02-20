@@ -15,6 +15,19 @@ members = [
     "crates/storage",
     "crates/system",
     "crates/vm",
+    "datacenter",
+    "host-agent",
+    "resource-pools",
+    "encryption",
+    "predictive-drs",
+    "distributed-storage",
+    "fault-tolerance",
+    "replication",
+    "distributed-firewall",
+    "site-recovery",
+    "content-library",
+    "lifecycle-manager",
+    "certificate-manager",
 ]
 
 [workspace.package]
@@ -43,3 +56,4 @@ chrono = { version = "0.4", features = ["serde"] }
 regex = "1.11"
 tar = "0.4"
 flate2 = "1.0"
+hostname = "0.4"

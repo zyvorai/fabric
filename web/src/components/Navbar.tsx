@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   Server, Plus, Home, Terminal, Network, HardDrive, Settings,
   Layers, Shield, Calendar, FileText, BarChart3, Save, Bell,
-  Database, Cpu, Menu, X, ChevronDown,
+  Database, Cpu, Menu, X, ChevronDown, Building2, GitBranch,
+  Zap, Lock, Globe, RefreshCw, Archive, Key, Activity, PackageCheck,
 } from 'lucide-react'
 import ConnectionStatus from './ConnectionStatus'
 
@@ -24,24 +25,46 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/', icon: <Home className="w-4 h-4" />, label: 'Dashboard' },
       { to: '/vms', icon: <Server className="w-4 h-4" />, label: 'VMs' },
+      { to: '/datacenters', icon: <Building2 className="w-4 h-4" />, label: 'Datacenters' },
     ],
   },
   {
     label: 'Infrastructure',
     items: [
       { to: '/network', icon: <Network className="w-4 h-4" />, label: 'Network' },
+      { to: '/sdn-networking', icon: <Globe className="w-4 h-4" />, label: 'SDN' },
       { to: '/storage', icon: <HardDrive className="w-4 h-4" />, label: 'Storage' },
       { to: '/storage-pools', icon: <Database className="w-4 h-4" />, label: 'Pools' },
+      { to: '/distributed-storage', icon: <Database className="w-4 h-4" />, label: 'Distributed Storage' },
+      { to: '/resource-pools', icon: <Layers className="w-4 h-4" />, label: 'Resource Pools' },
       { to: '/system', icon: <Cpu className="w-4 h-4" />, label: 'System' },
+    ],
+  },
+  {
+    label: 'Cluster',
+    items: [
+      { to: '/drs', icon: <GitBranch className="w-4 h-4" />, label: 'DRS' },
+      { to: '/fault-tolerance', icon: <Zap className="w-4 h-4" />, label: 'Fault Tolerance' },
+      { to: '/replication', icon: <RefreshCw className="w-4 h-4" />, label: 'Replication' },
+      { to: '/site-recovery', icon: <Activity className="w-4 h-4" />, label: 'Site Recovery' },
     ],
   },
   {
     label: 'Operations',
     items: [
       { to: '/templates', icon: <Layers className="w-4 h-4" />, label: 'Templates' },
+      { to: '/content-library', icon: <Archive className="w-4 h-4" />, label: 'Content Library' },
       { to: '/schedules', icon: <Calendar className="w-4 h-4" />, label: 'Schedules' },
       { to: '/backups', icon: <Save className="w-4 h-4" />, label: 'Backups' },
       { to: '/quotas', icon: <Shield className="w-4 h-4" />, label: 'Quotas' },
+      { to: '/lifecycle', icon: <PackageCheck className="w-4 h-4" />, label: 'Lifecycle' },
+    ],
+  },
+  {
+    label: 'Security',
+    items: [
+      { to: '/encryption', icon: <Lock className="w-4 h-4" />, label: 'Encryption' },
+      { to: '/certificates', icon: <Key className="w-4 h-4" />, label: 'Certificates' },
     ],
   },
   {

@@ -7,6 +7,8 @@ pub struct Config {
     pub daemon: DaemonConfig,
     pub storage: StorageConfig,
     pub network: NetworkConfig,
+    #[serde(default)]
+    pub controller: ControllerConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +36,33 @@ pub struct NetworkConfig {
 
 fn default_image_path() -> String {
     "/var/lib/vmspawnd/images".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControllerConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_controller_mode")]
+    pub mode: String, // "standalone" or "controller"
+    #[serde(default)]
+    pub cluster_name: Option<String>,
+    #[serde(default)]
+    pub datacenter_name: Option<String>,
+}
+
+fn default_controller_mode() -> String {
+    "standalone".to_string()
+}
+
+impl Default for ControllerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: default_controller_mode(),
+            cluster_name: None,
+            datacenter_name: None,
+        }
+    }
 }
 
 impl Config {
@@ -64,6 +93,7 @@ impl Config {
             network: NetworkConfig {
                 bridge: "br0".to_string(),
             },
+            controller: ControllerConfig::default(),
         })
     }
 }

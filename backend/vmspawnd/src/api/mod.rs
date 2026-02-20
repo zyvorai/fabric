@@ -9,3 +9,17 @@ pub mod schedules;
 pub mod settings;
 pub mod storage;
 pub mod system;
+
+// Phase 2 API modules for enterprise features
+pub mod certificates;
+pub mod content_library;
+pub mod datacenter;
+pub mod distributed_storage;
+pub mod drs;
+pub mod fault_tolerance;
+pub mod lifecycle;
+pub mod network;
+pub mod replication_api;
+pub mod resource_pools;
+pub mod site_recovery_api;
+pub mod vm_encryption;

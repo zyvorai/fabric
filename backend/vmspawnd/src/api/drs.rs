@@ -1,0 +1,170 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
+use chrono::Utc;
+use std::sync::Arc;
+use uuid::Uuid;
+
+use crate::server::AppState;
+use predictive_drs::{
+    AffinityRule, ClusterBalance, DrsConfig, HostSnapshot, MigrationRecommendation,
+    PlacementRequest, PlacementResult, VmSnapshot,
+};
+
+pub async fn configure_drs(
+    State(state): State<Arc<AppState>>,
+    Json(config): Json<DrsConfig>,
+) -> impl IntoResponse {
+    match state.store.save_entity("drs_configs", &config.cluster_id, &config) {
+        Ok(_) => (StatusCode::OK, Json(serde_json::to_value(&config).unwrap())).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn get_drs_config(
+    State(state): State<Arc<AppState>>,
+    Path(cluster_id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<DrsConfig>("drs_configs", &cluster_id) {
+        Ok(Some(c)) => Json(serde_json::to_value(&c).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn compute_placement(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<PlacementRequest>,
+) -> impl IntoResponse {
+    let mgr = predictive_drs::DrsManager::new();
+    let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_default();
+    match mgr.compute_placement(&hosts, &req) {
+        Ok(result) => Json(serde_json::to_value(&result).unwrap()).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct BalanceRequest {
+    pub hosts: Vec<HostSnapshot>,
+}
+
+pub async fn analyze_balance(
+    State(_state): State<Arc<AppState>>,
+    Json(req): Json<BalanceRequest>,
+) -> impl IntoResponse {
+    let mgr = predictive_drs::DrsManager::new();
+    let balance = mgr.analyze_cluster_balance(&req.hosts);
+    Json(serde_json::to_value(&balance).unwrap())
+}
+
+#[derive(serde::Deserialize)]
+pub struct RecommendationRequest {
+    pub cluster_id: String,
+    pub hosts: Vec<HostSnapshot>,
+    pub vms: Vec<VmSnapshot>,
+}
+
+pub async fn generate_recommendations(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RecommendationRequest>,
+) -> impl IntoResponse {
+    let mgr = predictive_drs::DrsManager::new();
+    let recs = mgr.generate_recommendations(&req.cluster_id, &req.hosts, &req.vms);
+    for rec in &recs {
+        let _ = state.store.save_entity("drs_recommendations", &rec.id, rec);
+    }
+    Json(serde_json::to_value(&recs).unwrap())
+}
+
+pub async fn list_recommendations(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn approve_recommendation(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let mut rec = match state.store.get_entity::<MigrationRecommendation>("drs_recommendations", &id) {
+        Ok(Some(r)) => r,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    rec.status = predictive_drs::RecommendationStatus::Approved;
+    let _ = state.store.save_entity("drs_recommendations", &rec.id, &rec);
+    Json(serde_json::to_value(&rec).unwrap()).into_response()
+}
+
+pub async fn reject_recommendation(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let mut rec = match state.store.get_entity::<MigrationRecommendation>("drs_recommendations", &id) {
+        Ok(Some(r)) => r,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    rec.status = predictive_drs::RecommendationStatus::Rejected;
+    let _ = state.store.save_entity("drs_recommendations", &rec.id, &rec);
+    StatusCode::OK.into_response()
+}
+
+// ============================================================================
+// Affinity rules
+// ============================================================================
+
+pub async fn list_affinity_rules(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_affinity_rule(
+    State(state): State<Arc<AppState>>,
+    Json(mut rule): Json<AffinityRule>,
+) -> impl IntoResponse {
+    if rule.id.is_empty() {
+        rule.id = Uuid::new_v4().to_string();
+    }
+    rule.created = Utc::now();
+    rule.updated = Utc::now();
+    match state.store.save_entity("affinity_rules", &rule.id, &rule) {
+        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&rule).unwrap())).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn get_affinity_rule(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<AffinityRule>("affinity_rules", &id) {
+        Ok(Some(r)) => Json(serde_json::to_value(&r).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn update_affinity_rule(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(mut rule): Json<AffinityRule>,
+) -> impl IntoResponse {
+    rule.id = id.clone();
+    rule.updated = Utc::now();
+    let _ = state.store.save_entity("affinity_rules", &id, &rule);
+    Json(serde_json::to_value(&rule).unwrap())
+}
+
+pub async fn delete_affinity_rule(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let _ = state.store.delete_entity("affinity_rules", &id);
+    StatusCode::NO_CONTENT
+}
