@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Network as NetworkIcon, Plus, Trash2, RefreshCw, X, Server, Layers, Cable, Terminal, Link2, Settings, FileText } from 'lucide-react'
+import { Network as NetworkIcon, Plus, Trash2, RefreshCw, X, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft } from 'lucide-react'
 import * as api from '../api/networkd'
 import type {
   BridgeConfig, VlanConfig, MacvtapConfig, TapConfig, LinkInfo,
-  BondConfig, NetworkFileConfig, LinkFileConfig,
+  BondConfig, NetworkFileConfig, LinkFileConfig, PortForwardConfig,
   CreateBridgeRequest, CreateVlanRequest, CreateMacvtapRequest, CreateTapRequest,
   CreateBondRequest, CreateNetworkFileRequest, CreateLinkFileRequest,
-  MacvtapMode, BondMode,
+  CreatePortForwardRequest,
+  MacvtapMode, BondMode, Protocol,
 } from '../api/networkd'
 
-type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'status'
+type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'status'
 
 export default function Network() {
   const [activeTab, setActiveTab] = useState<Tab>('bridges')
@@ -20,6 +21,7 @@ export default function Network() {
   const [taps, setTaps] = useState<TapConfig[]>([])
   const [netfiles, setNetfiles] = useState<NetworkFileConfig[]>([])
   const [linkfiles, setLinkfiles] = useState<LinkFileConfig[]>([])
+  const [portForwards, setPortForwards] = useState<PortForwardConfig[]>([])
   const [links, setLinks] = useState<LinkInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,12 +34,13 @@ export default function Network() {
   const [showCreateTap, setShowCreateTap] = useState(false)
   const [showCreateNetfile, setShowCreateNetfile] = useState(false)
   const [showCreateLinkfile, setShowCreateLinkfile] = useState(false)
+  const [showCreatePortForward, setShowCreatePortForward] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [b, bo, v, m, t, nf, lf, l] = await Promise.all([
+      const [b, bo, v, m, t, nf, lf, pf, l] = await Promise.all([
         api.listBridges(),
         api.listBonds(),
         api.listVlans(),
@@ -45,6 +48,7 @@ export default function Network() {
         api.listTaps(),
         api.listNetworkFiles(),
         api.listLinkFiles(),
+        api.listPortForwards(),
         api.listLinks().catch(() => []),
       ])
       setBridges(b)
@@ -54,6 +58,7 @@ export default function Network() {
       setTaps(t)
       setNetfiles(nf)
       setLinkfiles(lf)
+      setPortForwards(pf)
       setLinks(l)
     } catch (e: any) {
       setError(e.message)
@@ -129,6 +134,21 @@ export default function Network() {
     } catch (e: any) { setError(e.message) }
   }
 
+  const handleDeletePortForward = async (id: string) => {
+    if (!confirm('Delete this port forward rule?')) return
+    try {
+      await api.deletePortForward(id)
+      setPortForwards(prev => prev.filter(p => p.id !== id))
+    } catch (e: any) { setError(e.message) }
+  }
+
+  const handleSyncPortForwards = async () => {
+    try {
+      await api.syncPortForwards()
+      await fetchAll()
+    } catch (e: any) { setError(e.message) }
+  }
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'bridges', label: 'Bridges', icon: <Server className="w-4 h-4" /> },
     { key: 'bonds', label: 'Bonds', icon: <Link2 className="w-4 h-4" /> },
@@ -137,6 +157,7 @@ export default function Network() {
     { key: 'taps', label: 'Tap', icon: <Terminal className="w-4 h-4" /> },
     { key: 'netfiles', label: 'Interfaces', icon: <Settings className="w-4 h-4" /> },
     { key: 'linkfiles', label: 'Link Files', icon: <FileText className="w-4 h-4" /> },
+    { key: 'portforwards', label: 'Port Forwards', icon: <ArrowRightLeft className="w-4 h-4" /> },
     { key: 'status', label: 'Status', icon: <RefreshCw className="w-4 h-4" /> },
   ]
 
@@ -161,7 +182,7 @@ export default function Network() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
           <div className="text-gray-400 text-xs mb-1">Bridges</div>
           <div className="text-2xl font-bold text-blue-400">{bridges.length}</div>
@@ -189,6 +210,10 @@ export default function Network() {
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
           <div className="text-gray-400 text-xs mb-1">Link Files</div>
           <div className="text-2xl font-bold text-pink-400">{linkfiles.length}</div>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="text-gray-400 text-xs mb-1">Port Forwards</div>
+          <div className="text-2xl font-bold text-red-400">{portForwards.length}</div>
         </div>
       </div>
 
@@ -237,6 +262,9 @@ export default function Network() {
           {activeTab === 'linkfiles' && (
             <LinkfilesTab linkfiles={linkfiles} onDelete={handleDeleteLinkfile} onCreate={() => setShowCreateLinkfile(true)} />
           )}
+          {activeTab === 'portforwards' && (
+            <PortForwardsTab portForwards={portForwards} onDelete={handleDeletePortForward} onCreate={() => setShowCreatePortForward(true)} onSync={handleSyncPortForwards} />
+          )}
           {activeTab === 'status' && <StatusTab links={links} onRefresh={fetchAll} />}
         </>
       )}
@@ -249,6 +277,7 @@ export default function Network() {
       {showCreateTap && <CreateTapModal onClose={() => setShowCreateTap(false)} onCreated={(t) => { setTaps(prev => [...prev, t]); setShowCreateTap(false) }} />}
       {showCreateNetfile && <CreateNetfileModal onClose={() => setShowCreateNetfile(false)} onCreated={(n) => { setNetfiles(prev => [...prev, n]); setShowCreateNetfile(false) }} />}
       {showCreateLinkfile && <CreateLinkfileModal onClose={() => setShowCreateLinkfile(false)} onCreated={(l) => { setLinkfiles(prev => [...prev, l]); setShowCreateLinkfile(false) }} />}
+      {showCreatePortForward && <CreatePortForwardModal onClose={() => setShowCreatePortForward(false)} onCreated={(pf) => { setPortForwards(prev => [...prev, pf]); setShowCreatePortForward(false) }} />}
     </div>
   )
 }
@@ -1009,6 +1038,122 @@ function CreateNetfileModal({ onClose, onCreated }: { onClose: () => void; onCre
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Configure Interface'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+function PortForwardsTab({ portForwards, onDelete, onCreate, onSync }: {
+  portForwards: PortForwardConfig[]; onDelete: (id: string) => void; onCreate: () => void; onSync: () => void
+}) {
+  return (
+    <div className="bg-gray-800 rounded-lg border border-gray-700">
+      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Port Forwards (nftables DNAT)</h2>
+        <div className="flex gap-2">
+          <button onClick={onSync} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+            <RefreshCw className="w-4 h-4" /> Sync Rules
+          </button>
+          <button onClick={onCreate} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition text-sm">
+            <Plus className="w-4 h-4" /> Add Port Forward
+          </button>
+        </div>
+      </div>
+      {portForwards.length === 0 ? (
+        <div className="p-12 text-center text-gray-400">No port forwards configured. Add one to expose a VM service to the host network.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-700">
+              <tr>
+                <th className="text-left p-4 font-medium text-gray-300">Name</th>
+                <th className="text-left p-4 font-medium text-gray-300">Protocol</th>
+                <th className="text-left p-4 font-medium text-gray-300">Host Port</th>
+                <th className="text-left p-4 font-medium text-gray-300">Guest IP:Port</th>
+                <th className="text-left p-4 font-medium text-gray-300">Enabled</th>
+                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {portForwards.map(pf => (
+                <tr key={pf.id} className="hover:bg-gray-700 transition">
+                  <td className="p-4 font-medium">{pf.name}</td>
+                  <td className="p-4">
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">{pf.protocol}</span>
+                  </td>
+                  <td className="p-4 font-mono text-sm text-blue-400">{pf.host_port}</td>
+                  <td className="p-4 font-mono text-sm text-gray-400">{pf.guest_ip}:{pf.guest_port}</td>
+                  <td className="p-4">{pf.enabled ? <span className="text-green-400">yes</span> : <span className="text-gray-500">no</span>}</td>
+                  <td className="p-4">
+                    <button onClick={() => onDelete(pf.id)} className="p-2 hover:bg-red-600 rounded transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CreatePortForwardModal({ onClose, onCreated }: { onClose: () => void; onCreated: (pf: PortForwardConfig) => void }) {
+  const [name, setName] = useState('')
+  const [protocol, setProtocol] = useState<Protocol>('tcp')
+  const [hostPort, setHostPort] = useState('')
+  const [guestIp, setGuestIp] = useState('')
+  const [guestPort, setGuestPort] = useState('')
+  const [iface, setIface] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !hostPort || !guestIp.trim() || !guestPort) {
+      setErr('Name, host port, guest IP, and guest port are required')
+      return
+    }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreatePortForwardRequest = {
+        name: name.trim(),
+        protocol,
+        host_port: parseInt(hostPort),
+        guest_ip: guestIp.trim(),
+        guest_port: parseInt(guestPort),
+        interface: iface.trim() || undefined,
+      }
+      const pf = await api.createPortForward(req)
+      onCreated(pf)
+    } catch (e: any) {
+      setErr(e.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Add Port Forward" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="web-server" />
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Protocol</label>
+          <select value={protocol} onChange={e => setProtocol(e.target.value as Protocol)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="both">Both (TCP + UDP)</option>
+          </select>
+        </div>
+        <InputField label="Host Port" value={hostPort} onChange={setHostPort} placeholder="8080" type="number" />
+        <InputField label="Guest IP" value={guestIp} onChange={setGuestIp} placeholder="192.168.100.10" />
+        <InputField label="Guest Port" value={guestPort} onChange={setGuestPort} placeholder="80" type="number" />
+        <InputField label="Interface (optional)" value={iface} onChange={setIface} placeholder="eth0" />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Creating...' : 'Add Port Forward'}
         </button>
       </div>
     </ModalWrapper>

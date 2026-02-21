@@ -579,6 +579,76 @@ pub enum NetworkDevice {
     Tap(TapConfig),
 }
 
+// ─── Port forwarding (nftables DNAT) ─────────────────────────────────────────
+
+/// Protocol for port forwarding rules
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Protocol {
+    Tcp,
+    Udp,
+    Both,
+}
+
+impl Protocol {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Protocol::Tcp => "tcp",
+            Protocol::Udp => "udp",
+            Protocol::Both => "both",
+        }
+    }
+}
+
+impl Default for Protocol {
+    fn default() -> Self {
+        Protocol::Tcp
+    }
+}
+
+/// A port forwarding configuration (DNAT rule via nftables)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortForwardConfig {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub protocol: Protocol,
+    pub host_port: u16,
+    pub guest_ip: String,
+    pub guest_port: u16,
+    /// Optional: restrict to traffic arriving on this interface
+    #[serde(default)]
+    pub interface: Option<String>,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub created: String,
+    #[serde(default)]
+    pub updated: String,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePortForwardRequest {
+    pub name: String,
+    #[serde(default)]
+    pub protocol: Protocol,
+    pub host_port: u16,
+    pub guest_ip: String,
+    pub guest_port: u16,
+    #[serde(default)]
+    pub interface: Option<String>,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
 // ─── Parsed config file ──────────────────────────────────────────────────────
 
 /// A parsed section from a systemd-networkd config file

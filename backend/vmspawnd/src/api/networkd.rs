@@ -11,9 +11,11 @@ use uuid::Uuid;
 use crate::server::AppState;
 use networking::models::{
     BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest, CreateLinkFileRequest,
-    CreateMacvtapRequest, CreateNetworkFileRequest, CreateTapRequest, CreateVlanRequest,
-    LinkFileConfig, MacvtapConfig, NetworkFileConfig, TapConfig, VlanConfig,
+    CreateMacvtapRequest, CreateNetworkFileRequest, CreatePortForwardRequest, CreateTapRequest,
+    CreateVlanRequest, LinkFileConfig, MacvtapConfig, NetworkFileConfig, PortForwardConfig,
+    TapConfig, VlanConfig,
 };
+use networking::nftables::NftManager;
 use networking::NetworkdManager;
 
 fn networkd_manager(state: &AppState) -> NetworkdManager {
@@ -673,6 +675,115 @@ pub async fn delete_link_file(
     }
     let _ = state.store.delete_entity("networkd_linkfiles", &id);
     StatusCode::NO_CONTENT
+}
+
+// ============================================================================
+// Port forwarding handlers (nftables DNAT)
+// ============================================================================
+
+pub async fn list_port_forwards(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<PortForwardConfig> = state
+        .store
+        .list_entities("networkd_port_forwards")
+        .unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_port_forward(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreatePortForwardRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now().to_rfc3339();
+    let cfg = PortForwardConfig {
+        id: Uuid::new_v4().to_string(),
+        name: req.name,
+        protocol: req.protocol,
+        host_port: req.host_port,
+        guest_ip: req.guest_ip,
+        guest_port: req.guest_port,
+        interface: req.interface,
+        enabled: req.enabled,
+        description: req.description,
+        created: now.clone(),
+        updated: now,
+    };
+
+    if cfg.enabled {
+        let nft = NftManager::new();
+        if let Err(e) = nft.apply(&cfg) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    }
+
+    match state
+        .store
+        .save_entity("networkd_port_forwards", &cfg.id, &cfg)
+    {
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(serde_json::to_value(&cfg).unwrap()),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+pub async fn get_port_forward(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state
+        .store
+        .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
+    {
+        Ok(Some(pf)) => Json(serde_json::to_value(&pf).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn delete_port_forward(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    if let Ok(Some(cfg)) = state
+        .store
+        .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
+    {
+        let nft = NftManager::new();
+        let _ = nft.remove(&cfg);
+    }
+    let _ = state.store.delete_entity("networkd_port_forwards", &id);
+    StatusCode::NO_CONTENT
+}
+
+pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let configs: Vec<PortForwardConfig> = state
+        .store
+        .list_entities("networkd_port_forwards")
+        .unwrap_or_default();
+
+    let nft = NftManager::new();
+    match nft.sync_all(&configs) {
+        Ok(_) => Json(serde_json::json!({
+            "status": "synced",
+            "rules": configs.len(),
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
 }
 
 // ============================================================================

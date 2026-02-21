@@ -459,6 +459,68 @@ export async function deleteLinkFile(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete link file')
 }
 
+// ─── Port Forwards ───────────────────────────────────────────────────────────
+
+export type Protocol = 'tcp' | 'udp' | 'both'
+
+export interface PortForwardConfig {
+  id: string
+  name: string
+  protocol: Protocol
+  host_port: number
+  guest_ip: string
+  guest_port: number
+  interface?: string
+  enabled: boolean
+  description?: string
+  created: string
+  updated: string
+}
+
+export interface CreatePortForwardRequest {
+  name: string
+  protocol?: Protocol
+  host_port: number
+  guest_ip: string
+  guest_port: number
+  interface?: string
+  enabled?: boolean
+  description?: string
+}
+
+export async function listPortForwards(): Promise<PortForwardConfig[]> {
+  const res = await fetch(`${API_BASE}/networkd/port-forwards`)
+  if (!res.ok) throw new Error('Failed to fetch port forwards')
+  return res.json()
+}
+
+export async function createPortForward(req: CreatePortForwardRequest): Promise<PortForwardConfig> {
+  const res = await fetch(`${API_BASE}/networkd/port-forwards`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error('Failed to create port forward')
+  return res.json()
+}
+
+export async function getPortForward(id: string): Promise<PortForwardConfig> {
+  const res = await fetch(`${API_BASE}/networkd/port-forwards/${id}`)
+  if (!res.ok) throw new Error('Failed to fetch port forward')
+  return res.json()
+}
+
+export async function deletePortForward(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/networkd/port-forwards/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete port forward')
+}
+
+export async function syncPortForwards(): Promise<{ status: string; rules: number }> {
+  const res = await fetch(`${API_BASE}/networkd/port-forwards/sync`, { method: 'POST' })
+  if (!res.ok) throw new Error('Failed to sync port forwards')
+  return res.json()
+}
+
 // ─── Scan existing configs ────────────────────────────────────────────────────
 
 export async function scanConfigs(): Promise<ParsedConfigFile[]> {

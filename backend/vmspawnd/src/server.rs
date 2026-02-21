@@ -299,6 +299,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/networkd/links/:name/status", get(api::networkd::get_device_status))
             .route("/networkd/reload", post(api::networkd::reload_networkd))
             .route("/networkd/files", get(api::networkd::list_managed_files))
+            .route("/networkd/port-forwards", get(api::networkd::list_port_forwards).post(api::networkd::create_port_forward))
+            .route("/networkd/port-forwards/sync", post(api::networkd::sync_port_forwards))
+            .route("/networkd/port-forwards/:id", get(api::networkd::get_port_forward).delete(api::networkd::delete_port_forward))
             .route("/networkd/scan", get(api::networkd::scan_configs))
             // Fault tolerance routes
             .route("/ft/enable", post(api::fault_tolerance::enable_ft))
