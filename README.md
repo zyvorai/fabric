@@ -57,8 +57,11 @@
 - ✅ Advanced log filtering
 - ✅ Export logs (JSON/CSV)
 - ✅ Audit statistics dashboard
-- ✅ JWT authentication
-- ✅ Role-Based Access Control (RBAC)
+- ✅ JWT authentication with SQLite user storage
+- ✅ Role-Based Access Control (RBAC: Admin/User/Viewer)
+- ✅ bcrypt password hashing
+- ✅ Auto-seeding default admin user
+- ✅ Login page with protected routes
 - ✅ TLS/HTTPS support
 
 ### **🎨 User Interfaces**
@@ -211,6 +214,13 @@ See [TUI_GUI_ENHANCEMENTS.md](TUI_GUI_ENHANCEMENTS.md) for complete details.
 ## 🌐 REST API
 
 ```
+# Authentication (public)
+POST   /api/auth/login              - Login, returns JWT token
+
+# Authentication (protected)
+GET    /api/auth/me                 - Get current user info
+
+# VM Management (all protected, JWT required)
 GET    /api/vms                    - List all VMs
 GET    /api/vms/:name              - Get VM details
 POST   /api/vms                    - Create VM
@@ -225,10 +235,13 @@ POST   /api/vms/:name/cloud-init   - Configure cloud-init
 WS     /ws/console/:name           - Console WebSocket
 WS     /ws/vnc/:name               - VNC WebSocket proxy
 
-# Monitoring
+# Monitoring (public)
 GET    /metrics                    - Prometheus metrics
 GET    /health                     - Health check
 ```
+
+All `/api/*` routes (except `/api/auth/login`) require a valid JWT token in the
+`Authorization: Bearer <token>` header.
 
 ## 🔧 Advanced Features
 
@@ -366,7 +379,23 @@ image_path = "/var/lib/vmspawnd/images"
 
 [network]
 bridge = "br0"
+
+[auth]
+enabled = true                              # Set to false to disable auth
+jwt_secret = "change-me-in-production"      # Or set VMSPAWND_JWT_SECRET env var
+db_path = "/var/lib/vmspawnd/auth.db"       # SQLite user database
+default_admin_password = "admin"            # Initial admin password (change after first login)
+token_expiration_hours = 24                 # JWT token lifetime
 ```
+
+When authentication is enabled, a default `admin` user is created on first startup.
+The three RBAC roles are:
+
+| Role | Read | Write | Manage Users |
+|------|------|-------|-------------|
+| **Admin** | Yes | Yes | Yes |
+| **User** | Yes | Yes | No |
+| **Viewer** | Yes | No | No |
 
 ## 🔄 systemd Integration
 
