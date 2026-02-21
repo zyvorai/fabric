@@ -124,6 +124,12 @@ impl Server {
             run_ha_monitor(ha_state).await;
         });
 
+        // Start VM auto-healer
+        let heal_state = self.state.clone();
+        tokio::spawn(async move {
+            run_vm_autohealer(heal_state).await;
+        });
+
         axum::serve(listener, app).await?;
 
         Ok(())
@@ -286,6 +292,16 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/migrations", get(api::migration::list_migrations).post(api::migration::start_migration))
             .route("/migrations/:id", get(api::migration::get_migration))
             .route("/migrations/:id/cancel", post(api::migration::cancel_migration))
+            // Image build routes
+            .route("/images/build", post(api::images::build_image))
+            .route("/images/builds", get(api::images::list_builds))
+            .route("/images", get(api::images::list_images))
+            // VM profile / instance type routes
+            .route("/profiles", get(api::profiles::list_profiles).post(api::profiles::create_profile))
+            .route("/profiles/:name", get(api::profiles::get_profile).delete(api::profiles::delete_profile))
+            // Event routes
+            .route("/events", get(api::events::list_events))
+            .route("/events/stream", get(api::events::event_stream))
             // Plugin routes
             .route("/plugins", get(plugins::list_plugins))
             // Resource optimization routes
@@ -902,6 +918,80 @@ async fn run_ha_monitor(state: Arc<AppState>) {
 
                 tracing::info!("HA monitor: failover complete for VM '{}', new primary: '{}'",
                     ft.vm_name, ft.primary_host_id);
+            }
+        }
+    }
+}
+
+/// Background task that auto-restarts crashed VMs (auto-healing)
+async fn run_vm_autohealer(state: Arc<AppState>) {
+    use chrono::Utc;
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+    const MAX_RESTARTS: u32 = 5;
+
+    loop {
+        interval.tick().await;
+
+        let vms = match state.store.list_vms() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        for vm in vms {
+            // Only heal VMs that were Running but whose process is gone
+            if !matches!(vm.state, vm_model::VMState::Running) {
+                continue;
+            }
+
+            // Check if the VM is actually still running via machinectl
+            match vmspawn_driver::get_vm_state(&vm.name) {
+                Ok(vm_model::VMState::Running) => continue, // Still running, no action needed
+                Ok(_) | Err(_) => {
+                    // VM was supposed to be running but isn't — it crashed
+
+                    // Check restart count
+                    let restart_key = format!("autoheal/{}", vm.name);
+                    let restart_count: u32 = state.store
+                        .get_entity::<serde_json::Value>("autoheal", &vm.name)
+                        .ok()
+                        .flatten()
+                        .and_then(|v| v["count"].as_u64().map(|c| c as u32))
+                        .unwrap_or(0);
+
+                    if restart_count >= MAX_RESTARTS {
+                        tracing::warn!("Auto-healer: VM '{}' exceeded max restarts ({}), not restarting",
+                            vm.name, MAX_RESTARTS);
+                        continue;
+                    }
+
+                    tracing::warn!("Auto-healer: VM '{}' crashed, attempting restart ({}/{})",
+                        vm.name, restart_count + 1, MAX_RESTARTS);
+
+                    match vmspawn_driver::start_vm(&vm.name) {
+                        Ok(_) => {
+                            tracing::info!("Auto-healer: VM '{}' restarted successfully", vm.name);
+
+                            // Record restart
+                            let heal_record = serde_json::json!({
+                                "count": restart_count + 1,
+                                "last_restart": Utc::now().to_rfc3339(),
+                            });
+                            let _ = state.store.save_entity("autoheal", &vm.name, &heal_record);
+
+                            // Record event
+                            crate::api::events::record_event(
+                                &state,
+                                crate::api::events::VMEventType::AutoHealed,
+                                &vm.name,
+                                Some(format!("Auto-restarted (attempt {}/{})", restart_count + 1, MAX_RESTARTS)),
+                            );
+                        }
+                        Err(e) => {
+                            tracing::error!("Auto-healer: failed to restart VM '{}': {}", vm.name, e);
+                        }
+                    }
+                }
             }
         }
     }

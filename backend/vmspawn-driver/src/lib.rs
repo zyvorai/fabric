@@ -3,23 +3,118 @@ pub mod qemu;
 use anyhow::{anyhow, Result};
 use std::fs;
 use std::process::Command;
-use vm_model::{CreateVMRequest, VM, VMMetrics, VMState};
+use vm_model::{CreateVMRequest, VM, VMMetrics, VMStartOptions, VMState};
 
 pub fn create_vm(req: &CreateVMRequest) -> Result<VM> {
     let vm = VM::from_request(req);
     Ok(vm)
 }
 
-pub fn start_vm(name: &str) -> Result<()> {
-    let output = Command::new("systemd-vmspawn")
-        .arg(format!("--machine={}", name))
-        .arg("--boot")
-        .spawn();
+/// Start a VM using systemd-vmspawn with proper flags.
+///
+/// Uses the systemd-vmspawn(1) interface:
+///   --image=      Root filesystem image
+///   --directory=  Root filesystem directory
+///   --machine=    Machine name
+///   --qemu-smp=   Number of CPUs
+///   --qemu-mem=   Memory size
+///   --qemu-kvm=   KVM acceleration
+///   --qemu-vsock= VSock networking
+///   --secure-boot= Secure Boot firmware
+///   --qemu-gui    Graphical mode
+///   --set-credential= Pass credentials
+pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
+    let mut cmd = Command::new("systemd-vmspawn");
+
+    // Machine name
+    cmd.arg(format!("--machine={}", vm.name));
+
+    // Image or directory
+    if let Some(ref dir) = opts.directory {
+        cmd.arg(format!("--directory={}", dir));
+    } else {
+        // Resolve image path
+        let image_path = resolve_image_path(&vm.image, &vm.name);
+        cmd.arg(format!("--image={}", image_path));
+    }
+
+    // CPU count
+    cmd.arg(format!("--qemu-smp={}", vm.cpus));
+
+    // Memory (systemd-vmspawn expects e.g. "2G" or "512M")
+    let mem_str = if vm.memory >= 1024 && vm.memory % 1024 == 0 {
+        format!("{}G", vm.memory / 1024)
+    } else {
+        format!("{}M", vm.memory)
+    };
+    cmd.arg(format!("--qemu-mem={}", mem_str));
+
+    // KVM acceleration
+    if let Some(kvm) = opts.kvm {
+        cmd.arg(format!("--qemu-kvm={}", if kvm { "yes" } else { "no" }));
+    }
+
+    // Secure Boot
+    if let Some(sb) = opts.secure_boot {
+        cmd.arg(format!("--secure-boot={}", if sb { "yes" } else { "no" }));
+    }
+
+    // VSock
+    if let Some(vsock) = opts.vsock {
+        cmd.arg(format!("--qemu-vsock={}", if vsock { "yes" } else { "no" }));
+    }
+    if let Some(cid) = opts.vsock_cid {
+        cmd.arg(format!("--vsock-cid={}", cid));
+    }
+
+    // GUI mode
+    if opts.gui {
+        cmd.arg("--qemu-gui");
+    }
+
+    // Credentials
+    for cred in &opts.credentials {
+        cmd.arg(format!("--set-credential={}:{}", cred.id, cred.value));
+    }
+
+    tracing::info!("Starting VM '{}': {:?}", vm.name, cmd);
+
+    let output = cmd.spawn();
 
     match output {
         Ok(_) => Ok(()),
         Err(e) => {
             // Fallback: try machinectl if systemd-vmspawn is not available
+            tracing::warn!("systemd-vmspawn failed, falling back to machinectl: {}", e);
+            let fallback = Command::new("machinectl")
+                .arg("start")
+                .arg(&vm.name)
+                .output();
+
+            match fallback {
+                Ok(out) if out.status.success() => Ok(()),
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    Err(anyhow!("Failed to start VM: {}", stderr))
+                }
+                Err(_) => Err(anyhow!("Failed to start VM: {}", e)),
+            }
+        }
+    }
+}
+
+/// Simple start_vm with default options (backward compatible)
+pub fn start_vm(name: &str) -> Result<()> {
+    let mut cmd = Command::new("systemd-vmspawn");
+    cmd.arg(format!("--machine={}", name));
+
+    // Try to find the image
+    let image_path = resolve_image_path(name, name);
+    cmd.arg(format!("--image={}", image_path));
+
+    match cmd.spawn() {
+        Ok(_) => Ok(()),
+        Err(e) => {
             let fallback = Command::new("machinectl")
                 .arg("start")
                 .arg(name)
@@ -31,6 +126,28 @@ pub fn start_vm(name: &str) -> Result<()> {
             }
         }
     }
+}
+
+/// Resolve an image path, checking common locations
+fn resolve_image_path(image: &str, name: &str) -> String {
+    let candidates = [
+        image.to_string(),
+        format!("/var/lib/machines/{}", image),
+        format!("/var/lib/machines/{}.raw", name),
+        format!("/var/lib/machines/{}.qcow2", name),
+        format!("/var/lib/vmspawnd/images/{}", image),
+        format!("/var/lib/vmspawnd/images/{}.raw", name),
+        format!("/var/lib/vmspawnd/images/{}.qcow2", name),
+    ];
+
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return path.clone();
+        }
+    }
+
+    // Return the original image path if nothing found
+    image.to_string()
 }
 
 pub fn stop_vm(name: &str) -> Result<()> {
@@ -143,19 +260,16 @@ fn read_cpu_usage(cgroup_path: &str) -> Result<f64> {
         }
     }
 
-    // Read number of CPUs available to this cgroup
     let cpuset_path = format!("{}/cpuset.cpus.effective", cgroup_path);
     let num_cpus = if let Ok(cpuset) = fs::read_to_string(&cpuset_path) {
         count_cpus_in_cpuset(cpuset.trim())
     } else {
-        // Fallback: count processors from /proc/cpuinfo
         fs::read_to_string("/proc/cpuinfo")
             .map(|c| c.lines().filter(|l| l.starts_with("processor")).count() as u32)
             .unwrap_or(1)
             .max(1)
     };
 
-    // Read system uptime to calculate percentage
     let uptime_content = fs::read_to_string("/proc/uptime")
         .map_err(|e| anyhow!("Failed to read /proc/uptime: {}", e))?;
     let uptime_secs: f64 = uptime_content
@@ -174,7 +288,6 @@ fn read_cpu_usage(cgroup_path: &str) -> Result<f64> {
     Ok(percentage.min(100.0).max(0.0))
 }
 
-/// Count CPUs in a cpuset string like "0-3,5,7-9"
 fn count_cpus_in_cpuset(cpuset: &str) -> u32 {
     if cpuset.is_empty() {
         return 1;
@@ -192,7 +305,6 @@ fn count_cpus_in_cpuset(cpuset: &str) -> u32 {
     count.max(1)
 }
 
-/// Read memory usage from cgroup v2
 fn read_memory_usage(cgroup_path: &str) -> Result<u64> {
     let memory_current_path = format!("{}/memory.current", cgroup_path);
     let content = fs::read_to_string(&memory_current_path)
@@ -201,7 +313,6 @@ fn read_memory_usage(cgroup_path: &str) -> Result<u64> {
     Ok(bytes)
 }
 
-/// Read disk I/O stats from cgroup v2 io.stat
 fn read_disk_io(cgroup_path: &str) -> Result<(u64, u64)> {
     let io_stat_path = format!("{}/io.stat", cgroup_path);
     let content = match fs::read_to_string(&io_stat_path) {
@@ -225,17 +336,14 @@ fn read_disk_io(cgroup_path: &str) -> Result<(u64, u64)> {
     Ok((total_read, total_write))
 }
 
-/// Read network statistics for VM interfaces from /sys/class/net
 fn read_network_stats(vm_name: &str) -> Result<(u64, u64)> {
     let mut total_rx: u64 = 0;
     let mut total_tx: u64 = 0;
 
-    // Look for VM-associated interfaces (ve-*, veth-*, tap-* prefixed with VM name)
     let net_dir = "/sys/class/net";
     if let Ok(entries) = fs::read_dir(net_dir) {
         for entry in entries.flatten() {
             let iface_name = entry.file_name().to_string_lossy().to_string();
-            // Match interfaces associated with this VM
             if iface_name.contains(vm_name)
                 || iface_name.starts_with(&format!("ve-{}", vm_name))
                 || iface_name.starts_with(&format!("veth-{}", vm_name))
@@ -275,4 +383,61 @@ pub fn get_vm_state(name: &str) -> Result<VMState> {
         }
         Err(_) => Ok(VMState::Unknown),
     }
+}
+
+/// Build a VM image using mkosi
+///
+/// mkosi builds OS images from a configuration. Usage:
+///   mkosi -d <distribution> -p <packages> --autologin -o <output> build
+pub fn build_image_mkosi(config: &MkosiConfig) -> Result<String> {
+    let output_path = format!(
+        "/var/lib/vmspawnd/images/{}.raw",
+        config.name
+    );
+
+    let mut cmd = Command::new("mkosi");
+
+    // Distribution
+    cmd.arg("-d").arg(&config.distribution);
+
+    // Packages
+    for pkg in &config.packages {
+        cmd.arg("-p").arg(pkg);
+    }
+
+    // Output
+    cmd.arg("-o").arg(&output_path);
+
+    // Force rebuild
+    cmd.arg("-f");
+
+    // Auto-login for convenience
+    if config.autologin {
+        cmd.arg("--autologin");
+    }
+
+    // Build command
+    cmd.arg("build");
+
+    tracing::info!("Building image '{}' with mkosi: {:?}", config.name, cmd);
+
+    let output = cmd.output()
+        .map_err(|e| anyhow!("Failed to run mkosi: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("mkosi build failed: {}", stderr));
+    }
+
+    tracing::info!("Image '{}' built successfully at {}", config.name, output_path);
+    Ok(output_path)
+}
+
+/// Configuration for mkosi image builds
+#[derive(Debug, Clone)]
+pub struct MkosiConfig {
+    pub name: String,
+    pub distribution: String,
+    pub packages: Vec<String>,
+    pub autologin: bool,
 }

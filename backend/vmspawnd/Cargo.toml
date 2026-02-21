@@ -26,6 +26,8 @@ chrono.workspace = true
 reqwest = { version = "0.12", features = ["json"] }
 lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
 rand.workspace = true
+async-stream = "0.3"
+tokio-stream = "0.1"
 
 networking = { path = "../networking" }
 vm-model = { path = "../vm-model" }

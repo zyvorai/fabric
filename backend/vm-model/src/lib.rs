@@ -53,6 +53,52 @@ fn default_disk_size() -> u64 {
     20 // 20GB default disk size
 }
 
+/// Options for starting a VM via systemd-vmspawn
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VMStartOptions {
+    /// Use KVM acceleration (None = auto-detect)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kvm: Option<bool>,
+    /// Enable Secure Boot firmware
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secure_boot: Option<bool>,
+    /// Enable VSock networking
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vsock: Option<bool>,
+    /// VSock CID (None = random)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vsock_cid: Option<u32>,
+    /// Start in graphical mode
+    #[serde(default)]
+    pub gui: bool,
+    /// Use directory instead of image
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub directory: Option<String>,
+    /// Credentials to pass (ID -> value)
+    #[serde(default)]
+    pub credentials: Vec<VMCredential>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VMCredential {
+    pub id: String,
+    pub value: String,
+}
+
+impl Default for VMStartOptions {
+    fn default() -> Self {
+        Self {
+            kvm: None,
+            secure_boot: None,
+            vsock: None,
+            vsock_cid: None,
+            gui: false,
+            directory: None,
+            credentials: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMMetrics {
     pub cpu_usage: f64,
