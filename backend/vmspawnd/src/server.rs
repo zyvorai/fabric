@@ -18,6 +18,8 @@ pub struct AppState {
     pub storage_manager: Arc<RwLock<StorageManager>>,
     pub http_client: reqwest::Client,
     pub quota_cache: Arc<std::sync::RwLock<QuotaCache>>,
+    pub user_db: Option<Arc<security::db::UserDb>>,
+    pub jwt_config: Option<Arc<security::JwtConfig>>,
 }
 
 pub struct QuotaCache {
@@ -55,12 +57,28 @@ impl Server {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
 
+        // Initialize auth if enabled
+        let (user_db, jwt_config) = if config.auth.enabled {
+            let db = security::db::UserDb::new(&config.auth.db_path)?;
+            db.seed_admin(&config.auth.default_admin_password)?;
+
+            let mut jwt = security::JwtConfig::new(config.auth.jwt_secret.clone());
+            jwt.expiration_hours = config.auth.token_expiration_hours;
+
+            (Some(Arc::new(db)), Some(Arc::new(jwt)))
+        } else {
+            tracing::warn!("Authentication is disabled");
+            (None, None)
+        };
+
         let state = Arc::new(AppState {
             store,
             config,
             storage_manager: Arc::new(RwLock::new(storage_manager)),
             http_client,
             quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
+            user_db,
+            jwt_config,
         });
 
         Ok(Self { state })
@@ -112,7 +130,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
     };
 
-    let api_routes = Router::new()
+    // Public auth routes (no JWT required)
+    let public_auth_routes = Router::new()
+            .route("/auth/login", post(api::auth::login))
+            .with_state(state.clone());
+
+    // Protected API routes
+    let mut api_routes = Router::new()
+            // Auth - me endpoint (protected)
+            .route("/auth/me", get(api::auth::me))
             // VM management routes
             .route("/vms", get(routes::list_vms).post(routes::create_vm))
             .route("/vms/:name", get(routes::get_vm).delete(routes::delete_vm))
@@ -382,13 +408,21 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/certificates/health", get(api::certificates::get_cert_health_dashboard))
             .with_state(state.clone());
 
+        // Apply auth middleware if enabled
+        if let Some(ref jwt_config) = state.jwt_config {
+            api_routes = api_routes.route_layer(axum::middleware::from_fn_with_state(
+                jwt_config.clone(),
+                security::auth_middleware,
+            ));
+        }
+
         let ws_routes = Router::new()
             .route("/console/:name", get(websocket::console_handler))
             .route("/vnc/:name", get(vnc_proxy::vnc_handler))
             .with_state(state.clone());
 
         Router::new()
-            .nest("/api", api_routes)
+            .nest("/api", public_auth_routes.merge(api_routes))
             .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
             .route("/metrics", get(prometheus_exporter::metrics_handler))

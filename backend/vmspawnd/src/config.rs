@@ -9,6 +9,8 @@ pub struct Config {
     pub network: NetworkConfig,
     #[serde(default)]
     pub controller: ControllerConfig,
+    #[serde(default)]
+    pub auth: AuthConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +79,58 @@ impl Default for ControllerConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthConfig {
+    #[serde(default = "default_auth_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_jwt_secret")]
+    pub jwt_secret: String,
+    #[serde(default = "default_auth_db_path")]
+    pub db_path: String,
+    #[serde(default = "default_admin_password")]
+    pub default_admin_password: String,
+    #[serde(default = "default_token_expiration_hours")]
+    pub token_expiration_hours: i64,
+}
+
+fn default_auth_enabled() -> bool {
+    true
+}
+
+fn default_jwt_secret() -> String {
+    std::env::var("VMSPAWND_JWT_SECRET").unwrap_or_else(|_| {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        (0..32)
+            .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
+            .collect()
+    })
+}
+
+fn default_auth_db_path() -> String {
+    "/var/lib/vmspawnd/auth.db".to_string()
+}
+
+fn default_admin_password() -> String {
+    "admin".to_string()
+}
+
+fn default_token_expiration_hours() -> i64 {
+    24
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_auth_enabled(),
+            jwt_secret: default_jwt_secret(),
+            db_path: default_auth_db_path(),
+            default_admin_password: default_admin_password(),
+            token_expiration_hours: default_token_expiration_hours(),
+        }
+    }
+}
+
 impl Config {
     pub fn load() -> Result<Self> {
         let paths = vec![
@@ -108,6 +162,7 @@ impl Config {
                 networkd_file_prefix: default_networkd_file_prefix(),
             },
             controller: ControllerConfig::default(),
+            auth: AuthConfig::default(),
         })
     }
 }

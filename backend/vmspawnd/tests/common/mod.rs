@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use vmspawnd::config::{
-    Config, ControllerConfig, DaemonConfig, NetworkConfig, StorageConfig,
+    AuthConfig, Config, ControllerConfig, DaemonConfig, NetworkConfig, StorageConfig,
 };
 use vmspawnd::server::{AppState, QuotaCache};
 
@@ -32,6 +32,10 @@ pub async fn create_test_app() -> Router {
             networkd_file_prefix: "50-vmspawnd-".to_string(),
         },
         controller: ControllerConfig::default(),
+        auth: AuthConfig {
+            enabled: false,
+            ..AuthConfig::default()
+        },
     };
 
     let storage_manager = vmspawnd_storage::StorageManager::new(&storage_dir).unwrap();
@@ -47,6 +51,8 @@ pub async fn create_test_app() -> Router {
         storage_manager: Arc::new(RwLock::new(storage_manager)),
         http_client,
         quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
+        user_db: None,
+        jwt_config: None,
     });
 
     vmspawnd::server::build_router(state)

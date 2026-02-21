@@ -29,6 +29,7 @@ members = [
     "content-library",
     "lifecycle-manager",
     "certificate-manager",
+    "security",
 ]
 
 [workspace.package]

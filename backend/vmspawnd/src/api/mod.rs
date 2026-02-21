@@ -1,3 +1,5 @@
+pub mod auth;
+
 // Phase 1 API modules for advanced features
 pub mod analytics;
 pub mod audit;

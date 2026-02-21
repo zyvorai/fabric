@@ -1,3 +1,5 @@
+pub mod db;
+
 use anyhow::Result;
 use axum::{
     extract::{Request, State},
