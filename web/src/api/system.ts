@@ -220,3 +220,43 @@ export async function getSystemMemory(): Promise<SystemMemory> {
   }
   return response.json()
 }
+
+// Optimization types
+export interface ResourceRecommendation {
+  resource: string
+  current_value: string
+  recommended_value: string
+  reason: string
+  impact: string
+}
+
+export interface OptimizationRecommendation {
+  vm_name: string
+  recommendations: ResourceRecommendation[]
+}
+
+export interface OptimizationResult {
+  vm_name: string
+  applied: string[]
+  skipped: string[]
+}
+
+// Get optimization recommendations
+export async function getOptimizationRecommendations(): Promise<OptimizationRecommendation[]> {
+  const response = await fetch(`${API_BASE_URL}/system/optimization/recommendations`)
+  if (!response.ok) {
+    throw new Error('Failed to get optimization recommendations')
+  }
+  return response.json()
+}
+
+// Auto-optimize a VM
+export async function optimizeVM(vmName: string): Promise<OptimizationResult> {
+  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/optimize`, {
+    method: 'POST',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to optimize VM: ${vmName}`)
+  }
+  return response.json()
+}

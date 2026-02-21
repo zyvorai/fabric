@@ -784,3 +784,202 @@ async fn test_vm_metrics() {
     // get_metrics returns Ok with zeroes even if cgroup doesn't exist, so expect 200
     assert_eq!(response.status(), StatusCode::OK);
 }
+
+// ─── Plugins ────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_list_plugins() {
+    let app = common::create_test_app().await;
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/api/plugins")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let plugins: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    // No plugins registered in test env
+    assert!(plugins.is_empty());
+}
+
+// ─── Cluster Health ─────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_cluster_health_not_found() {
+    let app = common::create_test_app().await;
+
+    let request = Request::builder()
+        .method("GET")
+        .uri("/api/clusters/nonexistent/health")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_cluster_health_with_cluster() {
+    let app = common::create_test_app().await;
+
+    // Create a cluster first
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/api/clusters")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "name": "test-cluster",
+                "description": "Test cluster",
+                "datacenter_id": "dc-1",
+                "ha_enabled": false,
+                "drs_enabled": false,
+                "drs_mode": "manual",
+                "evc_mode": null
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let response = app.clone().oneshot(create_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let cluster: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let cluster_id = cluster["id"].as_str().unwrap();
+
+    // Get cluster health
+    let health_request = Request::builder()
+        .method("GET")
+        .uri(&format!("/api/clusters/{}/health", cluster_id))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(health_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let health: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(health["total_hosts"], 0);
+    assert_eq!(health["health_status"], "empty");
+}
+
+// ─── Host Discovery ─────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_host_discovery_unreachable() {
+    let app = common::create_test_app().await;
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/api/hosts/discover")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "address": "192.0.2.1",
+                "port": 9999
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(result["reachable"], false);
+    assert_eq!(result["already_registered"], false);
+}
+
+// ─── Datacenter & Host Lifecycle ────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_datacenter_host_lifecycle() {
+    let app = common::create_test_app().await;
+
+    // Create datacenter
+    let dc_request = Request::builder()
+        .method("POST")
+        .uri("/api/datacenters")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({ "name": "test-dc", "description": "Test datacenter" }).to_string(),
+        ))
+        .unwrap();
+
+    let response = app.clone().oneshot(dc_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    // Register host
+    let host_request = Request::builder()
+        .method("POST")
+        .uri("/api/hosts")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "hostname": "host-1",
+                "address": "10.0.0.1",
+                "cluster_id": "",
+                "cpus": 16,
+                "memory_mb": 32768,
+                "agent_version": "0.1.0"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let response = app.clone().oneshot(host_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let host: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let host_id = host["id"].as_str().unwrap();
+
+    // Send heartbeat
+    let hb_request = Request::builder()
+        .method("POST")
+        .uri(&format!("/api/hosts/{}/heartbeat", host_id))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "cpu_usage_pct": 45.5,
+                "memory_usage_pct": 62.0,
+                "vm_count": 5,
+                "uptime_secs": 3600
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let response = app.clone().oneshot(hb_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // List hosts
+    let list_request = Request::builder()
+        .method("GET")
+        .uri("/api/hosts")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(list_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let hosts: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(!hosts.is_empty());
+
+    // Delete host
+    let delete_request = Request::builder()
+        .method("DELETE")
+        .uri(&format!("/api/hosts/{}", host_id))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(delete_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+}

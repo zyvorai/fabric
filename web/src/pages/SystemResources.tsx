@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react'
-import { Cpu, Server, MemoryStick, HardDrive, RefreshCw } from 'lucide-react'
+import { Cpu, Server, MemoryStick, HardDrive, RefreshCw, Zap } from 'lucide-react'
 import {
   getCpuTopology,
   getNumaTopology,
   getSystemMemory,
   getHugepageStats,
   allocateHugepages,
+  getOptimizationRecommendations,
+  optimizeVM,
   type CpuTopology,
   type NumaTopology,
   type SystemMemory,
   type HugepageStats,
+  type OptimizationRecommendation,
 } from '../api/system'
+import { useToastContext } from '../contexts/ToastContext'
 
 export default function SystemResources() {
+  const toast = useToastContext()
   const [cpuTopology, setCpuTopology] = useState<CpuTopology | null>(null)
   const [numaTopology, setNumaTopology] = useState<NumaTopology | null>(null)
   const [systemMemory, setSystemMemory] = useState<SystemMemory | null>(null)
   const [hugepages2mb, setHugepages2mb] = useState<HugepageStats | null>(null)
   const [hugepages1gb, setHugepages1gb] = useState<HugepageStats | null>(null)
+  const [recommendations, setRecommendations] = useState<OptimizationRecommendation[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'cpu' | 'numa' | 'memory'>('cpu')
+  const [activeTab, setActiveTab] = useState<'cpu' | 'numa' | 'memory' | 'optimization'>('cpu')
 
   useEffect(() => {
     loadResources()
@@ -27,12 +33,13 @@ export default function SystemResources() {
 
   const loadResources = async () => {
     try {
-      const [cpu, numa, memory, hp2mb, hp1gb] = await Promise.all([
+      const [cpu, numa, memory, hp2mb, hp1gb, recs] = await Promise.all([
         getCpuTopology().catch(() => null),
         getNumaTopology().catch(() => null),
         getSystemMemory().catch(() => null),
         getHugepageStats('Size2MB').catch(() => null),
         getHugepageStats('Size1GB').catch(() => null),
+        getOptimizationRecommendations().catch(() => []),
       ])
 
       setCpuTopology(cpu)
@@ -40,6 +47,7 @@ export default function SystemResources() {
       setSystemMemory(memory)
       setHugepages2mb(hp2mb)
       setHugepages1gb(hp1gb)
+      setRecommendations(recs)
     } catch (error) {
       console.error('Failed to load system resources:', error)
     } finally {
@@ -158,6 +166,20 @@ export default function SystemResources() {
             >
               Memory & Hugepages
             </button>
+            <button
+              onClick={() => setActiveTab('optimization')}
+              className={`px-6 py-3 flex items-center gap-2 ${
+                activeTab === 'optimization'
+                  ? 'bg-gray-700 border-b-2 border-blue-500'
+                  : 'hover:bg-gray-750'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              Optimization
+              {recommendations.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-xs bg-blue-500 rounded-full">{recommendations.length}</span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -171,6 +193,17 @@ export default function SystemResources() {
               hugepages1gb={hugepages1gb}
               onRefresh={loadResources}
             />
+          )}
+          {activeTab === 'optimization' && (
+            <OptimizationView recommendations={recommendations} onOptimize={async (vmName) => {
+              try {
+                const result = await optimizeVM(vmName)
+                toast.success(`Optimized '${vmName}': ${result.applied.length} settings applied`)
+                loadResources()
+              } catch (_error) {
+                toast.error(`Failed to optimize '${vmName}'`)
+              }
+            }} />
           )}
         </div>
       </div>
@@ -494,6 +527,60 @@ function MemoryView({
           }}
         />
       )}
+    </div>
+  )
+}
+
+function OptimizationView({
+  recommendations,
+  onOptimize,
+}: {
+  recommendations: OptimizationRecommendation[]
+  onOptimize: (vmName: string) => void
+}) {
+  if (recommendations.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Zap className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+        <p className="text-lg text-gray-400 mb-2">No optimization recommendations</p>
+        <p className="text-sm text-gray-500">All running VMs are configured optimally, or no VMs are running.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-gray-400">
+        Recommendations based on system topology analysis. Click "Apply" to auto-configure optimal settings.
+      </p>
+      {recommendations.map((rec) => (
+        <div key={rec.vm_name} className="bg-gray-750 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold">{rec.vm_name}</h3>
+            <button
+              onClick={() => onOptimize(rec.vm_name)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm transition"
+            >
+              <Zap className="w-4 h-4" />
+              Apply
+            </button>
+          </div>
+          <div className="space-y-3">
+            {rec.recommendations.map((r, idx) => (
+              <div key={idx} className="bg-gray-800 rounded p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-blue-400">{r.resource}</span>
+                  <span className="text-xs text-gray-500">
+                    {r.current_value} &rarr; {r.recommended_value}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-400 mb-1">{r.reason}</p>
+                <p className="text-xs text-green-400">{r.impact}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
