@@ -5,7 +5,7 @@ import {
   Layers, Shield, Calendar, FileText, BarChart3, Save, Bell,
   Database, Cpu, Menu, X, ChevronDown, Building2, GitBranch,
   Zap, Lock, RefreshCw, Archive, Key, Activity, PackageCheck, Camera,
-  ArrowRightLeft,
+  ArrowRightLeft, Package, Monitor,
 } from 'lucide-react'
 import ConnectionStatus from './ConnectionStatus'
 
@@ -26,6 +26,8 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/', icon: <Home className="w-4 h-4" />, label: 'Dashboard' },
       { to: '/vms', icon: <Server className="w-4 h-4" />, label: 'VMs' },
+      { to: '/machines', icon: <Monitor className="w-4 h-4" />, label: 'Machines' },
+      { to: '/profiles', icon: <Layers className="w-4 h-4" />, label: 'Profiles' },
       { to: '/datacenters', icon: <Building2 className="w-4 h-4" />, label: 'Datacenters' },
     ],
   },
@@ -56,6 +58,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/templates', icon: <Layers className="w-4 h-4" />, label: 'Templates' },
       { to: '/content-library', icon: <Archive className="w-4 h-4" />, label: 'Content Library' },
+      { to: '/image-builder', icon: <Package className="w-4 h-4" />, label: 'Image Builder' },
       { to: '/schedules', icon: <Calendar className="w-4 h-4" />, label: 'Schedules' },
       { to: '/snapshots', icon: <Camera className="w-4 h-4" />, label: 'Snapshots' },
       { to: '/backups', icon: <Save className="w-4 h-4" />, label: 'Backups' },
