@@ -3,7 +3,9 @@ pub mod auth;
 // Phase 1 API modules for advanced features
 pub mod analytics;
 pub mod audit;
+pub mod autoscale;
 pub mod backups;
+pub mod declarative;
 pub mod events;
 pub mod firmware;
 pub mod hotplug;

@@ -130,6 +130,12 @@ impl Server {
             run_vm_autohealer(heal_state).await;
         });
 
+        // Start auto-scaling engine
+        let scale_state = self.state.clone();
+        tokio::spawn(async move {
+            run_autoscaler(scale_state).await;
+        });
+
         axum::serve(listener, app).await?;
 
         Ok(())
@@ -331,6 +337,13 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/vms/:name/checkpoints/:id", delete(api::vm_advanced::delete_checkpoint))
             // VM forking
             .route("/vms/:name/fork", post(api::vm_advanced::fork_vm))
+            // Declarative VM spec
+            .route("/vms/apply", post(api::declarative::apply_vm_spec))
+            .route("/vms/:name/spec", get(api::declarative::export_vm_spec))
+            // Auto-scaling
+            .route("/autoscale", get(api::autoscale::list_scaling_policies).post(api::autoscale::create_scaling_policy))
+            .route("/autoscale/events", get(api::autoscale::list_scale_events))
+            .route("/autoscale/:vm_name", get(api::autoscale::get_scaling_policy).delete(api::autoscale::delete_scaling_policy))
             // Plugin routes
             .route("/plugins", get(plugins::list_plugins))
             // Resource optimization routes
@@ -1024,4 +1037,148 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
             }
         }
     }
+}
+
+/// Background task that evaluates auto-scaling policies and adjusts resources
+async fn run_autoscaler(state: Arc<AppState>) {
+    use crate::api::autoscale::{ScalingPolicy, ScaleEvent, ScaleAction};
+    use crate::api::analytics::VMPerformance;
+    use chrono::Utc;
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+    loop {
+        interval.tick().await;
+
+        let policies = match state.store.list_entities::<ScalingPolicy>("autoscale_policies") {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        let now = Utc::now();
+
+        for mut policy in policies {
+            if !policy.enabled {
+                continue;
+            }
+
+            // Check cooldown
+            if let Some(last_action) = policy.last_scale_action {
+                if (now - last_action).num_seconds() < policy.cooldown_secs as i64 {
+                    continue;
+                }
+            }
+
+            let vm = match state.store.get_vm(&policy.vm_name) {
+                Ok(Some(vm)) if matches!(vm.state, vm_model::VMState::Running) => vm,
+                _ => continue,
+            };
+
+            // Get latest metrics
+            let metrics_key = format!("metrics/vm/{}/1h", policy.vm_name);
+            let latest_cpu = state.store
+                .get_entity::<VMPerformance>("performance", &metrics_key)
+                .ok()
+                .flatten()
+                .and_then(|p| p.metrics.last().map(|m| m.cpu_usage));
+
+            let latest_memory = state.store
+                .get_entity::<VMPerformance>("performance", &metrics_key)
+                .ok()
+                .flatten()
+                .and_then(|p| p.metrics.last().map(|m| m.memory_usage));
+
+            // CPU scaling
+            if let Some(cpu_usage) = latest_cpu {
+                if let Some(threshold) = policy.cpu_scale_up_threshold {
+                    if cpu_usage > threshold && vm.cpus < policy.max_cpus {
+                        let new_cpus = (vm.cpus + 1).min(policy.max_cpus);
+                        tracing::info!("Autoscaler: scaling up CPU for '{}': {} -> {}", policy.vm_name, vm.cpus, new_cpus);
+                        record_scale_event(&state, &policy.vm_name, ScaleAction::ScaleUp,
+                            "cpu", &vm.cpus.to_string(), &new_cpus.to_string(),
+                            &format!("CPU usage {:.1}% > threshold {:.1}%", cpu_usage, threshold));
+                        if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            vm.cpus = new_cpus;
+                            let _ = state.store.save_vm(&vm);
+                        }
+                        policy.last_scale_action = Some(now);
+                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                        continue;
+                    }
+                }
+                if let Some(threshold) = policy.cpu_scale_down_threshold {
+                    if cpu_usage < threshold && vm.cpus > policy.min_cpus {
+                        let new_cpus = (vm.cpus - 1).max(policy.min_cpus);
+                        tracing::info!("Autoscaler: scaling down CPU for '{}': {} -> {}", policy.vm_name, vm.cpus, new_cpus);
+                        record_scale_event(&state, &policy.vm_name, ScaleAction::ScaleDown,
+                            "cpu", &vm.cpus.to_string(), &new_cpus.to_string(),
+                            &format!("CPU usage {:.1}% < threshold {:.1}%", cpu_usage, threshold));
+                        if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            vm.cpus = new_cpus;
+                            let _ = state.store.save_vm(&vm);
+                        }
+                        policy.last_scale_action = Some(now);
+                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                        continue;
+                    }
+                }
+            }
+
+            // Memory scaling
+            if let Some(mem_usage) = latest_memory {
+                if let Some(threshold) = policy.memory_scale_up_threshold {
+                    if mem_usage > threshold && vm.memory < policy.max_memory_mb {
+                        let new_mem = (vm.memory + 1024).min(policy.max_memory_mb);
+                        tracing::info!("Autoscaler: scaling up memory for '{}': {}MB -> {}MB", policy.vm_name, vm.memory, new_mem);
+                        record_scale_event(&state, &policy.vm_name, ScaleAction::ScaleUp,
+                            "memory", &format!("{}MB", vm.memory), &format!("{}MB", new_mem),
+                            &format!("Memory usage {:.1}% > threshold {:.1}%", mem_usage, threshold));
+                        if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            vm.memory = new_mem;
+                            let _ = state.store.save_vm(&vm);
+                        }
+                        policy.last_scale_action = Some(now);
+                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                    }
+                }
+                if let Some(threshold) = policy.memory_scale_down_threshold {
+                    if mem_usage < threshold && vm.memory > policy.min_memory_mb {
+                        let new_mem = (vm.memory - 1024).max(policy.min_memory_mb);
+                        tracing::info!("Autoscaler: scaling down memory for '{}': {}MB -> {}MB", policy.vm_name, vm.memory, new_mem);
+                        record_scale_event(&state, &policy.vm_name, ScaleAction::ScaleDown,
+                            "memory", &format!("{}MB", vm.memory), &format!("{}MB", new_mem),
+                            &format!("Memory usage {:.1}% < threshold {:.1}%", mem_usage, threshold));
+                        if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            vm.memory = new_mem;
+                            let _ = state.store.save_vm(&vm);
+                        }
+                        policy.last_scale_action = Some(now);
+                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn record_scale_event(
+    state: &Arc<AppState>,
+    vm_name: &str,
+    action: crate::api::autoscale::ScaleAction,
+    resource: &str,
+    from: &str,
+    to: &str,
+    reason: &str,
+) {
+    let event = crate::api::autoscale::ScaleEvent {
+        id: uuid::Uuid::new_v4().to_string(),
+        vm_name: vm_name.to_string(),
+        action,
+        resource: resource.to_string(),
+        from_value: from.to_string(),
+        to_value: to.to_string(),
+        reason: reason.to_string(),
+        timestamp: chrono::Utc::now(),
+    };
+    let _ = state.store.save_entity("scale_events", &event.id, &event);
 }
