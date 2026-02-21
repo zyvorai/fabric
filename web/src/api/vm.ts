@@ -1,3 +1,5 @@
+import { apiFetch } from './client'
+
 export interface VM {
   name: string
   state: 'running' | 'stopped' | 'paused' | 'unknown'
@@ -23,8 +25,6 @@ export interface VMMetrics {
   network_rx: number
   network_tx: number
 }
-
-import { apiFetch } from './client'
 
 const API_BASE = '/api'
 
