@@ -1,6 +1,6 @@
 use anyhow::Result;
 use state_store::StateStore;
-use crate::{config::Config, server::Server};
+use vmspawnd::{config::Config, server::Server};
 
 pub struct Daemon {
     config: Config,

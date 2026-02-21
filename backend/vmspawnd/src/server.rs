@@ -67,31 +67,52 @@ impl Server {
     }
 
     pub async fn run(self) -> Result<()> {
-        let cors = {
-            use axum::http::{HeaderValue, Method, header};
+        let app = build_router(self.state.clone());
 
-            let origins: Vec<HeaderValue> = self
-                .state
-                .config
-                .daemon
-                .cors_origins
-                .iter()
-                .filter_map(|o| o.parse::<HeaderValue>().ok())
-                .collect();
+        let addr: std::net::SocketAddr = self.state.config.daemon.listen.parse()?;
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
 
-            CorsLayer::new()
-                .allow_origin(origins)
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::DELETE,
-                    Method::OPTIONS,
-                ])
-                .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
-        };
+        tracing::info!("Listening on {}", addr);
 
-        let api_routes = Router::new()
+        // Start background scheduler for automated schedule execution
+        let scheduler_state = self.state.clone();
+        tokio::spawn(async move {
+            run_schedule_checker(scheduler_state).await;
+        });
+
+        axum::serve(listener, app).await?;
+
+        Ok(())
+    }
+}
+
+/// Build the full application router with all routes. Used by both the server
+/// and integration tests.
+pub fn build_router(state: Arc<AppState>) -> Router {
+    let cors = {
+        use axum::http::{HeaderValue, Method, header};
+
+        let origins: Vec<HeaderValue> = state
+            .config
+            .daemon
+            .cors_origins
+            .iter()
+            .filter_map(|o| o.parse::<HeaderValue>().ok())
+            .collect();
+
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+    };
+
+    let api_routes = Router::new()
             // VM management routes
             .route("/vms", get(routes::list_vms).post(routes::create_vm))
             .route("/vms/:name", get(routes::get_vm).delete(routes::delete_vm))
@@ -356,14 +377,14 @@ impl Server {
             .route("/certificates/security-baselines", get(api::certificates::list_security_baselines).post(api::certificates::create_security_baseline))
             .route("/certificates/security-baselines/:id/compliance", post(api::certificates::check_vm_security_compliance))
             .route("/certificates/health", get(api::certificates::get_cert_health_dashboard))
-            .with_state(self.state.clone());
+            .with_state(state.clone());
 
         let ws_routes = Router::new()
             .route("/console/:name", get(websocket::console_handler))
             .route("/vnc/:name", get(vnc_proxy::vnc_handler))
-            .with_state(self.state.clone());
+            .with_state(state.clone());
 
-        let app = Router::new()
+        Router::new()
             .nest("/api", api_routes)
             .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
@@ -375,23 +396,7 @@ impl Server {
                     "../web/dist"
                 },
             ))
-            .layer(cors);
-
-        let addr: std::net::SocketAddr = self.state.config.daemon.listen.parse()?;
-        let listener = tokio::net::TcpListener::bind(&addr).await?;
-
-        tracing::info!("Listening on {}", addr);
-
-        // Start background scheduler for automated schedule execution
-        let scheduler_state = self.state.clone();
-        tokio::spawn(async move {
-            run_schedule_checker(scheduler_state).await;
-        });
-
-        axum::serve(listener, app).await?;
-
-        Ok(())
-    }
+            .layer(cors)
 }
 
 /// Background task that checks and executes due schedules every 30 seconds

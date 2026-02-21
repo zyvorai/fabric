@@ -1,10 +1,4 @@
-mod api;
-mod config;
 mod daemon;
-mod routes;
-mod server;
-pub mod validation;
-mod websocket;
 
 use anyhow::Result;
 use daemon::Daemon;
