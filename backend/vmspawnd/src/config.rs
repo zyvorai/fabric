@@ -32,6 +32,18 @@ pub struct StorageConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
     pub bridge: String,
+    #[serde(default = "default_networkd_config_dir")]
+    pub networkd_config_dir: String,
+    #[serde(default = "default_networkd_file_prefix")]
+    pub networkd_file_prefix: String,
+}
+
+fn default_networkd_config_dir() -> String {
+    "/etc/systemd/network".to_string()
+}
+
+fn default_networkd_file_prefix() -> String {
+    "50-vmspawnd-".to_string()
 }
 
 fn default_image_path() -> String {
@@ -92,6 +104,8 @@ impl Config {
             },
             network: NetworkConfig {
                 bridge: "br0".to_string(),
+                networkd_config_dir: default_networkd_config_dir(),
+                networkd_file_prefix: default_networkd_file_prefix(),
             },
             controller: ControllerConfig::default(),
         })

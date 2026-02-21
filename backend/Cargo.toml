@@ -12,6 +12,7 @@ members = [
     "cloud-init",
     "tpm-support",
     "prometheus-exporter",
+    "networking",
     "crates/storage",
     "crates/system",
     "crates/vm",
@@ -57,3 +58,4 @@ regex = "1.11"
 tar = "0.4"
 flate2 = "1.0"
 hostname = "0.4"
+rand = "0.8"
