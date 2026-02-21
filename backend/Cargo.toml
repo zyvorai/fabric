@@ -24,7 +24,7 @@ members = [
     "distributed-storage",
     "fault-tolerance",
     "replication",
-    "distributed-firewall",
+
     "site-recovery",
     "content-library",
     "lifecycle-manager",

@@ -28,7 +28,7 @@ import ResourcePools from './pages/ResourcePools'
 import DRS from './pages/DRS'
 import DistributedStorage from './pages/DistributedStorage'
 import Encryption from './pages/Encryption'
-import SDNNetworking from './pages/SDNNetworking'
+
 import FaultTolerance from './pages/FaultTolerance'
 import Replication from './pages/Replication'
 import SiteRecovery from './pages/SiteRecovery'
@@ -72,7 +72,7 @@ function App() {
                 <Route path="/drs" element={<DRS />} />
                 <Route path="/distributed-storage" element={<DistributedStorage />} />
                 <Route path="/encryption" element={<Encryption />} />
-                <Route path="/sdn-networking" element={<SDNNetworking />} />
+
                 <Route path="/fault-tolerance" element={<FaultTolerance />} />
                 <Route path="/replication" element={<Replication />} />
                 <Route path="/site-recovery" element={<SiteRecovery />} />

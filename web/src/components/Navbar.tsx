@@ -4,7 +4,7 @@ import {
   Server, Plus, Home, Terminal, Network, HardDrive, Settings,
   Layers, Shield, Calendar, FileText, BarChart3, Save, Bell,
   Database, Cpu, Menu, X, ChevronDown, Building2, GitBranch,
-  Zap, Lock, Globe, RefreshCw, Archive, Key, Activity, PackageCheck,
+  Zap, Lock, RefreshCw, Archive, Key, Activity, PackageCheck,
 } from 'lucide-react'
 import ConnectionStatus from './ConnectionStatus'
 
@@ -32,7 +32,7 @@ const navGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { to: '/network', icon: <Network className="w-4 h-4" />, label: 'Network' },
-      { to: '/sdn-networking', icon: <Globe className="w-4 h-4" />, label: 'SDN' },
+
       { to: '/storage', icon: <HardDrive className="w-4 h-4" />, label: 'Storage' },
       { to: '/storage-pools', icon: <Database className="w-4 h-4" />, label: 'Pools' },
       { to: '/distributed-storage', icon: <Database className="w-4 h-4" />, label: 'Distributed Storage' },
