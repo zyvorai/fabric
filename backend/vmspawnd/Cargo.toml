@@ -46,6 +46,7 @@ predictive-drs = { path = "../predictive-drs" }
 distributed-storage = { path = "../distributed-storage" }
 encryption = { path = "../encryption" }
 
+migration = { path = "../migration" }
 fault-tolerance = { path = "../fault-tolerance" }
 replication = { path = "../replication" }
 site-recovery = { path = "../site-recovery" }

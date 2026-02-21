@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Copy, Layers } from 'lucide-react'
-import { listTemplates, deleteTemplate, createVMFromTemplate, Template } from '../api/vm'
+import {
+  listTemplates as fetchTemplates,
+  deleteTemplate as removeTemplate,
+  deployTemplate,
+  VMTemplate,
+} from '../api/templates'
 import { useToastContext } from '../contexts/ToastContext'
 import { useNavigate } from 'react-router-dom'
 
 export default function Templates() {
   const toast = useToastContext()
   const navigate = useNavigate()
-  const [templates, setTemplates] = useState<Template[]>([])
+  const [templates, setTemplates] = useState<VMTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
@@ -18,7 +23,7 @@ export default function Templates() {
 
   const loadTemplates = async () => {
     try {
-      const data = await listTemplates()
+      const data = await fetchTemplates()
       setTemplates(data)
     } catch (error) {
       console.error('Failed to load templates:', error)
@@ -27,10 +32,10 @@ export default function Templates() {
     }
   }
 
-  const handleDelete = async (name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Delete template '${name}'? This cannot be undone.`)) {
       try {
-        await deleteTemplate(name)
+        await removeTemplate(id)
         toast.success(`Template '${name}' deleted successfully`)
         loadTemplates()
       } catch (_error) {
@@ -39,8 +44,8 @@ export default function Templates() {
     }
   }
 
-  const handleInstantiate = (templateName: string) => {
-    setSelectedTemplate(templateName)
+  const handleInstantiate = (templateId: string) => {
+    setSelectedTemplate(templateId)
     setShowCreateDialog(true)
   }
 
@@ -91,10 +96,10 @@ export default function Templates() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {templates.map((template) => (
             <TemplateCard
-              key={template.name}
+              key={template.id}
               template={template}
-              onDelete={() => handleDelete(template.name)}
-              onInstantiate={() => handleInstantiate(template.name)}
+              onDelete={() => handleDelete(template.id, template.name)}
+              onInstantiate={() => handleInstantiate(template.id)}
             />
           ))}
         </div>
@@ -102,7 +107,7 @@ export default function Templates() {
 
       {showCreateDialog && selectedTemplate && (
         <CreateVMFromTemplateDialog
-          templateName={selectedTemplate}
+          templateId={selectedTemplate}
           onClose={() => {
             setShowCreateDialog(false)
             setSelectedTemplate(null)
@@ -122,7 +127,7 @@ function TemplateCard({
   onDelete,
   onInstantiate,
 }: {
-  template: Template
+  template: VMTemplate
   onDelete: () => void
   onInstantiate: () => void
 }) {
@@ -146,8 +151,14 @@ function TemplateCard({
         </div>
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Disk Size</span>
-          <span className="font-medium">{template.disk_size} GB</span>
+          <span className="font-medium">{template.disk} GB</span>
         </div>
+        {template.tags.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-gray-400">Tags</span>
+            <span className="font-medium text-xs">{template.tags.join(', ')}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Created</span>
           <span className="font-medium text-xs">{new Date(template.created).toLocaleDateString()}</span>
@@ -174,11 +185,11 @@ function TemplateCard({
 }
 
 function CreateVMFromTemplateDialog({
-  templateName,
+  templateId,
   onClose,
   onSuccess,
 }: {
-  templateName: string
+  templateId: string
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -194,7 +205,7 @@ function CreateVMFromTemplateDialog({
 
     setIsCreating(true)
     try {
-      await createVMFromTemplate(templateName, vmName)
+      await deployTemplate(templateId, vmName)
       onSuccess()
       onClose()
     } catch (error) {
@@ -215,16 +226,6 @@ function CreateVMFromTemplateDialog({
         </div>
 
         <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Template</label>
-            <input
-              type="text"
-              value={templateName}
-              disabled
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-gray-400"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">VM Name</label>
             <input

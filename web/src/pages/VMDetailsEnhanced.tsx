@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getVM, startVM, stopVM, restartVM, deleteVM, VM } from '../api/vm'
+import { getVM, startVM, stopVM, restartVM, deleteVM, pauseVM, resumeVM, cloneVM, VM } from '../api/vm'
 import {
   Play, Square, RotateCw, Trash2, ArrowLeft, Info, Activity, HardDrive,
-  Network, Camera, Terminal, Cpu, MemoryStick, Clock
+  Network, Camera, Terminal, Cpu, MemoryStick, Clock, Pause, Copy
 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -18,6 +18,8 @@ export default function VMDetailsEnhanced() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showCloneDialog, setShowCloneDialog] = useState(false)
+  const [cloneName, setCloneName] = useState('')
 
   useEffect(() => {
     if (name) {
@@ -70,6 +72,40 @@ export default function VMDetailsEnhanced() {
       loadVM()
     } catch (_error) {
       toast.error(`Failed to restart VM '${name}'`)
+    }
+  }
+
+  const handlePause = async () => {
+    if (!name) return
+    try {
+      await pauseVM(name)
+      toast.success(`VM '${name}' paused successfully`)
+      loadVM()
+    } catch (_error) {
+      toast.error(`Failed to pause VM '${name}'`)
+    }
+  }
+
+  const handleResume = async () => {
+    if (!name) return
+    try {
+      await resumeVM(name)
+      toast.success(`VM '${name}' resumed successfully`)
+      loadVM()
+    } catch (_error) {
+      toast.error(`Failed to resume VM '${name}'`)
+    }
+  }
+
+  const handleClone = async () => {
+    if (!name || !cloneName.trim()) return
+    try {
+      await cloneVM(name, cloneName)
+      toast.success(`VM '${name}' cloned as '${cloneName}'`)
+      setShowCloneDialog(false)
+      setCloneName('')
+    } catch (_error) {
+      toast.error(`Failed to clone VM '${name}'`)
     }
   }
 
@@ -149,6 +185,14 @@ export default function VMDetailsEnhanced() {
                 <Play className="w-4 h-4" />
                 Start
               </button>
+            ) : vm.state === 'paused' ? (
+              <button
+                onClick={handleResume}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
+              >
+                <Play className="w-4 h-4" />
+                Resume
+              </button>
             ) : (
               <>
                 <button
@@ -159,6 +203,13 @@ export default function VMDetailsEnhanced() {
                   Stop
                 </button>
                 <button
+                  onClick={handlePause}
+                  className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition"
+                >
+                  <Pause className="w-4 h-4" />
+                  Pause
+                </button>
+                <button
                   onClick={handleRestart}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
                 >
@@ -167,6 +218,13 @@ export default function VMDetailsEnhanced() {
                 </button>
               </>
             )}
+            <button
+              onClick={() => setShowCloneDialog(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition"
+            >
+              <Copy className="w-4 h-4" />
+              Clone
+            </button>
             <button
               onClick={handleDelete}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition"
@@ -220,6 +278,40 @@ export default function VMDetailsEnhanced() {
           onConfirm={confirmDelete}
           onCancel={() => setShowDeleteConfirm(false)}
         />
+      )}
+
+      {showCloneDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <h2 className="text-xl font-bold">Clone VM</h2>
+              <button onClick={() => { setShowCloneDialog(false); setCloneName('') }} className="p-2 hover:bg-gray-700 rounded transition">
+                <span className="text-2xl">&times;</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Source VM</label>
+                <input type="text" value={name} disabled className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-gray-400" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">New VM Name</label>
+                <input
+                  type="text"
+                  value={cloneName}
+                  onChange={(e) => setCloneName(e.target.value)}
+                  placeholder="Enter clone name"
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-6 border-t border-gray-700">
+              <button onClick={() => { setShowCloneDialog(false); setCloneName('') }} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition">Cancel</button>
+              <button onClick={handleClone} disabled={!cloneName.trim()} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition disabled:opacity-50">Clone</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

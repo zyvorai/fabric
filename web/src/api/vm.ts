@@ -76,6 +76,20 @@ export async function restartVM(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to restart VM')
 }
 
+export async function pauseVM(name: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/vms/${name}/pause`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to pause VM')
+}
+
+export async function resumeVM(name: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/vms/${name}/resume`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to resume VM')
+}
+
 export async function getMetrics(name: string): Promise<VMMetrics> {
   const res = await fetch(`${API_BASE}/vms/${name}/metrics`)
   if (!res.ok) throw new Error('Failed to fetch metrics')

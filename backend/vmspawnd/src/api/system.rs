@@ -430,6 +430,203 @@ pub async fn get_system_memory(
     }
 }
 
+// ============================================================================
+// Resource Optimization
+// ============================================================================
+
+#[derive(Debug, Serialize)]
+pub struct OptimizationRecommendation {
+    pub vm_name: String,
+    pub recommendations: Vec<ResourceRecommendation>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResourceRecommendation {
+    pub resource: String,
+    pub current_value: String,
+    pub recommended_value: String,
+    pub reason: String,
+    pub impact: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OptimizationResult {
+    pub vm_name: String,
+    pub applied: Vec<String>,
+    pub skipped: Vec<String>,
+}
+
+/// GET /api/system/optimization/recommendations - Get resource optimization suggestions
+pub async fn get_optimization_recommendations(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<OptimizationRecommendation>>, (StatusCode, String)> {
+    let vms = state.store.list_vms().unwrap_or_default();
+
+    let numa_topology = NumaTopology::detect().ok();
+    let cpu_topology = CpuTopology::detect().ok();
+
+    let mut recommendations = Vec::new();
+
+    for vm in &vms {
+        if !matches!(vm.state, vm_model::VMState::Running) {
+            continue;
+        }
+
+        let mut vm_recs = Vec::new();
+
+        // NUMA placement recommendation
+        if let Some(ref numa) = numa_topology {
+            if numa.nodes.len() > 1 {
+                if let Some(placement) = numa.recommend_placement(vm.memory, vm.cpus) {
+                    vm_recs.push(ResourceRecommendation {
+                        resource: "NUMA".to_string(),
+                        current_value: "auto".to_string(),
+                        recommended_value: format!("node {}", placement.numa_node),
+                        reason: format!(
+                            "VM requires {} MB memory and {} CPUs; NUMA node {} has optimal resources",
+                            vm.memory, vm.cpus, placement.numa_node
+                        ),
+                        impact: "Reduced memory access latency, improved performance".to_string(),
+                    });
+                }
+            }
+        }
+
+        // CPU pinning recommendation
+        if let Some(ref cpu) = cpu_topology {
+            if vm.cpus <= cpu.total_cpus && cpu.total_cpus > 4 {
+                // Recommend pinning for VMs with dedicated cores
+                let available_cores: Vec<u32> = cpu.cpus.iter()
+                    .filter(|c| c.online)
+                    .map(|c| c.id)
+                    .take(vm.cpus as usize)
+                    .collect();
+
+                if !available_cores.is_empty() {
+                    vm_recs.push(ResourceRecommendation {
+                        resource: "CPU Pinning".to_string(),
+                        current_value: "unpinned".to_string(),
+                        recommended_value: format!("cores {:?}", available_cores),
+                        reason: "CPU pinning reduces context switching and cache misses".to_string(),
+                        impact: "5-15% CPU performance improvement for compute-intensive workloads".to_string(),
+                    });
+                }
+            }
+        }
+
+        // Memory optimization: check if hugepages would help
+        if vm.memory >= 2048 {
+            vm_recs.push(ResourceRecommendation {
+                resource: "Hugepages".to_string(),
+                current_value: "4KB pages".to_string(),
+                recommended_value: "2MB hugepages".to_string(),
+                reason: format!(
+                    "VM has {} MB memory; hugepages reduce TLB misses for large memory VMs",
+                    vm.memory
+                ),
+                impact: "Reduced TLB misses, 2-5% memory access improvement".to_string(),
+            });
+        }
+
+        // Memory ballooning recommendation for overcommitted scenarios
+        if vm.memory >= 4096 {
+            vm_recs.push(ResourceRecommendation {
+                resource: "Memory Ballooning".to_string(),
+                current_value: "disabled".to_string(),
+                recommended_value: "enabled".to_string(),
+                reason: "Enables dynamic memory reclamation for better host utilization".to_string(),
+                impact: "Allows host to reclaim unused VM memory during pressure".to_string(),
+            });
+        }
+
+        if !vm_recs.is_empty() {
+            recommendations.push(OptimizationRecommendation {
+                vm_name: vm.name.clone(),
+                recommendations: vm_recs,
+            });
+        }
+    }
+
+    Ok(Json(recommendations))
+}
+
+/// POST /api/vms/:name/optimize - Auto-apply optimal NUMA/CPU settings
+pub async fn optimize_vm(
+    State(state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+) -> Result<Json<OptimizationResult>, (StatusCode, String)> {
+    validate_vm_name(&vm_name)?;
+
+    let vm = match state.store.get_vm(&vm_name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => {
+            return Err((StatusCode::NOT_FOUND, format!("VM '{}' not found", vm_name)));
+        }
+        Err(e) => {
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+        }
+    };
+
+    let mut applied = Vec::new();
+    let mut skipped = Vec::new();
+
+    // Try to apply NUMA placement
+    if let Ok(numa) = NumaTopology::detect() {
+        if numa.nodes.len() > 1 {
+            if let Some(placement) = numa.recommend_placement(vm.memory, vm.cpus) {
+                let cpu_list = placement.cpu_affinity.iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+
+                let service_name = format!("systemd-vmspawn@{}.service", vm_name);
+                let output = std::process::Command::new("systemctl")
+                    .arg("set-property")
+                    .arg(&service_name)
+                    .arg(format!("CPUAffinity={}", cpu_list))
+                    .output();
+
+                match output {
+                    Ok(o) if o.status.success() => {
+                        applied.push(format!("CPU pinning to NUMA node {} (cores: {})", placement.numa_node, cpu_list));
+                    }
+                    _ => {
+                        skipped.push("CPU pinning: failed to apply via systemctl".to_string());
+                    }
+                }
+            } else {
+                skipped.push("NUMA placement: no suitable node found".to_string());
+            }
+        } else {
+            skipped.push("NUMA placement: single-node system".to_string());
+        }
+    } else {
+        skipped.push("NUMA placement: failed to detect topology".to_string());
+    }
+
+    // Try to set memory limit via cgroup
+    let controller = MemoryController::new(&vm_name);
+    if controller.exists() {
+        let limit_bytes = vm.memory * 1024 * 1024;
+        match controller.set_limit(limit_bytes) {
+            Ok(_) => {
+                applied.push(format!("Memory limit set to {} MB", vm.memory));
+            }
+            Err(e) => {
+                skipped.push(format!("Memory limit: {}", e));
+            }
+        }
+    } else {
+        skipped.push("Memory limit: cgroup not found (VM may not be running)".to_string());
+    }
+
+    Ok(Json(OptimizationResult {
+        vm_name,
+        applied,
+        skipped,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

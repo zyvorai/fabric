@@ -98,6 +98,12 @@ impl Server {
             run_schedule_checker(scheduler_state).await;
         });
 
+        // Start background metrics collector
+        let metrics_state = self.state.clone();
+        tokio::spawn(async move {
+            run_metrics_collector(metrics_state).await;
+        });
+
         axum::serve(listener, app).await?;
 
         Ok(())
@@ -146,6 +152,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/vms/:name/stop", post(routes::stop_vm))
             .route("/vms/:name/restart", post(routes::restart_vm))
             .route("/vms/:name/metrics", get(routes::get_metrics))
+            .route("/vms/:name/pause", post(routes::pause_vm))
+            .route("/vms/:name/resume", post(routes::resume_vm))
+            .route("/vms/:name/clone", post(routes::clone_vm))
             .route("/vms/:name/cloud-init", post(routes::configure_cloud_init))
             // Snapshot routes
             .route("/vms/:name/snapshots", get(api::snapshots::list_snapshots).post(api::snapshots::create_snapshot))
@@ -248,6 +257,17 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/analytics/top", get(api::analytics::get_top_vms_by_resource))
             .route("/analytics/utilization", get(api::analytics::get_resource_utilization))
             .route("/analytics/export", get(api::analytics::export_performance_report))
+            // Template routes
+            .route("/templates", get(api::templates::list_templates).post(api::templates::create_template))
+            .route("/templates/:id", get(api::templates::get_template).put(api::templates::update_template).delete(api::templates::delete_template))
+            .route("/templates/:id/deploy", post(api::templates::deploy_template))
+            // Migration routes
+            .route("/migrations", get(api::migration::list_migrations).post(api::migration::start_migration))
+            .route("/migrations/:id", get(api::migration::get_migration))
+            .route("/migrations/:id/cancel", post(api::migration::cancel_migration))
+            // Resource optimization routes
+            .route("/system/optimization/recommendations", get(api::system::get_optimization_recommendations))
+            .route("/vms/:name/optimize", post(api::system::optimize_vm))
             // Backup routes
             .route("/backups", get(api::backups::list_backups))
             .route("/backups", post(api::backups::create_backup))
@@ -583,5 +603,134 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                 let _ = state_clone.store.save_entity("schedule_history", &history_id, &history);
             });
         }
+    }
+}
+
+/// Background task that collects real VM metrics every 60 seconds
+async fn run_metrics_collector(state: Arc<AppState>) {
+    use crate::api::analytics::{PerformanceMetrics, VMPerformance, SystemPerformance};
+    use chrono::Utc;
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    // Maximum entries to keep (24h at 1-min intervals)
+    const MAX_ENTRIES: usize = 1440;
+
+    loop {
+        interval.tick().await;
+
+        let vms = match state.store.list_vms() {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("Metrics collector: failed to list VMs: {}", e);
+                continue;
+            }
+        };
+
+        let now = Utc::now();
+        let running_vms: Vec<_> = vms.iter()
+            .filter(|vm| matches!(vm.state, vm_model::VMState::Running))
+            .collect();
+
+        let mut total_cpu = 0.0;
+        let mut total_memory = 0.0;
+        let mut total_network_rx: u64 = 0;
+        let mut total_network_tx: u64 = 0;
+        let mut collected_count = 0u32;
+
+        for vm in &running_vms {
+            match vmspawn_driver::get_metrics(&vm.name) {
+                Ok(metrics) => {
+                    // Calculate memory usage as percentage
+                    let memory_pct = if vm.memory > 0 {
+                        (metrics.memory_usage as f64 / (vm.memory as f64 * 1024.0 * 1024.0)) * 100.0
+                    } else {
+                        0.0
+                    };
+
+                    let perf_metric = PerformanceMetrics {
+                        timestamp: now,
+                        cpu_usage: metrics.cpu_usage,
+                        memory_usage: memory_pct.min(100.0),
+                        disk_io_read: metrics.disk_usage / 2, // approximate split
+                        disk_io_write: metrics.disk_usage / 2,
+                        network_rx: metrics.network_rx,
+                        network_tx: metrics.network_tx,
+                    };
+
+                    // Load existing metrics and append
+                    let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+                    let mut existing_metrics = if let Ok(Some(existing)) =
+                        state.store.get_entity::<VMPerformance>("performance", &metrics_key)
+                    {
+                        existing.metrics
+                    } else {
+                        Vec::new()
+                    };
+
+                    existing_metrics.push(perf_metric);
+
+                    // Trim to rolling window
+                    if existing_metrics.len() > MAX_ENTRIES {
+                        let drain_count = existing_metrics.len() - MAX_ENTRIES;
+                        existing_metrics.drain(..drain_count);
+                    }
+
+                    let vm_perf = VMPerformance {
+                        vm_name: vm.name.clone(),
+                        metrics: existing_metrics,
+                    };
+
+                    if let Err(e) = state.store.save_entity("performance", &metrics_key, &vm_perf) {
+                        tracing::error!("Metrics collector: failed to save metrics for VM '{}': {}", vm.name, e);
+                    }
+
+                    total_cpu += metrics.cpu_usage;
+                    total_memory += memory_pct.min(100.0);
+                    total_network_rx += metrics.network_rx;
+                    total_network_tx += metrics.network_tx;
+                    collected_count += 1;
+
+                    tracing::debug!(
+                        "Collected metrics for VM '{}': cpu={:.1}%, mem={:.1}%",
+                        vm.name, metrics.cpu_usage, memory_pct
+                    );
+                }
+                Err(e) => {
+                    tracing::debug!("Metrics collector: failed to get metrics for VM '{}': {}", vm.name, e);
+                }
+            }
+        }
+
+        // Compute and store aggregate system performance
+        let sys_perf = SystemPerformance {
+            timestamp: now,
+            total_vms: vms.len() as u32,
+            running_vms: running_vms.len() as u32,
+            total_cpu_usage: if collected_count > 0 { total_cpu / collected_count as f64 } else { 0.0 },
+            total_memory_usage: if collected_count > 0 { total_memory / collected_count as f64 } else { 0.0 },
+            total_network_rx,
+            total_network_tx,
+        };
+
+        let sys_key = "metrics/system/1h";
+        let mut sys_entries = if let Ok(Some(existing)) =
+            state.store.get_entity::<Vec<SystemPerformance>>("performance", sys_key)
+        {
+            existing
+        } else {
+            Vec::new()
+        };
+
+        sys_entries.push(sys_perf);
+        if sys_entries.len() > MAX_ENTRIES {
+            let drain_count = sys_entries.len() - MAX_ENTRIES;
+            sys_entries.drain(..drain_count);
+        }
+
+        if let Err(e) = state.store.save_entity("performance", sys_key, &sys_entries) {
+            tracing::error!("Metrics collector: failed to save system metrics: {}", e);
+        }
+
+        tracing::debug!("Metrics collector: collected metrics for {} VMs", collected_count);
     }
 }
