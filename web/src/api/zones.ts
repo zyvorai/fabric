@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 const API_BASE = '/api'
 
 export interface AvailabilityZone {
@@ -23,13 +24,13 @@ export interface SpotInstance {
 }
 
 export async function listZones(): Promise<AvailabilityZone[]> {
-  const res = await fetch(`${API_BASE}/zones`)
+  const res = await apiFetch(`${API_BASE}/zones`)
   if (!res.ok) throw new Error('Failed to list zones')
   return res.json()
 }
 
 export async function createZone(req: { name: string; description?: string; region?: string }): Promise<AvailabilityZone> {
-  const res = await fetch(`${API_BASE}/zones`, {
+  const res = await apiFetch(`${API_BASE}/zones`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -39,18 +40,18 @@ export async function createZone(req: { name: string; description?: string; regi
 }
 
 export async function deleteZone(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/zones/${id}`, { method: 'DELETE' })
+  const res = await apiFetch(`${API_BASE}/zones/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete zone')
 }
 
 export async function listSpotInstances(): Promise<SpotInstance[]> {
-  const res = await fetch(`${API_BASE}/spot-instances`)
+  const res = await apiFetch(`${API_BASE}/spot-instances`)
   if (!res.ok) throw new Error('Failed to list spot instances')
   return res.json()
 }
 
 export async function evictSpotInstance(id: string): Promise<SpotInstance> {
-  const res = await fetch(`${API_BASE}/spot-instances/${id}/evict`, { method: 'POST' })
+  const res = await apiFetch(`${API_BASE}/spot-instances/${id}/evict`, { method: 'POST' })
   if (!res.ok) throw new Error('Failed to evict spot instance')
   return res.json()
 }

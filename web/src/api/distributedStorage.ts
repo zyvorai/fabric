@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface DistributedStoragePool {
   id: string
   name: string
@@ -86,7 +87,7 @@ const API_BASE = '/api'
 // Distributed storage pools
 
 export async function listStoragePools(): Promise<DistributedStoragePool[]> {
-  const res = await fetch(`${API_BASE}/distributed-storage/pools`)
+  const res = await apiFetch(`${API_BASE}/distributed-storage/pools`)
   if (!res.ok) throw new Error('Failed to fetch distributed storage pools')
   return res.json()
 }
@@ -98,7 +99,7 @@ export async function createStoragePool(req: {
   replication_factor?: number
   erasure_coding?: boolean
 }): Promise<DistributedStoragePool> {
-  const res = await fetch(`${API_BASE}/distributed-storage/pools`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/pools`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -108,7 +109,7 @@ export async function createStoragePool(req: {
 }
 
 export async function deleteStoragePool(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/distributed-storage/pools/${id}`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/pools/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete distributed storage pool')
@@ -122,7 +123,7 @@ export async function startStorageMigration(req: {
   target_pool_id: string
   policy_id?: string
 }): Promise<StorageMigration> {
-  const res = await fetch(`${API_BASE}/distributed-storage/migrations`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/migrations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -135,7 +136,7 @@ export async function listStorageMigrations(status?: string): Promise<StorageMig
   const url = status
     ? `${API_BASE}/distributed-storage/migrations?status=${status}`
     : `${API_BASE}/distributed-storage/migrations`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch storage migrations')
   return res.json()
 }
@@ -143,7 +144,7 @@ export async function listStorageMigrations(status?: string): Promise<StorageMig
 // Storage policies
 
 export async function listStoragePolicies(): Promise<StoragePolicy[]> {
-  const res = await fetch(`${API_BASE}/distributed-storage/policies`)
+  const res = await apiFetch(`${API_BASE}/distributed-storage/policies`)
   if (!res.ok) throw new Error('Failed to fetch storage policies')
   return res.json()
 }
@@ -161,7 +162,7 @@ export async function createStoragePolicy(req: {
   iops_limit?: number
   throughput_limit_mbps?: number
 }): Promise<StoragePolicy> {
-  const res = await fetch(`${API_BASE}/distributed-storage/policies`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/policies`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -171,7 +172,7 @@ export async function createStoragePolicy(req: {
 }
 
 export async function deleteStoragePolicy(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/distributed-storage/policies/${id}`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/policies/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete storage policy')
@@ -180,7 +181,7 @@ export async function deleteStoragePolicy(id: string): Promise<void> {
 // Compliance
 
 export async function checkCompliance(vmId: string, policyId: string): Promise<ComplianceReport> {
-  const res = await fetch(`${API_BASE}/distributed-storage/compliance/check`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/compliance/check`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vm_id: vmId, policy_id: policyId }),
@@ -192,7 +193,7 @@ export async function checkCompliance(vmId: string, policyId: string): Promise<C
 // Datastore clusters
 
 export async function listDatastoreClusters(): Promise<DatastoreCluster[]> {
-  const res = await fetch(`${API_BASE}/distributed-storage/datastore-clusters`)
+  const res = await apiFetch(`${API_BASE}/distributed-storage/datastore-clusters`)
   if (!res.ok) throw new Error('Failed to fetch datastore clusters')
   return res.json()
 }
@@ -205,7 +206,7 @@ export async function createDatastoreCluster(req: {
   space_threshold_pct?: number
   io_latency_threshold_ms?: number
 }): Promise<DatastoreCluster> {
-  const res = await fetch(`${API_BASE}/distributed-storage/datastore-clusters`, {
+  const res = await apiFetch(`${API_BASE}/distributed-storage/datastore-clusters`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

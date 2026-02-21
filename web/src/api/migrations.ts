@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 const API_BASE = '/api'
 
 export type MigrationType = 'live' | 'offline' | 'storage'
@@ -25,7 +26,7 @@ export interface MigrationStatus {
 }
 
 export async function startMigration(req: MigrationRequest): Promise<MigrationStatus> {
-  const res = await fetch(`${API_BASE}/migrations`, {
+  const res = await apiFetch(`${API_BASE}/migrations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -35,19 +36,19 @@ export async function startMigration(req: MigrationRequest): Promise<MigrationSt
 }
 
 export async function listMigrations(): Promise<MigrationStatus[]> {
-  const res = await fetch(`${API_BASE}/migrations`)
+  const res = await apiFetch(`${API_BASE}/migrations`)
   if (!res.ok) throw new Error('Failed to fetch migrations')
   return res.json()
 }
 
 export async function getMigration(id: string): Promise<MigrationStatus> {
-  const res = await fetch(`${API_BASE}/migrations/${id}`)
+  const res = await apiFetch(`${API_BASE}/migrations/${id}`)
   if (!res.ok) throw new Error('Failed to fetch migration')
   return res.json()
 }
 
 export async function cancelMigration(id: string): Promise<MigrationStatus> {
-  const res = await fetch(`${API_BASE}/migrations/${id}/cancel`, {
+  const res = await apiFetch(`${API_BASE}/migrations/${id}/cancel`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to cancel migration')

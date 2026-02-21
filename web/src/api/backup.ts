@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface Backup {
   id: string
   vm_name: string
@@ -56,19 +57,19 @@ const API_BASE = '/api'
 
 export async function listBackups(vmName?: string): Promise<Backup[]> {
   const url = vmName ? `${API_BASE}/backups?vm=${vmName}` : `${API_BASE}/backups`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch backups')
   return res.json()
 }
 
 export async function getBackup(id: string): Promise<Backup> {
-  const res = await fetch(`${API_BASE}/backups/${id}`)
+  const res = await apiFetch(`${API_BASE}/backups/${id}`)
   if (!res.ok) throw new Error('Failed to fetch backup')
   return res.json()
 }
 
 export async function createBackup(req: CreateBackupRequest): Promise<BackupJob> {
-  const res = await fetch(`${API_BASE}/backups`, {
+  const res = await apiFetch(`${API_BASE}/backups`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -78,14 +79,14 @@ export async function createBackup(req: CreateBackupRequest): Promise<BackupJob>
 }
 
 export async function deleteBackup(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/backups/${id}`, {
+  const res = await apiFetch(`${API_BASE}/backups/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete backup')
 }
 
 export async function restoreBackup(options: RestoreOptions): Promise<BackupJob> {
-  const res = await fetch(`${API_BASE}/backups/restore`, {
+  const res = await apiFetch(`${API_BASE}/backups/restore`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(options),
@@ -95,25 +96,25 @@ export async function restoreBackup(options: RestoreOptions): Promise<BackupJob>
 }
 
 export async function getBackupJobs(): Promise<BackupJob[]> {
-  const res = await fetch(`${API_BASE}/backups/jobs`)
+  const res = await apiFetch(`${API_BASE}/backups/jobs`)
   if (!res.ok) throw new Error('Failed to fetch backup jobs')
   return res.json()
 }
 
 export async function getBackupJob(id: string): Promise<BackupJob> {
-  const res = await fetch(`${API_BASE}/backups/jobs/${id}`)
+  const res = await apiFetch(`${API_BASE}/backups/jobs/${id}`)
   if (!res.ok) throw new Error('Failed to fetch backup job')
   return res.json()
 }
 
 export async function listBackupPolicies(): Promise<BackupPolicy[]> {
-  const res = await fetch(`${API_BASE}/backups/policies`)
+  const res = await apiFetch(`${API_BASE}/backups/policies`)
   if (!res.ok) throw new Error('Failed to fetch backup policies')
   return res.json()
 }
 
 export async function createBackupPolicy(policy: Omit<BackupPolicy, 'id' | 'last_run' | 'next_run'>): Promise<BackupPolicy> {
-  const res = await fetch(`${API_BASE}/backups/policies`, {
+  const res = await apiFetch(`${API_BASE}/backups/policies`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(policy),
@@ -123,21 +124,21 @@ export async function createBackupPolicy(policy: Omit<BackupPolicy, 'id' | 'last
 }
 
 export async function deleteBackupPolicy(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/backups/policies/${id}`, {
+  const res = await apiFetch(`${API_BASE}/backups/policies/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete backup policy')
 }
 
 export async function enableBackupPolicy(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/backups/policies/${id}/enable`, {
+  const res = await apiFetch(`${API_BASE}/backups/policies/${id}/enable`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to enable backup policy')
 }
 
 export async function disableBackupPolicy(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/backups/policies/${id}/disable`, {
+  const res = await apiFetch(`${API_BASE}/backups/policies/${id}/disable`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to disable backup policy')
@@ -153,7 +154,7 @@ export interface BackupStats {
 }
 
 export async function getBackupStats(): Promise<BackupStats> {
-  const res = await fetch(`${API_BASE}/backups/stats`)
+  const res = await apiFetch(`${API_BASE}/backups/stats`)
   if (!res.ok) throw new Error('Failed to fetch backup stats')
   return res.json()
 }

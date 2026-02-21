@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface RecoveryPlan {
   id: string
   name: string
@@ -76,7 +77,7 @@ const API_BASE = '/api'
 // Recovery plans
 
 export async function listPlans(): Promise<RecoveryPlan[]> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans`)
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans`)
   if (!res.ok) throw new Error('Failed to fetch recovery plans')
   return res.json()
 }
@@ -104,7 +105,7 @@ export async function createPlan(req: {
   }>
   test_network?: string
 }): Promise<RecoveryPlan> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -114,13 +115,13 @@ export async function createPlan(req: {
 }
 
 export async function getPlan(id: string): Promise<RecoveryPlan> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans/${id}`)
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans/${id}`)
   if (!res.ok) throw new Error('Failed to fetch recovery plan')
   return res.json()
 }
 
 export async function updatePlan(id: string, req: Partial<RecoveryPlan>): Promise<RecoveryPlan> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans/${id}`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -130,7 +131,7 @@ export async function updatePlan(id: string, req: Partial<RecoveryPlan>): Promis
 }
 
 export async function deletePlan(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans/${id}`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete recovery plan')
@@ -139,7 +140,7 @@ export async function deletePlan(id: string): Promise<void> {
 // Plan executions
 
 export async function executePlannedMigration(planId: string): Promise<RecoveryExecution> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans/${planId}/execute`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans/${planId}/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ execution_type: 'planned_migration' }),
@@ -149,7 +150,7 @@ export async function executePlannedMigration(planId: string): Promise<RecoveryE
 }
 
 export async function executeDisasterRecovery(planId: string): Promise<RecoveryExecution> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans/${planId}/execute`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans/${planId}/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ execution_type: 'disaster_recovery' }),
@@ -159,7 +160,7 @@ export async function executeDisasterRecovery(planId: string): Promise<RecoveryE
 }
 
 export async function executeTestFailover(planId: string): Promise<RecoveryExecution> {
-  const res = await fetch(`${API_BASE}/site-recovery/plans/${planId}/execute`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/plans/${planId}/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ execution_type: 'test_failover' }),
@@ -172,19 +173,19 @@ export async function listExecutions(planId?: string): Promise<RecoveryExecution
   const url = planId
     ? `${API_BASE}/site-recovery/executions?plan_id=${planId}`
     : `${API_BASE}/site-recovery/executions`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch recovery executions')
   return res.json()
 }
 
 export async function getExecution(id: string): Promise<RecoveryExecution> {
-  const res = await fetch(`${API_BASE}/site-recovery/executions/${id}`)
+  const res = await apiFetch(`${API_BASE}/site-recovery/executions/${id}`)
   if (!res.ok) throw new Error('Failed to fetch recovery execution')
   return res.json()
 }
 
 export async function cancelExecution(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/site-recovery/executions/${id}/cancel`, {
+  const res = await apiFetch(`${API_BASE}/site-recovery/executions/${id}/cancel`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to cancel recovery execution')
@@ -193,7 +194,7 @@ export async function cancelExecution(id: string): Promise<void> {
 // Dashboard
 
 export async function getDrDashboard(): Promise<DrDashboard> {
-  const res = await fetch(`${API_BASE}/site-recovery/dashboard`)
+  const res = await apiFetch(`${API_BASE}/site-recovery/dashboard`)
   if (!res.ok) throw new Error('Failed to fetch DR dashboard')
   return res.json()
 }

@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 import { API_BASE_URL } from './config'
 
 export interface FirmwareStatus {
@@ -22,7 +23,7 @@ export interface FirmwareCapabilities {
 
 // Get firmware status for a VM
 export async function getFirmwareStatus(vmName: string): Promise<FirmwareStatus> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/firmware/status`)
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/firmware/status`)
   if (!response.ok) {
     throw new Error(`Failed to get firmware status for: ${vmName}`)
   }
@@ -31,7 +32,7 @@ export async function getFirmwareStatus(vmName: string): Promise<FirmwareStatus>
 
 // Enable UEFI firmware for a VM
 export async function enableUefi(vmName: string, request: EnableUefiRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/firmware/uefi`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/firmware/uefi`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -43,7 +44,7 @@ export async function enableUefi(vmName: string, request: EnableUefiRequest): Pr
 
 // Enable Secure Boot for a VM
 export async function enableSecureBoot(vmName: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/firmware/secureboot`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/firmware/secureboot`, {
     method: 'POST',
   })
   if (!response.ok) {
@@ -53,7 +54,7 @@ export async function enableSecureBoot(vmName: string): Promise<void> {
 
 // Disable Secure Boot for a VM
 export async function disableSecureBoot(vmName: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/firmware/secureboot`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/firmware/secureboot`, {
     method: 'DELETE',
   })
   if (!response.ok) {
@@ -63,7 +64,7 @@ export async function disableSecureBoot(vmName: string): Promise<void> {
 
 // Reset NVRAM to defaults
 export async function resetNvram(vmName: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/firmware/reset`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/firmware/reset`, {
     method: 'POST',
   })
   if (!response.ok) {
@@ -73,7 +74,7 @@ export async function resetNvram(vmName: string): Promise<void> {
 
 // Get system firmware capabilities
 export async function getFirmwareCapabilities(): Promise<FirmwareCapabilities> {
-  const response = await fetch(`${API_BASE_URL}/system/firmware/capabilities`)
+  const response = await apiFetch(`${API_BASE_URL}/system/firmware/capabilities`)
   if (!response.ok) {
     throw new Error('Failed to get firmware capabilities')
   }

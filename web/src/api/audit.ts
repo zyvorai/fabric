@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface AuditLog {
   id: string
   timestamp: string
@@ -33,13 +34,13 @@ export async function listAuditLogs(filters?: AuditLogFilters): Promise<AuditLog
   }
 
   const url = `${API_BASE}/audit/logs${params.toString() ? `?${params}` : ''}`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch audit logs')
   return res.json()
 }
 
 export async function getAuditLog(id: string): Promise<AuditLog> {
-  const res = await fetch(`${API_BASE}/audit/logs/${id}`)
+  const res = await apiFetch(`${API_BASE}/audit/logs/${id}`)
   if (!res.ok) throw new Error('Failed to fetch audit log')
   return res.json()
 }
@@ -54,7 +55,7 @@ export async function exportAuditLogs(filters?: AuditLogFilters, format: 'json' 
   params.append('format', format)
 
   const url = `${API_BASE}/audit/logs/export?${params}`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to export audit logs')
   return res.blob()
 }
@@ -68,7 +69,7 @@ export interface AuditStats {
 }
 
 export async function getAuditStats(): Promise<AuditStats> {
-  const res = await fetch(`${API_BASE}/audit/stats`)
+  const res = await apiFetch(`${API_BASE}/audit/stats`)
   if (!res.ok) throw new Error('Failed to fetch audit stats')
   return res.json()
 }

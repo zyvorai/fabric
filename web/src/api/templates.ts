@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 const API_BASE = '/api'
 
 export interface VMTemplate {
@@ -31,19 +32,19 @@ export interface DeployTemplateRequest {
 }
 
 export async function listTemplates(): Promise<VMTemplate[]> {
-  const res = await fetch(`${API_BASE}/templates`)
+  const res = await apiFetch(`${API_BASE}/templates`)
   if (!res.ok) throw new Error('Failed to fetch templates')
   return res.json()
 }
 
 export async function getTemplate(id: string): Promise<VMTemplate> {
-  const res = await fetch(`${API_BASE}/templates/${id}`)
+  const res = await apiFetch(`${API_BASE}/templates/${id}`)
   if (!res.ok) throw new Error('Failed to fetch template')
   return res.json()
 }
 
 export async function createTemplate(req: CreateTemplateRequest): Promise<VMTemplate> {
-  const res = await fetch(`${API_BASE}/templates`, {
+  const res = await apiFetch(`${API_BASE}/templates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -53,7 +54,7 @@ export async function createTemplate(req: CreateTemplateRequest): Promise<VMTemp
 }
 
 export async function updateTemplate(id: string, req: Partial<CreateTemplateRequest>): Promise<VMTemplate> {
-  const res = await fetch(`${API_BASE}/templates/${id}`, {
+  const res = await apiFetch(`${API_BASE}/templates/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -63,14 +64,14 @@ export async function updateTemplate(id: string, req: Partial<CreateTemplateRequ
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/templates/${id}`, {
+  const res = await apiFetch(`${API_BASE}/templates/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete template')
 }
 
 export async function deployTemplate(id: string, vmName: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/templates/${id}/deploy`, {
+  const res = await apiFetch(`${API_BASE}/templates/${id}/deploy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vm_name: vmName }),

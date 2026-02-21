@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface Schedule {
   id: string
   name: string
@@ -35,19 +36,19 @@ export interface ScheduleHistory {
 const API_BASE = '/api'
 
 export async function listSchedules(): Promise<Schedule[]> {
-  const res = await fetch(`${API_BASE}/schedules`)
+  const res = await apiFetch(`${API_BASE}/schedules`)
   if (!res.ok) throw new Error('Failed to fetch schedules')
   return res.json()
 }
 
 export async function getSchedule(id: string): Promise<Schedule> {
-  const res = await fetch(`${API_BASE}/schedules/${id}`)
+  const res = await apiFetch(`${API_BASE}/schedules/${id}`)
   if (!res.ok) throw new Error('Failed to fetch schedule')
   return res.json()
 }
 
 export async function createSchedule(req: CreateScheduleRequest): Promise<Schedule> {
-  const res = await fetch(`${API_BASE}/schedules`, {
+  const res = await apiFetch(`${API_BASE}/schedules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -57,7 +58,7 @@ export async function createSchedule(req: CreateScheduleRequest): Promise<Schedu
 }
 
 export async function updateSchedule(id: string, req: Partial<CreateScheduleRequest>): Promise<Schedule> {
-  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+  const res = await apiFetch(`${API_BASE}/schedules/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -67,21 +68,21 @@ export async function updateSchedule(id: string, req: Partial<CreateScheduleRequ
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+  const res = await apiFetch(`${API_BASE}/schedules/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete schedule')
 }
 
 export async function enableSchedule(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/schedules/${id}/enable`, {
+  const res = await apiFetch(`${API_BASE}/schedules/${id}/enable`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to enable schedule')
 }
 
 export async function disableSchedule(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/schedules/${id}/disable`, {
+  const res = await apiFetch(`${API_BASE}/schedules/${id}/disable`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to disable schedule')
@@ -91,13 +92,13 @@ export async function getScheduleHistory(scheduleId?: string): Promise<ScheduleH
   const url = scheduleId
     ? `${API_BASE}/schedules/${scheduleId}/history`
     : `${API_BASE}/schedules/history`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch schedule history')
   return res.json()
 }
 
 export async function runScheduleNow(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/schedules/${id}/run`, {
+  const res = await apiFetch(`${API_BASE}/schedules/${id}/run`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to run schedule')

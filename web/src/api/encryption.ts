@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface KeyProvider {
   id: string
   name: string
@@ -42,7 +43,7 @@ const API_BASE = '/api'
 // Key providers
 
 export async function listProviders(): Promise<KeyProvider[]> {
-  const res = await fetch(`${API_BASE}/encryption/providers`)
+  const res = await apiFetch(`${API_BASE}/encryption/providers`)
   if (!res.ok) throw new Error('Failed to fetch key providers')
   return res.json()
 }
@@ -53,7 +54,7 @@ export async function registerProvider(req: {
   endpoint: string
   default_provider?: boolean
 }): Promise<KeyProvider> {
-  const res = await fetch(`${API_BASE}/encryption/providers`, {
+  const res = await apiFetch(`${API_BASE}/encryption/providers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -63,7 +64,7 @@ export async function registerProvider(req: {
 }
 
 export async function removeProvider(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/encryption/providers/${id}`, {
+  const res = await apiFetch(`${API_BASE}/encryption/providers/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to remove key provider')
@@ -72,7 +73,7 @@ export async function removeProvider(id: string): Promise<void> {
 // Encryption policies
 
 export async function listEncryptionPolicies(): Promise<EncryptionPolicy[]> {
-  const res = await fetch(`${API_BASE}/encryption/policies`)
+  const res = await apiFetch(`${API_BASE}/encryption/policies`)
   if (!res.ok) throw new Error('Failed to fetch encryption policies')
   return res.json()
 }
@@ -87,7 +88,7 @@ export async function createEncryptionPolicy(req: {
   rotation_interval_days?: number
   enabled?: boolean
 }): Promise<EncryptionPolicy> {
-  const res = await fetch(`${API_BASE}/encryption/policies`, {
+  const res = await apiFetch(`${API_BASE}/encryption/policies`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -99,7 +100,7 @@ export async function createEncryptionPolicy(req: {
 // VM encryption operations
 
 export async function encryptVm(vmId: string, policyId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/encryption/vms/${vmId}/encrypt`, {
+  const res = await apiFetch(`${API_BASE}/encryption/vms/${vmId}/encrypt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ policy_id: policyId }),
@@ -108,26 +109,26 @@ export async function encryptVm(vmId: string, policyId: string): Promise<void> {
 }
 
 export async function decryptVm(vmId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/encryption/vms/${vmId}/decrypt`, {
+  const res = await apiFetch(`${API_BASE}/encryption/vms/${vmId}/decrypt`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to decrypt VM')
 }
 
 export async function getVmEncryptionStatus(vmId: string): Promise<VmEncryptionStatus> {
-  const res = await fetch(`${API_BASE}/encryption/vms/${vmId}/status`)
+  const res = await apiFetch(`${API_BASE}/encryption/vms/${vmId}/status`)
   if (!res.ok) throw new Error('Failed to fetch VM encryption status')
   return res.json()
 }
 
 export async function listEncryptedVms(): Promise<VmEncryptionStatus[]> {
-  const res = await fetch(`${API_BASE}/encryption/vms`)
+  const res = await apiFetch(`${API_BASE}/encryption/vms`)
   if (!res.ok) throw new Error('Failed to fetch encrypted VMs')
   return res.json()
 }
 
 export async function rotateVmKey(vmId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/encryption/vms/${vmId}/rotate-key`, {
+  const res = await apiFetch(`${API_BASE}/encryption/vms/${vmId}/rotate-key`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to rotate VM encryption key')

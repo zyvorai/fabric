@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface ResourcePool {
   id: string
   name: string
@@ -48,7 +49,7 @@ export async function listPools(clusterId?: string): Promise<ResourcePool[]> {
   const url = clusterId
     ? `${API_BASE}/resource-pools?cluster_id=${clusterId}`
     : `${API_BASE}/resource-pools`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch resource pools')
   return res.json()
 }
@@ -65,7 +66,7 @@ export async function createPool(req: {
   memory_shares?: number
   expandable_reservation?: boolean
 }): Promise<ResourcePool> {
-  const res = await fetch(`${API_BASE}/resource-pools`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -75,13 +76,13 @@ export async function createPool(req: {
 }
 
 export async function getPool(id: string): Promise<ResourcePool> {
-  const res = await fetch(`${API_BASE}/resource-pools/${id}`)
+  const res = await apiFetch(`${API_BASE}/resource-pools/${id}`)
   if (!res.ok) throw new Error('Failed to fetch resource pool')
   return res.json()
 }
 
 export async function updatePool(id: string, req: Partial<ResourcePool>): Promise<ResourcePool> {
-  const res = await fetch(`${API_BASE}/resource-pools/${id}`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -91,14 +92,14 @@ export async function updatePool(id: string, req: Partial<ResourcePool>): Promis
 }
 
 export async function deletePool(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/resource-pools/${id}`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete resource pool')
 }
 
 export async function getPoolSummary(id: string): Promise<ResourcePoolSummary> {
-  const res = await fetch(`${API_BASE}/resource-pools/${id}/summary`)
+  const res = await apiFetch(`${API_BASE}/resource-pools/${id}/summary`)
   if (!res.ok) throw new Error('Failed to fetch resource pool summary')
   return res.json()
 }
@@ -106,7 +107,7 @@ export async function getPoolSummary(id: string): Promise<ResourcePoolSummary> {
 // VM assignment
 
 export async function assignVm(poolId: string, vmId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/resource-pools/${poolId}/vms`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools/${poolId}/vms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vm_id: vmId }),
@@ -115,14 +116,14 @@ export async function assignVm(poolId: string, vmId: string): Promise<void> {
 }
 
 export async function unassignVm(poolId: string, vmId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/resource-pools/${poolId}/vms/${vmId}`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools/${poolId}/vms/${vmId}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to unassign VM from resource pool')
 }
 
 export async function moveVm(vmId: string, fromPoolId: string, toPoolId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/resource-pools/move-vm`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools/move-vm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -140,7 +141,7 @@ export async function checkAdmission(poolId: string, req: {
   cpu: number
   memory_mb: number
 }): Promise<AdmissionControlResult> {
-  const res = await fetch(`${API_BASE}/resource-pools/${poolId}/check-admission`, {
+  const res = await apiFetch(`${API_BASE}/resource-pools/${poolId}/check-admission`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

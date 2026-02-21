@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 const API_BASE = '/api'
 
 export interface ImageBuildRequest {
@@ -26,7 +27,7 @@ export interface ImageInfo {
 }
 
 export async function buildImage(req: ImageBuildRequest): Promise<ImageBuildStatus> {
-  const res = await fetch(`${API_BASE}/images/build`, {
+  const res = await apiFetch(`${API_BASE}/images/build`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -36,13 +37,13 @@ export async function buildImage(req: ImageBuildRequest): Promise<ImageBuildStat
 }
 
 export async function listBuilds(): Promise<ImageBuildStatus[]> {
-  const res = await fetch(`${API_BASE}/images/builds`)
+  const res = await apiFetch(`${API_BASE}/images/builds`)
   if (!res.ok) throw new Error('Failed to list builds')
   return res.json()
 }
 
 export async function listImages(): Promise<ImageInfo[]> {
-  const res = await fetch(`${API_BASE}/images`)
+  const res = await apiFetch(`${API_BASE}/images`)
   if (!res.ok) throw new Error('Failed to list images')
   return res.json()
 }

@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface Baseline {
   id: string
   name: string
@@ -79,7 +80,7 @@ const API_BASE = '/api'
 // Baselines
 
 export async function listBaselines(): Promise<Baseline[]> {
-  const res = await fetch(`${API_BASE}/lifecycle/baselines`)
+  const res = await apiFetch(`${API_BASE}/lifecycle/baselines`)
   if (!res.ok) throw new Error('Failed to fetch baselines')
   return res.json()
 }
@@ -91,7 +92,7 @@ export async function createBaseline(req: {
   severity: 'critical' | 'important' | 'moderate' | 'low'
   patches?: string[]
 }): Promise<Baseline> {
-  const res = await fetch(`${API_BASE}/lifecycle/baselines`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/baselines`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -101,7 +102,7 @@ export async function createBaseline(req: {
 }
 
 export async function deleteBaseline(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/lifecycle/baselines/${id}`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/baselines/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete baseline')
@@ -110,7 +111,7 @@ export async function deleteBaseline(id: string): Promise<void> {
 // Compliance scanning
 
 export async function scanHostCompliance(baselineId: string, hostIds?: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/lifecycle/compliance/scan`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/compliance/scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ baseline_id: baselineId, host_ids: hostIds }),
@@ -123,7 +124,7 @@ export async function getComplianceStatus(baselineId?: string, hostId?: string):
   if (baselineId) params.append('baseline_id', baselineId)
   if (hostId) params.append('host_id', hostId)
   const url = `${API_BASE}/lifecycle/compliance${params.toString() ? `?${params}` : ''}`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch compliance status')
   return res.json()
 }
@@ -131,7 +132,7 @@ export async function getComplianceStatus(baselineId?: string, hostId?: string):
 // Remediation
 
 export async function listRemediations(): Promise<RemediationTask[]> {
-  const res = await fetch(`${API_BASE}/lifecycle/remediations`)
+  const res = await apiFetch(`${API_BASE}/lifecycle/remediations`)
   if (!res.ok) throw new Error('Failed to fetch remediation tasks')
   return res.json()
 }
@@ -140,7 +141,7 @@ export async function createRemediation(req: {
   host_id: string
   baseline_id: string
 }): Promise<RemediationTask> {
-  const res = await fetch(`${API_BASE}/lifecycle/remediations`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/remediations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -152,7 +153,7 @@ export async function createRemediation(req: {
 // Rolling updates
 
 export async function listRollingUpdates(): Promise<RollingUpdatePlan[]> {
-  const res = await fetch(`${API_BASE}/lifecycle/rolling-updates`)
+  const res = await apiFetch(`${API_BASE}/lifecycle/rolling-updates`)
   if (!res.ok) throw new Error('Failed to fetch rolling updates')
   return res.json()
 }
@@ -167,7 +168,7 @@ export async function createRollingUpdate(req: {
   pre_check_enabled?: boolean
   auto_remediate?: boolean
 }): Promise<RollingUpdatePlan> {
-  const res = await fetch(`${API_BASE}/lifecycle/rolling-updates`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/rolling-updates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -177,21 +178,21 @@ export async function createRollingUpdate(req: {
 }
 
 export async function startRollingUpdate(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/lifecycle/rolling-updates/${id}/start`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/rolling-updates/${id}/start`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to start rolling update')
 }
 
 export async function pauseRollingUpdate(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/lifecycle/rolling-updates/${id}/pause`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/rolling-updates/${id}/pause`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to pause rolling update')
 }
 
 export async function advanceRollingUpdate(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/lifecycle/rolling-updates/${id}/advance`, {
+  const res = await apiFetch(`${API_BASE}/lifecycle/rolling-updates/${id}/advance`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to advance rolling update')

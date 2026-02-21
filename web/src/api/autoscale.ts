@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 const API_BASE = '/api'
 
 export interface ScalingPolicy {
@@ -28,13 +29,13 @@ export interface ScaleEvent {
 }
 
 export async function listPolicies(): Promise<ScalingPolicy[]> {
-  const res = await fetch(`${API_BASE}/autoscale`)
+  const res = await apiFetch(`${API_BASE}/autoscale`)
   if (!res.ok) throw new Error('Failed to list policies')
   return res.json()
 }
 
 export async function createPolicy(policy: Omit<ScalingPolicy, 'enabled' | 'created' | 'last_scale_action'>): Promise<ScalingPolicy> {
-  const res = await fetch(`${API_BASE}/autoscale`, {
+  const res = await apiFetch(`${API_BASE}/autoscale`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(policy),
@@ -44,12 +45,12 @@ export async function createPolicy(policy: Omit<ScalingPolicy, 'enabled' | 'crea
 }
 
 export async function deletePolicy(vmName: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/autoscale/${vmName}`, { method: 'DELETE' })
+  const res = await apiFetch(`${API_BASE}/autoscale/${vmName}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete policy')
 }
 
 export async function listScaleEvents(): Promise<ScaleEvent[]> {
-  const res = await fetch(`${API_BASE}/autoscale/events`)
+  const res = await apiFetch(`${API_BASE}/autoscale/events`)
   if (!res.ok) throw new Error('Failed to list events')
   return res.json()
 }

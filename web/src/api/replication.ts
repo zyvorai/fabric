@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface ReplicationSite {
   id: string
   name: string
@@ -67,7 +68,7 @@ const API_BASE = '/api'
 // Sites
 
 export async function listSites(): Promise<ReplicationSite[]> {
-  const res = await fetch(`${API_BASE}/replication/sites`)
+  const res = await apiFetch(`${API_BASE}/replication/sites`)
   if (!res.ok) throw new Error('Failed to fetch replication sites')
   return res.json()
 }
@@ -78,7 +79,7 @@ export async function registerSite(req: {
   endpoint: string
   site_type: 'primary' | 'secondary' | 'bidirectional'
 }): Promise<ReplicationSite> {
-  const res = await fetch(`${API_BASE}/replication/sites`, {
+  const res = await apiFetch(`${API_BASE}/replication/sites`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -88,7 +89,7 @@ export async function registerSite(req: {
 }
 
 export async function removeSite(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/replication/sites/${id}`, {
+  const res = await apiFetch(`${API_BASE}/replication/sites/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to remove replication site')
@@ -100,7 +101,7 @@ export async function listReplications(siteId?: string): Promise<ReplicationConf
   const url = siteId
     ? `${API_BASE}/replication/configs?site_id=${siteId}`
     : `${API_BASE}/replication/configs`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) throw new Error('Failed to fetch replications')
   return res.json()
 }
@@ -115,7 +116,7 @@ export async function configureReplication(req: {
   encryption_enabled?: boolean
   bandwidth_limit_mbps?: number
 }): Promise<ReplicationConfig> {
-  const res = await fetch(`${API_BASE}/replication/configs`, {
+  const res = await apiFetch(`${API_BASE}/replication/configs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -125,14 +126,14 @@ export async function configureReplication(req: {
 }
 
 export async function pauseReplication(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/replication/configs/${id}/pause`, {
+  const res = await apiFetch(`${API_BASE}/replication/configs/${id}/pause`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to pause replication')
 }
 
 export async function resumeReplication(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/replication/configs/${id}/resume`, {
+  const res = await apiFetch(`${API_BASE}/replication/configs/${id}/resume`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to resume replication')
@@ -141,13 +142,13 @@ export async function resumeReplication(id: string): Promise<void> {
 // Metrics
 
 export async function getReplicationMetrics(replicationId: string): Promise<ReplicationMetrics> {
-  const res = await fetch(`${API_BASE}/replication/configs/${replicationId}/metrics`)
+  const res = await apiFetch(`${API_BASE}/replication/configs/${replicationId}/metrics`)
   if (!res.ok) throw new Error('Failed to fetch replication metrics')
   return res.json()
 }
 
 export async function checkRpoViolations(): Promise<ReplicationMetrics[]> {
-  const res = await fetch(`${API_BASE}/replication/rpo-violations`)
+  const res = await apiFetch(`${API_BASE}/replication/rpo-violations`)
   if (!res.ok) throw new Error('Failed to check RPO violations')
   return res.json()
 }
@@ -155,7 +156,7 @@ export async function checkRpoViolations(): Promise<ReplicationMetrics[]> {
 // Health
 
 export async function getReplicationHealth(): Promise<ReplicationHealthSummary> {
-  const res = await fetch(`${API_BASE}/replication/health`)
+  const res = await apiFetch(`${API_BASE}/replication/health`)
   if (!res.ok) throw new Error('Failed to fetch replication health')
   return res.json()
 }

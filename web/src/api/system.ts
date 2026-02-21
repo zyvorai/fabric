@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 import { API_BASE_URL } from './config'
 
 export interface CpuCore {
@@ -91,7 +92,7 @@ export interface AllocateHugepagesRequest {
 
 // Get CPU topology
 export async function getCpuTopology(): Promise<CpuTopology> {
-  const response = await fetch(`${API_BASE_URL}/system/cpu/topology`)
+  const response = await apiFetch(`${API_BASE_URL}/system/cpu/topology`)
   if (!response.ok) {
     throw new Error('Failed to get CPU topology')
   }
@@ -100,7 +101,7 @@ export async function getCpuTopology(): Promise<CpuTopology> {
 
 // Get NUMA topology
 export async function getNumaTopology(): Promise<NumaTopology> {
-  const response = await fetch(`${API_BASE_URL}/system/numa/topology`)
+  const response = await apiFetch(`${API_BASE_URL}/system/numa/topology`)
   if (!response.ok) {
     throw new Error('Failed to get NUMA topology')
   }
@@ -109,7 +110,7 @@ export async function getNumaTopology(): Promise<NumaTopology> {
 
 // Get NUMA node details
 export async function getNumaNode(nodeId: number): Promise<NumaNode> {
-  const response = await fetch(`${API_BASE_URL}/system/numa/nodes/${nodeId}`)
+  const response = await apiFetch(`${API_BASE_URL}/system/numa/nodes/${nodeId}`)
   if (!response.ok) {
     throw new Error(`Failed to get NUMA node: ${nodeId}`)
   }
@@ -118,7 +119,7 @@ export async function getNumaNode(nodeId: number): Promise<NumaNode> {
 
 // Get recommended NUMA placement for a VM
 export async function getNumaPlacement(memoryMb: number, cpus: number): Promise<NumaPlacement> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/system/numa/placement?memory_mb=${memoryMb}&cpus=${cpus}`
   )
   if (!response.ok) {
@@ -129,7 +130,7 @@ export async function getNumaPlacement(memoryMb: number, cpus: number): Promise<
 
 // Set CPU pinning for a VM
 export async function setCpuPinning(vmName: string, request: SetCpuPinningRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -141,7 +142,7 @@ export async function setCpuPinning(vmName: string, request: SetCpuPinningReques
 
 // Remove CPU pinning from a VM
 export async function removeCpuPinning(vmName: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, {
     method: 'DELETE',
   })
   if (!response.ok) {
@@ -151,7 +152,7 @@ export async function removeCpuPinning(vmName: string): Promise<void> {
 
 // Get CPU affinity for a VM
 export async function getCpuAffinity(vmName: string): Promise<number[]> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/cpu/affinity`)
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/cpu/affinity`)
   if (!response.ok) {
     throw new Error(`Failed to get CPU affinity for: ${vmName}`)
   }
@@ -160,7 +161,7 @@ export async function getCpuAffinity(vmName: string): Promise<number[]> {
 
 // Set memory limit for a VM
 export async function setMemoryLimit(vmName: string, request: SetMemoryLimitRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/memory/limit`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/limit`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -172,7 +173,7 @@ export async function setMemoryLimit(vmName: string, request: SetMemoryLimitRequ
 
 // Get memory usage for a VM
 export async function getMemoryUsage(vmName: string): Promise<MemoryStats> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/memory/usage`)
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/usage`)
   if (!response.ok) {
     throw new Error(`Failed to get memory usage for: ${vmName}`)
   }
@@ -181,7 +182,7 @@ export async function getMemoryUsage(vmName: string): Promise<MemoryStats> {
 
 // Enable/disable memory ballooning for a VM
 export async function setMemoryBallooning(vmName: string, enabled: boolean): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/memory/balloon`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/balloon`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
@@ -193,7 +194,7 @@ export async function setMemoryBallooning(vmName: string, enabled: boolean): Pro
 
 // Get hugepage info
 export async function getHugepageStats(size: 'Size2MB' | 'Size1GB'): Promise<HugepageStats> {
-  const response = await fetch(`${API_BASE_URL}/system/memory/hugepages?size=${size}`)
+  const response = await apiFetch(`${API_BASE_URL}/system/memory/hugepages?size=${size}`)
   if (!response.ok) {
     throw new Error('Failed to get hugepage stats')
   }
@@ -202,7 +203,7 @@ export async function getHugepageStats(size: 'Size2MB' | 'Size1GB'): Promise<Hug
 
 // Allocate hugepages
 export async function allocateHugepages(request: AllocateHugepagesRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/system/memory/hugepages`, {
+  const response = await apiFetch(`${API_BASE_URL}/system/memory/hugepages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -214,7 +215,7 @@ export async function allocateHugepages(request: AllocateHugepagesRequest): Prom
 
 // Get system memory info
 export async function getSystemMemory(): Promise<SystemMemory> {
-  const response = await fetch(`${API_BASE_URL}/system/memory`)
+  const response = await apiFetch(`${API_BASE_URL}/system/memory`)
   if (!response.ok) {
     throw new Error('Failed to get system memory info')
   }
@@ -243,7 +244,7 @@ export interface OptimizationResult {
 
 // Get optimization recommendations
 export async function getOptimizationRecommendations(): Promise<OptimizationRecommendation[]> {
-  const response = await fetch(`${API_BASE_URL}/system/optimization/recommendations`)
+  const response = await apiFetch(`${API_BASE_URL}/system/optimization/recommendations`)
   if (!response.ok) {
     throw new Error('Failed to get optimization recommendations')
   }
@@ -252,7 +253,7 @@ export async function getOptimizationRecommendations(): Promise<OptimizationReco
 
 // Auto-optimize a VM
 export async function optimizeVM(vmName: string): Promise<OptimizationResult> {
-  const response = await fetch(`${API_BASE_URL}/vms/${vmName}/optimize`, {
+  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/optimize`, {
     method: 'POST',
   })
   if (!response.ok) {

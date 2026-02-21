@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 import { API_BASE_URL } from './config'
 
 export interface NfsConfig {
@@ -56,7 +57,7 @@ export interface CreateLocalPoolRequest {
 
 // List all storage pools
 export async function listStoragePools(): Promise<StoragePool[]> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools`)
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools`)
   if (!response.ok) {
     throw new Error('Failed to list storage pools')
   }
@@ -65,7 +66,7 @@ export async function listStoragePools(): Promise<StoragePool[]> {
 
 // Get storage pool details
 export async function getStoragePool(name: string): Promise<StoragePool> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}`)
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}`)
   if (!response.ok) {
     throw new Error(`Failed to get storage pool: ${name}`)
   }
@@ -74,7 +75,7 @@ export async function getStoragePool(name: string): Promise<StoragePool> {
 
 // Create local storage pool
 export async function createLocalPool(request: CreateLocalPoolRequest): Promise<StoragePool> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/local`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/local`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -87,7 +88,7 @@ export async function createLocalPool(request: CreateLocalPoolRequest): Promise<
 
 // Create NFS storage pool
 export async function createNfsPool(request: CreateNfsPoolRequest): Promise<StoragePool> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/nfs`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/nfs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -105,7 +106,7 @@ export async function createLvmPool(request: {
   volume_group: string
   auto_start: boolean
 }): Promise<StoragePool> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/lvm`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/lvm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -121,7 +122,7 @@ export async function createLvmThinPool(request: {
   thin_pool: string
   auto_start: boolean
 }): Promise<StoragePool> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/lvm-thin`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/lvm-thin`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -137,7 +138,7 @@ export async function createZfsPool(request: {
   dataset?: string
   auto_start: boolean
 }): Promise<StoragePool> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/zfs`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/zfs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -148,7 +149,7 @@ export async function createZfsPool(request: {
 
 // Delete storage pool
 export async function deleteStoragePool(name: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}`, {
     method: 'DELETE',
   })
   if (!response.ok) {
@@ -158,7 +159,7 @@ export async function deleteStoragePool(name: string): Promise<void> {
 
 // Start storage pool
 export async function startStoragePool(name: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}/start`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}/start`, {
     method: 'POST',
   })
   if (!response.ok) {
@@ -168,7 +169,7 @@ export async function startStoragePool(name: string): Promise<void> {
 
 // Stop storage pool
 export async function stopStoragePool(name: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}/stop`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}/stop`, {
     method: 'POST',
   })
   if (!response.ok) {
@@ -178,7 +179,7 @@ export async function stopStoragePool(name: string): Promise<void> {
 
 // Get NFS pool health
 export async function getNfsHealth(name: string): Promise<NfsHealth> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}/health`)
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}/health`)
   if (!response.ok) {
     throw new Error(`Failed to get NFS health for: ${name}`)
   }
@@ -187,7 +188,7 @@ export async function getNfsHealth(name: string): Promise<NfsHealth> {
 
 // Get NFS pool stats
 export async function getNfsStats(name: string): Promise<NfsStats> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}/stats`)
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}/stats`)
   if (!response.ok) {
     throw new Error(`Failed to get NFS stats for: ${name}`)
   }
@@ -196,7 +197,7 @@ export async function getNfsStats(name: string): Promise<NfsStats> {
 
 // Refresh pool statistics
 export async function refreshPoolStats(name: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/storage/pools/${name}/refresh`, {
+  const response = await apiFetch(`${API_BASE_URL}/storage/pools/${name}/refresh`, {
     method: 'POST',
   })
   if (!response.ok) {

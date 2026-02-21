@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface NotificationChannel {
   id: string
   name: string
@@ -57,13 +58,13 @@ const API_BASE = '/api'
 
 // Channels
 export async function listChannels(): Promise<NotificationChannel[]> {
-  const res = await fetch(`${API_BASE}/notifications/channels`)
+  const res = await apiFetch(`${API_BASE}/notifications/channels`)
   if (!res.ok) throw new Error('Failed to fetch channels')
   return res.json()
 }
 
 export async function createChannel(req: CreateChannelRequest): Promise<NotificationChannel> {
-  const res = await fetch(`${API_BASE}/notifications/channels`, {
+  const res = await apiFetch(`${API_BASE}/notifications/channels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -73,7 +74,7 @@ export async function createChannel(req: CreateChannelRequest): Promise<Notifica
 }
 
 export async function updateChannel(id: string, req: Partial<CreateChannelRequest>): Promise<NotificationChannel> {
-  const res = await fetch(`${API_BASE}/notifications/channels/${id}`, {
+  const res = await apiFetch(`${API_BASE}/notifications/channels/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -83,14 +84,14 @@ export async function updateChannel(id: string, req: Partial<CreateChannelReques
 }
 
 export async function deleteChannel(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/notifications/channels/${id}`, {
+  const res = await apiFetch(`${API_BASE}/notifications/channels/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete channel')
 }
 
 export async function testChannel(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/notifications/channels/${id}/test`, {
+  const res = await apiFetch(`${API_BASE}/notifications/channels/${id}/test`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to test channel')
@@ -98,13 +99,13 @@ export async function testChannel(id: string): Promise<void> {
 
 // Rules
 export async function listRules(): Promise<NotificationRule[]> {
-  const res = await fetch(`${API_BASE}/notifications/rules`)
+  const res = await apiFetch(`${API_BASE}/notifications/rules`)
   if (!res.ok) throw new Error('Failed to fetch rules')
   return res.json()
 }
 
 export async function createRule(req: CreateRuleRequest): Promise<NotificationRule> {
-  const res = await fetch(`${API_BASE}/notifications/rules`, {
+  const res = await apiFetch(`${API_BASE}/notifications/rules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -114,7 +115,7 @@ export async function createRule(req: CreateRuleRequest): Promise<NotificationRu
 }
 
 export async function updateRule(id: string, req: Partial<CreateRuleRequest>): Promise<NotificationRule> {
-  const res = await fetch(`${API_BASE}/notifications/rules/${id}`, {
+  const res = await apiFetch(`${API_BASE}/notifications/rules/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -124,21 +125,21 @@ export async function updateRule(id: string, req: Partial<CreateRuleRequest>): P
 }
 
 export async function deleteRule(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/notifications/rules/${id}`, {
+  const res = await apiFetch(`${API_BASE}/notifications/rules/${id}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete rule')
 }
 
 export async function enableRule(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/notifications/rules/${id}/enable`, {
+  const res = await apiFetch(`${API_BASE}/notifications/rules/${id}/enable`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to enable rule')
 }
 
 export async function disableRule(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/notifications/rules/${id}/disable`, {
+  const res = await apiFetch(`${API_BASE}/notifications/rules/${id}/disable`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to disable rule')
@@ -146,7 +147,7 @@ export async function disableRule(id: string): Promise<void> {
 
 // History
 export async function getHistory(limit: number = 50): Promise<NotificationHistory[]> {
-  const res = await fetch(`${API_BASE}/notifications/history?limit=${limit}`)
+  const res = await apiFetch(`${API_BASE}/notifications/history?limit=${limit}`)
   if (!res.ok) throw new Error('Failed to fetch notification history')
   return res.json()
 }

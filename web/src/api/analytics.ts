@@ -1,3 +1,4 @@
+import { apiFetch } from "./client"
 export interface PerformanceMetrics {
   timestamp: string
   cpu_usage: number
@@ -41,7 +42,7 @@ export async function getVMPerformance(
   vmName: string,
   timeRange: TimeRange = '24h'
 ): Promise<VMPerformance> {
-  const res = await fetch(`${API_BASE}/analytics/vms/${vmName}?range=${timeRange}`)
+  const res = await apiFetch(`${API_BASE}/analytics/vms/${vmName}?range=${timeRange}`)
   if (!res.ok) throw new Error('Failed to fetch VM performance')
   return res.json()
 }
@@ -49,13 +50,13 @@ export async function getVMPerformance(
 export async function getSystemPerformance(
   timeRange: TimeRange = '24h'
 ): Promise<SystemPerformance[]> {
-  const res = await fetch(`${API_BASE}/analytics/system?range=${timeRange}`)
+  const res = await apiFetch(`${API_BASE}/analytics/system?range=${timeRange}`)
   if (!res.ok) throw new Error('Failed to fetch system performance')
   return res.json()
 }
 
 export async function getPerformanceInsights(): Promise<PerformanceInsight[]> {
-  const res = await fetch(`${API_BASE}/analytics/insights`)
+  const res = await apiFetch(`${API_BASE}/analytics/insights`)
   if (!res.ok) throw new Error('Failed to fetch performance insights')
   return res.json()
 }
@@ -64,7 +65,7 @@ export async function getTopVMsByResource(
   resource: 'cpu' | 'memory' | 'network' | 'disk',
   limit: number = 10
 ): Promise<Array<{ vm_name: string; value: number }>> {
-  const res = await fetch(`${API_BASE}/analytics/top?resource=${resource}&limit=${limit}`)
+  const res = await apiFetch(`${API_BASE}/analytics/top?resource=${resource}&limit=${limit}`)
   if (!res.ok) throw new Error('Failed to fetch top VMs')
   return res.json()
 }
@@ -73,7 +74,7 @@ export async function exportPerformanceReport(
   timeRange: TimeRange,
   format: 'pdf' | 'csv' = 'pdf'
 ): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/analytics/export?range=${timeRange}&format=${format}`)
+  const res = await apiFetch(`${API_BASE}/analytics/export?range=${timeRange}&format=${format}`)
   if (!res.ok) throw new Error('Failed to export performance report')
   return res.blob()
 }
@@ -86,7 +87,7 @@ export interface ResourceUtilization {
 }
 
 export async function getResourceUtilization(): Promise<ResourceUtilization> {
-  const res = await fetch(`${API_BASE}/analytics/utilization`)
+  const res = await apiFetch(`${API_BASE}/analytics/utilization`)
   if (!res.ok) throw new Error('Failed to fetch resource utilization')
   return res.json()
 }
