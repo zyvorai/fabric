@@ -104,29 +104,72 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
     }
 }
 
-/// Simple start_vm with default options (backward compatible)
+/// Start a VM using machinectl start --runner=vmspawn.
+///
+/// The image must be available in /var/lib/machines/ (imported via
+/// machinectl import-raw or symlinked). machinectl handles the full
+/// lifecycle through machined, including registration, VSock, SSH keys,
+/// and proper process supervision.
 pub fn start_vm(name: &str) -> Result<()> {
-    let mut cmd = Command::new("systemd-vmspawn");
-    cmd.arg(format!("--machine={}", name));
+    // First ensure the image is available in /var/lib/machines/
+    ensure_image_in_machines(name)?;
 
-    // Try to find the image
-    let image_path = resolve_image_path(name, name);
-    cmd.arg(format!("--image={}", image_path));
+    let output = Command::new("machinectl")
+        .args(["start", "--runner=vmspawn", name])
+        .output()
+        .map_err(|e| anyhow!("Failed to run machinectl: {}", e))?;
 
-    match cmd.spawn() {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            let fallback = Command::new("machinectl")
-                .arg("start")
-                .arg(name)
-                .output();
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("Failed to start VM '{}': {}", name, stderr.trim()))
+    }
+}
 
-            match fallback {
-                Ok(_) => Ok(()),
-                Err(_) => Err(anyhow!("Failed to start VM: {}", e)),
-            }
+/// Ensure an image is available in /var/lib/machines/ for machinectl.
+/// If the image exists elsewhere, create a symlink.
+fn ensure_image_in_machines(name: &str) -> Result<()> {
+    let machines_dir = "/var/lib/machines";
+    let _ = std::fs::create_dir_all(machines_dir);
+
+    // Check if already exists in /var/lib/machines/
+    let candidates_in_machines = [
+        format!("{}/{}.raw", machines_dir, name),
+        format!("{}/{}.qcow2", machines_dir, name),
+        format!("{}/{}", machines_dir, name),
+    ];
+
+    for path in &candidates_in_machines {
+        if std::path::Path::new(path).exists() {
+            return Ok(());
         }
     }
+
+    // Look for the image in other locations
+    let external_candidates = [
+        format!("/var/lib/vmspawnd/images/{}.raw", name),
+        format!("/var/lib/vmspawnd/images/{}_1.raw", name),
+        format!("/var/lib/vmspawnd/images/{}.qcow2", name),
+    ];
+
+    for src in &external_candidates {
+        if std::path::Path::new(src).exists() {
+            let ext = std::path::Path::new(src)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("raw");
+            let dest = format!("{}/{}.{}", machines_dir, name, ext);
+            tracing::info!("Symlinking {} -> {}", src, dest);
+            // Use symlink so we don't duplicate disk space
+            std::os::unix::fs::symlink(src, &dest)
+                .map_err(|e| anyhow!("Failed to symlink image: {}", e))?;
+            return Ok(());
+        }
+    }
+
+    // Image might already be registered by name in machined
+    Ok(())
 }
 
 /// Resolve an image path, checking common locations
