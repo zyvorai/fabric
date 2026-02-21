@@ -112,49 +112,6 @@ export async function cloneVM(sourceName: string, targetName: string, options?: 
   if (!res.ok) throw new Error('Failed to clone VM')
 }
 
-export interface Template {
-  name: string
-  description: string
-  cpus: number
-  memory: number
-  disk_size: number
-  created: string
-}
-
-export async function createTemplate(vmName: string, templateName: string, description?: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/vms/${vmName}/template`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      template_name: templateName,
-      description: description || ''
-    }),
-  })
-  if (!res.ok) throw new Error('Failed to create template')
-}
-
-export async function listTemplates(): Promise<Template[]> {
-  const res = await fetch(`${API_BASE}/templates`)
-  if (!res.ok) throw new Error('Failed to fetch templates')
-  return res.json()
-}
-
-export async function createVMFromTemplate(templateName: string, vmName: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/templates/${templateName}/instantiate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ vm_name: vmName }),
-  })
-  if (!res.ok) throw new Error('Failed to create VM from template')
-}
-
-export async function deleteTemplate(name: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/templates/${name}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete template')
-}
-
 // Tag Management
 export async function addTag(vmName: string, tag: string): Promise<void> {
   const res = await fetch(`${API_BASE}/vms/${vmName}/tags`, {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Square, Trash2, Terminal, Cpu, HardDrive, Copy, Tag } from 'lucide-react'
-import { VM, startVM, stopVM, deleteVM } from '../api/vm'
+import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag } from 'lucide-react'
+import { VM, startVM, stopVM, pauseVM, resumeVM, deleteVM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import CloneVMDialog from './CloneVMDialog'
 import ConfirmDialog from './ConfirmDialog'
@@ -35,6 +35,26 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
       onUpdate()
     } catch (_error) {
       toast.error(`Failed to stop VM '${vm.name}'`)
+    }
+  }
+
+  const handlePause = async () => {
+    try {
+      await pauseVM(vm.name)
+      toast.success(`VM '${vm.name}' paused successfully`)
+      onUpdate()
+    } catch (_error) {
+      toast.error(`Failed to pause VM '${vm.name}'`)
+    }
+  }
+
+  const handleResume = async () => {
+    try {
+      await resumeVM(vm.name)
+      toast.success(`VM '${vm.name}' resumed successfully`)
+      onUpdate()
+    } catch (_error) {
+      toast.error(`Failed to resume VM '${vm.name}'`)
     }
   }
 
@@ -108,14 +128,31 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
             <Play className="w-4 h-4" />
             Start
           </button>
-        ) : (
+        ) : vm.state === 'paused' ? (
           <button
-            onClick={handleStop}
-            className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 rounded transition text-sm"
+            onClick={handleResume}
+            className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 rounded transition text-sm"
           >
-            <Square className="w-4 h-4" />
-            Stop
+            <Play className="w-4 h-4" />
+            Resume
           </button>
+        ) : (
+          <>
+            <button
+              onClick={handleStop}
+              className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 rounded transition text-sm"
+            >
+              <Square className="w-4 h-4" />
+              Stop
+            </button>
+            <button
+              onClick={handlePause}
+              className="flex items-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition text-sm"
+            >
+              <Pause className="w-4 h-4" />
+              Pause
+            </button>
+          </>
         )}
         <button
           onClick={() => setShowCloneDialog(true)}
