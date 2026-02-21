@@ -9,6 +9,7 @@ pub mod firmware;
 pub mod hotplug;
 pub mod images;
 pub mod migration;
+pub mod network_cloud;
 pub mod notifications;
 pub mod profiles;
 pub mod quotas;
@@ -18,7 +19,9 @@ pub mod snapshots;
 pub mod storage;
 pub mod system;
 pub mod templates;
+pub mod vm_advanced;
 pub mod volumes;
+pub mod zones;
 
 // Phase 2 API modules for enterprise features
 pub mod certificates;

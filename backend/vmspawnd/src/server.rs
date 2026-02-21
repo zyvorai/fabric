@@ -302,6 +302,35 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             // Event routes
             .route("/events", get(api::events::list_events))
             .route("/events/stream", get(api::events::event_stream))
+            // Floating IP routes
+            .route("/floating-ips", get(api::network_cloud::list_floating_ips).post(api::network_cloud::create_floating_ip))
+            .route("/floating-ips/:id", delete(api::network_cloud::delete_floating_ip))
+            .route("/floating-ips/:id/assign", post(api::network_cloud::assign_floating_ip))
+            .route("/floating-ips/:id/unassign", post(api::network_cloud::unassign_floating_ip))
+            // DHCP server routes (systemd-networkd)
+            .route("/dhcp-servers", get(api::network_cloud::list_dhcp_servers).post(api::network_cloud::create_dhcp_server))
+            .route("/dhcp-servers/:id", delete(api::network_cloud::delete_dhcp_server))
+            // DNS routes (systemd-resolved)
+            .route("/dns", get(api::network_cloud::list_dns_configs).post(api::network_cloud::create_dns_config))
+            .route("/dns/:id", delete(api::network_cloud::delete_dns_config))
+            .route("/dns/:id/records", post(api::network_cloud::add_dns_record))
+            // Availability zone routes
+            .route("/zones", get(api::zones::list_zones).post(api::zones::create_zone))
+            .route("/zones/:id", get(api::zones::get_zone).delete(api::zones::delete_zone))
+            // Spot instance routes
+            .route("/spot-instances", get(api::zones::list_spot_instances).post(api::zones::create_spot_instance))
+            .route("/spot-instances/:id", delete(api::zones::delete_spot_instance))
+            .route("/spot-instances/:id/evict", post(api::zones::evict_spot_instance))
+            // KSM memory deduplication
+            .route("/system/ksm", get(api::vm_advanced::get_ksm_status).post(api::vm_advanced::configure_ksm))
+            // Nested virtualization
+            .route("/system/nested-virt", get(api::vm_advanced::get_nested_virt_status).post(api::vm_advanced::set_nested_virt))
+            // VM checkpoints
+            .route("/vms/:name/checkpoints", get(api::vm_advanced::list_checkpoints).post(api::vm_advanced::create_checkpoint))
+            .route("/vms/:name/checkpoints/:id/restore", post(api::vm_advanced::restore_checkpoint))
+            .route("/vms/:name/checkpoints/:id", delete(api::vm_advanced::delete_checkpoint))
+            // VM forking
+            .route("/vms/:name/fork", post(api::vm_advanced::fork_vm))
             // Plugin routes
             .route("/plugins", get(plugins::list_plugins))
             // Resource optimization routes
