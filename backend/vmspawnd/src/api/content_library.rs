@@ -89,6 +89,79 @@ pub async fn sync_library(
 }
 
 // ============================================================================
+// Download handler
+// ============================================================================
+
+#[derive(serde::Deserialize)]
+pub struct DownloadImageRequest {
+    pub url: String,
+    pub name: String,
+    #[serde(default = "default_item_type")]
+    pub item_type: content_library::ItemType,
+}
+
+fn default_item_type() -> content_library::ItemType {
+    content_library::ItemType::VmImage
+}
+
+pub async fn download_image(
+    State(state): State<Arc<AppState>>,
+    Path(library_id): Path<String>,
+    Json(req): Json<DownloadImageRequest>,
+) -> impl IntoResponse {
+    // Verify library exists
+    match state.store.get_entity::<Library>("libraries", &library_id) {
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+
+    let mgr = content_library::ContentLibraryManager::new();
+
+    // We need a library in the manager. Create a temporary one with the storage path.
+    let lib = match state.store.get_entity::<Library>("libraries", &library_id) {
+        Ok(Some(l)) => l,
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+
+    // Create library in the in-memory manager so download_image can find it
+    let _ = mgr.create_library(content_library::CreateLibraryRequest {
+        name: lib.name.clone(),
+        description: lib.description.clone(),
+        library_type: lib.library_type.clone(),
+        storage_path: lib.storage_path.clone(),
+        publish_url: None,
+        subscription_url: None,
+        auto_sync: false,
+        sync_interval_hours: None,
+    });
+
+    // Find the library ID in the manager (it generates a new one)
+    let manager_libs = mgr.list_libraries();
+    let manager_lib_id = match manager_libs.first() {
+        Some(l) => l.id.clone(),
+        None => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    match mgr.download_image(&manager_lib_id, &req.url, &req.name, req.item_type).await {
+        Ok(item) => {
+            // Save to our state store
+            let mut saved_item = item.clone();
+            saved_item.library_id = library_id;
+            let id = Uuid::new_v4().to_string();
+            saved_item.id = id.clone();
+            match state.store.save_entity("library_items", &id, &saved_item) {
+                Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&saved_item).unwrap())).into_response(),
+                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+            }
+        }
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+        }
+    }
+}
+
+// ============================================================================
 // Library item handlers
 // ============================================================================
 

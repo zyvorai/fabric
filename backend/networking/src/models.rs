@@ -649,6 +649,99 @@ pub struct CreatePortForwardRequest {
     pub description: Option<String>,
 }
 
+// ─── VXLAN ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VxlanConfig {
+    pub id: String,
+    pub name: String,
+    pub vni: u32,
+    #[serde(default)]
+    pub remote: Option<String>,
+    #[serde(default)]
+    pub local: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub parent_interface: Option<String>,
+    #[serde(default)]
+    pub mtu: Option<u32>,
+    #[serde(default)]
+    pub addresses: Vec<String>,
+    #[serde(default)]
+    pub gateway: Option<String>,
+    #[serde(default)]
+    pub dns: Vec<String>,
+    #[serde(default)]
+    pub dhcp: DhcpMode,
+    #[serde(default)]
+    pub created: String,
+    #[serde(default)]
+    pub updated: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateVxlanRequest {
+    pub name: String,
+    pub vni: u32,
+    #[serde(default)]
+    pub remote: Option<String>,
+    #[serde(default)]
+    pub local: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub parent_interface: Option<String>,
+    #[serde(default)]
+    pub mtu: Option<u32>,
+    #[serde(default)]
+    pub addresses: Vec<String>,
+    #[serde(default)]
+    pub gateway: Option<String>,
+    #[serde(default)]
+    pub dns: Vec<String>,
+    #[serde(default)]
+    pub dhcp: DhcpMode,
+}
+
+// ─── SR-IOV ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SriovConfig {
+    pub id: String,
+    pub pf_name: String,
+    pub num_vfs: u32,
+    #[serde(default)]
+    pub vf_configs: Vec<VfConfig>,
+    #[serde(default)]
+    pub created: String,
+    #[serde(default)]
+    pub updated: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VfConfig {
+    pub vf_index: u32,
+    #[serde(default)]
+    pub mac_address: Option<String>,
+    #[serde(default)]
+    pub vlan: Option<u16>,
+    #[serde(default)]
+    pub qos: Option<u32>,
+    #[serde(default)]
+    pub spoofchk: Option<bool>,
+    #[serde(default)]
+    pub trust: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSriovRequest {
+    pub pf_name: String,
+    pub num_vfs: u32,
+    #[serde(default)]
+    pub vf_configs: Vec<VfConfig>,
+}
+
 // ─── Parsed config file ──────────────────────────────────────────────────────
 
 /// A parsed section from a systemd-networkd config file

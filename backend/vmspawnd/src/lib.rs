@@ -1,5 +1,6 @@
 pub mod api;
 pub mod config;
+pub mod qmp;
 pub mod routes;
 pub mod server;
 pub mod validation;

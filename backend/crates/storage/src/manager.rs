@@ -6,8 +6,10 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::lvm::{LvmError, LvmPool};
 use crate::nfs::{NfsConfig, NfsError, NfsHealth, NfsPool, NfsStats};
 use crate::pool::{PoolState, StoragePool, StoragePoolType};
+use crate::zfs::{ZfsError, ZfsPool};
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -19,6 +21,12 @@ pub enum StorageError {
 
     #[error("NFS error: {0}")]
     Nfs(#[from] NfsError),
+
+    #[error("LVM error: {0}")]
+    Lvm(#[from] LvmError),
+
+    #[error("ZFS error: {0}")]
+    Zfs(#[from] ZfsError),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -168,6 +176,114 @@ impl StorageManager {
 
         pools.insert(name.clone(), pool.clone());
         nfs_pools.insert(name.clone(), nfs_pool);
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
+    /// Create a new LVM storage pool
+    pub async fn create_lvm_pool(
+        &self,
+        name: String,
+        volume_group: String,
+        auto_start: bool,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        // Validate VG exists
+        let lvm_pool = LvmPool::new(&volume_group)?;
+        let stats = lvm_pool.get_stats()?;
+
+        let device_path = PathBuf::from(format!("/dev/{}", volume_group));
+        let mut pool = StoragePool::new(
+            name.clone(),
+            StoragePoolType::LVM { volume_group },
+            device_path,
+        );
+        pool.auto_start = auto_start;
+        pool.state = PoolState::Active;
+        pool.update_stats(stats.vg_size_bytes, stats.vg_free_bytes);
+
+        pools.insert(name.clone(), pool.clone());
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
+    /// Create a new LVM thin-provisioning storage pool
+    pub async fn create_lvm_thin_pool(
+        &self,
+        name: String,
+        volume_group: String,
+        thin_pool: String,
+        auto_start: bool,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        // Validate VG exists
+        let lvm_pool = LvmPool::new(&volume_group)?;
+        let stats = lvm_pool.get_stats()?;
+
+        let device_path = PathBuf::from(format!("/dev/{}", volume_group));
+        let mut pool = StoragePool::new(
+            name.clone(),
+            StoragePoolType::LVMThin {
+                volume_group,
+                thin_pool,
+            },
+            device_path,
+        );
+        pool.auto_start = auto_start;
+        pool.state = PoolState::Active;
+        pool.update_stats(stats.vg_size_bytes, stats.vg_free_bytes);
+
+        pools.insert(name.clone(), pool.clone());
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
+    /// Create a new ZFS storage pool
+    pub async fn create_zfs_pool(
+        &self,
+        name: String,
+        zpool: String,
+        dataset: Option<String>,
+        auto_start: bool,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        // Validate zpool exists
+        let zfs_pool = ZfsPool::new(&zpool, dataset.clone())?;
+        let stats = zfs_pool.get_stats()?;
+
+        let mount_path = match &dataset {
+            Some(ds) => PathBuf::from(format!("/{}/{}", zpool, ds)),
+            None => PathBuf::from(format!("/{}", zpool)),
+        };
+
+        let mut pool = StoragePool::new(
+            name.clone(),
+            StoragePoolType::ZFS { zpool, dataset },
+            mount_path,
+        );
+        pool.auto_start = auto_start;
+        pool.state = PoolState::Active;
+        pool.update_stats(stats.size_bytes, stats.free_bytes);
+
+        pools.insert(name.clone(), pool.clone());
         self.save_state(&pools)?;
 
         Ok(pool)
@@ -382,6 +498,15 @@ impl StorageManager {
                 }
                 StoragePoolType::Ceph { .. } => {
                     tracing::info!("Ceph storage pool '{}' metadata restored (mount not yet implemented)", name);
+                }
+                StoragePoolType::LVM { ref volume_group } => {
+                    tracing::info!("LVM storage pool '{}' restored (VG: {})", name, volume_group);
+                }
+                StoragePoolType::LVMThin { ref volume_group, ref thin_pool } => {
+                    tracing::info!("LVM thin storage pool '{}' restored (VG: {}, thin: {})", name, volume_group, thin_pool);
+                }
+                StoragePoolType::ZFS { ref zpool, ref dataset } => {
+                    tracing::info!("ZFS storage pool '{}' restored (zpool: {}, dataset: {:?})", name, zpool, dataset);
                 }
             }
         }

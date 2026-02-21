@@ -11,9 +11,9 @@ use uuid::Uuid;
 use crate::server::AppState;
 use networking::models::{
     BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest, CreateLinkFileRequest,
-    CreateMacvtapRequest, CreateNetworkFileRequest, CreatePortForwardRequest, CreateTapRequest,
-    CreateVlanRequest, LinkFileConfig, MacvtapConfig, NetworkFileConfig, PortForwardConfig,
-    TapConfig, VlanConfig,
+    CreateMacvtapRequest, CreateNetworkFileRequest, CreatePortForwardRequest, CreateSriovRequest,
+    CreateTapRequest, CreateVlanRequest, CreateVxlanRequest, LinkFileConfig, MacvtapConfig,
+    NetworkFileConfig, PortForwardConfig, SriovConfig, TapConfig, VlanConfig, VxlanConfig,
 };
 use networking::nftables::NftManager;
 use networking::NetworkdManager;
@@ -784,6 +784,132 @@ pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl Into
         )
             .into_response(),
     }
+}
+
+// ============================================================================
+// VXLAN handlers
+// ============================================================================
+
+pub async fn list_vxlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_vxlan(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateVxlanRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now().to_rfc3339();
+    let cfg = VxlanConfig {
+        id: Uuid::new_v4().to_string(),
+        name: req.name,
+        vni: req.vni,
+        remote: req.remote,
+        local: req.local,
+        port: req.port,
+        parent_interface: req.parent_interface,
+        mtu: req.mtu,
+        addresses: req.addresses,
+        gateway: req.gateway,
+        dns: req.dns,
+        dhcp: req.dhcp,
+        created: now.clone(),
+        updated: now,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_vxlan(&cfg) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+    }
+
+    match state.store.save_entity("networkd_vxlans", &cfg.id, &cfg) {
+        Ok(_) => {
+            let _ = mgr.reload();
+            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn get_vxlan(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
+        Ok(Some(v)) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn delete_vxlan(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let mgr = networkd_manager(&state);
+    if let Ok(Some(cfg)) = state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
+        let _ = mgr.remove_device(&cfg.name);
+        let _ = mgr.reload();
+    }
+    let _ = state.store.delete_entity("networkd_vxlans", &id);
+    StatusCode::NO_CONTENT
+}
+
+// ============================================================================
+// SR-IOV handlers
+// ============================================================================
+
+pub async fn list_sriov(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_sriov(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateSriovRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now().to_rfc3339();
+    let cfg = SriovConfig {
+        id: Uuid::new_v4().to_string(),
+        pf_name: req.pf_name,
+        num_vfs: req.num_vfs,
+        vf_configs: req.vf_configs,
+        created: now.clone(),
+        updated: now,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_sriov(&cfg) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+    }
+
+    match state.store.save_entity("networkd_sriov", &cfg.id, &cfg) {
+        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn get_sriov(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
+        Ok(Some(s)) => Json(serde_json::to_value(&s).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn delete_sriov(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    if let Ok(Some(cfg)) = state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
+        let mgr = networkd_manager(&state);
+        let _ = mgr.remove_sriov(&cfg.pf_name);
+    }
+    let _ = state.store.delete_entity("networkd_sriov", &id);
+    StatusCode::NO_CONTENT
 }
 
 // ============================================================================

@@ -12,7 +12,13 @@ export interface NfsConfig {
 export interface StoragePool {
   id: string
   name: string
-  pool_type: 'Local' | 'Directory' | { NFS: { server: string; export_path: string; mount_options: string[] } }
+  pool_type:
+    | 'Local'
+    | 'Directory'
+    | { NFS: { server: string; export_path: string; mount_options: string[] } }
+    | { LVM: { volume_group: string } }
+    | { LVMThin: { volume_group: string; thin_pool: string } }
+    | { ZFS: { zpool: string; dataset: string | null } }
   path: string
   capacity: number
   available: number
@@ -90,6 +96,53 @@ export async function createNfsPool(request: CreateNfsPoolRequest): Promise<Stor
     const error = await response.text()
     throw new Error(`Failed to create NFS pool: ${error}`)
   }
+  return response.json()
+}
+
+// Create LVM storage pool
+export async function createLvmPool(request: {
+  name: string
+  volume_group: string
+  auto_start: boolean
+}): Promise<StoragePool> {
+  const response = await fetch(`${API_BASE_URL}/storage/pools/lvm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) throw new Error('Failed to create LVM pool')
+  return response.json()
+}
+
+// Create LVM thin storage pool
+export async function createLvmThinPool(request: {
+  name: string
+  volume_group: string
+  thin_pool: string
+  auto_start: boolean
+}): Promise<StoragePool> {
+  const response = await fetch(`${API_BASE_URL}/storage/pools/lvm-thin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) throw new Error('Failed to create LVM thin pool')
+  return response.json()
+}
+
+// Create ZFS storage pool
+export async function createZfsPool(request: {
+  name: string
+  zpool: string
+  dataset?: string
+  auto_start: boolean
+}): Promise<StoragePool> {
+  const response = await fetch(`${API_BASE_URL}/storage/pools/zfs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) throw new Error('Failed to create ZFS pool')
   return response.json()
 }
 

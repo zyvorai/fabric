@@ -100,9 +100,21 @@ export default function StoragePools() {
   const getPoolTypeDisplay = (pool: StoragePool) => {
     if (pool.pool_type === 'Local') return 'Local'
     if (pool.pool_type === 'Directory') return 'Directory'
-    if (typeof pool.pool_type === 'object' && 'NFS' in pool.pool_type) {
-      const nfs = pool.pool_type.NFS
-      return `NFS: ${nfs.server}:${nfs.export_path}`
+    if (typeof pool.pool_type === 'object') {
+      if ('NFS' in pool.pool_type) {
+        const nfs = pool.pool_type.NFS
+        return `NFS: ${nfs.server}:${nfs.export_path}`
+      }
+      if ('LVM' in pool.pool_type) {
+        return `LVM: ${pool.pool_type.LVM.volume_group}`
+      }
+      if ('LVMThin' in pool.pool_type) {
+        return `LVM-thin: ${pool.pool_type.LVMThin.volume_group}/${pool.pool_type.LVMThin.thin_pool}`
+      }
+      if ('ZFS' in pool.pool_type) {
+        const zfs = pool.pool_type.ZFS
+        return `ZFS: ${zfs.zpool}${zfs.dataset ? '/' + zfs.dataset : ''}`
+      }
     }
     return 'Unknown'
   }
@@ -311,7 +323,7 @@ interface CreatePoolDialogProps {
 }
 
 function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
-  const [poolType, setPoolType] = useState<'local' | 'nfs'>('local')
+  const [poolType, setPoolType] = useState<'local' | 'nfs' | 'lvm' | 'lvm-thin' | 'zfs'>('local')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [autoStart, setAutoStart] = useState(true)
@@ -323,13 +335,22 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
   const [nfsVersion, setNfsVersion] = useState<'V4' | 'V3' | 'V4_1' | 'V4_2'>('V4')
   const [mountOptions, setMountOptions] = useState('rw,hard,intr')
 
+  // LVM specific
+  const [volumeGroup, setVolumeGroup] = useState('')
+  const [thinPool, setThinPool] = useState('')
+
+  // ZFS specific
+  const [zpool, setZpool] = useState('')
+  const [dataset, setDataset] = useState('')
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const { createLvmPool, createLvmThinPool, createZfsPool } = await import('../api/storage')
 
     try {
       if (poolType === 'local') {
         await createLocalPool({ name, path, auto_start: autoStart })
-      } else {
+      } else if (poolType === 'nfs') {
         await createNfsPool({
           name,
           config: {
@@ -341,6 +362,12 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
             nfs_version: nfsVersion,
           },
         })
+      } else if (poolType === 'lvm') {
+        await createLvmPool({ name, volume_group: volumeGroup, auto_start: autoStart })
+      } else if (poolType === 'lvm-thin') {
+        await createLvmThinPool({ name, volume_group: volumeGroup, thin_pool: thinPool, auto_start: autoStart })
+      } else if (poolType === 'zfs') {
+        await createZfsPool({ name, zpool, dataset: dataset || undefined, auto_start: autoStart })
       }
 
       onCreated()
@@ -360,33 +387,29 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
           {/* Pool Type */}
           <div className="mb-6">
             <label className="block text-sm font-medium mb-2">Pool Type</label>
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => setPoolType('local')}
-                className={`flex-1 p-4 rounded border-2 transition ${
-                  poolType === 'local'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-700 hover:border-gray-600'
-                }`}
-              >
-                <HardDrive className="w-6 h-6 mx-auto mb-2" />
-                <div className="font-medium">Local/Directory</div>
-                <div className="text-xs text-gray-400">Local filesystem storage</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPoolType('nfs')}
-                className={`flex-1 p-4 rounded border-2 transition ${
-                  poolType === 'nfs'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-700 hover:border-gray-600'
-                }`}
-              >
-                <Server className="w-6 h-6 mx-auto mb-2" />
-                <div className="font-medium">NFS</div>
-                <div className="text-xs text-gray-400">Network file system</div>
-              </button>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { key: 'local' as const, label: 'Local', desc: 'Local filesystem', Icon: HardDrive },
+                { key: 'nfs' as const, label: 'NFS', desc: 'Network file system', Icon: Server },
+                { key: 'lvm' as const, label: 'LVM', desc: 'LVM volume group', Icon: HardDrive },
+                { key: 'lvm-thin' as const, label: 'LVM-thin', desc: 'Thin provisioned LVM', Icon: HardDrive },
+                { key: 'zfs' as const, label: 'ZFS', desc: 'ZFS pool/dataset', Icon: HardDrive },
+              ]).map(({ key, label, desc, Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPoolType(key)}
+                  className={`p-3 rounded border-2 transition text-center ${
+                    poolType === key
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-gray-700 hover:border-gray-600'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 mx-auto mb-1" />
+                  <div className="font-medium text-sm">{label}</div>
+                  <div className="text-xs text-gray-400">{desc}</div>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -415,6 +438,57 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                 required
               />
             </div>
+          ) : poolType === 'lvm' || poolType === 'lvm-thin' ? (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Volume Group</label>
+                <input
+                  type="text"
+                  value={volumeGroup}
+                  onChange={(e) => setVolumeGroup(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="vg0"
+                  required
+                />
+              </div>
+              {poolType === 'lvm-thin' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Thin Pool</label>
+                  <input
+                    type="text"
+                    value={thinPool}
+                    onChange={(e) => setThinPool(e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                    placeholder="thinpool0"
+                    required
+                  />
+                </div>
+              )}
+            </>
+          ) : poolType === 'zfs' ? (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">ZFS Pool</label>
+                <input
+                  type="text"
+                  value={zpool}
+                  onChange={(e) => setZpool(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="tank"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Dataset (optional)</label>
+                <input
+                  type="text"
+                  value={dataset}
+                  onChange={(e) => setDataset(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="vms"
+                />
+              </div>
+            </>
           ) : (
             <>
               <div className="mb-4">

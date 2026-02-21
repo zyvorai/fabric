@@ -4,7 +4,7 @@ import {
   Server, Plus, Home, Terminal, Network, HardDrive, Settings,
   Layers, Shield, Calendar, FileText, BarChart3, Save, Bell,
   Database, Cpu, Menu, X, ChevronDown, Building2, GitBranch,
-  Zap, Lock, RefreshCw, Archive, Key, Activity, PackageCheck,
+  Zap, Lock, RefreshCw, Archive, Key, Activity, PackageCheck, Camera,
 } from 'lucide-react'
 import ConnectionStatus from './ConnectionStatus'
 
@@ -55,6 +55,7 @@ const navGroups: NavGroup[] = [
       { to: '/templates', icon: <Layers className="w-4 h-4" />, label: 'Templates' },
       { to: '/content-library', icon: <Archive className="w-4 h-4" />, label: 'Content Library' },
       { to: '/schedules', icon: <Calendar className="w-4 h-4" />, label: 'Schedules' },
+      { to: '/snapshots', icon: <Camera className="w-4 h-4" />, label: 'Snapshots' },
       { to: '/backups', icon: <Save className="w-4 h-4" />, label: 'Backups' },
       { to: '/quotas', icon: <Shield className="w-4 h-4" />, label: 'Quotas' },
       { to: '/lifecycle', icon: <PackageCheck className="w-4 h-4" />, label: 'Lifecycle' },

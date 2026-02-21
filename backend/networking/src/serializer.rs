@@ -382,6 +382,68 @@ pub fn link_file(cfg: &LinkFileConfig) -> String {
     out
 }
 
+// ─── VXLAN ────────────────────────────────────────────────────────────────────
+
+/// Generate the .netdev file for a VXLAN device
+pub fn vxlan_netdev(cfg: &VxlanConfig) -> String {
+    let mut out = String::new();
+    out.push_str("[NetDev]\n");
+    out.push_str(&format!("Name={}\n", cfg.name));
+    out.push_str("Kind=vxlan\n");
+    if let Some(mtu) = cfg.mtu {
+        out.push_str(&format!("MTUBytes={}\n", mtu));
+    }
+
+    out.push_str("\n[VXLAN]\n");
+    out.push_str(&format!("VNI={}\n", cfg.vni));
+    if let Some(ref remote) = cfg.remote {
+        out.push_str(&format!("Remote={}\n", remote));
+    }
+    if let Some(ref local) = cfg.local {
+        out.push_str(&format!("Local={}\n", local));
+    }
+    if let Some(port) = cfg.port {
+        out.push_str(&format!("DestinationPort={}\n", port));
+    }
+
+    out
+}
+
+/// Generate the .network file for a VXLAN's parent interface
+pub fn vxlan_parent_network(cfg: &VxlanConfig) -> String {
+    let mut out = String::new();
+    if let Some(ref parent) = cfg.parent_interface {
+        out.push_str("[Match]\n");
+        out.push_str(&format!("Name={}\n", parent));
+        out.push_str("\n[Network]\n");
+        out.push_str(&format!("VXLAN={}\n", cfg.name));
+    }
+    out
+}
+
+/// Generate the .network file for the VXLAN interface itself
+pub fn vxlan_network(cfg: &VxlanConfig) -> String {
+    let mut out = String::new();
+    out.push_str("[Match]\n");
+    out.push_str(&format!("Name={}\n", cfg.name));
+
+    out.push_str("\n[Network]\n");
+    for addr in &cfg.addresses {
+        out.push_str(&format!("Address={}\n", addr));
+    }
+    if let Some(ref gw) = cfg.gateway {
+        out.push_str(&format!("Gateway={}\n", gw));
+    }
+    for d in &cfg.dns {
+        out.push_str(&format!("DNS={}\n", d));
+    }
+    if cfg.dhcp != DhcpMode::No {
+        out.push_str(&format!("DHCP={}\n", cfg.dhcp.as_str()));
+    }
+
+    out
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

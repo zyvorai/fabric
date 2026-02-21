@@ -28,6 +28,33 @@ pub struct CreateNfsPoolRequest {
     pub config: NfsConfigDto,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CreateLvmPoolRequest {
+    pub name: String,
+    pub volume_group: String,
+    #[serde(default)]
+    pub auto_start: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateLvmThinPoolRequest {
+    pub name: String,
+    pub volume_group: String,
+    pub thin_pool: String,
+    #[serde(default)]
+    pub auto_start: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateZfsPoolRequest {
+    pub name: String,
+    pub zpool: String,
+    #[serde(default)]
+    pub dataset: Option<String>,
+    #[serde(default)]
+    pub auto_start: bool,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct NfsConfigDto {
     pub server: String,
@@ -206,6 +233,63 @@ pub async fn refresh_pool_stats(
     match manager.refresh_pool_stats(&name).await {
         Ok(_) => Ok(StatusCode::OK),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to refresh stats: {}", e))),
+    }
+}
+
+/// POST /api/storage/pools/lvm - Create LVM storage pool
+pub async fn create_lvm_pool(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateLvmPoolRequest>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager
+        .create_lvm_pool(req.name, req.volume_group, req.auto_start)
+        .await
+    {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create LVM pool: {}", e),
+        )),
+    }
+}
+
+/// POST /api/storage/pools/lvm-thin - Create LVM thin storage pool
+pub async fn create_lvm_thin_pool(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateLvmThinPoolRequest>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager
+        .create_lvm_thin_pool(req.name, req.volume_group, req.thin_pool, req.auto_start)
+        .await
+    {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create LVM thin pool: {}", e),
+        )),
+    }
+}
+
+/// POST /api/storage/pools/zfs - Create ZFS storage pool
+pub async fn create_zfs_pool(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateZfsPoolRequest>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager
+        .create_zfs_pool(req.name, req.zpool, req.dataset, req.auto_start)
+        .await
+    {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create ZFS pool: {}", e),
+        )),
     }
 }
 

@@ -1,0 +1,326 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
+use serde::Deserialize;
+use std::sync::Arc;
+
+use crate::qmp::QmpClient;
+use crate::server::AppState;
+
+#[derive(Debug, Deserialize)]
+pub struct HotplugCpuRequest {
+    pub count: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HotplugMemoryRequest {
+    pub size_mb: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HotplugDiskRequest {
+    pub path: String,
+    #[serde(default = "default_bus")]
+    pub bus: String,
+}
+
+fn default_bus() -> String {
+    "virtio".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HotplugNicRequest {
+    pub bridge: String,
+    #[serde(default)]
+    pub model: Option<String>,
+}
+
+fn not_available_response() -> impl IntoResponse {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "error": "QMP socket not available. The QEMU monitor socket must be exposed by systemd-vmspawn for hotplug operations."
+        })),
+    )
+}
+
+/// POST /api/vms/:name/hotplug/cpu - Hot-add vCPUs
+pub async fn hotplug_cpu(
+    State(_state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(req): Json<HotplugCpuRequest>,
+) -> impl IntoResponse {
+    let qmp = QmpClient::new(&vm_name);
+    if !qmp.is_available() {
+        return not_available_response().into_response();
+    }
+
+    // Query hotpluggable CPUs to find available slots
+    match qmp.execute("query-hotpluggable-cpus", serde_json::Value::Null) {
+        Ok(cpus) => {
+            // Find unrealized CPU slots and add them
+            let mut added = 0u32;
+            if let Some(cpu_list) = cpus.as_array() {
+                for cpu in cpu_list {
+                    if added >= req.count {
+                        break;
+                    }
+                    // Skip already-realized CPUs
+                    if cpu.get("qom-path").is_some() {
+                        continue;
+                    }
+                    if let Some(props) = cpu.get("props") {
+                        let cpu_id = format!("cpu-hotplug-{}", added);
+                        let args = serde_json::json!({
+                            "driver": "host-x86_64-cpu",
+                            "id": cpu_id,
+                            "socket-id": props.get("socket-id").and_then(|v| v.as_u64()).unwrap_or(0),
+                            "core-id": props.get("core-id").and_then(|v| v.as_u64()).unwrap_or(0),
+                            "thread-id": props.get("thread-id").and_then(|v| v.as_u64()).unwrap_or(0),
+                        });
+
+                        match qmp.execute("device_add", args) {
+                            Ok(_) => added += 1,
+                            Err(e) => {
+                                return (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    Json(serde_json::json!({"error": format!("CPU hotplug failed: {}", e), "added": added})),
+                                )
+                                    .into_response();
+                            }
+                        }
+                    }
+                }
+            }
+
+            Json(serde_json::json!({
+                "status": "ok",
+                "cpus_added": added,
+            }))
+            .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to query CPUs: {}", e)})),
+        )
+            .into_response(),
+    }
+}
+
+/// POST /api/vms/:name/hotplug/memory - Hot-add memory
+pub async fn hotplug_memory(
+    State(_state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(req): Json<HotplugMemoryRequest>,
+) -> impl IntoResponse {
+    let qmp = QmpClient::new(&vm_name);
+    if !qmp.is_available() {
+        return not_available_response().into_response();
+    }
+
+    let size_bytes = req.size_mb * 1024 * 1024;
+    let backend_id = format!("mem-hotplug-{}", uuid::Uuid::new_v4().simple());
+    let dimm_id = format!("dimm-hotplug-{}", uuid::Uuid::new_v4().simple());
+
+    // Add memory backend
+    let backend_args = serde_json::json!({
+        "qom-type": "memory-backend-ram",
+        "id": backend_id,
+        "size": size_bytes,
+    });
+
+    if let Err(e) = qmp.execute("object-add", backend_args) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Memory backend add failed: {}", e)})),
+        )
+            .into_response();
+    }
+
+    // Add DIMM device
+    let dimm_args = serde_json::json!({
+        "driver": "pc-dimm",
+        "id": dimm_id,
+        "memdev": backend_id,
+    });
+
+    match qmp.execute("device_add", dimm_args) {
+        Ok(_) => Json(serde_json::json!({
+            "status": "ok",
+            "memory_added_mb": req.size_mb,
+            "dimm_id": dimm_id,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("DIMM hotplug failed: {}", e)})),
+        )
+            .into_response(),
+    }
+}
+
+/// POST /api/vms/:name/hotplug/disk - Hot-add a disk
+pub async fn hotplug_disk(
+    State(_state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(req): Json<HotplugDiskRequest>,
+) -> impl IntoResponse {
+    let qmp = QmpClient::new(&vm_name);
+    if !qmp.is_available() {
+        return not_available_response().into_response();
+    }
+
+    let node_name = format!("drive-hotplug-{}", uuid::Uuid::new_v4().simple());
+    let device_id = format!("disk-hotplug-{}", uuid::Uuid::new_v4().simple());
+
+    // Add block device
+    let blockdev_args = serde_json::json!({
+        "driver": "qcow2",
+        "node-name": node_name,
+        "file": {
+            "driver": "file",
+            "filename": req.path,
+        }
+    });
+
+    if let Err(e) = qmp.execute("blockdev-add", blockdev_args) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("blockdev-add failed: {}", e)})),
+        )
+            .into_response();
+    }
+
+    // Add device
+    let driver = match req.bus.as_str() {
+        "scsi" => "scsi-hd",
+        "ide" => "ide-hd",
+        _ => "virtio-blk-pci",
+    };
+
+    let device_args = serde_json::json!({
+        "driver": driver,
+        "id": device_id,
+        "drive": node_name,
+    });
+
+    match qmp.execute("device_add", device_args) {
+        Ok(_) => Json(serde_json::json!({
+            "status": "ok",
+            "device_id": device_id,
+            "node_name": node_name,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("device_add failed: {}", e)})),
+        )
+            .into_response(),
+    }
+}
+
+/// DELETE /api/vms/:name/hotplug/disk/:id - Hot-remove a disk
+pub async fn hotremove_disk(
+    State(_state): State<Arc<AppState>>,
+    Path((vm_name, device_id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let qmp = QmpClient::new(&vm_name);
+    if !qmp.is_available() {
+        return not_available_response().into_response();
+    }
+
+    let args = serde_json::json!({"id": device_id});
+    match qmp.execute("device_del", args) {
+        Ok(_) => Json(serde_json::json!({
+            "status": "ok",
+            "removed": device_id,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("device_del failed: {}", e)})),
+        )
+            .into_response(),
+    }
+}
+
+/// POST /api/vms/:name/hotplug/nic - Hot-add a NIC
+pub async fn hotplug_nic(
+    State(_state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(req): Json<HotplugNicRequest>,
+) -> impl IntoResponse {
+    let qmp = QmpClient::new(&vm_name);
+    if !qmp.is_available() {
+        return not_available_response().into_response();
+    }
+
+    let netdev_id = format!("net-hotplug-{}", uuid::Uuid::new_v4().simple());
+    let device_id = format!("nic-hotplug-{}", uuid::Uuid::new_v4().simple());
+
+    // Add netdev (tap backend attached to bridge)
+    let netdev_args = serde_json::json!({
+        "type": "tap",
+        "id": netdev_id,
+        "br": req.bridge,
+        "helper": "/usr/lib/qemu/qemu-bridge-helper",
+    });
+
+    if let Err(e) = qmp.execute("netdev_add", netdev_args) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("netdev_add failed: {}", e)})),
+        )
+            .into_response();
+    }
+
+    // Add NIC device
+    let model = req.model.as_deref().unwrap_or("virtio-net-pci");
+    let device_args = serde_json::json!({
+        "driver": model,
+        "id": device_id,
+        "netdev": netdev_id,
+    });
+
+    match qmp.execute("device_add", device_args) {
+        Ok(_) => Json(serde_json::json!({
+            "status": "ok",
+            "device_id": device_id,
+            "netdev_id": netdev_id,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("NIC device_add failed: {}", e)})),
+        )
+            .into_response(),
+    }
+}
+
+/// DELETE /api/vms/:name/hotplug/nic/:id - Hot-remove a NIC
+pub async fn hotremove_nic(
+    State(_state): State<Arc<AppState>>,
+    Path((vm_name, device_id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let qmp = QmpClient::new(&vm_name);
+    if !qmp.is_available() {
+        return not_available_response().into_response();
+    }
+
+    let args = serde_json::json!({"id": device_id});
+    match qmp.execute("device_del", args) {
+        Ok(_) => Json(serde_json::json!({
+            "status": "ok",
+            "removed": device_id,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("NIC device_del failed: {}", e)})),
+        )
+            .into_response(),
+    }
+}

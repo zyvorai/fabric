@@ -20,6 +20,17 @@ pub enum StoragePoolType {
         monitors: Vec<String>,
         pool_name: String,
     },
+    LVM {
+        volume_group: String,
+    },
+    LVMThin {
+        volume_group: String,
+        thin_pool: String,
+    },
+    ZFS {
+        zpool: String,
+        dataset: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +84,14 @@ impl StoragePool {
 
     pub fn is_local(&self) -> bool {
         matches!(self.pool_type, StoragePoolType::Local | StoragePoolType::Directory { .. })
+    }
+
+    pub fn is_lvm(&self) -> bool {
+        matches!(self.pool_type, StoragePoolType::LVM { .. } | StoragePoolType::LVMThin { .. })
+    }
+
+    pub fn is_zfs(&self) -> bool {
+        matches!(self.pool_type, StoragePoolType::ZFS { .. })
     }
 
     pub fn usage_percent(&self) -> f64 {

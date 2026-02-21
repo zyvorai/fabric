@@ -687,6 +687,153 @@ impl ContentLibraryManager {
         self.add_item(library_id, item)
     }
 
+    /// Download an image from a URL into a library
+    pub async fn download_image(
+        &self,
+        library_id: &str,
+        url: &str,
+        name: &str,
+        item_type: ItemType,
+    ) -> Result<LibraryItem> {
+        // Get library storage path
+        let storage_path = {
+            let libs = self
+                .libraries
+                .read()
+                .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+            let lib = libs
+                .get(library_id)
+                .ok_or_else(|| anyhow!("Library '{}' not found", library_id))?;
+            lib.storage_path.clone()
+        };
+
+        // Ensure storage directory exists
+        std::fs::create_dir_all(&storage_path)?;
+
+        // Download the file
+        let client = reqwest::Client::new();
+        let response = client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| anyhow!("Download failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Download failed with status: {}",
+                response.status()
+            ));
+        }
+
+        let content_length = response.content_length().unwrap_or(0);
+
+        // Determine file extension from URL
+        let extension = url
+            .rsplit('/')
+            .next()
+            .and_then(|f| f.rsplit('.').next())
+            .unwrap_or("img");
+        let filename = format!("{}.{}", name, extension);
+        let dest_path = format!("{}/{}", storage_path, filename);
+
+        // Write to file
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| anyhow!("Failed to read response body: {}", e))?;
+        std::fs::write(&dest_path, &bytes)?;
+
+        let actual_size = bytes.len() as u64;
+
+        tracing::info!(
+            library_id = %library_id, name = %name, url = %url,
+            size = actual_size, "Downloaded image"
+        );
+
+        // Create library item
+        let item = LibraryItem {
+            id: String::new(),
+            library_id: library_id.to_string(),
+            name: name.to_string(),
+            description: Some(format!("Downloaded from {}", url)),
+            item_type,
+            version: 1,
+            versions: Vec::new(),
+            size_bytes: if content_length > 0 {
+                content_length
+            } else {
+                actual_size
+            },
+            file_path: dest_path,
+            checksum: None,
+            properties: HashMap::new(),
+            created: Utc::now(),
+            updated: Utc::now(),
+        };
+
+        self.add_item(library_id, item)
+    }
+
+    /// Import an image from a local file path into a library
+    pub fn import_from_path(
+        &self,
+        library_id: &str,
+        source_path: &str,
+        name: &str,
+    ) -> Result<LibraryItem> {
+        let storage_path = {
+            let libs = self
+                .libraries
+                .read()
+                .map_err(|e| anyhow!("Lock poisoned: {}", e))?;
+            let lib = libs
+                .get(library_id)
+                .ok_or_else(|| anyhow!("Library '{}' not found", library_id))?;
+            lib.storage_path.clone()
+        };
+
+        std::fs::create_dir_all(&storage_path)?;
+
+        let source = std::path::Path::new(source_path);
+        if !source.exists() {
+            return Err(anyhow!("Source path '{}' does not exist", source_path));
+        }
+
+        let extension = source
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("img");
+        let filename = format!("{}.{}", name, extension);
+        let dest_path = format!("{}/{}", storage_path, filename);
+
+        std::fs::copy(source_path, &dest_path)?;
+
+        let metadata = std::fs::metadata(&dest_path)?;
+
+        tracing::info!(
+            library_id = %library_id, name = %name, source = %source_path,
+            "Imported image from path"
+        );
+
+        let item = LibraryItem {
+            id: String::new(),
+            library_id: library_id.to_string(),
+            name: name.to_string(),
+            description: Some(format!("Imported from {}", source_path)),
+            item_type: ItemType::VmImage,
+            version: 1,
+            versions: Vec::new(),
+            size_bytes: metadata.len(),
+            file_path: dest_path,
+            checksum: None,
+            properties: HashMap::new(),
+            created: Utc::now(),
+            updated: Utc::now(),
+        };
+
+        self.add_item(library_id, item)
+    }
+
     pub fn export_vm_as_ovf(&self, vm_name: &str) -> Result<OvfPackage> {
         // In a real implementation this would inspect a running/stopped VM and
         // produce an OVF descriptor.  Here we return a template package.

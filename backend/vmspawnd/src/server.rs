@@ -147,6 +147,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/vms/:name/restart", post(routes::restart_vm))
             .route("/vms/:name/metrics", get(routes::get_metrics))
             .route("/vms/:name/cloud-init", post(routes::configure_cloud_init))
+            // Snapshot routes
+            .route("/vms/:name/snapshots", get(api::snapshots::list_snapshots).post(api::snapshots::create_snapshot))
+            .route("/vms/:name/snapshots/tree", get(api::snapshots::snapshot_tree))
+            .route("/vms/:name/snapshots/:id", get(api::snapshots::get_snapshot).delete(api::snapshots::delete_snapshot))
+            .route("/vms/:name/snapshots/:id/revert", post(api::snapshots::revert_snapshot))
+            // Hotplug routes
+            .route("/vms/:name/hotplug/cpu", post(api::hotplug::hotplug_cpu))
+            .route("/vms/:name/hotplug/memory", post(api::hotplug::hotplug_memory))
+            .route("/vms/:name/hotplug/disk", post(api::hotplug::hotplug_disk))
+            .route("/vms/:name/hotplug/disk/:id", delete(api::hotplug::hotremove_disk))
+            .route("/vms/:name/hotplug/nic", post(api::hotplug::hotplug_nic))
+            .route("/vms/:name/hotplug/nic/:id", delete(api::hotplug::hotremove_nic))
             // Storage pool routes
             .route("/storage/pools", get(api::storage::list_pools))
             .route("/storage/pools/:name", get(api::storage::get_pool))
@@ -158,6 +170,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/storage/pools/:name/health", get(api::storage::get_pool_health))
             .route("/storage/pools/:name/stats", get(api::storage::get_pool_stats))
             .route("/storage/pools/:name/refresh", post(api::storage::refresh_pool_stats))
+            .route("/storage/pools/lvm", post(api::storage::create_lvm_pool))
+            .route("/storage/pools/lvm-thin", post(api::storage::create_lvm_thin_pool))
+            .route("/storage/pools/zfs", post(api::storage::create_zfs_pool))
+            // Volume management routes
+            .route("/storage/pools/:name/volumes", get(api::volumes::list_volumes).post(api::volumes::create_volume))
+            .route("/storage/pools/:name/volumes/:id", get(api::volumes::get_volume).delete(api::volumes::delete_volume))
+            .route("/storage/pools/:name/volumes/:id/resize", post(api::volumes::resize_volume))
+            .route("/storage/pools/:name/volumes/:id/attach", post(api::volumes::attach_volume))
+            .route("/storage/pools/:name/volumes/:id/detach", post(api::volumes::detach_volume))
             // System resource routes - CPU
             .route("/system/cpu/topology", get(api::system::get_cpu_topology))
             .route("/vms/:name/cpu/pin", post(api::system::set_cpu_pinning))
@@ -328,6 +349,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/networkd/port-forwards", get(api::networkd::list_port_forwards).post(api::networkd::create_port_forward))
             .route("/networkd/port-forwards/sync", post(api::networkd::sync_port_forwards))
             .route("/networkd/port-forwards/:id", get(api::networkd::get_port_forward).delete(api::networkd::delete_port_forward))
+            .route("/networkd/vxlans", get(api::networkd::list_vxlans).post(api::networkd::create_vxlan))
+            .route("/networkd/vxlans/:id", get(api::networkd::get_vxlan).delete(api::networkd::delete_vxlan))
+            .route("/networkd/sriov", get(api::networkd::list_sriov).post(api::networkd::create_sriov))
+            .route("/networkd/sriov/:id", get(api::networkd::get_sriov).delete(api::networkd::delete_sriov))
             .route("/networkd/scan", get(api::networkd::scan_configs))
             // Fault tolerance routes
             .route("/ft/enable", post(api::fault_tolerance::enable_ft))
@@ -368,6 +393,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/content-library/libraries", get(api::content_library::list_libraries).post(api::content_library::create_library))
             .route("/content-library/libraries/:id", get(api::content_library::get_library).delete(api::content_library::delete_library))
             .route("/content-library/libraries/:id/sync", post(api::content_library::sync_library))
+            .route("/content-library/libraries/:id/download", post(api::content_library::download_image))
             .route("/content-library/libraries/:id/items", get(api::content_library::list_library_items).post(api::content_library::add_library_item))
             .route("/content-library/items/:id", get(api::content_library::get_library_item).delete(api::content_library::delete_library_item))
             .route("/content-library/items/search", get(api::content_library::search_items))
@@ -492,8 +518,31 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                     crate::api::schedules::VMAction::Stop => vmspawn_driver::stop_vm(&schedule_clone.vm_name),
                     crate::api::schedules::VMAction::Restart => vmspawn_driver::restart_vm(&schedule_clone.vm_name),
                     crate::api::schedules::VMAction::Snapshot => {
-                        tracing::warn!("Snapshot action not implemented");
-                        Ok(())
+                        // Create a disk snapshot using qemu-img
+                        let snap_name = format!("scheduled-{}", Utc::now().format("%Y%m%d-%H%M%S"));
+                        let image_candidates = [
+                            format!("/var/lib/machines/{}.qcow2", schedule_clone.vm_name),
+                            format!("/var/lib/machines/{}/{}.qcow2", schedule_clone.vm_name, schedule_clone.vm_name),
+                            format!("/var/lib/vmspawnd/images/{}.qcow2", schedule_clone.vm_name),
+                        ];
+
+                        let image_path = image_candidates.iter().find(|p| std::path::Path::new(p).exists());
+                        match image_path {
+                            Some(path) => {
+                                let output = std::process::Command::new("qemu-img")
+                                    .args(["snapshot", "-c", &snap_name, path])
+                                    .output();
+                                match output {
+                                    Ok(o) if o.status.success() => Ok(()),
+                                    Ok(o) => Err(anyhow::anyhow!("qemu-img snapshot failed: {}", String::from_utf8_lossy(&o.stderr))),
+                                    Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
+                                }
+                            }
+                            None => {
+                                tracing::warn!("No disk image found for VM '{}'", schedule_clone.vm_name);
+                                Ok(())
+                            }
+                        }
                     }
                 };
 

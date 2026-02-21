@@ -113,6 +113,103 @@ impl NetworkdManager {
         Ok(())
     }
 
+    /// Write a VXLAN's .netdev, optional parent .network, and VXLAN .network files
+    pub fn apply_vxlan(&self, cfg: &VxlanConfig) -> Result<()> {
+        let netdev = serializer::vxlan_netdev(cfg);
+        let vxlan_network = serializer::vxlan_network(cfg);
+
+        self.write_file(&cfg.name, "netdev", &netdev)?;
+        self.write_file(&cfg.name, "network", &vxlan_network)?;
+
+        // If a parent interface is specified, write the parent .network file
+        if cfg.parent_interface.is_some() {
+            let parent_network = serializer::vxlan_parent_network(cfg);
+            if !parent_network.is_empty() {
+                self.write_file(&format!("{}-parent", cfg.name), "network", &parent_network)?;
+            }
+        }
+
+        tracing::info!("Applied VXLAN config: {} (VNI={})", cfg.name, cfg.vni);
+        Ok(())
+    }
+
+    /// Configure SR-IOV VFs on a physical function interface
+    pub fn apply_sriov(&self, cfg: &SriovConfig) -> Result<()> {
+        // Set number of VFs via sysfs
+        let sriov_path = format!("/sys/class/net/{}/device/sriov_numvfs", cfg.pf_name);
+        fs::write(&sriov_path, cfg.num_vfs.to_string())
+            .with_context(|| format!("Failed to set sriov_numvfs on {}", cfg.pf_name))?;
+
+        tracing::info!(
+            pf = %cfg.pf_name, num_vfs = cfg.num_vfs,
+            "Set SR-IOV VFs"
+        );
+
+        // Configure individual VFs using ip link
+        for vf in &cfg.vf_configs {
+            let mut args = vec![
+                "link".to_string(),
+                "set".to_string(),
+                cfg.pf_name.clone(),
+                "vf".to_string(),
+                vf.vf_index.to_string(),
+            ];
+
+            if let Some(ref mac) = vf.mac_address {
+                args.push("mac".to_string());
+                args.push(mac.clone());
+            }
+            if let Some(vlan) = vf.vlan {
+                args.push("vlan".to_string());
+                args.push(vlan.to_string());
+                if let Some(qos) = vf.qos {
+                    args.push("qos".to_string());
+                    args.push(qos.to_string());
+                }
+            }
+            if let Some(spoofchk) = vf.spoofchk {
+                args.push("spoofchk".to_string());
+                args.push(if spoofchk { "on" } else { "off" }.to_string());
+            }
+            if let Some(trust) = vf.trust {
+                args.push("trust".to_string());
+                args.push(if trust { "on" } else { "off" }.to_string());
+            }
+
+            // Only run if we have extra config beyond the base "ip link set dev vf idx"
+            if args.len() > 5 {
+                let output = Command::new("ip")
+                    .args(&args)
+                    .output()
+                    .with_context(|| format!("Failed to configure VF {}", vf.vf_index))?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow::anyhow!(
+                        "ip link set vf {} failed: {}", vf.vf_index, stderr
+                    ));
+                }
+
+                tracing::info!(
+                    pf = %cfg.pf_name, vf = vf.vf_index,
+                    "Configured SR-IOV VF"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove SR-IOV VFs by setting numvfs to 0
+    pub fn remove_sriov(&self, pf_name: &str) -> Result<()> {
+        let sriov_path = format!("/sys/class/net/{}/device/sriov_numvfs", pf_name);
+        fs::write(&sriov_path, "0")
+            .with_context(|| format!("Failed to reset sriov_numvfs on {}", pf_name))?;
+
+        tracing::info!(pf = %pf_name, "Removed SR-IOV VFs");
+        Ok(())
+    }
+
     /// Remove all config files for a named device
     pub fn remove_device(&self, name: &str) -> Result<()> {
         let patterns = [
