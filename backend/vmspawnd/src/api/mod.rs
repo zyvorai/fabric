@@ -10,6 +10,7 @@ pub mod events;
 pub mod firmware;
 pub mod hotplug;
 pub mod images;
+pub mod machined;
 pub mod migration;
 pub mod network_cloud;
 pub mod notifications;

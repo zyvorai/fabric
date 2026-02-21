@@ -1,3 +1,4 @@
+pub mod machinectl;
 pub mod qemu;
 
 use anyhow::{anyhow, Result};
