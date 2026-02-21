@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::ceph::{CephError, CephPool};
 use crate::lvm::{LvmError, LvmPool};
 use crate::nfs::{NfsConfig, NfsError, NfsHealth, NfsPool, NfsStats};
 use crate::pool::{PoolState, StoragePool, StoragePoolType};
@@ -27,6 +28,9 @@ pub enum StorageError {
 
     #[error("ZFS error: {0}")]
     Zfs(#[from] ZfsError),
+
+    #[error("Ceph error: {0}")]
+    Ceph(#[from] CephError),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -289,6 +293,54 @@ impl StorageManager {
         Ok(pool)
     }
 
+    /// Create a new Ceph RBD storage pool
+    pub async fn create_ceph_pool(
+        &self,
+        name: String,
+        monitors: Vec<String>,
+        ceph_pool_name: String,
+        user: Option<String>,
+        keyring: Option<String>,
+        auto_start: bool,
+    ) -> Result<StoragePool, StorageError> {
+        let mut pools = self.pools.write().await;
+
+        if pools.contains_key(&name) {
+            return Err(StorageError::PoolExists(name));
+        }
+
+        let mut ceph_pool = CephPool::new(monitors.clone(), ceph_pool_name.clone())?;
+        if let Some(user) = user {
+            ceph_pool = ceph_pool.with_auth(user, keyring.unwrap_or_default());
+        }
+
+        // Verify cluster is reachable
+        if !ceph_pool.check_cluster()? {
+            return Err(StorageError::Ceph(CephError::ClusterUnreachable(
+                monitors.join(","),
+            )));
+        }
+
+        let stats = ceph_pool.get_stats()?;
+
+        let mut pool = StoragePool::new(
+            name.clone(),
+            StoragePoolType::Ceph {
+                monitors,
+                pool_name: ceph_pool_name,
+            },
+            std::path::PathBuf::from("/dev/rbd"),
+        );
+        pool.auto_start = auto_start;
+        pool.state = PoolState::Active;
+        pool.update_stats(stats.total_bytes, stats.available_bytes);
+
+        pools.insert(name.clone(), pool.clone());
+        self.save_state(&pools)?;
+
+        Ok(pool)
+    }
+
     /// Delete a storage pool
     pub async fn delete_pool(&self, name: &str) -> Result<(), StorageError> {
         let mut pools = self.pools.write().await;
@@ -496,8 +548,8 @@ impl StorageManager {
                 StoragePoolType::Local | StoragePoolType::Directory { .. } => {
                     tracing::info!("Local storage pool '{}' restored", name);
                 }
-                StoragePoolType::Ceph { .. } => {
-                    tracing::info!("Ceph storage pool '{}' metadata restored (mount not yet implemented)", name);
+                StoragePoolType::Ceph { ref monitors, ref pool_name } => {
+                    tracing::info!("Ceph storage pool '{}' restored (monitors: {}, pool: {})", name, monitors.join(","), pool_name);
                 }
                 StoragePoolType::LVM { ref volume_group } => {
                     tracing::info!("LVM storage pool '{}' restored (VG: {})", name, volume_group);

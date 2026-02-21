@@ -6,4 +6,5 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+tracing.workspace = true
 vm-model = { path = "../vm-model" }

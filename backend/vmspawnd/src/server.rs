@@ -10,7 +10,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use vmspawnd_storage::StorageManager;
 
-use crate::{api, config::Config, routes, websocket};
+use crate::{api, config::Config, plugins, routes, websocket};
 
 pub struct AppState {
     pub store: StateStore,
@@ -20,6 +20,7 @@ pub struct AppState {
     pub quota_cache: Arc<std::sync::RwLock<QuotaCache>>,
     pub user_db: Option<Arc<security::db::UserDb>>,
     pub jwt_config: Option<Arc<security::JwtConfig>>,
+    pub plugin_registry: Arc<RwLock<plugins::PluginRegistry>>,
 }
 
 pub struct QuotaCache {
@@ -79,6 +80,7 @@ impl Server {
             quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
             user_db,
             jwt_config,
+            plugin_registry: Arc::new(RwLock::new(plugins::PluginRegistry::new())),
         });
 
         Ok(Self { state })
@@ -102,6 +104,24 @@ impl Server {
         let metrics_state = self.state.clone();
         tokio::spawn(async move {
             run_metrics_collector(metrics_state).await;
+        });
+
+        // Start stale host detector
+        let host_state = self.state.clone();
+        tokio::spawn(async move {
+            run_stale_host_detector(host_state).await;
+        });
+
+        // Start DRS auto-executor
+        let drs_state = self.state.clone();
+        tokio::spawn(async move {
+            run_drs_executor(drs_state).await;
+        });
+
+        // Start HA failover monitor
+        let ha_state = self.state.clone();
+        tokio::spawn(async move {
+            run_ha_monitor(ha_state).await;
         });
 
         axum::serve(listener, app).await?;
@@ -182,6 +202,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/storage/pools/lvm", post(api::storage::create_lvm_pool))
             .route("/storage/pools/lvm-thin", post(api::storage::create_lvm_thin_pool))
             .route("/storage/pools/zfs", post(api::storage::create_zfs_pool))
+            .route("/storage/pools/ceph", post(api::storage::create_ceph_pool))
             // Volume management routes
             .route("/storage/pools/:name/volumes", get(api::volumes::list_volumes).post(api::volumes::create_volume))
             .route("/storage/pools/:name/volumes/:id", get(api::volumes::get_volume).delete(api::volumes::delete_volume))
@@ -265,6 +286,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/migrations", get(api::migration::list_migrations).post(api::migration::start_migration))
             .route("/migrations/:id", get(api::migration::get_migration))
             .route("/migrations/:id/cancel", post(api::migration::cancel_migration))
+            // Plugin routes
+            .route("/plugins", get(plugins::list_plugins))
             // Resource optimization routes
             .route("/system/optimization/recommendations", get(api::system::get_optimization_recommendations))
             .route("/vms/:name/optimize", post(api::system::optimize_vm))
@@ -300,6 +323,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/hosts/:id/heartbeat", post(api::datacenter::host_heartbeat))
             .route("/hosts/:id/maintenance/enter", post(api::datacenter::host_enter_maintenance))
             .route("/hosts/:id/maintenance/exit", post(api::datacenter::host_exit_maintenance))
+            .route("/hosts/discover", post(api::datacenter::discover_host))
+            .route("/clusters/:id/health", get(api::datacenter::get_cluster_health))
             // Resource pool routes
             .route("/resource-pools", get(api::resource_pools::list_pools).post(api::resource_pools::create_pool))
             .route("/resource-pools/:id", get(api::resource_pools::get_pool).put(api::resource_pools::update_pool).delete(api::resource_pools::delete_pool))
@@ -732,5 +757,152 @@ async fn run_metrics_collector(state: Arc<AppState>) {
         }
 
         tracing::debug!("Metrics collector: collected metrics for {} VMs", collected_count);
+    }
+}
+
+/// Background task that marks hosts as NotResponding if heartbeat is stale
+async fn run_stale_host_detector(state: Arc<AppState>) {
+    use datacenter::{HostInfo, HostStatus};
+    use chrono::Utc;
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    const HEARTBEAT_TIMEOUT_SECS: i64 = 120;
+
+    loop {
+        interval.tick().await;
+
+        let hosts = match state.store.list_entities::<HostInfo>("hosts") {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
+
+        let now = Utc::now();
+
+        for mut host in hosts {
+            if matches!(host.status, HostStatus::Maintenance) {
+                continue;
+            }
+
+            let elapsed = (now - host.last_heartbeat).num_seconds();
+
+            if elapsed > HEARTBEAT_TIMEOUT_SECS && !matches!(host.status, HostStatus::NotResponding | HostStatus::Disconnected) {
+                tracing::warn!("Host '{}' ({}) not responding (last heartbeat {}s ago)", host.hostname, host.id, elapsed);
+                host.status = HostStatus::NotResponding;
+                host.updated_at = now;
+                let _ = state.store.save_entity("hosts", &host.id, &host);
+            } else if elapsed <= HEARTBEAT_TIMEOUT_SECS && matches!(host.status, HostStatus::NotResponding) {
+                host.status = HostStatus::Connected;
+                host.updated_at = now;
+                let _ = state.store.save_entity("hosts", &host.id, &host);
+            }
+        }
+    }
+}
+
+/// Background task that auto-applies approved DRS recommendations
+async fn run_drs_executor(state: Arc<AppState>) {
+    use predictive_drs::{MigrationRecommendation, RecommendationStatus};
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(120));
+
+    loop {
+        interval.tick().await;
+
+        let recommendations = match state.store.list_entities::<MigrationRecommendation>("drs_recommendations") {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        for mut rec in recommendations {
+            if !matches!(rec.status, RecommendationStatus::Approved) {
+                continue;
+            }
+
+            tracing::info!("DRS executor: applying recommendation {} - migrate VM '{}' to '{}'",
+                rec.id, rec.vm_name, rec.target_host_id);
+
+            let migration_id = uuid::Uuid::new_v4().to_string();
+            let migration_status = crate::api::migration::MigrationStatus {
+                id: migration_id.clone(),
+                vm_name: rec.vm_name.clone(),
+                target_host: rec.target_host_id.clone(),
+                migration_type: crate::api::migration::MigrationType::Live,
+                state: crate::api::migration::MigrationState::Pending,
+                progress_percent: 0,
+                bytes_transferred: 0,
+                started: chrono::Utc::now(),
+                completed: None,
+                error: None,
+            };
+
+            let _ = state.store.save_entity("migrations", &migration_id, &migration_status);
+
+            rec.status = RecommendationStatus::Applied;
+            let _ = state.store.save_entity("drs_recommendations", &rec.id, &rec);
+        }
+    }
+}
+
+/// Background task that monitors FT-enabled VMs and triggers failover on host failure
+async fn run_ha_monitor(state: Arc<AppState>) {
+    use fault_tolerance::{FtConfig, FtStatus, FtEvent, FtEventType};
+    use datacenter::{HostInfo, HostStatus};
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let ft_configs = match state.store.list_entities::<FtConfig>("ft_configs") {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        if ft_configs.is_empty() {
+            continue;
+        }
+
+        let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+
+        for mut ft in ft_configs {
+            if !matches!(ft.status, FtStatus::Enabled) {
+                continue;
+            }
+
+            // Check if primary host is down
+            let primary_down = hosts.iter()
+                .find(|h| h.id == ft.primary_host_id || h.hostname == ft.primary_host_id)
+                .map(|h| matches!(h.status, HostStatus::NotResponding | HostStatus::Disconnected))
+                .unwrap_or(false);
+
+            if primary_down {
+                tracing::warn!("HA monitor: primary host '{}' is down for FT VM '{}', triggering failover",
+                    ft.primary_host_id, ft.vm_name);
+
+                // Swap primary and secondary
+                let old_primary = ft.primary_host_id.clone();
+                ft.primary_host_id = ft.secondary_host_id.clone();
+                ft.secondary_host_id = old_primary.clone();
+                ft.failover_count += 1;
+                ft.updated = chrono::Utc::now();
+
+                let _ = state.store.save_entity("ft_configs", &ft.vm_name, &ft);
+
+                // Log the failover event
+                let event = FtEvent {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    vm_name: ft.vm_name.clone(),
+                    event_type: FtEventType::FailoverCompleted,
+                    source_host_id: old_primary,
+                    target_host_id: Some(ft.primary_host_id.clone()),
+                    details: Some("Automatic failover triggered by HA monitor".to_string()),
+                    timestamp: chrono::Utc::now(),
+                };
+                let _ = state.store.save_entity("ft_events", &event.id, &event);
+
+                tracing::info!("HA monitor: failover complete for VM '{}', new primary: '{}'",
+                    ft.vm_name, ft.primary_host_id);
+            }
+        }
     }
 }

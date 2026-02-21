@@ -293,6 +293,35 @@ pub async fn create_zfs_pool(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CreateCephPoolRequest {
+    pub name: String,
+    pub monitors: Vec<String>,
+    pub pool_name: String,
+    pub user: Option<String>,
+    pub keyring: Option<String>,
+    #[serde(default)]
+    pub auto_start: bool,
+}
+
+pub async fn create_ceph_pool(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateCephPoolRequest>,
+) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    let manager = state.storage_manager.read().await;
+
+    match manager
+        .create_ceph_pool(req.name, req.monitors, req.pool_name, req.user, req.keyring, req.auto_start)
+        .await
+    {
+        Ok(pool) => Ok(Json(pool)),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create Ceph pool: {}", e),
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

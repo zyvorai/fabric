@@ -1,3 +1,5 @@
+pub mod qemu;
+
 use anyhow::{anyhow, Result};
 use std::fs;
 use std::process::Command;

@@ -53,6 +53,7 @@ pub async fn create_test_app() -> Router {
         quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
         user_db: None,
         jwt_config: None,
+        plugin_registry: Arc::new(RwLock::new(vmspawnd::plugins::PluginRegistry::new())),
     });
 
     vmspawnd::server::build_router(state)

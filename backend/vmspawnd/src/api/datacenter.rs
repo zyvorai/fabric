@@ -333,3 +333,144 @@ pub async fn host_exit_maintenance(
     let _ = state.store.save_entity("hosts", &host.id, &host);
     StatusCode::OK.into_response()
 }
+
+// ============================================================================
+// Host discovery & cluster health
+// ============================================================================
+
+#[derive(serde::Deserialize)]
+pub struct DiscoverHostRequest {
+    pub address: String,
+    pub port: Option<u16>,
+    pub cluster_id: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+pub struct DiscoverHostResult {
+    pub reachable: bool,
+    pub hostname: Option<String>,
+    pub cpus: Option<u32>,
+    pub memory_mb: Option<u64>,
+    pub already_registered: bool,
+}
+
+/// POST /api/hosts/discover - Probe a host to check reachability and gather info
+pub async fn discover_host(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<DiscoverHostRequest>,
+) -> impl IntoResponse {
+    let port = req.port.unwrap_or(8080);
+    let url = format!("http://{}:{}/health", req.address, port);
+
+    // Check if already registered
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    let already_registered = hosts.iter().any(|h| h.address == req.address);
+
+    // Probe the host
+    let reachable = match state.http_client.get(&url).timeout(std::time::Duration::from_secs(5)).send().await {
+        Ok(resp) => resp.status().is_success(),
+        Err(_) => false,
+    };
+
+    let (hostname, cpus, memory_mb) = if reachable {
+        // Try to get system info from the remote host
+        let info_url = format!("http://{}:{}/api/system/cpu/topology", req.address, port);
+        let cpu_info = state.http_client.get(&info_url).send().await.ok()
+            .and_then(|r| if r.status().is_success() { Some(r) } else { None });
+
+        let cpus = if let Some(resp) = cpu_info {
+            resp.json::<serde_json::Value>().await.ok()
+                .and_then(|v| v["total_cpus"].as_u64().map(|c| c as u32))
+        } else {
+            None
+        };
+
+        let mem_url = format!("http://{}:{}/api/system/memory", req.address, port);
+        let mem_info = state.http_client.get(&mem_url).send().await.ok()
+            .and_then(|r| if r.status().is_success() { Some(r) } else { None });
+
+        let memory_mb = if let Some(resp) = mem_info {
+            resp.json::<serde_json::Value>().await.ok()
+                .and_then(|v| v["total_kb"].as_u64().map(|k| k / 1024))
+        } else {
+            None
+        };
+
+        (Some(req.address.clone()), cpus, memory_mb)
+    } else {
+        (None, None, None)
+    };
+
+    Json(DiscoverHostResult {
+        reachable,
+        hostname,
+        cpus,
+        memory_mb,
+        already_registered,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct ClusterHealth {
+    pub cluster_id: String,
+    pub total_hosts: u32,
+    pub connected_hosts: u32,
+    pub disconnected_hosts: u32,
+    pub maintenance_hosts: u32,
+    pub total_vms: u32,
+    pub avg_cpu_usage: f64,
+    pub avg_memory_usage: f64,
+    pub health_status: String,
+}
+
+/// GET /api/clusters/:id/health - Get cluster health summary
+pub async fn get_cluster_health(
+    State(state): State<Arc<AppState>>,
+    Path(cluster_id): Path<String>,
+) -> impl IntoResponse {
+    // Verify cluster exists
+    match state.store.get_entity::<Cluster>("clusters", &cluster_id) {
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    let cluster_hosts: Vec<&HostInfo> = hosts.iter()
+        .filter(|h| h.cluster_id == cluster_id)
+        .collect();
+
+    let total = cluster_hosts.len() as u32;
+    let connected = cluster_hosts.iter().filter(|h| matches!(h.status, HostStatus::Connected)).count() as u32;
+    let disconnected = cluster_hosts.iter().filter(|h| matches!(h.status, HostStatus::Disconnected | HostStatus::NotResponding)).count() as u32;
+    let maintenance = cluster_hosts.iter().filter(|h| matches!(h.status, HostStatus::Maintenance)).count() as u32;
+    let total_vms: u32 = cluster_hosts.iter().map(|h| h.vm_count).sum();
+
+    let (avg_cpu, avg_mem) = if !cluster_hosts.is_empty() {
+        let cpu: f64 = cluster_hosts.iter().map(|h| h.cpu_usage_pct).sum::<f64>() / cluster_hosts.len() as f64;
+        let mem: f64 = cluster_hosts.iter().map(|h| h.memory_usage_pct).sum::<f64>() / cluster_hosts.len() as f64;
+        (cpu, mem)
+    } else {
+        (0.0, 0.0)
+    };
+
+    let health_status = if disconnected > 0 {
+        "degraded"
+    } else if total == 0 {
+        "empty"
+    } else {
+        "healthy"
+    };
+
+    (StatusCode::OK, Json(ClusterHealth {
+        cluster_id,
+        total_hosts: total,
+        connected_hosts: connected,
+        disconnected_hosts: disconnected,
+        maintenance_hosts: maintenance,
+        total_vms,
+        avg_cpu_usage: avg_cpu,
+        avg_memory_usage: avg_mem,
+        health_status: health_status.to_string(),
+    })).into_response()
+}
