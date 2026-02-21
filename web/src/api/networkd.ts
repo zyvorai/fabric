@@ -4,6 +4,16 @@ const API_BASE = '/api'
 
 export type DhcpMode = 'yes' | 'no' | 'ipv4' | 'ipv6'
 export type MacvtapMode = 'private' | 'vepa' | 'bridge' | 'passthru' | 'source'
+export type BondMode = 'balance-rr' | 'active-backup' | 'balance-xor' | 'broadcast' | '802.3ad' | 'balance-tlb' | 'balance-alb'
+export type LacpRate = 'slow' | 'fast'
+export type TransmitHashPolicy = 'layer2' | 'layer3+4' | 'layer2+3' | 'encap2+3' | 'encap3+4'
+
+export interface RouteEntry {
+  destination: string
+  gateway?: string
+  metric?: number
+  scope?: string
+}
 
 export interface BridgeConfig {
   id: string
@@ -105,6 +115,113 @@ export interface CreateTapRequest {
   bridge?: string
   mtu?: number
   mac_address?: string
+}
+
+export interface BondConfig {
+  id: string
+  name: string
+  mode: BondMode
+  mii_monitor_sec?: number
+  up_delay_sec?: number
+  down_delay_sec?: number
+  lacp_rate?: LacpRate
+  transmit_hash_policy?: TransmitHashPolicy
+  min_links?: number
+  primary_slave?: string
+  slave_interfaces: string[]
+  mtu?: number
+  mac_address?: string
+  addresses: string[]
+  gateway?: string
+  dns: string[]
+  dhcp: DhcpMode
+  routes: RouteEntry[]
+  created: string
+  updated: string
+}
+
+export interface CreateBondRequest {
+  name: string
+  mode?: BondMode
+  mii_monitor_sec?: number
+  up_delay_sec?: number
+  down_delay_sec?: number
+  lacp_rate?: LacpRate
+  transmit_hash_policy?: TransmitHashPolicy
+  min_links?: number
+  primary_slave?: string
+  slave_interfaces?: string[]
+  mtu?: number
+  mac_address?: string
+  addresses?: string[]
+  gateway?: string
+  dns?: string[]
+  dhcp?: DhcpMode
+  routes?: RouteEntry[]
+}
+
+export interface NetworkFileConfig {
+  id: string
+  match_name: string
+  match_mac?: string
+  addresses: string[]
+  gateway?: string
+  dns: string[]
+  dhcp: DhcpMode
+  bridge?: string
+  bond?: string
+  mtu?: number
+  routes: RouteEntry[]
+  description?: string
+  created: string
+  updated: string
+}
+
+export interface CreateNetworkFileRequest {
+  match_name: string
+  match_mac?: string
+  addresses?: string[]
+  gateway?: string
+  dns?: string[]
+  dhcp?: DhcpMode
+  bridge?: string
+  bond?: string
+  mtu?: number
+  routes?: RouteEntry[]
+  description?: string
+}
+
+export interface LinkFileConfig {
+  id: string
+  match_mac?: string
+  match_path?: string
+  match_driver?: string
+  match_original_name?: string
+  name?: string
+  mtu?: number
+  mac_address?: string
+  wake_on_lan?: string
+  description?: string
+  created: string
+  updated: string
+}
+
+export interface CreateLinkFileRequest {
+  match_mac?: string
+  match_path?: string
+  match_driver?: string
+  match_original_name?: string
+  name?: string
+  mtu?: number
+  mac_address?: string
+  wake_on_lan?: string
+  description?: string
+}
+
+export interface ParsedConfigFile {
+  filename: string
+  file_type: string
+  sections: { name: string; entries: [string, string][] }[]
 }
 
 export interface LinkInfo {
@@ -249,6 +366,105 @@ export async function getTap(id: string): Promise<TapConfig> {
 export async function deleteTap(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/networkd/taps/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete tap')
+}
+
+// ─── Bonds ────────────────────────────────────────────────────────────────────
+
+export async function listBonds(): Promise<BondConfig[]> {
+  const res = await fetch(`${API_BASE}/networkd/bonds`)
+  if (!res.ok) throw new Error('Failed to fetch bonds')
+  return res.json()
+}
+
+export async function createBond(req: CreateBondRequest): Promise<BondConfig> {
+  const res = await fetch(`${API_BASE}/networkd/bonds`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error('Failed to create bond')
+  return res.json()
+}
+
+export async function getBond(id: string): Promise<BondConfig> {
+  const res = await fetch(`${API_BASE}/networkd/bonds/${id}`)
+  if (!res.ok) throw new Error('Failed to fetch bond')
+  return res.json()
+}
+
+export async function updateBond(id: string, req: CreateBondRequest): Promise<BondConfig> {
+  const res = await fetch(`${API_BASE}/networkd/bonds/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error('Failed to update bond')
+  return res.json()
+}
+
+export async function deleteBond(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/networkd/bonds/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete bond')
+}
+
+// ─── Network Files ────────────────────────────────────────────────────────────
+
+export async function listNetworkFiles(): Promise<NetworkFileConfig[]> {
+  const res = await fetch(`${API_BASE}/networkd/network-files`)
+  if (!res.ok) throw new Error('Failed to fetch network files')
+  return res.json()
+}
+
+export async function createNetworkFile(req: CreateNetworkFileRequest): Promise<NetworkFileConfig> {
+  const res = await fetch(`${API_BASE}/networkd/network-files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error('Failed to create network file')
+  return res.json()
+}
+
+export async function getNetworkFile(id: string): Promise<NetworkFileConfig> {
+  const res = await fetch(`${API_BASE}/networkd/network-files/${id}`)
+  if (!res.ok) throw new Error('Failed to fetch network file')
+  return res.json()
+}
+
+export async function deleteNetworkFile(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/networkd/network-files/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete network file')
+}
+
+// ─── Link Files ───────────────────────────────────────────────────────────────
+
+export async function listLinkFiles(): Promise<LinkFileConfig[]> {
+  const res = await fetch(`${API_BASE}/networkd/link-files`)
+  if (!res.ok) throw new Error('Failed to fetch link files')
+  return res.json()
+}
+
+export async function createLinkFile(req: CreateLinkFileRequest): Promise<LinkFileConfig> {
+  const res = await fetch(`${API_BASE}/networkd/link-files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error('Failed to create link file')
+  return res.json()
+}
+
+export async function deleteLinkFile(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/networkd/link-files/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete link file')
+}
+
+// ─── Scan existing configs ────────────────────────────────────────────────────
+
+export async function scanConfigs(): Promise<ParsedConfigFile[]> {
+  const res = await fetch(`${API_BASE}/networkd/scan`)
+  if (!res.ok) throw new Error('Failed to scan configs')
+  return res.json()
 }
 
 // ─── Status & Control ─────────────────────────────────────────────────────────

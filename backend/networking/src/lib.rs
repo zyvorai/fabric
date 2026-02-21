@@ -1,4 +1,5 @@
 pub mod models;
+pub mod parser;
 pub mod serializer;
 
 use anyhow::{Context, Result};
@@ -72,12 +73,52 @@ impl NetworkdManager {
         Ok(())
     }
 
+    /// Write a bond's .netdev, .network, and slave .network files
+    pub fn apply_bond(&self, cfg: &BondConfig) -> Result<()> {
+        let netdev = serializer::bond_netdev(cfg);
+        let network = serializer::bond_network(cfg);
+
+        self.write_file(&cfg.name, "netdev", &netdev)?;
+        self.write_file(&cfg.name, "network", &network)?;
+
+        // Write slave .network files for each interface
+        for slave in &cfg.slave_interfaces {
+            let slave_network = serializer::bond_slave_network(slave, &cfg.name);
+            self.write_file(&format!("{}-slave-{}", cfg.name, slave), "network", &slave_network)?;
+        }
+
+        tracing::info!("Applied bond config: {} (mode={}, slaves={:?})", cfg.name, cfg.mode.as_str(), cfg.slave_interfaces);
+        Ok(())
+    }
+
+    /// Write a .network file for an existing physical interface
+    pub fn apply_network_file(&self, cfg: &NetworkFileConfig) -> Result<()> {
+        let content = serializer::network_file(cfg);
+        self.write_file(&format!("net-{}", cfg.match_name), "network", &content)?;
+
+        tracing::info!("Applied network file for: {}", cfg.match_name);
+        Ok(())
+    }
+
+    /// Write a .link file for interface configuration
+    pub fn apply_link_file(&self, cfg: &LinkFileConfig) -> Result<()> {
+        let content = serializer::link_file(cfg);
+        let file_id = cfg.name.as_deref()
+            .or(cfg.match_original_name.as_deref())
+            .unwrap_or(&cfg.id);
+        self.write_file(&format!("link-{}", file_id), "link", &content)?;
+
+        tracing::info!("Applied link file: {:?}", cfg.name);
+        Ok(())
+    }
+
     /// Remove all config files for a named device
     pub fn remove_device(&self, name: &str) -> Result<()> {
         let patterns = [
             format!("{}{}.netdev", self.file_prefix, name),
             format!("{}{}.network", self.file_prefix, name),
             format!("{}{}-parent.network", self.file_prefix, name),
+            format!("{}{}.link", self.file_prefix, name),
         ];
 
         for filename in &patterns {
@@ -86,6 +127,20 @@ impl NetworkdManager {
                 fs::remove_file(&path)
                     .with_context(|| format!("Failed to remove {}", path.display()))?;
                 tracing::info!("Removed {}", path.display());
+            }
+        }
+
+        // Also remove any bond slave files matching prefix-name-slave-*
+        if self.config_dir.exists() {
+            let slave_prefix = format!("{}{}-slave-", self.file_prefix, name);
+            for entry in fs::read_dir(&self.config_dir)? {
+                let entry = entry?;
+                let fname = entry.file_name().to_string_lossy().to_string();
+                if fname.starts_with(&slave_prefix) {
+                    fs::remove_file(entry.path())
+                        .with_context(|| format!("Failed to remove {}", entry.path().display()))?;
+                    tracing::info!("Removed {}", entry.path().display());
+                }
             }
         }
 
@@ -308,5 +363,112 @@ mod tests {
         let mac = NetworkdManager::generate_mac_address();
         assert!(mac.starts_with("52:54:00:"));
         assert_eq!(mac.len(), 17);
+    }
+
+    #[test]
+    fn test_apply_bond_writes_files() {
+        let (mgr, dir) = tmp_manager();
+        let cfg = BondConfig {
+            id: "id".into(),
+            name: "bond0".into(),
+            mode: BondMode::Ieee8023ad,
+            mii_monitor_sec: Some(100),
+            up_delay_sec: None,
+            down_delay_sec: None,
+            lacp_rate: None,
+            transmit_hash_policy: None,
+            min_links: None,
+            primary_slave: None,
+            slave_interfaces: vec!["eth0".into(), "eth1".into()],
+            mtu: None,
+            mac_address: None,
+            addresses: vec!["10.0.0.1/24".into()],
+            gateway: None,
+            dns: vec![],
+            dhcp: DhcpMode::No,
+            routes: vec![],
+            created: String::new(),
+            updated: String::new(),
+        };
+        mgr.apply_bond(&cfg).unwrap();
+
+        assert!(dir.path().join("50-vmspawnd-bond0.netdev").exists());
+        assert!(dir.path().join("50-vmspawnd-bond0.network").exists());
+        assert!(dir.path().join("50-vmspawnd-bond0-slave-eth0.network").exists());
+        assert!(dir.path().join("50-vmspawnd-bond0-slave-eth1.network").exists());
+
+        let slave = fs::read_to_string(dir.path().join("50-vmspawnd-bond0-slave-eth0.network")).unwrap();
+        assert!(slave.contains("Name=eth0"));
+        assert!(slave.contains("Bond=bond0"));
+    }
+
+    #[test]
+    fn test_remove_bond_cleans_slaves() {
+        let (mgr, dir) = tmp_manager();
+        fs::write(dir.path().join("50-vmspawnd-bond0.netdev"), "test").unwrap();
+        fs::write(dir.path().join("50-vmspawnd-bond0.network"), "test").unwrap();
+        fs::write(dir.path().join("50-vmspawnd-bond0-slave-eth0.network"), "test").unwrap();
+        fs::write(dir.path().join("50-vmspawnd-bond0-slave-eth1.network"), "test").unwrap();
+
+        mgr.remove_device("bond0").unwrap();
+
+        assert!(!dir.path().join("50-vmspawnd-bond0.netdev").exists());
+        assert!(!dir.path().join("50-vmspawnd-bond0.network").exists());
+        assert!(!dir.path().join("50-vmspawnd-bond0-slave-eth0.network").exists());
+        assert!(!dir.path().join("50-vmspawnd-bond0-slave-eth1.network").exists());
+    }
+
+    #[test]
+    fn test_apply_network_file() {
+        let (mgr, dir) = tmp_manager();
+        let cfg = NetworkFileConfig {
+            id: "id".into(),
+            match_name: "enp3s0".into(),
+            match_mac: None,
+            addresses: vec!["192.168.1.10/24".into()],
+            gateway: Some("192.168.1.1".into()),
+            dns: vec![],
+            dhcp: DhcpMode::No,
+            bridge: Some("br0".into()),
+            bond: None,
+            mtu: None,
+            routes: vec![],
+            description: None,
+            created: String::new(),
+            updated: String::new(),
+        };
+        mgr.apply_network_file(&cfg).unwrap();
+
+        let path = dir.path().join("50-vmspawnd-net-enp3s0.network");
+        assert!(path.exists());
+        let content = fs::read_to_string(path).unwrap();
+        assert!(content.contains("Name=enp3s0"));
+        assert!(content.contains("Bridge=br0"));
+    }
+
+    #[test]
+    fn test_apply_link_file() {
+        let (mgr, dir) = tmp_manager();
+        let cfg = LinkFileConfig {
+            id: "test-id".into(),
+            match_mac: Some("00:11:22:33:44:55".into()),
+            match_path: None,
+            match_driver: None,
+            match_original_name: None,
+            name: Some("lan0".into()),
+            mtu: Some(9000),
+            mac_address: None,
+            wake_on_lan: None,
+            description: None,
+            created: String::new(),
+            updated: String::new(),
+        };
+        mgr.apply_link_file(&cfg).unwrap();
+
+        let path = dir.path().join("50-vmspawnd-link-lan0.link");
+        assert!(path.exists());
+        let content = fs::read_to_string(path).unwrap();
+        assert!(content.contains("MACAddress=00:11:22:33:44:55"));
+        assert!(content.contains("Name=lan0"));
     }
 }

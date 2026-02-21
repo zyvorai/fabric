@@ -10,8 +10,9 @@ use uuid::Uuid;
 
 use crate::server::AppState;
 use networking::models::{
-    BridgeConfig, CreateBridgeRequest, CreateMacvtapRequest, CreateTapRequest,
-    CreateVlanRequest, MacvtapConfig, TapConfig, VlanConfig,
+    BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest, CreateLinkFileRequest,
+    CreateMacvtapRequest, CreateNetworkFileRequest, CreateTapRequest, CreateVlanRequest,
+    LinkFileConfig, MacvtapConfig, NetworkFileConfig, TapConfig, VlanConfig,
 };
 use networking::NetworkdManager;
 
@@ -415,6 +416,273 @@ pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl Into
     let mgr = networkd_manager(&state);
     match mgr.list_managed_files() {
         Ok(files) => Json(serde_json::to_value(&files).unwrap()).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+// ============================================================================
+// Bond handlers
+// ============================================================================
+
+pub async fn list_bonds(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_bond(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateBondRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now().to_rfc3339();
+    let cfg = BondConfig {
+        id: Uuid::new_v4().to_string(),
+        name: req.name,
+        mode: req.mode,
+        mii_monitor_sec: req.mii_monitor_sec,
+        up_delay_sec: req.up_delay_sec,
+        down_delay_sec: req.down_delay_sec,
+        lacp_rate: req.lacp_rate,
+        transmit_hash_policy: req.transmit_hash_policy,
+        min_links: req.min_links,
+        primary_slave: req.primary_slave,
+        slave_interfaces: req.slave_interfaces,
+        mtu: req.mtu,
+        mac_address: req.mac_address,
+        addresses: req.addresses,
+        gateway: req.gateway,
+        dns: req.dns,
+        dhcp: req.dhcp,
+        routes: req.routes,
+        created: now.clone(),
+        updated: now,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_bond(&cfg) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+    }
+
+    match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
+        Ok(_) => {
+            let _ = mgr.reload();
+            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn get_bond(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
+        Ok(Some(b)) => Json(serde_json::to_value(&b).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn update_bond(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateBondRequest>,
+) -> impl IntoResponse {
+    let existing = match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
+        Ok(Some(b)) => b,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let mgr = networkd_manager(&state);
+    if existing.name != req.name {
+        let _ = mgr.remove_device(&existing.name);
+    }
+
+    let cfg = BondConfig {
+        id: id.clone(),
+        name: req.name,
+        mode: req.mode,
+        mii_monitor_sec: req.mii_monitor_sec,
+        up_delay_sec: req.up_delay_sec,
+        down_delay_sec: req.down_delay_sec,
+        lacp_rate: req.lacp_rate,
+        transmit_hash_policy: req.transmit_hash_policy,
+        min_links: req.min_links,
+        primary_slave: req.primary_slave,
+        slave_interfaces: req.slave_interfaces,
+        mtu: req.mtu,
+        mac_address: req.mac_address,
+        addresses: req.addresses,
+        gateway: req.gateway,
+        dns: req.dns,
+        dhcp: req.dhcp,
+        routes: req.routes,
+        created: existing.created,
+        updated: Utc::now().to_rfc3339(),
+    };
+
+    if let Err(e) = mgr.apply_bond(&cfg) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+    }
+
+    match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
+        Ok(_) => {
+            let _ = mgr.reload();
+            Json(serde_json::to_value(&cfg).unwrap()).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn delete_bond(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let mgr = networkd_manager(&state);
+    if let Ok(Some(cfg)) = state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
+        let _ = mgr.remove_device(&cfg.name);
+        let _ = mgr.reload();
+    }
+    let _ = state.store.delete_entity("networkd_bonds", &id);
+    StatusCode::NO_CONTENT
+}
+
+// ============================================================================
+// Network file handlers (physical interface config)
+// ============================================================================
+
+pub async fn list_network_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_network_file(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateNetworkFileRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now().to_rfc3339();
+    let cfg = NetworkFileConfig {
+        id: Uuid::new_v4().to_string(),
+        match_name: req.match_name,
+        match_mac: req.match_mac,
+        addresses: req.addresses,
+        gateway: req.gateway,
+        dns: req.dns,
+        dhcp: req.dhcp,
+        bridge: req.bridge,
+        bond: req.bond,
+        mtu: req.mtu,
+        routes: req.routes,
+        description: req.description,
+        created: now.clone(),
+        updated: now,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_network_file(&cfg) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+    }
+
+    match state.store.save_entity("networkd_netfiles", &cfg.id, &cfg) {
+        Ok(_) => {
+            let _ = mgr.reload();
+            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn get_network_file(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
+        Ok(Some(n)) => Json(serde_json::to_value(&n).unwrap()).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+pub async fn delete_network_file(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let mgr = networkd_manager(&state);
+    if let Ok(Some(cfg)) = state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
+        let _ = mgr.remove_device(&format!("net-{}", cfg.match_name));
+        let _ = mgr.reload();
+    }
+    let _ = state.store.delete_entity("networkd_netfiles", &id);
+    StatusCode::NO_CONTENT
+}
+
+// ============================================================================
+// Link file handlers
+// ============================================================================
+
+pub async fn list_link_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_default();
+    Json(items)
+}
+
+pub async fn create_link_file(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateLinkFileRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now().to_rfc3339();
+    let cfg = LinkFileConfig {
+        id: Uuid::new_v4().to_string(),
+        match_mac: req.match_mac,
+        match_path: req.match_path,
+        match_driver: req.match_driver,
+        match_original_name: req.match_original_name,
+        name: req.name,
+        mtu: req.mtu,
+        mac_address: req.mac_address,
+        wake_on_lan: req.wake_on_lan,
+        description: req.description,
+        created: now.clone(),
+        updated: now,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_link_file(&cfg) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+    }
+
+    match state.store.save_entity("networkd_linkfiles", &cfg.id, &cfg) {
+        Ok(_) => {
+            let _ = mgr.reload();
+            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+pub async fn delete_link_file(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let mgr = networkd_manager(&state);
+    if let Ok(Some(cfg)) = state.store.get_entity::<LinkFileConfig>("networkd_linkfiles", &id) {
+        let file_id = cfg.name.as_deref()
+            .or(cfg.match_original_name.as_deref())
+            .unwrap_or(&cfg.id);
+        let _ = mgr.remove_device(&format!("link-{}", file_id));
+        let _ = mgr.reload();
+    }
+    let _ = state.store.delete_entity("networkd_linkfiles", &id);
+    StatusCode::NO_CONTENT
+}
+
+// ============================================================================
+// Scan existing configs (parser)
+// ============================================================================
+
+pub async fn scan_configs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let dir = std::path::Path::new(&state.config.network.networkd_config_dir);
+    match networking::parser::scan_networkd_dir(dir) {
+        Ok(configs) => Json(serde_json::to_value(&configs).unwrap()).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
