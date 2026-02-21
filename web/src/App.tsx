@@ -36,6 +36,7 @@ import SiteRecovery from './pages/SiteRecovery'
 import ContentLibrary from './pages/ContentLibrary'
 import LifecycleManager from './pages/LifecycleManager'
 import Certificates from './pages/Certificates'
+import Migrations from './pages/Migrations'
 import Snapshots from './pages/Snapshots'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
@@ -99,6 +100,7 @@ function AppRoutes() {
                   <Route path="/fault-tolerance" element={<FaultTolerance />} />
                   <Route path="/replication" element={<Replication />} />
                   <Route path="/site-recovery" element={<SiteRecovery />} />
+                  <Route path="/migrations" element={<Migrations />} />
                   <Route path="/snapshots" element={<Snapshots />} />
                   <Route path="/content-library" element={<ContentLibrary />} />
                   <Route path="/lifecycle" element={<LifecycleManager />} />
