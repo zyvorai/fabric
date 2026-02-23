@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import {
-  listStoragePools,
-  createStoragePool,
-  deleteStoragePool,
+  listDistributedPools,
+  createDistributedPool,
+  deleteDistributedPool,
   listStoragePolicies,
   createStoragePolicy,
   deleteStoragePolicy,
@@ -38,7 +38,7 @@ export default function DistributedStorage() {
   const loadData = async () => {
     try {
       const [p, pol, mig, cl] = await Promise.all([
-        listStoragePools(),
+        listDistributedPools(),
         listStoragePolicies(),
         listStorageMigrations(),
         listDatastoreClusters(),
@@ -57,7 +57,7 @@ export default function DistributedStorage() {
   const handleDeletePool = async (id: string) => {
     if (!confirm('Delete this storage pool?')) return
     try {
-      await deleteStoragePool(id)
+      await deleteDistributedPool(id)
       toast.success('Storage pool deleted')
       loadData()
     } catch { toast.error('Failed to delete storage pool') }
@@ -340,7 +340,7 @@ export default function DistributedStorage() {
       {/* Create Pool Modal */}
       {showCreatePool && (
         <ModalForm title="Create Storage Pool" onClose={() => setShowCreatePool(false)}
-          onSubmit={async (data) => { await createStoragePool(data as any); toast.success('Pool created'); setShowCreatePool(false); loadData() }}
+          onSubmit={async (data) => { await createDistributedPool(data as any); toast.success('Pool created'); setShowCreatePool(false); loadData() }}
           fields={[
             { name: 'name', label: 'Pool Name', type: 'text', required: true },
             { name: 'pool_type', label: 'Type', type: 'text', required: true },

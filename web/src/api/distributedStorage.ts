@@ -86,13 +86,13 @@ const API_BASE = '/api'
 
 // Distributed storage pools
 
-export async function listStoragePools(): Promise<DistributedStoragePool[]> {
+export async function listDistributedPools(): Promise<DistributedStoragePool[]> {
   const res = await apiFetch(`${API_BASE}/distributed-storage/pools`)
   if (!res.ok) throw new Error('Failed to fetch distributed storage pools')
   return res.json()
 }
 
-export async function createStoragePool(req: {
+export async function createDistributedPool(req: {
   name: string
   pool_type: string
   hosts: string[]
@@ -108,7 +108,7 @@ export async function createStoragePool(req: {
   return res.json()
 }
 
-export async function deleteStoragePool(id: string): Promise<void> {
+export async function deleteDistributedPool(id: string): Promise<void> {
   const res = await apiFetch(`${API_BASE}/distributed-storage/pools/${id}`, {
     method: 'DELETE',
   })
