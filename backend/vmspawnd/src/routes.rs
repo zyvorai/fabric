@@ -91,20 +91,40 @@ pub async fn start_vm(
     if let Err((status, msg)) = validate_vm_name(&name) {
         return (status, Json(json!({ "error": msg }))).into_response();
     }
-    match vmspawn_driver::start_vm(&name) {
-        Ok(_) => {
-            if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
-                vm.state = vm_model::VMState::Running;
-                let _ = state.store.save_vm(&vm);
-            }
-            (StatusCode::OK, Json(json!({ "status": "started" }))).into_response()
-        }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+
+    // Mark as running immediately (machinectl start blocks until boot completes)
+    if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
+        vm.state = vm_model::VMState::Running;
+        let _ = state.store.save_vm(&vm);
     }
+
+    // Spawn machinectl start in background so API returns immediately
+    let vm_name = name.clone();
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        let result = tokio::task::spawn_blocking(move || {
+            vmspawn_driver::start_vm(&vm_name)
+        }).await;
+
+        match result {
+            Ok(Ok(_)) => {
+                tracing::info!("VM '{}' started successfully", name);
+            }
+            Ok(Err(e)) => {
+                tracing::error!("Failed to start VM '{}': {}", name, e);
+                // Revert state on failure
+                if let Ok(Some(mut vm)) = state_clone.store.get_vm(&name) {
+                    vm.state = vm_model::VMState::Stopped;
+                    let _ = state_clone.store.save_vm(&vm);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Start task panicked for VM '{}': {}", name, e);
+            }
+        }
+    });
+
+    (StatusCode::ACCEPTED, Json(json!({ "status": "starting" }))).into_response()
 }
 
 pub async fn stop_vm(

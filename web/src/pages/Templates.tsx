@@ -7,7 +7,7 @@ import {
   VMTemplate,
 } from '../api/templates'
 import { useToastContext } from '../contexts/ToastContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 export default function Templates() {
   const toast = useToastContext()

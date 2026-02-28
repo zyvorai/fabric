@@ -1,5 +1,5 @@
+import { apiGet, apiPost, apiDelete } from './client'
 import { API_BASE_URL } from './config'
-import { apiFetch } from './client'
 
 export interface Volume {
   id: string
@@ -25,58 +25,29 @@ export interface AttachVolumeRequest {
 }
 
 export async function listVolumes(poolName: string): Promise<Volume[]> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes`)
-  if (!res.ok) throw new Error('Failed to list volumes')
-  return res.json()
+  return apiGet<Volume[]>(`${API_BASE_URL}/storage/pools/${poolName}/volumes`)
 }
 
 export async function createVolume(poolName: string, req: CreateVolumeRequest): Promise<Volume> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create volume')
-  return res.json()
+  return apiPost<Volume>(`${API_BASE_URL}/storage/pools/${poolName}/volumes`, req)
 }
 
 export async function getVolume(poolName: string, id: string): Promise<Volume> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}`)
-  if (!res.ok) throw new Error('Failed to get volume')
-  return res.json()
+  return apiGet<Volume>(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}`)
 }
 
 export async function deleteVolume(poolName: string, id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete volume')
+  return apiDelete(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}`)
 }
 
 export async function resizeVolume(poolName: string, id: string, req: ResizeVolumeRequest): Promise<Volume> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}/resize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to resize volume')
-  return res.json()
+  return apiPost<Volume>(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}/resize`, req)
 }
 
 export async function attachVolume(poolName: string, id: string, req: AttachVolumeRequest): Promise<Volume> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}/attach`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to attach volume')
-  return res.json()
+  return apiPost<Volume>(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}/attach`, req)
 }
 
 export async function detachVolume(poolName: string, id: string): Promise<Volume> {
-  const res = await apiFetch(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}/detach`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to detach volume')
-  return res.json()
+  return apiPost<Volume>(`${API_BASE_URL}/storage/pools/${poolName}/volumes/${id}/detach`)
 }

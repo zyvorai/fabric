@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPut, apiPostVoid, apiDelete } from './client'
+
 const API_BASE = '/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -236,228 +237,135 @@ export interface LinkInfo {
 // ─── Bridges ──────────────────────────────────────────────────────────────────
 
 export async function listBridges(): Promise<BridgeConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/bridges`)
-  if (!res.ok) throw new Error('Failed to fetch bridges')
-  return res.json()
+  return apiGet<BridgeConfig[]>(`${API_BASE}/networkd/bridges`)
 }
 
 export async function createBridge(req: CreateBridgeRequest): Promise<BridgeConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/bridges`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create bridge')
-  return res.json()
+  return apiPost<BridgeConfig>(`${API_BASE}/networkd/bridges`, req)
 }
 
 export async function getBridge(id: string): Promise<BridgeConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/bridges/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch bridge')
-  return res.json()
+  return apiGet<BridgeConfig>(`${API_BASE}/networkd/bridges/${id}`)
 }
 
 export async function updateBridge(id: string, req: CreateBridgeRequest): Promise<BridgeConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/bridges/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update bridge')
-  return res.json()
+  return apiPut<BridgeConfig>(`${API_BASE}/networkd/bridges/${id}`, req)
 }
 
 export async function deleteBridge(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/bridges/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete bridge')
+  return apiDelete(`${API_BASE}/networkd/bridges/${id}`)
 }
 
 // ─── VLANs ────────────────────────────────────────────────────────────────────
 
 export async function listVlans(): Promise<VlanConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/vlans`)
-  if (!res.ok) throw new Error('Failed to fetch VLANs')
-  return res.json()
+  return apiGet<VlanConfig[]>(`${API_BASE}/networkd/vlans`)
 }
 
 export async function createVlan(req: CreateVlanRequest): Promise<VlanConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/vlans`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create VLAN')
-  return res.json()
+  return apiPost<VlanConfig>(`${API_BASE}/networkd/vlans`, req)
 }
 
 export async function getVlan(id: string): Promise<VlanConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/vlans/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch VLAN')
-  return res.json()
+  return apiGet<VlanConfig>(`${API_BASE}/networkd/vlans/${id}`)
 }
 
 export async function updateVlan(id: string, req: CreateVlanRequest): Promise<VlanConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/vlans/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update VLAN')
-  return res.json()
+  return apiPut<VlanConfig>(`${API_BASE}/networkd/vlans/${id}`, req)
 }
 
 export async function deleteVlan(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/vlans/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete VLAN')
+  return apiDelete(`${API_BASE}/networkd/vlans/${id}`)
 }
 
 // ─── Macvtap ──────────────────────────────────────────────────────────────────
 
 export async function listMacvtaps(): Promise<MacvtapConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/macvtaps`)
-  if (!res.ok) throw new Error('Failed to fetch macvtaps')
-  return res.json()
+  return apiGet<MacvtapConfig[]>(`${API_BASE}/networkd/macvtaps`)
 }
 
 export async function createMacvtap(req: CreateMacvtapRequest): Promise<MacvtapConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/macvtaps`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create macvtap')
-  return res.json()
+  return apiPost<MacvtapConfig>(`${API_BASE}/networkd/macvtaps`, req)
 }
 
 export async function getMacvtap(id: string): Promise<MacvtapConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/macvtaps/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch macvtap')
-  return res.json()
+  return apiGet<MacvtapConfig>(`${API_BASE}/networkd/macvtaps/${id}`)
 }
 
 export async function deleteMacvtap(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/macvtaps/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete macvtap')
+  return apiDelete(`${API_BASE}/networkd/macvtaps/${id}`)
 }
 
 // ─── Tap ──────────────────────────────────────────────────────────────────────
 
 export async function listTaps(): Promise<TapConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/taps`)
-  if (!res.ok) throw new Error('Failed to fetch taps')
-  return res.json()
+  return apiGet<TapConfig[]>(`${API_BASE}/networkd/taps`)
 }
 
 export async function createTap(req: CreateTapRequest): Promise<TapConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/taps`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create tap')
-  return res.json()
+  return apiPost<TapConfig>(`${API_BASE}/networkd/taps`, req)
 }
 
 export async function getTap(id: string): Promise<TapConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/taps/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch tap')
-  return res.json()
+  return apiGet<TapConfig>(`${API_BASE}/networkd/taps/${id}`)
 }
 
 export async function deleteTap(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/taps/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete tap')
+  return apiDelete(`${API_BASE}/networkd/taps/${id}`)
 }
 
 // ─── Bonds ────────────────────────────────────────────────────────────────────
 
 export async function listBonds(): Promise<BondConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/bonds`)
-  if (!res.ok) throw new Error('Failed to fetch bonds')
-  return res.json()
+  return apiGet<BondConfig[]>(`${API_BASE}/networkd/bonds`)
 }
 
 export async function createBond(req: CreateBondRequest): Promise<BondConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/bonds`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create bond')
-  return res.json()
+  return apiPost<BondConfig>(`${API_BASE}/networkd/bonds`, req)
 }
 
 export async function getBond(id: string): Promise<BondConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/bonds/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch bond')
-  return res.json()
+  return apiGet<BondConfig>(`${API_BASE}/networkd/bonds/${id}`)
 }
 
 export async function updateBond(id: string, req: CreateBondRequest): Promise<BondConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/bonds/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update bond')
-  return res.json()
+  return apiPut<BondConfig>(`${API_BASE}/networkd/bonds/${id}`, req)
 }
 
 export async function deleteBond(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/bonds/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete bond')
+  return apiDelete(`${API_BASE}/networkd/bonds/${id}`)
 }
 
 // ─── Network Files ────────────────────────────────────────────────────────────
 
 export async function listNetworkFiles(): Promise<NetworkFileConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/network-files`)
-  if (!res.ok) throw new Error('Failed to fetch network files')
-  return res.json()
+  return apiGet<NetworkFileConfig[]>(`${API_BASE}/networkd/network-files`)
 }
 
 export async function createNetworkFile(req: CreateNetworkFileRequest): Promise<NetworkFileConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/network-files`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create network file')
-  return res.json()
+  return apiPost<NetworkFileConfig>(`${API_BASE}/networkd/network-files`, req)
 }
 
 export async function getNetworkFile(id: string): Promise<NetworkFileConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/network-files/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch network file')
-  return res.json()
+  return apiGet<NetworkFileConfig>(`${API_BASE}/networkd/network-files/${id}`)
 }
 
 export async function deleteNetworkFile(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/network-files/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete network file')
+  return apiDelete(`${API_BASE}/networkd/network-files/${id}`)
 }
 
 // ─── Link Files ───────────────────────────────────────────────────────────────
 
 export async function listLinkFiles(): Promise<LinkFileConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/link-files`)
-  if (!res.ok) throw new Error('Failed to fetch link files')
-  return res.json()
+  return apiGet<LinkFileConfig[]>(`${API_BASE}/networkd/link-files`)
 }
 
 export async function createLinkFile(req: CreateLinkFileRequest): Promise<LinkFileConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/link-files`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create link file')
-  return res.json()
+  return apiPost<LinkFileConfig>(`${API_BASE}/networkd/link-files`, req)
 }
 
 export async function deleteLinkFile(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/link-files/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete link file')
+  return apiDelete(`${API_BASE}/networkd/link-files/${id}`)
 }
 
 // ─── Port Forwards ───────────────────────────────────────────────────────────
@@ -490,67 +398,45 @@ export interface CreatePortForwardRequest {
 }
 
 export async function listPortForwards(): Promise<PortForwardConfig[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/port-forwards`)
-  if (!res.ok) throw new Error('Failed to fetch port forwards')
-  return res.json()
+  return apiGet<PortForwardConfig[]>(`${API_BASE}/networkd/port-forwards`)
 }
 
 export async function createPortForward(req: CreatePortForwardRequest): Promise<PortForwardConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/port-forwards`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create port forward')
-  return res.json()
+  return apiPost<PortForwardConfig>(`${API_BASE}/networkd/port-forwards`, req)
 }
 
 export async function getPortForward(id: string): Promise<PortForwardConfig> {
-  const res = await apiFetch(`${API_BASE}/networkd/port-forwards/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch port forward')
-  return res.json()
+  return apiGet<PortForwardConfig>(`${API_BASE}/networkd/port-forwards/${id}`)
 }
 
 export async function deletePortForward(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/port-forwards/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete port forward')
+  return apiDelete(`${API_BASE}/networkd/port-forwards/${id}`)
 }
 
 export async function syncPortForwards(): Promise<{ status: string; rules: number }> {
-  const res = await apiFetch(`${API_BASE}/networkd/port-forwards/sync`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to sync port forwards')
-  return res.json()
+  return apiPost<{ status: string; rules: number }>(`${API_BASE}/networkd/port-forwards/sync`)
 }
 
 // ─── Scan existing configs ────────────────────────────────────────────────────
 
 export async function scanConfigs(): Promise<ParsedConfigFile[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/scan`)
-  if (!res.ok) throw new Error('Failed to scan configs')
-  return res.json()
+  return apiGet<ParsedConfigFile[]>(`${API_BASE}/networkd/scan`)
 }
 
 // ─── Status & Control ─────────────────────────────────────────────────────────
 
 export async function listLinks(): Promise<LinkInfo[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/links`)
-  if (!res.ok) throw new Error('Failed to fetch links')
-  return res.json()
+  return apiGet<LinkInfo[]>(`${API_BASE}/networkd/links`)
 }
 
 export async function getDeviceStatus(name: string): Promise<{ name: string; status: string }> {
-  const res = await apiFetch(`${API_BASE}/networkd/links/${name}/status`)
-  if (!res.ok) throw new Error('Failed to fetch device status')
-  return res.json()
+  return apiGet<{ name: string; status: string }>(`${API_BASE}/networkd/links/${name}/status`)
 }
 
 export async function reloadNetworkd(): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/networkd/reload`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to reload networkd')
+  return apiPostVoid(`${API_BASE}/networkd/reload`)
 }
 
 export async function listManagedFiles(): Promise<string[]> {
-  const res = await apiFetch(`${API_BASE}/networkd/files`)
-  if (!res.ok) throw new Error('Failed to fetch managed files')
-  return res.json()
+  return apiGet<string[]>(`${API_BASE}/networkd/files`)
 }

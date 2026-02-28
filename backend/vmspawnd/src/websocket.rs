@@ -102,7 +102,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                 Ok(Ok(0)) => break,
                 Ok(Ok(n)) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    if ws_sender.send(Message::Text(data)).await.is_err() {
+                    if ws_sender.send(Message::Text(data.into())).await.is_err() {
                         break;
                     }
                 }
@@ -117,7 +117,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                     );
                     let _ = ws_sender
                         .send(Message::Text(
-                            "\r\n[Session timed out due to inactivity]\r\n".to_string(),
+                            "\r\n[Session timed out due to inactivity]\r\n".into(),
                         ))
                         .await;
                     break;

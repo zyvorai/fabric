@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiFetch } from './client'
+
 export interface AuditLog {
   id: string
   timestamp: string
@@ -34,15 +35,11 @@ export async function listAuditLogs(filters?: AuditLogFilters): Promise<AuditLog
   }
 
   const url = `${API_BASE}/audit/logs${params.toString() ? `?${params}` : ''}`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch audit logs')
-  return res.json()
+  return apiGet<AuditLog[]>(url)
 }
 
 export async function getAuditLog(id: string): Promise<AuditLog> {
-  const res = await apiFetch(`${API_BASE}/audit/logs/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch audit log')
-  return res.json()
+  return apiGet<AuditLog>(`${API_BASE}/audit/logs/${id}`)
 }
 
 export async function exportAuditLogs(filters?: AuditLogFilters, format: 'json' | 'csv' = 'json'): Promise<Blob> {
@@ -69,7 +66,5 @@ export interface AuditStats {
 }
 
 export async function getAuditStats(): Promise<AuditStats> {
-  const res = await apiFetch(`${API_BASE}/audit/stats`)
-  if (!res.ok) throw new Error('Failed to fetch audit stats')
-  return res.json()
+  return apiGet<AuditStats>(`${API_BASE}/audit/stats`)
 }

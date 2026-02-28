@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPut, apiPostVoid, apiDelete } from './client'
+
 export interface DrsConfig {
   cluster_id: string
   enabled: boolean
@@ -87,74 +88,44 @@ const API_BASE = '/api'
 // DRS configuration
 
 export async function configureDrs(req: Partial<DrsConfig> & { cluster_id: string }): Promise<DrsConfig> {
-  const res = await apiFetch(`${API_BASE}/drs/config`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to configure DRS')
-  return res.json()
+  return apiPut<DrsConfig>(`${API_BASE}/drs/config`, req)
 }
 
 export async function getDrsConfig(clusterId: string): Promise<DrsConfig> {
-  const res = await apiFetch(`${API_BASE}/drs/config?cluster_id=${clusterId}`)
-  if (!res.ok) throw new Error('Failed to fetch DRS config')
-  return res.json()
+  return apiGet<DrsConfig>(`${API_BASE}/drs/config?cluster_id=${clusterId}`)
 }
 
 // Placement
 
 export async function computePlacement(req: PlacementRequest): Promise<PlacementResult> {
-  const res = await apiFetch(`${API_BASE}/drs/placement`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to compute placement')
-  return res.json()
+  return apiPost<PlacementResult>(`${API_BASE}/drs/placement`, req)
 }
 
 // Balance analysis
 
 export async function analyzeBalance(clusterId: string): Promise<ClusterBalance> {
-  const res = await apiFetch(`${API_BASE}/drs/balance?cluster_id=${clusterId}`)
-  if (!res.ok) throw new Error('Failed to analyze cluster balance')
-  return res.json()
+  return apiGet<ClusterBalance>(`${API_BASE}/drs/balance?cluster_id=${clusterId}`)
 }
 
 // Migration recommendations
 
 export async function generateRecommendations(clusterId: string): Promise<MigrationRecommendation[]> {
-  const res = await apiFetch(`${API_BASE}/drs/recommendations/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cluster_id: clusterId }),
-  })
-  if (!res.ok) throw new Error('Failed to generate recommendations')
-  return res.json()
+  return apiPost<MigrationRecommendation[]>(`${API_BASE}/drs/recommendations/generate`, { cluster_id: clusterId })
 }
 
 export async function listRecommendations(clusterId?: string): Promise<MigrationRecommendation[]> {
   const url = clusterId
     ? `${API_BASE}/drs/recommendations?cluster_id=${clusterId}`
     : `${API_BASE}/drs/recommendations`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch recommendations')
-  return res.json()
+  return apiGet<MigrationRecommendation[]>(url)
 }
 
 export async function approveRecommendation(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/drs/recommendations/${id}/approve`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to approve recommendation')
+  return apiPostVoid(`${API_BASE}/drs/recommendations/${id}/approve`)
 }
 
 export async function rejectRecommendation(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/drs/recommendations/${id}/reject`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to reject recommendation')
+  return apiPostVoid(`${API_BASE}/drs/recommendations/${id}/reject`)
 }
 
 // Affinity rules
@@ -163,9 +134,7 @@ export async function listAffinityRules(clusterId?: string): Promise<AffinityRul
   const url = clusterId
     ? `${API_BASE}/drs/affinity-rules?cluster_id=${clusterId}`
     : `${API_BASE}/drs/affinity-rules`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch affinity rules')
-  return res.json()
+  return apiGet<AffinityRule[]>(url)
 }
 
 export async function createAffinityRule(req: {
@@ -177,28 +146,13 @@ export async function createAffinityRule(req: {
   host_ids?: string[]
   enabled?: boolean
 }): Promise<AffinityRule> {
-  const res = await apiFetch(`${API_BASE}/drs/affinity-rules`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create affinity rule')
-  return res.json()
+  return apiPost<AffinityRule>(`${API_BASE}/drs/affinity-rules`, req)
 }
 
 export async function updateAffinityRule(id: string, req: Partial<AffinityRule>): Promise<AffinityRule> {
-  const res = await apiFetch(`${API_BASE}/drs/affinity-rules/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update affinity rule')
-  return res.json()
+  return apiPut<AffinityRule>(`${API_BASE}/drs/affinity-rules/${id}`, req)
 }
 
 export async function deleteAffinityRule(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/drs/affinity-rules/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete affinity rule')
+  return apiDelete(`${API_BASE}/drs/affinity-rules/${id}`)
 }

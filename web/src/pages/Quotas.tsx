@@ -10,8 +10,7 @@ import {
   getAllQuotaUsage
 } from '../api/quota'
 import { useToastContext } from '../contexts/ToastContext'
-import CreateQuotaDialog from '../components/CreateQuotaDialog'
-import EditQuotaDialog from '../components/EditQuotaDialog'
+import QuotaDialog from '../components/QuotaDialog'
 
 export default function Quotas() {
   const toast = useToastContext()
@@ -313,14 +312,16 @@ export default function Quotas() {
       )}
 
       {showCreateDialog && (
-        <CreateQuotaDialog
+        <QuotaDialog
+          mode="create"
           onClose={() => setShowCreateDialog(false)}
           onSuccess={loadData}
         />
       )}
 
       {editingQuota && (
-        <EditQuotaDialog
+        <QuotaDialog
+          mode="edit"
           quota={editingQuota}
           onClose={() => setEditingQuota(null)}
           onSuccess={loadData}

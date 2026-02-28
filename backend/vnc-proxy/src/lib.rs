@@ -43,7 +43,7 @@ async fn handle_vnc(socket: WebSocket, vm_name: String) {
                 Ok(0) => break,
                 Ok(n) => {
                     if ws_sender
-                        .send(Message::Binary(buf[..n].to_vec()))
+                        .send(Message::Binary(buf[..n].to_vec().into()))
                         .await
                         .is_err()
                     {

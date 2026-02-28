@@ -1,3 +1,5 @@
+import { apiGet } from './client'
+
 export interface LoginRequest {
   username: string
   password: string
@@ -31,10 +33,6 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
   return res.json()
 }
 
-export async function getMe(token: string): Promise<UserInfo> {
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Failed to get user info')
-  return res.json()
+export async function getMe(): Promise<UserInfo> {
+  return apiGet<UserInfo>(`${API_BASE}/auth/me`)
 }

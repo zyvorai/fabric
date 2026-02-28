@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './config'
-import { apiFetch } from './client'
+import { apiPost, apiFetch } from './client'
 
 export interface HotplugCpuRequest {
   count: number
@@ -20,33 +20,15 @@ export interface HotplugNicRequest {
 }
 
 export async function hotplugCpu(vmName: string, req: HotplugCpuRequest): Promise<unknown> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/hotplug/cpu`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to hotplug CPU')
-  return res.json()
+  return apiPost<unknown>(`${API_BASE_URL}/vms/${vmName}/hotplug/cpu`, req)
 }
 
 export async function hotplugMemory(vmName: string, req: HotplugMemoryRequest): Promise<unknown> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/hotplug/memory`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to hotplug memory')
-  return res.json()
+  return apiPost<unknown>(`${API_BASE_URL}/vms/${vmName}/hotplug/memory`, req)
 }
 
 export async function hotplugDisk(vmName: string, req: HotplugDiskRequest): Promise<unknown> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/hotplug/disk`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to hotplug disk')
-  return res.json()
+  return apiPost<unknown>(`${API_BASE_URL}/vms/${vmName}/hotplug/disk`, req)
 }
 
 export async function hotremoveDisk(vmName: string, deviceId: string): Promise<unknown> {
@@ -58,13 +40,7 @@ export async function hotremoveDisk(vmName: string, deviceId: string): Promise<u
 }
 
 export async function hotplugNic(vmName: string, req: HotplugNicRequest): Promise<unknown> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/hotplug/nic`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to hotplug NIC')
-  return res.json()
+  return apiPost<unknown>(`${API_BASE_URL}/vms/${vmName}/hotplug/nic`, req)
 }
 
 export async function hotremoveNic(vmName: string, deviceId: string): Promise<unknown> {

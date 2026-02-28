@@ -1,4 +1,4 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPostVoid, apiDelete, apiFetch } from './client'
 import { API_BASE_URL } from './config'
 
 export interface CpuCore {
@@ -92,134 +92,74 @@ export interface AllocateHugepagesRequest {
 
 // Get CPU topology
 export async function getCpuTopology(): Promise<CpuTopology> {
-  const response = await apiFetch(`${API_BASE_URL}/system/cpu/topology`)
-  if (!response.ok) {
-    throw new Error('Failed to get CPU topology')
-  }
-  return response.json()
+  return apiGet<CpuTopology>(`${API_BASE_URL}/system/cpu/topology`)
 }
 
 // Get NUMA topology
 export async function getNumaTopology(): Promise<NumaTopology> {
-  const response = await apiFetch(`${API_BASE_URL}/system/numa/topology`)
-  if (!response.ok) {
-    throw new Error('Failed to get NUMA topology')
-  }
-  return response.json()
+  return apiGet<NumaTopology>(`${API_BASE_URL}/system/numa/topology`)
 }
 
 // Get NUMA node details
 export async function getNumaNode(nodeId: number): Promise<NumaNode> {
-  const response = await apiFetch(`${API_BASE_URL}/system/numa/nodes/${nodeId}`)
-  if (!response.ok) {
-    throw new Error(`Failed to get NUMA node: ${nodeId}`)
-  }
-  return response.json()
+  return apiGet<NumaNode>(`${API_BASE_URL}/system/numa/nodes/${nodeId}`)
 }
 
 // Get recommended NUMA placement for a VM
 export async function getNumaPlacement(memoryMb: number, cpus: number): Promise<NumaPlacement> {
-  const response = await apiFetch(
+  return apiGet<NumaPlacement>(
     `${API_BASE_URL}/system/numa/placement?memory_mb=${memoryMb}&cpus=${cpus}`
   )
-  if (!response.ok) {
-    throw new Error('Failed to get NUMA placement recommendation')
-  }
-  return response.json()
 }
 
 // Set CPU pinning for a VM
 export async function setCpuPinning(vmName: string, request: SetCpuPinningRequest): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to set CPU pinning for: ${vmName}`)
-  }
+  return apiPostVoid(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, request)
 }
 
 // Remove CPU pinning from a VM
 export async function removeCpuPinning(vmName: string): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/cpu/pin`, {
-    method: 'DELETE',
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to remove CPU pinning for: ${vmName}`)
-  }
+  return apiDelete(`${API_BASE_URL}/vms/${vmName}/cpu/pin`)
 }
 
 // Get CPU affinity for a VM
 export async function getCpuAffinity(vmName: string): Promise<number[]> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/cpu/affinity`)
-  if (!response.ok) {
-    throw new Error(`Failed to get CPU affinity for: ${vmName}`)
-  }
-  return response.json()
+  return apiGet<number[]>(`${API_BASE_URL}/vms/${vmName}/cpu/affinity`)
 }
 
 // Set memory limit for a VM
 export async function setMemoryLimit(vmName: string, request: SetMemoryLimitRequest): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/limit`, {
+  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/limit`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   })
-  if (!response.ok) {
-    throw new Error(`Failed to set memory limit for: ${vmName}`)
-  }
+  if (!res.ok) throw new Error(`Failed to set memory limit for: ${vmName}`)
 }
 
 // Get memory usage for a VM
 export async function getMemoryUsage(vmName: string): Promise<MemoryStats> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/usage`)
-  if (!response.ok) {
-    throw new Error(`Failed to get memory usage for: ${vmName}`)
-  }
-  return response.json()
+  return apiGet<MemoryStats>(`${API_BASE_URL}/vms/${vmName}/memory/usage`)
 }
 
 // Enable/disable memory ballooning for a VM
 export async function setMemoryBallooning(vmName: string, enabled: boolean): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/balloon`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled }),
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to set memory ballooning for: ${vmName}`)
-  }
+  return apiPostVoid(`${API_BASE_URL}/vms/${vmName}/memory/balloon`, { enabled })
 }
 
 // Get hugepage info
 export async function getHugepageStats(size: 'Size2MB' | 'Size1GB'): Promise<HugepageStats> {
-  const response = await apiFetch(`${API_BASE_URL}/system/memory/hugepages?size=${size}`)
-  if (!response.ok) {
-    throw new Error('Failed to get hugepage stats')
-  }
-  return response.json()
+  return apiGet<HugepageStats>(`${API_BASE_URL}/system/memory/hugepages?size=${size}`)
 }
 
 // Allocate hugepages
 export async function allocateHugepages(request: AllocateHugepagesRequest): Promise<void> {
-  const response = await apiFetch(`${API_BASE_URL}/system/memory/hugepages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  })
-  if (!response.ok) {
-    throw new Error('Failed to allocate hugepages')
-  }
+  return apiPostVoid(`${API_BASE_URL}/system/memory/hugepages`, request)
 }
 
 // Get system memory info
 export async function getSystemMemory(): Promise<SystemMemory> {
-  const response = await apiFetch(`${API_BASE_URL}/system/memory`)
-  if (!response.ok) {
-    throw new Error('Failed to get system memory info')
-  }
-  return response.json()
+  return apiGet<SystemMemory>(`${API_BASE_URL}/system/memory`)
 }
 
 // Optimization types
@@ -244,20 +184,10 @@ export interface OptimizationResult {
 
 // Get optimization recommendations
 export async function getOptimizationRecommendations(): Promise<OptimizationRecommendation[]> {
-  const response = await apiFetch(`${API_BASE_URL}/system/optimization/recommendations`)
-  if (!response.ok) {
-    throw new Error('Failed to get optimization recommendations')
-  }
-  return response.json()
+  return apiGet<OptimizationRecommendation[]>(`${API_BASE_URL}/system/optimization/recommendations`)
 }
 
 // Auto-optimize a VM
 export async function optimizeVM(vmName: string): Promise<OptimizationResult> {
-  const response = await apiFetch(`${API_BASE_URL}/vms/${vmName}/optimize`, {
-    method: 'POST',
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to optimize VM: ${vmName}`)
-  }
-  return response.json()
+  return apiPost<OptimizationResult>(`${API_BASE_URL}/vms/${vmName}/optimize`)
 }

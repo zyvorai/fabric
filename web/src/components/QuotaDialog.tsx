@@ -1,24 +1,26 @@
 import { useState } from 'react'
 import { X, Shield } from 'lucide-react'
-import { createQuota, CreateQuotaRequest } from '../api/quota'
+import { createQuota, updateQuota, CreateQuotaRequest, ResourceQuota } from '../api/quota'
 import { useToastContext } from '../contexts/ToastContext'
 
-interface CreateQuotaDialogProps {
+interface QuotaDialogProps {
+  mode: 'create' | 'edit'
+  quota?: ResourceQuota
   onClose: () => void
   onSuccess: () => void
 }
 
-export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDialogProps) {
+export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDialogProps) {
   const toast = useToastContext()
-  const [creating, setCreating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState<CreateQuotaRequest>({
-    name: '',
-    max_cpus: 16,
-    max_memory: 16384, // 16GB
-    max_disk: 500, // 500GB
-    max_vms: 10,
-    tags: [],
-    enabled: true,
+    name: quota?.name ?? '',
+    max_cpus: quota?.max_cpus ?? 16,
+    max_memory: quota?.max_memory ?? 16384,
+    max_disk: quota?.max_disk ?? 500,
+    max_vms: quota?.max_vms ?? 10,
+    tags: quota?.tags ?? [],
+    enabled: quota?.enabled ?? true,
   })
   const [tagInput, setTagInput] = useState('')
 
@@ -35,16 +37,21 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
       return
     }
 
-    setCreating(true)
+    setSubmitting(true)
     try {
-      await createQuota(formData)
-      toast.success('Quota created successfully')
+      if (mode === 'create') {
+        await createQuota(formData)
+        toast.success('Quota created successfully')
+      } else {
+        await updateQuota(quota!.id, formData)
+        toast.success('Quota updated successfully')
+      }
       onSuccess()
       onClose()
     } catch (_error) {
-      toast.error('Failed to create quota')
+      toast.error(mode === 'create' ? 'Failed to create quota' : 'Failed to update quota')
     } finally {
-      setCreating(false)
+      setSubmitting(false)
     }
   }
 
@@ -66,7 +73,7 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
     })
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddTag()
@@ -80,7 +87,14 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
         <div className="flex items-center justify-between p-6 border-b border-gray-700 sticky top-0 bg-gray-800 z-10">
           <div className="flex items-center gap-3">
             <Shield className="w-6 h-6 text-blue-500" />
-            <h2 className="text-xl font-bold">Create Resource Quota</h2>
+            <div>
+              <h2 className="text-xl font-bold">
+                {mode === 'create' ? 'Create Resource Quota' : 'Edit Resource Quota'}
+              </h2>
+              {mode === 'edit' && quota && (
+                <p className="text-sm text-gray-400">ID: {quota.id}</p>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -107,6 +121,34 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
             />
           </div>
 
+          {/* Current Usage Info (edit mode only) */}
+          {mode === 'edit' && quota && (
+            <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
+              <h4 className="text-sm font-medium mb-3">Current Usage</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-400">CPUs</p>
+                  <p className="font-medium">{quota.used_cpus} used</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Memory</p>
+                  <p className="font-medium">{quota.used_memory}MB used</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Disk</p>
+                  <p className="font-medium">{quota.used_disk}GB used</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">VMs</p>
+                  <p className="font-medium">{quota.used_vms} active</p>
+                </div>
+              </div>
+              <p className="text-xs text-yellow-400 mt-3">
+                Warning: Setting limits below current usage may prevent new VM creation
+              </p>
+            </div>
+          )}
+
           {/* Resource Limits */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Max CPUs */}
@@ -122,7 +164,13 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">Total CPU cores allowed</p>
+              {mode === 'edit' && quota && formData.max_cpus < quota.used_cpus ? (
+                <p className="text-xs text-red-400 mt-1">
+                  Below current usage ({quota.used_cpus})
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Total CPU cores allowed</p>
+              )}
             </div>
 
             {/* Max Memory */}
@@ -142,6 +190,11 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
               <p className="text-xs text-gray-400 mt-1">
                 {(formData.max_memory / 1024).toFixed(1)}GB total
               </p>
+              {mode === 'edit' && quota && formData.max_memory < quota.used_memory && (
+                <p className="text-xs text-red-400 mt-1">
+                  Below current usage ({quota.used_memory}MB)
+                </p>
+              )}
             </div>
 
             {/* Max Disk */}
@@ -158,7 +211,13 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">Total disk space allowed</p>
+              {mode === 'edit' && quota && formData.max_disk < quota.used_disk ? (
+                <p className="text-xs text-red-400 mt-1">
+                  Below current usage ({quota.used_disk}GB)
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Total disk space allowed</p>
+              )}
             </div>
 
             {/* Max VMs */}
@@ -174,7 +233,13 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">Maximum number of VMs</p>
+              {mode === 'edit' && quota && formData.max_vms < quota.used_vms ? (
+                <p className="text-xs text-red-400 mt-1">
+                  Below current usage ({quota.used_vms} VMs)
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Maximum number of VMs</p>
+              )}
             </div>
           </div>
 
@@ -214,7 +279,7 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleTagKeyDown}
                 placeholder="Enter tag name..."
                 className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
               />
@@ -229,19 +294,21 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
             </div>
           </div>
 
-          {/* Enabled */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="enabled"
-              checked={formData.enabled}
-              onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-              className="w-4 h-4 bg-gray-900 border-gray-700 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="enabled" className="text-sm font-medium">
-              Enable quota immediately
-            </label>
-          </div>
+          {/* Enabled (create mode only) */}
+          {mode === 'create' && (
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="enabled"
+                checked={formData.enabled}
+                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                className="w-4 h-4 bg-gray-900 border-gray-700 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="enabled" className="text-sm font-medium">
+                Enable quota immediately
+              </label>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
@@ -254,10 +321,13 @@ export default function CreateQuotaDialog({ onClose, onSuccess }: CreateQuotaDia
             </button>
             <button
               type="submit"
-              disabled={creating}
+              disabled={submitting}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
             >
-              {creating ? 'Creating...' : 'Create Quota'}
+              {submitting
+                ? (mode === 'create' ? 'Creating...' : 'Saving...')
+                : (mode === 'create' ? 'Create Quota' : 'Save Changes')
+              }
             </button>
           </div>
         </form>

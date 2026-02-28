@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { createVM } from '../api/vm'
 import { ArrowLeft } from 'lucide-react'
 

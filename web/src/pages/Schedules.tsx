@@ -11,8 +11,7 @@ import {
   getScheduleHistory
 } from '../api/schedule'
 import { useToastContext } from '../contexts/ToastContext'
-import CreateScheduleDialog from '../components/CreateScheduleDialog'
-import EditScheduleDialog from '../components/EditScheduleDialog'
+import ScheduleDialog from '../components/ScheduleDialog'
 
 export default function Schedules() {
   const toast = useToastContext()
@@ -315,14 +314,16 @@ export default function Schedules() {
       )}
 
       {showCreateDialog && (
-        <CreateScheduleDialog
+        <ScheduleDialog
+          mode="create"
           onClose={() => setShowCreateDialog(false)}
           onSuccess={loadData}
         />
       )}
 
       {editingSchedule && (
-        <EditScheduleDialog
+        <ScheduleDialog
+          mode="edit"
           schedule={editingSchedule}
           onClose={() => setEditingSchedule(null)}
           onSuccess={loadData}

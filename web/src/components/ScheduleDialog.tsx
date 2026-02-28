@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Calendar } from 'lucide-react'
-import { updateSchedule, Schedule } from '../api/schedule'
+import { createSchedule, updateSchedule, CreateScheduleRequest, Schedule } from '../api/schedule'
+import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 
-interface EditScheduleDialogProps {
-  schedule: Schedule
+interface ScheduleDialogProps {
+  mode: 'create' | 'edit'
+  schedule?: Schedule
   onClose: () => void
   onSuccess: () => void
 }
@@ -19,16 +21,38 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Saturday' },
 ]
 
-export default function EditScheduleDialog({ schedule, onClose, onSuccess }: EditScheduleDialogProps) {
+export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: ScheduleDialogProps) {
   const toast = useToastContext()
-  const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({
-    name: schedule.name,
-    action: schedule.action,
-    schedule_type: schedule.schedule_type,
-    time: schedule.time,
-    days_of_week: schedule.days_of_week || [],
+  const [submitting, setSubmitting] = useState(false)
+  const [vms, setVMs] = useState<VM[]>([])
+  const [formData, setFormData] = useState<CreateScheduleRequest>({
+    name: schedule?.name ?? '',
+    vm_name: schedule?.vm_name ?? '',
+    action: schedule?.action ?? 'start',
+    schedule_type: schedule?.schedule_type ?? 'daily',
+    time: schedule?.time ?? '09:00',
+    days_of_week: schedule?.days_of_week ?? [],
+    enabled: schedule?.enabled ?? true,
   })
+
+  useEffect(() => {
+    if (mode === 'create') {
+      loadVMs()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
+  const loadVMs = async () => {
+    try {
+      const data = await listVMs()
+      setVMs(data)
+      if (data.length > 0 && !formData.vm_name) {
+        setFormData(prev => ({ ...prev, vm_name: data[0].name }))
+      }
+    } catch (error) {
+      console.error('Failed to load VMs:', error)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,34 +62,51 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
       return
     }
 
-    if (formData.schedule_type === 'weekly' && formData.days_of_week.length === 0) {
+    if (mode === 'create' && !formData.vm_name) {
+      toast.error('Please select a VM')
+      return
+    }
+
+    if (formData.schedule_type === 'weekly' && (!formData.days_of_week || formData.days_of_week.length === 0)) {
       toast.error('Please select at least one day for weekly schedule')
       return
     }
 
-    setSaving(true)
+    setSubmitting(true)
     try {
-      await updateSchedule(schedule.id, formData)
-      toast.success('Schedule updated successfully')
+      if (mode === 'create') {
+        await createSchedule(formData)
+        toast.success('Schedule created successfully')
+      } else {
+        await updateSchedule(schedule!.id, {
+          name: formData.name,
+          action: formData.action,
+          schedule_type: formData.schedule_type,
+          time: formData.time,
+          days_of_week: formData.days_of_week,
+        })
+        toast.success('Schedule updated successfully')
+      }
       onSuccess()
       onClose()
     } catch (_error) {
-      toast.error('Failed to update schedule')
+      toast.error(mode === 'create' ? 'Failed to create schedule' : 'Failed to update schedule')
     } finally {
-      setSaving(false)
+      setSubmitting(false)
     }
   }
 
   const toggleDay = (day: number) => {
-    if (formData.days_of_week.includes(day)) {
+    const days = formData.days_of_week || []
+    if (days.includes(day)) {
       setFormData({
         ...formData,
-        days_of_week: formData.days_of_week.filter(d => d !== day)
+        days_of_week: days.filter(d => d !== day)
       })
     } else {
       setFormData({
         ...formData,
-        days_of_week: [...formData.days_of_week, day].sort()
+        days_of_week: [...days, day].sort()
       })
     }
   }
@@ -78,8 +119,12 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
           <div className="flex items-center gap-3">
             <Calendar className="w-6 h-6 text-blue-500" />
             <div>
-              <h2 className="text-xl font-bold">Edit Schedule</h2>
-              <p className="text-sm text-gray-400">VM: {schedule.vm_name}</p>
+              <h2 className="text-xl font-bold">
+                {mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}
+              </h2>
+              {mode === 'edit' && schedule && (
+                <p className="text-sm text-gray-400">VM: {schedule.vm_name}</p>
+              )}
             </div>
           </div>
           <button
@@ -106,6 +151,27 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
               required
             />
           </div>
+
+          {/* VM Selection (create mode only) */}
+          {mode === 'create' && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Virtual Machine <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.vm_name}
+                onChange={(e) => setFormData({ ...formData, vm_name: e.target.value })}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                required
+              >
+                {vms.map((vm) => (
+                  <option key={vm.name} value={vm.name}>
+                    {vm.name} ({vm.state})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Action */}
           <div>
@@ -150,7 +216,7 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
               </label>
               <div className="flex flex-wrap gap-2">
                 {DAYS_OF_WEEK.map((day) => {
-                  const isSelected = formData.days_of_week.includes(day.value)
+                  const isSelected = formData.days_of_week?.includes(day.value)
                   return (
                     <button
                       key={day.value}
@@ -185,24 +251,42 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
             <p className="text-xs text-gray-400 mt-1">24-hour format (HH:MM)</p>
           </div>
 
-          {/* Current Status */}
-          <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
-            <h4 className="text-sm font-medium mb-2">Current Status</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-gray-400">Status</p>
-                <p className={schedule.enabled ? 'text-green-400' : 'text-gray-400'}>
-                  {schedule.enabled ? 'Enabled' : 'Disabled'}
-                </p>
-              </div>
-              {schedule.next_run && (
+          {/* Current Status (edit mode only) */}
+          {mode === 'edit' && schedule && (
+            <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
+              <h4 className="text-sm font-medium mb-2">Current Status</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-400">Next Run</p>
-                  <p className="text-blue-400">{new Date(schedule.next_run).toLocaleString()}</p>
+                  <p className="text-gray-400">Status</p>
+                  <p className={schedule.enabled ? 'text-green-400' : 'text-gray-400'}>
+                    {schedule.enabled ? 'Enabled' : 'Disabled'}
+                  </p>
                 </div>
-              )}
+                {schedule.next_run && (
+                  <div>
+                    <p className="text-gray-400">Next Run</p>
+                    <p className="text-blue-400">{new Date(schedule.next_run).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Enabled (create mode only) */}
+          {mode === 'create' && (
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="enabled"
+                checked={formData.enabled}
+                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                className="w-4 h-4 bg-gray-900 border-gray-700 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="enabled" className="text-sm font-medium">
+                Enable schedule immediately
+              </label>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
@@ -215,10 +299,13 @@ export default function EditScheduleDialog({ schedule, onClose, onSuccess }: Edi
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={submitting}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {submitting
+                ? (mode === 'create' ? 'Creating...' : 'Saving...')
+                : (mode === 'create' ? 'Create Schedule' : 'Save Changes')
+              }
             </button>
           </div>
         </form>

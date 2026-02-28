@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPut, apiPostVoid, apiDelete } from './client'
+
 export interface Datacenter {
   id: string
   name: string
@@ -57,48 +58,27 @@ const API_BASE = '/api'
 // Datacenter CRUD
 
 export async function listDatacenters(): Promise<Datacenter[]> {
-  const res = await apiFetch(`${API_BASE}/datacenters`)
-  if (!res.ok) throw new Error('Failed to fetch datacenters')
-  return res.json()
+  return apiGet<Datacenter[]>(`${API_BASE}/datacenters`)
 }
 
 export async function createDatacenter(req: { name: string; description?: string }): Promise<Datacenter> {
-  const res = await apiFetch(`${API_BASE}/datacenters`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create datacenter')
-  return res.json()
+  return apiPost<Datacenter>(`${API_BASE}/datacenters`, req)
 }
 
 export async function getDatacenter(id: string): Promise<Datacenter> {
-  const res = await apiFetch(`${API_BASE}/datacenters/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch datacenter')
-  return res.json()
+  return apiGet<Datacenter>(`${API_BASE}/datacenters/${id}`)
 }
 
 export async function updateDatacenter(id: string, req: Partial<Datacenter>): Promise<Datacenter> {
-  const res = await apiFetch(`${API_BASE}/datacenters/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update datacenter')
-  return res.json()
+  return apiPut<Datacenter>(`${API_BASE}/datacenters/${id}`, req)
 }
 
 export async function deleteDatacenter(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/datacenters/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete datacenter')
+  return apiDelete(`${API_BASE}/datacenters/${id}`)
 }
 
 export async function getDatacenterSummary(id: string): Promise<DatacenterSummary> {
-  const res = await apiFetch(`${API_BASE}/datacenters/${id}/summary`)
-  if (!res.ok) throw new Error('Failed to fetch datacenter summary')
-  return res.json()
+  return apiGet<DatacenterSummary>(`${API_BASE}/datacenters/${id}/summary`)
 }
 
 // Cluster CRUD
@@ -107,42 +87,23 @@ export async function listClusters(datacenterId?: string): Promise<Cluster[]> {
   const url = datacenterId
     ? `${API_BASE}/clusters?datacenter_id=${datacenterId}`
     : `${API_BASE}/clusters`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch clusters')
-  return res.json()
+  return apiGet<Cluster[]>(url)
 }
 
 export async function createCluster(req: { name: string; datacenter_id: string; description?: string }): Promise<Cluster> {
-  const res = await apiFetch(`${API_BASE}/clusters`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create cluster')
-  return res.json()
+  return apiPost<Cluster>(`${API_BASE}/clusters`, req)
 }
 
 export async function getCluster(id: string): Promise<Cluster> {
-  const res = await apiFetch(`${API_BASE}/clusters/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch cluster')
-  return res.json()
+  return apiGet<Cluster>(`${API_BASE}/clusters/${id}`)
 }
 
 export async function updateCluster(id: string, req: Partial<Cluster>): Promise<Cluster> {
-  const res = await apiFetch(`${API_BASE}/clusters/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update cluster')
-  return res.json()
+  return apiPut<Cluster>(`${API_BASE}/clusters/${id}`, req)
 }
 
 export async function deleteCluster(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/clusters/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete cluster')
+  return apiDelete(`${API_BASE}/clusters/${id}`)
 }
 
 // Host management
@@ -151,9 +112,7 @@ export async function listHosts(clusterId?: string): Promise<HostInfo[]> {
   const url = clusterId
     ? `${API_BASE}/hosts?cluster_id=${clusterId}`
     : `${API_BASE}/hosts`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch hosts')
-  return res.json()
+  return apiGet<HostInfo[]>(url)
 }
 
 export async function registerHost(req: {
@@ -163,38 +122,21 @@ export async function registerHost(req: {
   cpus: number
   memory_mb: number
 }): Promise<HostInfo> {
-  const res = await apiFetch(`${API_BASE}/hosts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to register host')
-  return res.json()
+  return apiPost<HostInfo>(`${API_BASE}/hosts`, req)
 }
 
 export async function getHost(id: string): Promise<HostInfo> {
-  const res = await apiFetch(`${API_BASE}/hosts/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch host')
-  return res.json()
+  return apiGet<HostInfo>(`${API_BASE}/hosts/${id}`)
 }
 
 export async function removeHost(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/hosts/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to remove host')
+  return apiDelete(`${API_BASE}/hosts/${id}`)
 }
 
 export async function hostEnterMaintenance(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/hosts/${id}/maintenance/enter`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to enter maintenance mode')
+  return apiPostVoid(`${API_BASE}/hosts/${id}/maintenance/enter`)
 }
 
 export async function hostExitMaintenance(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/hosts/${id}/maintenance/exit`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to exit maintenance mode')
+  return apiPostVoid(`${API_BASE}/hosts/${id}/maintenance/exit`)
 }

@@ -15,7 +15,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [subscribers, setSubscribers] = useState<Set<(message: WebSocketMessage) => void>>(new Set())
 
   // Determine WebSocket URL based on current location
-  const wsUrl = `ws://${window.location.hostname}:8080/ws/events`
+  const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/events`
 
   const handleMessage = (message: WebSocketMessage) => {
     // Notify all subscribers

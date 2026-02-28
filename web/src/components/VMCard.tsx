@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag } from 'lucide-react'
 import { VM, startVM, stopVM, pauseVM, resumeVM, deleteVM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'

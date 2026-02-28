@@ -1,5 +1,5 @@
+import { apiGet, apiPost, apiPostVoid, apiDelete } from './client'
 import { API_BASE_URL } from './config'
-import { apiFetch } from './client'
 
 export interface VMSnapshot {
   id: string
@@ -24,43 +24,25 @@ export interface CreateSnapshotRequest {
 }
 
 export async function listSnapshots(vmName: string): Promise<VMSnapshot[]> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/snapshots`)
-  if (!res.ok) throw new Error('Failed to list snapshots')
-  return res.json()
+  return apiGet<VMSnapshot[]>(`${API_BASE_URL}/vms/${vmName}/snapshots`)
 }
 
 export async function createSnapshot(vmName: string, req: CreateSnapshotRequest): Promise<VMSnapshot> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/snapshots`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create snapshot')
-  return res.json()
+  return apiPost<VMSnapshot>(`${API_BASE_URL}/vms/${vmName}/snapshots`, req)
 }
 
 export async function getSnapshot(vmName: string, id: string): Promise<VMSnapshot> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/snapshots/${id}`)
-  if (!res.ok) throw new Error('Failed to get snapshot')
-  return res.json()
+  return apiGet<VMSnapshot>(`${API_BASE_URL}/vms/${vmName}/snapshots/${id}`)
 }
 
 export async function deleteSnapshot(vmName: string, id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/snapshots/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete snapshot')
+  return apiDelete(`${API_BASE_URL}/vms/${vmName}/snapshots/${id}`)
 }
 
 export async function revertSnapshot(vmName: string, id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/snapshots/${id}/revert`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to revert snapshot')
+  return apiPostVoid(`${API_BASE_URL}/vms/${vmName}/snapshots/${id}/revert`)
 }
 
 export async function getSnapshotTree(vmName: string): Promise<SnapshotTreeNode[]> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/snapshots/tree`)
-  if (!res.ok) throw new Error('Failed to get snapshot tree')
-  return res.json()
+  return apiGet<SnapshotTreeNode[]>(`${API_BASE_URL}/vms/${vmName}/snapshots/tree`)
 }

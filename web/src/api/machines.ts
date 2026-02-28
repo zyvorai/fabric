@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPostVoid, apiDelete } from './client'
+
 const API_BASE = '/api'
 
 export interface MachineInfo {
@@ -27,101 +28,61 @@ export interface SshInfo {
 }
 
 export async function listMachines(): Promise<MachineInfo[]> {
-  const res = await apiFetch(`${API_BASE}/machines`)
-  if (!res.ok) throw new Error('Failed to list machines')
-  return res.json()
+  return apiGet<MachineInfo[]>(`${API_BASE}/machines`)
 }
 
 export async function getMachineProperties(name: string): Promise<Record<string, string>> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/properties`)
-  if (!res.ok) throw new Error('Failed to get machine properties')
-  return res.json()
+  return apiGet<Record<string, string>>(`${API_BASE}/machines/${name}/properties`)
 }
 
 export async function poweroffMachine(name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/poweroff`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to poweroff machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/poweroff`)
 }
 
 export async function rebootMachine(name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/reboot`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to reboot machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/reboot`)
 }
 
 export async function terminateMachine(name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/terminate`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to terminate machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/terminate`)
 }
 
 export async function enableMachine(name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/enable`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to enable machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/enable`)
 }
 
 export async function disableMachine(name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/disable`, { method: 'POST' })
-  if (!res.ok) throw new Error('Failed to disable machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/disable`)
 }
 
 export async function shellMachine(name: string, command: string): Promise<ShellOutput> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/shell`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ command }),
-  })
-  if (!res.ok) throw new Error('Failed to execute shell command')
-  return res.json()
+  return apiPost<ShellOutput>(`${API_BASE}/machines/${name}/shell`, { command })
 }
 
 export async function getSshInfo(name: string): Promise<SshInfo> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/ssh`)
-  if (!res.ok) throw new Error('Failed to get SSH info')
-  return res.json()
+  return apiGet<SshInfo>(`${API_BASE}/machines/${name}/ssh`)
 }
 
 export async function copyToMachine(name: string, hostPath: string, machinePath: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/copy-to`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_path: hostPath, machine_path: machinePath }),
-  })
-  if (!res.ok) throw new Error('Failed to copy file to machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/copy-to`, { host_path: hostPath, machine_path: machinePath })
 }
 
 export async function copyFromMachine(name: string, machinePath: string, hostPath: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/copy-from`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_path: hostPath, machine_path: machinePath }),
-  })
-  if (!res.ok) throw new Error('Failed to copy file from machine')
+  return apiPostVoid(`${API_BASE}/machines/${name}/copy-from`, { host_path: hostPath, machine_path: machinePath })
 }
 
 export async function bindMachine(name: string, hostPath: string, machinePath: string, readOnly = false): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/${name}/bind`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_path: hostPath, machine_path: machinePath, read_only: readOnly }),
-  })
-  if (!res.ok) throw new Error('Failed to bind mount')
+  return apiPostVoid(`${API_BASE}/machines/${name}/bind`, { host_path: hostPath, machine_path: machinePath, read_only: readOnly })
 }
 
 export async function listMachineImages(): Promise<MachineImage[]> {
-  const res = await apiFetch(`${API_BASE}/machines/images`)
-  if (!res.ok) throw new Error('Failed to list images')
-  return res.json()
+  return apiGet<MachineImage[]>(`${API_BASE}/machines/images`)
 }
 
 export async function pullRawImage(url: string, name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/images/pull-raw`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, name, verify: false }),
-  })
-  if (!res.ok) throw new Error('Failed to pull image')
+  return apiPostVoid(`${API_BASE}/machines/images/pull-raw`, { url, name, verify: false })
 }
 
 export async function removeMachineImage(name: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/machines/images/${name}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to remove image')
+  return apiDelete(`${API_BASE}/machines/images/${name}`)
 }

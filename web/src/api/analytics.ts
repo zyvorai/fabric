@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiFetch } from './client'
+
 export interface PerformanceMetrics {
   timestamp: string
   cpu_usage: number
@@ -42,32 +43,24 @@ export async function getVMPerformance(
   vmName: string,
   timeRange: TimeRange = '24h'
 ): Promise<VMPerformance> {
-  const res = await apiFetch(`${API_BASE}/analytics/vms/${vmName}?range=${timeRange}`)
-  if (!res.ok) throw new Error('Failed to fetch VM performance')
-  return res.json()
+  return apiGet<VMPerformance>(`${API_BASE}/analytics/vms/${vmName}?range=${timeRange}`)
 }
 
 export async function getSystemPerformance(
   timeRange: TimeRange = '24h'
 ): Promise<SystemPerformance[]> {
-  const res = await apiFetch(`${API_BASE}/analytics/system?range=${timeRange}`)
-  if (!res.ok) throw new Error('Failed to fetch system performance')
-  return res.json()
+  return apiGet<SystemPerformance[]>(`${API_BASE}/analytics/system?range=${timeRange}`)
 }
 
 export async function getPerformanceInsights(): Promise<PerformanceInsight[]> {
-  const res = await apiFetch(`${API_BASE}/analytics/insights`)
-  if (!res.ok) throw new Error('Failed to fetch performance insights')
-  return res.json()
+  return apiGet<PerformanceInsight[]>(`${API_BASE}/analytics/insights`)
 }
 
 export async function getTopVMsByResource(
   resource: 'cpu' | 'memory' | 'network' | 'disk',
   limit: number = 10
 ): Promise<Array<{ vm_name: string; value: number }>> {
-  const res = await apiFetch(`${API_BASE}/analytics/top?resource=${resource}&limit=${limit}`)
-  if (!res.ok) throw new Error('Failed to fetch top VMs')
-  return res.json()
+  return apiGet<Array<{ vm_name: string; value: number }>>(`${API_BASE}/analytics/top?resource=${resource}&limit=${limit}`)
 }
 
 export async function exportPerformanceReport(
@@ -87,7 +80,5 @@ export interface ResourceUtilization {
 }
 
 export async function getResourceUtilization(): Promise<ResourceUtilization> {
-  const res = await apiFetch(`${API_BASE}/analytics/utilization`)
-  if (!res.ok) throw new Error('Failed to fetch resource utilization')
-  return res.json()
+  return apiGet<ResourceUtilization>(`${API_BASE}/analytics/utilization`)
 }

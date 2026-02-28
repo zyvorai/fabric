@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPut, apiPostVoid, apiDelete } from './client'
+
 const API_BASE = '/api'
 
 export interface VMTemplate {
@@ -32,49 +33,25 @@ export interface DeployTemplateRequest {
 }
 
 export async function listTemplates(): Promise<VMTemplate[]> {
-  const res = await apiFetch(`${API_BASE}/templates`)
-  if (!res.ok) throw new Error('Failed to fetch templates')
-  return res.json()
+  return apiGet<VMTemplate[]>(`${API_BASE}/templates`)
 }
 
 export async function getTemplate(id: string): Promise<VMTemplate> {
-  const res = await apiFetch(`${API_BASE}/templates/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch template')
-  return res.json()
+  return apiGet<VMTemplate>(`${API_BASE}/templates/${id}`)
 }
 
 export async function createTemplate(req: CreateTemplateRequest): Promise<VMTemplate> {
-  const res = await apiFetch(`${API_BASE}/templates`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create template')
-  return res.json()
+  return apiPost<VMTemplate>(`${API_BASE}/templates`, req)
 }
 
 export async function updateTemplate(id: string, req: Partial<CreateTemplateRequest>): Promise<VMTemplate> {
-  const res = await apiFetch(`${API_BASE}/templates/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update template')
-  return res.json()
+  return apiPut<VMTemplate>(`${API_BASE}/templates/${id}`, req)
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/templates/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete template')
+  return apiDelete(`${API_BASE}/templates/${id}`)
 }
 
 export async function deployTemplate(id: string, vmName: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/templates/${id}/deploy`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ vm_name: vmName }),
-  })
-  if (!res.ok) throw new Error('Failed to deploy template')
+  return apiPostVoid(`${API_BASE}/templates/${id}/deploy`, { vm_name: vmName })
 }

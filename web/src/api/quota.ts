@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPut, apiPostVoid, apiDelete } from './client'
+
 export interface ResourceQuota {
   id: string
   name: string
@@ -40,66 +41,37 @@ export interface QuotaUsage {
 const API_BASE = '/api'
 
 export async function listQuotas(): Promise<ResourceQuota[]> {
-  const res = await apiFetch(`${API_BASE}/quotas`)
-  if (!res.ok) throw new Error('Failed to fetch quotas')
-  return res.json()
+  return apiGet<ResourceQuota[]>(`${API_BASE}/quotas`)
 }
 
 export async function getQuota(id: string): Promise<ResourceQuota> {
-  const res = await apiFetch(`${API_BASE}/quotas/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch quota')
-  return res.json()
+  return apiGet<ResourceQuota>(`${API_BASE}/quotas/${id}`)
 }
 
 export async function createQuota(req: CreateQuotaRequest): Promise<ResourceQuota> {
-  const res = await apiFetch(`${API_BASE}/quotas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create quota')
-  return res.json()
+  return apiPost<ResourceQuota>(`${API_BASE}/quotas`, req)
 }
 
 export async function updateQuota(id: string, req: Partial<CreateQuotaRequest>): Promise<ResourceQuota> {
-  const res = await apiFetch(`${API_BASE}/quotas/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to update quota')
-  return res.json()
+  return apiPut<ResourceQuota>(`${API_BASE}/quotas/${id}`, req)
 }
 
 export async function deleteQuota(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/quotas/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete quota')
+  return apiDelete(`${API_BASE}/quotas/${id}`)
 }
 
 export async function enableQuota(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/quotas/${id}/enable`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to enable quota')
+  return apiPostVoid(`${API_BASE}/quotas/${id}/enable`)
 }
 
 export async function disableQuota(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/quotas/${id}/disable`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to disable quota')
+  return apiPostVoid(`${API_BASE}/quotas/${id}/disable`)
 }
 
 export async function getQuotaUsage(id: string): Promise<QuotaUsage> {
-  const res = await apiFetch(`${API_BASE}/quotas/${id}/usage`)
-  if (!res.ok) throw new Error('Failed to fetch quota usage')
-  return res.json()
+  return apiGet<QuotaUsage>(`${API_BASE}/quotas/${id}/usage`)
 }
 
 export async function getAllQuotaUsage(): Promise<QuotaUsage[]> {
-  const res = await apiFetch(`${API_BASE}/quotas/usage`)
-  if (!res.ok) throw new Error('Failed to fetch quota usage')
-  return res.json()
+  return apiGet<QuotaUsage[]>(`${API_BASE}/quotas/usage`)
 }

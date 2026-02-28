@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { ArrowLeft, Terminal as TerminalIcon, Monitor } from 'lucide-react'
 import Terminal from '../components/Terminal'
 import VNCViewer from '../components/VNCViewer'

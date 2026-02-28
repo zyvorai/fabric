@@ -331,7 +331,7 @@ impl NetworkdManager {
     /// Generate a random MAC address with QEMU KVM prefix 52:54:00
     pub fn generate_mac_address() -> String {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         format!(
             "52:54:00:{:02x}:{:02x}:{:02x}",
             rng.gen::<u8>(),

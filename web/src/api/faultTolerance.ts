@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPostVoid } from './client'
+
 export interface FtConfig {
   vm_id: string
   vm_name: string
@@ -68,73 +69,46 @@ export async function enableFt(req: {
   logging_bandwidth_mbps?: number
   checkpoint_interval_seconds?: number
 }): Promise<FtConfig> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/enable`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to enable fault tolerance')
-  return res.json()
+  return apiPost<FtConfig>(`${API_BASE}/fault-tolerance/enable`, req)
 }
 
 export async function disableFt(vmId: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/${vmId}/disable`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to disable fault tolerance')
+  return apiPostVoid(`${API_BASE}/fault-tolerance/${vmId}/disable`)
 }
 
 export async function getFtConfig(vmId: string): Promise<FtConfig> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/${vmId}/config`)
-  if (!res.ok) throw new Error('Failed to fetch fault tolerance config')
-  return res.json()
+  return apiGet<FtConfig>(`${API_BASE}/fault-tolerance/${vmId}/config`)
 }
 
 export async function listFtVms(): Promise<FtConfig[]> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/vms`)
-  if (!res.ok) throw new Error('Failed to fetch fault-tolerant VMs')
-  return res.json()
+  return apiGet<FtConfig[]>(`${API_BASE}/fault-tolerance/vms`)
 }
 
 // Compatibility check
 
 export async function checkFtCompatibility(vmId: string): Promise<FtCompatibility> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/${vmId}/compatibility`)
-  if (!res.ok) throw new Error('Failed to check fault tolerance compatibility')
-  return res.json()
+  return apiGet<FtCompatibility>(`${API_BASE}/fault-tolerance/${vmId}/compatibility`)
 }
 
 // Failover operations
 
 export async function triggerFailover(vmId: string): Promise<FailoverResult> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/${vmId}/failover`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to trigger failover')
-  return res.json()
+  return apiPost<FailoverResult>(`${API_BASE}/fault-tolerance/${vmId}/failover`)
 }
 
 export async function testFailover(vmId: string): Promise<FailoverResult> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/${vmId}/test-failover`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to test failover')
-  return res.json()
+  return apiPost<FailoverResult>(`${API_BASE}/fault-tolerance/${vmId}/test-failover`)
 }
 
 // Metrics and events
 
 export async function getFtMetrics(vmId: string): Promise<FtMetrics> {
-  const res = await apiFetch(`${API_BASE}/fault-tolerance/${vmId}/metrics`)
-  if (!res.ok) throw new Error('Failed to fetch fault tolerance metrics')
-  return res.json()
+  return apiGet<FtMetrics>(`${API_BASE}/fault-tolerance/${vmId}/metrics`)
 }
 
 export async function getFtEvents(vmId?: string): Promise<FailoverResult[]> {
   const url = vmId
     ? `${API_BASE}/fault-tolerance/events?vm_id=${vmId}`
     : `${API_BASE}/fault-tolerance/events`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch fault tolerance events')
-  return res.json()
+  return apiGet<FailoverResult[]>(url)
 }

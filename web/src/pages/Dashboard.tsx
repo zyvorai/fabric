@@ -4,7 +4,7 @@ import { Activity, Cpu, HardDrive, Server } from 'lucide-react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
 import { SkeletonDashboard } from '../components/Skeleton'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 interface MetricsPoint {
   time: string

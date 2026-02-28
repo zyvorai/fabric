@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet } from './client'
+
 const API_BASE = '/api'
 
 export interface PluginInfo {
@@ -11,7 +12,5 @@ export interface PluginInfo {
 }
 
 export async function listPlugins(): Promise<PluginInfo[]> {
-  const res = await apiFetch(`${API_BASE}/plugins`)
-  if (!res.ok) throw new Error('Failed to fetch plugins')
-  return res.json()
+  return apiGet<PluginInfo[]>(`${API_BASE}/plugins`)
 }

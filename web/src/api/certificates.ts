@@ -1,4 +1,5 @@
-import { apiFetch } from "./client"
+import { apiGet, apiPost, apiPostVoid } from './client'
+
 export interface CertificateAuthority {
   id: string
   name: string
@@ -112,9 +113,7 @@ const API_BASE = '/api'
 // Certificate authorities
 
 export async function listCas(): Promise<CertificateAuthority[]> {
-  const res = await apiFetch(`${API_BASE}/certificates/cas`)
-  if (!res.ok) throw new Error('Failed to fetch certificate authorities')
-  return res.json()
+  return apiGet<CertificateAuthority[]>(`${API_BASE}/certificates/cas`)
 }
 
 export async function createCa(req: {
@@ -124,13 +123,7 @@ export async function createCa(req: {
   key_algorithm?: string
   key_size?: number
 }): Promise<CertificateAuthority> {
-  const res = await apiFetch(`${API_BASE}/certificates/cas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create certificate authority')
-  return res.json()
+  return apiPost<CertificateAuthority>(`${API_BASE}/certificates/cas`, req)
 }
 
 // Certificates
@@ -139,9 +132,7 @@ export async function listCertificates(caId?: string): Promise<Certificate[]> {
   const url = caId
     ? `${API_BASE}/certificates/certs?ca_id=${caId}`
     : `${API_BASE}/certificates/certs`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch certificates')
-  return res.json()
+  return apiGet<Certificate[]>(url)
 }
 
 export async function issueCertificate(req: {
@@ -152,37 +143,22 @@ export async function issueCertificate(req: {
   san?: string[]
   validity_days?: number
 }): Promise<Certificate> {
-  const res = await apiFetch(`${API_BASE}/certificates/certs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to issue certificate')
-  return res.json()
+  return apiPost<Certificate>(`${API_BASE}/certificates/certs`, req)
 }
 
 export async function revokeCertificate(id: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/certificates/certs/${id}/revoke`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to revoke certificate')
+  return apiPostVoid(`${API_BASE}/certificates/certs/${id}/revoke`)
 }
 
 export async function renewCertificate(id: string): Promise<Certificate> {
-  const res = await apiFetch(`${API_BASE}/certificates/certs/${id}/renew`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to renew certificate')
-  return res.json()
+  return apiPost<Certificate>(`${API_BASE}/certificates/certs/${id}/renew`)
 }
 
 export async function checkExpiring(days?: number): Promise<Certificate[]> {
   const url = days
     ? `${API_BASE}/certificates/certs/expiring?days=${days}`
     : `${API_BASE}/certificates/certs/expiring`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to check expiring certificates')
-  return res.json()
+  return apiGet<Certificate[]>(url)
 }
 
 // Certificate requests
@@ -191,9 +167,7 @@ export async function listCertRequests(status?: string): Promise<CertificateRequ
   const url = status
     ? `${API_BASE}/certificates/requests?status=${status}`
     : `${API_BASE}/certificates/requests`
-  const res = await apiFetch(url)
-  if (!res.ok) throw new Error('Failed to fetch certificate requests')
-  return res.json()
+  return apiGet<CertificateRequest[]>(url)
 }
 
 export async function submitCertRequest(req: {
@@ -203,29 +177,17 @@ export async function submitCertRequest(req: {
   key_size?: number
   san?: string[]
 }): Promise<CertificateRequest> {
-  const res = await apiFetch(`${API_BASE}/certificates/requests`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to submit certificate request')
-  return res.json()
+  return apiPost<CertificateRequest>(`${API_BASE}/certificates/requests`, req)
 }
 
 export async function approveCertRequest(id: string): Promise<Certificate> {
-  const res = await apiFetch(`${API_BASE}/certificates/requests/${id}/approve`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to approve certificate request')
-  return res.json()
+  return apiPost<Certificate>(`${API_BASE}/certificates/requests/${id}/approve`)
 }
 
 // Trust attestations
 
 export async function listAttestations(): Promise<TrustAttestation[]> {
-  const res = await apiFetch(`${API_BASE}/certificates/attestations`)
-  if (!res.ok) throw new Error('Failed to fetch trust attestations')
-  return res.json()
+  return apiGet<TrustAttestation[]>(`${API_BASE}/certificates/attestations`)
 }
 
 export async function submitAttestation(req: {
@@ -235,21 +197,13 @@ export async function submitAttestation(req: {
   secure_boot_enabled?: boolean
   measured_boot_log?: string
 }): Promise<TrustAttestation> {
-  const res = await apiFetch(`${API_BASE}/certificates/attestations`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to submit trust attestation')
-  return res.json()
+  return apiPost<TrustAttestation>(`${API_BASE}/certificates/attestations`, req)
 }
 
 // Security baselines
 
 export async function listSecurityBaselines(): Promise<VmSecurityBaseline[]> {
-  const res = await apiFetch(`${API_BASE}/certificates/security-baselines`)
-  if (!res.ok) throw new Error('Failed to fetch security baselines')
-  return res.json()
+  return apiGet<VmSecurityBaseline[]>(`${API_BASE}/certificates/security-baselines`)
 }
 
 export async function createSecurityBaseline(req: {
@@ -263,13 +217,7 @@ export async function createSecurityBaseline(req: {
     enabled?: boolean
   }>
 }): Promise<VmSecurityBaseline> {
-  const res = await apiFetch(`${API_BASE}/certificates/security-baselines`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Failed to create security baseline')
-  return res.json()
+  return apiPost<VmSecurityBaseline>(`${API_BASE}/certificates/security-baselines`, req)
 }
 
 export async function checkVmSecurityCompliance(baselineId: string, vmId: string): Promise<{
@@ -282,19 +230,20 @@ export async function checkVmSecurityCompliance(baselineId: string, vmId: string
   }>
   checked_at: string
 }> {
-  const res = await apiFetch(`${API_BASE}/certificates/security-baselines/${baselineId}/check`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ vm_id: vmId }),
-  })
-  if (!res.ok) throw new Error('Failed to check VM security compliance')
-  return res.json()
+  return apiPost<{
+    compliant: boolean
+    checks: Array<{
+      check_id: string
+      name: string
+      status: 'pass' | 'fail' | 'not_applicable'
+      details?: string
+    }>
+    checked_at: string
+  }>(`${API_BASE}/certificates/security-baselines/${baselineId}/check`, { vm_id: vmId })
 }
 
 // Dashboard
 
 export async function getCertHealthDashboard(): Promise<CertHealthDashboard> {
-  const res = await apiFetch(`${API_BASE}/certificates/dashboard`)
-  if (!res.ok) throw new Error('Failed to fetch certificate health dashboard')
-  return res.json()
+  return apiGet<CertHealthDashboard>(`${API_BASE}/certificates/dashboard`)
 }

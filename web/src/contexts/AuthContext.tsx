@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) {
-      getMe(token)
+      getMe()
         .then(setUser)
         .catch(() => {
           clearToken()

@@ -100,9 +100,9 @@ fn default_auth_enabled() -> bool {
 fn default_jwt_secret() -> String {
     std::env::var("VMSPAWND_JWT_SECRET").unwrap_or_else(|_| {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         (0..32)
-            .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
+            .map(|_| rng.sample(rand::distr::Alphanumeric) as char)
             .collect()
     })
 }
