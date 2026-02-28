@@ -5,9 +5,11 @@ services:
     build: .
     container_name: vmspawnd
     ports:
-      - "8080:8080"
+      - "9080:8080"
     volumes:
-      - /var/lib/vmspawnd:/var/lib/vmspawnd
-      - /etc/vmspawnd:/etc/vmspawnd
+      - vmspawnd-data:/var/lib/vmspawnd
     privileged: true
     restart: unless-stopped
+
+volumes:
+  vmspawnd-data:
