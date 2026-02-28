@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPostVoid, apiDelete, apiFetch } from './client'
+import { apiGet, apiPost, apiPostVoid, apiPutVoid, apiDelete } from './client'
 import { API_BASE_URL } from './config'
 
 export interface CpuCore {
@@ -129,12 +129,7 @@ export async function getCpuAffinity(vmName: string): Promise<number[]> {
 
 // Set memory limit for a VM
 export async function setMemoryLimit(vmName: string, request: SetMemoryLimitRequest): Promise<void> {
-  const res = await apiFetch(`${API_BASE_URL}/vms/${vmName}/memory/limit`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  })
-  if (!res.ok) throw new Error(`Failed to set memory limit for: ${vmName}`)
+  return apiPutVoid(`${API_BASE_URL}/vms/${vmName}/memory/limit`, request)
 }
 
 // Get memory usage for a VM

@@ -4,12 +4,9 @@ import { createSchedule, updateSchedule, CreateScheduleRequest, Schedule } from 
 import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 
-interface ScheduleDialogProps {
-  mode: 'create' | 'edit'
-  schedule?: Schedule
-  onClose: () => void
-  onSuccess: () => void
-}
+type ScheduleDialogProps =
+  | { mode: 'create'; schedule?: never; onClose: () => void; onSuccess: () => void }
+  | { mode: 'edit'; schedule: Schedule; onClose: () => void; onSuccess: () => void }
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Sunday' },
@@ -39,15 +36,14 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
     if (mode === 'create') {
       loadVMs()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
   const loadVMs = async () => {
     try {
       const data = await listVMs()
       setVMs(data)
-      if (data.length > 0 && !formData.vm_name) {
-        setFormData(prev => ({ ...prev, vm_name: data[0].name }))
+      if (data.length > 0) {
+        setFormData(prev => prev.vm_name ? prev : { ...prev, vm_name: data[0].name })
       }
     } catch (error) {
       console.error('Failed to load VMs:', error)
@@ -78,7 +74,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
         await createSchedule(formData)
         toast.success('Schedule created successfully')
       } else {
-        await updateSchedule(schedule!.id, {
+        await updateSchedule(schedule.id, {
           name: formData.name,
           action: formData.action,
           schedule_type: formData.schedule_type,
@@ -122,7 +118,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
               <h2 className="text-xl font-bold">
                 {mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}
               </h2>
-              {mode === 'edit' && schedule && (
+              {mode === 'edit' && (
                 <p className="text-sm text-gray-400">VM: {schedule.vm_name}</p>
               )}
             </div>
@@ -164,6 +160,9 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               >
+                {vms.length === 0 && (
+                  <option value="">Loading VMs...</option>
+                )}
                 {vms.map((vm) => (
                   <option key={vm.name} value={vm.name}>
                     {vm.name} ({vm.state})
@@ -180,7 +179,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
             </label>
             <select
               value={formData.action}
-              onChange={(e) => setFormData({ ...formData, action: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, action: e.target.value as CreateScheduleRequest['action'] })}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
               required
             >
@@ -198,7 +197,14 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
             </label>
             <select
               value={formData.schedule_type}
-              onChange={(e) => setFormData({ ...formData, schedule_type: e.target.value as any })}
+              onChange={(e) => {
+                const newType = e.target.value as CreateScheduleRequest['schedule_type']
+                setFormData({
+                  ...formData,
+                  schedule_type: newType,
+                  days_of_week: newType === 'weekly' ? formData.days_of_week : [],
+                })
+              }}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
               required
             >
@@ -252,7 +258,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
           </div>
 
           {/* Current Status (edit mode only) */}
-          {mode === 'edit' && schedule && (
+          {mode === 'edit' && (
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
               <h4 className="text-sm font-medium mb-2">Current Status</h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -293,7 +299,8 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+              disabled={submitting}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>

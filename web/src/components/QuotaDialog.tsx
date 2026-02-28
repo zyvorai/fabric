@@ -3,12 +3,9 @@ import { X, Shield } from 'lucide-react'
 import { createQuota, updateQuota, CreateQuotaRequest, ResourceQuota } from '../api/quota'
 import { useToastContext } from '../contexts/ToastContext'
 
-interface QuotaDialogProps {
-  mode: 'create' | 'edit'
-  quota?: ResourceQuota
-  onClose: () => void
-  onSuccess: () => void
-}
+type QuotaDialogProps =
+  | { mode: 'create'; quota?: never; onClose: () => void; onSuccess: () => void }
+  | { mode: 'edit'; quota: ResourceQuota; onClose: () => void; onSuccess: () => void }
 
 export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDialogProps) {
   const toast = useToastContext()
@@ -43,7 +40,8 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
         await createQuota(formData)
         toast.success('Quota created successfully')
       } else {
-        await updateQuota(quota!.id, formData)
+        const { enabled: _, ...editPayload } = formData
+        await updateQuota(quota.id, editPayload)
         toast.success('Quota updated successfully')
       }
       onSuccess()
@@ -91,7 +89,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
               <h2 className="text-xl font-bold">
                 {mode === 'create' ? 'Create Resource Quota' : 'Edit Resource Quota'}
               </h2>
-              {mode === 'edit' && quota && (
+              {mode === 'edit' && (
                 <p className="text-sm text-gray-400">ID: {quota.id}</p>
               )}
             </div>
@@ -122,7 +120,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
           </div>
 
           {/* Current Usage Info (edit mode only) */}
-          {mode === 'edit' && quota && (
+          {mode === 'edit' && (
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
               <h4 className="text-sm font-medium mb-3">Current Usage</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -164,7 +162,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              {mode === 'edit' && quota && formData.max_cpus < quota.used_cpus ? (
+              {mode === 'edit' && formData.max_cpus < quota.used_cpus ? (
                 <p className="text-xs text-red-400 mt-1">
                   Below current usage ({quota.used_cpus})
                 </p>
@@ -187,12 +185,13 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">
-                {(formData.max_memory / 1024).toFixed(1)}GB total
-              </p>
-              {mode === 'edit' && quota && formData.max_memory < quota.used_memory && (
+              {mode === 'edit' && formData.max_memory < quota.used_memory ? (
                 <p className="text-xs text-red-400 mt-1">
                   Below current usage ({quota.used_memory}MB)
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">
+                  {(formData.max_memory / 1024).toFixed(1)}GB total
                 </p>
               )}
             </div>
@@ -211,7 +210,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              {mode === 'edit' && quota && formData.max_disk < quota.used_disk ? (
+              {mode === 'edit' && formData.max_disk < quota.used_disk ? (
                 <p className="text-xs text-red-400 mt-1">
                   Below current usage ({quota.used_disk}GB)
                 </p>
@@ -233,7 +232,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
-              {mode === 'edit' && quota && formData.max_vms < quota.used_vms ? (
+              {mode === 'edit' && formData.max_vms < quota.used_vms ? (
                 <p className="text-xs text-red-400 mt-1">
                   Below current usage ({quota.used_vms} VMs)
                 </p>
@@ -315,7 +314,8 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+              disabled={submitting}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>

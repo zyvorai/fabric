@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPostVoid, apiDelete, apiFetch } from './client'
+import { apiGet, apiPost, apiPostVoid, apiPutVoid, apiDelete } from './client'
 
 export interface VM {
   name: string
@@ -89,10 +89,5 @@ export async function removeTag(vmName: string, tag: string): Promise<void> {
 }
 
 export async function updateTags(vmName: string, tags: string[]): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/vms/${vmName}/tags`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tags }),
-  })
-  if (!res.ok) throw new Error('Failed to update tags')
+  return apiPutVoid(`${API_BASE}/vms/${vmName}/tags`, { tags })
 }

@@ -67,6 +67,15 @@ export async function apiPut<T>(url: string, body: unknown): Promise<T> {
   return res.json()
 }
 
+export async function apiPutVoid(url: string, body: unknown): Promise<void> {
+  const res = await apiFetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`PUT ${url} failed`)
+}
+
 export async function apiDelete(url: string): Promise<void> {
   const res = await apiFetch(url, { method: 'DELETE' })
   if (!res.ok) throw new Error(`DELETE ${url} failed`)

@@ -120,6 +120,10 @@ pub async fn start_vm(
             }
             Err(e) => {
                 tracing::error!("Start task panicked for VM '{}': {}", name, e);
+                if let Ok(Some(mut vm)) = state_clone.store.get_vm(&name) {
+                    vm.state = vm_model::VMState::Stopped;
+                    let _ = state_clone.store.save_vm(&vm);
+                }
             }
         }
     });
