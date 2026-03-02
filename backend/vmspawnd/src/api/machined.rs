@@ -2,52 +2,76 @@
 //!
 //! Exposes systemd-machined functionality: machine lifecycle, image management,
 //! file transfer, SSH, and shell execution.
+//!
+//! Machine lifecycle and property queries use native D-Bus via the MachinectlDriver.
+//! Image transfer and file operations still use CLI calls (machined's import1
+//! D-Bus interface uses FD passing which is more complex).
 
 use axum::{
-    extract::Path,
+    extract::{Path, State},
     http::StatusCode,
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
+use crate::server::AppState;
 use crate::validation::validate_vm_name;
 use security::RequireAdmin;
 use vmspawn_driver::machinectl;
+use vmspawnd_driver_core::{MachineInfo, VMDriver};
 
 // ============================================================================
-// Machine operations
+// Machine operations (migrated to D-Bus driver)
 // ============================================================================
 
 /// GET /api/machines - List running machines from machined
-pub async fn list_machines() -> Result<Json<Vec<machinectl::MachineInfo>>, (StatusCode, String)> {
-    machinectl::list_machines()
+pub async fn list_machines(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<MachineInfo>>, (StatusCode, String)> {
+    state
+        .driver
+        .list_machines()
+        .await
         .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// GET /api/machines/:name/properties - Show machine properties
 pub async fn show_machine(
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<std::collections::HashMap<String, String>>, (StatusCode, String)> {
-    machinectl::show_machine(&name)
+    state
+        .driver
+        .get_properties(&name)
+        .await
         .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/machines/:name/poweroff - Graceful poweroff
 pub async fn poweroff_machine(
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    machinectl::poweroff(&name)
+    state
+        .driver
+        .poweroff(&name)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/machines/:name/reboot - Reboot machine
 pub async fn reboot_machine(
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    machinectl::reboot(&name)
+    state
+        .driver
+        .reboot(&name)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
@@ -55,34 +79,46 @@ pub async fn reboot_machine(
 /// POST /api/machines/:name/terminate - Force terminate (Admin only)
 pub async fn terminate_machine(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
-    machinectl::terminate(&name)
+    state
+        .driver
+        .terminate(&name)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/machines/:name/enable - Enable auto-start at boot
 pub async fn enable_machine(
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    machinectl::enable(&name)
+    state
+        .driver
+        .enable(&name)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/machines/:name/disable - Disable auto-start
 pub async fn disable_machine(
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    machinectl::disable(&name)
+    state
+        .driver
+        .disable(&name)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 // ============================================================================
-// Shell & SSH
+// Shell & SSH (still CLI-based)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
@@ -131,7 +167,7 @@ pub async fn ssh_info(
 }
 
 // ============================================================================
-// File transfer
+// File transfer (still CLI-based)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
@@ -188,7 +224,7 @@ pub async fn bind_machine(
 }
 
 // ============================================================================
-// Image management
+// Image management (still CLI-based — import1 uses FD passing)
 // ============================================================================
 
 /// GET /api/machines/images - List images from /var/lib/machines
@@ -253,7 +289,7 @@ pub async fn set_image_read_only(
 }
 
 // ============================================================================
-// Image transfer (pull/import/export)
+// Image transfer (pull/import/export — still CLI-based)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]

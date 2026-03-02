@@ -29,6 +29,9 @@ members = [
     "lifecycle-manager",
     "certificate-manager",
     "security",
+    "crates/driver-core",
+    "crates/machined-dbus",
+    "crates/machinectl-driver",
 ]
 
 [workspace.package]
@@ -59,3 +62,5 @@ tar = "0.4"
 flate2 = "1.1"
 hostname = "0.4"
 rand = "0.9"
+zbus = { version = "4", default-features = false, features = ["tokio"] }
+async-stream = "0.3"

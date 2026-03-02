@@ -10,6 +10,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use vmspawnd_storage::StorageManager;
 
+use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
+
 use crate::{api, config::Config, plugins, routes, websocket};
 
 pub struct AppState {
@@ -21,6 +23,7 @@ pub struct AppState {
     pub user_db: Option<Arc<security::db::UserDb>>,
     pub jwt_config: Option<Arc<security::JwtConfig>>,
     pub plugin_registry: Arc<RwLock<plugins::PluginRegistry>>,
+    pub driver: Arc<vmspawnd_machinectl_driver::MachinectlDriver>,
 }
 
 pub struct QuotaCache {
@@ -46,7 +49,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(store: StateStore, config: Config) -> Result<Self> {
+    pub async fn new(store: StateStore, config: Config) -> Result<Self> {
         // Initialize storage manager
         let storage_path = std::path::PathBuf::from("/var/lib/vmspawnd/storage");
         let storage_manager = StorageManager::new(&storage_path)
@@ -72,6 +75,11 @@ impl Server {
             (None, None)
         };
 
+        // Initialize the D-Bus machined driver
+        let driver = vmspawnd_machinectl_driver::MachinectlDriver::new()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to initialize machined D-Bus driver: {}", e))?;
+
         let state = Arc::new(AppState {
             store,
             config,
@@ -81,6 +89,7 @@ impl Server {
             user_db,
             jwt_config,
             plugin_registry: Arc::new(RwLock::new(plugins::PluginRegistry::new())),
+            driver: Arc::new(driver),
         });
 
         Ok(Self { state })
@@ -767,7 +776,7 @@ async fn run_metrics_collector(state: Arc<AppState>) {
         let mut collected_count = 0u32;
 
         for vm in &running_vms {
-            match vmspawn_driver::get_metrics(&vm.name) {
+            match state.driver.get_metrics(&vm.name).await {
                 Ok(metrics) => {
                     // Calculate memory usage as percentage
                     let memory_pct = if vm.memory > 0 {
@@ -1044,8 +1053,8 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                 continue;
             }
 
-            // Check if the VM is actually still running via machinectl
-            match vmspawn_driver::get_vm_state(&vm.name) {
+            // Check if the VM is actually still running via D-Bus
+            match state.driver.get_state(&vm.name).await {
                 Ok(vm_model::VMState::Running) => continue, // Still running, no action needed
                 Ok(_) | Err(_) => {
                     // VM was supposed to be running but isn't — it crashed
@@ -1067,7 +1076,7 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                     tracing::warn!("Auto-healer: VM '{}' crashed, attempting restart ({}/{})",
                         vm.name, restart_count + 1, MAX_RESTARTS);
 
-                    match vmspawn_driver::start_vm(&vm.name) {
+                    match state.driver.start(&vm.name).await {
                         Ok(_) => {
                             tracing::info!("Auto-healer: VM '{}' restarted successfully", vm.name);
 

@@ -18,7 +18,7 @@ impl Daemon {
     pub async fn start(self) -> Result<()> {
         tracing::info!("vmspawnd daemon starting on {}", self.config.daemon.listen);
 
-        let server = Server::new(self.state, self.config)?;
+        let server = Server::new(self.state, self.config).await?;
         server.run().await
     }
 }

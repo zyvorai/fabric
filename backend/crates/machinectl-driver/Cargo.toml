@@ -1,0 +1,19 @@
+[package]
+name = "vmspawnd-machinectl-driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+futures.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+zbus.workspace = true
+async-stream.workspace = true
+vm-model = { path = "../../vm-model" }
+vmspawnd-driver-core = { path = "../driver-core" }
+vmspawnd-machined-dbus = { path = "../machined-dbus" }

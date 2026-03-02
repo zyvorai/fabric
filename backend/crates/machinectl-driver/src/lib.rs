@@ -1,0 +1,48 @@
+mod lifecycle;
+mod logs;
+mod resource_control;
+mod stats;
+
+use anyhow::Result;
+use zbus::Connection;
+
+pub use vmspawnd_driver_core::{
+    CapabilityProvider, LogDriver, LogEntry, MachineInfo, ResourceControlDriver,
+    ResourceStatsDriver, VMDriver,
+};
+
+/// Main driver that implements all driver-core traits using native D-Bus calls.
+///
+/// Holds a single `zbus::Connection` to the system bus. The connection is
+/// internally ref-counted and thread-safe.
+#[derive(Clone)]
+pub struct MachinectlDriver {
+    conn: Connection,
+}
+
+impl MachinectlDriver {
+    /// Create a new driver by connecting to the system D-Bus.
+    pub async fn new() -> Result<Self> {
+        let conn = vmspawnd_machined_dbus::system_bus().await?;
+        Ok(Self { conn })
+    }
+
+    /// Create a driver from an existing connection (useful for testing).
+    pub fn from_connection(conn: Connection) -> Self {
+        Self { conn }
+    }
+}
+
+impl CapabilityProvider for MachinectlDriver {
+    fn has_dbus(&self) -> bool {
+        true // We successfully connected in new()
+    }
+
+    fn has_machined(&self) -> bool {
+        true // If we got this far, machined is expected
+    }
+
+    fn has_resource_control(&self) -> bool {
+        std::path::Path::new("/sys/fs/cgroup/machine.slice").exists()
+    }
+}

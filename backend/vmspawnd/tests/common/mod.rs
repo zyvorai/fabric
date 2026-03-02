@@ -45,6 +45,10 @@ pub async fn create_test_app() -> Router {
         .build()
         .unwrap();
 
+    let driver = vmspawnd_machinectl_driver::MachinectlDriver::new()
+        .await
+        .expect("Failed to connect to system D-Bus for test setup");
+
     let state = Arc::new(AppState {
         store,
         config,
@@ -54,6 +58,7 @@ pub async fn create_test_app() -> Router {
         user_db: None,
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(vmspawnd::plugins::PluginRegistry::new())),
+        driver: Arc::new(driver),
     });
 
     vmspawnd::server::build_router(state)

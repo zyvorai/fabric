@@ -12,6 +12,7 @@ use security::{RequireRead, RequireWrite, RequireAdmin};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
+use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
 
 pub async fn list_vms(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match state.store.list_vms() {
@@ -105,31 +106,20 @@ pub async fn start_vm(
         }
     }
 
-    // Spawn machinectl start in background so API returns immediately
+    // Spawn start in background so API returns immediately
     let vm_name = name.clone();
     let state_clone = state.clone();
     tokio::spawn(async move {
-        let result = tokio::task::spawn_blocking(move || {
-            vmspawn_driver::start_vm(&vm_name)
-        }).await;
+        use vmspawnd_driver_core::VMDriver;
 
-        match result {
-            Ok(Ok(_)) => {
-                tracing::info!("VM '{}' started successfully", name);
-            }
-            Ok(Err(e)) => {
-                tracing::error!("Failed to start VM '{}': {}", name, e);
-                // Revert state on failure
-                if let Ok(Some(mut vm)) = state_clone.store.get_vm(&name) {
-                    vm.state = vm_model::VMState::Stopped;
-                    if let Err(e) = state_clone.store.save_vm(&vm) {
-                        tracing::error!("Failed to save VM state: {}", e);
-                    }
-                }
+        match state_clone.driver.start(&vm_name).await {
+            Ok(_) => {
+                tracing::info!("VM '{}' started successfully", vm_name);
             }
             Err(e) => {
-                tracing::error!("Start task panicked for VM '{}': {}", name, e);
-                if let Ok(Some(mut vm)) = state_clone.store.get_vm(&name) {
+                tracing::error!("Failed to start VM '{}': {}", vm_name, e);
+                // Revert state on failure
+                if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
                     vm.state = vm_model::VMState::Stopped;
                     if let Err(e) = state_clone.store.save_vm(&vm) {
                         tracing::error!("Failed to save VM state: {}", e);
@@ -150,7 +140,7 @@ pub async fn stop_vm(
     if let Err((status, msg)) = validate_vm_name(&name) {
         return (status, Json(json!({ "error": msg }))).into_response();
     }
-    match vmspawn_driver::stop_vm(&name) {
+    match state.driver.poweroff(&name).await {
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Stopped;
@@ -363,13 +353,13 @@ pub async fn clone_vm(
 
 pub async fn get_metrics(
     RequireRead(_claims): RequireRead,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
         return (status, Json(json!({ "error": msg }))).into_response();
     }
-    match vmspawn_driver::get_metrics(&name) {
+    match state.driver.get_metrics(&name).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,

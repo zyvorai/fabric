@@ -32,6 +32,9 @@ pub enum VMState {
     Running,
     Stopped,
     Paused,
+    Starting,
+    Stopping,
+    Failed,
     Unknown,
 }
 
