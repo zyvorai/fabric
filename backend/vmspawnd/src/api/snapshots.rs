@@ -7,6 +7,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::server::AppState;
@@ -59,9 +60,10 @@ pub async fn create_snapshot(
 
     // Attempt qemu-img snapshot
     if let Some(ref path) = image_path {
-        let output = std::process::Command::new("qemu-img")
+        let output = Command::new("qemu-img")
             .args(["snapshot", "-c", &req.name, path])
-            .output();
+            .output()
+            .await;
 
         match output {
             Ok(o) if !o.status.success() => {
@@ -96,7 +98,7 @@ pub async fn create_snapshot(
 
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.save_entity(&store_key, &snapshot.id, &snapshot) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&snapshot).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(snapshot)).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -122,7 +124,7 @@ pub async fn get_snapshot(
 ) -> impl IntoResponse {
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
-        Ok(Some(s)) => Json(serde_json::to_value(&s).unwrap()).into_response(),
+        Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -138,13 +140,19 @@ pub async fn delete_snapshot(
     // Get snapshot info to delete from qemu-img
     if let Ok(Some(snapshot)) = state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         if let Some(ref path) = find_vm_image(&vm_name) {
-            let _ = std::process::Command::new("qemu-img")
+            if let Err(e) = Command::new("qemu-img")
                 .args(["snapshot", "-d", &snapshot.name, path])
-                .output();
+                .output()
+                .await
+            {
+                tracing::warn!("Command failed: {}", e);
+            }
         }
     }
 
-    let _ = state.store.delete_entity(&store_key, &id);
+    if let Err(e) = state.store.delete_entity(&store_key, &id) {
+        tracing::error!("Failed to delete: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -163,9 +171,10 @@ pub async fn revert_snapshot(
 
     // VM should be stopped before reverting
     if let Some(ref path) = find_vm_image(&vm_name) {
-        let output = std::process::Command::new("qemu-img")
+        let output = Command::new("qemu-img")
             .args(["snapshot", "-a", &snapshot.name, path])
-            .output();
+            .output()
+            .await;
 
         match output {
             Ok(o) if !o.status.success() => {

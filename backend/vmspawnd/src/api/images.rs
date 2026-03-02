@@ -83,7 +83,9 @@ pub async fn build_image(
         // Update state to building
         if let Ok(Some(mut s)) = state_clone.store.get_entity::<ImageBuildStatus>("image_builds", &build_id_clone) {
             s.state = BuildState::Building;
-            let _ = state_clone.store.save_entity("image_builds", &build_id_clone, &s);
+            if let Err(e) = state_clone.store.save_entity("image_builds", &build_id_clone, &s) {
+                tracing::error!("Failed to save: {}", e);
+            }
         }
 
         let config = vmspawn_driver::MkosiConfig {
@@ -115,7 +117,9 @@ pub async fn build_image(
                 }
             }
             s.completed = Some(Utc::now());
-            let _ = state_clone.store.save_entity("image_builds", &build_id_clone, &s);
+            if let Err(e) = state_clone.store.save_entity("image_builds", &build_id_clone, &s) {
+                tracing::error!("Failed to save image build: {}", e);
+            }
         }
     });
 

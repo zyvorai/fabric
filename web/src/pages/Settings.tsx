@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Settings as SettingsIcon, Save, RotateCcw, Bell, Globe, Shield, Database, Loader2 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'
+import { apiGet, apiPut } from '../api/client'
 
 interface AppSettings {
   daemon_name: string
@@ -60,11 +61,8 @@ export default function Settings() {
 
   const loadSettings = async () => {
     try {
-      const res = await fetch('/api/settings')
-      if (res.ok) {
-        const data = await res.json()
-        setSettings(data)
-      }
+      const data = await apiGet<AppSettings>('/api/settings')
+      setSettings(data)
     } catch (error) {
       console.error('Failed to load settings:', error)
     } finally {
@@ -75,16 +73,8 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      })
-      if (res.ok) {
-        toast.success('Settings saved successfully')
-      } else {
-        toast.error('Failed to save settings')
-      }
+      await apiPut<AppSettings>('/api/settings', settings)
+      toast.success('Settings saved successfully')
     } catch (_error) {
       toast.error('Failed to save settings')
     } finally {

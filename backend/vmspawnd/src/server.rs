@@ -17,7 +17,7 @@ pub struct AppState {
     pub config: Config,
     pub storage_manager: Arc<RwLock<StorageManager>>,
     pub http_client: reqwest::Client,
-    pub quota_cache: Arc<std::sync::RwLock<QuotaCache>>,
+    pub quota_cache: Arc<tokio::sync::RwLock<QuotaCache>>,
     pub user_db: Option<Arc<security::db::UserDb>>,
     pub jwt_config: Option<Arc<security::JwtConfig>>,
     pub plugin_registry: Arc<RwLock<plugins::PluginRegistry>>,
@@ -77,7 +77,7 @@ impl Server {
             config,
             storage_manager: Arc::new(RwLock::new(storage_manager)),
             http_client,
-            quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
+            quota_cache: Arc::new(tokio::sync::RwLock::new(QuotaCache::new())),
             user_db,
             jwt_config,
             plugin_registry: Arc::new(RwLock::new(plugins::PluginRegistry::new())),
@@ -94,49 +94,58 @@ impl Server {
 
         tracing::info!("Listening on {}", addr);
 
+        let mut bg_tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+
         // Start background scheduler for automated schedule execution
         let scheduler_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_schedule_checker(scheduler_state).await;
-        });
+        }));
 
         // Start background metrics collector
         let metrics_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_metrics_collector(metrics_state).await;
-        });
+        }));
 
         // Start stale host detector
         let host_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_stale_host_detector(host_state).await;
-        });
+        }));
 
         // Start DRS auto-executor
         let drs_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_drs_executor(drs_state).await;
-        });
+        }));
 
         // Start HA failover monitor
         let ha_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_ha_monitor(ha_state).await;
-        });
+        }));
 
         // Start VM auto-healer
         let heal_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_vm_autohealer(heal_state).await;
-        });
+        }));
 
         // Start auto-scaling engine
         let scale_state = self.state.clone();
-        tokio::spawn(async move {
+        bg_tasks.push(tokio::spawn(async move {
             run_autoscaler(scale_state).await;
-        });
+        }));
 
-        axum::serve(listener, app).await?;
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+
+        tracing::info!("Shutdown signal received, aborting background tasks");
+        for handle in bg_tasks {
+            handle.abort();
+        }
 
         Ok(())
     }
@@ -587,7 +596,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                     "../web/dist"
                 },
             ))
+            .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
             .layer(cors)
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to install Ctrl+C signal handler");
+    tracing::info!("Received Ctrl+C, starting graceful shutdown");
 }
 
 /// Background task that checks and executes due schedules every 30 seconds
@@ -686,7 +703,9 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                     sched.next_run = crate::api::schedules::calculate_next_run_pub(
                         &sched.schedule_type, &sched.time, &sched.days_of_week
                     );
-                    let _ = state_clone.store.save_entity("schedules", &sched.id, &sched);
+                    if let Err(e) = state_clone.store.save_entity("schedules", &sched.id, &sched) {
+                        tracing::error!("Failed to save: {}", e);
+                    }
                 }
 
                 // Record history
@@ -708,7 +727,9 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                 };
 
                 let history_id = uuid::Uuid::new_v4().to_string();
-                let _ = state_clone.store.save_entity("schedule_history", &history_id, &history);
+                if let Err(e) = state_clone.store.save_entity("schedule_history", &history_id, &history) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             });
         }
     }
@@ -872,11 +893,15 @@ async fn run_stale_host_detector(state: Arc<AppState>) {
                 tracing::warn!("Host '{}' ({}) not responding (last heartbeat {}s ago)", host.hostname, host.id, elapsed);
                 host.status = HostStatus::NotResponding;
                 host.updated_at = now;
-                let _ = state.store.save_entity("hosts", &host.id, &host);
+                if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             } else if elapsed <= HEARTBEAT_TIMEOUT_SECS && matches!(host.status, HostStatus::NotResponding) {
                 host.status = HostStatus::Connected;
                 host.updated_at = now;
-                let _ = state.store.save_entity("hosts", &host.id, &host);
+                if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             }
         }
     }
@@ -918,10 +943,14 @@ async fn run_drs_executor(state: Arc<AppState>) {
                 error: None,
             };
 
-            let _ = state.store.save_entity("migrations", &migration_id, &migration_status);
+            if let Err(e) = state.store.save_entity("migrations", &migration_id, &migration_status) {
+                tracing::error!("Failed to save: {}", e);
+            }
 
             rec.status = RecommendationStatus::Applied;
-            let _ = state.store.save_entity("drs_recommendations", &rec.id, &rec);
+            if let Err(e) = state.store.save_entity("drs_recommendations", &rec.id, &rec) {
+                tracing::error!("Failed to save: {}", e);
+            }
         }
     }
 }
@@ -969,7 +998,9 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                 ft.failover_count += 1;
                 ft.updated = chrono::Utc::now();
 
-                let _ = state.store.save_entity("ft_configs", &ft.vm_name, &ft);
+                if let Err(e) = state.store.save_entity("ft_configs", &ft.vm_name, &ft) {
+                    tracing::error!("Failed to save: {}", e);
+                }
 
                 // Log the failover event
                 let event = FtEvent {
@@ -981,7 +1012,9 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                     details: Some("Automatic failover triggered by HA monitor".to_string()),
                     timestamp: chrono::Utc::now(),
                 };
-                let _ = state.store.save_entity("ft_events", &event.id, &event);
+                if let Err(e) = state.store.save_entity("ft_events", &event.id, &event) {
+                    tracing::error!("Failed to save: {}", e);
+                }
 
                 tracing::info!("HA monitor: failover complete for VM '{}', new primary: '{}'",
                     ft.vm_name, ft.primary_host_id);
@@ -1044,7 +1077,9 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                                 "count": restart_count + 1,
                                 "last_restart": Utc::now().to_rfc3339(),
                             });
-                            let _ = state.store.save_entity("autoheal", &vm.name, &heal_record);
+                            if let Err(e) = state.store.save_entity("autoheal", &vm.name, &heal_record) {
+                                tracing::error!("Failed to save: {}", e);
+                            }
 
                             // Record event
                             crate::api::events::record_event(
@@ -1124,10 +1159,14 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             &format!("CPU usage {:.1}% > threshold {:.1}%", cpu_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
                             vm.cpus = new_cpus;
-                            let _ = state.store.save_vm(&vm);
+                            if let Err(e) = state.store.save_vm(&vm) {
+                                tracing::error!("Failed to save VM: {}", e);
+                            }
                         }
                         policy.last_scale_action = Some(now);
-                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                        if let Err(e) = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy) {
+                            tracing::error!("Failed to save: {}", e);
+                        }
                         continue;
                     }
                 }
@@ -1140,10 +1179,14 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             &format!("CPU usage {:.1}% < threshold {:.1}%", cpu_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
                             vm.cpus = new_cpus;
-                            let _ = state.store.save_vm(&vm);
+                            if let Err(e) = state.store.save_vm(&vm) {
+                                tracing::error!("Failed to save VM: {}", e);
+                            }
                         }
                         policy.last_scale_action = Some(now);
-                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                        if let Err(e) = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy) {
+                            tracing::error!("Failed to save: {}", e);
+                        }
                         continue;
                     }
                 }
@@ -1160,10 +1203,14 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             &format!("Memory usage {:.1}% > threshold {:.1}%", mem_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
                             vm.memory = new_mem;
-                            let _ = state.store.save_vm(&vm);
+                            if let Err(e) = state.store.save_vm(&vm) {
+                                tracing::error!("Failed to save VM: {}", e);
+                            }
                         }
                         policy.last_scale_action = Some(now);
-                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                        if let Err(e) = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy) {
+                            tracing::error!("Failed to save: {}", e);
+                        }
                     }
                 }
                 if let Some(threshold) = policy.memory_scale_down_threshold {
@@ -1175,10 +1222,14 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             &format!("Memory usage {:.1}% < threshold {:.1}%", mem_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
                             vm.memory = new_mem;
-                            let _ = state.store.save_vm(&vm);
+                            if let Err(e) = state.store.save_vm(&vm) {
+                                tracing::error!("Failed to save VM: {}", e);
+                            }
                         }
                         policy.last_scale_action = Some(now);
-                        let _ = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy);
+                        if let Err(e) = state.store.save_entity("autoscale_policies", &policy.vm_name, &policy) {
+                            tracing::error!("Failed to save: {}", e);
+                        }
                     }
                 }
             }
@@ -1205,5 +1256,7 @@ fn record_scale_event(
         reason: reason.to_string(),
         timestamp: chrono::Utc::now(),
     };
-    let _ = state.store.save_entity("scale_events", &event.id, &event);
+    if let Err(e) = state.store.save_entity("scale_events", &event.id, &event) {
+        tracing::error!("Failed to save: {}", e);
+    }
 }

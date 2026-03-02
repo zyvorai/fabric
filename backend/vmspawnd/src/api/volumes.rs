@@ -67,7 +67,7 @@ pub async fn create_volume(
 
     let store_key = format!("volumes_{}", pool_name);
     match state.store.save_entity(&store_key, &volume.id, &volume) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&volume).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(volume)).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -93,7 +93,7 @@ pub async fn get_volume(
 ) -> impl IntoResponse {
     let store_key = format!("volumes_{}", pool_name);
     match state.store.get_entity::<Volume>(&store_key, &id) {
-        Ok(Some(v)) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+        Ok(Some(v)) => Json(v).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -105,7 +105,9 @@ pub async fn delete_volume(
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     let store_key = format!("volumes_{}", pool_name);
-    let _ = state.store.delete_entity(&store_key, &id);
+    if let Err(e) = state.store.delete_entity(&store_key, &id) {
+        tracing::error!("Failed to delete volume: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -121,7 +123,7 @@ pub async fn resize_volume(
             v.size = req.size;
             v.updated = Utc::now().to_rfc3339();
             match state.store.save_entity(&store_key, &v.id, &v) {
-                Ok(_) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+                Ok(_) => Json(v).into_response(),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": e.to_string()})),
@@ -153,7 +155,7 @@ pub async fn attach_volume(
             v.vm_attached = Some(req.vm_name);
             v.updated = Utc::now().to_rfc3339();
             match state.store.save_entity(&store_key, &v.id, &v) {
-                Ok(_) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+                Ok(_) => Json(v).into_response(),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": e.to_string()})),
@@ -177,7 +179,7 @@ pub async fn detach_volume(
             v.vm_attached = None;
             v.updated = Utc::now().to_rfc3339();
             match state.store.save_entity(&store_key, &v.id, &v) {
-                Ok(_) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+                Ok(_) => Json(v).into_response(),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": e.to_string()})),

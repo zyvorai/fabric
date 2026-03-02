@@ -1,49 +1,49 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
+import { Suspense, lazy, ReactNode } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { ErrorBoundary } from './components/ErrorBoundary'
+import { PageErrorBoundary } from './components/ErrorBoundary'
 import Navbar from './components/Navbar'
 import KeyboardShortcutsPanel from './components/KeyboardShortcutsPanel'
 import CommandPalette from './components/CommandPalette'
-import Dashboard from './pages/Dashboard'
-import VMList from './pages/VMList'
-import VMDetails from './pages/VMDetails'
-import CreateVM from './pages/CreateVM'
-import Console from './pages/Console'
-import Logs from './pages/Logs'
-import Network from './pages/Network'
-import Storage from './pages/Storage'
-import Settings from './pages/Settings'
-import Templates from './pages/Templates'
-import Quotas from './pages/Quotas'
-import Schedules from './pages/Schedules'
-import AuditLogs from './pages/AuditLogs'
-import Analytics from './pages/Analytics'
-import Backups from './pages/Backups'
-import Notifications from './pages/Notifications'
-import StoragePools from './pages/StoragePools'
-import SystemResources from './pages/SystemResources'
-import Datacenters from './pages/Datacenters'
-import ResourcePools from './pages/ResourcePools'
-import DRS from './pages/DRS'
-import DistributedStorage from './pages/DistributedStorage'
-import Encryption from './pages/Encryption'
-
-import FaultTolerance from './pages/FaultTolerance'
-import Replication from './pages/Replication'
-import SiteRecovery from './pages/SiteRecovery'
-import ContentLibrary from './pages/ContentLibrary'
-import LifecycleManager from './pages/LifecycleManager'
-import Certificates from './pages/Certificates'
-import ImageBuilder from './pages/ImageBuilder'
-import Machines from './pages/Machines'
-import Migrations from './pages/Migrations'
-import Profiles from './pages/Profiles'
-import Snapshots from './pages/Snapshots'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
-import { ReactNode } from 'react'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const VMList = lazy(() => import('./pages/VMList'))
+const VMDetails = lazy(() => import('./pages/VMDetails'))
+const CreateVM = lazy(() => import('./pages/CreateVM'))
+const Console = lazy(() => import('./pages/Console'))
+const Logs = lazy(() => import('./pages/Logs'))
+const Network = lazy(() => import('./pages/Network'))
+const Storage = lazy(() => import('./pages/Storage'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Templates = lazy(() => import('./pages/Templates'))
+const Quotas = lazy(() => import('./pages/Quotas'))
+const Schedules = lazy(() => import('./pages/Schedules'))
+const AuditLogs = lazy(() => import('./pages/AuditLogs'))
+const Analytics = lazy(() => import('./pages/Analytics'))
+const Backups = lazy(() => import('./pages/Backups'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const StoragePools = lazy(() => import('./pages/StoragePools'))
+const SystemResources = lazy(() => import('./pages/SystemResources'))
+const Datacenters = lazy(() => import('./pages/Datacenters'))
+const ResourcePools = lazy(() => import('./pages/ResourcePools'))
+const DRS = lazy(() => import('./pages/DRS'))
+const DistributedStorage = lazy(() => import('./pages/DistributedStorage'))
+const Encryption = lazy(() => import('./pages/Encryption'))
+const FaultTolerance = lazy(() => import('./pages/FaultTolerance'))
+const Replication = lazy(() => import('./pages/Replication'))
+const SiteRecovery = lazy(() => import('./pages/SiteRecovery'))
+const ContentLibrary = lazy(() => import('./pages/ContentLibrary'))
+const LifecycleManager = lazy(() => import('./pages/LifecycleManager'))
+const Certificates = lazy(() => import('./pages/Certificates'))
+const ImageBuilder = lazy(() => import('./pages/ImageBuilder'))
+const Machines = lazy(() => import('./pages/Machines'))
+const Migrations = lazy(() => import('./pages/Migrations'))
+const Profiles = lazy(() => import('./pages/Profiles'))
+const Snapshots = lazy(() => import('./pages/Snapshots'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -74,7 +74,8 @@ function AppRoutes() {
             <KeyboardShortcutsPanel />
             <CommandPalette />
             <main className="container mx-auto px-4 py-8">
-              <ErrorBoundary>
+              <PageErrorBoundary>
+                <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/vms" element={<VMList />} />
@@ -113,7 +114,8 @@ function AppRoutes() {
                   <Route path="/certificates" element={<Certificates />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-              </ErrorBoundary>
+                </Suspense>
+              </PageErrorBoundary>
             </main>
           </div>
         </ProtectedRoute>

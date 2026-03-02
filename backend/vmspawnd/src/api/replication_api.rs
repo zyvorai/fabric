@@ -32,7 +32,7 @@ pub async fn register_site(
     site.created = now;
     site.updated = now;
     match state.store.save_entity("replication_sites", &site.id, &site) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&site).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(site)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -41,7 +41,9 @@ pub async fn remove_site(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("replication_sites", &id);
+    if let Err(e) = state.store.delete_entity("replication_sites", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -63,7 +65,7 @@ pub async fn configure_replication(
     config.created = now;
     config.updated = now;
     match state.store.save_entity("replications", &config.id, &config) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&config).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(config)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -73,7 +75,7 @@ pub async fn get_replication(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<ReplicationConfig>("replications", &id) {
-        Ok(Some(r)) => Json(serde_json::to_value(&r).unwrap()).into_response(),
+        Ok(Some(r)) => Json(r).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -90,7 +92,9 @@ pub async fn pause_replication(
     };
     repl.status = ReplicationStatus::Paused;
     repl.updated = Utc::now();
-    let _ = state.store.save_entity("replications", &repl.id, &repl);
+    if let Err(e) = state.store.save_entity("replications", &repl.id, &repl) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -105,7 +109,9 @@ pub async fn resume_replication(
     };
     repl.status = ReplicationStatus::Active;
     repl.updated = Utc::now();
-    let _ = state.store.save_entity("replications", &repl.id, &repl);
+    if let Err(e) = state.store.save_entity("replications", &repl.id, &repl) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -113,7 +119,9 @@ pub async fn remove_replication(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("replications", &id);
+    if let Err(e) = state.store.delete_entity("replications", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -139,7 +147,7 @@ pub async fn get_replication_metrics(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<ReplicationMetrics>("replication_metrics", &id) {
-        Ok(Some(m)) => Json(serde_json::to_value(&m).unwrap()).into_response(),
+        Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }

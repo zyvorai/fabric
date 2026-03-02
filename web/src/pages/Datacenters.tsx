@@ -19,9 +19,12 @@ import {
   type DatacenterSummary,
 } from '../api/datacenter'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Datacenters() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [datacenters, setDatacenters] = useState<Datacenter[]>([])
   const [clusters, setClusters] = useState<Cluster[]>([])
   const [hosts, setHosts] = useState<HostInfo[]>([])
@@ -82,7 +85,7 @@ export default function Datacenters() {
   }
 
   const handleDeleteDC = async (id: string) => {
-    if (!confirm('Delete this datacenter?')) return
+    if (!await confirm('Delete Datacenter', 'Delete this datacenter?')) return
     try {
       await deleteDatacenter(id)
       toast.success('Datacenter deleted')
@@ -91,7 +94,7 @@ export default function Datacenters() {
   }
 
   const handleDeleteCluster = async (id: string) => {
-    if (!confirm('Delete this cluster?')) return
+    if (!await confirm('Delete Cluster', 'Delete this cluster?')) return
     try {
       await deleteCluster(id)
       toast.success('Cluster deleted')
@@ -100,7 +103,7 @@ export default function Datacenters() {
   }
 
   const handleRemoveHost = async (id: string) => {
-    if (!confirm('Remove this host?')) return
+    if (!await confirm('Remove Host', 'Remove this host?')) return
     try {
       await removeHost(id)
       toast.success('Host removed')
@@ -365,6 +368,17 @@ export default function Datacenters() {
           clusterId={showRegisterHost}
           onClose={() => setShowRegisterHost(null)}
           onCreated={() => { setShowRegisterHost(null); loadData() }}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

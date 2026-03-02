@@ -7,8 +7,11 @@ import {
   revertSnapshot,
   type VMSnapshot,
 } from '../api/snapshots'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Snapshots() {
+  const { confirmState, confirm, cancel } = useConfirm()
   const [vmName, setVmName] = useState('')
   const [snapshots, setSnapshots] = useState<VMSnapshot[]>([])
   const [loading, setLoading] = useState(false)
@@ -32,7 +35,7 @@ export default function Snapshots() {
   }, [vmName])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this snapshot?')) return
+    if (!await confirm('Delete Snapshot', 'Are you sure you want to delete this snapshot?')) return
     try {
       await deleteSnapshot(vmName, id)
       await loadSnapshots()
@@ -43,7 +46,7 @@ export default function Snapshots() {
   }
 
   const handleRevert = async (id: string) => {
-    if (!confirm('Revert VM to this snapshot? The VM must be stopped.')) return
+    if (!await confirm('Revert Snapshot', 'Revert VM to this snapshot? The VM must be stopped.', { confirmLabel: 'Revert', variant: 'warning' })) return
     try {
       await revertSnapshot(vmName, id)
       alert('Successfully reverted to snapshot')
@@ -164,6 +167,17 @@ export default function Snapshots() {
           vmName={vmName}
           onClose={() => setShowCreateDialog(false)}
           onCreated={loadSnapshots}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

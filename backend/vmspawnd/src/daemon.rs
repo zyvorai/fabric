@@ -8,7 +8,7 @@ pub struct Daemon {
 }
 
 impl Daemon {
-    pub async fn new() -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let config = Config::load()?;
         let state = StateStore::new(&config.storage.path)?;
 

@@ -9,6 +9,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
+use crate::validation::validate_vm_name;
+use security::{RequireRead, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -61,11 +63,22 @@ pub struct MigrationStatus {
 // Handlers
 // ============================================================================
 
-/// POST /api/migrations - Start a new migration
+/// POST /api/migrations - Start a new migration (Admin only)
 pub async fn start_migration(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<MigrationRequest>,
 ) -> Result<(StatusCode, Json<MigrationStatus>), (StatusCode, Json<serde_json::Value>)> {
+    // Validate VM name
+    validate_vm_name(&req.vm_name).map_err(|(_status, msg)| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
+    })?;
+
+    // Validate target host (must be a hostname or IP, no shell metacharacters)
+    validate_hostname(&req.target_host).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
+    })?;
+
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {}
@@ -121,6 +134,7 @@ pub async fn start_migration(
 
 /// GET /api/migrations - List all migrations
 pub async fn list_migrations(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<MigrationStatus>>, (StatusCode, Json<serde_json::Value>)> {
     let migrations = state.store.list_entities::<MigrationStatus>("migrations").map_err(|e| {
@@ -151,8 +165,9 @@ pub async fn get_migration(
     }
 }
 
-/// POST /api/migrations/:id/cancel - Cancel a migration
+/// POST /api/migrations/:id/cancel - Cancel a migration (Admin only)
 pub async fn cancel_migration(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<MigrationStatus>, (StatusCode, Json<serde_json::Value>)> {
@@ -183,10 +198,20 @@ pub async fn cancel_migration(
         _ => {}
     }
 
-    // Kill any rsync processes for this VM
-    let _ = std::process::Command::new("pkill")
-        .args(["-f", &format!("rsync.*{}", status.vm_name)])
-        .output();
+    // Kill any rsync processes for this VM.
+    // Validate the VM name to prevent regex injection in pkill's -f pattern.
+    if crate::validation::validate_vm_name(&status.vm_name).is_err() {
+        tracing::error!("Migration cancel: invalid VM name '{}', skipping pkill", status.vm_name);
+    } else {
+        // VM name is validated to only contain [a-zA-Z0-9._-], which are all
+        // regex-safe characters, so no escaping is needed after validation.
+        if let Err(e) = std::process::Command::new("pkill")
+            .args(["-f", &format!("rsync.*{}", status.vm_name)])
+            .output()
+        {
+            tracing::warn!("Command failed: {}", e);
+        }
+    }
 
     status.state = MigrationState::Cancelled;
     status.completed = Some(Utc::now());
@@ -205,6 +230,33 @@ pub async fn cancel_migration(
 // Background Migration Task
 // ============================================================================
 
+/// Validate that a target host string is a valid hostname or IP address.
+/// Rejects shell metacharacters and other injection vectors.
+fn validate_hostname(host: &str) -> Result<(), String> {
+    if host.is_empty() || host.len() > 253 {
+        return Err("Target host must be between 1 and 253 characters".to_string());
+    }
+
+    // Must be a valid IP address or hostname (alphanumeric, dots, hyphens, colons for IPv6)
+    let valid = host.chars().all(|c| {
+        c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == ':' || c == '_'
+    });
+
+    if !valid {
+        return Err(format!(
+            "Target host '{}' contains invalid characters. Only alphanumeric, dots, hyphens, underscores, and colons are allowed.",
+            host
+        ));
+    }
+
+    // Must not start with a hyphen (could be interpreted as a flag)
+    if host.starts_with('-') {
+        return Err("Target host must not start with a hyphen".to_string());
+    }
+
+    Ok(())
+}
+
 async fn run_migration(state: Arc<AppState>, migration_id: String, req: MigrationRequest) {
     let update_status = |state: &Arc<AppState>, id: &str, mig_state: MigrationState, progress: u32, bytes: u64, error: Option<String>| {
         if let Ok(Some(mut status)) = state.store.get_entity::<MigrationStatus>("migrations", id) {
@@ -215,7 +267,9 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
             if status.progress_percent >= 100 {
                 status.completed = Some(Utc::now());
             }
-            let _ = state.store.save_entity("migrations", id, &status);
+            if let Err(e) = state.store.save_entity("migrations", id, &status) {
+                tracing::error!("Failed to save: {}", e);
+            }
         }
     };
 
@@ -223,7 +277,7 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
     update_status(&state, &migration_id, MigrationState::PreCheck, 5, 0, None);
 
     let ssh_check = std::process::Command::new("ssh")
-        .args(["-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=no", &req.target_host, "echo ok"])
+        .args(["-o", "ConnectTimeout=5", "-o", "BatchMode=yes", &req.target_host, "echo ok"])
         .output();
 
     match ssh_check {

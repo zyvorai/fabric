@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use tracing::warn;
 use vm_model::VM;
 
 #[derive(Clone)]
@@ -53,10 +54,17 @@ impl StateStore {
 
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
-            if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
-                if let Ok(content) = fs::read_to_string(entry.path()) {
-                    if let Ok(entity) = serde_json::from_str::<T>(&content) {
-                        entities.push(entity);
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                match fs::read_to_string(&path) {
+                    Ok(content) => match serde_json::from_str::<T>(&content) {
+                        Ok(entity) => entities.push(entity),
+                        Err(e) => {
+                            warn!("Failed to deserialize entity from {}: {}", path.display(), e);
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Failed to read entity file {}: {}", path.display(), e);
                     }
                 }
             }
@@ -102,12 +110,20 @@ impl StateStore {
     }
 
     pub fn save_vm(&self, vm: &VM) -> Result<()> {
-        let mut vms = self.vms.write().unwrap();
-        vms.insert(vm.name.clone(), vm.clone());
+        // Serialize and prepare data before acquiring the lock
+        let content = serde_json::to_string_pretty(vm)?;
 
+        {
+            let mut vms = self
+                .vms
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+            vms.insert(vm.name.clone(), vm.clone());
+        }
+
+        // Perform file I/O outside the lock scope
         let vm_file = self.path.join(format!("{}.json", vm.name));
         let tmp_file = self.path.join(format!("{}.json.tmp", vm.name));
-        let content = serde_json::to_string_pretty(vm)?;
         fs::write(&tmp_file, content)?;
         fs::rename(&tmp_file, &vm_file)?;
 
@@ -115,12 +131,18 @@ impl StateStore {
     }
 
     pub fn get_vm(&self, name: &str) -> Result<Option<VM>> {
-        let vms = self.vms.read().unwrap();
+        let vms = self
+            .vms
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         Ok(vms.get(name).cloned())
     }
 
     pub fn list_vms(&self) -> Result<Vec<VM>> {
-        let vms = self.vms.read().unwrap();
+        let vms = self
+            .vms
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         Ok(vms.values().cloned().collect())
     }
 

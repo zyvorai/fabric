@@ -7,8 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
+use tokio::process::Command;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireAdmin};
 
 // ============================================================================
 // Floating IP
@@ -34,11 +36,16 @@ pub struct AssignFloatingIpRequest {
     pub vm_name: String,
 }
 
-/// POST /api/floating-ips - Create a floating IP
+/// POST /api/floating-ips - Create a floating IP (Admin only)
 pub async fn create_floating_ip(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateFloatingIpRequest>,
 ) -> Result<(StatusCode, Json<FloatingIp>), (StatusCode, Json<serde_json::Value>)> {
+    // Validate IP address format
+    validate_ip_address(&req.address).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
+    })?;
     let fip = FloatingIp {
         id: uuid::Uuid::new_v4().to_string(),
         address: req.address,
@@ -56,14 +63,16 @@ pub async fn create_floating_ip(
 
 /// GET /api/floating-ips - List floating IPs
 pub async fn list_floating_ips(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<FloatingIp>> {
     let ips: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_default();
     Json(ips)
 }
 
-/// POST /api/floating-ips/:id/assign - Assign floating IP to a VM
+/// POST /api/floating-ips/:id/assign - Assign floating IP to a VM (Admin only)
 pub async fn assign_floating_ip(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<AssignFloatingIpRequest>,
@@ -76,15 +85,20 @@ pub async fn assign_floating_ip(
 
     // Remove from previous VM if assigned
     if let Some(ref _old_vm) = fip.assigned_vm {
-        let _ = std::process::Command::new("ip")
+        if let Err(e) = Command::new("ip")
             .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
-            .output();
+            .output()
+            .await
+        {
+            tracing::warn!("Command failed: {}", e);
+        }
     }
 
     // Add IP to the interface associated with the new VM
-    let output = std::process::Command::new("ip")
+    let output = Command::new("ip")
         .args(["addr", "add", &format!("{}/32", fip.address), "dev", &fip.interface])
         .output()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
     if !output.status.success() {
@@ -103,8 +117,9 @@ pub async fn assign_floating_ip(
     Ok(Json(fip))
 }
 
-/// POST /api/floating-ips/:id/unassign - Unassign floating IP from VM
+/// POST /api/floating-ips/:id/unassign - Unassign floating IP from VM (Admin only)
 pub async fn unassign_floating_ip(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<FloatingIp>, (StatusCode, Json<serde_json::Value>)> {
@@ -114,9 +129,13 @@ pub async fn unassign_floating_ip(
         Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
     };
 
-    let _ = std::process::Command::new("ip")
+    if let Err(e) = Command::new("ip")
         .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
-        .output();
+        .output()
+        .await
+    {
+        tracing::warn!("Command failed: {}", e);
+    }
 
     fip.assigned_vm = None;
     state.store.save_entity("floating_ips", &id, &fip).map_err(|e| {
@@ -126,15 +145,20 @@ pub async fn unassign_floating_ip(
     Ok(Json(fip))
 }
 
-/// DELETE /api/floating-ips/:id - Delete a floating IP
+/// DELETE /api/floating-ips/:id - Delete a floating IP (Admin only)
 pub async fn delete_floating_ip(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     if let Ok(Some(fip)) = state.store.get_entity::<FloatingIp>("floating_ips", &id) {
-        let _ = std::process::Command::new("ip")
+        if let Err(e) = Command::new("ip")
             .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
-            .output();
+            .output()
+            .await
+        {
+            tracing::warn!("Command failed: {}", e);
+        }
     }
 
     state.store.delete_entity("floating_ips", &id).map_err(|e| {
@@ -185,8 +209,9 @@ fn default_pool_size() -> u32 { 100 }
 fn default_lease_time() -> u32 { 3600 }
 fn default_max_lease_time() -> u32 { 7200 }
 
-/// POST /api/dhcp-servers - Enable DHCP server on a bridge via systemd-networkd
+/// POST /api/dhcp-servers - Enable DHCP server on a bridge via systemd-networkd (Admin only)
 pub async fn create_dhcp_server(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDhcpServerRequest>,
 ) -> Result<(StatusCode, Json<DhcpServerConfig>), (StatusCode, Json<serde_json::Value>)> {
@@ -210,12 +235,14 @@ pub async fn create_dhcp_server(
     let prefix = &state.config.network.networkd_file_prefix;
     let file_path = format!("{}/{}{}-dhcp.network", config_dir, prefix, req.bridge);
 
-    std::fs::write(&file_path, &network_content).map_err(|e| {
+    tokio::fs::write(&file_path, &network_content).await.map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to write config: {}", e) })))
     })?;
 
     // Reload networkd
-    let _ = std::process::Command::new("networkctl").arg("reload").output();
+    if let Err(e) = Command::new("networkctl").arg("reload").output().await {
+        tracing::warn!("Command failed: {}", e);
+    }
 
     state.store.save_entity("dhcp_servers", &config.id, &config).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
@@ -232,8 +259,9 @@ pub async fn list_dhcp_servers(
     Json(configs)
 }
 
-/// DELETE /api/dhcp-servers/:id - Remove DHCP server
+/// DELETE /api/dhcp-servers/:id - Remove DHCP server (Admin only)
 pub async fn delete_dhcp_server(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -241,8 +269,12 @@ pub async fn delete_dhcp_server(
         let config_dir = &state.config.network.networkd_config_dir;
         let prefix = &state.config.network.networkd_file_prefix;
         let file_path = format!("{}/{}{}-dhcp.network", config_dir, prefix, config.bridge);
-        let _ = std::fs::remove_file(&file_path);
-        let _ = std::process::Command::new("networkctl").arg("reload").output();
+        if let Err(e) = tokio::fs::remove_file(&file_path).await {
+            tracing::warn!("Failed to remove file: {}", e);
+        }
+        if let Err(e) = Command::new("networkctl").arg("reload").output().await {
+            tracing::warn!("Command failed: {}", e);
+        }
     }
 
     state.store.delete_entity("dhcp_servers", &id).map_err(|e| {
@@ -325,8 +357,9 @@ pub struct AddDnsRecordRequest {
     pub value: String,
 }
 
-/// POST /api/dns - Create DNS configuration
+/// POST /api/dns - Create DNS configuration (Admin only)
 pub async fn create_dns_config(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDnsConfigRequest>,
 ) -> Result<(StatusCode, Json<DnsConfig>), (StatusCode, Json<serde_json::Value>)> {
@@ -342,19 +375,27 @@ pub async fn create_dns_config(
 
     // Configure systemd-resolved search domains
     if !config.search_domains.is_empty() {
-        let _ = std::process::Command::new("resolvectl")
+        if let Err(e) = Command::new("resolvectl")
             .arg("domain")
             .arg("--")
             .args(&config.search_domains)
-            .output();
+            .output()
+            .await
+        {
+            tracing::warn!("Command failed: {}", e);
+        }
     }
 
     if !config.upstream_servers.is_empty() {
-        let _ = std::process::Command::new("resolvectl")
+        if let Err(e) = Command::new("resolvectl")
             .arg("dns")
             .arg("--")
             .args(&config.upstream_servers)
-            .output();
+            .output()
+            .await
+        {
+            tracing::warn!("Command failed: {}", e);
+        }
     }
 
     state.store.save_entity("dns_configs", &config.id, &config).map_err(|e| {
@@ -391,7 +432,7 @@ pub async fn add_dns_record(
     });
 
     // Write /etc/hosts-style entries for A records
-    update_hosts_file(&config);
+    update_hosts_file(&config).await;
 
     state.store.save_entity("dns_configs", &id, &config).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
@@ -412,7 +453,14 @@ pub async fn delete_dns_config(
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn update_hosts_file(config: &DnsConfig) {
+/// Validate that a string is a valid IPv4 or IPv6 address.
+fn validate_ip_address(addr: &str) -> Result<(), String> {
+    addr.parse::<std::net::IpAddr>()
+        .map(|_| ())
+        .map_err(|_| format!("Invalid IP address: '{}'", addr))
+}
+
+async fn update_hosts_file(config: &DnsConfig) {
     let hosts_path = "/etc/vmspawnd-hosts";
 
     let mut content = String::from("# Managed by vmspawnd - do not edit\n");
@@ -427,5 +475,7 @@ fn update_hosts_file(config: &DnsConfig) {
         }
     }
 
-    let _ = std::fs::write(hosts_path, content);
+    if let Err(e) = tokio::fs::write(hosts_path, content).await {
+        tracing::warn!("Failed to write hosts file: {}", e);
+    }
 }

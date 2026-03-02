@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::process::Command;
 
 use vmspawnd_system::{
     CpuTopology, HugepageManager, HugepageSize, MemoryController, NumaTopology,
@@ -182,11 +183,12 @@ pub async fn set_cpu_pinning(
 
     // Set CPUAffinity via systemctl set-property
     let service_name = format!("systemd-vmspawn@{}.service", vm_name);
-    let output = std::process::Command::new("systemctl")
+    let output = Command::new("systemctl")
         .arg("set-property")
         .arg(&service_name)
         .arg(format!("CPUAffinity={}", cpu_list))
         .output()
+        .await
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -224,11 +226,12 @@ pub async fn get_cpu_affinity(
     tracing::info!("Getting CPU affinity for VM '{}'", vm_name);
 
     let service_name = format!("systemd-vmspawn@{}.service", vm_name);
-    let output = std::process::Command::new("systemctl")
+    let output = Command::new("systemctl")
         .arg("show")
         .arg(&service_name)
         .arg("--property=CPUAffinity")
         .output()
+        .await
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -358,12 +361,13 @@ pub async fn set_memory_ballooning(
             target_bytes
         );
 
-        let output = std::process::Command::new("socat")
+        let output = Command::new("socat")
             .arg("-")
             .arg(format!("UNIX-CONNECT:{}", monitor_socket))
             .arg("EXEC:'echo {}'")
             .arg(&qmp_command)
             .output()
+            .await
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -580,11 +584,12 @@ pub async fn optimize_vm(
                     .join(",");
 
                 let service_name = format!("systemd-vmspawn@{}.service", vm_name);
-                let output = std::process::Command::new("systemctl")
+                let output = Command::new("systemctl")
                     .arg("set-property")
                     .arg(&service_name)
                     .arg(format!("CPUAffinity={}", cpu_list))
-                    .output();
+                    .output()
+                    .await;
 
                 match output {
                     Ok(o) if o.status.success() => {

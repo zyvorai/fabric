@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { listVMs, getMetrics, VM, VMMetrics } from '../api/vm'
+import { apiGet } from '../api/client'
+import { getStateColor } from '../utils/vm'
 import { Activity, Cpu, HardDrive, Server } from 'lucide-react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
@@ -82,11 +84,8 @@ export default function Dashboard() {
 
   const loadActivityFeed = useCallback(async () => {
     try {
-      const res = await fetch('/api/audit/logs?limit=5')
-      if (res.ok) {
-        const data = await res.json()
-        setActivityFeed(data)
-      }
+      const data = await apiGet<AuditEntry[]>('/api/audit/logs?limit=5')
+      setActivityFeed(data)
     } catch (_error) {
       // Audit logs may not be available, fall back silently
     }
@@ -297,18 +296,11 @@ function StatCard({ icon, title, value, color }: any) {
 }
 
 function VMRow({ vm }: { vm: VM }) {
-  const stateColors: Record<string, string> = {
-    running: 'bg-green-500',
-    stopped: 'bg-red-500',
-    paused: 'bg-yellow-500',
-    unknown: 'bg-gray-500',
-  }
-
   return (
     <Link to={`/vms/${vm.name}`} className="block p-4 hover:bg-gray-700 transition cursor-pointer">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className={`w-3 h-3 rounded-full ${stateColors[vm.state]}`}></div>
+          <div className={`w-3 h-3 rounded-full ${getStateColor(vm.state)}`}></div>
           <div>
             <div className="font-medium">{vm.name}</div>
             <div className="text-sm text-gray-400">

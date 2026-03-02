@@ -53,26 +53,35 @@ fn default_image_path() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ControllerMode {
+    Standalone,
+    Controller,
+}
+
+impl Default for ControllerMode {
+    fn default() -> Self {
+        Self::Standalone
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerConfig {
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default = "default_controller_mode")]
-    pub mode: String, // "standalone" or "controller"
+    #[serde(default)]
+    pub mode: ControllerMode,
     #[serde(default)]
     pub cluster_name: Option<String>,
     #[serde(default)]
     pub datacenter_name: Option<String>,
 }
 
-fn default_controller_mode() -> String {
-    "standalone".to_string()
-}
-
 impl Default for ControllerConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            mode: default_controller_mode(),
+            mode: ControllerMode::default(),
             cluster_name: None,
             datacenter_name: None,
         }
@@ -98,13 +107,42 @@ fn default_auth_enabled() -> bool {
 }
 
 fn default_jwt_secret() -> String {
-    std::env::var("VMSPAWND_JWT_SECRET").unwrap_or_else(|_| {
-        use rand::Rng;
-        let mut rng = rand::rng();
-        (0..32)
-            .map(|_| rng.sample(rand::distr::Alphanumeric) as char)
-            .collect()
-    })
+    match std::env::var("VMSPAWND_JWT_SECRET") {
+        Ok(secret) => secret,
+        Err(_) => {
+            // Generate a random secret and persist it so tokens survive restarts
+            let secret = generate_random_secret();
+            let secret_path = "/var/lib/vmspawnd/.jwt_secret";
+            // Try to load a previously persisted secret first
+            if let Ok(persisted) = std::fs::read_to_string(secret_path) {
+                let trimmed = persisted.trim().to_string();
+                if !trimmed.is_empty() {
+                    return trimmed;
+                }
+            }
+            // Persist the newly generated secret
+            if let Some(parent) = std::path::Path::new(secret_path).parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Err(e) = std::fs::write(secret_path, &secret) {
+                tracing::warn!(
+                    "Could not persist JWT secret to {}: {}. \
+                     Tokens will be invalidated on restart. \
+                     Set VMSPAWND_JWT_SECRET or fix file permissions.",
+                    secret_path, e
+                );
+            }
+            secret
+        }
+    }
+}
+
+fn generate_random_secret() -> String {
+    use rand::Rng;
+    let mut rng = rand::rng();
+    (0..64)
+        .map(|_| rng.sample(rand::distr::Alphanumeric) as char)
+        .collect()
 }
 
 fn default_auth_db_path() -> String {
@@ -112,7 +150,26 @@ fn default_auth_db_path() -> String {
 }
 
 fn default_admin_password() -> String {
-    "admin".to_string()
+    // Use env var or generate a secure random password (never default to "admin")
+    std::env::var("VMSPAWND_ADMIN_PASSWORD").unwrap_or_else(|_| {
+        let password = generate_random_secret();
+        tracing::warn!(
+            "================================================================"
+        );
+        tracing::warn!(
+            "No admin password configured. Generated random password."
+        );
+        tracing::warn!(
+            "Set VMSPAWND_ADMIN_PASSWORD or auth.default_admin_password in config."
+        );
+        tracing::warn!(
+            "Generated admin password: {}", password
+        );
+        tracing::warn!(
+            "================================================================"
+        );
+        password
+    })
 }
 
 fn default_token_expiration_hours() -> i64 {

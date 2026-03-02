@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag } from 'lucide-react'
-import { VM, startVM, stopVM, pauseVM, resumeVM, deleteVM } from '../api/vm'
-import { useToastContext } from '../contexts/ToastContext'
+import { VM } from '../api/vm'
+import { useVMActions } from '../hooks/useVMActions'
+import { getStateColor } from '../utils/vm'
 import CloneVMDialog from './CloneVMDialog'
 import ConfirmDialog from './ConfirmDialog'
 import TagEditor, { getTagColor } from './TagEditor'
@@ -13,72 +14,17 @@ interface VMCardProps {
 }
 
 export default function VMCard({ vm, onUpdate }: VMCardProps) {
-  const toast = useToastContext()
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [showTagEditor, setShowTagEditor] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-
-  const handleStart = async () => {
-    try {
-      await startVM(vm.name)
-      toast.success(`VM '${vm.name}' started successfully`)
-      onUpdate()
-    } catch (_error) {
-      toast.error(`Failed to start VM '${vm.name}'`)
-    }
-  }
-
-  const handleStop = async () => {
-    try {
-      await stopVM(vm.name)
-      toast.success(`VM '${vm.name}' stopped successfully`)
-      onUpdate()
-    } catch (_error) {
-      toast.error(`Failed to stop VM '${vm.name}'`)
-    }
-  }
-
-  const handlePause = async () => {
-    try {
-      await pauseVM(vm.name)
-      toast.success(`VM '${vm.name}' paused successfully`)
-      onUpdate()
-    } catch (_error) {
-      toast.error(`Failed to pause VM '${vm.name}'`)
-    }
-  }
-
-  const handleResume = async () => {
-    try {
-      await resumeVM(vm.name)
-      toast.success(`VM '${vm.name}' resumed successfully`)
-      onUpdate()
-    } catch (_error) {
-      toast.error(`Failed to resume VM '${vm.name}'`)
-    }
-  }
-
-  const handleDelete = async () => {
-    setShowDeleteConfirm(true)
-  }
+  const { handleStart, handleStop, handlePause, handleResume, handleDelete } = useVMActions(vm.name, onUpdate)
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false)
-    try {
-      await deleteVM(vm.name)
-      toast.success(`VM '${vm.name}' deleted successfully`)
-      onUpdate()
-    } catch (_error) {
-      toast.error(`Failed to delete VM '${vm.name}'`)
-    }
+    await handleDelete()
   }
 
-  const stateColor = {
-    running: 'bg-green-500',
-    stopped: 'bg-red-500',
-    paused: 'bg-yellow-500',
-    unknown: 'bg-gray-500',
-  }[vm.state]
+  const stateColor = getStateColor(vm.state)
 
   return (
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
@@ -171,6 +117,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
         <Link
           to={`/vms/${vm.name}/console`}
           className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded transition text-sm"
+          aria-label={`Open console for VM ${vm.name}`}
         >
           <Terminal className="w-4 h-4" />
         </Link>
@@ -181,8 +128,9 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
           Details
         </Link>
         <button
-          onClick={handleDelete}
+          onClick={() => setShowDeleteConfirm(true)}
           className="ml-auto flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 rounded transition text-sm"
+          aria-label={`Delete VM ${vm.name}`}
         >
           <Trash2 className="w-4 h-4" />
         </button>

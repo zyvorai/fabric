@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
+use tokio::process::Command;
 
 use crate::server::AppState;
 
@@ -285,12 +286,15 @@ pub async fn deploy_template(
         let target_image = format!("/var/lib/vmspawnd/images/{}.{}", req.vm_name, ext);
 
         if let Some(parent) = std::path::Path::new(&target_image).parent() {
-            let _ = std::fs::create_dir_all(parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                tracing::warn!("Failed to create directory: {}", e);
+            }
         }
 
-        let output = std::process::Command::new("cp")
+        let output = Command::new("cp")
             .args(["--reflink=auto", source_image, &target_image])
             .output()
+            .await
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,

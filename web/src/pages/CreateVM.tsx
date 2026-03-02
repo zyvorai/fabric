@@ -48,8 +48,9 @@ export default function CreateVM() {
           )}
 
           <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Name</label>
+            <label htmlFor="vm-name" className="block text-sm font-medium mb-2">Name</label>
             <input
+              id="vm-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -59,8 +60,9 @@ export default function CreateVM() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Image Path</label>
+            <label htmlFor="vm-image" className="block text-sm font-medium mb-2">Image Path</label>
             <input
+              id="vm-image"
               type="text"
               value={image}
               onChange={(e) => setImage(e.target.value)}
@@ -72,8 +74,9 @@ export default function CreateVM() {
 
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
-              <label className="block text-sm font-medium mb-2">CPUs</label>
+              <label htmlFor="vm-cpus" className="block text-sm font-medium mb-2">CPUs</label>
               <input
+                id="vm-cpus"
                 type="number"
                 value={cpus}
                 onChange={(e) => setCpus(parseInt(e.target.value))}
@@ -85,8 +88,9 @@ export default function CreateVM() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Memory (MB)</label>
+              <label htmlFor="vm-memory" className="block text-sm font-medium mb-2">Memory (MB)</label>
               <input
+                id="vm-memory"
                 type="number"
                 value={memory}
                 onChange={(e) => setMemory(parseInt(e.target.value))}

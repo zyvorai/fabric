@@ -96,7 +96,7 @@ pub async fn auth_middleware(
         .and_then(|value| value.to_str().ok());
 
     let token = match auth_header {
-        Some(header) if header.starts_with("Bearer ") => &header[7..],
+        Some(header) => header.strip_prefix("Bearer ").ok_or(StatusCode::UNAUTHORIZED)?,
         _ => return Err(StatusCode::UNAUTHORIZED),
     };
 
@@ -108,6 +108,96 @@ pub async fn auth_middleware(
     req.extensions_mut().insert(claims);
 
     Ok(next.run(req).await)
+}
+
+// ============================================================================
+// Role-based authorization extractors
+// ============================================================================
+
+/// When auth middleware is not active (auth disabled), extractors use this
+/// default Claims to allow all operations.
+fn unauthenticated_claims() -> Claims {
+    Claims {
+        sub: "anonymous".to_string(),
+        role: Role::Admin,
+        exp: usize::MAX,
+    }
+}
+
+/// Extractor that requires the caller to have at least read permission (any role).
+/// When auth is disabled (no claims in extensions), allows the request through.
+pub struct RequireRead(pub Claims);
+
+impl<S> axum::extract::FromRequestParts<S> for RequireRead
+where
+    S: Send + Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let claims = parts.extensions.get::<Claims>().cloned()
+            .unwrap_or_else(unauthenticated_claims);
+        Ok(RequireRead(claims))
+    }
+}
+
+/// Extractor that requires the caller to have write permission (Admin or User).
+/// Rejects Viewer role with 403 Forbidden.
+/// When auth is disabled (no claims in extensions), allows the request through.
+pub struct RequireWrite(pub Claims);
+
+impl<S> axum::extract::FromRequestParts<S> for RequireWrite
+where
+    S: Send + Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let claims = parts.extensions.get::<Claims>().cloned()
+            .unwrap_or_else(unauthenticated_claims);
+        if !claims.role.can_write() {
+            tracing::warn!(
+                "Authorization denied: user '{}' with role {:?} attempted a write operation",
+                claims.sub, claims.role
+            );
+            return Err(StatusCode::FORBIDDEN);
+        }
+        Ok(RequireWrite(claims))
+    }
+}
+
+/// Extractor that requires the caller to have admin permission (Admin only).
+/// Rejects User and Viewer roles with 403 Forbidden.
+/// When auth is disabled (no claims in extensions), allows the request through.
+pub struct RequireAdmin(pub Claims);
+
+impl<S> axum::extract::FromRequestParts<S> for RequireAdmin
+where
+    S: Send + Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let claims = parts.extensions.get::<Claims>().cloned()
+            .unwrap_or_else(unauthenticated_claims);
+        if !claims.role.can_manage() {
+            tracing::warn!(
+                "Authorization denied: user '{}' with role {:?} attempted an admin operation",
+                claims.sub, claims.role
+            );
+            return Err(StatusCode::FORBIDDEN);
+        }
+        Ok(RequireAdmin(claims))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

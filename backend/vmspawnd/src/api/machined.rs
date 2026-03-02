@@ -13,6 +13,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
+use crate::validation::validate_vm_name;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use vmspawn_driver::machinectl;
 
 // ============================================================================
@@ -53,10 +55,12 @@ pub async fn reboot_machine(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// POST /api/machines/:name/terminate - Force terminate
+/// POST /api/machines/:name/terminate - Force terminate (Admin only)
 pub async fn terminate_machine(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     machinectl::terminate(&name)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -89,11 +93,13 @@ pub struct ShellRequest {
     pub command: String,
 }
 
-/// POST /api/machines/:name/shell - Run command inside machine
+/// POST /api/machines/:name/shell - Run command inside machine (Admin only)
 pub async fn shell_machine(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<ShellRequest>,
 ) -> Result<Json<machinectl::ShellOutput>, (StatusCode, String)> {
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     machinectl::shell(&name, &req.command)
         .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -137,21 +143,27 @@ pub struct CopyRequest {
     pub machine_path: String,
 }
 
-/// POST /api/machines/:name/copy-to - Copy file from host to machine
+/// POST /api/machines/:name/copy-to - Copy file from host to machine (Admin only)
 pub async fn copy_to_machine(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.host_path)?;
     machinectl::copy_to(&name, &req.host_path, &req.machine_path)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// POST /api/machines/:name/copy-from - Copy file from machine to host
+/// POST /api/machines/:name/copy-from - Copy file from machine to host (Admin only)
 pub async fn copy_from_machine(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.host_path)?;
     machinectl::copy_from(&name, &req.machine_path, &req.host_path)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -165,11 +177,14 @@ pub struct BindRequest {
     pub read_only: bool,
 }
 
-/// POST /api/machines/:name/bind - Bind mount host path into machine
+/// POST /api/machines/:name/bind - Bind mount host path into machine (Admin only)
 pub async fn bind_machine(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<BindRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.host_path)?;
     machinectl::bind(&name, &req.host_path, &req.machine_path, req.read_only)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -276,19 +291,23 @@ pub struct ImportImageRequest {
     pub name: String,
 }
 
-/// POST /api/machines/images/import-raw - Import raw image file
+/// POST /api/machines/images/import-raw - Import raw image file (Admin only)
 pub async fn import_raw_image(
+    RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_host_path(&req.path)?;
     machinectl::import_raw(&req.path, &req.name)
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// POST /api/machines/images/import-tar - Import tar image file
+/// POST /api/machines/images/import-tar - Import tar image file (Admin only)
 pub async fn import_tar_image(
+    RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_host_path(&req.path)?;
     machinectl::import_tar(&req.path, &req.name)
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -299,29 +318,73 @@ pub struct ExportImageRequest {
     pub path: String,
 }
 
-/// POST /api/machines/images/:name/export-raw - Export to raw file
+/// POST /api/machines/images/:name/export-raw - Export to raw file (Admin only)
 pub async fn export_raw_image(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_host_path(&req.path)?;
     machinectl::export_raw(&name, &req.path)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// POST /api/machines/images/:name/export-tar - Export to tar file
+/// POST /api/machines/images/:name/export-tar - Export to tar file (Admin only)
 pub async fn export_tar_image(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_host_path(&req.path)?;
     machinectl::export_tar(&name, &req.path)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// POST /api/machines/images/clean - Clean hidden/cached images
-pub async fn clean_images() -> Result<StatusCode, (StatusCode, String)> {
+/// POST /api/machines/images/clean - Clean hidden/cached images (Admin only)
+pub async fn clean_images(
+    RequireAdmin(_claims): RequireAdmin,
+) -> Result<StatusCode, (StatusCode, String)> {
     machinectl::clean(false)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+// ============================================================================
+// Security validation helpers
+// ============================================================================
+
+/// Validate that a host path is within allowed directories to prevent arbitrary file access.
+/// Only allows paths under /var/lib/machines, /var/lib/vmspawnd, and /tmp.
+fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
+    let canonical = std::path::Path::new(path);
+
+    // Reject paths with traversal components
+    for component in canonical.components() {
+        if let std::path::Component::ParentDir = component {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Path must not contain '..' components".to_string(),
+            ));
+        }
+    }
+
+    let allowed_prefixes = [
+        "/var/lib/machines",
+        "/var/lib/vmspawnd",
+        "/tmp",
+    ];
+
+    if !allowed_prefixes.iter().any(|prefix| path.starts_with(prefix)) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            format!(
+                "Host path must be under one of: {}",
+                allowed_prefixes.join(", ")
+            ),
+        ));
+    }
+
+    Ok(())
 }

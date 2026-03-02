@@ -47,7 +47,7 @@ pub async fn create_storage_pool(
         updated: now,
     };
     match state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&pool).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(pool)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -57,7 +57,7 @@ pub async fn get_storage_pool(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &id) {
-        Ok(Some(p)) => Json(serde_json::to_value(&p).unwrap()).into_response(),
+        Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -67,7 +67,9 @@ pub async fn delete_storage_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("dist_storage_pools", &id);
+    if let Err(e) = state.store.delete_entity("dist_storage_pools", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -86,7 +88,9 @@ pub async fn add_storage_host(
     pool.total_capacity_gb += added_capacity;
     pool.free_capacity_gb += added_capacity;
     pool.updated = Utc::now();
-    let _ = state.store.save_entity("dist_storage_pools", &pool.id, &pool);
+    if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -101,7 +105,9 @@ pub async fn remove_storage_host(
     };
     pool.hosts.retain(|h| h.host_id != host_id);
     pool.updated = Utc::now();
-    let _ = state.store.save_entity("dist_storage_pools", &pool.id, &pool);
+    if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -124,7 +130,9 @@ pub async fn report_disk_failure(
     pool.status = PoolStatus::Degraded;
     pool.health = PoolHealth::Warning;
     pool.updated = Utc::now();
-    let _ = state.store.save_entity("dist_storage_pools", &pool.id, &pool);
+    if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -148,7 +156,7 @@ pub async fn get_pool_health(
         rebuilding_disks: 0,
         capacity_used_pct,
     };
-    Json(serde_json::to_value(&report).unwrap()).into_response()
+    Json(report).into_response()
 }
 
 // ============================================================================
@@ -182,7 +190,7 @@ pub async fn start_storage_migration(
         error: None,
     };
     match state.store.save_entity("storage_migrations", &migration.id, &migration) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&migration).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(migration)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -192,7 +200,7 @@ pub async fn get_storage_migration(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
-        Ok(Some(m)) => Json(serde_json::to_value(&m).unwrap()).into_response(),
+        Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -221,7 +229,9 @@ pub async fn update_migration_progress(
     m.bytes_transferred = req.bytes_transferred;
     let total_bytes = m.disk_size_gb * 1024 * 1024 * 1024;
     m.progress_pct = if total_bytes > 0 { (req.bytes_transferred as f64 / total_bytes as f64 * 100.0).min(100.0) } else { 100.0 };
-    let _ = state.store.save_entity("storage_migrations", &m.id, &m);
+    if let Err(e) = state.store.save_entity("storage_migrations", &m.id, &m) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -237,7 +247,9 @@ pub async fn complete_migration(
     m.status = MigrationStatus::Completed;
     m.progress_pct = 100.0;
     m.completed = Some(Utc::now());
-    let _ = state.store.save_entity("storage_migrations", &m.id, &m);
+    if let Err(e) = state.store.save_entity("storage_migrations", &m.id, &m) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -252,7 +264,9 @@ pub async fn cancel_migration(
     };
     m.status = MigrationStatus::Cancelled;
     m.completed = Some(Utc::now());
-    let _ = state.store.save_entity("storage_migrations", &m.id, &m);
+    if let Err(e) = state.store.save_entity("storage_migrations", &m.id, &m) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -274,7 +288,7 @@ pub async fn create_storage_policy(
     policy.created = now;
     policy.updated = now;
     match state.store.save_entity("storage_policies", &policy.id, &policy) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&policy).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(policy)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -284,7 +298,7 @@ pub async fn get_storage_policy(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<StoragePolicy>("storage_policies", &id) {
-        Ok(Some(p)) => Json(serde_json::to_value(&p).unwrap()).into_response(),
+        Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -297,15 +311,19 @@ pub async fn update_storage_policy(
 ) -> impl IntoResponse {
     policy.id = id.clone();
     policy.updated = Utc::now();
-    let _ = state.store.save_entity("storage_policies", &id, &policy);
-    Json(serde_json::to_value(&policy).unwrap())
+    if let Err(e) = state.store.save_entity("storage_policies", &id, &policy) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(policy)
 }
 
 pub async fn delete_storage_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("storage_policies", &id);
+    if let Err(e) = state.store.delete_entity("storage_policies", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -334,7 +352,7 @@ pub async fn check_compliance(
         violations: Vec::new(),
         checked_at: Utc::now(),
     };
-    Json(serde_json::to_value(&report).unwrap()).into_response()
+    Json(report).into_response()
 }
 
 // ============================================================================
@@ -364,7 +382,7 @@ pub async fn create_datastore_cluster(
         updated: now,
     };
     match state.store.save_entity("datastore_clusters", &dsc.id, &dsc) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&dsc).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(dsc)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -374,7 +392,7 @@ pub async fn get_datastore_cluster(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<DatastoreCluster>("datastore_clusters", &id) {
-        Ok(Some(c)) => Json(serde_json::to_value(&c).unwrap()).into_response(),
+        Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -384,7 +402,9 @@ pub async fn delete_datastore_cluster(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("datastore_clusters", &id);
+    if let Err(e) = state.store.delete_entity("datastore_clusters", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 

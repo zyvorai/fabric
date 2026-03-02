@@ -31,7 +31,7 @@ pub async fn console_handler(
     ws: WebSocketUpgrade,
     Path(vm_name): Path<String>,
     Query(query): Query<ConsoleQuery>,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     // Validate VM name to prevent command injection
     validate_vm_name(&vm_name).map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -45,18 +45,11 @@ pub async fn console_handler(
         StatusCode::UNAUTHORIZED
     })?;
 
-    // Validate JWT token
-    let jwt_secret = match std::env::var("VMSPAWND_JWT_SECRET") {
-        Ok(secret) => secret,
-        Err(_) => {
-            tracing::warn!(
-                "VMSPAWND_JWT_SECRET not set - WebSocket auth is using an insecure default secret. \
-                 Set this environment variable in production."
-            );
-            "vmspawnd-default-dev-secret".to_string()
-        }
-    };
-    let jwt_config = security::JwtConfig::new(jwt_secret);
+    // Validate JWT token using the same config as the REST API
+    let jwt_config = state.jwt_config.as_ref().ok_or_else(|| {
+        tracing::error!("WebSocket console rejected: authentication is not configured");
+        StatusCode::UNAUTHORIZED
+    })?;
     let _claims = jwt_config.validate_token(token).map_err(|e| {
         tracing::warn!("WebSocket auth failed for VM '{}': {}", vm_name, e);
         StatusCode::UNAUTHORIZED

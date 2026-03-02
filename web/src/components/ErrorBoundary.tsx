@@ -53,18 +53,29 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 }
 
 export function PageErrorBoundary({ children }: { children: React.ReactNode }) {
+  const [key, setKey] = React.useState(0)
+
   return (
     <ErrorBoundary
+      key={key}
       fallback={
         <div className="flex flex-col items-center justify-center p-8">
           <AlertTriangle className="w-12 h-12 text-yellow-400 mb-3" />
           <h3 className="text-xl font-bold text-white mb-2">This section encountered an error</h3>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition text-sm"
-          >
-            Reload
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setKey((k) => k + 1)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition text-sm"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition text-sm"
+            >
+              Reload Page
+            </button>
+          </div>
         </div>
       }
     >

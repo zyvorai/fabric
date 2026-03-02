@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Terminal, Filter, Download, Trash2 } from 'lucide-react'
 
 interface LogEntry {
@@ -13,6 +13,7 @@ export default function Logs() {
   const [filter, setFilter] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('ALL')
   const [autoScroll, setAutoScroll] = useState(true)
+  const logContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadLogs()
@@ -45,6 +46,12 @@ export default function Logs() {
     return matchesText && matchesLevel
   })
 
+  useEffect(() => {
+    if (autoScroll && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
+    }
+  }, [autoScroll, logs])
+
   const clearLogs = () => {
     setLogs([])
   }
@@ -59,6 +66,7 @@ export default function Logs() {
     a.href = url
     a.download = `vmspawnd-logs-${new Date().toISOString()}.txt`
     a.click()
+    URL.revokeObjectURL(url)
   }
 
   const getLevelColor = (level: string) => {
@@ -160,7 +168,7 @@ export default function Logs() {
 
       {/* Log Stream */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-        <div className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
+        <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
           {filteredLogs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-400">
               No logs to display

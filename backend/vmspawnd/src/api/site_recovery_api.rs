@@ -33,7 +33,7 @@ pub async fn create_plan(
     plan.status = PlanStatus::Ready;
     plan.priority_groups.sort_by_key(|g| g.priority);
     match state.store.save_entity("recovery_plans", &plan.id, &plan) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&plan).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(plan)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -43,7 +43,7 @@ pub async fn get_plan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
-        Ok(Some(p)) => Json(serde_json::to_value(&p).unwrap()).into_response(),
+        Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -63,15 +63,19 @@ pub async fn update_plan(
     plan.created = existing.created;
     plan.updated = Some(Utc::now());
     plan.priority_groups.sort_by_key(|g| g.priority);
-    let _ = state.store.save_entity("recovery_plans", &id, &plan);
-    Json(serde_json::to_value(&plan).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("recovery_plans", &id, &plan) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(plan).into_response()
 }
 
 pub async fn delete_plan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("recovery_plans", &id);
+    if let Err(e) = state.store.delete_entity("recovery_plans", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -118,7 +122,7 @@ pub async fn execute_planned_migration(
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
     match start_execution(&state, &plan_id, ExecutionType::PlannedMigration) {
-        Ok(exec) => (StatusCode::CREATED, Json(serde_json::to_value(&exec).unwrap())).into_response(),
+        Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
     }
 }
@@ -128,7 +132,7 @@ pub async fn execute_disaster_recovery(
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
     match start_execution(&state, &plan_id, ExecutionType::DisasterRecovery) {
-        Ok(exec) => (StatusCode::CREATED, Json(serde_json::to_value(&exec).unwrap())).into_response(),
+        Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
     }
 }
@@ -138,7 +142,7 @@ pub async fn execute_test_failover(
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
     match start_execution(&state, &plan_id, ExecutionType::TestFailover) {
-        Ok(exec) => (StatusCode::CREATED, Json(serde_json::to_value(&exec).unwrap())).into_response(),
+        Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
     }
 }
@@ -148,7 +152,7 @@ pub async fn execute_reprotect(
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
     match start_execution(&state, &plan_id, ExecutionType::Reprotect) {
-        Ok(exec) => (StatusCode::CREATED, Json(serde_json::to_value(&exec).unwrap())).into_response(),
+        Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
     }
 }
@@ -163,7 +167,7 @@ pub async fn get_execution(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
-        Ok(Some(e)) => Json(serde_json::to_value(&e).unwrap()).into_response(),
+        Ok(Some(e)) => Json(e).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -180,7 +184,9 @@ pub async fn cancel_execution(
     };
     exec.status = ExecutionStatus::Cancelled;
     exec.completed = Some(Utc::now());
-    let _ = state.store.save_entity("recovery_executions", &exec.id, &exec);
+    if let Err(e) = state.store.save_entity("recovery_executions", &exec.id, &exec) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 

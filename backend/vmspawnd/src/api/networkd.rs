@@ -64,8 +64,8 @@ pub async fn create_bridge(
 
     match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -76,7 +76,7 @@ pub async fn get_bridge(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
-        Ok(Some(b)) => Json(serde_json::to_value(&b).unwrap()).into_response(),
+        Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -97,7 +97,7 @@ pub async fn update_bridge(
 
     // Remove old config files if name changed
     if existing.name != req.name {
-        let _ = mgr.remove_device(&existing.name);
+        if let Err(e) = mgr.remove_device(&existing.name) { tracing::warn!("Failed to remove device: {}", e); }
     }
 
     let cfg = BridgeConfig {
@@ -124,8 +124,8 @@ pub async fn update_bridge(
 
     match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            Json(serde_json::to_value(&cfg).unwrap()).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            Json(cfg).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -137,10 +137,10 @@ pub async fn delete_bridge(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
-        let _ = mgr.remove_device(&cfg.name);
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_bridges", &id);
+    if let Err(e) = state.store.delete_entity("networkd_bridges", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -179,8 +179,8 @@ pub async fn create_vlan(
 
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -191,7 +191,7 @@ pub async fn get_vlan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
-        Ok(Some(v)) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+        Ok(Some(v)) => Json(v).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -210,7 +210,7 @@ pub async fn update_vlan(
 
     let mgr = networkd_manager(&state);
     if existing.name != req.name {
-        let _ = mgr.remove_device(&existing.name);
+        if let Err(e) = mgr.remove_device(&existing.name) { tracing::warn!("Failed to remove device: {}", e); }
     }
 
     let cfg = VlanConfig {
@@ -233,8 +233,8 @@ pub async fn update_vlan(
 
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            Json(serde_json::to_value(&cfg).unwrap()).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            Json(cfg).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -246,10 +246,10 @@ pub async fn delete_vlan(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
-        let _ = mgr.remove_device(&cfg.name);
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_vlans", &id);
+    if let Err(e) = state.store.delete_entity("networkd_vlans", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -286,8 +286,8 @@ pub async fn create_macvtap(
 
     match state.store.save_entity("networkd_macvtaps", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -298,7 +298,7 @@ pub async fn get_macvtap(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
-        Ok(Some(m)) => Json(serde_json::to_value(&m).unwrap()).into_response(),
+        Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -310,10 +310,10 @@ pub async fn delete_macvtap(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
-        let _ = mgr.remove_device(&cfg.name);
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_macvtaps", &id);
+    if let Err(e) = state.store.delete_entity("networkd_macvtaps", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -352,8 +352,8 @@ pub async fn create_tap(
 
     match state.store.save_entity("networkd_taps", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -364,7 +364,7 @@ pub async fn get_tap(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<TapConfig>("networkd_taps", &id) {
-        Ok(Some(t)) => Json(serde_json::to_value(&t).unwrap()).into_response(),
+        Ok(Some(t)) => Json(t).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -376,10 +376,10 @@ pub async fn delete_tap(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<TapConfig>("networkd_taps", &id) {
-        let _ = mgr.remove_device(&cfg.name);
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_taps", &id);
+    if let Err(e) = state.store.delete_entity("networkd_taps", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -390,7 +390,7 @@ pub async fn delete_tap(
 pub async fn list_links(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     match mgr.list_links() {
-        Ok(links) => Json(serde_json::to_value(&links).unwrap()).into_response(),
+        Ok(links) => Json(links).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -417,7 +417,7 @@ pub async fn reload_networkd(State(state): State<Arc<AppState>>) -> impl IntoRes
 pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     match mgr.list_managed_files() {
-        Ok(files) => Json(serde_json::to_value(&files).unwrap()).into_response(),
+        Ok(files) => Json(files).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -466,8 +466,8 @@ pub async fn create_bond(
 
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -478,7 +478,7 @@ pub async fn get_bond(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
-        Ok(Some(b)) => Json(serde_json::to_value(&b).unwrap()).into_response(),
+        Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -497,7 +497,7 @@ pub async fn update_bond(
 
     let mgr = networkd_manager(&state);
     if existing.name != req.name {
-        let _ = mgr.remove_device(&existing.name);
+        if let Err(e) = mgr.remove_device(&existing.name) { tracing::warn!("Failed to remove device: {}", e); }
     }
 
     let cfg = BondConfig {
@@ -529,8 +529,8 @@ pub async fn update_bond(
 
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            Json(serde_json::to_value(&cfg).unwrap()).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            Json(cfg).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -542,10 +542,10 @@ pub async fn delete_bond(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
-        let _ = mgr.remove_device(&cfg.name);
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_bonds", &id);
+    if let Err(e) = state.store.delete_entity("networkd_bonds", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -587,8 +587,8 @@ pub async fn create_network_file(
 
     match state.store.save_entity("networkd_netfiles", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -599,7 +599,7 @@ pub async fn get_network_file(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
-        Ok(Some(n)) => Json(serde_json::to_value(&n).unwrap()).into_response(),
+        Ok(Some(n)) => Json(n).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -611,10 +611,10 @@ pub async fn delete_network_file(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
-        let _ = mgr.remove_device(&format!("net-{}", cfg.match_name));
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&format!("net-{}", cfg.match_name)) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_netfiles", &id);
+    if let Err(e) = state.store.delete_entity("networkd_netfiles", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -654,8 +654,8 @@ pub async fn create_link_file(
 
     match state.store.save_entity("networkd_linkfiles", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -670,10 +670,10 @@ pub async fn delete_link_file(
         let file_id = cfg.name.as_deref()
             .or(cfg.match_original_name.as_deref())
             .unwrap_or(&cfg.id);
-        let _ = mgr.remove_device(&format!("link-{}", file_id));
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&format!("link-{}", file_id)) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_linkfiles", &id);
+    if let Err(e) = state.store.delete_entity("networkd_linkfiles", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -725,7 +725,7 @@ pub async fn create_port_forward(
     {
         Ok(_) => (
             StatusCode::CREATED,
-            Json(serde_json::to_value(&cfg).unwrap()),
+            Json(cfg),
         )
             .into_response(),
         Err(e) => (
@@ -744,7 +744,7 @@ pub async fn get_port_forward(
         .store
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
     {
-        Ok(Some(pf)) => Json(serde_json::to_value(&pf).unwrap()).into_response(),
+        Ok(Some(pf)) => Json(pf).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -759,9 +759,9 @@ pub async fn delete_port_forward(
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
     {
         let nft = NftManager::new();
-        let _ = nft.remove(&cfg);
+        if let Err(e) = nft.remove(&cfg) { tracing::warn!("Failed to remove nft rule: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_port_forwards", &id);
+    if let Err(e) = state.store.delete_entity("networkd_port_forwards", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -824,8 +824,8 @@ pub async fn create_vxlan(
 
     match state.store.save_entity("networkd_vxlans", &cfg.id, &cfg) {
         Ok(_) => {
-            let _ = mgr.reload();
-            (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response()
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -836,7 +836,7 @@ pub async fn get_vxlan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
-        Ok(Some(v)) => Json(serde_json::to_value(&v).unwrap()).into_response(),
+        Ok(Some(v)) => Json(v).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -848,10 +848,10 @@ pub async fn delete_vxlan(
 ) -> impl IntoResponse {
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
-        let _ = mgr.remove_device(&cfg.name);
-        let _ = mgr.reload();
+        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_vxlans", &id);
+    if let Err(e) = state.store.delete_entity("networkd_vxlans", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -884,7 +884,7 @@ pub async fn create_sriov(
     }
 
     match state.store.save_entity("networkd_sriov", &cfg.id, &cfg) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&cfg).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(cfg)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -894,7 +894,7 @@ pub async fn get_sriov(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
-        Ok(Some(s)) => Json(serde_json::to_value(&s).unwrap()).into_response(),
+        Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -906,9 +906,9 @@ pub async fn delete_sriov(
 ) -> impl IntoResponse {
     if let Ok(Some(cfg)) = state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         let mgr = networkd_manager(&state);
-        let _ = mgr.remove_sriov(&cfg.pf_name);
+        if let Err(e) = mgr.remove_sriov(&cfg.pf_name) { tracing::warn!("Failed to remove device: {}", e); }
     }
-    let _ = state.store.delete_entity("networkd_sriov", &id);
+    if let Err(e) = state.store.delete_entity("networkd_sriov", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT
 }
 
@@ -919,7 +919,7 @@ pub async fn delete_sriov(
 pub async fn scan_configs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let dir = std::path::Path::new(&state.config.network.networkd_config_dir);
     match networking::parser::scan_networkd_dir(dir) {
-        Ok(configs) => Json(serde_json::to_value(&configs).unwrap()).into_response(),
+        Ok(configs) => Json(configs).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }

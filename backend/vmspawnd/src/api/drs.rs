@@ -19,7 +19,7 @@ pub async fn configure_drs(
     Json(config): Json<DrsConfig>,
 ) -> impl IntoResponse {
     match state.store.save_entity("drs_configs", &config.cluster_id, &config) {
-        Ok(_) => (StatusCode::OK, Json(serde_json::to_value(&config).unwrap())).into_response(),
+        Ok(_) => (StatusCode::OK, Json(config)).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -29,7 +29,7 @@ pub async fn get_drs_config(
     Path(cluster_id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<DrsConfig>("drs_configs", &cluster_id) {
-        Ok(Some(c)) => Json(serde_json::to_value(&c).unwrap()).into_response(),
+        Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -42,7 +42,7 @@ pub async fn compute_placement(
     let mgr = predictive_drs::DrsManager::new();
     let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_default();
     match mgr.compute_placement(&hosts, &req) {
-        Ok(result) => Json(serde_json::to_value(&result).unwrap()).into_response(),
+        Ok(result) => Json(result).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -58,7 +58,7 @@ pub async fn analyze_balance(
 ) -> impl IntoResponse {
     let mgr = predictive_drs::DrsManager::new();
     let balance = mgr.analyze_cluster_balance(&req.hosts);
-    Json(serde_json::to_value(&balance).unwrap())
+    Json(balance)
 }
 
 #[derive(serde::Deserialize)]
@@ -75,9 +75,11 @@ pub async fn generate_recommendations(
     let mgr = predictive_drs::DrsManager::new();
     let recs = mgr.generate_recommendations(&req.cluster_id, &req.hosts, &req.vms);
     for rec in &recs {
-        let _ = state.store.save_entity("drs_recommendations", &rec.id, rec);
+        if let Err(e) = state.store.save_entity("drs_recommendations", &rec.id, rec) {
+            tracing::error!("Failed to save entity: {}", e);
+        }
     }
-    Json(serde_json::to_value(&recs).unwrap())
+    Json(recs)
 }
 
 pub async fn list_recommendations(
@@ -97,8 +99,10 @@ pub async fn approve_recommendation(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     rec.status = predictive_drs::RecommendationStatus::Approved;
-    let _ = state.store.save_entity("drs_recommendations", &rec.id, &rec);
-    Json(serde_json::to_value(&rec).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("drs_recommendations", &rec.id, &rec) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(rec).into_response()
 }
 
 pub async fn reject_recommendation(
@@ -111,7 +115,9 @@ pub async fn reject_recommendation(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     rec.status = predictive_drs::RecommendationStatus::Rejected;
-    let _ = state.store.save_entity("drs_recommendations", &rec.id, &rec);
+    if let Err(e) = state.store.save_entity("drs_recommendations", &rec.id, &rec) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -134,7 +140,7 @@ pub async fn create_affinity_rule(
     rule.created = Utc::now();
     rule.updated = Utc::now();
     match state.store.save_entity("affinity_rules", &rule.id, &rule) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&rule).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(rule)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -144,7 +150,7 @@ pub async fn get_affinity_rule(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<AffinityRule>("affinity_rules", &id) {
-        Ok(Some(r)) => Json(serde_json::to_value(&r).unwrap()).into_response(),
+        Ok(Some(r)) => Json(r).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -157,14 +163,18 @@ pub async fn update_affinity_rule(
 ) -> impl IntoResponse {
     rule.id = id.clone();
     rule.updated = Utc::now();
-    let _ = state.store.save_entity("affinity_rules", &id, &rule);
-    Json(serde_json::to_value(&rule).unwrap())
+    if let Err(e) = state.store.save_entity("affinity_rules", &id, &rule) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(rule)
 }
 
 pub async fn delete_affinity_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("affinity_rules", &id);
+    if let Err(e) = state.store.delete_entity("affinity_rules", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }

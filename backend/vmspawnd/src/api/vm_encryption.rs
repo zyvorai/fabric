@@ -29,7 +29,7 @@ pub async fn register_provider(
     provider.created = now;
     provider.updated = now;
     match state.store.save_entity("key_providers", &provider.id, &provider) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&provider).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(provider)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -38,7 +38,9 @@ pub async fn remove_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("key_providers", &id);
+    if let Err(e) = state.store.delete_entity("key_providers", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -77,7 +79,7 @@ pub async fn create_policy(
     policy.created = now;
     policy.updated = now;
     match state.store.save_entity("encryption_policies", &policy.id, &policy) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&policy).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(policy)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -87,7 +89,7 @@ pub async fn get_policy(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<EncryptionPolicy>("encryption_policies", &id) {
-        Ok(Some(p)) => Json(serde_json::to_value(&p).unwrap()).into_response(),
+        Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -100,15 +102,19 @@ pub async fn update_policy(
 ) -> impl IntoResponse {
     policy.id = id.clone();
     policy.updated = Utc::now();
-    let _ = state.store.save_entity("encryption_policies", &id, &policy);
-    Json(serde_json::to_value(&policy).unwrap())
+    if let Err(e) = state.store.save_entity("encryption_policies", &id, &policy) {
+        tracing::error!("Failed to save: {}", e);
+    }
+    Json(policy)
 }
 
 pub async fn delete_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("encryption_policies", &id);
+    if let Err(e) = state.store.delete_entity("encryption_policies", &id) {
+        tracing::error!("Failed to delete: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -140,8 +146,10 @@ pub async fn encrypt_vm(
         vmotion_encrypted: policy.encrypt_vmotion,
         last_key_rotation: None,
     };
-    let _ = state.store.save_entity("vm_encryption", &req.vm_name, &status);
-    (StatusCode::OK, Json(serde_json::to_value(&status).unwrap())).into_response()
+    if let Err(e) = state.store.save_entity("vm_encryption", &req.vm_name, &status) {
+        tracing::error!("Failed to save: {}", e);
+    }
+    (StatusCode::OK, Json(status)).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -162,7 +170,9 @@ pub async fn decrypt_vm(
         vmotion_encrypted: false,
         last_key_rotation: None,
     };
-    let _ = state.store.save_entity("vm_encryption", &req.vm_name, &status);
+    if let Err(e) = state.store.save_entity("vm_encryption", &req.vm_name, &status) {
+        tracing::error!("Failed to save: {}", e);
+    }
     StatusCode::OK
 }
 
@@ -171,7 +181,7 @@ pub async fn get_vm_encryption_status(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
-        Ok(Some(s)) => Json(serde_json::to_value(&s).unwrap()).into_response(),
+        Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -197,6 +207,8 @@ pub async fn rotate_vm_key(
     }
     status.key_id = Some(Uuid::new_v4().to_string());
     status.last_key_rotation = Some(Utc::now());
-    let _ = state.store.save_entity("vm_encryption", &vm_name, &status);
-    Json(serde_json::to_value(&status).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("vm_encryption", &vm_name, &status) {
+        tracing::error!("Failed to save: {}", e);
+    }
+    Json(status).into_response()
 }

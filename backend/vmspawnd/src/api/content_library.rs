@@ -46,7 +46,7 @@ pub async fn create_library(
         updated: now,
     };
     match state.store.save_entity("libraries", &library.id, &library) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&library).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(library)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -56,7 +56,7 @@ pub async fn get_library(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<Library>("libraries", &id) {
-        Ok(Some(l)) => Json(serde_json::to_value(&l).unwrap()).into_response(),
+        Ok(Some(l)) => Json(l).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -66,7 +66,9 @@ pub async fn delete_library(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("libraries", &id);
+    if let Err(e) = state.store.delete_entity("libraries", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -84,7 +86,9 @@ pub async fn sync_library(
     }
     lib.last_sync = Some(Utc::now());
     lib.updated = Utc::now();
-    let _ = state.store.save_entity("libraries", &lib.id, &lib);
+    if let Err(e) = state.store.save_entity("libraries", &lib.id, &lib) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -125,7 +129,7 @@ pub async fn download_image(
     };
 
     // Create library in the in-memory manager so download_image can find it
-    let _ = mgr.create_library(content_library::CreateLibraryRequest {
+    if let Err(e) = mgr.create_library(content_library::CreateLibraryRequest {
         name: lib.name.clone(),
         description: lib.description.clone(),
         library_type: lib.library_type.clone(),
@@ -134,7 +138,9 @@ pub async fn download_image(
         subscription_url: None,
         auto_sync: false,
         sync_interval_hours: None,
-    });
+    }) {
+        tracing::warn!("Failed to create library in manager: {}", e);
+    }
 
     // Find the library ID in the manager (it generates a new one)
     let manager_libs = mgr.list_libraries();
@@ -151,7 +157,7 @@ pub async fn download_image(
             let id = Uuid::new_v4().to_string();
             saved_item.id = id.clone();
             match state.store.save_entity("library_items", &id, &saved_item) {
-                Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&saved_item).unwrap())).into_response(),
+                Ok(_) => (StatusCode::CREATED, Json(saved_item)).into_response(),
                 Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
             }
         }
@@ -180,7 +186,7 @@ pub async fn add_library_item(
     item.updated = now;
     if item.version == 0 { item.version = 1; }
     match state.store.save_entity("library_items", &item.id, &item) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&item).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(item)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -190,7 +196,7 @@ pub async fn get_library_item(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<LibraryItem>("library_items", &id) {
-        Ok(Some(i)) => Json(serde_json::to_value(&i).unwrap()).into_response(),
+        Ok(Some(i)) => Json(i).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -200,7 +206,9 @@ pub async fn delete_library_item(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("library_items", &id);
+    if let Err(e) = state.store.delete_entity("library_items", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -237,7 +245,7 @@ pub async fn create_customization_spec(
     spec.created = now;
     spec.updated = now;
     match state.store.save_entity("customization_specs", &spec.id, &spec) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&spec).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(spec)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -247,7 +255,7 @@ pub async fn get_customization_spec(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<GuestCustomizationSpec>("customization_specs", &id) {
-        Ok(Some(s)) => Json(serde_json::to_value(&s).unwrap()).into_response(),
+        Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -257,7 +265,9 @@ pub async fn delete_customization_spec(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("customization_specs", &id);
+    if let Err(e) = state.store.delete_entity("customization_specs", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -279,7 +289,7 @@ pub async fn create_host_profile(
     profile.created = now;
     profile.updated = now;
     match state.store.save_entity("host_profiles", &profile.id, &profile) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&profile).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(profile)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -289,7 +299,7 @@ pub async fn get_host_profile(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<HostProfile>("host_profiles", &id) {
-        Ok(Some(p)) => Json(serde_json::to_value(&p).unwrap()).into_response(),
+        Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -299,7 +309,9 @@ pub async fn delete_host_profile(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("host_profiles", &id);
+    if let Err(e) = state.store.delete_entity("host_profiles", &id) {
+        tracing::error!("Failed to delete: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -317,8 +329,10 @@ pub async fn check_host_compliance(
     let mgr = content_library::ContentLibraryManager::new();
     // Load profile into the manager for compliance check
     if let Ok(Some(profile)) = state.store.get_entity::<HostProfile>("host_profiles", &profile_id) {
-        let _ = mgr.create_host_profile(profile);
+        if let Err(e) = mgr.create_host_profile(profile) {
+            tracing::warn!("Failed to create host profile in manager: {}", e);
+        }
     }
     let result = mgr.check_host_compliance(&req.host_id, &profile_id, &req.current_config);
-    Json(serde_json::to_value(&result).unwrap())
+    Json(result)
 }

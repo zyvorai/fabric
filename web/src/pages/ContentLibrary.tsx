@@ -18,9 +18,12 @@ import {
   type HostProfile,
 } from '../api/contentLibrary'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function ContentLibrary() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [libraries, setLibraries] = useState<Library[]>([])
   const [items, setItems] = useState<LibraryItem[]>([])
   const [specs, setSpecs] = useState<GuestCustomizationSpec[]>([])
@@ -60,25 +63,25 @@ export default function ContentLibrary() {
   }
 
   const handleDeleteLibrary = async (id: string) => {
-    if (!confirm('Delete this library and all its items?')) return
+    if (!await confirm('Delete Library', 'Delete this library and all its items?')) return
     try { await deleteLibrary(id); toast.success('Library deleted'); loadData() }
     catch { toast.error('Failed to delete library') }
   }
 
   const handleDeleteItem = async (libraryId: string, itemId: string) => {
-    if (!confirm('Delete this item?')) return
+    if (!await confirm('Delete Item', 'Delete this item?')) return
     try { await deleteLibraryItem(libraryId, itemId); toast.success('Item deleted'); loadData() }
     catch { toast.error('Failed to delete item') }
   }
 
   const handleDeleteSpec = async (id: string) => {
-    if (!confirm('Delete this customization spec?')) return
+    if (!await confirm('Delete Customization Spec', 'Delete this customization spec?')) return
     try { await deleteCustomizationSpec(id); toast.success('Spec deleted'); loadData() }
     catch { toast.error('Failed to delete spec') }
   }
 
   const handleDeleteProfile = async (id: string) => {
-    if (!confirm('Delete this host profile?')) return
+    if (!await confirm('Delete Host Profile', 'Delete this host profile?')) return
     try { await deleteHostProfile(id); toast.success('Profile deleted'); loadData() }
     catch { toast.error('Failed to delete profile') }
   }
@@ -334,6 +337,16 @@ export default function ContentLibrary() {
       {showCreateLibrary && <CreateLibraryModal onClose={() => setShowCreateLibrary(false)} onCreated={() => { setShowCreateLibrary(false); loadData() }} />}
       {showCreateSpec && <CreateSpecModal onClose={() => setShowCreateSpec(false)} onCreated={() => { setShowCreateSpec(false); loadData() }} />}
       {showCreateProfile && <CreateProfileModal onClose={() => setShowCreateProfile(false)} onCreated={() => { setShowCreateProfile(false); loadData() }} />}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Network as NetworkIcon, Plus, Trash2, RefreshCw, X, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft } from 'lucide-react'
 import * as api from '../api/networkd'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type {
   BridgeConfig, VlanConfig, MacvtapConfig, TapConfig, LinkInfo,
   BondConfig, NetworkFileConfig, LinkFileConfig, PortForwardConfig,
@@ -35,6 +37,7 @@ export default function Network() {
   const [showCreateNetfile, setShowCreateNetfile] = useState(false)
   const [showCreateLinkfile, setShowCreateLinkfile] = useState(false)
   const [showCreatePortForward, setShowCreatePortForward] = useState(false)
+  const { confirmState, confirm, cancel } = useConfirm()
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -79,7 +82,7 @@ export default function Network() {
   }
 
   const handleDeleteBridge = async (id: string) => {
-    if (!confirm('Delete this bridge and its systemd-networkd config files?')) return
+    if (!await confirm('Delete Bridge', 'Delete this bridge and its systemd-networkd config files?')) return
     try {
       await api.deleteBridge(id)
       setBridges(prev => prev.filter(b => b.id !== id))
@@ -87,7 +90,7 @@ export default function Network() {
   }
 
   const handleDeleteVlan = async (id: string) => {
-    if (!confirm('Delete this VLAN?')) return
+    if (!await confirm('Delete VLAN', 'Delete this VLAN?')) return
     try {
       await api.deleteVlan(id)
       setVlans(prev => prev.filter(v => v.id !== id))
@@ -95,7 +98,7 @@ export default function Network() {
   }
 
   const handleDeleteMacvtap = async (id: string) => {
-    if (!confirm('Delete this macvtap device?')) return
+    if (!await confirm('Delete Macvtap', 'Delete this macvtap device?')) return
     try {
       await api.deleteMacvtap(id)
       setMacvtaps(prev => prev.filter(m => m.id !== id))
@@ -103,7 +106,7 @@ export default function Network() {
   }
 
   const handleDeleteTap = async (id: string) => {
-    if (!confirm('Delete this tap device?')) return
+    if (!await confirm('Delete Tap', 'Delete this tap device?')) return
     try {
       await api.deleteTap(id)
       setTaps(prev => prev.filter(t => t.id !== id))
@@ -111,7 +114,7 @@ export default function Network() {
   }
 
   const handleDeleteBond = async (id: string) => {
-    if (!confirm('Delete this bond and its systemd-networkd config files?')) return
+    if (!await confirm('Delete Bond', 'Delete this bond and its systemd-networkd config files?')) return
     try {
       await api.deleteBond(id)
       setBonds(prev => prev.filter(b => b.id !== id))
@@ -119,7 +122,7 @@ export default function Network() {
   }
 
   const handleDeleteNetfile = async (id: string) => {
-    if (!confirm('Delete this network file config?')) return
+    if (!await confirm('Delete Network File', 'Delete this network file config?')) return
     try {
       await api.deleteNetworkFile(id)
       setNetfiles(prev => prev.filter(n => n.id !== id))
@@ -127,7 +130,7 @@ export default function Network() {
   }
 
   const handleDeleteLinkfile = async (id: string) => {
-    if (!confirm('Delete this link file config?')) return
+    if (!await confirm('Delete Link File', 'Delete this link file config?')) return
     try {
       await api.deleteLinkFile(id)
       setLinkfiles(prev => prev.filter(l => l.id !== id))
@@ -135,7 +138,7 @@ export default function Network() {
   }
 
   const handleDeletePortForward = async (id: string) => {
-    if (!confirm('Delete this port forward rule?')) return
+    if (!await confirm('Delete Port Forward', 'Delete this port forward rule?')) return
     try {
       await api.deletePortForward(id)
       setPortForwards(prev => prev.filter(p => p.id !== id))
@@ -278,6 +281,16 @@ export default function Network() {
       {showCreateNetfile && <CreateNetfileModal onClose={() => setShowCreateNetfile(false)} onCreated={(n) => { setNetfiles(prev => [...prev, n]); setShowCreateNetfile(false) }} />}
       {showCreateLinkfile && <CreateLinkfileModal onClose={() => setShowCreateLinkfile(false)} onCreated={(l) => { setLinkfiles(prev => [...prev, l]); setShowCreateLinkfile(false) }} />}
       {showCreatePortForward && <CreatePortForwardModal onClose={() => setShowCreatePortForward(false)} onCreated={(pf) => { setPortForwards(prev => [...prev, pf]); setShowCreatePortForward(false) }} />}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }

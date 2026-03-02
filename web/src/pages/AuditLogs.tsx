@@ -160,7 +160,7 @@ export default function AuditLogs() {
               <div>
                 <p className="text-sm text-gray-400">Success Rate</p>
                 <p className="text-2xl font-bold text-green-400">
-                  {((stats.by_status.success || 0) / stats.total_logs * 100).toFixed(1)}%
+                  {stats.total_logs > 0 ? ((stats.by_status.success || 0) / stats.total_logs * 100).toFixed(1) : '0.0'}%
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-500" />

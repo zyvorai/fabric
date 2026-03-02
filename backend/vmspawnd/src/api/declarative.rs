@@ -211,7 +211,9 @@ pub async fn apply_vm_spec(
                 started = true;
                 if let Ok(Some(mut vm)) = state.store.get_vm(&spec.name) {
                     vm.state = vm_model::VMState::Running;
-                    let _ = state.store.save_vm(&vm);
+                    if let Err(e) = state.store.save_vm(&vm) {
+                        tracing::error!("Failed to save VM: {}", e);
+                    }
                 }
             }
             Err(e) => {

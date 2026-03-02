@@ -43,7 +43,7 @@ pub async fn create_pool(
         updated: None,
     };
     match state.store.save_entity("resource_pools", &pool.id, &pool) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&pool).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(pool)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -53,7 +53,7 @@ pub async fn get_pool(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
-        Ok(Some(p)) => Json(serde_json::to_value(&p).unwrap()).into_response(),
+        Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -79,15 +79,19 @@ pub async fn update_pool(
     if let Some(v) = req.memory_limit_mb { pool.memory_limit_mb = v; }
     if let Some(v) = req.memory_expandable_reservation { pool.memory_expandable_reservation = v; }
     pool.updated = Some(Utc::now());
-    let _ = state.store.save_entity("resource_pools", &pool.id, &pool);
-    Json(serde_json::to_value(&pool).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("resource_pools", &pool.id, &pool) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(pool).into_response()
 }
 
 pub async fn delete_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("resource_pools", &id);
+    if let Err(e) = state.store.delete_entity("resource_pools", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -114,7 +118,7 @@ pub async fn get_pool_summary(
         vm_count: pool.vms.len(),
         child_pool_count: pool.children.len(),
     };
-    Json(serde_json::to_value(&summary).unwrap()).into_response()
+    Json(summary).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -137,7 +141,9 @@ pub async fn assign_vm(
     }
     pool.vms.push(req.vm_name);
     pool.updated = Some(Utc::now());
-    let _ = state.store.save_entity("resource_pools", &pool.id, &pool);
+    if let Err(e) = state.store.save_entity("resource_pools", &pool.id, &pool) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -152,7 +158,9 @@ pub async fn unassign_vm(
     };
     pool.vms.retain(|v| v != &vm_name);
     pool.updated = Some(Utc::now());
-    let _ = state.store.save_entity("resource_pools", &pool.id, &pool);
+    if let Err(e) = state.store.save_entity("resource_pools", &pool.id, &pool) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -182,8 +190,12 @@ pub async fn move_vm(
     let now = Some(Utc::now());
     src.updated = now;
     dst.updated = now;
-    let _ = state.store.save_entity("resource_pools", &src.id, &src);
-    let _ = state.store.save_entity("resource_pools", &dst.id, &dst);
+    if let Err(e) = state.store.save_entity("resource_pools", &src.id, &src) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    if let Err(e) = state.store.save_entity("resource_pools", &dst.id, &dst) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -212,5 +224,5 @@ pub async fn check_admission(
         available_cpu_mhz: avail_cpu,
         available_memory_mb: avail_mem,
     };
-    Json(serde_json::to_value(&result).unwrap()).into_response()
+    Json(result).into_response()
 }

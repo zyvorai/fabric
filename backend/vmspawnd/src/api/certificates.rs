@@ -33,7 +33,7 @@ pub async fn create_ca(
     ca.created = now;
     ca.updated = now;
     match state.store.save_entity("cert_cas", &ca.id, &ca) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&ca).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(ca)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -42,7 +42,9 @@ pub async fn delete_ca(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("cert_cas", &id);
+    if let Err(e) = state.store.delete_entity("cert_cas", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -79,7 +81,7 @@ pub async fn issue_certificate(
         updated: now,
     };
     match state.store.save_entity("certificates", &cert.id, &cert) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&cert).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(cert)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -95,7 +97,9 @@ pub async fn revoke_certificate(
     };
     cert.status = CertStatus::Revoked;
     cert.updated = Utc::now();
-    let _ = state.store.save_entity("certificates", &cert.id, &cert);
+    if let Err(e) = state.store.save_entity("certificates", &cert.id, &cert) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -114,7 +118,9 @@ pub async fn renew_certificate(
     let mut expired = old_cert.clone();
     expired.status = CertStatus::Expired;
     expired.updated = now;
-    let _ = state.store.save_entity("certificates", &id, &expired);
+    if let Err(e) = state.store.save_entity("certificates", &id, &expired) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     let new_cert = Certificate {
         id: Uuid::new_v4().to_string(),
         common_name: old_cert.common_name,
@@ -132,8 +138,10 @@ pub async fn renew_certificate(
         created: now,
         updated: now,
     };
-    let _ = state.store.save_entity("certificates", &new_cert.id, &new_cert);
-    Json(serde_json::to_value(&new_cert).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("certificates", &new_cert.id, &new_cert) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(new_cert).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -173,7 +181,7 @@ pub async fn submit_cert_request(
     req.status = certificate_manager::CsrStatus::Pending;
     req.created = Utc::now();
     match state.store.save_entity("cert_requests", &req.id, &req) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&req).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(req)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -188,8 +196,10 @@ pub async fn approve_cert_request(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     req.status = certificate_manager::CsrStatus::Approved;
-    let _ = state.store.save_entity("cert_requests", &req.id, &req);
-    Json(serde_json::to_value(&req).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("cert_requests", &req.id, &req) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(req).into_response()
 }
 
 pub async fn reject_cert_request(
@@ -202,7 +212,9 @@ pub async fn reject_cert_request(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     req.status = certificate_manager::CsrStatus::Rejected;
-    let _ = state.store.save_entity("cert_requests", &req.id, &req);
+    if let Err(e) = state.store.save_entity("cert_requests", &req.id, &req) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -240,8 +252,10 @@ pub async fn schedule_rotation(
         completed_at: None,
         error: None,
     };
-    let _ = state.store.save_entity("cert_rotations", &rotation.id, &rotation);
-    (StatusCode::CREATED, Json(serde_json::to_value(&rotation).unwrap())).into_response()
+    if let Err(e) = state.store.save_entity("cert_rotations", &rotation.id, &rotation) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    (StatusCode::CREATED, Json(rotation)).into_response()
 }
 
 pub async fn execute_rotation(
@@ -256,8 +270,10 @@ pub async fn execute_rotation(
     rotation.status = RotationStatus::Completed;
     rotation.new_cert_fingerprint = Some(format!("sha256:{}", Uuid::new_v4()));
     rotation.completed_at = Some(Utc::now());
-    let _ = state.store.save_entity("cert_rotations", &rotation.id, &rotation);
-    Json(serde_json::to_value(&rotation).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("cert_rotations", &rotation.id, &rotation) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(rotation).into_response()
 }
 
 // ============================================================================
@@ -274,7 +290,7 @@ pub async fn submit_attestation(
     Json(att): Json<TrustAttestation>,
 ) -> impl IntoResponse {
     match state.store.save_entity("attestations", &att.host_id, &att) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&att).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(att)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -295,7 +311,9 @@ pub async fn verify_attestation(
         certificate_manager::AttestationStatus::Untrusted
     };
     att.last_attested = Some(Utc::now());
-    let _ = state.store.save_entity("attestations", &att.host_id, &att);
+    if let Err(e) = state.store.save_entity("attestations", &att.host_id, &att) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     Json(serde_json::json!({"trusted": trusted})).into_response()
 }
 
@@ -317,7 +335,7 @@ pub async fn create_security_baseline(
     baseline.created = now;
     baseline.updated = now;
     match state.store.save_entity("security_baselines", &baseline.id, &baseline) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&baseline).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(baseline)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -362,7 +380,7 @@ pub async fn check_vm_security_compliance(
         violations,
         checked_at: Utc::now(),
     };
-    Json(serde_json::to_value(&result).unwrap()).into_response()
+    Json(result).into_response()
 }
 
 // ============================================================================

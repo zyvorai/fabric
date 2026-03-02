@@ -406,7 +406,7 @@ pub async fn get_all_quota_usage(
 ) -> Result<Json<Vec<QuotaUsage>>, StatusCode> {
     // Check cache first
     {
-        let cache = state.quota_cache.read().unwrap();
+        let cache = state.quota_cache.read().await;
         if !cache.is_stale() && !cache.usage.is_empty() {
             let usage: Vec<QuotaUsage> = cache.usage.values().cloned().collect();
             return Ok(Json(usage));
@@ -427,7 +427,7 @@ pub async fn get_all_quota_usage(
 
     // Update cache
     {
-        let mut cache = state.quota_cache.write().unwrap();
+        let mut cache = state.quota_cache.write().await;
         cache.usage.clear();
         for u in &usage {
             cache.usage.insert(u.quota_id.clone(), u.clone());

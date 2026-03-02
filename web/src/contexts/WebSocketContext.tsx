@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode, useState } from 'react'
+import { createContext, useContext, ReactNode, useState, useRef } from 'react'
 import { useWebSocket, WebSocketMessage } from '../hooks/useWebSocket'
 import { VM } from '../api/vm'
 
@@ -12,44 +12,54 @@ const WebSocketContext = createContext<WebSocketContextType | undefined>(undefin
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [vmUpdates, setVmUpdates] = useState<Map<string, Partial<VM>>>(new Map())
-  const [subscribers, setSubscribers] = useState<Set<(message: WebSocketMessage) => void>>(new Set())
+  const subscribersRef = useRef<Set<(message: WebSocketMessage) => void>>(new Set())
 
   // Determine WebSocket URL based on current location
   const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/events`
 
   const handleMessage = (message: WebSocketMessage) => {
     // Notify all subscribers
-    subscribers.forEach((callback) => callback(message))
+    subscribersRef.current.forEach((callback) => callback(message))
+
+    const data = message.data as Record<string, string | Record<string, unknown>>
+    const vmName = data.name as string
 
     // Update VM state cache
     switch (message.type) {
       case 'vm_state_changed':
-        setVmUpdates((prev) => {
-          const updated = new Map(prev)
-          updated.set(message.data.name, {
-            state: message.data.state,
+        if (vmName) {
+          setVmUpdates((prev) => {
+            const updated = new Map(prev)
+            updated.set(vmName, {
+              state: data.state as string,
+            } as Partial<VM>)
+            return updated
           })
-          return updated
-        })
+        }
         break
 
       case 'vm_metrics':
-        setVmUpdates((prev) => {
-          const updated = new Map(prev)
-          updated.set(message.data.name, {
-            ...prev.get(message.data.name),
-            ...message.data.metrics,
+        if (vmName) {
+          setVmUpdates((prev) => {
+            const updated = new Map(prev)
+            const metrics = (data.metrics || {}) as Record<string, unknown>
+            updated.set(vmName, {
+              ...prev.get(vmName),
+              ...metrics,
+            } as Partial<VM>)
+            return updated
           })
-          return updated
-        })
+        }
         break
 
       case 'vm_deleted':
-        setVmUpdates((prev) => {
-          const updated = new Map(prev)
-          updated.delete(message.data.name)
-          return updated
-        })
+        if (vmName) {
+          setVmUpdates((prev) => {
+            const updated = new Map(prev)
+            updated.delete(vmName)
+            return updated
+          })
+        }
         break
     }
   }
@@ -64,15 +74,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   })
 
   const subscribe = (callback: (message: WebSocketMessage) => void) => {
-    setSubscribers((prev) => new Set(prev).add(callback))
+    subscribersRef.current.add(callback)
 
     // Return unsubscribe function
     return () => {
-      setSubscribers((prev) => {
-        const updated = new Set(prev)
-        updated.delete(callback)
-        return updated
-      })
+      subscribersRef.current.delete(callback)
     }
   }
 

@@ -39,7 +39,7 @@ pub async fn create_datacenter(
         status: DatacenterStatus::Active,
     };
     match state.store.save_entity("datacenters", &dc.id, &dc) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&dc).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(dc)).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -53,7 +53,7 @@ pub async fn get_datacenter(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<Datacenter>("datacenters", &id) {
-        Ok(Some(dc)) => Json(serde_json::to_value(&dc).unwrap()).into_response(),
+        Ok(Some(dc)) => Json(dc).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -90,15 +90,19 @@ pub async fn update_datacenter(
         dc.status = status;
     }
     dc.updated_at = Utc::now();
-    let _ = state.store.save_entity("datacenters", &dc.id, &dc);
-    Json(serde_json::to_value(&dc).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("datacenters", &dc.id, &dc) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(dc).into_response()
 }
 
 pub async fn delete_datacenter(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("datacenters", &id);
+    if let Err(e) = state.store.delete_entity("datacenters", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -122,7 +126,7 @@ pub async fn get_datacenter_summary(
         total_cpus: dc_hosts.iter().map(|h| h.cpus).sum(),
         total_memory_mb: dc_hosts.iter().map(|h| h.memory_mb).sum(),
     };
-    Json(serde_json::to_value(&summary).unwrap()).into_response()
+    Json(summary).into_response()
 }
 
 // ============================================================================
@@ -154,7 +158,7 @@ pub async fn create_cluster(
         status: datacenter::ClusterStatus::Active,
     };
     match state.store.save_entity("clusters", &cluster.id, &cluster) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&cluster).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(cluster)).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -168,7 +172,7 @@ pub async fn get_cluster(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<Cluster>("clusters", &id) {
-        Ok(Some(c)) => Json(serde_json::to_value(&c).unwrap()).into_response(),
+        Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -192,15 +196,19 @@ pub async fn update_cluster(
     if let Some(evc) = req.evc_mode { cluster.evc_mode = evc; }
     if let Some(status) = req.status { cluster.status = status; }
     cluster.updated_at = Utc::now();
-    let _ = state.store.save_entity("clusters", &cluster.id, &cluster);
-    Json(serde_json::to_value(&cluster).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("clusters", &cluster.id, &cluster) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(cluster).into_response()
 }
 
 pub async fn delete_cluster(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("clusters", &id);
+    if let Err(e) = state.store.delete_entity("clusters", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -236,7 +244,7 @@ pub async fn register_host(
         updated_at: now,
     };
     match state.store.save_entity("hosts", &host.id, &host) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&host).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(host)).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -250,7 +258,7 @@ pub async fn get_host(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<HostInfo>("hosts", &id) {
-        Ok(Some(h)) => Json(serde_json::to_value(&h).unwrap()).into_response(),
+        Ok(Some(h)) => Json(h).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -273,15 +281,19 @@ pub async fn update_host(
     if let Some(agent_version) = req.agent_version { host.agent_version = agent_version; }
     if let Some(status) = req.status { host.status = status; }
     host.updated_at = Utc::now();
-    let _ = state.store.save_entity("hosts", &host.id, &host);
-    Json(serde_json::to_value(&host).unwrap()).into_response()
+    if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(host).into_response()
 }
 
 pub async fn remove_host(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("hosts", &id);
+    if let Err(e) = state.store.delete_entity("hosts", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -300,7 +312,9 @@ pub async fn host_heartbeat(
     host.vm_count = hb.vm_count;
     host.last_heartbeat = Utc::now();
     host.updated_at = host.last_heartbeat;
-    let _ = state.store.save_entity("hosts", &host.id, &host);
+    if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -315,7 +329,9 @@ pub async fn host_enter_maintenance(
     };
     host.status = HostStatus::Maintenance;
     host.updated_at = Utc::now();
-    let _ = state.store.save_entity("hosts", &host.id, &host);
+    if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -330,7 +346,9 @@ pub async fn host_exit_maintenance(
     };
     host.status = HostStatus::Connected;
     host.updated_at = Utc::now();
-    let _ = state.store.save_entity("hosts", &host.id, &host);
+    if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 

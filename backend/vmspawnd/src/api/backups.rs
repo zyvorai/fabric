@@ -164,49 +164,9 @@ pub async fn list_backups(
     State(state): State<Arc<AppState>>,
     Query(query): Query<BackupQuery>,
 ) -> Result<Json<Vec<Backup>>, StatusCode> {
-    // Load from state store, fall back to mock data if empty
+    // Load from state store
     let mut backups = state.store.list_entities::<Backup>("backups")
-        .unwrap_or_else(|_| vec![
-        Backup {
-            id: Uuid::new_v4().to_string(),
-            vm_name: "web-server-01".to_string(),
-            backup_type: BackupType::Full,
-            size_bytes: 10 * 1024 * 1024 * 1024, // 10GB
-            compressed: true,
-            created: Utc::now() - Duration::days(1),
-            status: BackupStatus::Completed,
-            storage_location: "/var/lib/vmspawnd/backups/web-server-01-full-20260218.tar.gz".to_string(),
-            retention_days: 30,
-            expires_at: Some(Utc::now() + Duration::days(29)),
-            metadata: None,
-        },
-        Backup {
-            id: Uuid::new_v4().to_string(),
-            vm_name: "database-01".to_string(),
-            backup_type: BackupType::Full,
-            size_bytes: 50 * 1024 * 1024 * 1024, // 50GB
-            compressed: true,
-            created: Utc::now() - Duration::days(2),
-            status: BackupStatus::Completed,
-            storage_location: "/var/lib/vmspawnd/backups/database-01-full-20260217.tar.gz".to_string(),
-            retention_days: 90,
-            expires_at: Some(Utc::now() + Duration::days(88)),
-            metadata: None,
-        },
-        Backup {
-            id: Uuid::new_v4().to_string(),
-            vm_name: "web-server-01".to_string(),
-            backup_type: BackupType::Incremental,
-            size_bytes: 512 * 1024 * 1024, // 512MB
-            compressed: true,
-            created: Utc::now() - Duration::hours(12),
-            status: BackupStatus::Completed,
-            storage_location: "/var/lib/vmspawnd/backups/web-server-01-incr-20260219.tar.gz".to_string(),
-            retention_days: 7,
-            expires_at: Some(Utc::now() + Duration::days(6)),
-            metadata: None,
-        },
-    ]);
+        .unwrap_or_default();
 
     // Filter by VM if specified
     if let Some(vm_name) = query.vm {
@@ -281,7 +241,9 @@ pub async fn create_backup(
                 job.status = JobStatus::Failed;
                 job.error = Some(e.to_string());
                 job.completed_at = Some(Utc::now());
-                let _ = state_ref.store.save_entity("backup_jobs", &job_id, &job);
+                if let Err(e) = state_ref.store.save_entity("backup_jobs", &job_id, &job) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             }
         }
     });
@@ -296,7 +258,9 @@ pub async fn create_backup(
                 job.status = JobStatus::Failed;
                 job.error = Some("Internal error: worker panicked".to_string());
                 job.completed_at = Some(Utc::now());
-                let _ = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job);
+                if let Err(e) = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             }
         }
     });
@@ -392,7 +356,9 @@ pub async fn restore_backup(
                 job.status = JobStatus::Failed;
                 job.error = Some(e.to_string());
                 job.completed_at = Some(Utc::now());
-                let _ = state_ref.store.save_entity("backup_jobs", &job_id, &job);
+                if let Err(e) = state_ref.store.save_entity("backup_jobs", &job_id, &job) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             }
         }
     });
@@ -407,7 +373,9 @@ pub async fn restore_backup(
                 job.status = JobStatus::Failed;
                 job.error = Some("Internal error: worker panicked".to_string());
                 job.completed_at = Some(Utc::now());
-                let _ = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job);
+                if let Err(e) = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job) {
+                    tracing::error!("Failed to save: {}", e);
+                }
             }
         }
     });
@@ -425,32 +393,9 @@ pub async fn restore_backup(
 pub async fn get_backup_jobs(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupJob>>, StatusCode> {
-    // Load from state store, fall back to mock data if empty
+    // Load from state store
     let jobs = state.store.list_entities::<BackupJob>("backup_jobs")
-        .unwrap_or_else(|_| vec![
-        BackupJob {
-            id: Uuid::new_v4().to_string(),
-            backup_id: Some(Uuid::new_v4().to_string()),
-            vm_name: "web-server-01".to_string(),
-            operation: JobOperation::Backup,
-            status: JobStatus::Running,
-            progress: 65.5,
-            started_at: Some(Utc::now() - Duration::minutes(10)),
-            completed_at: None,
-            error: None,
-        },
-        BackupJob {
-            id: Uuid::new_v4().to_string(),
-            backup_id: Some(Uuid::new_v4().to_string()),
-            vm_name: "database-01".to_string(),
-            operation: JobOperation::Backup,
-            status: JobStatus::Completed,
-            progress: 100.0,
-            started_at: Some(Utc::now() - Duration::hours(2)),
-            completed_at: Some(Utc::now() - Duration::hours(1)),
-            error: None,
-        },
-    ]);
+        .unwrap_or_default();
 
     Ok(Json(jobs))
 }

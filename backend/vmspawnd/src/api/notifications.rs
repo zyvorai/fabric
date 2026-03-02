@@ -173,11 +173,12 @@ fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, 
             if !config.contains_key("url") {
                 return Err("Webhook channel requires 'url'".to_string());
             }
-            // Validate URL format
+            // Validate URL format and block internal/private addresses (SSRF prevention)
             if let Some(url) = config.get("url").and_then(|v| v.as_str()) {
                 if !url.starts_with("http://") && !url.starts_with("https://") {
                     return Err("Webhook URL must start with http:// or https://".to_string());
                 }
+                validate_external_url(url)?;
             }
         }
         ChannelType::Teams => {
@@ -216,6 +217,63 @@ fn validate_notification_rule(rule: &CreateRuleRequest) -> Result<(), String> {
     Ok(())
 }
 
+/// Validate that a URL points to an external host, not internal/private networks.
+/// Prevents SSRF attacks against internal services like metadata endpoints.
+fn validate_external_url(url: &str) -> Result<(), String> {
+    // Parse the URL to extract the host
+    let host = url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .split(':')
+        .next()
+        .unwrap_or("");
+
+    if host.is_empty() {
+        return Err("URL has no host".to_string());
+    }
+
+    // Block well-known internal hostnames
+    let blocked_hosts = [
+        "localhost",
+        "localhost.localdomain",
+        "metadata.google.internal",
+        "metadata",
+    ];
+    let host_lower = host.to_lowercase();
+    if blocked_hosts.iter().any(|&b| host_lower == b) {
+        return Err(format!("Webhook URL host '{}' is not allowed (internal host)", host));
+    }
+
+    // Check if the host is an IP address and block private/internal ranges
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        let is_private = match ip {
+            std::net::IpAddr::V4(v4) => {
+                v4.is_loopback()                              // 127.0.0.0/8
+                    || v4.is_private()                        // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+                    || v4.is_link_local()                     // 169.254.0.0/16
+                    || v4.is_unspecified()                     // 0.0.0.0
+                    || v4.is_broadcast()                      // 255.255.255.255
+                    || v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64  // 100.64.0.0/10 (CGNAT)
+            }
+            std::net::IpAddr::V6(v6) => {
+                v6.is_loopback()                              // ::1
+                    || v6.is_unspecified()                     // ::
+            }
+        };
+
+        if is_private {
+            return Err(format!(
+                "Webhook URL must not target private/internal IP address '{}'", ip
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 // ============================================================================
 // Channel Handlers
 // ============================================================================
@@ -223,40 +281,9 @@ fn validate_notification_rule(rule: &CreateRuleRequest) -> Result<(), String> {
 pub async fn list_channels(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationChannel>>, StatusCode> {
-    // Load from state store, fall back to mock data if empty
+    // Load from state store
     let channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
-        .unwrap_or_else(|_| vec![
-        NotificationChannel {
-            id: Uuid::new_v4().to_string(),
-            name: "Email Alerts".to_string(),
-            channel_type: ChannelType::Email,
-            config: {
-                let mut map = HashMap::new();
-                map.insert("smtp_host".to_string(), serde_json::json!("smtp.example.com"));
-                map.insert("smtp_port".to_string(), serde_json::json!(587));
-                map.insert("from".to_string(), serde_json::json!("alerts@example.com"));
-                map.insert("to".to_string(), serde_json::json!(vec!["admin@example.com"]));
-                map
-            },
-            enabled: true,
-            created: Utc::now(),
-            last_test: None,
-        },
-        NotificationChannel {
-            id: Uuid::new_v4().to_string(),
-            name: "Slack Notifications".to_string(),
-            channel_type: ChannelType::Slack,
-            config: {
-                let mut map = HashMap::new();
-                map.insert("webhook_url".to_string(), serde_json::json!("https://hooks.slack.com/services/xxx"));
-                map.insert("channel".to_string(), serde_json::json!("#alerts"));
-                map
-            },
-            enabled: true,
-            created: Utc::now(),
-            last_test: Some(Utc::now()),
-        },
-    ]);
+        .unwrap_or_default();
 
     Ok(Json(channels))
 }
@@ -391,36 +418,9 @@ pub async fn test_channel(
 pub async fn list_rules(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationRule>>, StatusCode> {
-    // Load from state store, fall back to mock data if empty
+    // Load from state store
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .unwrap_or_else(|_| vec![
-        NotificationRule {
-            id: Uuid::new_v4().to_string(),
-            name: "VM Failures".to_string(),
-            description: Some("Alert on VM failures".to_string()),
-            event_types: vec!["vm.failed".to_string()],
-            severity_levels: vec![Severity::Critical],
-            channels: vec![],
-            vm_tags: None,
-            enabled: true,
-            created: Utc::now(),
-            triggered_count: 5,
-            last_triggered: Some(Utc::now()),
-        },
-        NotificationRule {
-            id: Uuid::new_v4().to_string(),
-            name: "High Resource Usage".to_string(),
-            description: Some("Alert when resource usage is high".to_string()),
-            event_types: vec!["resource.high_usage".to_string()],
-            severity_levels: vec![Severity::Warning],
-            channels: vec![],
-            vm_tags: Some(vec!["production".to_string()]),
-            enabled: true,
-            created: Utc::now(),
-            triggered_count: 12,
-            last_triggered: Some(Utc::now()),
-        },
-    ]);
+        .unwrap_or_default();
 
     Ok(Json(rules))
 }

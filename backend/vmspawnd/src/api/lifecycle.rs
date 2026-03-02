@@ -31,7 +31,7 @@ pub async fn create_baseline(
     baseline.created = Utc::now();
     baseline.updated = None;
     match state.store.save_entity("lm_baselines", &baseline.id, &baseline) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&baseline).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(baseline)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -41,7 +41,7 @@ pub async fn get_baseline(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<Baseline>("lm_baselines", &id) {
-        Ok(Some(b)) => Json(serde_json::to_value(&b).unwrap()).into_response(),
+        Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -54,15 +54,19 @@ pub async fn update_baseline(
 ) -> impl IntoResponse {
     baseline.id = id.clone();
     baseline.updated = Some(Utc::now());
-    let _ = state.store.save_entity("lm_baselines", &id, &baseline);
-    Json(serde_json::to_value(&baseline).unwrap())
+    if let Err(e) = state.store.save_entity("lm_baselines", &id, &baseline) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
+    Json(baseline)
 }
 
 pub async fn delete_baseline(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let _ = state.store.delete_entity("lm_baselines", &id);
+    if let Err(e) = state.store.delete_entity("lm_baselines", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -85,13 +89,17 @@ pub async fn scan_host_compliance(
     let mgr = lifecycle_manager::LifecycleManager::new();
     // Load baseline into manager
     if let Ok(Some(baseline)) = state.store.get_entity::<Baseline>("lm_baselines", &req.baseline_id) {
-        let _ = mgr.create_baseline(baseline);
+        if let Err(e) = mgr.create_baseline(baseline) {
+            tracing::warn!("Failed to load baseline into manager: {}", e);
+        }
     }
     match mgr.scan_host_compliance(&req.host_id, &req.hostname, &req.baseline_id, &req.installed_packages) {
         Ok(status) => {
             let id = Uuid::new_v4().to_string();
-            let _ = state.store.save_entity("compliance_results", &id, &status);
-            Json(serde_json::to_value(&status).unwrap()).into_response()
+            if let Err(e) = state.store.save_entity("compliance_results", &id, &status) {
+                tracing::error!("Failed to save entity: {}", e);
+            }
+            Json(status).into_response()
         }
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -162,8 +170,10 @@ pub async fn create_remediation(
     let mgr = lifecycle_manager::LifecycleManager::new();
     match mgr.create_remediation(&req.host_id, &req.hostname, &req.baseline_id) {
         Ok(task) => {
-            let _ = state.store.save_entity("remediations", &task.id, &task);
-            (StatusCode::CREATED, Json(serde_json::to_value(&task).unwrap())).into_response()
+            if let Err(e) = state.store.save_entity("remediations", &task.id, &task) {
+                tracing::error!("Failed to save entity: {}", e);
+            }
+            (StatusCode::CREATED, Json(task)).into_response()
         }
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
@@ -174,7 +184,7 @@ pub async fn get_remediation(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.store.get_entity::<RemediationTask>("remediations", &id) {
-        Ok(Some(t)) => Json(serde_json::to_value(&t).unwrap()).into_response(),
+        Ok(Some(t)) => Json(t).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -200,7 +210,7 @@ pub async fn create_rolling_update(
     plan.completed = None;
     if plan.max_concurrent == 0 { plan.max_concurrent = 1; }
     match state.store.save_entity("rolling_updates", &plan.id, &plan) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::to_value(&plan).unwrap())).into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(plan)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -216,7 +226,9 @@ pub async fn start_rolling_update(
     };
     plan.status = RollingUpdateStatus::InProgress;
     plan.started = Some(Utc::now());
-    let _ = state.store.save_entity("rolling_updates", &plan.id, &plan);
+    if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -230,7 +242,9 @@ pub async fn pause_rolling_update(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     plan.status = RollingUpdateStatus::Paused;
-    let _ = state.store.save_entity("rolling_updates", &plan.id, &plan);
+    if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     StatusCode::OK.into_response()
 }
 
@@ -247,11 +261,15 @@ pub async fn advance_rolling_update(
     if index >= plan.host_order.len() {
         plan.status = RollingUpdateStatus::Completed;
         plan.completed = Some(Utc::now());
-        let _ = state.store.save_entity("rolling_updates", &plan.id, &plan);
+        if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
+            tracing::error!("Failed to save entity: {}", e);
+        }
         return Json(serde_json::json!({"completed": true})).into_response();
     }
     let host_id = plan.host_order[index].clone();
     plan.current_host_index += 1;
-    let _ = state.store.save_entity("rolling_updates", &plan.id, &plan);
+    if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
+        tracing::error!("Failed to save entity: {}", e);
+    }
     Json(serde_json::json!({"next_host_id": host_id})).into_response()
 }

@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { getVM, startVM, stopVM, restartVM, deleteVM, pauseVM, resumeVM, VM } from '../api/vm'
+import { getVM, deleteVM, VM } from '../api/vm'
 import {
   Play, Square, RotateCw, Trash2, ArrowLeft, Info, Activity, HardDrive,
   Network, Camera, Terminal, Cpu, MemoryStick, Clock, Pause, Copy
 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'
+import { useVMActions } from '../hooks/useVMActions'
+import { getStateColor } from '../utils/vm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import CloneVMDialog from '../components/CloneVMDialog'
 
@@ -42,77 +44,20 @@ export default function VMDetails() {
     }
   }
 
-  const handleStart = async () => {
-    if (!name) return
-    try {
-      await startVM(name)
-      toast.success(`VM '${name}' started successfully`)
-      loadVM()
-    } catch (_error) {
-      toast.error(`Failed to start VM '${name}'`)
-    }
-  }
+  const { handleStart, handleStop, handleRestart, handlePause, handleResume } = useVMActions(name ?? '', loadVM)
 
-  const handleStop = async () => {
-    if (!name) return
-    try {
-      await stopVM(name)
-      toast.success(`VM '${name}' stopped successfully`)
-      loadVM()
-    } catch (_error) {
-      toast.error(`Failed to stop VM '${name}'`)
-    }
-  }
-
-  const handleRestart = async () => {
-    if (!name) return
-    try {
-      await restartVM(name)
-      toast.success(`VM '${name}' restarted successfully`)
-      loadVM()
-    } catch (_error) {
-      toast.error(`Failed to restart VM '${name}'`)
-    }
-  }
-
-  const handlePause = async () => {
-    if (!name) return
-    try {
-      await pauseVM(name)
-      toast.success(`VM '${name}' paused successfully`)
-      loadVM()
-    } catch (_error) {
-      toast.error(`Failed to pause VM '${name}'`)
-    }
-  }
-
-  const handleResume = async () => {
-    if (!name) return
-    try {
-      await resumeVM(name)
-      toast.success(`VM '${name}' resumed successfully`)
-      loadVM()
-    } catch (_error) {
-      toast.error(`Failed to resume VM '${name}'`)
-    }
-  }
-
-  const handleDelete = () => {
-    if (!name) return
-    setShowDeleteConfirm(true)
-  }
-
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (!name) return
     setShowDeleteConfirm(false)
     try {
       await deleteVM(name)
       toast.success(`VM '${name}' deleted successfully`)
       navigate('/vms')
-    } catch (_error) {
-      toast.error(`Failed to delete VM '${name}'`)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      toast.error(`Failed to delete VM '${name}': ${msg}`)
     }
-  }
+  }, [name, toast, navigate])
 
   if (loading) {
     return (
@@ -126,12 +71,7 @@ export default function VMDetails() {
     return <div className="text-center py-8 text-gray-400">VM not found</div>
   }
 
-  const stateColor = {
-    running: 'bg-green-500',
-    stopped: 'bg-red-500',
-    paused: 'bg-yellow-500',
-    unknown: 'bg-gray-500',
-  }[vm.state]
+  const stateColor = getStateColor(vm.state)
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Info },
@@ -214,7 +154,7 @@ export default function VMDetails() {
               Clone
             </button>
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition"
             >
               <Trash2 className="w-4 h-4" />

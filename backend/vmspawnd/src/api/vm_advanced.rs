@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
+use tokio::process::Command;
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
@@ -67,11 +68,15 @@ pub async fn configure_ksm(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to set KSM: {}", e)))?;
 
     if let Some(sleep_ms) = req.sleep_ms {
-        let _ = std::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string());
+        if let Err(e) = std::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string()) {
+            tracing::warn!("Failed to write: {}", e);
+        }
     }
 
     if let Some(pages) = req.pages_to_scan {
-        let _ = std::fs::write("/sys/kernel/mm/ksm/pages_to_scan", pages.to_string());
+        if let Err(e) = std::fs::write("/sys/kernel/mm/ksm/pages_to_scan", pages.to_string()) {
+            tracing::warn!("Failed to write: {}", e);
+        }
     }
 
     Ok(StatusCode::OK)
@@ -173,9 +178,10 @@ pub async fn create_checkpoint(
     let image_path = find_vm_image(&vm_name);
 
     // Create internal snapshot via qemu-img
-    let output = std::process::Command::new("qemu-img")
+    let output = Command::new("qemu-img")
         .args(["snapshot", "-c", &req.name, &image_path])
         .output()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("qemu-img failed: {}", e) }))))?;
 
     if !output.status.success() {
@@ -232,9 +238,10 @@ pub async fn restore_checkpoint(
     let image_path = find_vm_image(&vm_name);
 
     // Apply snapshot via qemu-img
-    let output = std::process::Command::new("qemu-img")
+    let output = Command::new("qemu-img")
         .args(["snapshot", "-a", &checkpoint.name, &image_path])
         .output()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("qemu-img failed: {}", e) }))))?;
 
     if !output.status.success() {
@@ -254,9 +261,13 @@ pub async fn delete_checkpoint(
 
     if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
         let image_path = find_vm_image(&vm_name);
-        let _ = std::process::Command::new("qemu-img")
+        if let Err(e) = Command::new("qemu-img")
             .args(["snapshot", "-d", &checkpoint.name, &image_path])
-            .output();
+            .output()
+            .await
+        {
+            tracing::warn!("Command failed: {}", e);
+        }
     }
 
     state.store.delete_entity("checkpoints", &id).map_err(|e| {
@@ -299,12 +310,15 @@ pub async fn fork_vm(
     let fork_image = format!("/var/lib/vmspawnd/images/{}.qcow2", req.new_name);
 
     if let Some(parent) = std::path::Path::new(&fork_image).parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("Failed to create dir: {}", e);
+        }
     }
 
-    let output = std::process::Command::new("qemu-img")
+    let output = Command::new("qemu-img")
         .args(["create", "-f", "qcow2", "-b", &source_image, "-F", "qcow2", &fork_image])
         .output()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("qemu-img create failed: {}", e) }))))?;
 
     if !output.status.success() {

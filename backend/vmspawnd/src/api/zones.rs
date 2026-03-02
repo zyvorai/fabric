@@ -208,21 +208,33 @@ pub async fn evict_spot_instance(
     // Apply eviction policy
     match spot.eviction_policy {
         EvictionPolicy::Stop => {
-            let _ = vmspawn_driver::stop_vm(&spot.vm_name);
+            if let Err(e) = vmspawn_driver::stop_vm(&spot.vm_name) {
+                tracing::error!("Failed to stop VM: {}", e);
+            }
             if let Ok(Some(mut vm)) = state.store.get_vm(&spot.vm_name) {
                 vm.state = vm_model::VMState::Stopped;
-                let _ = state.store.save_vm(&vm);
+                if let Err(e) = state.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM: {}", e);
+                }
             }
         }
         EvictionPolicy::Delete => {
-            let _ = vmspawn_driver::stop_vm(&spot.vm_name);
-            let _ = state.store.delete_vm(&spot.vm_name);
+            if let Err(e) = vmspawn_driver::stop_vm(&spot.vm_name) {
+                tracing::error!("Failed to stop VM: {}", e);
+            }
+            if let Err(e) = state.store.delete_vm(&spot.vm_name) {
+                tracing::error!("Failed to delete VM: {}", e);
+            }
         }
         EvictionPolicy::Deallocate => {
-            let _ = vmspawn_driver::stop_vm(&spot.vm_name);
+            if let Err(e) = vmspawn_driver::stop_vm(&spot.vm_name) {
+                tracing::error!("Failed to stop VM: {}", e);
+            }
             if let Ok(Some(mut vm)) = state.store.get_vm(&spot.vm_name) {
                 vm.state = vm_model::VMState::Stopped;
-                let _ = state.store.save_vm(&vm);
+                if let Err(e) = state.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM: {}", e);
+                }
             }
         }
     }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 export interface WebSocketMessage {
   type: 'vm_state_changed' | 'vm_metrics' | 'vm_created' | 'vm_deleted' | 'log_entry'
-  data: any
+  data: Record<string, unknown>
 }
 
 interface UseWebSocketOptions {
@@ -88,7 +88,7 @@ export function useWebSocket({
     }
   }
 
-  const sendMessage = (message: any) => {
+  const sendMessage = (message: Record<string, unknown> | string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message))
     } else {

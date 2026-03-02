@@ -50,7 +50,7 @@ pub async fn create_test_app() -> Router {
         config,
         storage_manager: Arc::new(RwLock::new(storage_manager)),
         http_client,
-        quota_cache: Arc::new(std::sync::RwLock::new(QuotaCache::new())),
+        quota_cache: Arc::new(tokio::sync::RwLock::new(QuotaCache::new())),
         user_db: None,
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(vmspawnd::plugins::PluginRegistry::new())),

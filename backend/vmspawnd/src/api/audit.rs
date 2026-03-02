@@ -76,55 +76,27 @@ fn default_format() -> String {
 }
 
 // ============================================================================
-// Mock Data Generators
+// CSV Safety
 // ============================================================================
 
-fn generate_mock_logs(count: usize) -> Vec<AuditLog> {
-    let actions = vec![
-        "vm.create",
-        "vm.start",
-        "vm.stop",
-        "vm.delete",
-        "vm.restart",
-        "quota.create",
-        "quota.update",
-        "schedule.create",
-        "backup.create",
-    ];
+/// Escape a string for safe CSV output. Prevents CSV injection by:
+/// - Quoting fields containing commas, newlines, or double quotes
+/// - Prefixing formula characters (=, +, -, @) with a single quote
+fn escape_csv_field(field: &str) -> String {
+    let needs_quoting = field.contains(',') || field.contains('\n') || field.contains('"');
+    let is_formula = field.starts_with('=') || field.starts_with('+') || field.starts_with('-') || field.starts_with('@');
 
-    let users = vec!["admin", "operator", "developer"];
-    let resource_types = vec!["vm", "quota", "schedule", "backup"];
+    let mut escaped = if is_formula {
+        format!("'{}", field)
+    } else {
+        field.to_string()
+    };
 
-    let mut logs = Vec::new();
-
-    for i in 0..count {
-        let action = actions[i % actions.len()];
-        let user = users[i % users.len()];
-        let resource_type = resource_types[i % resource_types.len()];
-        let status = if i % 10 == 0 {
-            AuditStatus::Failed
-        } else {
-            AuditStatus::Success
-        };
-
-        logs.push(AuditLog {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now() - Duration::hours(i as i64),
-            user: user.to_string(),
-            action: action.to_string(),
-            resource_type: resource_type.to_string(),
-            resource_name: format!("{}-{}", resource_type, i),
-            status: status.clone(),
-            ip_address: Some(format!("192.168.1.{}", 100 + (i % 50))),
-            details: Some(format!("Action {} performed on {} {}", action, resource_type, i)),
-            error: match status {
-                AuditStatus::Failed => Some("Insufficient permissions".to_string()),
-                AuditStatus::Success => None,
-            },
-        });
+    if needs_quoting || is_formula {
+        escaped = format!("\"{}\"", escaped.replace('"', "\"\""));
     }
 
-    logs
+    escaped
 }
 
 // ============================================================================
@@ -135,9 +107,9 @@ pub async fn list_audit_logs(
     State(state): State<Arc<AppState>>,
     Query(filters): Query<AuditLogFilters>,
 ) -> Result<Json<Vec<AuditLog>>, StatusCode> {
-    // Load from state store, fall back to mock data if empty
+    // Load from state store
     let mut logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .unwrap_or_else(|_| generate_mock_logs(50));
+        .unwrap_or_default();
 
     // Apply filters
     if let Some(action) = &filters.action {
@@ -197,9 +169,9 @@ pub async fn export_audit_logs(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
-    // Load from state store, fall back to mock data if empty
+    // Load from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .unwrap_or_else(|_| generate_mock_logs(100));
+        .unwrap_or_default();
 
     match query.format.as_str() {
         "json" => {
@@ -213,19 +185,19 @@ pub async fn export_audit_logs(
             for log in logs {
                 csv.push_str(&format!(
                     "{},{},{},{},{},{},{},{},{},{}\n",
-                    log.id,
-                    log.timestamp.to_rfc3339(),
-                    log.user,
-                    log.action,
-                    log.resource_type,
-                    log.resource_name,
-                    match log.status {
+                    escape_csv_field(&log.id),
+                    escape_csv_field(&log.timestamp.to_rfc3339()),
+                    escape_csv_field(&log.user),
+                    escape_csv_field(&log.action),
+                    escape_csv_field(&log.resource_type),
+                    escape_csv_field(&log.resource_name),
+                    escape_csv_field(match log.status {
                         AuditStatus::Success => "success",
                         AuditStatus::Failed => "failed",
-                    },
-                    log.ip_address.unwrap_or_default(),
-                    log.details.unwrap_or_default(),
-                    log.error.unwrap_or_default(),
+                    }),
+                    escape_csv_field(&log.ip_address.unwrap_or_default()),
+                    escape_csv_field(&log.details.unwrap_or_default()),
+                    escape_csv_field(&log.error.unwrap_or_default()),
                 ));
             }
 
@@ -238,9 +210,9 @@ pub async fn export_audit_logs(
 pub async fn get_audit_stats(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AuditStats>, StatusCode> {
-    // Calculate from state store, fall back to mock data if empty
+    // Calculate from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .unwrap_or_else(|_| generate_mock_logs(100));
+        .unwrap_or_default();
 
     let total_logs = logs.len() as u64;
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getToken,
   setToken,
@@ -24,7 +24,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, wri
 // Mock window.location
 const locationMock = { pathname: '/dashboard', href: '' }
 Object.defineProperty(globalThis, 'window', {
-  value: { location: locationMock, ...globalThis.window },
+  value: { ...globalThis.window, location: locationMock },
   writable: true,
 })
 
@@ -45,7 +45,9 @@ function failResponse(status = 500): Response {
   return {
     ok: false,
     status,
+    statusText: 'Internal Server Error',
     json: () => Promise.resolve({ error: 'fail' }),
+    text: () => Promise.resolve('server error'),
   } as unknown as Response
 }
 
@@ -168,7 +170,7 @@ describe('apiGet', () => {
 
   it('throws on non-ok response', async () => {
     fetchMock.mockResolvedValue(failResponse())
-    await expect(apiGet('/api/fail')).rejects.toThrow('GET /api/fail failed')
+    await expect(apiGet('/api/fail')).rejects.toThrow('500: server error')
   })
 
   it('does not send a request body', async () => {
@@ -208,7 +210,7 @@ describe('apiPost', () => {
 
   it('throws on non-ok response', async () => {
     fetchMock.mockResolvedValue(failResponse())
-    await expect(apiPost('/api/fail', {})).rejects.toThrow('POST /api/fail failed')
+    await expect(apiPost('/api/fail', {})).rejects.toThrow('500: server error')
   })
 })
 
@@ -234,7 +236,7 @@ describe('apiPostVoid', () => {
 
   it('throws on non-ok response', async () => {
     fetchMock.mockResolvedValue(failResponse())
-    await expect(apiPostVoid('/api/fail')).rejects.toThrow('POST /api/fail failed')
+    await expect(apiPostVoid('/api/fail')).rejects.toThrow('500: server error')
   })
 })
 
@@ -255,7 +257,7 @@ describe('apiPut', () => {
 
   it('throws on non-ok response', async () => {
     fetchMock.mockResolvedValue(failResponse())
-    await expect(apiPut('/api/fail', {})).rejects.toThrow('PUT /api/fail failed')
+    await expect(apiPut('/api/fail', {})).rejects.toThrow('500: server error')
   })
 })
 
@@ -274,7 +276,7 @@ describe('apiPutVoid', () => {
 
   it('throws on non-ok response', async () => {
     fetchMock.mockResolvedValue(failResponse())
-    await expect(apiPutVoid('/api/fail', {})).rejects.toThrow('PUT /api/fail failed')
+    await expect(apiPutVoid('/api/fail', {})).rejects.toThrow('500: server error')
   })
 })
 
@@ -292,6 +294,6 @@ describe('apiDelete', () => {
 
   it('throws on non-ok response', async () => {
     fetchMock.mockResolvedValue(failResponse())
-    await expect(apiDelete('/api/fail')).rejects.toThrow('DELETE /api/fail failed')
+    await expect(apiDelete('/api/fail')).rejects.toThrow('500: server error')
   })
 })

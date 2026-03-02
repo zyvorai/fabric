@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::validation::validate_vm_name;
 use vmspawnd_vm::{is_ovmf_available, is_secureboot_available, FirmwareStatus, TpmVersion};
 
 // Request/Response types
@@ -44,7 +45,9 @@ pub struct FirmwareCapabilities {
 pub async fn get_firmware_status(
     Path(vm_name): Path<String>,
 ) -> Result<Json<FirmwareStatus>, (StatusCode, String)> {
-    // Read firmware status from VM configuration
+    // Validate VM name to prevent path traversal
+    validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     tracing::info!("Getting firmware status for VM '{}'", vm_name);
 
     let config_dir = std::env::var("VM_CONFIG_DIR")
@@ -106,6 +109,8 @@ pub async fn enable_uefi(
     Path(vm_name): Path<String>,
     Json(req): Json<EnableUefiRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     tracing::info!(
         "Enabling UEFI for VM '{}': secure_boot={}, tpm={:?}",
         vm_name,
@@ -113,7 +118,6 @@ pub async fn enable_uefi(
         req.tpm_version
     );
 
-    // Update VM configuration to use UEFI
     let config_dir = std::env::var("VM_CONFIG_DIR")
         .unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
     let config_path = std::path::Path::new(&config_dir)
@@ -173,6 +177,8 @@ pub async fn enable_uefi(
 pub async fn enable_secureboot(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     tracing::info!("Enabling Secure Boot for VM '{}'", vm_name);
 
     // Check if Secure Boot is available
@@ -229,6 +235,8 @@ pub async fn enable_secureboot(
 pub async fn disable_secureboot(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     tracing::info!("Disabling Secure Boot for VM '{}'", vm_name);
 
     // Update VM configuration to disable Secure Boot
@@ -277,6 +285,8 @@ pub async fn disable_secureboot(
 pub async fn reset_nvram(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     tracing::info!("Resetting NVRAM for VM '{}'", vm_name);
 
     // Reset OVMF NVRAM variables to template defaults

@@ -8,11 +8,12 @@ use serde_json::json;
 use std::sync::Arc;
 use vm_model::CreateVMRequest;
 use cloud_init::{CloudInitConfig, CloudInitGenerator};
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
 
-pub async fn list_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_vms(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match state.store.list_vms() {
         Ok(vms) => (StatusCode::OK, Json(vms)).into_response(),
         Err(e) => (
@@ -24,6 +25,7 @@ pub async fn list_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 }
 
 pub async fn get_vm(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -42,6 +44,7 @@ pub async fn get_vm(
 }
 
 pub async fn create_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVMRequest>,
 ) -> impl IntoResponse {
@@ -68,6 +71,7 @@ pub async fn create_vm(
 }
 
 pub async fn delete_vm(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -85,6 +89,7 @@ pub async fn delete_vm(
 }
 
 pub async fn start_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -95,7 +100,9 @@ pub async fn start_vm(
     // Mark as running immediately (machinectl start blocks until boot completes)
     if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
         vm.state = vm_model::VMState::Running;
-        let _ = state.store.save_vm(&vm);
+        if let Err(e) = state.store.save_vm(&vm) {
+            tracing::error!("Failed to save VM state: {}", e);
+        }
     }
 
     // Spawn machinectl start in background so API returns immediately
@@ -115,14 +122,18 @@ pub async fn start_vm(
                 // Revert state on failure
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&name) {
                     vm.state = vm_model::VMState::Stopped;
-                    let _ = state_clone.store.save_vm(&vm);
+                    if let Err(e) = state_clone.store.save_vm(&vm) {
+                        tracing::error!("Failed to save VM state: {}", e);
+                    }
                 }
             }
             Err(e) => {
                 tracing::error!("Start task panicked for VM '{}': {}", name, e);
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&name) {
                     vm.state = vm_model::VMState::Stopped;
-                    let _ = state_clone.store.save_vm(&vm);
+                    if let Err(e) = state_clone.store.save_vm(&vm) {
+                        tracing::error!("Failed to save VM state: {}", e);
+                    }
                 }
             }
         }
@@ -132,6 +143,7 @@ pub async fn start_vm(
 }
 
 pub async fn stop_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -142,7 +154,9 @@ pub async fn stop_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Stopped;
-                let _ = state.store.save_vm(&vm);
+                if let Err(e) = state.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM state: {}", e);
+                }
             }
             (StatusCode::OK, Json(json!({ "status": "stopped" }))).into_response()
         }
@@ -155,6 +169,7 @@ pub async fn stop_vm(
 }
 
 pub async fn restart_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -172,6 +187,7 @@ pub async fn restart_vm(
 }
 
 pub async fn pause_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -182,7 +198,9 @@ pub async fn pause_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Paused;
-                let _ = state.store.save_vm(&vm);
+                if let Err(e) = state.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM state: {}", e);
+                }
             }
             (StatusCode::OK, Json(json!({ "status": "paused" }))).into_response()
         }
@@ -195,6 +213,7 @@ pub async fn pause_vm(
 }
 
 pub async fn resume_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -205,7 +224,9 @@ pub async fn resume_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Running;
-                let _ = state.store.save_vm(&vm);
+                if let Err(e) = state.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM state: {}", e);
+                }
             }
             (StatusCode::OK, Json(json!({ "status": "running" }))).into_response()
         }
@@ -225,6 +246,7 @@ pub struct CloneVMRequest {
 }
 
 pub async fn clone_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(source_name): Path<String>,
     Json(req): Json<CloneVMRequest>,
@@ -263,11 +285,30 @@ pub async fn clone_vm(
         .find(|p| std::path::Path::new(p).exists());
 
     if let Some(src_path) = source_image {
-        let target_path = src_path.replace(&source_name, &req.target_name);
+        // Build target path by replacing only the filename, not arbitrary path components.
+        // Using String::replace on the full path is dangerous because the VM name could
+        // appear in directory components too, producing unexpected results.
+        let src = std::path::Path::new(src_path.as_str());
+        let target_path = if let Some(parent) = src.parent() {
+            let parent_str = parent.to_string_lossy();
+            let safe_parent = if parent_str.ends_with(&source_name) {
+                format!("{}{}", &parent_str[..parent_str.len() - source_name.len()], &req.target_name)
+            } else {
+                parent_str.to_string()
+            };
+            format!("{}/{}.qcow2", safe_parent, &req.target_name)
+        } else {
+            format!("{}.qcow2", &req.target_name)
+        };
 
         // Ensure target directory exists
         if let Some(parent) = std::path::Path::new(&target_path).parent() {
-            let _ = std::fs::create_dir_all(parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": format!("Failed to create directory: {}", e) })),
+                ).into_response();
+            }
         }
 
         let result = if req.linked_clone {
@@ -319,6 +360,7 @@ pub async fn clone_vm(
 }
 
 pub async fn get_metrics(
+    RequireRead(_claims): RequireRead,
     State(_state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -336,6 +378,7 @@ pub async fn get_metrics(
 }
 
 pub async fn configure_cloud_init(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(config): Json<CloudInitConfig>,
