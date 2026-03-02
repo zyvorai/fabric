@@ -32,6 +32,8 @@ members = [
     "crates/driver-core",
     "crates/machined-dbus",
     "crates/machinectl-driver",
+    "crates/lock-manager",
+    "network-policy",
 ]
 
 [workspace.package]

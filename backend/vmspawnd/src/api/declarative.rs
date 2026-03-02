@@ -175,6 +175,7 @@ pub async fn apply_vm_spec(
             disk: disk_gb,
             hostname: spec.hostname.clone(),
             tags: if spec.tags.is_empty() { None } else { Some(spec.tags.clone()) },
+            labels: None,
         };
 
         let vm = vmspawn_driver::create_vm(&req).map_err(|e| {

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VM {
@@ -19,6 +20,8 @@ pub struct VM {
     pub hostname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vnc_port: Option<u16>,
     pub created: DateTime<Utc>,
@@ -50,6 +53,8 @@ pub struct CreateVMRequest {
     pub hostname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
 }
 
 fn default_disk_size() -> u64 {
@@ -129,6 +134,7 @@ impl VM {
             mac_address: None,
             hostname: None,
             tags: None,
+            labels: None,
             vnc_port: None,
             created: Utc::now(),
             updated: None,
@@ -148,6 +154,7 @@ impl VM {
             mac_address: None,
             hostname: req.hostname.clone(),
             tags: req.tags.clone(),
+            labels: req.labels.clone(),
             vnc_port: None,
             created: Utc::now(),
             updated: None,
@@ -178,6 +185,9 @@ mod tests {
 
     #[test]
     fn test_vm_from_request() {
+        let mut labels = HashMap::new();
+        labels.insert("app".to_string(), "web".to_string());
+        labels.insert("env".to_string(), "prod".to_string());
         let req = CreateVMRequest {
             name: "web-01".to_string(),
             image: "ubuntu.img".to_string(),
@@ -186,11 +196,13 @@ mod tests {
             disk: 50,
             hostname: Some("web-server".to_string()),
             tags: Some(vec!["production".to_string()]),
+            labels: Some(labels.clone()),
         };
         let vm = VM::from_request(&req);
         assert_eq!(vm.name, "web-01");
         assert_eq!(vm.hostname, Some("web-server".to_string()));
         assert_eq!(vm.tags, Some(vec!["production".to_string()]));
+        assert_eq!(vm.labels, Some(labels));
     }
 
     #[test]
@@ -210,6 +222,36 @@ mod tests {
 
         let state: VMState = serde_json::from_str("\"stopped\"").unwrap();
         assert_eq!(state, VMState::Stopped);
+    }
+
+    #[test]
+    fn test_labels_backward_compat() {
+        // Deserialize JSON without labels field — should default to None
+        let json = r#"{
+            "name": "old-vm",
+            "state": "stopped",
+            "cpus": 2,
+            "memory": 1024,
+            "disk": 20,
+            "image": "img.qcow2",
+            "created": "2025-01-01T00:00:00Z"
+        }"#;
+        let vm: VM = serde_json::from_str(json).unwrap();
+        assert!(vm.labels.is_none());
+    }
+
+    #[test]
+    fn test_labels_roundtrip() {
+        let mut vm = VM::new("labeled".to_string(), "img.qcow2".to_string(), 2, 1024);
+        let mut labels = HashMap::new();
+        labels.insert("app".to_string(), "web".to_string());
+        labels.insert("env".to_string(), "prod".to_string());
+        vm.labels = Some(labels.clone());
+
+        let json = serde_json::to_string(&vm).unwrap();
+        assert!(json.contains("\"labels\""));
+        let deserialized: VM = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.labels, Some(labels));
     }
 
     #[test]

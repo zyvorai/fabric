@@ -320,6 +320,7 @@ pub async fn deploy_template(
         disk: template.disk,
         hostname: None,
         tags: Some(template.tags.clone()),
+        labels: None,
     };
 
     let vm = vmspawn_driver::create_vm(&create_req).map_err(|e| {

@@ -121,6 +121,7 @@ impl Cli {
                     disk: 20, // Default 20GB
                     hostname: None,
                     tags: None,
+                    labels: None,
                 };
 
                 client

@@ -61,6 +61,24 @@ pub async fn create_vm(
                 )
                     .into_response();
             }
+
+            // Allocate security identity if VM has labels
+            if let Some(ref labels) = vm.labels {
+                if !labels.is_empty() {
+                    match state.policy_engine.allocator.allocate_or_get(labels, &vm.name) {
+                        Ok(id) => {
+                            if let Some(ref ip) = vm.ip {
+                                let _ = state.policy_engine.allocator.update_ip_mapping(ip, id);
+                            }
+                            tracing::debug!("Allocated identity {} for VM '{}'", id, vm.name);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to allocate identity for VM '{}': {}", vm.name, e);
+                        }
+                    }
+                }
+            }
+
             (StatusCode::CREATED, Json(vm)).into_response()
         }
         Err(e) => (
@@ -79,6 +97,21 @@ pub async fn delete_vm(
     if let Err((status, msg)) = validate_vm_name(&name) {
         return (status, Json(json!({ "error": msg }))).into_response();
     }
+
+    // Deallocate security identity before deleting VM
+    if let Ok(Some(vm)) = state.store.get_vm(&name) {
+        if let Some(ref labels) = vm.labels {
+            if !labels.is_empty() {
+                if let Err(e) = state.policy_engine.allocator.deallocate(&name, labels) {
+                    tracing::warn!("Failed to deallocate identity for VM '{}': {}", name, e);
+                }
+            }
+        }
+        if let Some(ref ip) = vm.ip {
+            let _ = state.policy_engine.allocator.remove_ip_mapping(ip);
+        }
+    }
+
     match state.store.delete_vm(&name) {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => (

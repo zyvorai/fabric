@@ -49,6 +49,10 @@ pub async fn create_test_app() -> Router {
         .await
         .expect("Failed to connect to system D-Bus for test setup");
 
+    let lock_manager = Arc::new(vmspawnd_lock_manager::LockManager::new(
+        vmspawnd_lock_manager::LockConfig::default(),
+    ));
+
     let state = Arc::new(AppState {
         store,
         config,
@@ -59,6 +63,8 @@ pub async fn create_test_app() -> Router {
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(vmspawnd::plugins::PluginRegistry::new())),
         driver: Arc::new(driver),
+        lock_manager,
+        policy_engine: Arc::new(network_policy::PolicyEngine::new()),
     });
 
     vmspawnd::server::build_router(state)
