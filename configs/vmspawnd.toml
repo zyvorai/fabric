@@ -13,3 +13,6 @@ image_path = "/var/lib/vmspawnd/images"
 [network]
 # Default network bridge
 bridge = "br0"
+
+[auth]
+enabled = false

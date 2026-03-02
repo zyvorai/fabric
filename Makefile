@@ -1,5 +1,5 @@
 .PHONY: all build build-backend build-web \
-       install install-bin install-conf install-systemd install-web \
+       install install-bin install-conf install-systemd install-web install-modules \
        uninstall run dev tui cli test clean fmt lint \
        docker-build docker-up docker-down help
 
@@ -20,7 +20,7 @@ build-backend:
 build-web:
 	cd web && npm install && npm run build
 
-install: install-bin install-conf install-systemd install-web
+install: install-bin install-conf install-systemd install-web install-modules
 
 install-bin:
 	install -d $(DESTDIR)$(BINDIR)
@@ -41,6 +41,10 @@ install-systemd:
 install-web:
 	install -d $(DESTDIR)$(DATADIR)/vmspawnd/web
 	cp -r web/dist/* $(DESTDIR)$(DATADIR)/vmspawnd/web/
+
+install-modules:
+	install -d $(DESTDIR)/etc/modules-load.d
+	install -m 0644 configs/modules-load.d/vmspawnd.conf $(DESTDIR)/etc/modules-load.d/vmspawnd.conf
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/vmspawnd
