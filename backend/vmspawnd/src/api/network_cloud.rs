@@ -43,7 +43,7 @@ pub async fn create_floating_ip(
     Json(req): Json<CreateFloatingIpRequest>,
 ) -> Result<(StatusCode, Json<FloatingIp>), (StatusCode, Json<serde_json::Value>)> {
     // Validate IP address format
-    validate_ip_address(&req.address).map_err(|msg| {
+    crate::validation::validate_ip_address(&req.address).map_err(|msg| {
         (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
     })?;
     let fip = FloatingIp {
@@ -451,13 +451,6 @@ pub async fn delete_dns_config(
     })?;
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-/// Validate that a string is a valid IPv4 or IPv6 address.
-fn validate_ip_address(addr: &str) -> Result<(), String> {
-    addr.parse::<std::net::IpAddr>()
-        .map(|_| ())
-        .map_err(|_| format!("Invalid IP address: '{}'", addr))
 }
 
 async fn update_hosts_file(config: &DnsConfig) {

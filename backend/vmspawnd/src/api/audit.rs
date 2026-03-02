@@ -75,29 +75,7 @@ fn default_format() -> String {
     "json".to_string()
 }
 
-// ============================================================================
-// CSV Safety
-// ============================================================================
-
-/// Escape a string for safe CSV output. Prevents CSV injection by:
-/// - Quoting fields containing commas, newlines, or double quotes
-/// - Prefixing formula characters (=, +, -, @) with a single quote
-fn escape_csv_field(field: &str) -> String {
-    let needs_quoting = field.contains(',') || field.contains('\n') || field.contains('"');
-    let is_formula = field.starts_with('=') || field.starts_with('+') || field.starts_with('-') || field.starts_with('@');
-
-    let mut escaped = if is_formula {
-        format!("'{}", field)
-    } else {
-        field.to_string()
-    };
-
-    if needs_quoting || is_formula {
-        escaped = format!("\"{}\"", escaped.replace('"', "\"\""));
-    }
-
-    escaped
-}
+use crate::validation::escape_csv_field;
 
 // ============================================================================
 // Audit Log Handlers

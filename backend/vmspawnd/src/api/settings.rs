@@ -14,7 +14,7 @@ pub struct AppSettings {
     pub daemon_name: String,
     #[serde(default = "default_log_level")]
     pub log_level: String,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub auto_refresh: bool,
     #[serde(default = "default_refresh_interval")]
     pub refresh_interval: u32,
@@ -28,33 +28,32 @@ pub struct AppSettings {
     pub default_pool: String,
     #[serde(default = "default_format")]
     pub default_format: String,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enable_compression: bool,
     #[serde(default = "default_retention")]
     pub snapshot_retention: u32,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enable_auth: bool,
     #[serde(default)]
     pub enable_tls: bool,
     #[serde(default = "default_session_timeout")]
     pub session_timeout: u32,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub audit_logging: bool,
     #[serde(default)]
     pub email_notifications: bool,
     #[serde(default)]
     pub webhook_url: String,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub notify_on_start: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub notify_on_stop: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub notify_on_error: bool,
 }
 
 fn default_daemon_name() -> String { "vmspawnd-01".to_string() }
 fn default_log_level() -> String { "info".to_string() }
-fn default_true() -> bool { true }
 fn default_refresh_interval() -> u32 { 5 }
 fn default_bridge() -> String { "br0".to_string() }
 fn default_dns() -> String { "8.8.8.8, 8.8.4.4".to_string() }

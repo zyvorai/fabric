@@ -49,7 +49,7 @@ pub struct Backup {
 pub struct CreateBackupRequest {
     pub vm_name: String,
     pub backup_type: BackupType,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub compress: bool,
     #[serde(default = "default_retention")]
     pub retention_days: u32,
@@ -60,9 +60,9 @@ pub struct CreateBackupRequest {
 pub struct RestoreOptions {
     pub backup_id: String,
     pub target_vm_name: Option<String>,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub restore_config: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub restore_disks: bool,
     #[serde(default = "default_false")]
     pub restore_state: bool,
@@ -125,7 +125,7 @@ pub struct CreateBackupPolicyRequest {
     pub schedule_type: ScheduleType,
     pub backup_type: BackupType,
     pub retention_days: u32,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enabled: bool,
 }
 
@@ -142,10 +142,6 @@ pub struct BackupStats {
 #[derive(Debug, Deserialize)]
 pub struct BackupQuery {
     pub vm: Option<String>,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 fn default_false() -> bool {

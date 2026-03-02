@@ -20,11 +20,9 @@ pub struct ImageBuildRequest {
     pub distribution: String,
     #[serde(default)]
     pub packages: Vec<String>,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub autologin: bool,
 }
-
-fn default_true() -> bool { true }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageBuildStatus {

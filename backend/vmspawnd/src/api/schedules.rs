@@ -54,7 +54,7 @@ pub struct CreateScheduleRequest {
     pub schedule_type: ScheduleType,
     pub time: String,
     pub days_of_week: Option<Vec<u8>>,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enabled: bool,
 }
 
@@ -85,10 +85,6 @@ pub struct ScheduleHistory {
     pub executed_at: DateTime<Utc>,
     pub status: ExecutionStatus,
     pub error: Option<String>,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 // ============================================================================

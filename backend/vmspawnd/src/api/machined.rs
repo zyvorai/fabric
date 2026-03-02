@@ -351,40 +351,4 @@ pub async fn clean_images(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-// ============================================================================
-// Security validation helpers
-// ============================================================================
-
-/// Validate that a host path is within allowed directories to prevent arbitrary file access.
-/// Only allows paths under /var/lib/machines, /var/lib/vmspawnd, and /tmp.
-fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
-    let canonical = std::path::Path::new(path);
-
-    // Reject paths with traversal components
-    for component in canonical.components() {
-        if let std::path::Component::ParentDir = component {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Path must not contain '..' components".to_string(),
-            ));
-        }
-    }
-
-    let allowed_prefixes = [
-        "/var/lib/machines",
-        "/var/lib/vmspawnd",
-        "/tmp",
-    ];
-
-    if !allowed_prefixes.iter().any(|prefix| path.starts_with(prefix)) {
-        return Err((
-            StatusCode::FORBIDDEN,
-            format!(
-                "Host path must be under one of: {}",
-                allowed_prefixes.join(", ")
-            ),
-        ));
-    }
-
-    Ok(())
-}
+use crate::validation::validate_host_path;

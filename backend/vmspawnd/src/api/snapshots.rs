@@ -56,7 +56,7 @@ pub async fn create_snapshot(
     Json(req): Json<CreateSnapshotRequest>,
 ) -> impl IntoResponse {
     // Find the VM's disk image path
-    let image_path = find_vm_image(&vm_name);
+    let image_path = crate::validation::find_vm_image(&vm_name);
 
     // Attempt qemu-img snapshot
     if let Some(ref path) = image_path {
@@ -139,7 +139,7 @@ pub async fn delete_snapshot(
 
     // Get snapshot info to delete from qemu-img
     if let Ok(Some(snapshot)) = state.store.get_entity::<VMSnapshot>(&store_key, &id) {
-        if let Some(ref path) = find_vm_image(&vm_name) {
+        if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
             if let Err(e) = Command::new("qemu-img")
                 .args(["snapshot", "-d", &snapshot.name, path])
                 .output()
@@ -170,7 +170,7 @@ pub async fn revert_snapshot(
     };
 
     // VM should be stopped before reverting
-    if let Some(ref path) = find_vm_image(&vm_name) {
+    if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
         let output = Command::new("qemu-img")
             .args(["snapshot", "-a", &snapshot.name, path])
             .output()
@@ -237,19 +237,3 @@ fn build_node(snap: &VMSnapshot, all: &[VMSnapshot]) -> SnapshotTreeNode {
     }
 }
 
-/// Helper to find a VM's disk image path
-fn find_vm_image(vm_name: &str) -> Option<String> {
-    let candidates = [
-        format!("/var/lib/machines/{}.qcow2", vm_name),
-        format!("/var/lib/machines/{}/{}.qcow2", vm_name, vm_name),
-        format!("/var/lib/vmspawnd/images/{}.qcow2", vm_name),
-    ];
-
-    for path in &candidates {
-        if std::path::Path::new(path).exists() {
-            return Some(path.clone());
-        }
-    }
-
-    None
-}

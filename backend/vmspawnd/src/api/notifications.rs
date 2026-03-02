@@ -42,7 +42,7 @@ pub struct CreateChannelRequest {
     #[serde(rename = "type")]
     pub channel_type: ChannelType,
     pub config: HashMap<String, serde_json::Value>,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enabled: bool,
 }
 
@@ -84,7 +84,7 @@ pub struct CreateRuleRequest {
     pub severity_levels: Vec<Severity>,
     pub channels: Vec<String>,
     pub vm_tags: Option<Vec<String>>,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enabled: bool,
 }
 
@@ -125,10 +125,6 @@ pub struct NotificationHistory {
 pub struct HistoryQuery {
     #[serde(default = "default_limit")]
     pub limit: usize,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 fn default_limit() -> usize {

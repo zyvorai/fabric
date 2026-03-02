@@ -175,7 +175,7 @@ pub async fn create_checkpoint(
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     // Find the disk image for this VM
-    let image_path = find_vm_image(&vm_name);
+    let image_path = crate::validation::find_vm_image_or_default(&vm_name);
 
     // Create internal snapshot via qemu-img
     let output = Command::new("qemu-img")
@@ -235,7 +235,7 @@ pub async fn restore_checkpoint(
         Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
     };
 
-    let image_path = find_vm_image(&vm_name);
+    let image_path = crate::validation::find_vm_image_or_default(&vm_name);
 
     // Apply snapshot via qemu-img
     let output = Command::new("qemu-img")
@@ -260,7 +260,7 @@ pub async fn delete_checkpoint(
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
-        let image_path = find_vm_image(&vm_name);
+        let image_path = crate::validation::find_vm_image_or_default(&vm_name);
         if let Err(e) = Command::new("qemu-img")
             .args(["snapshot", "-d", &checkpoint.name, &image_path])
             .output()
@@ -306,7 +306,7 @@ pub async fn fork_vm(
     }
 
     // Create CoW disk using qemu-img with backing file
-    let source_image = find_vm_image(&source_name);
+    let source_image = crate::validation::find_vm_image_or_default(&source_name);
     let fork_image = format!("/var/lib/vmspawnd/images/{}.qcow2", req.new_name);
 
     if let Some(parent) = std::path::Path::new(&fork_image).parent() {
@@ -351,24 +351,3 @@ pub async fn fork_vm(
     Ok((StatusCode::CREATED, Json(forked)))
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-fn find_vm_image(name: &str) -> String {
-    let candidates = [
-        format!("/var/lib/machines/{}.qcow2", name),
-        format!("/var/lib/machines/{}.raw", name),
-        format!("/var/lib/machines/{}/{}.qcow2", name, name),
-        format!("/var/lib/vmspawnd/images/{}.qcow2", name),
-        format!("/var/lib/vmspawnd/images/{}.raw", name),
-    ];
-
-    for path in &candidates {
-        if std::path::Path::new(path).exists() {
-            return path.clone();
-        }
-    }
-
-    format!("/var/lib/vmspawnd/images/{}.qcow2", name)
-}

@@ -75,7 +75,7 @@ pub async fn start_migration(
     })?;
 
     // Validate target host (must be a hostname or IP, no shell metacharacters)
-    validate_hostname(&req.target_host).map_err(|msg| {
+    crate::validation::validate_hostname(&req.target_host).map_err(|msg| {
         (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
     })?;
 
@@ -229,33 +229,6 @@ pub async fn cancel_migration(
 // ============================================================================
 // Background Migration Task
 // ============================================================================
-
-/// Validate that a target host string is a valid hostname or IP address.
-/// Rejects shell metacharacters and other injection vectors.
-fn validate_hostname(host: &str) -> Result<(), String> {
-    if host.is_empty() || host.len() > 253 {
-        return Err("Target host must be between 1 and 253 characters".to_string());
-    }
-
-    // Must be a valid IP address or hostname (alphanumeric, dots, hyphens, colons for IPv6)
-    let valid = host.chars().all(|c| {
-        c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == ':' || c == '_'
-    });
-
-    if !valid {
-        return Err(format!(
-            "Target host '{}' contains invalid characters. Only alphanumeric, dots, hyphens, underscores, and colons are allowed.",
-            host
-        ));
-    }
-
-    // Must not start with a hyphen (could be interpreted as a flag)
-    if host.starts_with('-') {
-        return Err("Target host must not start with a hyphen".to_string());
-    }
-
-    Ok(())
-}
 
 async fn run_migration(state: Arc<AppState>, migration_id: String, req: MigrationRequest) {
     let update_status = |state: &Arc<AppState>, id: &str, mig_state: MigrationState, progress: u32, bytes: u64, error: Option<String>| {

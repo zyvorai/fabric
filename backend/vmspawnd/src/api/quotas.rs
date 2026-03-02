@@ -40,7 +40,7 @@ pub struct CreateQuotaRequest {
     pub max_disk: u64,
     pub max_vms: u32,
     pub tags: Option<Vec<String>>,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::validation::default_true")]
     pub enabled: bool,
 }
 
@@ -65,10 +65,6 @@ pub struct QuotaUsage {
     pub vms_percent: f64,
     pub is_exceeded: bool,
     pub exceeded_resources: Vec<String>,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 // ============================================================================
