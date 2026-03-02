@@ -1,0 +1,300 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
+use chrono::Utc;
+use security::{RequireRead, RequireWrite};
+use serde_json::json;
+use std::sync::Arc;
+use uuid::Uuid;
+
+use service_mesh::compiler::VMSnapshot;
+use service_mesh::models::{
+    BackendHealth, CreateServiceRequest, Service, ServiceStatus,
+};
+
+use crate::server::AppState;
+
+const STORE_KEY: &str = "services";
+
+// ── Service CRUD ────────────────────────────────────────────────────
+
+pub async fn create_service(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateServiceRequest>,
+) -> impl IntoResponse {
+    let now = Utc::now();
+    let service = Service {
+        id: Uuid::new_v4(),
+        name: req.name,
+        description: req.description,
+        virtual_ip: req.virtual_ip,
+        selector: req.selector,
+        ports: req.ports,
+        algorithm: req.algorithm,
+        health_check: req.health_check,
+        enabled: req.enabled,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &service.id.to_string(), &service)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_services(&state).await {
+        tracing::warn!("Post-create reconciliation failed: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(service)).into_response()
+}
+
+pub async fn list_services(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    match state.store.list_entities::<Service>(STORE_KEY) {
+        Ok(services) => (StatusCode::OK, Json(services)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+pub async fn get_service(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_entity::<Service>(STORE_KEY, &id) {
+        Ok(Some(service)) => (StatusCode::OK, Json(service)).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Service not found" })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+pub async fn update_service(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateServiceRequest>,
+) -> impl IntoResponse {
+    let existing = match state.store.get_entity::<Service>(STORE_KEY, &id) {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Service not found" })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let service = Service {
+        id: existing.id,
+        name: req.name,
+        description: req.description,
+        virtual_ip: req.virtual_ip,
+        selector: req.selector,
+        ports: req.ports,
+        algorithm: req.algorithm,
+        health_check: req.health_check,
+        enabled: req.enabled,
+        created: existing.created,
+        updated: Utc::now(),
+    };
+
+    if let Err(e) = state.store.save_entity(STORE_KEY, &id, &service) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_services(&state).await {
+        tracing::warn!("Post-update reconciliation failed: {}", e);
+    }
+
+    (StatusCode::OK, Json(service)).into_response()
+}
+
+pub async fn delete_service(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_services(&state).await {
+        tracing::warn!("Post-delete reconciliation failed: {}", e);
+    }
+
+    StatusCode::NO_CONTENT.into_response()
+}
+
+// ── Backend health ──────────────────────────────────────────────────
+
+pub async fn get_service_backends(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let service = match state.store.get_entity::<Service>(STORE_KEY, &id) {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Service not found" })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let backends = state
+        .service_mesh
+        .compiler
+        .health_checker()
+        .get_all_backends(&service.name)
+        .await;
+
+    (StatusCode::OK, Json(backends)).into_response()
+}
+
+// ── Sync and status ─────────────────────────────────────────────────
+
+pub async fn sync_services(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    match reconcile_services(&state).await {
+        Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+pub async fn get_service_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let services: Vec<Service> = match state.store.list_entities(STORE_KEY) {
+        Ok(s) => s,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let mut statuses = Vec::new();
+    for service in &services {
+        let all_backends = state
+            .service_mesh
+            .compiler
+            .health_checker()
+            .get_all_backends(&service.name)
+            .await;
+        let healthy_backends = all_backends
+            .iter()
+            .filter(|b| b.health == BackendHealth::Healthy)
+            .count();
+
+        statuses.push(ServiceStatus {
+            service_id: service.id,
+            name: service.name.clone(),
+            healthy_backends,
+            total_backends: all_backends.len(),
+            active: service.enabled,
+        });
+    }
+
+    (StatusCode::OK, Json(statuses)).into_response()
+}
+
+// ── Reconciliation ──────────────────────────────────────────────────
+
+pub async fn reconcile_services(state: &AppState) -> anyhow::Result<()> {
+    let services: Vec<Service> = state.store.list_entities(STORE_KEY)?;
+
+    let vms = build_vm_snapshots(state);
+
+    let enabled: Vec<Service> = services.into_iter().filter(|s| s.enabled).collect();
+    let rules = state
+        .service_mesh
+        .compiler
+        .compile_all(&enabled, &vms)
+        .await;
+
+    state.service_mesh.enforcer.sync_rules(&rules)?;
+
+    tracing::info!(
+        "Reconciled {} services → {} DNAT rules",
+        enabled.len(),
+        rules.len()
+    );
+
+    Ok(())
+}
+
+fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
+    let vms = match state.store.list_vms() {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+
+    vms.into_iter()
+        .filter_map(|vm| {
+            Some(VMSnapshot {
+                name: vm.name,
+                labels: vm.labels.clone().unwrap_or_default(),
+                ip: vm.ip,
+            })
+        })
+        .collect()
+}

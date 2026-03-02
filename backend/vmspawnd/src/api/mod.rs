@@ -40,3 +40,9 @@ pub mod replication_api;
 pub mod resource_pools;
 pub mod site_recovery_api;
 pub mod vm_encryption;
+
+// Phase 3 API modules for networking features
+pub mod dns_policy;
+pub mod service_mesh;
+pub mod traffic_shaping;
+pub mod vm_firewall;

@@ -26,6 +26,10 @@ pub struct AppState {
     pub driver: Arc<vmspawnd_machinectl_driver::MachinectlDriver>,
     pub lock_manager: Arc<vmspawnd_lock_manager::LockManager>,
     pub policy_engine: Arc<network_policy::PolicyEngine>,
+    pub service_mesh: Arc<service_mesh::ServiceMesh>,
+    pub traffic_shaper: Arc<traffic_shaping::TrafficShaper>,
+    pub dns_manager: Arc<dns_policy::DnsManager>,
+    pub vm_firewall: Arc<vm_firewall::VMFirewall>,
 }
 
 pub struct QuotaCache {
@@ -98,6 +102,10 @@ impl Server {
             driver: Arc::new(driver),
             lock_manager,
             policy_engine: Arc::new(network_policy::PolicyEngine::new()),
+            service_mesh: Arc::new(service_mesh::ServiceMesh::new()),
+            traffic_shaper: Arc::new(traffic_shaping::TrafficShaper::new()),
+            dns_manager: Arc::new(dns_policy::DnsManager::new()),
+            vm_firewall: Arc::new(vm_firewall::VMFirewall::new()),
         });
 
         Ok(Self { state })
@@ -171,6 +179,36 @@ impl Server {
         let policy_state = self.state.clone();
         bg_tasks.push(tokio::spawn(async move {
             run_policy_reconciler(policy_state).await;
+        }));
+
+        // Start service mesh health checker (10s interval)
+        let svc_health_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_service_health_checker(svc_health_state).await;
+        }));
+
+        // Start service mesh reconciler (30s interval)
+        let svc_reconcile_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_service_reconciler(svc_reconcile_state).await;
+        }));
+
+        // Start traffic shaping reconciler (30s interval)
+        let qos_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_qos_reconciler(qos_state).await;
+        }));
+
+        // Start DNS policy reconciler (30s interval)
+        let dns_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_dns_reconciler(dns_state).await;
+        }));
+
+        // Start VM firewall reconciler (30s interval)
+        let fw_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_firewall_reconciler(fw_state).await;
         }));
 
         axum::serve(listener, app)
@@ -533,6 +571,32 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/network-policies/{id}", get(api::network_policy::get_policy).put(api::network_policy::update_policy).delete(api::network_policy::delete_policy))
             .route("/identities", get(api::network_policy::list_identities))
             .route("/identities/{id}", get(api::network_policy::get_identity))
+            // Service mesh routes
+            .route("/services", get(api::service_mesh::list_services).post(api::service_mesh::create_service))
+            .route("/services/sync", post(api::service_mesh::sync_services))
+            .route("/services/status", get(api::service_mesh::get_service_status))
+            .route("/services/{id}", get(api::service_mesh::get_service).put(api::service_mesh::update_service).delete(api::service_mesh::delete_service))
+            .route("/services/{id}/backends", get(api::service_mesh::get_service_backends))
+            // Traffic shaping routes
+            .route("/qos-policies", get(api::traffic_shaping::list_qos_policies).post(api::traffic_shaping::create_qos_policy))
+            .route("/qos-policies/sync", post(api::traffic_shaping::sync_qos_policies))
+            .route("/qos-policies/status", get(api::traffic_shaping::get_qos_status))
+            .route("/qos-policies/{id}", get(api::traffic_shaping::get_qos_policy).put(api::traffic_shaping::update_qos_policy).delete(api::traffic_shaping::delete_qos_policy))
+            // DNS policy routes
+            .route("/dns-zones", get(api::dns_policy::list_zones).post(api::dns_policy::create_zone))
+            .route("/dns-zones/{id}", get(api::dns_policy::get_zone).delete(api::dns_policy::delete_zone))
+            .route("/dns-policies", get(api::dns_policy::list_policies).post(api::dns_policy::create_policy))
+            .route("/dns-policies/sync", post(api::dns_policy::sync_dns_policies))
+            .route("/dns-policies/{id}", get(api::dns_policy::get_policy).put(api::dns_policy::update_policy).delete(api::dns_policy::delete_policy))
+            .route("/dns-records", get(api::dns_policy::list_dns_records))
+            // VM firewall routes
+            .route("/firewall-profiles", get(api::vm_firewall::list_profiles).post(api::vm_firewall::create_profile))
+            .route("/firewall-profiles/{id}", get(api::vm_firewall::get_profile).put(api::vm_firewall::update_profile).delete(api::vm_firewall::delete_profile))
+            .route("/firewall-zones", get(api::vm_firewall::list_zones).post(api::vm_firewall::create_zone))
+            .route("/firewall-zones/{id}", get(api::vm_firewall::get_zone).delete(api::vm_firewall::delete_zone))
+            .route("/vms/{name}/firewall", get(api::vm_firewall::get_vm_firewall).put(api::vm_firewall::assign_vm_firewall).delete(api::vm_firewall::remove_vm_firewall))
+            .route("/firewall/sync", post(api::vm_firewall::sync_firewall))
+            .route("/firewall/status", get(api::vm_firewall::get_firewall_status))
             // Fault tolerance routes
             .route("/ft/enable", post(api::fault_tolerance::enable_ft))
             .route("/ft/vms", get(api::fault_tolerance::list_ft_vms))
@@ -1683,6 +1747,129 @@ async fn run_policy_reconciler(state: Arc<AppState>) {
 
         if let Err(e) = crate::api::network_policy::reconcile_policies(&state).await {
             tracing::error!("Policy reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that runs service mesh health checks every 10 seconds.
+async fn run_service_health_checker(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+
+    loop {
+        interval.tick().await;
+
+        let services: Vec<service_mesh::models::Service> = match state
+            .store
+            .list_entities("services")
+        {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        for service in &services {
+            if service.enabled {
+                state.service_mesh.compiler.health_checker().run_checks(service).await;
+            }
+        }
+    }
+}
+
+/// Background task that reconciles service mesh DNAT rules every 30 seconds.
+async fn run_service_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let services: Vec<service_mesh::models::Service> = match state
+            .store
+            .list_entities("services")
+        {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        if services.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::service_mesh::reconcile_services(&state).await {
+            tracing::error!("Service mesh reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that reconciles QoS policies every 30 seconds.
+async fn run_qos_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let policies: Vec<traffic_shaping::models::QoSPolicy> = match state
+            .store
+            .list_entities("qos_policies")
+        {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        if policies.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::traffic_shaping::reconcile_qos(&state).await {
+            tracing::error!("QoS reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that reconciles DNS policies every 30 seconds.
+async fn run_dns_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let policies: Vec<dns_policy::models::DnsPolicy> = match state
+            .store
+            .list_entities("dns_policies")
+        {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        if policies.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::dns_policy::reconcile_dns(&state).await {
+            tracing::error!("DNS reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that reconciles VM firewall rules every 30 seconds.
+async fn run_firewall_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let assignments: Vec<vm_firewall::models::VMFirewallAssignment> = match state
+            .store
+            .list_entities("firewall_assignments")
+        {
+            Ok(a) => a,
+            Err(_) => continue,
+        };
+
+        if assignments.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::vm_firewall::reconcile_firewall(&state).await {
+            tracing::error!("Firewall reconciliation failed: {}", e);
         }
     }
 }

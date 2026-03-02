@@ -65,6 +65,10 @@ pub async fn create_test_app() -> Router {
         driver: Arc::new(driver),
         lock_manager,
         policy_engine: Arc::new(network_policy::PolicyEngine::new()),
+        service_mesh: Arc::new(service_mesh::ServiceMesh::new()),
+        traffic_shaper: Arc::new(traffic_shaping::TrafficShaper::new()),
+        dns_manager: Arc::new(dns_policy::DnsManager::new()),
+        vm_firewall: Arc::new(vm_firewall::VMFirewall::new()),
     });
 
     vmspawnd::server::build_router(state)

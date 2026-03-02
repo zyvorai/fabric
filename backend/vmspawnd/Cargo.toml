@@ -49,6 +49,10 @@ predictive-drs = { path = "../predictive-drs" }
 distributed-storage = { path = "../distributed-storage" }
 encryption = { path = "../encryption" }
 network-policy = { path = "../network-policy" }
+service-mesh = { path = "../service-mesh" }
+traffic-shaping = { path = "../traffic-shaping" }
+dns-policy = { path = "../dns-policy" }
+vm-firewall = { path = "../vm-firewall" }
 
 migration = { path = "../migration" }
 fault-tolerance = { path = "../fault-tolerance" }
