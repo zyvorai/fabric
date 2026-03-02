@@ -46,3 +46,9 @@ pub mod dns_policy;
 pub mod service_mesh;
 pub mod traffic_shaping;
 pub mod vm_firewall;
+
+// Phase 4 API modules for advanced networking
+pub mod vpn_mesh;
+pub mod packet_mirror;
+pub mod nat_gateway;
+pub mod net_monitor;

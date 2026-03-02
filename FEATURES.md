@@ -2,10 +2,10 @@
 
 ## Project Statistics
 
-- 32 backend crates
-- 126 Rust source files, 117 TypeScript files
-- ~114,000 lines of code (91K Rust + 23K TypeScript)
-- 435 REST API endpoints + 3 WebSocket endpoints
+- 36 backend crates
+- 142 Rust source files, 117 TypeScript files
+- ~119,000 lines of code (96K Rust + 23K TypeScript)
+- 480+ REST API endpoints + 3 WebSocket endpoints
 - 36 web pages + 10 network sub-pages
 - 20 React components + 4 UI subcomponents
 - 3 RBAC roles (Admin, User, Viewer)
@@ -171,6 +171,37 @@
 - Isolated mode
 - VLAN isolation
 
+### VPN Mesh
+
+- WireGuard-based VPN tunnels
+- Point-to-point, hub-spoke, and full-mesh topologies
+- Auto-mesh via label selectors
+- Persistent keepalive
+
+### Packet Mirror
+
+- Traffic mirroring via tc mirred
+- Per-VM tap interface mirroring
+- Ingress, egress, and bidirectional capture
+- Protocol and port filtering
+
+### NAT Gateway
+
+- Masquerade NAT for VM internet access
+- SNAT with IP address pools
+- DNAT for inbound port forwarding
+- Hairpin NAT for internal loopback
+- nftables-based enforcement (`vmspawnd_nat` table)
+
+### Network Monitor
+
+- Per-VM bandwidth monitoring
+- Real-time rx/tx byte and packet rates
+- Threshold-based alerts (bps, kbps, mbps, gbps)
+- Alert severities (info, warning, critical)
+- Log, event, and webhook alert actions
+- sysfs counter collection
+
 ## High Availability
 
 ### Clustering
@@ -244,7 +275,7 @@
 - Operation counters (starts, stops, creates, deletes)
 - Grafana dashboard and alert rules
 
-## REST API (435 Endpoints)
+## REST API (480+ Endpoints)
 
 ### WebSocket Endpoints
 

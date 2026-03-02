@@ -18,7 +18,7 @@ Unauthenticated requests receive a `401 Unauthorized` response. Some read-only s
 
 ## Overview
 
-The API exposes 435 REST endpoints and 3 WebSocket endpoints organized into the categories below. This document lists the key endpoints in each category. All request and response bodies use JSON.
+The API exposes 480+ REST endpoints and 3 WebSocket endpoints organized into the categories below. This document lists the key endpoints in each category. All request and response bodies use JSON.
 
 ---
 
@@ -338,6 +338,104 @@ TLS certificate management.
 | POST | `/certificates` | Upload a certificate |
 | DELETE | `/certificates/:id` | Delete a certificate |
 | POST | `/certificates/:id/renew` | Renew a certificate |
+
+## VPN Mesh
+
+WireGuard-based VPN tunnels between VMs.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/vpn-tunnels` | Create a VPN tunnel |
+| GET | `/vpn-tunnels` | List VPN tunnels |
+| GET | `/vpn-tunnels/:id` | Get tunnel details |
+| PUT | `/vpn-tunnels/:id` | Update a tunnel |
+| DELETE | `/vpn-tunnels/:id` | Delete a tunnel |
+| POST | `/vpn-tunnels/sync` | Force tunnel reconciliation |
+| GET | `/vpn-tunnels/status` | Get tunnel status |
+| POST | `/vpn-networks` | Create a VPN network |
+| GET | `/vpn-networks` | List VPN networks |
+| GET | `/vpn-networks/:id` | Get network details |
+| PUT | `/vpn-networks/:id` | Update a network |
+| DELETE | `/vpn-networks/:id` | Delete a network |
+| GET | `/vpn-networks/status` | Get network status |
+
+### Example: Create a VPN Network
+
+```
+POST /api/vpn-networks
+Content-Type: application/json
+
+{
+  "name": "dev-mesh",
+  "selector": { "match_labels": { "env": "dev" } },
+  "subnet": "10.10.0.0/24",
+  "topology": "full_mesh"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "...",
+  "name": "dev-mesh",
+  "topology": "full_mesh",
+  "subnet": "10.10.0.0/24",
+  "enabled": true
+}
+```
+
+## Packet Mirror
+
+Traffic mirroring for VM debugging.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/mirror-sessions` | Create a mirror session |
+| GET | `/mirror-sessions` | List mirror sessions |
+| GET | `/mirror-sessions/:id` | Get session details |
+| PUT | `/mirror-sessions/:id` | Update a session |
+| DELETE | `/mirror-sessions/:id` | Delete a session |
+| POST | `/mirror-sessions/sync` | Force mirror reconciliation |
+| GET | `/mirror-sessions/status` | Get session status |
+
+## NAT Gateway
+
+Advanced NAT: masquerade, SNAT, DNAT, hairpin.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/nat-rules` | Create a NAT rule |
+| GET | `/nat-rules` | List NAT rules |
+| GET | `/nat-rules/:id` | Get rule details |
+| PUT | `/nat-rules/:id` | Update a rule |
+| DELETE | `/nat-rules/:id` | Delete a rule |
+| POST | `/nat-rules/sync` | Force NAT reconciliation |
+| GET | `/nat-rules/status` | Get rule status |
+| POST | `/nat-pools` | Create a SNAT pool |
+| GET | `/nat-pools` | List SNAT pools |
+| GET | `/nat-pools/:id` | Get pool details |
+| DELETE | `/nat-pools/:id` | Delete a pool |
+| POST | `/nat-gateways` | Create a NAT gateway |
+| GET | `/nat-gateways` | List NAT gateways |
+| GET | `/nat-gateways/:id` | Get gateway details |
+| DELETE | `/nat-gateways/:id` | Delete a gateway |
+
+## Network Monitor
+
+Per-VM bandwidth monitoring and alerting.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/monitor-policies` | Create a monitor policy |
+| GET | `/monitor-policies` | List monitor policies |
+| GET | `/monitor-policies/:id` | Get policy details |
+| PUT | `/monitor-policies/:id` | Update a policy |
+| DELETE | `/monitor-policies/:id` | Delete a policy |
+| POST | `/monitor-policies/sync` | Force monitor reconciliation |
+| GET | `/monitor-policies/status` | Get policy status |
+| GET | `/network-metrics` | Get all VM network metrics |
+| GET | `/network-metrics/:name` | Get per-VM network metrics |
+| GET | `/bandwidth-alerts` | Get active bandwidth alerts |
 
 ## Encryption
 

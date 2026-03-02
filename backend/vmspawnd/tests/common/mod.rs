@@ -69,6 +69,10 @@ pub async fn create_test_app() -> Router {
         traffic_shaper: Arc::new(traffic_shaping::TrafficShaper::new()),
         dns_manager: Arc::new(dns_policy::DnsManager::new()),
         vm_firewall: Arc::new(vm_firewall::VMFirewall::new()),
+        vpn_mesh: Arc::new(vpn_mesh::VpnMesh::new()),
+        packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
+        nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
+        net_monitor: Arc::new(net_monitor::NetMonitor::new()),
     });
 
     vmspawnd::server::build_router(state)

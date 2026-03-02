@@ -4,9 +4,9 @@ A virtual machine management platform built on systemd-vmspawn and systemd-machi
 
 ## Overview
 
-vmspawnd provides VM lifecycle management through three interfaces: a CLI (`vmctl`), a terminal UI (`vmctl-tui`), and a web dashboard (React). The backend exposes 435 REST API endpoints and 3 WebSocket endpoints for console access, VNC proxying, and real-time events.
+vmspawnd provides VM lifecycle management through three interfaces: a CLI (`vmctl`), a terminal UI (`vmctl-tui`), and a web dashboard (React). The backend exposes 480+ REST API endpoints and 3 WebSocket endpoints for console access, VNC proxying, and real-time events.
 
-**Codebase:** 32 backend crates, 126 Rust source files, 117 TypeScript/React source files (~114,000 LOC total: 91K Rust, 23K TypeScript).
+**Codebase:** 36 backend crates, 142 Rust source files, 117 TypeScript/React source files (~119,000 LOC total: 96K Rust, 23K TypeScript).
 
 ## Architecture
 
@@ -85,6 +85,12 @@ User Interfaces:
 - GPU passthrough (NVIDIA/AMD)
 - Live migration
 - Image builder and content library
+
+### Advanced Networking
+- VPN mesh (WireGuard tunnels: point-to-point, hub-spoke, full-mesh)
+- Packet mirroring (tc mirred for traffic capture and debugging)
+- NAT gateway (masquerade, SNAT pools, DNAT, hairpin NAT via nftables)
+- Network monitoring (per-VM bandwidth tracking with threshold alerts)
 
 ### High Availability and Resilience
 - HA clustering via etcd
@@ -213,7 +219,7 @@ GET    /metrics                     Prometheus metrics
 GET    /health                      Health check
 ```
 
-The full API surface covers 435 REST endpoints. See [docs/api.md](docs/api.md) for the complete reference.
+The full API surface covers 480+ REST endpoints. See [docs/api.md](docs/api.md) for the complete reference.
 
 ## Documentation
 

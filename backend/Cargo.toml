@@ -38,6 +38,10 @@ members = [
     "traffic-shaping",
     "dns-policy",
     "vm-firewall",
+    "vpn-mesh",
+    "packet-mirror",
+    "nat-gateway",
+    "net-monitor",
 ]
 
 [workspace.package]

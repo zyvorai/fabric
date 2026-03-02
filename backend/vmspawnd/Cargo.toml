@@ -53,6 +53,10 @@ service-mesh = { path = "../service-mesh" }
 traffic-shaping = { path = "../traffic-shaping" }
 dns-policy = { path = "../dns-policy" }
 vm-firewall = { path = "../vm-firewall" }
+vpn-mesh = { path = "../vpn-mesh" }
+packet-mirror = { path = "../packet-mirror" }
+nat-gateway = { path = "../nat-gateway" }
+net-monitor = { path = "../net-monitor" }
 
 migration = { path = "../migration" }
 fault-tolerance = { path = "../fault-tolerance" }

@@ -30,6 +30,10 @@ pub struct AppState {
     pub traffic_shaper: Arc<traffic_shaping::TrafficShaper>,
     pub dns_manager: Arc<dns_policy::DnsManager>,
     pub vm_firewall: Arc<vm_firewall::VMFirewall>,
+    pub vpn_mesh: Arc<vpn_mesh::VpnMesh>,
+    pub packet_mirror: Arc<packet_mirror::PacketMirror>,
+    pub nat_gateway: Arc<nat_gateway::NatGateway>,
+    pub net_monitor: Arc<net_monitor::NetMonitor>,
 }
 
 pub struct QuotaCache {
@@ -106,6 +110,10 @@ impl Server {
             traffic_shaper: Arc::new(traffic_shaping::TrafficShaper::new()),
             dns_manager: Arc::new(dns_policy::DnsManager::new()),
             vm_firewall: Arc::new(vm_firewall::VMFirewall::new()),
+            vpn_mesh: Arc::new(vpn_mesh::VpnMesh::new()),
+            packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
+            nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
+            net_monitor: Arc::new(net_monitor::NetMonitor::new()),
         });
 
         Ok(Self { state })
@@ -209,6 +217,30 @@ impl Server {
         let fw_state = self.state.clone();
         bg_tasks.push(tokio::spawn(async move {
             run_firewall_reconciler(fw_state).await;
+        }));
+
+        // Start VPN mesh reconciler (30s interval)
+        let vpn_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_vpn_reconciler(vpn_state).await;
+        }));
+
+        // Start packet mirror reconciler (30s interval)
+        let mirror_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_mirror_reconciler(mirror_state).await;
+        }));
+
+        // Start NAT gateway reconciler (30s interval)
+        let nat_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_nat_reconciler(nat_state).await;
+        }));
+
+        // Start network monitor collector + evaluator (10s interval)
+        let monitor_state = self.state.clone();
+        bg_tasks.push(tokio::spawn(async move {
+            run_net_monitor(monitor_state).await;
         }));
 
         axum::serve(listener, app)
@@ -597,6 +629,36 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/vms/{name}/firewall", get(api::vm_firewall::get_vm_firewall).put(api::vm_firewall::assign_vm_firewall).delete(api::vm_firewall::remove_vm_firewall))
             .route("/firewall/sync", post(api::vm_firewall::sync_firewall))
             .route("/firewall/status", get(api::vm_firewall::get_firewall_status))
+            // VPN mesh routes
+            .route("/vpn-tunnels", get(api::vpn_mesh::list_vpn_tunnels).post(api::vpn_mesh::create_vpn_tunnel))
+            .route("/vpn-tunnels/sync", post(api::vpn_mesh::sync_vpn_tunnels))
+            .route("/vpn-tunnels/status", get(api::vpn_mesh::get_vpn_tunnel_status))
+            .route("/vpn-tunnels/{id}", get(api::vpn_mesh::get_vpn_tunnel).put(api::vpn_mesh::update_vpn_tunnel).delete(api::vpn_mesh::delete_vpn_tunnel))
+            .route("/vpn-networks", get(api::vpn_mesh::list_vpn_networks).post(api::vpn_mesh::create_vpn_network))
+            .route("/vpn-networks/status", get(api::vpn_mesh::get_vpn_network_status))
+            .route("/vpn-networks/{id}", get(api::vpn_mesh::get_vpn_network).put(api::vpn_mesh::update_vpn_network).delete(api::vpn_mesh::delete_vpn_network))
+            // Packet mirror routes
+            .route("/mirror-sessions", get(api::packet_mirror::list_mirror_sessions).post(api::packet_mirror::create_mirror_session))
+            .route("/mirror-sessions/sync", post(api::packet_mirror::sync_mirror_sessions))
+            .route("/mirror-sessions/status", get(api::packet_mirror::get_mirror_status))
+            .route("/mirror-sessions/{id}", get(api::packet_mirror::get_mirror_session).put(api::packet_mirror::update_mirror_session).delete(api::packet_mirror::delete_mirror_session))
+            // NAT gateway routes
+            .route("/nat-rules", get(api::nat_gateway::list_nat_rules).post(api::nat_gateway::create_nat_rule))
+            .route("/nat-rules/sync", post(api::nat_gateway::sync_nat_rules))
+            .route("/nat-rules/status", get(api::nat_gateway::get_nat_status))
+            .route("/nat-rules/{id}", get(api::nat_gateway::get_nat_rule).put(api::nat_gateway::update_nat_rule).delete(api::nat_gateway::delete_nat_rule))
+            .route("/nat-pools", get(api::nat_gateway::list_nat_pools).post(api::nat_gateway::create_nat_pool))
+            .route("/nat-pools/{id}", get(api::nat_gateway::get_nat_pool).delete(api::nat_gateway::delete_nat_pool))
+            .route("/nat-gateways", get(api::nat_gateway::list_nat_gateways).post(api::nat_gateway::create_nat_gateway))
+            .route("/nat-gateways/{id}", get(api::nat_gateway::get_nat_gateway).delete(api::nat_gateway::delete_nat_gateway))
+            // Network monitor routes
+            .route("/monitor-policies", get(api::net_monitor::list_monitor_policies).post(api::net_monitor::create_monitor_policy))
+            .route("/monitor-policies/sync", post(api::net_monitor::sync_monitor_policies))
+            .route("/monitor-policies/status", get(api::net_monitor::get_monitor_status))
+            .route("/monitor-policies/{id}", get(api::net_monitor::get_monitor_policy).put(api::net_monitor::update_monitor_policy).delete(api::net_monitor::delete_monitor_policy))
+            .route("/network-metrics", get(api::net_monitor::get_all_network_metrics))
+            .route("/network-metrics/{name}", get(api::net_monitor::get_vm_network_metrics))
+            .route("/bandwidth-alerts", get(api::net_monitor::get_bandwidth_alerts))
             // Fault tolerance routes
             .route("/ft/enable", post(api::fault_tolerance::enable_ft))
             .route("/ft/vms", get(api::fault_tolerance::list_ft_vms))
@@ -1870,6 +1932,116 @@ async fn run_firewall_reconciler(state: Arc<AppState>) {
 
         if let Err(e) = crate::api::vm_firewall::reconcile_firewall(&state).await {
             tracing::error!("Firewall reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that reconciles VPN tunnels and networks every 30s
+async fn run_vpn_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let tunnels: Vec<vpn_mesh::models::VpnTunnel> = match state
+            .store
+            .list_entities("vpn_tunnels")
+        {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+
+        let networks: Vec<vpn_mesh::models::VpnNetwork> = state
+            .store
+            .list_entities("vpn_networks")
+            .unwrap_or_default();
+
+        if tunnels.is_empty() && networks.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::vpn_mesh::reconcile_vpn(&state).await {
+            tracing::error!("VPN reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that reconciles packet mirror sessions every 30s
+async fn run_mirror_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let sessions: Vec<packet_mirror::models::MirrorSession> = match state
+            .store
+            .list_entities("mirror_sessions")
+        {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        if sessions.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::packet_mirror::reconcile_mirrors(&state).await {
+            tracing::error!("Mirror reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that reconciles NAT rules every 30s
+async fn run_nat_reconciler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    loop {
+        interval.tick().await;
+
+        let rules: Vec<nat_gateway::models::NatRule> = match state
+            .store
+            .list_entities("nat_rules")
+        {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        let gateways: Vec<nat_gateway::models::NatGatewayConfig> = state
+            .store
+            .list_entities("nat_gateways")
+            .unwrap_or_default();
+
+        if rules.is_empty() && gateways.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::nat_gateway::reconcile_nat(&state).await {
+            tracing::error!("NAT reconciliation failed: {}", e);
+        }
+    }
+}
+
+/// Background task that collects network metrics and evaluates alerts every 10s
+async fn run_net_monitor(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+
+    loop {
+        interval.tick().await;
+
+        let policies: Vec<net_monitor::models::MonitorPolicy> = match state
+            .store
+            .list_entities("monitor_policies")
+        {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        if policies.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = crate::api::net_monitor::reconcile_monitor(&state).await {
+            tracing::error!("Network monitor reconciliation failed: {}", e);
         }
     }
 }
