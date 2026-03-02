@@ -274,7 +274,14 @@ export default function Dashboard() {
   )
 }
 
-function StatCard({ icon, title, value, color }: any) {
+interface StatCardProps {
+  icon: React.ReactNode
+  title: string
+  value: string | number
+  color: string
+}
+
+function StatCard({ icon, title, value, color }: StatCardProps) {
   const colors: Record<string, string> = {
     blue: 'text-blue-500',
     green: 'text-green-500',
@@ -314,7 +321,13 @@ function VMRow({ vm }: { vm: VM }) {
   )
 }
 
-function ActivityItem({ time, type, message }: any) {
+interface ActivityItemProps {
+  time: string
+  type: string
+  message: string
+}
+
+function ActivityItem({ time, type, message }: ActivityItemProps) {
   const typeColors: Record<string, string> = {
     success: 'text-green-500',
     warning: 'text-yellow-500',

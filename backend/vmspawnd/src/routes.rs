@@ -313,14 +313,16 @@ pub async fn clone_vm(
 
         let result = if req.linked_clone {
             // Linked clone: use qemu-img create with backing file
-            std::process::Command::new("qemu-img")
+            tokio::process::Command::new("qemu-img")
                 .args(["create", "-f", "qcow2", "-b", src_path, "-F", "qcow2", &target_path])
                 .output()
+                .await
         } else {
             // Full clone: use cp --reflink=auto for CoW on supported filesystems
-            std::process::Command::new("cp")
+            tokio::process::Command::new("cp")
                 .args(["--reflink=auto", src_path, &target_path])
                 .output()
+                .await
         };
 
         match result {

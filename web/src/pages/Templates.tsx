@@ -10,6 +10,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useNavigate } from 'react-router'
+import { PageHeader, EmptyState } from '../components/ui'
 
 export default function Templates() {
   const toast = useToastContext()
@@ -63,19 +64,18 @@ export default function Templates() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Layers className="w-8 h-8" />
-          VM Templates
-        </h1>
-        <button
-          onClick={() => navigate('/vms')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-        >
-          <Plus className="w-4 h-4" />
-          Create from VM
-        </button>
-      </div>
+      <PageHeader
+        title="VM Templates"
+        actions={
+          <button
+            onClick={() => navigate('/vms')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+          >
+            <Plus className="w-4 h-4" />
+            Create from VM
+          </button>
+        }
+      />
 
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-sm text-blue-400">
         <p>
@@ -85,16 +85,20 @@ export default function Templates() {
       </div>
 
       {templates.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
-          <Layers className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-          <p className="text-xl text-gray-400 mb-4">No templates yet</p>
-          <p className="text-gray-500 mb-6">Create a template from an existing VM to get started</p>
-          <button
-            onClick={() => navigate('/vms')}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-          >
-            Go to VMs
-          </button>
+        <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <EmptyState
+            icon={<Layers className="w-16 h-16" />}
+            title="No templates yet"
+            description="Create a template from an existing VM to get started"
+            action={
+              <button
+                onClick={() => navigate('/vms')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+              >
+                Go to VMs
+              </button>
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

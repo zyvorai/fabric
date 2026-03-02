@@ -13,6 +13,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QuotaDialog from '../components/QuotaDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Quotas() {
   const toast = useToastContext()
@@ -88,19 +89,19 @@ export default function Quotas() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Resource Quotas</h1>
-          <p className="text-gray-400">Manage resource limits and allocations</p>
-        </div>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
-        >
-          <Plus className="w-4 h-4" />
-          Create Quota
-        </button>
-      </div>
+      <PageHeader
+        title="Resource Quotas"
+        description="Manage resource limits and allocations"
+        actions={
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+          >
+            <Plus className="w-4 h-4" />
+            Create Quota
+          </button>
+        }
+      />
 
       {quotas.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">

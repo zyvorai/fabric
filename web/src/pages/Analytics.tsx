@@ -14,11 +14,16 @@ import {
 } from '../api/analytics'
 import { useToastContext } from '../contexts/ToastContext'
 
+interface TopVMEntry {
+  vm_name: string
+  value: number
+}
+
 export default function Analytics() {
   const toast = useToastContext()
   const [systemPerf, setSystemPerf] = useState<SystemPerformance[]>([])
   const [insights, setInsights] = useState<PerformanceInsight[]>([])
-  const [topVMs, setTopVMs] = useState<{ cpu: any[]; memory: any[]; network: any[] }>({
+  const [topVMs, setTopVMs] = useState<{ cpu: TopVMEntry[]; memory: TopVMEntry[]; network: TopVMEntry[] }>({
     cpu: [],
     memory: [],
     network: []

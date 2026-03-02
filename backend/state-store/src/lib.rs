@@ -147,7 +147,7 @@ impl StateStore {
     }
 
     pub fn delete_vm(&self, name: &str) -> Result<()> {
-        let mut vms = self.vms.write().unwrap();
+        let mut vms = self.vms.write().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         vms.remove(name);
 
         let vm_file = self.path.join(format!("{}.json", name));

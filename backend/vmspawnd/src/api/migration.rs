@@ -205,9 +205,10 @@ pub async fn cancel_migration(
     } else {
         // VM name is validated to only contain [a-zA-Z0-9._-], which are all
         // regex-safe characters, so no escaping is needed after validation.
-        if let Err(e) = std::process::Command::new("pkill")
+        if let Err(e) = tokio::process::Command::new("pkill")
             .args(["-f", &format!("rsync.*{}", status.vm_name)])
             .output()
+            .await
         {
             tracing::warn!("Command failed: {}", e);
         }
@@ -249,9 +250,10 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
     // Pre-check: verify target host reachable
     update_status(&state, &migration_id, MigrationState::PreCheck, 5, 0, None);
 
-    let ssh_check = std::process::Command::new("ssh")
+    let ssh_check = tokio::process::Command::new("ssh")
         .args(["-o", "ConnectTimeout=5", "-o", "BatchMode=yes", &req.target_host, "echo ok"])
-        .output();
+        .output()
+        .await;
 
     match ssh_check {
         Ok(output) if output.status.success() => {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { listVMs, VM } from '../api/vm'
-import { Search, X, Tag, Layers } from 'lucide-react'
+import { Search, X, Tag, Layers, Monitor } from 'lucide-react'
 import VMCard from '../components/VMCard'
 import { getTagColor } from '../components/TagEditor'
+import { PageHeader, EmptyState } from '../components/ui'
 
 export default function VMList() {
   const [vms, setVMs] = useState<VM[]>([])
@@ -86,25 +87,27 @@ export default function VMList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Virtual Machines</h1>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setGroupByTags(!groupByTags)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-              groupByTags
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            Group by Tags
-          </button>
-          <div className="text-sm text-gray-400">
-            {filteredVMs.length} of {vms.length} VMs
+      <PageHeader
+        title="Virtual Machines"
+        actions={
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setGroupByTags(!groupByTags)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                groupByTags
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              Group by Tags
+            </button>
+            <div className="text-sm text-gray-400">
+              {filteredVMs.length} of {vms.length} VMs
+            </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Search Bar */}
       {vms.length > 0 && (
@@ -177,14 +180,20 @@ export default function VMList() {
       )}
 
       {vms.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
-          <p className="text-xl text-gray-400 mb-4">No VMs found</p>
-          <p className="text-gray-500">Create your first virtual machine to get started</p>
+        <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <EmptyState
+            icon={<Monitor className="w-16 h-16" />}
+            title="No VMs found"
+            description="Create your first virtual machine to get started"
+          />
         </div>
       ) : filteredVMs.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
-          <p className="text-xl text-gray-400 mb-4">No matching VMs</p>
-          <p className="text-gray-500">Try adjusting your search query or tag filters</p>
+        <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <EmptyState
+            icon={<Search className="w-16 h-16" />}
+            title="No matching VMs"
+            description="Try adjusting your search query or tag filters"
+          />
         </div>
       ) : groupByTags ? (
         <div className="space-y-8">

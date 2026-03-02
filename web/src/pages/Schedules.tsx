@@ -14,6 +14,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ScheduleDialog from '../components/ScheduleDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Schedules() {
   const toast = useToastContext()
@@ -116,32 +117,32 @@ export default function Schedules() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">VM Schedules</h1>
-          <p className="text-gray-400">Automate VM lifecycle operations</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-              showHistory
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            History
-          </button>
-          <button
-            onClick={() => setShowCreateDialog(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
-          >
-            <Plus className="w-4 h-4" />
-            Create Schedule
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="VM Schedules"
+        description="Automate VM lifecycle operations"
+        actions={
+          <>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                showHistory
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              History
+            </button>
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+            >
+              <Plus className="w-4 h-4" />
+              Create Schedule
+            </button>
+          </>
+        }
+      />
 
       {/* Schedules List */}
       {!showHistory && (

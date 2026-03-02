@@ -15,6 +15,7 @@ import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Backups() {
   const toast = useToastContext()
@@ -124,19 +125,19 @@ export default function Backups() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Backups & Restore</h1>
-          <p className="text-gray-400">Manage VM backups and recovery</p>
-        </div>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
-        >
-          <Plus className="w-4 h-4" />
-          Create Backup
-        </button>
-      </div>
+      <PageHeader
+        title="Backups & Restore"
+        description="Manage VM backups and recovery"
+        actions={
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+          >
+            <Plus className="w-4 h-4" />
+            Create Backup
+          </button>
+        }
+      />
 
       {/* Statistics */}
       {stats && (
@@ -329,7 +330,13 @@ export default function Backups() {
 }
 
 // Create Backup Dialog Component
-function CreateBackupDialog({ vms, onClose, onCreate }: any) {
+interface CreateBackupDialogProps {
+  vms: VM[]
+  onClose: () => void
+  onCreate: (vmName: string, backupType: 'full' | 'incremental') => void
+}
+
+function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps) {
   const [vmName, setVmName] = useState(vms[0]?.name || '')
   const [backupType, setBackupType] = useState<'full' | 'incremental'>('full')
 
@@ -356,7 +363,7 @@ function CreateBackupDialog({ vms, onClose, onCreate }: any) {
             <label className="block text-sm font-medium mb-2">Backup Type</label>
             <select
               value={backupType}
-              onChange={(e) => setBackupType(e.target.value as any)}
+              onChange={(e) => setBackupType(e.target.value as 'full' | 'incremental')}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="full">Full Backup</option>
@@ -384,7 +391,13 @@ function CreateBackupDialog({ vms, onClose, onCreate }: any) {
 }
 
 // Restore Dialog Component
-function RestoreDialog({ backup, onClose, onRestore }: any) {
+interface RestoreDialogProps {
+  backup: Backup
+  onClose: () => void
+  onRestore: (backup: Backup, targetVmName?: string) => void
+}
+
+function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
   const [targetName, setTargetName] = useState('')
   const [createNew, setCreateNew] = useState(false)
 
