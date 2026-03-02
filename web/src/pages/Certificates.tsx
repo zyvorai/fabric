@@ -19,9 +19,12 @@ import {
   type CertHealthDashboard,
 } from '../api/certificates'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Certificates() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [cas, setCAs] = useState<CertificateAuthority[]>([])
   const [certs, setCerts] = useState<Certificate[]>([])
   const [csrs, setCSRs] = useState<CertificateRequest[]>([])
@@ -53,7 +56,8 @@ export default function Certificates() {
   }
 
   const handleRevoke = async (id: string) => {
-    if (!confirm('Revoke this certificate?')) return
+    const ok = await confirm('Revoke Certificate', 'Revoke this certificate?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try { await revokeCertificate(id); toast.success('Certificate revoked'); loadData() }
     catch { toast.error('Failed to revoke certificate') }
   }
@@ -403,6 +407,16 @@ export default function Certificates() {
             <CreateBaselineForm onClose={() => setShowCreateBaseline(false)} onCreated={() => { setShowCreateBaseline(false); loadData() }} />
           </div>
         </div>
+      )}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

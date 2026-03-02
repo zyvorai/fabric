@@ -15,9 +15,12 @@ import {
   type FailoverResult,
 } from '../api/faultTolerance'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function FaultTolerance() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [ftVMs, setFtVMs] = useState<FtConfig[]>([])
   const [events, setEvents] = useState<FailoverResult[]>([])
   const [metrics, setMetrics] = useState<Map<string, FtMetrics>>(new Map())
@@ -56,7 +59,8 @@ export default function FaultTolerance() {
   }
 
   const handleDisableFT = async (vmId: string) => {
-    if (!confirm('Disable fault tolerance for this VM?')) return
+    const ok = await confirm('Disable Fault Tolerance', 'Disable fault tolerance for this VM?', { variant: 'danger', confirmLabel: 'Disable' })
+    if (!ok) return
     try {
       await disableFt(vmId)
       toast.success('FT disabled')
@@ -65,7 +69,8 @@ export default function FaultTolerance() {
   }
 
   const handleTriggerFailover = async (vmId: string) => {
-    if (!confirm('Trigger failover for this VM? This will move the VM to the secondary host.')) return
+    const ok = await confirm('Trigger Failover', 'Trigger failover for this VM? This will move the VM to the secondary host.', { variant: 'danger', confirmLabel: 'Trigger Failover' })
+    if (!ok) return
     try {
       await triggerFailover(vmId)
       toast.success('Failover triggered')
@@ -314,6 +319,17 @@ export default function FaultTolerance() {
       {/* Enable FT Modal */}
       {showEnableFT && (
         <EnableFTModal onClose={() => setShowEnableFT(false)} onCreated={() => { setShowEnableFT(false); loadData() }} />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

@@ -10,10 +10,13 @@ import {
   getAllQuotaUsage
 } from '../api/quota'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 import QuotaDialog from '../components/QuotaDialog'
 
 export default function Quotas() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [quotas, setQuotas] = useState<ResourceQuota[]>([])
   const [usage, setUsage] = useState<QuotaUsage[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,7 +45,8 @@ export default function Quotas() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this quota? This action cannot be undone.')) return
+    const ok = await confirm('Delete Quota', 'Delete this quota? This action cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
 
     try {
       await deleteQuota(id)
@@ -325,6 +329,17 @@ export default function Quotas() {
           quota={editingQuota}
           onClose={() => setEditingQuota(null)}
           onSuccess={loadData}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

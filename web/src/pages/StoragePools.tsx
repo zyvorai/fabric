@@ -12,8 +12,11 @@ import {
   type StoragePool,
   type NfsHealth,
 } from '../api/storage'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function StoragePools() {
+  const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<StoragePool[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -67,9 +70,8 @@ export default function StoragePools() {
   }
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`Are you sure you want to delete storage pool "${name}"?`)) {
-      return
-    }
+    const ok = await confirm('Delete Storage Pool', `Are you sure you want to delete storage pool "${name}"?`, { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
 
     try {
       await deleteStoragePool(name)
@@ -312,6 +314,17 @@ export default function StoragePools() {
       {/* Create Pool Dialog */}
       {showCreateDialog && (
         <CreatePoolDialog onClose={() => setShowCreateDialog(false)} onCreated={loadPools} />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

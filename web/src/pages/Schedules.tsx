@@ -11,10 +11,13 @@ import {
   getScheduleHistory
 } from '../api/schedule'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 import ScheduleDialog from '../components/ScheduleDialog'
 
 export default function Schedules() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [history, setHistory] = useState<ScheduleHistory[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +47,8 @@ export default function Schedules() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this schedule? This action cannot be undone.')) return
+    const ok = await confirm('Delete Schedule', 'Delete this schedule? This action cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
 
     try {
       await deleteSchedule(id)
@@ -71,7 +75,8 @@ export default function Schedules() {
   }
 
   const handleRunNow = async (schedule: Schedule) => {
-    if (!confirm(`Run "${schedule.name}" now?`)) return
+    const ok = await confirm('Run Schedule Now', `Run "${schedule.name}" now?`, { variant: 'danger', confirmLabel: 'Run Now' })
+    if (!ok) return
 
     try {
       await runScheduleNow(schedule.id)
@@ -327,6 +332,17 @@ export default function Schedules() {
           schedule={editingSchedule}
           onClose={() => setEditingSchedule(null)}
           onSuccess={loadData}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

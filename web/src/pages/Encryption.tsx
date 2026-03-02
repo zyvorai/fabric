@@ -13,9 +13,12 @@ import {
   type VmEncryptionStatus,
 } from '../api/encryption'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Encryption() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [providers, setProviders] = useState<KeyProvider[]>([])
   const [policies, setPolicies] = useState<EncryptionPolicy[]>([])
   const [encryptedVMs, setEncryptedVMs] = useState<VmEncryptionStatus[]>([])
@@ -46,7 +49,8 @@ export default function Encryption() {
   }
 
   const handleRemoveProvider = async (id: string) => {
-    if (!confirm('Remove this key provider?')) return
+    const ok = await confirm('Remove Key Provider', 'Remove this key provider?', { variant: 'danger', confirmLabel: 'Remove' })
+    if (!ok) return
     try {
       await removeProvider(id)
       toast.success('Key provider removed')
@@ -55,7 +59,8 @@ export default function Encryption() {
   }
 
   const handleRotateKey = async (vmId: string) => {
-    if (!confirm('Rotate encryption key for this VM?')) return
+    const ok = await confirm('Rotate Encryption Key', 'Rotate encryption key for this VM?', { variant: 'danger', confirmLabel: 'Rotate' })
+    if (!ok) return
     try {
       await rotateVmKey(vmId)
       toast.success('Key rotation initiated')
@@ -280,6 +285,17 @@ export default function Encryption() {
       {showCreatePolicy && (
         <CreatePolicyModal providers={providers} onClose={() => setShowCreatePolicy(false)}
           onCreated={() => { setShowCreatePolicy(false); loadData() }} />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

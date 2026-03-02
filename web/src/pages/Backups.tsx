@@ -13,9 +13,12 @@ import {
 } from '../api/backup'
 import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Backups() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [backups, setBackups] = useState<Backup[]>([])
   const [jobs, setJobs] = useState<BackupJob[]>([])
   const [stats, setStats] = useState<BackupStats | null>(null)
@@ -66,7 +69,8 @@ export default function Backups() {
   }
 
   const handleDeleteBackup = async (id: string) => {
-    if (!confirm('Delete this backup? This action cannot be undone.')) return
+    const ok = await confirm('Delete Backup', 'Delete this backup? This action cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
 
     try {
       await deleteBackup(id)
@@ -78,7 +82,8 @@ export default function Backups() {
   }
 
   const handleRestore = async (backup: Backup, targetVmName?: string) => {
-    if (!confirm(`Restore VM from backup? ${targetVmName ? `New VM will be named: ${targetVmName}` : 'This will overwrite the current VM.'}`)) return
+    const ok = await confirm('Restore from Backup', `Restore VM from backup? ${targetVmName ? `New VM will be named: ${targetVmName}` : 'This will overwrite the current VM.'}`, { variant: 'danger', confirmLabel: 'Restore' })
+    if (!ok) return
 
     try {
       await restoreBackup({
@@ -306,6 +311,17 @@ export default function Backups() {
           backup={showRestoreDialog}
           onClose={() => setShowRestoreDialog(null)}
           onRestore={handleRestore}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

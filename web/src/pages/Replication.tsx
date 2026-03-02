@@ -16,9 +16,12 @@ import {
   type ReplicationHealthSummary,
 } from '../api/replication'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Replication() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [sites, setSites] = useState<ReplicationSite[]>([])
   const [replications, setReplications] = useState<ReplicationConfig[]>([])
   const [violations, setViolations] = useState<ReplicationMetrics[]>([])
@@ -50,7 +53,8 @@ export default function Replication() {
   }
 
   const handleRemoveSite = async (id: string) => {
-    if (!confirm('Remove this replication site?')) return
+    const ok = await confirm('Remove Site', 'Remove this replication site?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try { await removeSite(id); toast.success('Site removed'); loadData() }
     catch { toast.error('Failed to remove site') }
   }
@@ -291,6 +295,16 @@ export default function Replication() {
       )}
       {showCreateConfig && (
         <CreateConfigModal sites={sites} onClose={() => setShowCreateConfig(false)} onCreated={() => { setShowCreateConfig(false); loadData() }} />
+      )}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

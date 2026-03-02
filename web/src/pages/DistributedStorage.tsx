@@ -16,9 +16,12 @@ import {
   type DatastoreCluster,
 } from '../api/distributedStorage'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function DistributedStorage() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<DistributedStoragePool[]>([])
   const [policies, setPolicies] = useState<StoragePolicy[]>([])
   const [migrations, setMigrations] = useState<StorageMigration[]>([])
@@ -55,7 +58,8 @@ export default function DistributedStorage() {
   }
 
   const handleDeletePool = async (id: string) => {
-    if (!confirm('Delete this storage pool?')) return
+    const ok = await confirm('Delete Pool', 'Delete this storage pool?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try {
       await deleteDistributedPool(id)
       toast.success('Storage pool deleted')
@@ -64,7 +68,8 @@ export default function DistributedStorage() {
   }
 
   const handleDeletePolicy = async (id: string) => {
-    if (!confirm('Delete this storage policy?')) return
+    const ok = await confirm('Delete Policy', 'Delete this storage policy?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try {
       await deleteStoragePolicy(id)
       toast.success('Storage policy deleted')
@@ -373,6 +378,16 @@ export default function DistributedStorage() {
             { name: 'space_threshold_pct', label: 'Space Threshold (%)', type: 'number', defaultValue: 80 },
             { name: 'io_latency_threshold_ms', label: 'IO Latency Threshold (ms)', type: 'number', defaultValue: 15 },
           ]}
+        />
+      )}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

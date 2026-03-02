@@ -14,9 +14,12 @@ import {
   type RollingUpdatePlan,
 } from '../api/lifecycle'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function LifecycleManager() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [baselines, setBaselines] = useState<Baseline[]>([])
   const [scans, setScans] = useState<HostComplianceStatus[]>([])
   const [tasks, setTasks] = useState<RemediationTask[]>([])
@@ -46,7 +49,8 @@ export default function LifecycleManager() {
   }
 
   const handleDeleteBaseline = async (id: string) => {
-    if (!confirm('Delete this baseline?')) return
+    const ok = await confirm('Delete Baseline', 'Delete this baseline?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try { await deleteBaseline(id); toast.success('Baseline deleted'); loadData() }
     catch { toast.error('Failed to delete baseline') }
   }
@@ -307,6 +311,16 @@ export default function LifecycleManager() {
       {/* Create Baseline Modal */}
       {showCreateBaseline && (
         <CreateBaselineModal onClose={() => setShowCreateBaseline(false)} onCreated={() => { setShowCreateBaseline(false); loadData() }} />
+      )}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

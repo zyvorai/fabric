@@ -40,6 +40,11 @@ pub fn default_true() -> bool {
     true
 }
 
+/// Serde default for retention period (30 days).
+pub fn default_retention() -> u32 {
+    30
+}
+
 // === VM image path helpers ===
 
 /// Find the disk image path for a VM by checking common locations.

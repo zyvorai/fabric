@@ -51,7 +51,7 @@ pub struct CreateBackupRequest {
     pub backup_type: BackupType,
     #[serde(default = "crate::validation::default_true")]
     pub compress: bool,
-    #[serde(default = "default_retention")]
+    #[serde(default = "crate::validation::default_retention")]
     pub retention_days: u32,
     pub description: Option<String>,
 }
@@ -148,9 +148,6 @@ fn default_false() -> bool {
     false
 }
 
-fn default_retention() -> u32 {
-    30
-}
 
 // ============================================================================
 // Backup Handlers

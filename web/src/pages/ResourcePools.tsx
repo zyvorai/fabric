@@ -11,9 +11,12 @@ import {
   type AdmissionControlResult,
 } from '../api/resourcePools'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function ResourcePools() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<ResourcePool[]>([])
   const [summaries, setSummaries] = useState<Map<string, ResourcePoolSummary>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -55,7 +58,8 @@ export default function ResourcePools() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this resource pool?')) return
+    const ok = await confirm('Delete Resource Pool', 'Delete this resource pool?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try {
       await deletePool(id)
       toast.success('Resource pool deleted')
@@ -192,6 +196,17 @@ export default function ResourcePools() {
           result={admissionResult}
           onTest={handleAdmissionTest}
           onClose={() => { setShowAdmissionTest(null); setAdmissionResult(null) }}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

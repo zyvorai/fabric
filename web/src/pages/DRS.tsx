@@ -18,9 +18,12 @@ import {
   type PlacementResult,
 } from '../api/drs'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function DRS() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [clusterId] = useState('default')
   const [config, setConfig] = useState<DrsConfig | null>(null)
   const [balance, setBalance] = useState<ClusterBalance | null>(null)
@@ -79,7 +82,8 @@ export default function DRS() {
   }
 
   const handleDeleteRule = async (id: string) => {
-    if (!confirm('Delete this affinity rule?')) return
+    const ok = await confirm('Delete Affinity Rule', 'Delete this affinity rule?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try {
       await deleteAffinityRule(id)
       toast.success('Affinity rule deleted')
@@ -327,6 +331,16 @@ export default function DRS() {
           clusterId={clusterId}
           onClose={() => setShowCreateRule(false)}
           onCreated={() => { setShowCreateRule(false); loadData() }}
+        />
+      )}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

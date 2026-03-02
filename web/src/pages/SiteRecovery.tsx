@@ -14,9 +14,12 @@ import {
   type DrDashboard,
 } from '../api/siteRecovery'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function SiteRecovery() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [plans, setPlans] = useState<RecoveryPlan[]>([])
   const [executions, setExecutions] = useState<RecoveryExecution[]>([])
   const [dashboard, setDashboard] = useState<DrDashboard | null>(null)
@@ -45,18 +48,25 @@ export default function SiteRecovery() {
   }
 
   const handleDeletePlan = async (id: string) => {
-    if (!confirm('Delete this recovery plan?')) return
+    const ok = await confirm('Delete Recovery Plan', 'Delete this recovery plan?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     try { await deletePlan(id); toast.success('Plan deleted'); loadData() }
     catch { toast.error('Failed to delete plan') }
   }
 
   const handleExecute = async (planId: string, type: 'planned_migration' | 'disaster_recovery' | 'test_failover') => {
+    const title = type === 'disaster_recovery'
+      ? 'Execute Disaster Recovery'
+      : type === 'planned_migration'
+      ? 'Execute Planned Migration'
+      : 'Execute Test Failover'
     const msg = type === 'disaster_recovery'
       ? 'Execute DISASTER RECOVERY? This will failover all VMs to the target site.'
       : type === 'planned_migration'
       ? 'Execute planned migration?'
       : 'Execute test failover?'
-    if (!confirm(msg)) return
+    const ok = await confirm(title, msg, { variant: 'danger', confirmLabel: 'Execute' })
+    if (!ok) return
     try {
       if (type === 'planned_migration') await executePlannedMigration(planId)
       else if (type === 'disaster_recovery') await executeDisasterRecovery(planId)
@@ -299,6 +309,17 @@ export default function SiteRecovery() {
       {/* Create Plan Modal */}
       {showCreatePlan && (
         <CreatePlanModal onClose={() => setShowCreatePlan(false)} onCreated={() => { setShowCreatePlan(false); loadData() }} />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

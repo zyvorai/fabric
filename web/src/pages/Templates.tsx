@@ -7,10 +7,13 @@ import {
   VMTemplate,
 } from '../api/templates'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useNavigate } from 'react-router'
 
 export default function Templates() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<VMTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,14 +36,15 @@ export default function Templates() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Delete template '${name}'? This cannot be undone.`)) {
-      try {
-        await removeTemplate(id)
-        toast.success(`Template '${name}' deleted successfully`)
-        loadTemplates()
-      } catch (_error) {
-        toast.error(`Failed to delete template '${name}'`)
-      }
+    const ok = await confirm('Delete Template', `Delete template '${name}'? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
+
+    try {
+      await removeTemplate(id)
+      toast.success(`Template '${name}' deleted successfully`)
+      loadTemplates()
+    } catch (_error) {
+      toast.error(`Failed to delete template '${name}'`)
     }
   }
 
@@ -116,6 +120,17 @@ export default function Templates() {
             toast.success('VM created from template successfully')
             navigate('/vms')
           }}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

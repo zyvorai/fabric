@@ -14,9 +14,12 @@ import {
   NotificationHistory,
 } from '../api/notifications'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Notifications() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [channels, setChannels] = useState<NotificationChannel[]>([])
   const [rules, setRules] = useState<NotificationRule[]>([])
   const [history, setHistory] = useState<NotificationHistory[]>([])
@@ -49,7 +52,8 @@ export default function Notifications() {
   }
 
   const handleDeleteChannel = async (id: string) => {
-    if (!confirm('Delete this notification channel?')) return
+    const ok = await confirm('Delete Channel', 'Delete this notification channel?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
 
     try {
       await deleteChannel(id)
@@ -70,7 +74,8 @@ export default function Notifications() {
   }
 
   const handleDeleteRule = async (id: string) => {
-    if (!confirm('Delete this notification rule?')) return
+    const ok = await confirm('Delete Rule', 'Delete this notification rule?', { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
 
     try {
       await deleteRule(id)
@@ -445,6 +450,17 @@ export default function Notifications() {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

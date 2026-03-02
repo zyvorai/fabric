@@ -30,7 +30,7 @@ pub struct AppSettings {
     pub default_format: String,
     #[serde(default = "crate::validation::default_true")]
     pub enable_compression: bool,
-    #[serde(default = "default_retention")]
+    #[serde(default = "crate::validation::default_retention")]
     pub snapshot_retention: u32,
     #[serde(default = "crate::validation::default_true")]
     pub enable_auth: bool,
@@ -59,7 +59,6 @@ fn default_bridge() -> String { "br0".to_string() }
 fn default_dns() -> String { "8.8.8.8, 8.8.4.4".to_string() }
 fn default_pool() -> String { "default".to_string() }
 fn default_format() -> String { "qcow2".to_string() }
-fn default_retention() -> u32 { 30 }
 fn default_session_timeout() -> u32 { 3600 }
 
 impl Default for AppSettings {
@@ -75,7 +74,7 @@ impl Default for AppSettings {
             default_pool: default_pool(),
             default_format: default_format(),
             enable_compression: true,
-            snapshot_retention: default_retention(),
+            snapshot_retention: crate::validation::default_retention(),
             enable_auth: true,
             enable_tls: false,
             session_timeout: default_session_timeout(),
