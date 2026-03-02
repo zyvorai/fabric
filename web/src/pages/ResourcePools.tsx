@@ -13,6 +13,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function ResourcePools() {
   const toast = useToastContext()
@@ -147,13 +148,15 @@ export default function ResourcePools() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Resource Pools</h1>
-        <button onClick={() => setShowCreatePool(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Create Pool
-        </button>
-      </div>
+      <PageHeader
+        title="Resource Pools"
+        actions={
+          <button onClick={() => setShowCreatePool(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Create Pool
+          </button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

@@ -67,8 +67,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { isConnected } = useWebSocket({
     url: wsUrl,
     onMessage: handleMessage,
-    onOpen: () => console.log('Connected to vmspawnd events'),
-    onClose: () => console.log('Disconnected from vmspawnd events'),
     reconnect: true,
     reconnectInterval: 3000,
   })

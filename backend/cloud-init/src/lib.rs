@@ -146,7 +146,7 @@ impl CloudInitGenerator {
 }
 
 pub fn create_default_user_data(username: &str, ssh_key: Option<&str>) -> String {
-    let mut user_data = UserData {
+    let user_data = UserData {
         users: Some(vec![User {
             name: username.to_string(),
             sudo: Some("ALL=(ALL) NOPASSWD:ALL".to_string()),

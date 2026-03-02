@@ -209,20 +209,13 @@ fn calculate_next_run(
                 return None;
             }
 
-            let current_weekday = now.weekday().num_days_from_sunday() as u8;
-            let mut target_time = now
-                .with_hour(hour)?
-                .with_minute(minute)?
-                .with_second(0)?
-                .with_nanosecond(0)?;
-
             // Find next matching day
             for offset in 0..7 {
                 let check_date = now + Duration::days(offset);
                 let check_weekday = check_date.weekday().num_days_from_sunday() as u8;
 
                 if days.contains(&check_weekday) {
-                    target_time = check_date
+                    let target_time = check_date
                         .with_hour(hour)?
                         .with_minute(minute)?
                         .with_second(0)?

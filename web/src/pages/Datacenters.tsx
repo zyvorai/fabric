@@ -21,6 +21,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Datacenters() {
   const toast = useToastContext()
@@ -140,16 +141,18 @@ export default function Datacenters() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Datacenters</h1>
-        <button
-          onClick={() => setShowCreateDC(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Create Datacenter
-        </button>
-      </div>
+      <PageHeader
+        title="Datacenters"
+        actions={
+          <button
+            onClick={() => setShowCreateDC(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Create Datacenter
+          </button>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

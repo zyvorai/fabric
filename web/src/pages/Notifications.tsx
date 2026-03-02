@@ -16,6 +16,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Notifications() {
   const toast = useToastContext()
@@ -126,12 +127,10 @@ export default function Notifications() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Notifications</h1>
-          <p className="text-gray-400">Manage notification channels and alert rules</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Notifications"
+        description="Manage notification channels and alert rules"
+      />
 
       {/* Tabs */}
       <div className="flex gap-4 mb-6 border-b border-gray-700">

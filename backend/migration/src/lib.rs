@@ -2,8 +2,6 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationConfig {
@@ -34,6 +32,7 @@ pub enum MigrationState {
 }
 
 pub struct MigrationManager {
+    #[allow(dead_code)]
     workspace_dir: PathBuf,
 }
 
@@ -142,7 +141,7 @@ impl MigrationManager {
     }
 
     /// Perform live synchronization
-    async fn live_sync(&self, config: &MigrationConfig) -> Result<()> {
+    async fn live_sync(&self, _config: &MigrationConfig) -> Result<()> {
         tracing::info!("Starting live synchronization");
 
         // In a real implementation, this would:

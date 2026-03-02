@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use vmspawnd_system::{CpuTopology, NumaTopology};
 
-use crate::firmware::{Firmware, OvmfConfig, TpmVersion};
+use crate::firmware::Firmware;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VmConfig {

@@ -21,6 +21,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Certificates() {
   const toast = useToastContext()
@@ -87,12 +88,14 @@ export default function Certificates() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Certificates & Security</h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Certificates & Security"
+        actions={
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+        }
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1 overflow-x-auto">

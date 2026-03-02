@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::server::AppState;
 use predictive_drs::{
-    AffinityRule, ClusterBalance, DrsConfig, HostSnapshot, MigrationRecommendation,
-    PlacementRequest, PlacementResult, VmSnapshot,
+    AffinityRule, DrsConfig, HostSnapshot, MigrationRecommendation,
+    PlacementRequest, VmSnapshot,
 };
 
 pub async fn configure_drs(

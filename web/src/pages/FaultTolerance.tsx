@@ -17,6 +17,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function FaultTolerance() {
   const toast = useToastContext()
@@ -110,18 +111,20 @@ export default function FaultTolerance() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Fault Tolerance</h1>
-        <div className="flex gap-2">
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
-          <button onClick={() => setShowEnableFT(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Enable FT
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Fault Tolerance"
+        actions={
+          <>
+            <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+              <RefreshCw className="w-4 h-4" /> Refresh
+            </button>
+            <button onClick={() => setShowEnableFT(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Enable FT
+            </button>
+          </>
+        }
+      />
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

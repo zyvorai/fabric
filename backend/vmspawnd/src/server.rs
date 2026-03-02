@@ -1051,7 +1051,7 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                     // VM was supposed to be running but isn't — it crashed
 
                     // Check restart count
-                    let restart_key = format!("autoheal/{}", vm.name);
+                    let _restart_key = format!("autoheal/{}", vm.name);
                     let restart_count: u32 = state.store
                         .get_entity::<serde_json::Value>("autoheal", &vm.name)
                         .ok()
@@ -1101,7 +1101,7 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
 
 /// Background task that evaluates auto-scaling policies and adjusts resources
 async fn run_autoscaler(state: Arc<AppState>) {
-    use crate::api::autoscale::{ScalingPolicy, ScaleEvent, ScaleAction};
+    use crate::api::autoscale::{ScalingPolicy, ScaleAction};
     use crate::api::analytics::VMPerformance;
     use chrono::Utc;
 

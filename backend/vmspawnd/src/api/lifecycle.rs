@@ -116,7 +116,7 @@ pub async fn get_compliance_status(
 
 pub async fn get_cluster_compliance(
     State(state): State<Arc<AppState>>,
-    Path(cluster_id): Path<String>,
+    Path(_cluster_id): Path<String>,
 ) -> impl IntoResponse {
     let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_default();
     let mut total_hosts = 0u32;

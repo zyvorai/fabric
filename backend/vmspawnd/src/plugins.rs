@@ -2,7 +2,6 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 // ============================================================================
 // Plugin Trait Definitions
@@ -195,7 +194,6 @@ impl PluginRegistry {
 
 use axum::{
     extract::State,
-    http::StatusCode,
     Json,
 };
 

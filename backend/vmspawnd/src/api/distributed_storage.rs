@@ -12,7 +12,7 @@ use crate::server::AppState;
 use distributed_storage::{
     ComplianceReport, CreateDatastoreClusterRequest, CreatePoolRequest, DatastoreCluster,
     DistributedStoragePool, MigrationStatus, PoolHealth, PoolHealthReport, PoolStatus,
-    StorageHost, StorageMigration, StoragePolicy, StorageTier,
+    StorageHost, StorageMigration, StoragePolicy,
 };
 
 // ============================================================================
@@ -120,7 +120,7 @@ pub struct DiskFailureRequest {
 pub async fn report_disk_failure(
     State(state): State<Arc<AppState>>,
     Path(pool_id): Path<String>,
-    Json(req): Json<DiskFailureRequest>,
+    Json(_req): Json<DiskFailureRequest>,
 ) -> impl IntoResponse {
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
@@ -338,12 +338,12 @@ pub async fn check_compliance(
     Path(policy_id): Path<String>,
     Json(req): Json<ComplianceCheckRequest>,
 ) -> impl IntoResponse {
-    let pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &req.pool_id) {
+    let _pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &req.pool_id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    let mgr = distributed_storage::DistributedStorageManager::new();
+    let _mgr = distributed_storage::DistributedStorageManager::new();
     let report = ComplianceReport {
         vm_name: req.vm_name,
         policy_id: policy_id.clone(),

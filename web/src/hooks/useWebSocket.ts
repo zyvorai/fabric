@@ -35,7 +35,6 @@ export function useWebSocket({
       const ws = new WebSocket(url)
 
       ws.onopen = () => {
-        console.log('WebSocket connected')
         setIsConnected(true)
         onOpen?.()
       }
@@ -51,7 +50,6 @@ export function useWebSocket({
       }
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected')
         setIsConnected(false)
         wsRef.current = null
         onClose?.()
@@ -59,7 +57,6 @@ export function useWebSocket({
         // Attempt reconnect if enabled
         if (shouldReconnectRef.current) {
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('Attempting to reconnect...')
             connect()
           }, reconnectInterval)
         }

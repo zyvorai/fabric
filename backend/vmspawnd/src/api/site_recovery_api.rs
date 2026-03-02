@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::server::AppState;
 use site_recovery::{
     DrDashboard, DrHealth, ExecutionStatus, ExecutionType, PlanStatus, RecoveryExecution,
-    RecoveryPlan, RecoveryStep, SiteRecoveryManager,
+    RecoveryPlan, SiteRecoveryManager,
 };
 
 // ============================================================================

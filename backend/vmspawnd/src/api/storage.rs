@@ -6,10 +6,9 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use vmspawnd_storage::{
-    NfsConfig, NfsVersion, PoolState, StorageManager, StoragePool, StoragePoolType,
+    NfsConfig, NfsVersion, StoragePool,
 };
 
 use crate::server::AppState;

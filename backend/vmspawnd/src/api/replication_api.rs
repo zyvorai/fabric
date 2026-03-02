@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::server::AppState;
 use replication::{
     ReplicationConfig, ReplicationHealthSummary, ReplicationInstance, ReplicationMetrics,
-    ReplicationSite, ReplicationStatus, SiteStatus,
+    ReplicationSite, ReplicationStatus,
 };
 
 // ============================================================================

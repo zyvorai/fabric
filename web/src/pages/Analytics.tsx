@@ -13,6 +13,7 @@ import {
   ResourceUtilization
 } from '../api/analytics'
 import { useToastContext } from '../contexts/ToastContext'
+import { PageHeader } from '../components/ui'
 
 interface TopVMEntry {
   vm_name: string
@@ -102,52 +103,52 @@ export default function Analytics() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Performance Analytics</h1>
-          <p className="text-gray-400">Resource utilization and performance insights</p>
-        </div>
-        <div className="flex gap-3">
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-          >
-            <option value="1h">Last Hour</option>
-            <option value="6h">Last 6 Hours</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-          </select>
-          <div className="relative">
-            <button
-              onClick={() => document.getElementById('export-analytics')?.classList.toggle('hidden')}
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
+      <PageHeader
+        title="Performance Analytics"
+        description="Resource utilization and performance insights"
+        actions={
+          <>
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            <div
-              id="export-analytics"
-              className="hidden absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10"
-            >
+              <option value="1h">Last Hour</option>
+              <option value="6h">Last 6 Hours</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+            <div className="relative">
               <button
-                onClick={() => { handleExport('pdf'); document.getElementById('export-analytics')?.classList.add('hidden') }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-t-lg transition"
+                onClick={() => document.getElementById('export-analytics')?.classList.toggle('hidden')}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
               >
-                Export as PDF
+                <Download className="w-4 h-4" />
+                Export
               </button>
-              <button
-                onClick={() => { handleExport('csv'); document.getElementById('export-analytics')?.classList.add('hidden') }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-b-lg transition"
+              <div
+                id="export-analytics"
+                className="hidden absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10"
               >
-                Export as CSV
-              </button>
+                <button
+                  onClick={() => { handleExport('pdf'); document.getElementById('export-analytics')?.classList.add('hidden') }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-t-lg transition"
+                >
+                  Export as PDF
+                </button>
+                <button
+                  onClick={() => { handleExport('csv'); document.getElementById('export-analytics')?.classList.add('hidden') }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-b-lg transition"
+                >
+                  Export as CSV
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Resource Utilization Overview */}
       {utilization && (

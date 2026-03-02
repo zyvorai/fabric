@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::server::AppState;
 use resource_pools::{
-    AdmissionControlResult, CreateResourcePoolRequest, CpuShares, MemoryShares, ResourcePool,
+    AdmissionControlResult, CreateResourcePoolRequest, ResourcePool,
     ResourcePoolSummary, UpdateResourcePoolRequest,
 };
 

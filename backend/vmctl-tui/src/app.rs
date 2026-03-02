@@ -44,6 +44,7 @@ pub struct App {
     pub current_view: View,
     pub search_query: String,
     pub search_mode: bool,
+    #[allow(dead_code)]
     pub show_help: bool,
     pub cpu_history: Vec<f64>,
     pub memory_history: Vec<f64>,

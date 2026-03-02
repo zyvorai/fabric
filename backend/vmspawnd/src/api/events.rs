@@ -1,16 +1,12 @@
 use axum::{
     extract::State,
-    response::{
-        sse::{Event, Sse},
-        IntoResponse,
-    },
+    response::sse::{Event, Sse},
     Json,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::convert::Infallible;
 use chrono::{DateTime, Utc};
-use tokio_stream::StreamExt;
 
 use crate::server::AppState;
 

@@ -54,7 +54,7 @@ pub struct OvmfConfig {
 
 impl OvmfConfig {
     /// Create a new OVMF configuration for a VM
-    pub fn new(vm_name: &str, vm_dir: &Path, secure_boot: bool) -> Result<Self, FirmwareError> {
+    pub fn new(_vm_name: &str, vm_dir: &Path, secure_boot: bool) -> Result<Self, FirmwareError> {
         // Determine OVMF firmware paths
         let (code_path, vars_template) = if secure_boot {
             Self::find_ovmf_paths_secureboot()?

@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -215,7 +215,7 @@ impl NfsPool {
 
         // Read from /proc/mounts
         let mounts = fs::read_to_string("/proc/mounts")?;
-        let mount_info = mounts
+        let _mount_info = mounts
             .lines()
             .find(|line| line.contains(self.config.mount_path.to_str().unwrap()));
 

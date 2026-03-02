@@ -40,6 +40,11 @@ pub fn default_true() -> bool {
     true
 }
 
+/// Serde default for boolean false. Used across multiple API modules.
+pub fn default_false() -> bool {
+    false
+}
+
 /// Serde default for retention period (30 days).
 pub fn default_retention() -> u32 {
     30

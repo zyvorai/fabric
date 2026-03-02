@@ -5,13 +5,12 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
 use content_library::{
-    ComplianceResult, CreateLibraryRequest, GuestCustomizationSpec, HostProfile, Library,
+    CreateLibraryRequest, GuestCustomizationSpec, HostProfile, Library,
     LibraryItem, LibraryType,
 };
 

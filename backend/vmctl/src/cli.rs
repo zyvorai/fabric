@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use reqwest::Client;
-use serde_json::json;
 use tabled::{Table, Tabled};
 use vm_model::{CreateVMRequest, VM};
 

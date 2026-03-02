@@ -170,7 +170,7 @@ pub async fn stop_vm(
 
 pub async fn restart_vm(
     RequireWrite(_claims): RequireWrite,
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
@@ -381,7 +381,7 @@ pub async fn get_metrics(
 
 pub async fn configure_cloud_init(
     RequireWrite(_claims): RequireWrite,
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(config): Json<CloudInitConfig>,
 ) -> impl IntoResponse {

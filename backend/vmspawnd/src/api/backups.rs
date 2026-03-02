@@ -64,7 +64,7 @@ pub struct RestoreOptions {
     pub restore_config: bool,
     #[serde(default = "crate::validation::default_true")]
     pub restore_disks: bool,
-    #[serde(default = "default_false")]
+    #[serde(default = "crate::validation::default_false")]
     pub restore_state: bool,
 }
 
@@ -143,11 +143,6 @@ pub struct BackupStats {
 pub struct BackupQuery {
     pub vm: Option<String>,
 }
-
-fn default_false() -> bool {
-    false
-}
-
 
 // ============================================================================
 // Backup Handlers

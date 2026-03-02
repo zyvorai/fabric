@@ -9,6 +9,7 @@ import {
   AuditStats
 } from '../api/audit'
 import { useToastContext } from '../contexts/ToastContext'
+import { PageHeader } from '../components/ui'
 
 export default function AuditLogs() {
   const toast = useToastContext()
@@ -96,52 +97,52 @@ export default function AuditLogs() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Audit Logs</h1>
-          <p className="text-gray-400">Security and compliance audit trail</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-              showFilters
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            Filters
-          </button>
-          <div className="relative">
+      <PageHeader
+        title="Audit Logs"
+        description="Security and compliance audit trail"
+        actions={
+          <>
             <button
-              onClick={() => document.getElementById('export-menu')?.classList.toggle('hidden')}
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                showFilters
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+              }`}
             >
-              <Download className="w-4 h-4" />
-              Export
+              <Filter className="w-4 h-4" />
+              Filters
             </button>
-            <div
-              id="export-menu"
-              className="hidden absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10"
-            >
+            <div className="relative">
               <button
-                onClick={() => { handleExport('json'); document.getElementById('export-menu')?.classList.add('hidden') }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-t-lg transition"
+                onClick={() => document.getElementById('export-menu')?.classList.toggle('hidden')}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
               >
-                Export as JSON
+                <Download className="w-4 h-4" />
+                Export
               </button>
-              <button
-                onClick={() => { handleExport('csv'); document.getElementById('export-menu')?.classList.add('hidden') }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-b-lg transition"
+              <div
+                id="export-menu"
+                className="hidden absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10"
               >
-                Export as CSV
-              </button>
+                <button
+                  onClick={() => { handleExport('json'); document.getElementById('export-menu')?.classList.add('hidden') }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-t-lg transition"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={() => { handleExport('csv'); document.getElementById('export-menu')?.classList.add('hidden') }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-b-lg transition"
+                >
+                  Export as CSV
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Statistics */}
       {stats && (

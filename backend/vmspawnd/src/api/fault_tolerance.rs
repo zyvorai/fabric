@@ -6,11 +6,9 @@ use axum::{
 };
 use chrono::Utc;
 use std::sync::Arc;
-use uuid::Uuid;
-
 use crate::server::AppState;
 use fault_tolerance::{
-    FailoverResult, FtCompatibility, FtConfig, FtEvent, FtMetrics, FtStatus, ReplicationState,
+    FailoverResult, FtConfig, FtEvent, FtMetrics, FtStatus, ReplicationState,
 };
 
 #[derive(serde::Deserialize)]

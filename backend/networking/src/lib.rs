@@ -334,9 +334,9 @@ impl NetworkdManager {
         let mut rng = rand::rng();
         format!(
             "52:54:00:{:02x}:{:02x}:{:02x}",
-            rng.gen::<u8>(),
-            rng.gen::<u8>(),
-            rng.gen::<u8>()
+            rng.random::<u8>(),
+            rng.random::<u8>(),
+            rng.random::<u8>()
         )
     }
 

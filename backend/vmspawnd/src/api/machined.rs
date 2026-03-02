@@ -4,17 +4,14 @@
 //! file transfer, SSH, and shell execution.
 
 use axum::{
-    extract::{Path, State},
+    extract::Path,
     http::StatusCode,
     Json,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::sync::Arc;
 
-use crate::server::AppState;
 use crate::validation::validate_vm_name;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::RequireAdmin;
 use vmspawn_driver::machinectl;
 
 // ============================================================================
