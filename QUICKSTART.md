@@ -10,8 +10,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/youruser/vmspawnd.git
-cd vmspawnd
+git clone https://github.com/ssahani/vmspawn.git
+cd vmspawn
 
 # Build backend (Rust)
 cd backend
@@ -107,21 +107,35 @@ curl -X POST http://localhost:8080/api/vms/test-vm/start
 ## Directory Structure
 
 ```
-vmspawnd/
-├── backend/           # Rust backend (daemon, CLI, TUI, drivers)
-├── web/              # React web UI
-├── systemd/          # systemd service files
-├── configs/          # Configuration files
-├── scripts/          # Installation and utility scripts
-└── docs/             # Documentation
+vmspawn/
+├── backend/              # Rust backend (34 crates: daemon, CLI, TUI, drivers, enterprise features)
+│   ├── vmspawnd/         # Main daemon with REST API + WebSocket
+│   ├── vmctl/            # CLI tool
+│   ├── vmctl-tui/        # Terminal UI
+│   ├── vmspawn-driver/   # VM driver (systemd-vmspawn integration)
+│   ├── crates/           # Shared libraries (storage, system, vm)
+│   └── ...               # 28 more feature crates (networking, ha, migration, gpu-passthrough, etc.)
+├── web/                  # React web UI
+├── operator/             # Kubernetes operator
+├── terraform-provider/   # Terraform provider
+├── docs/                 # Documentation
+├── systemd/              # systemd service files
+├── configs/              # Configuration files
+├── scripts/              # Installation and utility scripts
+├── monitoring/           # Monitoring configuration
+├── sdk/                  # SDK
+├── tests/                # Integration tests
+└── debian/               # Debian packaging
 ```
 
 ## Next Steps
 
 1. Read [Architecture](docs/architecture.md)
 2. Explore [API Documentation](docs/api.md)
-3. Learn about [TUI](docs/tui.md)
-4. Check out [Web UI](docs/web-ui.md)
+3. Learn about the [TUI](docs/tui.md)
+4. Check out the [Web UI](docs/web-ui.md)
+5. Review [Security](docs/security.md)
+6. Explore [Advanced Features](docs/advanced-features.md)
 
 ## Troubleshooting
 
