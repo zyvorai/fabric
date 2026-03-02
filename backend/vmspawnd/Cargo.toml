@@ -34,7 +34,6 @@ vm-model = { path = "../vm-model" }
 security = { path = "../security" }
 state-store = { path = "../state-store" }
 vmspawn-driver = { path = "../vmspawn-driver" }
-systemd-driver = { path = "../systemd-driver" }
 vnc-proxy = { path = "../vnc-proxy" }
 cloud-init = { path = "../cloud-init" }
 tpm-support = { path = "../tpm-support" }

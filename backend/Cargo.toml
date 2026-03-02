@@ -5,7 +5,6 @@ members = [
     "vmctl",
     "vmctl-tui",
     "vmspawn-driver",
-    "systemd-driver",
     "vm-model",
     "state-store",
     "vnc-proxy",
