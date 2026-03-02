@@ -24,6 +24,15 @@ pub enum ZfsError {
 
     #[error("Parse error: {0}")]
     ParseError(String),
+
+    #[error("Replication error: {0}")]
+    ReplicationError(String),
+
+    #[error("SSH error connecting to {0}: {1}")]
+    SshError(String, String),
+
+    #[error("Clone error: {0}")]
+    CloneError(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +55,41 @@ pub struct ZfsSnapshot {
     pub name: String,
     pub creation: String,
     pub used_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZfsSendResult {
+    pub dataset: String,
+    pub from_snapshot: Option<String>,
+    pub to_snapshot: String,
+    pub bytes_sent: u64,
+    pub duration_secs: u64,
+    pub incremental: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZfsReplicationTarget {
+    pub host: String,
+    pub ssh_port: u16,
+    pub ssh_user: String,
+    pub target_pool: String,
+    pub target_dataset: Option<String>,
+    pub bandwidth_limit_kbps: Option<u64>,
+    pub compress: bool,
+}
+
+impl Default for ZfsReplicationTarget {
+    fn default() -> Self {
+        Self {
+            host: String::new(),
+            ssh_port: 22,
+            ssh_user: "root".to_string(),
+            target_pool: String::new(),
+            target_dataset: None,
+            bandwidth_limit_kbps: None,
+            compress: false,
+        }
+    }
 }
 
 pub struct ZfsPool {
@@ -294,6 +338,318 @@ impl ZfsPool {
     /// Get the device path for a ZFS volume
     pub fn device_path(&self, zvol_name: &str) -> String {
         format!("/dev/zvol/{}/{}", self.base_path(), zvol_name)
+    }
+
+    // -- Replication methods ------------------------------------------------
+
+    /// Build the SSH command prefix for a replication target
+    fn ssh_cmd(target: &ZfsReplicationTarget) -> String {
+        format!(
+            "ssh -p {} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {}@{}",
+            target.ssh_port, target.ssh_user, target.host
+        )
+    }
+
+    /// Build the target dataset path on the remote host
+    fn target_path(target: &ZfsReplicationTarget, dataset: &str) -> String {
+        match &target.target_dataset {
+            Some(ds) => format!("{}/{}", target.target_pool, ds),
+            None => format!("{}/{}", target.target_pool, dataset),
+        }
+    }
+
+    /// Send a full ZFS snapshot to a remote host
+    pub fn send_full(
+        &self,
+        dataset: &str,
+        snap_name: &str,
+        target: &ZfsReplicationTarget,
+    ) -> Result<ZfsSendResult, ZfsError> {
+        let snap_path = format!("{}/{}@{}", self.base_path(), dataset, snap_name);
+        let target_ds = Self::target_path(target, dataset);
+        let ssh = Self::ssh_cmd(target);
+
+        let mut pipeline = format!("zfs send {} | {} zfs recv -F {}", snap_path, ssh, target_ds);
+
+        if let Some(limit) = target.bandwidth_limit_kbps {
+            pipeline = format!(
+                "zfs send {} | pv -qL {}k | {} zfs recv -F {}",
+                snap_path, limit, ssh, target_ds
+            );
+        }
+
+        let start = std::time::Instant::now();
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&pipeline)
+            .output()?;
+
+        let duration = start.elapsed().as_secs();
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ZfsError::ReplicationError(format!(
+                "zfs send full failed: {}", stderr
+            )));
+        }
+
+        tracing::info!(
+            zpool = %self.zpool,
+            dataset = %dataset,
+            snapshot = %snap_name,
+            target = %target.host,
+            duration_secs = duration,
+            "Full ZFS send completed"
+        );
+
+        Ok(ZfsSendResult {
+            dataset: dataset.to_string(),
+            from_snapshot: None,
+            to_snapshot: snap_name.to_string(),
+            bytes_sent: 0, // Actual bytes not available without -v parsing
+            duration_secs: duration,
+            incremental: false,
+        })
+    }
+
+    /// Send an incremental ZFS snapshot to a remote host
+    pub fn send_incremental(
+        &self,
+        dataset: &str,
+        from_snap: &str,
+        to_snap: &str,
+        target: &ZfsReplicationTarget,
+    ) -> Result<ZfsSendResult, ZfsError> {
+        let from_path = format!("{}/{}@{}", self.base_path(), dataset, from_snap);
+        let to_path = format!("{}/{}@{}", self.base_path(), dataset, to_snap);
+        let target_ds = Self::target_path(target, dataset);
+        let ssh = Self::ssh_cmd(target);
+
+        let mut pipeline = format!(
+            "zfs send -i {} {} | {} zfs recv -F {}",
+            from_path, to_path, ssh, target_ds
+        );
+
+        if let Some(limit) = target.bandwidth_limit_kbps {
+            pipeline = format!(
+                "zfs send -i {} {} | pv -qL {}k | {} zfs recv -F {}",
+                from_path, to_path, limit, ssh, target_ds
+            );
+        }
+
+        let start = std::time::Instant::now();
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&pipeline)
+            .output()?;
+
+        let duration = start.elapsed().as_secs();
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ZfsError::ReplicationError(format!(
+                "zfs send incremental failed: {}", stderr
+            )));
+        }
+
+        tracing::info!(
+            zpool = %self.zpool,
+            dataset = %dataset,
+            from = %from_snap,
+            to = %to_snap,
+            target = %target.host,
+            duration_secs = duration,
+            "Incremental ZFS send completed"
+        );
+
+        Ok(ZfsSendResult {
+            dataset: dataset.to_string(),
+            from_snapshot: Some(from_snap.to_string()),
+            to_snapshot: to_snap.to_string(),
+            bytes_sent: 0,
+            duration_secs: duration,
+            incremental: true,
+        })
+    }
+
+    /// Estimate the size of a ZFS send stream (dry-run)
+    pub fn estimate_send_size(
+        &self,
+        dataset: &str,
+        from_snap: Option<&str>,
+        to_snap: &str,
+    ) -> Result<u64, ZfsError> {
+        let to_path = format!("{}/{}@{}", self.base_path(), dataset, to_snap);
+
+        let args = match from_snap {
+            Some(from) => {
+                let from_path = format!("{}/{}@{}", self.base_path(), dataset, from);
+                format!("zfs send -nv -i {} {}", from_path, to_path)
+            }
+            None => format!("zfs send -nv {}", to_path),
+        };
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&args)
+            .output()?;
+
+        // zfs send -nv outputs to stderr
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        // Parse "estimated size is X" from stderr
+        for line in stderr.lines() {
+            if let Some(rest) = line.strip_prefix("estimated size is ") {
+                return Ok(parse_zfs_size(rest.trim()));
+            }
+            // Also handle the "size" line in newer ZFS versions
+            let trimmed = line.trim();
+            if trimmed.starts_with("size") {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    return Ok(parse_zfs_size(parts[1]));
+                }
+            }
+        }
+
+        // If we can't parse the size, return 0 rather than error
+        Ok(0)
+    }
+
+    /// Clone a ZFS dataset from a snapshot
+    pub fn clone_from_snapshot(
+        &self,
+        dataset: &str,
+        snap_name: &str,
+        clone_name: &str,
+    ) -> Result<(), ZfsError> {
+        let snap_path = format!("{}/{}@{}", self.base_path(), dataset, snap_name);
+        let clone_path = format!("{}/{}", self.base_path(), clone_name);
+
+        let output = Command::new("zfs")
+            .args(["clone", &snap_path, &clone_path])
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ZfsError::CloneError(format!(
+                "zfs clone failed: {}", stderr
+            )));
+        }
+
+        tracing::info!(
+            zpool = %self.zpool,
+            snapshot = %snap_path,
+            clone = %clone_name,
+            "Created ZFS clone"
+        );
+        Ok(())
+    }
+
+    /// Promote a ZFS clone to a standalone dataset
+    pub fn promote_clone(&self, clone_name: &str) -> Result<(), ZfsError> {
+        let clone_path = format!("{}/{}", self.base_path(), clone_name);
+
+        let output = Command::new("zfs")
+            .args(["promote", &clone_path])
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ZfsError::CloneError(format!(
+                "zfs promote failed: {}", stderr
+            )));
+        }
+
+        tracing::info!(zpool = %self.zpool, clone = %clone_name, "Promoted ZFS clone");
+        Ok(())
+    }
+
+    /// Destroy all snapshots for a dataset before the specified snapshot, returning count destroyed
+    pub fn destroy_snapshots_before(
+        &self,
+        dataset: &str,
+        keep_snap: &str,
+    ) -> Result<u32, ZfsError> {
+        let snapshots = self.list_snapshots()?;
+        let dataset_prefix = format!("{}/{}", self.base_path(), dataset);
+        let keep_full = format!("{}@{}", dataset_prefix, keep_snap);
+
+        let mut destroyed = 0u32;
+        for snap in &snapshots {
+            if !snap.name.starts_with(&dataset_prefix) {
+                continue;
+            }
+            if snap.name == keep_full {
+                break; // Stop once we reach the snap to keep
+            }
+
+            let output = Command::new("zfs")
+                .args(["destroy", &snap.name])
+                .output()?;
+
+            if output.status.success() {
+                destroyed += 1;
+                tracing::debug!(snapshot = %snap.name, "Destroyed old snapshot");
+            }
+        }
+
+        tracing::info!(
+            dataset = %dataset,
+            keep = %keep_snap,
+            destroyed = destroyed,
+            "Snapshot garbage collection completed"
+        );
+        Ok(destroyed)
+    }
+
+    /// Check for a common snapshot between local and remote datasets
+    pub fn check_common_snapshot(
+        &self,
+        dataset: &str,
+        target: &ZfsReplicationTarget,
+    ) -> Result<Option<String>, ZfsError> {
+        // List local snapshots
+        let local_snaps = self.list_snapshots()?;
+        let dataset_prefix = format!("{}/{}", self.base_path(), dataset);
+        let local_names: Vec<String> = local_snaps
+            .iter()
+            .filter(|s| s.name.starts_with(&dataset_prefix))
+            .filter_map(|s| s.name.split('@').nth(1).map(String::from))
+            .collect();
+
+        // List remote snapshots via SSH
+        let ssh = Self::ssh_cmd(target);
+        let target_ds = Self::target_path(target, dataset);
+        let cmd = format!(
+            "{} zfs list -t snapshot -H -o name -r {}",
+            ssh, target_ds
+        );
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .output()?;
+
+        if !output.status.success() {
+            // Remote dataset might not exist yet — no common snapshot
+            return Ok(None);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let remote_names: Vec<String> = stdout
+            .lines()
+            .filter_map(|l| l.split('@').nth(1).map(String::from))
+            .collect();
+
+        // Find the latest common snapshot (iterate local in reverse)
+        for name in local_names.iter().rev() {
+            if remote_names.contains(name) {
+                return Ok(Some(name.clone()));
+            }
+        }
+
+        Ok(None)
     }
 }
 

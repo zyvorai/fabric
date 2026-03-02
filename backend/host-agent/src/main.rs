@@ -61,6 +61,9 @@ pub enum HostCommand {
     MigrateVm { vm_name: String, target_host: String },
     EnterMaintenance,
     ExitMaintenance,
+    FenceVm { vm_name: String },
+    PromoteStorage { vm_name: String, dataset: String },
+    AcknowledgeFence { vm_name: String },
 }
 
 /// Payload sent when registering with the controller.
@@ -266,6 +269,48 @@ impl Agent {
             }
             HostCommand::ExitMaintenance => {
                 info!("exiting maintenance mode – host available for scheduling");
+            }
+            HostCommand::FenceVm { vm_name } => {
+                warn!(vm = %vm_name, "fencing VM – force stopping");
+                // Try graceful stop first via machinectl
+                if let Err(e) = vmspawn_driver::stop_vm(&vm_name) {
+                    warn!(vm = %vm_name, error = %e, "graceful stop failed, attempting kill");
+                    // Fallback: find the leader PID and kill -9
+                    let kill_cmd = format!(
+                        "machinectl show {} --property=Leader --value 2>/dev/null | xargs -r kill -9",
+                        vm_name
+                    );
+                    match std::process::Command::new("sh").arg("-c").arg(&kill_cmd).output() {
+                        Ok(out) if out.status.success() => {
+                            info!(vm = %vm_name, "VM forcefully killed via leader PID");
+                        }
+                        _ => {
+                            error!(vm = %vm_name, "failed to fence VM – all methods exhausted");
+                        }
+                    }
+                } else {
+                    info!(vm = %vm_name, "VM fenced (graceful stop)");
+                }
+            }
+            HostCommand::PromoteStorage { vm_name, dataset } => {
+                info!(vm = %vm_name, dataset = %dataset, "promoting ZFS storage for failover");
+                // Promote the received ZFS dataset on this host
+                let cmd = format!("zfs promote {}", dataset);
+                match std::process::Command::new("sh").arg("-c").arg(&cmd).output() {
+                    Ok(out) if out.status.success() => {
+                        info!(vm = %vm_name, dataset = %dataset, "ZFS storage promoted");
+                    }
+                    Ok(out) => {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        warn!(vm = %vm_name, stderr = %stderr, "zfs promote returned non-zero (may be expected for non-clone)");
+                    }
+                    Err(e) => {
+                        error!(vm = %vm_name, error = %e, "failed to promote ZFS storage");
+                    }
+                }
+            }
+            HostCommand::AcknowledgeFence { vm_name } => {
+                info!(vm = %vm_name, "fence acknowledged – VM confirmed stopped on this host");
             }
         }
     }

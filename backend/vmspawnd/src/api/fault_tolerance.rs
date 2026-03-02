@@ -34,6 +34,10 @@ pub async fn enable_ft(
         failover_count: 0,
         created: now,
         updated: now,
+        lock_lease_id: None,
+        zfs_dataset: None,
+        zfs_last_replicated_snap: None,
+        fence_token: None,
     };
     match state.store.save_entity("ft_configs", &req.vm_name, &config) {
         Ok(_) => (StatusCode::CREATED, Json(config)).into_response(),
@@ -114,6 +118,9 @@ pub async fn trigger_failover(
         data_loss: false,
         success: true,
         error: None,
+        fence_method: None,
+        storage_promoted: false,
+        replication_lag_secs: None,
     };
     Json(result).into_response()
 }
@@ -135,6 +142,9 @@ pub async fn test_failover(
         data_loss: false,
         success: true,
         error: None,
+        fence_method: None,
+        storage_promoted: false,
+        replication_lag_secs: None,
     };
     Json(result).into_response()
 }

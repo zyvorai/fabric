@@ -56,6 +56,14 @@ pub struct FtConfig {
     pub failover_count: u32,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
+    #[serde(default)]
+    pub lock_lease_id: Option<String>,
+    #[serde(default)]
+    pub zfs_dataset: Option<String>,
+    #[serde(default)]
+    pub zfs_last_replicated_snap: Option<String>,
+    #[serde(default)]
+    pub fence_token: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,6 +95,12 @@ pub struct FailoverResult {
     pub data_loss: bool,
     pub success: bool,
     pub error: Option<String>,
+    #[serde(default)]
+    pub fence_method: Option<String>,
+    #[serde(default)]
+    pub storage_promoted: bool,
+    #[serde(default)]
+    pub replication_lag_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +187,10 @@ impl FaultToleranceManager {
             failover_count: 0,
             created: now,
             updated: now,
+            lock_lease_id: None,
+            zfs_dataset: None,
+            zfs_last_replicated_snap: None,
+            fence_token: None,
         };
 
         configs.insert(vm_name.to_string(), config.clone());
@@ -305,6 +323,9 @@ impl FaultToleranceManager {
             data_loss: false,
             success: true,
             error: None,
+            fence_method: None,
+            storage_promoted: false,
+            replication_lag_secs: None,
         };
 
         tracing::info!(
@@ -475,6 +496,9 @@ impl FaultToleranceManager {
             data_loss: false,
             success: true,
             error: None,
+            fence_method: None,
+            storage_promoted: false,
+            replication_lag_secs: None,
         };
 
         tracing::info!(vm = vm_name, "Test failover completed (non-disruptive)");
