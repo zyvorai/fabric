@@ -1,143 +1,262 @@
-use anyhow::Result;
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
 use tracing;
 
 use crate::models::{CompiledWgInterface, CompiledWgPeer};
 
-/// Manages WireGuard interfaces via `ip` and `wg` commands.
-pub struct WireguardEnforcer;
+/// Default directory for systemd-networkd config files.
+const DEFAULT_CONFIG_DIR: &str = "/etc/systemd/network";
+
+/// File prefix for vpn-mesh managed files.
+const FILE_PREFIX: &str = "50-vmspawnd-wg-";
+
+/// Manages WireGuard interfaces via systemd-networkd .netdev/.network files.
+pub struct WireguardEnforcer {
+    config_dir: PathBuf,
+    file_prefix: String,
+}
 
 impl WireguardEnforcer {
     pub fn new() -> Self {
-        Self
+        Self {
+            config_dir: PathBuf::from(DEFAULT_CONFIG_DIR),
+            file_prefix: FILE_PREFIX.to_string(),
+        }
     }
 
-    /// Ensure a WireGuard interface exists.
-    pub fn ensure_interface(&self, iface: &CompiledWgInterface) -> Result<()> {
-        // Delete existing (ignore errors if not present)
-        let _ = run_cmd("ip", &["link", "del", &iface.interface_name]);
-
-        // Create WireGuard interface
-        run_cmd("ip", &["link", "add", &iface.interface_name, "type", "wireguard"])?;
-
-        tracing::debug!("Created WireGuard interface {}", iface.interface_name);
-        Ok(())
+    /// Create with a custom config directory (for testing).
+    pub fn with_config_dir(config_dir: &Path) -> Self {
+        Self {
+            config_dir: config_dir.to_path_buf(),
+            file_prefix: FILE_PREFIX.to_string(),
+        }
     }
 
-    /// Apply WireGuard configuration (listen port + peers).
-    pub fn apply_config(&self, iface: &CompiledWgInterface) -> Result<()> {
-        let args = self.build_wg_set_args(iface);
-        let str_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        run_cmd("wg", &str_args)?;
-
-        tracing::debug!("Applied WireGuard config to {}", iface.interface_name);
-        Ok(())
+    /// Write a .netdev file for a WireGuard interface.
+    pub fn write_netdev(&self, iface: &CompiledWgInterface) -> Result<()> {
+        let content = self.build_netdev(iface);
+        self.write_file(&iface.interface_name, "netdev", &content)
     }
 
-    /// Assign the VPN address to the interface.
-    pub fn assign_address(&self, iface: &CompiledWgInterface) -> Result<()> {
-        run_cmd(
-            "ip",
-            &["addr", "add", &iface.address, "dev", &iface.interface_name],
-        )?;
-
-        tracing::debug!(
-            "Assigned address {} to {}",
-            iface.address,
-            iface.interface_name
-        );
-        Ok(())
+    /// Write a .network file for a WireGuard interface.
+    pub fn write_network(&self, iface: &CompiledWgInterface) -> Result<()> {
+        let content = self.build_network(iface);
+        self.write_file(&iface.interface_name, "network", &content)
     }
 
-    /// Bring the interface up.
-    pub fn bring_up(&self, name: &str) -> Result<()> {
-        run_cmd("ip", &["link", "set", name, "up"])?;
-        tracing::debug!("Brought up interface {}", name);
-        Ok(())
-    }
-
-    /// Full sync: ensure interface, apply config, assign address, bring up.
+    /// Full sync: write .netdev + .network for all interfaces, remove stale files, reload networkd.
     pub fn sync_all(&self, interfaces: &[CompiledWgInterface]) -> Result<()> {
+        // Collect names of interfaces we're about to write
+        let active_names: Vec<&str> = interfaces
+            .iter()
+            .map(|i| i.interface_name.as_str())
+            .collect();
+
+        // Remove stale files for interfaces no longer in the list
+        self.remove_stale_files(&active_names)?;
+
+        // Write config for each interface
         for iface in interfaces {
-            self.ensure_interface(iface)?;
-            self.apply_config(iface)?;
-            self.assign_address(iface)?;
-            self.bring_up(&iface.interface_name)?;
+            self.write_netdev(iface)?;
+            self.write_network(iface)?;
         }
 
-        tracing::info!("Synced {} WireGuard interfaces", interfaces.len());
+        // Reload systemd-networkd to apply
+        self.reload()?;
+
+        tracing::info!("Synced {} WireGuard interfaces via networkd", interfaces.len());
         Ok(())
     }
 
-    /// Remove a WireGuard interface.
+    /// Remove config files for a specific interface.
     pub fn remove_interface(&self, name: &str) -> Result<()> {
-        run_cmd("ip", &["link", "del", name])?;
-        tracing::info!("Removed WireGuard interface {}", name);
+        let netdev_path = self.file_path(name, "netdev");
+        let network_path = self.file_path(name, "network");
+
+        if netdev_path.exists() {
+            std::fs::remove_file(&netdev_path)
+                .with_context(|| format!("Failed to remove {}", netdev_path.display()))?;
+        }
+        if network_path.exists() {
+            std::fs::remove_file(&network_path)
+                .with_context(|| format!("Failed to remove {}", network_path.display()))?;
+        }
+
+        tracing::info!("Removed networkd config for WireGuard interface {}", name);
         Ok(())
     }
 
-    /// Cleanup managed interfaces.
+    /// Cleanup all managed WireGuard config files.
     pub fn cleanup(&self, managed: &[String]) -> Result<()> {
         for name in managed {
-            let _ = run_cmd("ip", &["link", "del", name]);
+            let _ = self.remove_interface(name);
         }
+
+        if !managed.is_empty() {
+            let _ = self.reload();
+        }
+
         tracing::info!("Cleaned up {} WireGuard interfaces", managed.len());
         Ok(())
     }
 
-    /// Build the `wg set` command arguments for an interface.
-    pub fn build_wg_set_args(&self, iface: &CompiledWgInterface) -> Vec<String> {
-        let mut args = vec![
-            "set".to_string(),
-            iface.interface_name.clone(),
-            "listen-port".to_string(),
-            iface.listen_port.to_string(),
-        ];
+    /// Reload systemd-networkd to apply configuration changes.
+    pub fn reload(&self) -> Result<()> {
+        let output = std::process::Command::new("networkctl")
+            .arg("reload")
+            .output()
+            .context("Failed to execute networkctl reload")?;
 
-        for peer in &iface.peers {
-            args.extend(self.build_peer_args(peer));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("networkctl reload failed: {}", stderr));
         }
 
-        args
+        tracing::debug!("Reloaded systemd-networkd");
+        Ok(())
     }
 
-    /// Build peer arguments for a `wg set` command.
-    pub fn build_peer_args(&self, peer: &CompiledWgPeer) -> Vec<String> {
-        let mut args = vec!["peer".to_string(), peer.public_key.clone()];
+    /// Build a .netdev file content for a WireGuard interface.
+    ///
+    /// Format:
+    /// ```ini
+    /// [NetDev]
+    /// Name=wg0
+    /// Kind=wireguard
+    ///
+    /// [WireGuard]
+    /// ListenPort=51820
+    /// PrivateKey=<key>
+    ///
+    /// [WireGuardPeer]
+    /// PublicKey=<key>
+    /// Endpoint=1.2.3.4:51820
+    /// AllowedIPs=10.0.0.0/24
+    /// PersistentKeepalive=25
+    /// ```
+    pub fn build_netdev(&self, iface: &CompiledWgInterface) -> String {
+        let mut out = String::new();
 
-        if let Some(ref endpoint) = peer.endpoint {
-            args.push("endpoint".to_string());
-            args.push(endpoint.clone());
+        // [NetDev] section
+        out.push_str("[NetDev]\n");
+        out.push_str(&format!("Name={}\n", iface.interface_name));
+        out.push_str("Kind=wireguard\n");
+
+        // [WireGuard] section
+        out.push_str("\n[WireGuard]\n");
+        out.push_str(&format!("ListenPort={}\n", iface.listen_port));
+        out.push_str(&format!("PrivateKey={}\n", iface.private_key_ref));
+
+        // [WireGuardPeer] sections
+        for peer in &iface.peers {
+            out.push_str(&self.build_peer_section(peer));
         }
 
-        if !peer.allowed_ips.is_empty() {
-            args.push("allowed-ips".to_string());
-            args.push(peer.allowed_ips.join(","));
+        out
+    }
+
+    /// Build a [WireGuardPeer] section.
+    pub fn build_peer_section(&self, peer: &CompiledWgPeer) -> String {
+        let mut out = String::new();
+
+        out.push_str("\n[WireGuardPeer]\n");
+        out.push_str(&format!("PublicKey={}\n", peer.public_key));
+
+        if let Some(ref endpoint) = peer.endpoint {
+            out.push_str(&format!("Endpoint={}\n", endpoint));
+        }
+
+        for ip in &peer.allowed_ips {
+            out.push_str(&format!("AllowedIPs={}\n", ip));
         }
 
         if peer.persistent_keepalive > 0 {
-            args.push("persistent-keepalive".to_string());
-            args.push(peer.persistent_keepalive.to_string());
+            out.push_str(&format!("PersistentKeepalive={}\n", peer.persistent_keepalive));
         }
 
-        args
+        out
     }
-}
 
-/// Execute a system command.
-fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
-    let output = std::process::Command::new(cmd).args(args).output();
+    /// Build a .network file content for a WireGuard interface.
+    ///
+    /// Format:
+    /// ```ini
+    /// [Match]
+    /// Name=wg0
+    ///
+    /// [Network]
+    /// Address=10.0.0.1/24
+    /// ```
+    pub fn build_network(&self, iface: &CompiledWgInterface) -> String {
+        let mut out = String::new();
 
-    match output {
-        Ok(out) if out.status.success() => Ok(()),
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            tracing::warn!("{} command failed: {:?} — {}", cmd, args, stderr);
-            Err(anyhow::anyhow!("{} failed: {}", cmd, stderr))
+        out.push_str("[Match]\n");
+        out.push_str(&format!("Name={}\n", iface.interface_name));
+
+        out.push_str("\n[Network]\n");
+        out.push_str(&format!("Address={}\n", iface.address));
+
+        out
+    }
+
+    // ── Internal helpers ────────────────────────────────────────────────
+
+    fn file_path(&self, device_name: &str, ext: &str) -> PathBuf {
+        let filename = format!("{}{}.{}", self.file_prefix, device_name, ext);
+        self.config_dir.join(filename)
+    }
+
+    fn write_file(&self, device_name: &str, ext: &str, content: &str) -> Result<()> {
+        std::fs::create_dir_all(&self.config_dir)
+            .with_context(|| format!("Failed to create config dir {}", self.config_dir.display()))?;
+
+        let path = self.file_path(device_name, ext);
+        let tmp_path = self.config_dir.join(format!("{}{}.{}.tmp", self.file_prefix, device_name, ext));
+
+        std::fs::write(&tmp_path, content)
+            .with_context(|| format!("Failed to write {}", tmp_path.display()))?;
+        std::fs::rename(&tmp_path, &path)
+            .with_context(|| format!("Failed to rename {} to {}", tmp_path.display(), path.display()))?;
+
+        tracing::debug!("Wrote {}", path.display());
+        Ok(())
+    }
+
+    fn remove_stale_files(&self, active_names: &[&str]) -> Result<()> {
+        if !self.config_dir.exists() {
+            return Ok(());
         }
-        Err(e) => {
-            tracing::warn!("Failed to execute {}: {}", cmd, e);
-            Err(anyhow::anyhow!("Failed to execute {}: {}", cmd, e))
+
+        let entries = std::fs::read_dir(&self.config_dir)
+            .with_context(|| format!("Failed to read {}", self.config_dir.display()))?;
+
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+
+            if !name_str.starts_with(&self.file_prefix) {
+                continue;
+            }
+
+            // Extract interface name from filename: prefix + iface_name + .ext
+            let without_prefix = &name_str[self.file_prefix.len()..];
+            let iface_name = without_prefix
+                .rsplit_once('.')
+                .map(|(n, _)| n)
+                .unwrap_or(without_prefix);
+
+            if !active_names.contains(&iface_name) {
+                let path = entry.path();
+                if let Err(e) = std::fs::remove_file(&path) {
+                    tracing::warn!("Failed to remove stale file {}: {}", path.display(), e);
+                } else {
+                    tracing::debug!("Removed stale file {}", path.display());
+                }
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -145,8 +264,8 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn make_enforcer() -> WireguardEnforcer {
-        WireguardEnforcer::new()
+    fn make_enforcer_with_dir(dir: &Path) -> WireguardEnforcer {
+        WireguardEnforcer::with_config_dir(dir)
     }
 
     fn make_interface(name: &str, peers: Vec<CompiledWgPeer>) -> CompiledWgInterface {
@@ -154,7 +273,7 @@ mod tests {
             interface_name: name.to_string(),
             listen_port: 51820,
             address: "10.0.0.1/24".to_string(),
-            private_key_ref: "key-ref".to_string(),
+            private_key_ref: "aWFtYXByaXZhdGVrZXk=".to_string(),
             peers,
         }
     }
@@ -174,69 +293,167 @@ mod tests {
     }
 
     #[test]
-    fn test_build_wg_set_args() {
-        let enforcer = make_enforcer();
+    fn test_build_netdev_basic() {
+        let enforcer = WireguardEnforcer::new();
+        let iface = make_interface("wg0", vec![]);
+
+        let content = enforcer.build_netdev(&iface);
+        assert!(content.contains("[NetDev]"));
+        assert!(content.contains("Name=wg0"));
+        assert!(content.contains("Kind=wireguard"));
+        assert!(content.contains("[WireGuard]"));
+        assert!(content.contains("ListenPort=51820"));
+        assert!(content.contains("PrivateKey=aWFtYXByaXZhdGVrZXk="));
+    }
+
+    #[test]
+    fn test_build_netdev_with_peer() {
+        let enforcer = WireguardEnforcer::new();
         let peer = make_peer("pubkey-1", Some("1.2.3.4:51820"), &["10.0.0.2/32"], 25);
         let iface = make_interface("wg0", vec![peer]);
 
-        let args = enforcer.build_wg_set_args(&iface);
-        assert!(args.contains(&"set".to_string()));
-        assert!(args.contains(&"wg0".to_string()));
-        assert!(args.contains(&"listen-port".to_string()));
-        assert!(args.contains(&"51820".to_string()));
-        assert!(args.contains(&"peer".to_string()));
-        assert!(args.contains(&"pubkey-1".to_string()));
+        let content = enforcer.build_netdev(&iface);
+        assert!(content.contains("[WireGuardPeer]"));
+        assert!(content.contains("PublicKey=pubkey-1"));
+        assert!(content.contains("Endpoint=1.2.3.4:51820"));
+        assert!(content.contains("AllowedIPs=10.0.0.2/32"));
+        assert!(content.contains("PersistentKeepalive=25"));
     }
 
     #[test]
-    fn test_peer_args_with_endpoint() {
-        let enforcer = make_enforcer();
-        let peer = make_peer("pubkey-1", Some("1.2.3.4:51820"), &["10.0.0.2/32"], 25);
-
-        let args = enforcer.build_peer_args(&peer);
-        assert!(args.contains(&"endpoint".to_string()));
-        assert!(args.contains(&"1.2.3.4:51820".to_string()));
-    }
-
-    #[test]
-    fn test_peer_args_without_endpoint() {
-        let enforcer = make_enforcer();
+    fn test_build_peer_without_endpoint() {
+        let enforcer = WireguardEnforcer::new();
         let peer = make_peer("pubkey-1", None, &["10.0.0.2/32"], 25);
 
-        let args = enforcer.build_peer_args(&peer);
-        assert!(!args.contains(&"endpoint".to_string()));
+        let content = enforcer.build_peer_section(&peer);
+        assert!(content.contains("PublicKey=pubkey-1"));
+        assert!(!content.contains("Endpoint="));
     }
 
     #[test]
-    fn test_keepalive_in_args() {
-        let enforcer = make_enforcer();
-        let peer = make_peer("pubkey-1", None, &["10.0.0.0/24"], 30);
+    fn test_build_peer_multiple_allowed_ips() {
+        let enforcer = WireguardEnforcer::new();
+        let peer = make_peer("pubkey-1", None, &["10.0.0.0/24", "10.0.1.0/24"], 25);
 
-        let args = enforcer.build_peer_args(&peer);
-        assert!(args.contains(&"persistent-keepalive".to_string()));
-        assert!(args.contains(&"30".to_string()));
+        let content = enforcer.build_peer_section(&peer);
+        assert!(content.contains("AllowedIPs=10.0.0.0/24"));
+        assert!(content.contains("AllowedIPs=10.0.1.0/24"));
     }
 
     #[test]
-    fn test_multiple_allowed_ips() {
-        let enforcer = make_enforcer();
-        let peer = make_peer(
-            "pubkey-1",
-            None,
-            &["10.0.0.0/24", "10.0.1.0/24"],
-            25,
-        );
+    fn test_build_peer_no_keepalive() {
+        let enforcer = WireguardEnforcer::new();
+        let peer = make_peer("pubkey-1", None, &["10.0.0.0/24"], 0);
 
-        let args = enforcer.build_peer_args(&peer);
-        assert!(args.contains(&"allowed-ips".to_string()));
-        assert!(args.contains(&"10.0.0.0/24,10.0.1.0/24".to_string()));
+        let content = enforcer.build_peer_section(&peer);
+        assert!(!content.contains("PersistentKeepalive"));
     }
 
     #[test]
-    fn test_cleanup_safe() {
-        let enforcer = make_enforcer();
-        // Cleanup with no interfaces should succeed
+    fn test_build_network() {
+        let enforcer = WireguardEnforcer::new();
+        let iface = make_interface("wg0", vec![]);
+
+        let content = enforcer.build_network(&iface);
+        assert!(content.contains("[Match]"));
+        assert!(content.contains("Name=wg0"));
+        assert!(content.contains("[Network]"));
+        assert!(content.contains("Address=10.0.0.1/24"));
+    }
+
+    #[test]
+    fn test_write_and_read_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let enforcer = make_enforcer_with_dir(dir.path());
+        let peer = make_peer("pubkey-1", Some("1.2.3.4:51820"), &["10.0.0.2/32"], 25);
+        let iface = make_interface("wg0", vec![peer]);
+
+        enforcer.write_netdev(&iface).unwrap();
+        enforcer.write_network(&iface).unwrap();
+
+        let netdev_path = dir.path().join("50-vmspawnd-wg-wg0.netdev");
+        let network_path = dir.path().join("50-vmspawnd-wg-wg0.network");
+
+        assert!(netdev_path.exists());
+        assert!(network_path.exists());
+
+        let netdev_content = std::fs::read_to_string(&netdev_path).unwrap();
+        assert!(netdev_content.contains("Kind=wireguard"));
+        assert!(netdev_content.contains("[WireGuardPeer]"));
+        assert!(netdev_content.contains("PublicKey=pubkey-1"));
+
+        let network_content = std::fs::read_to_string(&network_path).unwrap();
+        assert!(network_content.contains("Name=wg0"));
+        assert!(network_content.contains("Address=10.0.0.1/24"));
+    }
+
+    #[test]
+    fn test_remove_interface_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let enforcer = make_enforcer_with_dir(dir.path());
+        let iface = make_interface("wg0", vec![]);
+
+        enforcer.write_netdev(&iface).unwrap();
+        enforcer.write_network(&iface).unwrap();
+
+        let netdev_path = dir.path().join("50-vmspawnd-wg-wg0.netdev");
+        let network_path = dir.path().join("50-vmspawnd-wg-wg0.network");
+        assert!(netdev_path.exists());
+        assert!(network_path.exists());
+
+        enforcer.remove_interface("wg0").unwrap();
+        assert!(!netdev_path.exists());
+        assert!(!network_path.exists());
+    }
+
+    #[test]
+    fn test_remove_stale_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let enforcer = make_enforcer_with_dir(dir.path());
+
+        // Write configs for wg0 and wg1
+        let iface0 = make_interface("wg0", vec![]);
+        let iface1 = make_interface("wg1", vec![]);
+        enforcer.write_netdev(&iface0).unwrap();
+        enforcer.write_network(&iface0).unwrap();
+        enforcer.write_netdev(&iface1).unwrap();
+        enforcer.write_network(&iface1).unwrap();
+
+        // Only wg0 is active now
+        enforcer.remove_stale_files(&["wg0"]).unwrap();
+
+        // wg0 files should remain
+        assert!(dir.path().join("50-vmspawnd-wg-wg0.netdev").exists());
+        assert!(dir.path().join("50-vmspawnd-wg-wg0.network").exists());
+        // wg1 files should be gone
+        assert!(!dir.path().join("50-vmspawnd-wg-wg1.netdev").exists());
+        assert!(!dir.path().join("50-vmspawnd-wg-wg1.network").exists());
+    }
+
+    #[test]
+    fn test_cleanup_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let enforcer = make_enforcer_with_dir(dir.path());
         let result = enforcer.cleanup(&[]);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_multiple_peers() {
+        let enforcer = WireguardEnforcer::new();
+        let peers = vec![
+            make_peer("pubkey-1", Some("1.2.3.4:51820"), &["10.0.0.2/32"], 25),
+            make_peer("pubkey-2", Some("5.6.7.8:51820"), &["10.0.0.3/32"], 30),
+        ];
+        let iface = make_interface("wg0", peers);
+
+        let content = enforcer.build_netdev(&iface);
+        // Should have two [WireGuardPeer] sections
+        let peer_count = content.matches("[WireGuardPeer]").count();
+        assert_eq!(peer_count, 2);
+        assert!(content.contains("PublicKey=pubkey-1"));
+        assert!(content.contains("PublicKey=pubkey-2"));
+        assert!(content.contains("PersistentKeepalive=25"));
+        assert!(content.contains("PersistentKeepalive=30"));
     }
 }

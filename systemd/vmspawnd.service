@@ -14,7 +14,7 @@ Group=root
 # Security hardening
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/vmspawnd /etc/vmspawnd
+ReadWritePaths=/var/lib/vmspawnd /etc/vmspawnd /etc/systemd/network
 NoNewPrivileges=true
 PrivateTmp=yes
 
