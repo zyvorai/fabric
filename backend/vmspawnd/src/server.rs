@@ -1051,7 +1051,6 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                     // VM was supposed to be running but isn't — it crashed
 
                     // Check restart count
-                    let _restart_key = format!("autoheal/{}", vm.name);
                     let restart_count: u32 = state.store
                         .get_entity::<serde_json::Value>("autoheal", &vm.name)
                         .ok()

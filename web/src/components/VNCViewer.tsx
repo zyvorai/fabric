@@ -19,21 +19,20 @@ export default function VNCViewer({ vmName }: VNCViewerProps) {
     ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
-      console.log('VNC WebSocket connected')
+      // Connection established
     }
 
-    ws.onmessage = (event) => {
+    ws.onmessage = () => {
       // Handle VNC protocol data
       // For production, integrate noVNC library here
-      console.log('Received VNC data:', event.data)
     }
 
-    ws.onerror = (error) => {
-      console.error('VNC WebSocket error:', error)
+    ws.onerror = () => {
+      // WebSocket error
     }
 
     ws.onclose = () => {
-      console.log('VNC WebSocket closed')
+      // Connection closed
     }
 
     wsRef.current = ws

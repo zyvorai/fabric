@@ -64,7 +64,7 @@ pub struct RestoreOptions {
     pub restore_config: bool,
     #[serde(default = "crate::validation::default_true")]
     pub restore_disks: bool,
-    #[serde(default = "crate::validation::default_false")]
+    #[serde(default)]
     pub restore_state: bool,
 }
 

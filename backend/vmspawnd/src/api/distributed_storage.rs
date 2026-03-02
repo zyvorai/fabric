@@ -338,12 +338,11 @@ pub async fn check_compliance(
     Path(policy_id): Path<String>,
     Json(req): Json<ComplianceCheckRequest>,
 ) -> impl IntoResponse {
-    let _pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &req.pool_id) {
-        Ok(Some(p)) => p,
+    match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &req.pool_id) {
+        Ok(Some(_)) => {}
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    let _mgr = distributed_storage::DistributedStorageManager::new();
     let report = ComplianceReport {
         vm_name: req.vm_name,
         policy_id: policy_id.clone(),

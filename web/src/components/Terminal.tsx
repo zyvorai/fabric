@@ -34,7 +34,6 @@ export default function Terminal({ vmName }: TerminalProps) {
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
-      console.log('WebSocket connected')
       term.write('Connected to VM console\r\n')
     }
 
@@ -48,7 +47,6 @@ export default function Terminal({ vmName }: TerminalProps) {
     }
 
     ws.onclose = () => {
-      console.log('WebSocket closed')
       term.write('\r\nConnection closed\r\n')
     }
 

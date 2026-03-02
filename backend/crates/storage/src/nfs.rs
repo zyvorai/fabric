@@ -213,12 +213,6 @@ impl NfsPool {
             return Err(NfsError::MountFailed("Not mounted".to_string()));
         }
 
-        // Read from /proc/mounts
-        let mounts = fs::read_to_string("/proc/mounts")?;
-        let _mount_info = mounts
-            .lines()
-            .find(|line| line.contains(self.config.mount_path.to_str().unwrap()));
-
         // Get filesystem stats
         let output = Command::new("df")
             .args(&["-k", self.config.mount_path.to_str().unwrap()])

@@ -44,8 +44,6 @@ pub struct App {
     pub current_view: View,
     pub search_query: String,
     pub search_mode: bool,
-    #[allow(dead_code)]
-    pub show_help: bool,
     pub cpu_history: Vec<f64>,
     pub memory_history: Vec<f64>,
     pub network_rx_history: Vec<f64>,
@@ -65,7 +63,6 @@ impl App {
             current_view: View::Dashboard,
             search_query: String::new(),
             search_mode: false,
-            show_help: false,
             cpu_history: vec![0.0; 60],
             memory_history: vec![0.0; 60],
             network_rx_history: vec![0.0; 60],
