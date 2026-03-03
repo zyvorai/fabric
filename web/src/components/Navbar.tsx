@@ -35,7 +35,7 @@ const navGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { to: '/network', icon: <Network className="w-4 h-4" />, label: 'Network' },
-
+      { to: '/network-security', icon: <Shield className="w-4 h-4" />, label: 'Net Security' },
       { to: '/storage', icon: <HardDrive className="w-4 h-4" />, label: 'Storage' },
       { to: '/storage-pools', icon: <Database className="w-4 h-4" />, label: 'Pools' },
       { to: '/distributed-storage', icon: <Database className="w-4 h-4" />, label: 'Distributed Storage' },

@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Sparkline},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Sparkline, Tabs},
     Frame,
 };
 
@@ -28,6 +28,7 @@ pub fn ui(f: &mut Frame, app: &App) {
         View::Logs => render_logs_view(f, chunks[1]),
         View::Metrics => render_metrics_view(f, app, chunks[1]),
         View::Network => render_network_view(f, chunks[1]),
+        View::NetSecurity => render_netsec_view(f, app, chunks[1]),
         View::Storage => render_storage_view(f, chunks[1]),
         View::Help => views::render_help(f, chunks[1]),
         View::VMDetail => views::render_vm_detail_view(f, app, chunks[1]),
@@ -203,6 +204,144 @@ fn render_network_view(f: &mut Frame, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
+fn render_netsec_view(f: &mut Frame, app: &App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),  // Sub-tabs
+            Constraint::Length(3),  // Stats
+            Constraint::Min(0),    // Content
+        ])
+        .split(area);
+
+    // Sub-tabs for each resource type
+    let tab_names = app.netsec_tab_names();
+    let titles: Vec<Line> = tab_names
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            Line::from(Span::styled(
+                *name,
+                if i == app.netsec_tab {
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+                } else {
+                    Style::default().fg(Color::White)
+                },
+            ))
+        })
+        .collect();
+
+    let tabs = Tabs::new(titles)
+        .block(Block::default().borders(Borders::ALL).title(" Network Security "))
+        .highlight_style(Style::default().fg(Color::Yellow))
+        .select(app.netsec_tab);
+    f.render_widget(tabs, chunks[0]);
+
+    // Stats row
+    let stat_colors = [Color::Blue, Color::Red, Color::Cyan, Color::Magenta, Color::Green, Color::Yellow, Color::LightYellow, Color::LightMagenta, Color::LightCyan];
+    let stat_counts = [
+        app.net_policies.len(),
+        app.fw_profiles.len(),
+        app.services.len(),
+        app.qos_policies.len(),
+        app.dns_zones.len(),
+        app.vpn_tunnels.len(),
+        app.mirror_sessions.len(),
+        app.nat_rules.len(),
+        app.monitor_policies.len(),
+    ];
+    let stats_text: Vec<Span> = tab_names.iter().enumerate().map(|(i, name)| {
+        Span::styled(
+            format!(" {}:{} ", name, stat_counts[i]),
+            Style::default().fg(stat_colors[i]),
+        )
+    }).collect();
+    let stats_line = Paragraph::new(Line::from(stats_text))
+        .block(Block::default().borders(Borders::ALL));
+    f.render_widget(stats_line, chunks[1]);
+
+    // Resource list
+    let items = app.netsec_current_items();
+    if items.is_empty() {
+        let msg = Paragraph::new(format!("No {} configured.", tab_names[app.netsec_tab].to_lowercase()))
+            .block(Block::default().borders(Borders::ALL).title(format!(" {} ", tab_names[app.netsec_tab])))
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(msg, chunks[2]);
+    } else {
+        let content_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(chunks[2]);
+
+        // Left: list
+        let list_items: Vec<ListItem> = items.iter().enumerate().map(|(i, item)| {
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed");
+            let enabled = item.get("enabled").and_then(|v| v.as_bool());
+            let status_sym = match enabled {
+                Some(true) => Span::styled("● ", Style::default().fg(Color::Green)),
+                Some(false) => Span::styled("○ ", Style::default().fg(Color::Red)),
+                None => Span::styled("  ", Style::default()),
+            };
+
+            let content = Line::from(vec![
+                if i == app.netsec_selected {
+                    Span::styled("► ", Style::default().fg(Color::Yellow))
+                } else {
+                    Span::raw("  ")
+                },
+                status_sym,
+                Span::styled(
+                    name.to_string(),
+                    if i == app.netsec_selected {
+                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    },
+                ),
+            ]);
+            ListItem::new(content)
+        }).collect();
+
+        let list = List::new(list_items)
+            .block(Block::default().borders(Borders::ALL).title(format!(" {} ({}) ", tab_names[app.netsec_tab], items.len())));
+        f.render_widget(list, content_chunks[0]);
+
+        // Right: detail of selected item
+        if let Some(selected_item) = items.get(app.netsec_selected) {
+            let mut detail_lines = Vec::new();
+            // Show all fields
+            if let Some(obj) = selected_item.as_object() {
+                for (key, val) in obj {
+                    let val_str = match val {
+                        serde_json::Value::String(s) => s.clone(),
+                        serde_json::Value::Bool(b) => b.to_string(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::Array(a) => format!("[{} items]", a.len()),
+                        serde_json::Value::Object(o) => {
+                            if o.len() <= 3 {
+                                let pairs: Vec<String> = o.iter().map(|(k, v)| {
+                                    format!("{}={}", k, match v { serde_json::Value::String(s) => s.clone(), _ => v.to_string() })
+                                }).collect();
+                                pairs.join(", ")
+                            } else {
+                                format!("{{{} keys}}", o.len())
+                            }
+                        }
+                        serde_json::Value::Null => "null".to_string(),
+                    };
+                    detail_lines.push(Line::from(vec![
+                        Span::styled(format!("{:<16}", key), Style::default().fg(Color::Cyan)),
+                        Span::raw(val_str),
+                    ]));
+                }
+            }
+            let detail = Paragraph::new(detail_lines)
+                .block(Block::default().borders(Borders::ALL).title(" Details "));
+            f.render_widget(detail, content_chunks[1]);
+        }
+    }
+}
+
 fn render_storage_view(f: &mut Frame, area: Rect) {
     let text = vec![
         Line::from(Span::styled("Storage Pools", Style::default().add_modifier(Modifier::BOLD))),
@@ -232,10 +371,11 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
         )
     } else {
         match app.current_view {
-            View::Dashboard => "[1-6] Views  [Tab] Next  [R] Refresh  [?] Help  [q] Quit".to_string(),
+            View::Dashboard => "[1-7] Views  [Tab] Next  [R] Refresh  [?] Help  [q] Quit".to_string(),
             View::VMs => "[↑/↓] Navigate  [v] Bulk Mode  [s] Start  [t] Stop  [r] Restart  [d] Delete  [q] Quit".to_string(),
+            View::NetSecurity => "[←/→] Tabs  [↑/↓] Navigate  [S] Sync  [d] Delete  [q] Quit".to_string(),
             View::Help => "[q] Quit".to_string(),
-            _ => "[1-6] Views  [Tab] Next  [q] Quit".to_string(),
+            _ => "[1-7] Views  [Tab] Next  [q] Quit".to_string(),
         }
     };
 

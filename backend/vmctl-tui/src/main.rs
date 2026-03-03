@@ -104,12 +104,15 @@ async fn run_app<B: ratatui::backend::Backend>(
                         KeyCode::Char('3') => app.switch_to_view(View::Logs),
                         KeyCode::Char('4') => app.switch_to_view(View::Metrics),
                         KeyCode::Char('5') => app.switch_to_view(View::Network),
-                        KeyCode::Char('6') => app.switch_to_view(View::Storage),
+                        KeyCode::Char('6') => app.switch_to_view(View::NetSecurity),
+                        KeyCode::Char('7') => app.switch_to_view(View::Storage),
 
                         KeyCode::Tab => app.next_view(),
                         KeyCode::BackTab => app.previous_view(),
 
                         // List navigation
+                        KeyCode::Down | KeyCode::Char('j') if app.current_view == View::NetSecurity => app.netsec_next_item(),
+                        KeyCode::Up | KeyCode::Char('k') if app.current_view == View::NetSecurity => app.netsec_prev_item(),
                         KeyCode::Down | KeyCode::Char('j') => app.next(),
                         KeyCode::Up | KeyCode::Char('k') => app.previous(),
                         KeyCode::PageDown => {
@@ -144,6 +147,14 @@ async fn run_app<B: ratatui::backend::Backend>(
                         KeyCode::Char('D') if app.bulk_mode && !app.selected_vms.is_empty() => {
                             app.bulk_delete().await?
                         }
+
+                        // NetSecurity-specific actions
+                        KeyCode::Right if app.current_view == View::NetSecurity => app.netsec_next_tab(),
+                        KeyCode::Left if app.current_view == View::NetSecurity => app.netsec_prev_tab(),
+                        KeyCode::Char('l') if app.current_view == View::NetSecurity => app.netsec_next_tab(),
+                        KeyCode::Char('h') if app.current_view == View::NetSecurity => app.netsec_prev_tab(),
+                        KeyCode::Char('S') if app.current_view == View::NetSecurity => app.netsec_sync().await,
+                        KeyCode::Char('d') if app.current_view == View::NetSecurity => app.netsec_delete_selected().await,
 
                         // VM actions (single)
                         KeyCode::Char('s') if !app.bulk_mode => app.start_selected().await?,

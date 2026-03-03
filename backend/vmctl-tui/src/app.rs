@@ -13,6 +13,7 @@ pub enum View {
     Logs,
     Metrics,
     Network,
+    NetSecurity,
     Storage,
     Help,
     VMDetail,
@@ -52,6 +53,18 @@ pub struct App {
     pub selected_vms: Vec<usize>,
     pub status_messages: VecDeque<StatusMessage>,
     pub pending_action: Option<PendingAction>,
+    // Network security data
+    pub net_policies: Vec<serde_json::Value>,
+    pub fw_profiles: Vec<serde_json::Value>,
+    pub services: Vec<serde_json::Value>,
+    pub qos_policies: Vec<serde_json::Value>,
+    pub vpn_tunnels: Vec<serde_json::Value>,
+    pub mirror_sessions: Vec<serde_json::Value>,
+    pub nat_rules: Vec<serde_json::Value>,
+    pub monitor_policies: Vec<serde_json::Value>,
+    pub dns_zones: Vec<serde_json::Value>,
+    pub netsec_tab: usize,
+    pub netsec_selected: usize,
     client: Client,
 }
 
@@ -71,6 +84,17 @@ impl App {
             selected_vms: Vec::new(),
             status_messages: VecDeque::new(),
             pending_action: None,
+            net_policies: Vec::new(),
+            fw_profiles: Vec::new(),
+            services: Vec::new(),
+            qos_policies: Vec::new(),
+            vpn_tunnels: Vec::new(),
+            mirror_sessions: Vec::new(),
+            nat_rules: Vec::new(),
+            monitor_policies: Vec::new(),
+            dns_zones: Vec::new(),
+            netsec_tab: 0,
+            netsec_selected: 0,
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
@@ -309,8 +333,141 @@ impl App {
         }
 
         self.update_metrics_history().await;
+        self.refresh_netsec().await;
 
         Ok(())
+    }
+
+    async fn fetch_list(&self, path: &str) -> Vec<serde_json::Value> {
+        match self.client.get(format!("{}{}", API_BASE, path)).send().await {
+            Ok(res) if res.status().is_success() => {
+                res.json().await.unwrap_or_default()
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    async fn refresh_netsec(&mut self) {
+        self.net_policies = self.fetch_list("/network-policies").await;
+        self.fw_profiles = self.fetch_list("/firewall-profiles").await;
+        self.services = self.fetch_list("/services").await;
+        self.qos_policies = self.fetch_list("/qos-policies").await;
+        self.vpn_tunnels = self.fetch_list("/vpn-tunnels").await;
+        self.mirror_sessions = self.fetch_list("/mirror-sessions").await;
+        self.nat_rules = self.fetch_list("/nat-rules").await;
+        self.monitor_policies = self.fetch_list("/monitor-policies").await;
+        self.dns_zones = self.fetch_list("/dns-zones").await;
+    }
+
+    pub fn netsec_tab_names(&self) -> Vec<&str> {
+        vec!["Policies", "Firewall", "Services", "QoS", "DNS", "VPN", "Mirror", "NAT", "Monitor"]
+    }
+
+    pub fn netsec_current_items(&self) -> &[serde_json::Value] {
+        match self.netsec_tab {
+            0 => &self.net_policies,
+            1 => &self.fw_profiles,
+            2 => &self.services,
+            3 => &self.qos_policies,
+            4 => &self.dns_zones,
+            5 => &self.vpn_tunnels,
+            6 => &self.mirror_sessions,
+            7 => &self.nat_rules,
+            8 => &self.monitor_policies,
+            _ => &self.net_policies,
+        }
+    }
+
+    pub fn netsec_next_tab(&mut self) {
+        self.netsec_tab = (self.netsec_tab + 1) % 9;
+        self.netsec_selected = 0;
+    }
+
+    pub fn netsec_prev_tab(&mut self) {
+        self.netsec_tab = if self.netsec_tab == 0 { 8 } else { self.netsec_tab - 1 };
+        self.netsec_selected = 0;
+    }
+
+    pub fn netsec_next_item(&mut self) {
+        let len = self.netsec_current_items().len();
+        if len > 0 {
+            self.netsec_selected = (self.netsec_selected + 1) % len;
+        }
+    }
+
+    pub fn netsec_prev_item(&mut self) {
+        let len = self.netsec_current_items().len();
+        if len > 0 {
+            self.netsec_selected = if self.netsec_selected == 0 { len - 1 } else { self.netsec_selected - 1 };
+        }
+    }
+
+    pub async fn netsec_sync(&mut self) {
+        let path = match self.netsec_tab {
+            0 => "/network-policies/sync",
+            1 => "/firewall/sync",
+            2 => "/services/sync",
+            3 => "/qos-policies/sync",
+            4 => "/dns-policies/sync",
+            5 => "/vpn-tunnels/sync",
+            6 => "/mirror-sessions/sync",
+            7 => "/nat-rules/sync",
+            8 => "/monitor-policies/sync",
+            _ => return,
+        };
+        match self.client.post(format!("{}{}", API_BASE, path)).send().await {
+            Ok(res) if res.status().is_success() => {
+                self.add_status("Sync completed".to_string(), StatusLevel::Success);
+            }
+            Ok(res) => {
+                self.add_status(format!("Sync failed: {}", res.status()), StatusLevel::Error);
+            }
+            Err(e) => {
+                self.add_status(format!("Sync error: {}", e), StatusLevel::Error);
+            }
+        }
+        self.refresh_netsec().await;
+    }
+
+    pub async fn netsec_delete_selected(&mut self) {
+        let items = self.netsec_current_items().to_vec();
+        let item = match items.get(self.netsec_selected) {
+            Some(i) => i.clone(),
+            None => return,
+        };
+        let id = match item.get("id").and_then(|v| v.as_str()) {
+            Some(id) => id.to_string(),
+            None => return,
+        };
+        let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(&id).to_string();
+        let path = match self.netsec_tab {
+            0 => format!("/network-policies/{}", id),
+            1 => format!("/firewall-profiles/{}", id),
+            2 => format!("/services/{}", id),
+            3 => format!("/qos-policies/{}", id),
+            4 => format!("/dns-zones/{}", id),
+            5 => format!("/vpn-tunnels/{}", id),
+            6 => format!("/mirror-sessions/{}", id),
+            7 => format!("/nat-rules/{}", id),
+            8 => format!("/monitor-policies/{}", id),
+            _ => return,
+        };
+        match self.client.delete(format!("{}{}", API_BASE, path)).send().await {
+            Ok(res) if res.status().is_success() => {
+                self.add_status(format!("Deleted '{}'", name), StatusLevel::Success);
+            }
+            Ok(res) => {
+                self.add_status(format!("Delete failed: {}", res.status()), StatusLevel::Error);
+            }
+            Err(e) => {
+                self.add_status(format!("Delete error: {}", e), StatusLevel::Error);
+            }
+        }
+        self.refresh_netsec().await;
+        let len = self.netsec_current_items().len();
+        if self.netsec_selected >= len && len > 0 {
+            self.netsec_selected = len - 1;
+        }
     }
 
     async fn update_metrics_history(&mut self) {
@@ -384,7 +541,8 @@ impl App {
             View::VMs => View::Logs,
             View::Logs => View::Metrics,
             View::Metrics => View::Network,
-            View::Network => View::Storage,
+            View::Network => View::NetSecurity,
+            View::NetSecurity => View::Storage,
             View::Storage => View::Help,
             View::Help => View::Dashboard,
             View::VMDetail => View::VMs,
@@ -395,7 +553,8 @@ impl App {
         self.current_view = match self.current_view {
             View::Dashboard => View::Help,
             View::Help => View::Storage,
-            View::Storage => View::Network,
+            View::Storage => View::NetSecurity,
+            View::NetSecurity => View::Network,
             View::Network => View::Metrics,
             View::Metrics => View::Logs,
             View::Logs => View::VMs,

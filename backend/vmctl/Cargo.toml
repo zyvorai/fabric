@@ -16,4 +16,5 @@ serde_json.workspace = true
 reqwest = { version = "0.12", features = ["json"] }
 tokio.workspace = true
 tabled = "0.16"
+serde_yaml = "0.9"
 vm-model = { path = "../vm-model" }

@@ -44,6 +44,7 @@ const Machines = lazy(() => import('./pages/Machines'))
 const Migrations = lazy(() => import('./pages/Migrations'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Snapshots = lazy(() => import('./pages/Snapshots'))
+const NetworkSecurity = lazy(() => import('./pages/NetworkSecurity'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -112,6 +113,7 @@ function AppRoutes() {
                   <Route path="/content-library" element={<ContentLibrary />} />
                   <Route path="/lifecycle" element={<LifecycleManager />} />
                   <Route path="/certificates" element={<Certificates />} />
+                  <Route path="/network-security" element={<NetworkSecurity />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>
