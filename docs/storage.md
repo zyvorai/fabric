@@ -98,6 +98,90 @@ pool = "vmspawnd"
 monitors = ["mon1.example.com", "mon2.example.com"]
 ```
 
+#### CLI (vmctl)
+
+```bash
+# Create a Ceph storage pool
+vmctl ceph create my-pool \
+  --monitors=10.0.0.1,10.0.0.2,10.0.0.3 \
+  --pool=rbd \
+  --user=admin \
+  --keyring=/etc/ceph/ceph.client.admin.keyring
+
+# Check cluster health
+vmctl ceph health my-pool
+
+# Get pool statistics
+vmctl ceph stats my-pool
+
+# List RBD images
+vmctl ceph images my-pool
+
+# Create an RBD image (10 GB)
+vmctl ceph create-image my-pool vm-disk-01 --size=10240
+
+# Delete an RBD image
+vmctl ceph delete-image my-pool vm-disk-01
+
+# Delete a Ceph pool
+vmctl ceph delete my-pool
+
+# Export pool config as YAML
+vmctl ceph pools -o yaml
+```
+
+#### API
+
+```bash
+# Create Ceph pool
+curl -X POST http://localhost:8080/api/storage/pools/ceph \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-pool",
+    "monitors": ["10.0.0.1", "10.0.0.2", "10.0.0.3"],
+    "pool_name": "rbd",
+    "user": "admin",
+    "keyring": "/etc/ceph/ceph.client.admin.keyring",
+    "auto_start": true
+  }'
+
+# Get Ceph health
+curl http://localhost:8080/api/storage/pools/my-pool/health
+
+# Get Ceph stats
+curl http://localhost:8080/api/storage/pools/my-pool/stats
+
+# List RBD images
+curl http://localhost:8080/api/storage/pools/my-pool/images
+
+# Create RBD image
+curl -X POST http://localhost:8080/api/storage/pools/my-pool/images \
+  -H "Content-Type: application/json" \
+  -d '{"name": "vm-disk-01", "size_mb": 10240}'
+```
+
+#### Web UI
+
+Navigate to **Storage Pools** and click **Create Pool**. Select **Ceph** as the pool type and fill in:
+- Monitor addresses (comma-separated)
+- Ceph pool name (e.g., `rbd`)
+- User (optional, defaults to `admin`)
+- Keyring path (optional)
+
+Ceph pools show health status (Ok/Warn/Error) in the pool list.
+
+### LVM Storage
+
+Logical Volume Manager for flexible storage management.
+
+### LVM-thin Storage
+
+Thin-provisioned LVM for overcommitted storage.
+
+### ZFS Storage
+
+ZFS pool and dataset storage with replication support.
+
 ## Volume Formats
 
 - **qcow2**: QEMU Copy-On-Write (default, supports snapshots)

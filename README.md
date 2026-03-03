@@ -6,15 +6,15 @@ A virtual machine management platform built on systemd-vmspawn and systemd-machi
 
 vmspawnd provides VM lifecycle management through three interfaces: a CLI (`vmctl`), a terminal UI (`vmctl-tui`), and a web dashboard (React). The backend exposes 480+ REST API endpoints and 3 WebSocket endpoints for console access, VNC proxying, and real-time events.
 
-**Codebase:** 36 backend crates, 142 Rust source files, 117 TypeScript/React source files (~119,000 LOC total: 96K Rust, 23K TypeScript).
+**Codebase:** 40 backend crates, 165 Rust source files, 130 TypeScript/React source files (~87,000 LOC: 60K Rust, 27K TypeScript).
 
 ## Architecture
 
 ```
 User Interfaces:
-  vmctl (CLI)
-  vmctl-tui (Terminal UI - 7 views)
-  Web UI (React - 36+ pages, 20+ components)
+  vmctl (CLI) -- JSON/YAML/table output, 15+ subcommand groups
+  vmctl-tui (Terminal UI - 8 views)
+  Web UI (React - 37+ pages, 20+ sub-pages)
   Kubernetes Operator
   Terraform Provider
         |
@@ -43,9 +43,9 @@ User Interfaces:
 - Real-time metrics collection
 
 ### Interfaces
-- **CLI** (`vmctl`) -- scriptable command-line tool
-- **TUI** (`vmctl-tui`) -- k9s-style terminal UI with 7 views (Dashboard, VMs, Logs, Metrics, Network, Storage, Help), vim-style navigation
-- **Web UI** -- React dashboard with 36 main pages + 10 network sub-pages, command palette (Ctrl/Cmd+K), bulk operations, keyboard shortcuts
+- **CLI** (`vmctl`) -- scriptable command-line tool with `-o json|yaml|table` output, `vmctl apply -f config.yaml` for declarative config import, 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net)
+- **TUI** (`vmctl-tui`) -- k9s-style terminal UI with 8 views (Dashboard, VMs, Logs, Metrics, Network, Net Security, Storage, Help), vim-style navigation, live API data
+- **Web UI** -- React dashboard with 37 main pages + 20 network/security sub-pages, Cilium-style network policy editor, command palette (Ctrl/Cmd+K), bulk operations, keyboard shortcuts
 
 ### Console and Display
 - WebSocket terminal console via xterm.js
@@ -58,6 +58,23 @@ User Interfaces:
 - Audit logging with filtering and export (JSON/CSV)
 - Certificate management
 - Encryption at rest
+
+### Network Security (Cilium-style)
+- **Network Policies** -- label-based ingress/egress rules with priority and enforcement
+- **VM Firewall** -- per-VM firewall profiles, zones, and assignments with nftables
+- **Service Mesh** -- virtual IP load-balanced services (round-robin, least-conn, random, IP-hash)
+- **QoS / Traffic Shaping** -- guaranteed/max rate, burst, priority-based bandwidth management
+- **DNS Policy** -- zone management, upstream servers, domain blocking
+- **VPN Mesh** -- WireGuard tunnels (point-to-point, hub-spoke, full-mesh)
+- **Packet Mirror** -- traffic capture with direction/protocol/CIDR filtering
+- **NAT Gateway** -- masquerade, SNAT, DNAT, hairpin NAT via nftables
+- **Network Monitor** -- per-VM bandwidth tracking with threshold alerts
+
+### Storage
+- Local filesystem, NFS, LVM, LVM-thin, ZFS, Ceph/RBD backends
+- Volume CRUD with attach/detach, resize, clone
+- Snapshot create/restore
+- Ceph cluster health, stats, and RBD image management
 
 ### Organization and Governance
 - Tagging with predefined colors and custom tags, tag-based filtering and grouping
@@ -85,12 +102,6 @@ User Interfaces:
 - GPU passthrough (NVIDIA/AMD)
 - Live migration
 - Image builder and content library
-
-### Advanced Networking
-- VPN mesh (WireGuard tunnels: point-to-point, hub-spoke, full-mesh)
-- Packet mirroring (tc mirred for traffic capture and debugging)
-- NAT gateway (masquerade, SNAT pools, DNAT, hairpin NAT via nftables)
-- Network monitoring (per-VM bandwidth tracking with threshold alerts)
 
 ### High Availability and Resilience
 - HA clustering via etcd
@@ -138,14 +149,39 @@ sudo journalctl -u vmspawnd -f
 ### CLI usage
 
 ```bash
+# VM management
 vmctl list
+vmctl list -o json                    # JSON output
+vmctl list -o yaml                    # YAML output
 vmctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
 vmctl start myvm
 vmctl stop myvm
-vmctl restart myvm
 vmctl info myvm
 vmctl metrics myvm
 vmctl delete myvm
+
+# Declarative config (JSON/YAML)
+vmctl apply -f vm-config.yaml         # Create resource from file
+vmctl export vms -o yaml              # Export all VMs as YAML
+
+# Network security
+vmctl policy list                     # List network policies
+vmctl firewall list                   # List firewall profiles
+vmctl firewall assign myvm --profile=web-profile
+vmctl service list                    # List service mesh services
+vmctl vpn tunnels                     # List VPN tunnels
+vmctl nat rules                       # List NAT rules
+vmctl monitor alerts                  # Show bandwidth alerts
+
+# Ceph storage
+vmctl ceph create my-pool --monitors=10.0.0.1,10.0.0.2 --pool=rbd
+vmctl ceph health my-pool
+vmctl ceph images my-pool
+vmctl ceph create-image my-pool myimg --size=10240
+
+# Networking
+vmctl net bridges                     # List bridges
+vmctl net links                       # Show link status
 ```
 
 ### TUI usage
@@ -154,7 +190,7 @@ vmctl delete myvm
 vmctl-tui
 ```
 
-Keyboard shortcuts: `1`-`6` switch views, `?` help, `j`/`k` navigate, `s` start, `t` stop, `r` restart, `d` delete, `R` refresh, `q` quit.
+Keyboard shortcuts: `1`-`7` switch views, `?` help, `j`/`k` navigate, `s` start, `t` stop, `r` restart, `d` delete, `R` refresh, `q` quit. Net Security view: `h`/`l` switch tabs, `S` sync, `d` delete.
 
 ### Web UI
 

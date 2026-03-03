@@ -2,14 +2,15 @@
 
 ## Project Statistics
 
-- 36 backend crates
-- 142 Rust source files, 117 TypeScript files
-- ~119,000 lines of code (96K Rust + 23K TypeScript)
+- 40 backend crates
+- 165 Rust source files, 130 TypeScript files
+- ~87,000 lines of code (60K Rust + 27K TypeScript)
 - 480+ REST API endpoints + 3 WebSocket endpoints
-- 36 web pages + 10 network sub-pages
-- 20 React components + 4 UI subcomponents
+- 37 web pages + 20 network/security sub-pages
+- 20+ React components + reusable UI subcomponents
 - 3 RBAC roles (Admin, User, Viewer)
 - 4 disk formats (qcow2, raw, vmdk, vdi)
+- 6 storage backends (Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD)
 
 ---
 
@@ -30,24 +31,36 @@
 
 ### CLI (vmctl)
 
-- Tabular and JSON output
-- Color output
-- Progress indicators
+- 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net)
+- Output formats: table, JSON, YAML (`-o json|yaml|table`)
+- Declarative config import: `vmctl apply -f config.yaml`
+- Config export: `vmctl export <resource> -o yaml`
+- Ceph management: pool create, health, stats, RBD image CRUD
+- Color output and progress indicators
 
 ### TUI (vmctl-tui)
 
-- 7 views
-- Real-time updates
+- 8 views (Dashboard, VMs, Logs, Metrics, Network, Net Security, Storage, Help)
+- Real-time updates from live API data
 - Keyboard navigation with vim-style bindings
+- Net Security view with 9 sub-tabs (Policies, Firewall, Services, QoS, DNS, VPN, Mirror, NAT, Monitor)
+- Storage view with Ceph pool details, RBD images, and health status
+- Logs view with live audit log entries
+- Network view with live bridge, VLAN, and link data
 - Status colors and auto-refresh
 
 ### Web UI (React)
 
-- 36 pages + 10 network sub-pages
-- 20 React components + 4 UI subcomponents
+- 37 pages + 20 network/security sub-pages
+- 20+ React components + reusable UI subcomponents
 - Dashboard with real-time statistics
+- Cilium-style network security page with 9 tabs, label selector editors, create modals
 - VM list with quick actions
 - VM details, creation wizard
+- Ceph storage pool creation with monitor/pool/user/keyring config
+- Live logs from audit API (no mock data)
+- Storage management with live pool and volume data from API
+- Settings with dynamically populated storage pool dropdown
 - Dark theme, responsive layout
 - TailwindCSS styling
 
@@ -130,13 +143,14 @@
 
 - Local filesystem
 - NFS
-- Ceph/RBD
+- LVM and LVM-thin
+- ZFS (with replication)
+- Ceph/RBD (cluster health, stats, RBD image management)
 - Distributed storage
-- Thin provisioning
 
 ### Volume Operations
 
-- Create, delete, resize, clone volumes
+- Create, delete, resize, clone, attach, detach volumes
 - Volume info retrieval
 - Multiple formats (qcow2, raw, vmdk, vdi)
 
@@ -162,7 +176,7 @@
 ### Port Forwarding
 
 - TCP and UDP protocol support
-- iptables integration
+- nftables integration
 
 ### Network Modes
 
@@ -170,6 +184,18 @@
 - Bridged mode
 - Isolated mode
 - VLAN isolation
+
+### Network Security (Cilium-style)
+
+- **Network Policies** -- Label-based ingress/egress rules with direction badges, priority, and enforcement status
+- **VM Firewall** -- Per-VM profiles with rule builder (protocol/port/CIDR/action), zones, and VM assignments
+- **Service Mesh** -- Virtual IP services with load balancing (round-robin, least-conn, random, IP-hash), backend management
+- **QoS / Traffic Shaping** -- Guaranteed/max rate with burst, priority-based bandwidth management, label selectors
+- **DNS Policy** -- Zone management with record types (A/AAAA/CNAME/MX/TXT/SRV/PTR), upstream servers, domain blocking
+- **VPN Mesh** -- WireGuard tunnels with peer editor, network topology selector (full-mesh, hub-spoke, point-to-point)
+- **Packet Mirror** -- Direction selector (ingress/egress/both), collector target, protocol/port/CIDR filters
+- **NAT Gateway** -- Rule types (masquerade/SNAT/DNAT/hairpin), IP pool editor, gateway configuration
+- **Network Monitor** -- Threshold builder (metric/value/unit/direction/severity), live metrics, alert management
 
 ### VPN Mesh
 
@@ -317,7 +343,7 @@
 
 ## Build and Development
 
-- Cargo workspace
+- Cargo workspace (40 crates)
 - npm/Vite for web UI
 - GitHub Actions CI/CD
 - Automated builds, formatting checks, linting

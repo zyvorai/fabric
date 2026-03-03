@@ -1,6 +1,6 @@
 # Web UI
 
-Modern React-based web interface for vmspawnd with real-time updates, 36+ pages, and 20+ reusable components.
+Modern React-based web interface for vmspawnd with real-time updates, 37+ pages, 20+ network/security sub-pages, and 20+ reusable components.
 
 ## Features
 
@@ -47,7 +47,7 @@ Output in `dist/` directory. In production, the static files are served directly
 
 ## Pages
 
-The web UI contains 36+ pages organized into the following sections:
+The web UI contains 37+ pages and 20+ sub-pages organized into the following sections:
 
 ### Dashboard
 - Platform-wide summary with VM count statistics (running, stopped, paused, error)
@@ -72,14 +72,30 @@ The web UI contains 36+ pages organized into the following sections:
 - Deploy VM from template
 
 ### Storage
-- Storage pool management
-- Volume list with capacity and attachment info
+- Storage pool management (Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD)
+- Volume list with capacity and attachment info (live data from API)
 - Volume create, resize, attach, detach, and delete
+- Ceph pool creation with monitor, pool name, user, and keyring config
+- Ceph health status display
 
 ### Networking
 - Virtual network list and detail
 - Network create and edit
 - Interface attachment management
+
+### Network Security (`/network-security`)
+Cilium-style network policy management with 9 tabs:
+- **Policies** -- Label-based ingress/egress rules with direction badges, priority, and enforcement
+- **Firewall** -- Profiles with rule builder (protocol/port/CIDR/action), zones, VM assignments
+- **Services** -- Virtual IP services with load balancing algorithm selector and backend count
+- **QoS** -- Traffic shaping with guaranteed/max rate, burst, and priority
+- **DNS** -- Zone management with record type selector and TTL, policy with upstream servers and domain blocking
+- **VPN** -- WireGuard tunnel peer editor, network topology selector (full-mesh/hub-spoke/point-to-point)
+- **Mirror** -- Packet capture with direction selector, collector target, optional filters
+- **NAT** -- Rule type selector (masquerade/SNAT/DNAT/hairpin), pool editor, gateway config
+- **Monitor** -- Threshold builder (metric/value/unit/direction/severity), live metrics, alert management
+
+All tabs include: stat cards, create modals with label selector (Cilium-style key=value tag editor), sync buttons, delete with confirmation.
 
 ### Backups
 - Backup list and detail

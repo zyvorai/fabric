@@ -4,12 +4,14 @@ Interactive terminal interface for managing VMs, built with ratatui and crosster
 
 ## Features
 
-- 7 dedicated views for different management tasks
+- 8 dedicated views for different management tasks
 - Vim-style keyboard navigation
 - Real-time search and filtering
 - Bulk operations on multiple VMs
 - Auto-refresh with configurable interval
 - Sparkline graphs for live resource metrics
+- Network security management with 9 sub-tabs
+- Live data from API (logs, storage, network -- no mock data)
 - 256-color and true-color support
 
 ## Usage
@@ -32,7 +34,7 @@ The default landing view. Displays a summary of the platform state:
 - Total VM count with running/stopped/paused breakdown
 - Aggregate CPU and memory utilization
 - Sparkline graphs showing resource usage trends over time
-- Recent events and alerts
+- Recent activity log from audit API
 
 ### 2. VMs
 
@@ -45,35 +47,49 @@ The primary VM management view:
 
 ### 3. Logs
 
-Aggregated log viewer:
-- Live-streamed logs from the daemon and individual VMs
-- Filter by VM name or log level
-- Search within log output
+Live log viewer:
+- Real-time audit log entries fetched from `/api/audit/logs`
+- Color-coded log levels (INFO, WARN, ERROR, DEBUG)
+- Displays timestamp, level, action, resource type, and detail
 
 ### 4. Metrics
 
 Resource monitoring view:
 - Per-VM CPU and memory usage
 - Sparkline graphs for real-time visualization
-- Network I/O and disk I/O statistics
-- Historical trend display
+- Network I/O (RX/TX) statistics
+- System information from API (memory stats, VM counts, storage pool counts)
 
 ### 5. Network
 
-Virtual network overview:
-- List of virtual networks and bridges
-- Connected VMs per network
-- IP address assignments
-- Network traffic statistics
+Virtual network overview with live data:
+- Bridges from `/api/networkd/bridges` with addresses and DHCP config
+- VLANs from `/api/networkd/vlans` with VLAN ID and parent interface
+- Link status from `/api/networkd/links` with operational state
 
-### 6. Storage
+### 6. Net Security
 
-Storage management view:
-- Storage pools and volumes
-- Disk usage and capacity
-- Volume attachment status
+Cilium-style network security management with 9 sub-tabs:
+- **Policies** -- Network policies with label selectors
+- **Firewall** -- VM firewall profiles and zones
+- **Services** -- Service mesh with load balancing
+- **QoS** -- Traffic shaping policies
+- **DNS** -- DNS zones and policies
+- **VPN** -- WireGuard tunnels and networks
+- **Mirror** -- Packet mirror sessions
+- **NAT** -- NAT rules, pools, and gateways
+- **Monitor** -- Network monitoring policies and alerts
 
-### 7. Help
+Each tab shows resource counts, a navigable list, and a detail panel for the selected item. Supports sync and delete operations.
+
+### 7. Storage
+
+Storage management view with live data:
+- Storage pools from API with type detection (Local, NFS, LVM, ZFS, Ceph/RBD)
+- Pool details: name, state, path, capacity, available space
+- Ceph-specific details: monitors, pool name, cluster health, RBD image list
+
+### 8. Help
 
 In-app keyboard shortcut reference and usage guide.
 
@@ -107,6 +123,7 @@ In-app keyboard shortcut reference and usage guide.
 |-----|--------|
 | `s` | Start selected VM |
 | `t` | Stop selected VM |
+| `r` | Restart selected VM |
 | `d` | Delete selected VM (with confirmation) |
 | `Enter` | Open detail view for selected VM |
 
@@ -121,11 +138,22 @@ In-app keyboard shortcut reference and usage guide.
 | `D` | Delete all selected VMs (with confirmation) |
 | `Esc` | Clear selection |
 
+### Net Security View
+
+| Key | Action |
+|-----|--------|
+| `h` / Left | Previous sub-tab |
+| `l` / Right | Next sub-tab |
+| `j` / Down | Navigate items |
+| `k` / Up | Navigate items |
+| `S` | Sync current resource type |
+| `d` | Delete selected resource |
+
 ### General
 
 | Key | Action |
 |-----|--------|
-| `r` | Force refresh |
+| `R` | Force refresh |
 | `q` | Quit |
 | `?` | Toggle help overlay |
 
@@ -145,7 +173,7 @@ Resource metrics (CPU, memory, network, disk) are rendered as sparkline graphs d
 
 ```
 +----------------------------------------------------+
-| vmspawnd TUI            [Dashboard] VMs Logs ...    |
+| vmspawnd TUI   [Dashboard] VMs Logs ... NetSec ...  |
 +----------------------------------------------------+
 | Running: 12  Stopped: 3  Paused: 1   Total: 16    |
 |                                                     |
@@ -153,9 +181,9 @@ Resource metrics (CPU, memory, network, disk) are rendered as sparkline graphs d
 | CPU Trend: _.-'^-._.-'   Mem Trend: __--^^--__     |
 |                                                     |
 | Recent Events:                                      |
-|   vm-web-01  started    2 min ago                   |
-|   vm-db-03   snapshot   5 min ago                   |
-|   vm-app-02  stopped   12 min ago                   |
+|   [12:34:56] INFO   create vm web-01                |
+|   [12:34:45] WARN   high memory on db-03            |
+|   [12:34:30] INFO   start vm app-02                 |
 +----------------------------------------------------+
 | q:Quit  /:Search  Tab:Next View  ?:Help             |
 +----------------------------------------------------+
