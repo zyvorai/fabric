@@ -1,0 +1,8 @@
+# systemd-tmpfiles configuration for vmspawnd
+# Type Path                          Mode User Group Age Argument
+d /var/lib/vmspawnd                   0755 root root  -   -
+d /var/lib/vmspawnd/images            0755 root root  -   -
+d /var/lib/vmspawnd/state             0750 root root  -   -
+d /etc/vmspawnd                       0755 root root  -   -
+d /run/vmspawnd                       0755 root root  -   -
+d /var/log/vmspawnd                   0755 root root  -   -

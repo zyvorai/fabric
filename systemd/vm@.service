@@ -1,12 +1,31 @@
 [Unit]
-Description=Virtual Machine %i
-After=vmspawnd.service
+Description=Virtual Machine %i (vmspawnd)
+Documentation=https://github.com/ssahani/vmspawn
+After=vmspawnd.service network-online.target
+Wants=network-online.target
+BindsTo=vmspawnd.service
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/systemd-vmspawn --machine=%i --boot
 ExecStop=/usr/bin/machinectl stop %i
+ExecStopPost=-/usr/bin/machinectl terminate %i
 Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=120s
+TimeoutStopSec=90s
+KillMode=mixed
+KillSignal=SIGTERM
+SendSIGKILL=yes
+
+# Resource limits
+LimitNOFILE=65536
+TasksMax=infinity
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vm-%i
 
 [Install]
 WantedBy=multi-user.target

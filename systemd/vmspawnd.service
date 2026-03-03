@@ -1,25 +1,74 @@
 [Unit]
-Description=vmspawnd - Virtual Machine Spawn Daemon
-Documentation=https://github.com/youruser/vmspawnd
-After=network.target systemd-machined.service
+Description=vmspawnd - Virtual Machine Management Daemon
+Documentation=https://github.com/ssahani/vmspawn
+After=network-online.target systemd-machined.service systemd-networkd.service
+Wants=network-online.target
+Requires=vmspawnd.socket
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
 ExecStart=/usr/bin/vmspawnd
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s
+WatchdogSec=60s
+
+# Environment
+Environment=VSPAWN_LOG_LEVEL=info
+EnvironmentFile=-/etc/vmspawnd/vmspawnd.env
+
+# Credentials
 User=root
 Group=root
+
+# Filesystem access
+ReadWritePaths=/var/lib/vmspawnd
+ReadWritePaths=/etc/vmspawnd
+ReadWritePaths=/etc/systemd/network
+ReadWritePaths=/run/systemd/machines
+ReadWritePaths=/run/systemd/nspawn
+ReadWritePaths=/tmp
+StateDirectory=vmspawnd
+ConfigurationDirectory=vmspawnd
+LogsDirectory=vmspawnd
+RuntimeDirectory=vmspawnd
 
 # Security hardening
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/vmspawnd /etc/vmspawnd /etc/systemd/network
-NoNewPrivileges=true
 PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=no
+ProtectKernelModules=no
+ProtectControlGroups=no
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+RestrictNamespaces=no
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+SystemCallArchitectures=native
+
+# Capabilities required for VM management
+AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_NET_RAW CAP_MKNOD CAP_SYS_PTRACE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_NET_RAW CAP_MKNOD CAP_SYS_PTRACE CAP_KILL CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE
 
 # Resource limits
 LimitNOFILE=65536
+LimitNPROC=4096
+LimitMEMLOCK=infinity
+TasksMax=infinity
+
+# OOM handling
+OOMScoreAdjust=-900
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vmspawnd
 
 [Install]
 WantedBy=multi-user.target

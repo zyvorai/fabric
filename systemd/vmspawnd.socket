@@ -1,0 +1,12 @@
+[Unit]
+Description=vmspawnd API Socket
+Documentation=https://github.com/ssahani/vmspawn
+
+[Socket]
+ListenStream=8080
+BindIPv6Only=both
+Accept=no
+NoDelay=yes
+
+[Install]
+WantedBy=sockets.target
