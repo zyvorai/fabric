@@ -65,6 +65,11 @@ pub struct App {
     pub dns_zones: Vec<serde_json::Value>,
     pub netsec_tab: usize,
     pub netsec_selected: usize,
+    // Storage / Ceph data
+    pub storage_pools: Vec<serde_json::Value>,
+    pub ceph_images: Vec<String>,
+    pub ceph_health: Option<serde_json::Value>,
+    pub storage_selected: usize,
     client: Client,
 }
 
@@ -95,6 +100,10 @@ impl App {
             dns_zones: Vec::new(),
             netsec_tab: 0,
             netsec_selected: 0,
+            storage_pools: Vec::new(),
+            ceph_images: Vec::new(),
+            ceph_health: None,
+            storage_selected: 0,
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
@@ -334,8 +343,40 @@ impl App {
 
         self.update_metrics_history().await;
         self.refresh_netsec().await;
+        self.refresh_storage().await;
 
         Ok(())
+    }
+
+    async fn refresh_storage(&mut self) {
+        self.storage_pools = self.fetch_list("/storage/pools").await;
+
+        // Find first Ceph pool and load its images/health
+        let ceph_pool = self.storage_pools.iter().find(|p| {
+            if let Some(pt) = p.get("pool_type") {
+                if pt.is_object() {
+                    return pt.get("Ceph").is_some();
+                }
+            }
+            false
+        }).and_then(|p| p.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()));
+
+        if let Some(ref pool_name) = ceph_pool {
+            self.ceph_images = match self.client
+                .get(format!("{}/storage/pools/{}/images", API_BASE, pool_name))
+                .send().await
+            {
+                Ok(res) if res.status().is_success() => res.json().await.unwrap_or_default(),
+                _ => Vec::new(),
+            };
+            self.ceph_health = match self.client
+                .get(format!("{}/storage/pools/{}/health", API_BASE, pool_name))
+                .send().await
+            {
+                Ok(res) if res.status().is_success() => res.json().await.ok(),
+                _ => None,
+            };
+        }
     }
 
     async fn fetch_list(&self, path: &str) -> Vec<serde_json::Value> {

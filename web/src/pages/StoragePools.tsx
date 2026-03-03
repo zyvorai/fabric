@@ -4,11 +4,13 @@ import {
   listStoragePools,
   createNfsPool,
   createLocalPool,
+  createCephPool,
   deleteStoragePool,
   startStoragePool,
   stopStoragePool,
   refreshPoolStats,
   getNfsHealth,
+  getCephHealth,
   type StoragePool,
   type NfsHealth,
 } from '../api/storage'
@@ -21,6 +23,7 @@ export default function StoragePools() {
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [nfsHealth, setNfsHealth] = useState<Map<string, NfsHealth>>(new Map())
+  const [cephHealth, setCephHealth] = useState<Map<string, { status: string; detail: string }>>(new Map())
 
   useEffect(() => {
     loadPools()
@@ -31,7 +34,7 @@ export default function StoragePools() {
       const data = await listStoragePools()
       setPools(data)
 
-      // Load NFS health for NFS pools
+      // Load health for NFS and Ceph pools
       for (const pool of data) {
         if (typeof pool.pool_type === 'object' && 'NFS' in pool.pool_type) {
           try {
@@ -39,6 +42,14 @@ export default function StoragePools() {
             setNfsHealth((prev) => new Map(prev).set(pool.name, health))
           } catch (error) {
             console.error(`Failed to get NFS health for ${pool.name}:`, error)
+          }
+        }
+        if (typeof pool.pool_type === 'object' && 'Ceph' in pool.pool_type) {
+          try {
+            const health = await getCephHealth(pool.name)
+            setCephHealth((prev) => new Map(prev).set(pool.name, health))
+          } catch (error) {
+            console.error(`Failed to get Ceph health for ${pool.name}:`, error)
           }
         }
       }
@@ -116,6 +127,10 @@ export default function StoragePools() {
       if ('ZFS' in pool.pool_type) {
         const zfs = pool.pool_type.ZFS
         return `ZFS: ${zfs.zpool}${zfs.dataset ? '/' + zfs.dataset : ''}`
+      }
+      if ('Ceph' in pool.pool_type) {
+        const ceph = pool.pool_type.Ceph
+        return `Ceph: ${ceph.pool_name} (${ceph.monitors.length} mons)`
       }
     }
     return 'Unknown'
@@ -262,7 +277,16 @@ export default function StoragePools() {
                         {pool.state}
                       </span>
                     </td>
-                    <td className="p-4">{getHealthIcon(nfsHealth.get(pool.name))}</td>
+                    <td className="p-4">
+                      {getHealthIcon(nfsHealth.get(pool.name))}
+                      {cephHealth.has(pool.name) && (
+                        cephHealth.get(pool.name)?.status === 'Ok'
+                          ? <CheckCircle className="w-4 h-4 text-green-500" />
+                          : cephHealth.get(pool.name)?.status === 'Warn'
+                          ? <AlertCircle className="w-4 h-4 text-yellow-500" />
+                          : <AlertCircle className="w-4 h-4 text-red-500" />
+                      )}
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {pool.state === 'Inactive' ? (
@@ -336,7 +360,7 @@ interface CreatePoolDialogProps {
 }
 
 function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
-  const [poolType, setPoolType] = useState<'local' | 'nfs' | 'lvm' | 'lvm-thin' | 'zfs'>('local')
+  const [poolType, setPoolType] = useState<'local' | 'nfs' | 'lvm' | 'lvm-thin' | 'zfs' | 'ceph'>('local')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [autoStart, setAutoStart] = useState(true)
@@ -355,6 +379,12 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
   // ZFS specific
   const [zpool, setZpool] = useState('')
   const [dataset, setDataset] = useState('')
+
+  // Ceph specific
+  const [cephMonitors, setCephMonitors] = useState('')
+  const [cephPoolName, setCephPoolName] = useState('')
+  const [cephUser, setCephUser] = useState('')
+  const [cephKeyring, setCephKeyring] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -381,6 +411,15 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
         await createLvmThinPool({ name, volume_group: volumeGroup, thin_pool: thinPool, auto_start: autoStart })
       } else if (poolType === 'zfs') {
         await createZfsPool({ name, zpool, dataset: dataset || undefined, auto_start: autoStart })
+      } else if (poolType === 'ceph') {
+        await createCephPool({
+          name,
+          monitors: cephMonitors.split(',').map(m => m.trim()).filter(Boolean),
+          pool_name: cephPoolName,
+          user: cephUser || undefined,
+          keyring: cephKeyring || undefined,
+          auto_start: autoStart,
+        })
       }
 
       onCreated()
@@ -407,6 +446,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                 { key: 'lvm' as const, label: 'LVM', desc: 'LVM volume group', Icon: HardDrive },
                 { key: 'lvm-thin' as const, label: 'LVM-thin', desc: 'Thin provisioned LVM', Icon: HardDrive },
                 { key: 'zfs' as const, label: 'ZFS', desc: 'ZFS pool/dataset', Icon: HardDrive },
+                { key: 'ceph' as const, label: 'Ceph', desc: 'Ceph RBD pool', Icon: Server },
               ]).map(({ key, label, desc, Icon }) => (
                 <button
                   key={key}
@@ -499,6 +539,52 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   onChange={(e) => setDataset(e.target.value)}
                   className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
                   placeholder="vms"
+                />
+              </div>
+            </>
+          ) : poolType === 'ceph' ? (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Monitor Addresses</label>
+                <input
+                  type="text"
+                  value={cephMonitors}
+                  onChange={(e) => setCephMonitors(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="10.0.0.1, 10.0.0.2, 10.0.0.3"
+                  required
+                />
+                <div className="text-xs text-gray-400 mt-1">Comma-separated list of Ceph monitor addresses</div>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Ceph Pool Name</label>
+                <input
+                  type="text"
+                  value={cephPoolName}
+                  onChange={(e) => setCephPoolName(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="rbd"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">User (optional)</label>
+                <input
+                  type="text"
+                  value={cephUser}
+                  onChange={(e) => setCephUser(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="admin"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Keyring Path (optional)</label>
+                <input
+                  type="text"
+                  value={cephKeyring}
+                  onChange={(e) => setCephKeyring(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  placeholder="/etc/ceph/ceph.client.admin.keyring"
                 />
               </div>
             </>

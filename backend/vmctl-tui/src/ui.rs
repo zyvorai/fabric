@@ -29,7 +29,7 @@ pub fn ui(f: &mut Frame, app: &App) {
         View::Metrics => render_metrics_view(f, app, chunks[1]),
         View::Network => render_network_view(f, chunks[1]),
         View::NetSecurity => render_netsec_view(f, app, chunks[1]),
-        View::Storage => render_storage_view(f, chunks[1]),
+        View::Storage => render_storage_view(f, app, chunks[1]),
         View::Help => views::render_help(f, chunks[1]),
         View::VMDetail => views::render_vm_detail_view(f, app, chunks[1]),
     }
@@ -342,25 +342,155 @@ fn render_netsec_view(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn render_storage_view(f: &mut Frame, area: Rect) {
-    let text = vec![
-        Line::from(Span::styled("Storage Pools", Style::default().add_modifier(Modifier::BOLD))),
-        Line::from(""),
-        Line::from("default:"),
-        Line::from("  Path:     /var/lib/vmspawnd/images"),
-        Line::from("  Capacity: 500 GB"),
-        Line::from("  Used:     245 GB (49%)"),
-        Line::from("  Free:     255 GB"),
-        Line::from(""),
-        Line::from("Volumes: 12"),
-        Line::from("Snapshots: 5"),
-    ];
+fn render_storage_view(f: &mut Frame, app: &App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
 
-    let paragraph = Paragraph::new(text)
-        .block(Block::default().borders(Borders::ALL).title(" Storage "))
-        .style(Style::default());
+    // Left: pool list
+    let mut lines = Vec::new();
+    if app.storage_pools.is_empty() {
+        lines.push(Line::from(Span::styled("  No storage pools configured", Style::default().fg(Color::DarkGray))));
+    } else {
+        for (i, pool) in app.storage_pools.iter().enumerate() {
+            let name = pool.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed");
+            let state = pool.get("state").and_then(|v| v.as_str()).unwrap_or("Unknown");
+            let state_color = match state {
+                "Active" => Color::Green,
+                "Inactive" => Color::Red,
+                "Degraded" => Color::Yellow,
+                _ => Color::Gray,
+            };
 
-    f.render_widget(paragraph, area);
+            let pool_type = if let Some(pt) = pool.get("pool_type") {
+                if pt.is_string() {
+                    pt.as_str().unwrap_or("").to_string()
+                } else if pt.get("Ceph").is_some() {
+                    "Ceph/RBD".to_string()
+                } else if pt.get("NFS").is_some() {
+                    "NFS".to_string()
+                } else if pt.get("ZFS").is_some() {
+                    "ZFS".to_string()
+                } else if pt.get("LVM").is_some() {
+                    "LVM".to_string()
+                } else if pt.get("LVMThin").is_some() {
+                    "LVM-thin".to_string()
+                } else {
+                    "Unknown".to_string()
+                }
+            } else {
+                "Unknown".to_string()
+            };
+
+            let marker = if i == app.storage_selected { "► " } else { "  " };
+            lines.push(Line::from(vec![
+                Span::styled(marker, Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    format!("{:<18}", name),
+                    if i == app.storage_selected {
+                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    },
+                ),
+                Span::styled(format!("{:<10}", pool_type), Style::default().fg(Color::Cyan)),
+                Span::styled(state, Style::default().fg(state_color)),
+            ]));
+        }
+    }
+
+    let pool_list = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL).title(format!(" Storage Pools ({}) ", app.storage_pools.len())));
+    f.render_widget(pool_list, chunks[0]);
+
+    // Right: details + Ceph info
+    let mut detail_lines = Vec::new();
+
+    if let Some(pool) = app.storage_pools.get(app.storage_selected) {
+        let name = pool.get("name").and_then(|v| v.as_str()).unwrap_or("-");
+        let state = pool.get("state").and_then(|v| v.as_str()).unwrap_or("-");
+        let capacity = pool.get("capacity").and_then(|v| v.as_u64()).unwrap_or(0);
+        let available = pool.get("available").and_then(|v| v.as_u64()).unwrap_or(0);
+        let path = pool.get("path").and_then(|v| v.as_str()).unwrap_or("-");
+
+        detail_lines.push(Line::from(vec![
+            Span::styled("Name:     ", Style::default().fg(Color::Cyan)),
+            Span::styled(name, Style::default().add_modifier(Modifier::BOLD)),
+        ]));
+        detail_lines.push(Line::from(vec![
+            Span::styled("State:    ", Style::default().fg(Color::Cyan)),
+            Span::raw(state),
+        ]));
+        detail_lines.push(Line::from(vec![
+            Span::styled("Path:     ", Style::default().fg(Color::Cyan)),
+            Span::raw(path),
+        ]));
+
+        let cap_gb = capacity as f64 / (1024.0 * 1024.0 * 1024.0);
+        let avail_gb = available as f64 / (1024.0 * 1024.0 * 1024.0);
+        detail_lines.push(Line::from(vec![
+            Span::styled("Capacity: ", Style::default().fg(Color::Cyan)),
+            Span::raw(format!("{:.1} GB", cap_gb)),
+        ]));
+        detail_lines.push(Line::from(vec![
+            Span::styled("Avail:    ", Style::default().fg(Color::Cyan)),
+            Span::raw(format!("{:.1} GB", avail_gb)),
+        ]));
+
+        // Ceph-specific details
+        if let Some(pt) = pool.get("pool_type") {
+            if let Some(ceph) = pt.get("Ceph") {
+                detail_lines.push(Line::from(""));
+                detail_lines.push(Line::from(Span::styled("Ceph Details", Style::default().add_modifier(Modifier::BOLD).fg(Color::Magenta))));
+                if let Some(pool_name) = ceph.get("pool_name").and_then(|v| v.as_str()) {
+                    detail_lines.push(Line::from(vec![
+                        Span::styled("Pool:     ", Style::default().fg(Color::Cyan)),
+                        Span::raw(pool_name),
+                    ]));
+                }
+                if let Some(mons) = ceph.get("monitors").and_then(|v| v.as_array()) {
+                    let mon_str: Vec<&str> = mons.iter().filter_map(|m| m.as_str()).collect();
+                    detail_lines.push(Line::from(vec![
+                        Span::styled("Monitors: ", Style::default().fg(Color::Cyan)),
+                        Span::raw(mon_str.join(", ")),
+                    ]));
+                }
+
+                // Health
+                if let Some(ref health) = app.ceph_health {
+                    let status = health.get("status").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                    let health_color = match status {
+                        "Ok" | "HEALTH_OK" => Color::Green,
+                        "Warn" | "HEALTH_WARN" => Color::Yellow,
+                        _ => Color::Red,
+                    };
+                    detail_lines.push(Line::from(vec![
+                        Span::styled("Health:   ", Style::default().fg(Color::Cyan)),
+                        Span::styled(status, Style::default().fg(health_color).add_modifier(Modifier::BOLD)),
+                    ]));
+                }
+
+                // RBD Images
+                if !app.ceph_images.is_empty() {
+                    detail_lines.push(Line::from(""));
+                    detail_lines.push(Line::from(Span::styled(
+                        format!("RBD Images ({})", app.ceph_images.len()),
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )));
+                    for img in &app.ceph_images {
+                        detail_lines.push(Line::from(format!("  {}", img)));
+                    }
+                }
+            }
+        }
+    } else {
+        detail_lines.push(Line::from(Span::styled("No pool selected", Style::default().fg(Color::DarkGray))));
+    }
+
+    let detail = Paragraph::new(detail_lines)
+        .block(Block::default().borders(Borders::ALL).title(" Details "));
+    f.render_widget(detail, chunks[1]);
 }
 
 fn render_footer(f: &mut Frame, app: &App, area: Rect) {

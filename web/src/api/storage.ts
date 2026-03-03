@@ -20,6 +20,7 @@ export interface StoragePool {
     | { LVM: { volume_group: string } }
     | { LVMThin: { volume_group: string; thin_pool: string } }
     | { ZFS: { zpool: string; dataset: string | null } }
+    | { Ceph: { monitors: string[]; pool_name: string } }
   path: string
   capacity: number
   available: number
@@ -102,6 +103,54 @@ export async function createZfsPool(request: {
   auto_start: boolean
 }): Promise<StoragePool> {
   return apiPost<StoragePool>(`${API_BASE_URL}/storage/pools/zfs`, request)
+}
+
+// Create Ceph storage pool
+export async function createCephPool(request: {
+  name: string
+  monitors: string[]
+  pool_name: string
+  user?: string
+  keyring?: string
+  auto_start: boolean
+}): Promise<StoragePool> {
+  return apiPost<StoragePool>(`${API_BASE_URL}/storage/pools/ceph`, request)
+}
+
+// Get Ceph health
+export async function getCephHealth(name: string): Promise<{
+  status: 'Ok' | 'Warn' | 'Error'
+  detail: string
+}> {
+  return apiGet(`${API_BASE_URL}/storage/pools/${name}/health`)
+}
+
+// Get Ceph stats
+export async function getCephStats(name: string): Promise<{
+  total_bytes: number
+  used_bytes: number
+  available_bytes: number
+  objects: number
+}> {
+  return apiGet(`${API_BASE_URL}/storage/pools/${name}/stats`)
+}
+
+// List RBD images in a Ceph pool
+export async function listRbdImages(name: string): Promise<string[]> {
+  return apiGet<string[]>(`${API_BASE_URL}/storage/pools/${name}/images`)
+}
+
+// Create an RBD image
+export async function createRbdImage(poolName: string, request: {
+  name: string
+  size_mb: number
+}): Promise<void> {
+  return apiPost(`${API_BASE_URL}/storage/pools/${poolName}/images`, request)
+}
+
+// Delete an RBD image
+export async function deleteRbdImage(poolName: string, imageName: string): Promise<void> {
+  return apiDelete(`${API_BASE_URL}/storage/pools/${poolName}/images/${imageName}`)
 }
 
 // Delete storage pool

@@ -125,6 +125,11 @@ enum Commands {
     #[command(subcommand)]
     Monitor(MonitorCmd),
 
+    // ─── Ceph ────────────────────────────────────────────────────────────
+    /// Manage Ceph storage pools and RBD images
+    #[command(subcommand)]
+    Ceph(CephCmd),
+
     // ─── Network (networkd) ──────────────────────────────────────────────
     /// Manage networkd bridges, VLANs, bonds, taps, port-forwards
     #[command(subcommand)]
@@ -358,6 +363,57 @@ enum MonitorCmd {
     Sync,
     /// Show monitor status
     Status,
+}
+
+#[derive(Subcommand)]
+enum CephCmd {
+    /// Create a Ceph storage pool
+    Create {
+        /// Pool name in vmspawnd
+        name: String,
+        /// Ceph monitor addresses (comma-separated)
+        #[arg(long)]
+        monitors: String,
+        /// Ceph pool name (e.g. "rbd")
+        #[arg(long)]
+        pool: String,
+        /// Ceph user (default: admin)
+        #[arg(long)]
+        user: Option<String>,
+        /// Path to keyring file
+        #[arg(long)]
+        keyring: Option<String>,
+        /// Auto-start on daemon startup
+        #[arg(long, default_value = "true")]
+        auto_start: bool,
+    },
+    /// List all storage pools (shows Ceph pools)
+    Pools,
+    /// Get Ceph cluster health
+    Health { name: String },
+    /// Get Ceph pool stats
+    Stats { name: String },
+    /// List RBD images in a Ceph pool
+    Images { name: String },
+    /// Create an RBD image
+    CreateImage {
+        /// Storage pool name
+        pool: String,
+        /// Image name
+        name: String,
+        /// Image size in MB
+        #[arg(long)]
+        size: u64,
+    },
+    /// Delete an RBD image
+    DeleteImage {
+        /// Storage pool name
+        pool: String,
+        /// Image name
+        name: String,
+    },
+    /// Delete a Ceph storage pool
+    Delete { name: String },
 }
 
 #[derive(Subcommand)]
@@ -731,6 +787,7 @@ impl Cli {
                     "nat-pool" => ("POST", "/nat-pools"),
                     "nat-gateway" => ("POST", "/nat-gateways"),
                     "monitor-policy" => ("POST", "/monitor-policies"),
+                    "ceph-pool" => ("POST", "/storage/pools/ceph"),
                     "bridge" => ("POST", "/networkd/bridges"),
                     "vlan" => ("POST", "/networkd/vlans"),
                     "bond" => ("POST", "/networkd/bonds"),
@@ -1128,6 +1185,52 @@ impl Cli {
                 MonitorCmd::Status => {
                     let val = api_get(&client, "/monitor-policies/status").await?;
                     print_value(&val, fmt);
+                }
+            },
+
+            // ── Ceph ──────────────────────────────────────────────────────
+            Commands::Ceph(cmd) => match cmd {
+                CephCmd::Create { name, monitors, pool, user, keyring, auto_start } => {
+                    let body = serde_json::json!({
+                        "name": name,
+                        "monitors": monitors.split(',').map(|s| s.trim()).collect::<Vec<_>>(),
+                        "pool_name": pool,
+                        "user": user,
+                        "keyring": keyring,
+                        "auto_start": auto_start,
+                    });
+                    let val = api_post(&client, "/storage/pools/ceph", &body).await?;
+                    println!("Ceph pool '{}' created", name);
+                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                }
+                CephCmd::Pools => {
+                    let val = api_get(&client, "/storage/pools").await?;
+                    print_value(&val, fmt);
+                }
+                CephCmd::Health { name } => {
+                    let val = api_get(&client, &format!("/storage/pools/{}/health", name)).await?;
+                    print_value(&val, fmt);
+                }
+                CephCmd::Stats { name } => {
+                    let val = api_get(&client, &format!("/storage/pools/{}/stats", name)).await?;
+                    print_value(&val, fmt);
+                }
+                CephCmd::Images { name } => {
+                    let val = api_get(&client, &format!("/storage/pools/{}/images", name)).await?;
+                    print_value(&val, fmt);
+                }
+                CephCmd::CreateImage { pool, name, size } => {
+                    let body = serde_json::json!({ "name": name, "size_mb": size });
+                    api_post(&client, &format!("/storage/pools/{}/images", pool), &body).await?;
+                    println!("RBD image '{}' created in pool '{}' ({}MB)", name, pool, size);
+                }
+                CephCmd::DeleteImage { pool, name } => {
+                    api_delete(&client, &format!("/storage/pools/{}/images/{}", pool, name)).await?;
+                    println!("RBD image '{}' deleted from pool '{}'", name, pool);
+                }
+                CephCmd::Delete { name } => {
+                    api_delete(&client, &format!("/storage/pools/{}", name)).await?;
+                    println!("Storage pool '{}' deleted", name);
                 }
             },
 
