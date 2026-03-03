@@ -140,6 +140,7 @@ fn builtin_profiles() -> Vec<VMProfile> {
 pub async fn list_profiles(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<VMProfile>> {
+    tracing::debug!("profiles::{}", stringify!(list_profiles));
     let mut profiles = builtin_profiles();
 
     // Add custom profiles from store
@@ -155,6 +156,7 @@ pub async fn get_profile(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<VMProfile>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("profiles::{}", stringify!(get_profile));
     // Check built-in profiles first
     if let Some(profile) = builtin_profiles().into_iter().find(|p| p.name == name) {
         return Ok(Json(profile));
@@ -173,6 +175,7 @@ pub async fn create_profile(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateProfileRequest>,
 ) -> Result<(StatusCode, Json<VMProfile>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("profiles::{}", stringify!(create_profile));
     // Don't allow overriding built-in profiles
     if builtin_profiles().iter().any(|p| p.name == req.name) {
         return Err((StatusCode::CONFLICT, Json(json!({ "error": "Cannot override built-in profile" }))));
@@ -201,6 +204,7 @@ pub async fn delete_profile(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("profiles::{}", stringify!(delete_profile));
     if builtin_profiles().iter().any(|p| p.name == name) {
         return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Cannot delete built-in profile" }))));
     }

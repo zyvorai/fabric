@@ -34,6 +34,7 @@ pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(req): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    tracing::debug!("auth::{}", stringify!(login));
     let user_db = state.user_db.as_ref().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
     let jwt_config = state.jwt_config.as_ref().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -72,6 +73,7 @@ pub async fn me(
     State(state): State<Arc<AppState>>,
     req: axum::extract::Request,
 ) -> Result<impl IntoResponse, StatusCode> {
+    tracing::debug!("auth::{}", stringify!(me));
     let claims = req
         .extensions()
         .get::<security::Claims>()

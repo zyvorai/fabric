@@ -90,6 +90,7 @@ pub async fn create_scaling_policy(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateScalingPolicyRequest>,
 ) -> Result<(StatusCode, Json<ScalingPolicy>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("autoscale::{}", stringify!(create_scaling_policy));
     validate_vm_name(&req.vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     // Verify VM exists
@@ -126,6 +127,7 @@ pub async fn create_scaling_policy(
 pub async fn list_scaling_policies(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScalingPolicy>> {
+    tracing::debug!("autoscale::{}", stringify!(list_scaling_policies));
     let policies: Vec<ScalingPolicy> = state.store.list_entities("autoscale_policies").unwrap_or_default();
     Json(policies)
 }
@@ -135,6 +137,7 @@ pub async fn get_scaling_policy(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<ScalingPolicy>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("autoscale::{}", stringify!(get_scaling_policy));
     match state.store.get_entity::<ScalingPolicy>("autoscale_policies", &vm_name) {
         Ok(Some(p)) => Ok(Json(p)),
         Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({ "error": "No scaling policy for this VM" })))),
@@ -147,6 +150,7 @@ pub async fn delete_scaling_policy(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("autoscale::{}", stringify!(delete_scaling_policy));
     state.store.delete_entity("autoscale_policies", &vm_name).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;
@@ -158,6 +162,7 @@ pub async fn delete_scaling_policy(
 pub async fn list_scale_events(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScaleEvent>> {
+    tracing::debug!("autoscale::{}", stringify!(list_scale_events));
     let mut events: Vec<ScaleEvent> = state.store.list_entities("scale_events").unwrap_or_default();
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     events.truncate(100);

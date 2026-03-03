@@ -340,6 +340,7 @@ impl App {
     }
 
     pub async fn refresh(&mut self) -> Result<()> {
+        tracing::debug!("Refreshing all data from API");
         self.vms = self
             .client
             .get(format!("{}/vms", API_BASE))
@@ -347,6 +348,7 @@ impl App {
             .await?
             .json()
             .await?;
+        tracing::debug!("Loaded {} VMs", self.vms.len());
 
         if self.selected >= self.vms.len() && !self.vms.is_empty() {
             self.selected = self.vms.len() - 1;

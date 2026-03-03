@@ -15,6 +15,7 @@ use resource_pools::{
 };
 
 pub async fn list_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(list_pools));
     let items: Vec<ResourcePool> = state.store.list_entities("resource_pools").unwrap_or_default();
     Json(items)
 }
@@ -23,6 +24,7 @@ pub async fn create_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateResourcePoolRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(create_pool));
     let now = Utc::now();
     let pool = ResourcePool {
         id: Uuid::new_v4().to_string(),
@@ -52,6 +54,7 @@ pub async fn get_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(get_pool));
     match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -64,6 +67,7 @@ pub async fn update_pool(
     Path(id): Path<String>,
     Json(req): Json<UpdateResourcePoolRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(update_pool));
     let mut pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -89,6 +93,7 @@ pub async fn delete_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(delete_pool));
     if let Err(e) = state.store.delete_entity("resource_pools", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -99,6 +104,7 @@ pub async fn get_pool_summary(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(get_pool_summary));
     let pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -131,6 +137,7 @@ pub async fn assign_vm(
     Path(id): Path<String>,
     Json(req): Json<VmAssignment>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(assign_vm));
     let mut pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -151,6 +158,7 @@ pub async fn unassign_vm(
     State(state): State<Arc<AppState>>,
     Path((id, vm_name)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(unassign_vm));
     let mut pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -175,6 +183,7 @@ pub async fn move_vm(
     Path(from_id): Path<String>,
     Json(req): Json<MoveVmRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(move_vm));
     let mut src = match state.store.get_entity::<ResourcePool>("resource_pools", &from_id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -210,6 +219,7 @@ pub async fn check_admission(
     Path(id): Path<String>,
     Json(req): Json<AdmissionCheckRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("resource_pools::{}", stringify!(check_admission));
     let pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),

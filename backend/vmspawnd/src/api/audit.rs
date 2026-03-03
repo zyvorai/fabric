@@ -85,6 +85,7 @@ pub async fn list_audit_logs(
     State(state): State<Arc<AppState>>,
     Query(filters): Query<AuditLogFilters>,
 ) -> Result<Json<Vec<AuditLog>>, StatusCode> {
+    tracing::debug!("audit::{}", stringify!(list_audit_logs));
     // Load from state store
     let mut logs = state.store.list_entities::<AuditLog>("audit_logs")
         .unwrap_or_default();
@@ -135,6 +136,7 @@ pub async fn get_audit_log(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<AuditLog>, StatusCode> {
+    tracing::debug!("audit::{}", stringify!(get_audit_log));
     // Load from state store
     let log = state.store.get_entity::<AuditLog>("audit_logs", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -147,6 +149,7 @@ pub async fn export_audit_logs(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
+    tracing::debug!("audit::{}", stringify!(export_audit_logs));
     // Load from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
         .unwrap_or_default();
@@ -188,6 +191,7 @@ pub async fn export_audit_logs(
 pub async fn get_audit_stats(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AuditStats>, StatusCode> {
+    tracing::debug!("audit::{}", stringify!(get_audit_stats));
     // Calculate from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
         .unwrap_or_default();
@@ -245,6 +249,7 @@ pub async fn log_audit_event(
     details: Option<&str>,
     error: Option<&str>,
 ) -> Result<(), String> {
+    tracing::debug!("audit::{}", stringify!(log_audit_event));
     let log = AuditLog {
         id: Uuid::new_v4().to_string(),
         timestamp: Utc::now(),

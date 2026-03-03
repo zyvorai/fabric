@@ -53,6 +53,7 @@ pub async fn hotplug_cpu(
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugCpuRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("hotplug::{}", stringify!(hotplug_cpu));
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -116,6 +117,7 @@ pub async fn hotplug_memory(
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugMemoryRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("hotplug::{}", stringify!(hotplug_memory));
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -168,6 +170,7 @@ pub async fn hotplug_disk(
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugDiskRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("hotplug::{}", stringify!(hotplug_disk));
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -227,6 +230,7 @@ pub async fn hotremove_disk(
     State(_state): State<Arc<AppState>>,
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("hotplug::{}", stringify!(hotremove_disk));
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -253,6 +257,7 @@ pub async fn hotplug_nic(
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugNicRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("hotplug::{}", stringify!(hotplug_nic));
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -305,6 +310,7 @@ pub async fn hotremove_nic(
     State(_state): State<Arc<AppState>>,
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("hotplug::{}", stringify!(hotremove_nic));
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();

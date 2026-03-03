@@ -157,6 +157,7 @@ pub async fn apply_vm_spec(
     State(state): State<Arc<AppState>>,
     Json(spec): Json<VMSpec>,
 ) -> Result<(StatusCode, Json<ApplyResult>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("declarative::{}", stringify!(apply_vm_spec));
     let mut warnings = Vec::new();
 
     let memory_mb = parse_memory_mb(&spec.resources.memory);
@@ -246,6 +247,7 @@ pub async fn export_vm_spec(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<Json<VMSpec>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("declarative::{}", stringify!(export_vm_spec));
     let vm = match state.store.get_vm(&name) {
         Ok(Some(vm)) => vm,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "VM not found" })))),

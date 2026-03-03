@@ -24,6 +24,7 @@ pub async fn create_monitor_policy(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateMonitorPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(create_monitor_policy));
     let now = Utc::now();
     let policy = MonitorPolicy {
         id: Uuid::new_v4(),
@@ -61,6 +62,7 @@ pub async fn list_monitor_policies(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(list_monitor_policies));
     match state.store.list_entities::<MonitorPolicy>(STORE_KEY) {
         Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
         Err(e) => (
@@ -76,6 +78,7 @@ pub async fn get_monitor_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(get_monitor_policy));
     match state.store.get_entity::<MonitorPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
         Ok(None) => (
@@ -97,6 +100,7 @@ pub async fn update_monitor_policy(
     Path(id): Path<String>,
     Json(req): Json<CreateMonitorPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(update_monitor_policy));
     let existing = match state.store.get_entity::<MonitorPolicy>(STORE_KEY, &id) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -149,6 +153,7 @@ pub async fn delete_monitor_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(delete_monitor_policy));
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -170,6 +175,7 @@ pub async fn sync_monitor_policies(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(sync_monitor_policies));
     match reconcile_monitor(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -184,6 +190,7 @@ pub async fn get_monitor_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(get_monitor_status));
     let policies: Vec<MonitorPolicy> = match state.store.list_entities(STORE_KEY) {
         Ok(p) => p,
         Err(e) => {
@@ -229,6 +236,7 @@ pub async fn get_all_network_metrics(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(get_all_network_metrics));
     let metrics = state.net_monitor.collector.get_all_metrics().await;
     (StatusCode::OK, Json(metrics)).into_response()
 }
@@ -238,6 +246,7 @@ pub async fn get_vm_network_metrics(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(get_vm_network_metrics));
     match state.net_monitor.collector.get_vm_metrics(&name).await {
         Some(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         None => (
@@ -252,6 +261,7 @@ pub async fn get_bandwidth_alerts(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(get_bandwidth_alerts));
     let alerts = state.net_monitor.evaluator.get_active_alerts().await;
     (StatusCode::OK, Json(alerts)).into_response()
 }
@@ -259,6 +269,7 @@ pub async fn get_bandwidth_alerts(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_monitor(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("net_monitor::{}", stringify!(reconcile_monitor));
     let policies: Vec<MonitorPolicy> = state.store.list_entities(STORE_KEY)?;
 
     let vms = build_vm_snapshots(state);

@@ -55,6 +55,7 @@ pub async fn create_snapshot(
     Path(vm_name): Path<String>,
     Json(req): Json<CreateSnapshotRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("snapshots::{}", stringify!(create_snapshot));
     // Find the VM's disk image path
     let image_path = crate::validation::find_vm_image(&vm_name);
 
@@ -112,6 +113,7 @@ pub async fn list_snapshots(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("snapshots::{}", stringify!(list_snapshots));
     let store_key = format!("snapshots_{}", vm_name);
     let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_default();
     Json(items)
@@ -122,6 +124,7 @@ pub async fn get_snapshot(
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("snapshots::{}", stringify!(get_snapshot));
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         Ok(Some(s)) => Json(s).into_response(),
@@ -135,6 +138,7 @@ pub async fn delete_snapshot(
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("snapshots::{}", stringify!(delete_snapshot));
     let store_key = format!("snapshots_{}", vm_name);
 
     // Get snapshot info to delete from qemu-img
@@ -161,6 +165,7 @@ pub async fn revert_snapshot(
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("snapshots::{}", stringify!(revert_snapshot));
     let store_key = format!("snapshots_{}", vm_name);
 
     let snapshot = match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
@@ -204,6 +209,7 @@ pub async fn snapshot_tree(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("snapshots::{}", stringify!(snapshot_tree));
     let store_key = format!("snapshots_{}", vm_name);
     let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_default();
 

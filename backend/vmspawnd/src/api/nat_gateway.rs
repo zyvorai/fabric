@@ -29,6 +29,7 @@ pub async fn create_nat_rule(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNatRuleRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(create_nat_rule));
     let now = Utc::now();
     let rule = NatRule {
         id: Uuid::new_v4(),
@@ -72,6 +73,7 @@ pub async fn list_nat_rules(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(list_nat_rules));
     match state.store.list_entities::<NatRule>(RULE_STORE_KEY) {
         Ok(rules) => (StatusCode::OK, Json(rules)).into_response(),
         Err(e) => (
@@ -87,6 +89,7 @@ pub async fn get_nat_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(get_nat_rule));
     match state.store.get_entity::<NatRule>(RULE_STORE_KEY, &id) {
         Ok(Some(rule)) => (StatusCode::OK, Json(rule)).into_response(),
         Ok(None) => (
@@ -108,6 +111,7 @@ pub async fn update_nat_rule(
     Path(id): Path<String>,
     Json(req): Json<CreateNatRuleRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(update_nat_rule));
     let existing = match state.store.get_entity::<NatRule>(RULE_STORE_KEY, &id) {
         Ok(Some(r)) => r,
         Ok(None) => {
@@ -166,6 +170,7 @@ pub async fn delete_nat_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(delete_nat_rule));
     if let Err(e) = state.store.delete_entity(RULE_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -188,6 +193,7 @@ pub async fn create_nat_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNatPoolRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(create_nat_pool));
     let now = Utc::now();
     let pool = NatPool {
         id: Uuid::new_v4(),
@@ -216,6 +222,7 @@ pub async fn list_nat_pools(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(list_nat_pools));
     match state.store.list_entities::<NatPool>(POOL_STORE_KEY) {
         Ok(pools) => (StatusCode::OK, Json(pools)).into_response(),
         Err(e) => (
@@ -231,6 +238,7 @@ pub async fn get_nat_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(get_nat_pool));
     match state.store.get_entity::<NatPool>(POOL_STORE_KEY, &id) {
         Ok(Some(pool)) => (StatusCode::OK, Json(pool)).into_response(),
         Ok(None) => (
@@ -251,6 +259,7 @@ pub async fn delete_nat_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(delete_nat_pool));
     if let Err(e) = state.store.delete_entity(POOL_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -269,6 +278,7 @@ pub async fn create_nat_gateway(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNatGatewayRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(create_nat_gateway));
     let now = Utc::now();
     let gw = NatGatewayConfig {
         id: Uuid::new_v4(),
@@ -304,6 +314,7 @@ pub async fn list_nat_gateways(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(list_nat_gateways));
     match state
         .store
         .list_entities::<NatGatewayConfig>(GATEWAY_STORE_KEY)
@@ -322,6 +333,7 @@ pub async fn get_nat_gateway(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(get_nat_gateway));
     match state
         .store
         .get_entity::<NatGatewayConfig>(GATEWAY_STORE_KEY, &id)
@@ -345,6 +357,7 @@ pub async fn delete_nat_gateway(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(delete_nat_gateway));
     if let Err(e) = state.store.delete_entity(GATEWAY_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -366,6 +379,7 @@ pub async fn sync_nat_rules(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(sync_nat_rules));
     match reconcile_nat(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -380,6 +394,7 @@ pub async fn get_nat_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(get_nat_status));
     let rules: Vec<NatRule> = match state.store.list_entities(RULE_STORE_KEY) {
         Ok(r) => r,
         Err(e) => {
@@ -416,6 +431,7 @@ pub async fn get_nat_status(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_nat(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("nat_gateway::{}", stringify!(reconcile_nat));
     let rules: Vec<NatRule> = state.store.list_entities(RULE_STORE_KEY)?;
     let gateways: Vec<NatGatewayConfig> = state.store.list_entities(GATEWAY_STORE_KEY)?;
     let pools: Vec<NatPool> = state.store.list_entities(POOL_STORE_KEY)?;

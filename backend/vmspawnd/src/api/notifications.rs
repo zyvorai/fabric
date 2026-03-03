@@ -277,6 +277,7 @@ fn validate_external_url(url: &str) -> Result<(), String> {
 pub async fn list_channels(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationChannel>>, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(list_channels));
     // Load from state store
     let channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
         .unwrap_or_default();
@@ -288,6 +289,7 @@ pub async fn create_channel(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateChannelRequest>,
 ) -> Result<(StatusCode, Json<NotificationChannel>), StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(create_channel));
     // Validate config based on channel type
     if let Err(err) = validate_channel_config(&req.channel_type, &req.config) {
         tracing::warn!("Invalid channel config: {}", err);
@@ -318,6 +320,7 @@ pub async fn update_channel(
     Path(id): Path<String>,
     Json(req): Json<UpdateChannelRequest>,
 ) -> Result<Json<NotificationChannel>, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(update_channel));
     // Load existing channel from state store
     let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -352,6 +355,7 @@ pub async fn delete_channel(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(delete_channel));
     // Check if channel is used by any rules
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
         .unwrap_or_default();
@@ -376,6 +380,7 @@ pub async fn test_channel(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(test_channel));
     // Load channel from state store
     let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -414,6 +419,7 @@ pub async fn test_channel(
 pub async fn list_rules(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationRule>>, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(list_rules));
     // Load from state store
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
         .unwrap_or_default();
@@ -425,6 +431,7 @@ pub async fn create_rule(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateRuleRequest>,
 ) -> Result<(StatusCode, Json<NotificationRule>), StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(create_rule));
     // Validate rule
     if let Err(err) = validate_notification_rule(&req) {
         tracing::warn!("Invalid notification rule: {}", err);
@@ -468,6 +475,7 @@ pub async fn update_rule(
     Path(id): Path<String>,
     Json(req): Json<UpdateRuleRequest>,
 ) -> Result<Json<NotificationRule>, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(update_rule));
     // Load existing rule from state store
     let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -517,6 +525,7 @@ pub async fn delete_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(delete_rule));
     // Remove from state store
     if let Err(e) = state.store.delete_entity("notifications/rules", &id) {
         tracing::error!("Failed to delete rule: {}", e);
@@ -530,6 +539,7 @@ pub async fn enable_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(enable_rule));
     // Load rule from state store
     let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -551,6 +561,7 @@ pub async fn disable_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(disable_rule));
     // Load rule from state store
     let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -576,6 +587,7 @@ pub async fn get_history(
     State(state): State<Arc<AppState>>,
     Query(query): Query<HistoryQuery>,
 ) -> Result<Json<Vec<NotificationHistory>>, StatusCode> {
+    tracing::debug!("notifications::{}", stringify!(get_history));
     // Load from state store
     let mut history = state.store.list_entities::<NotificationHistory>("notification_history")
         .unwrap_or_default();

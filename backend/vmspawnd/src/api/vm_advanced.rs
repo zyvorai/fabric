@@ -37,6 +37,7 @@ pub struct KsmConfigRequest {
 
 /// GET /api/system/ksm - Get KSM status
 pub async fn get_ksm_status() -> Result<Json<KsmStatus>, (StatusCode, String)> {
+    tracing::debug!("vm_advanced::{}", stringify!(get_ksm_status));
     let read_ksm = |file: &str| -> u64 {
         std::fs::read_to_string(format!("/sys/kernel/mm/ksm/{}", file))
             .unwrap_or_default()
@@ -63,6 +64,7 @@ pub async fn get_ksm_status() -> Result<Json<KsmStatus>, (StatusCode, String)> {
 pub async fn configure_ksm(
     Json(req): Json<KsmConfigRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("vm_advanced::{}", stringify!(configure_ksm));
     let run_value = if req.enabled { "1" } else { "0" };
     std::fs::write("/sys/kernel/mm/ksm/run", run_value)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to set KSM: {}", e)))?;
@@ -95,6 +97,7 @@ pub struct NestedVirtStatus {
 
 /// GET /api/system/nested-virt - Get nested virtualization status
 pub async fn get_nested_virt_status() -> Json<NestedVirtStatus> {
+    tracing::debug!("vm_advanced::{}", stringify!(get_nested_virt_status));
     // Check for Intel (kvm_intel) or AMD (kvm_amd)
     let (hypervisor, path) = if std::path::Path::new("/sys/module/kvm_intel").exists() {
         ("kvm_intel", "/sys/module/kvm_intel/parameters/nested")
@@ -131,6 +134,7 @@ pub struct SetNestedVirtRequest {
 pub async fn set_nested_virt(
     Json(req): Json<SetNestedVirtRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("vm_advanced::{}", stringify!(set_nested_virt));
     let path = if std::path::Path::new("/sys/module/kvm_intel").exists() {
         "/sys/module/kvm_intel/parameters/nested"
     } else if std::path::Path::new("/sys/module/kvm_amd").exists() {
@@ -172,6 +176,7 @@ pub async fn create_checkpoint(
     Path(vm_name): Path<String>,
     Json(req): Json<CreateCheckpointRequest>,
 ) -> Result<(StatusCode, Json<VMCheckpoint>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("vm_advanced::{}", stringify!(create_checkpoint));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     // Find the disk image for this VM
@@ -212,6 +217,7 @@ pub async fn list_checkpoints(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<Vec<VMCheckpoint>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("vm_advanced::{}", stringify!(list_checkpoints));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     let all: Vec<VMCheckpoint> = state.store.list_entities("checkpoints").unwrap_or_default();
@@ -227,6 +233,7 @@ pub async fn restore_checkpoint(
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("vm_advanced::{}", stringify!(restore_checkpoint));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     let checkpoint = match state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
@@ -257,6 +264,7 @@ pub async fn delete_checkpoint(
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("vm_advanced::{}", stringify!(delete_checkpoint));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
@@ -292,6 +300,7 @@ pub async fn fork_vm(
     Path(source_name): Path<String>,
     Json(req): Json<ForkVMRequest>,
 ) -> Result<(StatusCode, Json<vm_model::VM>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("vm_advanced::{}", stringify!(fork_vm));
     validate_vm_name(&source_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
     validate_vm_name(&req.new_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 

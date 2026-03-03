@@ -52,6 +52,7 @@ pub enum VMEventType {
 pub async fn event_stream(
     State(state): State<Arc<AppState>>,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<Event, Infallible>>> {
+    tracing::debug!("events::{}", stringify!(event_stream));
     let stream = async_stream::stream! {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
         let mut last_check = Utc::now();
@@ -96,6 +97,7 @@ pub async fn event_stream(
 pub async fn list_events(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<VMEvent>> {
+    tracing::debug!("events::{}", stringify!(list_events));
     let mut events: Vec<VMEvent> = state.store
         .list_entities("vm_events")
         .unwrap_or_default();

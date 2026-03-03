@@ -45,6 +45,7 @@ pub struct FirmwareCapabilities {
 pub async fn get_firmware_status(
     Path(vm_name): Path<String>,
 ) -> Result<Json<FirmwareStatus>, (StatusCode, String)> {
+    tracing::debug!("firmware::{}", stringify!(get_firmware_status));
     // Validate VM name to prevent path traversal
     validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
@@ -109,6 +110,7 @@ pub async fn enable_uefi(
     Path(vm_name): Path<String>,
     Json(req): Json<EnableUefiRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("firmware::{}", stringify!(enable_uefi));
     validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
     tracing::info!(
@@ -177,6 +179,7 @@ pub async fn enable_uefi(
 pub async fn enable_secureboot(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("firmware::{}", stringify!(enable_secureboot));
     validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
     tracing::info!("Enabling Secure Boot for VM '{}'", vm_name);
@@ -235,6 +238,7 @@ pub async fn enable_secureboot(
 pub async fn disable_secureboot(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("firmware::{}", stringify!(disable_secureboot));
     validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
     tracing::info!("Disabling Secure Boot for VM '{}'", vm_name);
@@ -285,6 +289,7 @@ pub async fn disable_secureboot(
 pub async fn reset_nvram(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("firmware::{}", stringify!(reset_nvram));
     validate_vm_name(&vm_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
     tracing::info!("Resetting NVRAM for VM '{}'", vm_name);
@@ -339,6 +344,7 @@ pub async fn reset_nvram(
 /// GET /api/system/firmware/capabilities - Get system firmware capabilities
 pub async fn get_firmware_capabilities(
 ) -> Result<Json<FirmwareCapabilities>, (StatusCode, String)> {
+    tracing::debug!("firmware::{}", stringify!(get_firmware_capabilities));
     let capabilities = FirmwareCapabilities {
         ovmf_available: is_ovmf_available(),
         secureboot_available: is_secureboot_available(),

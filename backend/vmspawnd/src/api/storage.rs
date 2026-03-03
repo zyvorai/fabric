@@ -102,6 +102,7 @@ impl From<NfsVersion> for NfsVersionDto {
 pub async fn list_pools(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<StoragePool>>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(list_pools));
     let manager = state.storage_manager.read().await;
     let pools = manager.list_pools().await;
     Ok(Json(pools))
@@ -112,6 +113,7 @@ pub async fn get_pool(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(get_pool));
     let manager = state.storage_manager.read().await;
 
     match manager.get_pool(&name).await {
@@ -125,6 +127,7 @@ pub async fn create_local_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLocalPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_local_pool));
     let manager = state.storage_manager.read().await;
 
     let path = std::path::PathBuf::from(&req.path);
@@ -140,6 +143,7 @@ pub async fn create_nfs_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_nfs_pool));
     let manager = state.storage_manager.read().await;
 
     let nfs_config = NfsConfig {
@@ -162,6 +166,7 @@ pub async fn delete_pool(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(delete_pool));
     let manager = state.storage_manager.read().await;
 
     match manager.delete_pool(&name).await {
@@ -175,6 +180,7 @@ pub async fn start_pool(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(start_pool));
     let manager = state.storage_manager.read().await;
 
     match manager.start_pool(&name).await {
@@ -188,6 +194,7 @@ pub async fn stop_pool(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(stop_pool));
     let manager = state.storage_manager.read().await;
 
     match manager.stop_pool(&name).await {
@@ -201,6 +208,7 @@ pub async fn get_pool_health(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(get_pool_health));
     let manager = state.storage_manager.read().await;
 
     match manager.get_nfs_health(&name).await {
@@ -214,6 +222,7 @@ pub async fn get_pool_stats(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(get_pool_stats));
     let manager = state.storage_manager.read().await;
 
     match manager.get_nfs_stats(&name).await {
@@ -227,6 +236,7 @@ pub async fn refresh_pool_stats(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(refresh_pool_stats));
     let manager = state.storage_manager.read().await;
 
     match manager.refresh_pool_stats(&name).await {
@@ -240,6 +250,7 @@ pub async fn create_lvm_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLvmPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_lvm_pool));
     let manager = state.storage_manager.read().await;
 
     match manager
@@ -259,6 +270,7 @@ pub async fn create_lvm_thin_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLvmThinPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_lvm_thin_pool));
     let manager = state.storage_manager.read().await;
 
     match manager
@@ -278,6 +290,7 @@ pub async fn create_zfs_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateZfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_zfs_pool));
     let manager = state.storage_manager.read().await;
 
     match manager
@@ -307,6 +320,7 @@ pub async fn create_ceph_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateCephPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_ceph_pool));
     let manager = state.storage_manager.read().await;
 
     match manager

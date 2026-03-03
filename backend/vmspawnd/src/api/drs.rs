@@ -18,6 +18,7 @@ pub async fn configure_drs(
     State(state): State<Arc<AppState>>,
     Json(config): Json<DrsConfig>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(configure_drs));
     match state.store.save_entity("drs_configs", &config.cluster_id, &config) {
         Ok(_) => (StatusCode::OK, Json(config)).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
@@ -28,6 +29,7 @@ pub async fn get_drs_config(
     State(state): State<Arc<AppState>>,
     Path(cluster_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(get_drs_config));
     match state.store.get_entity::<DrsConfig>("drs_configs", &cluster_id) {
         Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -39,6 +41,7 @@ pub async fn compute_placement(
     State(state): State<Arc<AppState>>,
     Json(req): Json<PlacementRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(compute_placement));
     let mgr = predictive_drs::DrsManager::new();
     let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_default();
     match mgr.compute_placement(&hosts, &req) {
@@ -56,6 +59,7 @@ pub async fn analyze_balance(
     State(_state): State<Arc<AppState>>,
     Json(req): Json<BalanceRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(analyze_balance));
     let mgr = predictive_drs::DrsManager::new();
     let balance = mgr.analyze_cluster_balance(&req.hosts);
     Json(balance)
@@ -72,6 +76,7 @@ pub async fn generate_recommendations(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RecommendationRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(generate_recommendations));
     let mgr = predictive_drs::DrsManager::new();
     let recs = mgr.generate_recommendations(&req.cluster_id, &req.hosts, &req.vms);
     for rec in &recs {
@@ -85,6 +90,7 @@ pub async fn generate_recommendations(
 pub async fn list_recommendations(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(list_recommendations));
     let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_default();
     Json(items)
 }
@@ -93,6 +99,7 @@ pub async fn approve_recommendation(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(approve_recommendation));
     let mut rec = match state.store.get_entity::<MigrationRecommendation>("drs_recommendations", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -109,6 +116,7 @@ pub async fn reject_recommendation(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(reject_recommendation));
     let mut rec = match state.store.get_entity::<MigrationRecommendation>("drs_recommendations", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -126,6 +134,7 @@ pub async fn reject_recommendation(
 // ============================================================================
 
 pub async fn list_affinity_rules(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(list_affinity_rules));
     let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_default();
     Json(items)
 }
@@ -134,6 +143,7 @@ pub async fn create_affinity_rule(
     State(state): State<Arc<AppState>>,
     Json(mut rule): Json<AffinityRule>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(create_affinity_rule));
     if rule.id.is_empty() {
         rule.id = Uuid::new_v4().to_string();
     }
@@ -149,6 +159,7 @@ pub async fn get_affinity_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(get_affinity_rule));
     match state.store.get_entity::<AffinityRule>("affinity_rules", &id) {
         Ok(Some(r)) => Json(r).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -161,6 +172,7 @@ pub async fn update_affinity_rule(
     Path(id): Path<String>,
     Json(mut rule): Json<AffinityRule>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(update_affinity_rule));
     rule.id = id.clone();
     rule.updated = Utc::now();
     if let Err(e) = state.store.save_entity("affinity_rules", &id, &rule) {
@@ -173,6 +185,7 @@ pub async fn delete_affinity_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("drs::{}", stringify!(delete_affinity_rule));
     if let Err(e) = state.store.delete_entity("affinity_rules", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }

@@ -20,6 +20,7 @@ use datacenter::{
 // ============================================================================
 
 pub async fn list_datacenters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(list_datacenters));
     let items: Vec<Datacenter> = state.store.list_entities("datacenters").unwrap_or_default();
     Json(items)
 }
@@ -28,6 +29,7 @@ pub async fn create_datacenter(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDatacenterRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(create_datacenter));
     let now = Utc::now();
     let dc = Datacenter {
         id: Uuid::new_v4().to_string(),
@@ -52,6 +54,7 @@ pub async fn get_datacenter(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(get_datacenter));
     match state.store.get_entity::<Datacenter>("datacenters", &id) {
         Ok(Some(dc)) => Json(dc).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -68,6 +71,7 @@ pub async fn update_datacenter(
     Path(id): Path<String>,
     Json(req): Json<UpdateDatacenterRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(update_datacenter));
     let dc = match state.store.get_entity::<Datacenter>("datacenters", &id) {
         Ok(Some(dc)) => dc,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -100,6 +104,7 @@ pub async fn delete_datacenter(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(delete_datacenter));
     if let Err(e) = state.store.delete_entity("datacenters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -110,6 +115,7 @@ pub async fn get_datacenter_summary(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(get_datacenter_summary));
     let dc = match state.store.get_entity::<Datacenter>("datacenters", &id) {
         Ok(Some(dc)) => dc,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -134,6 +140,7 @@ pub async fn get_datacenter_summary(
 // ============================================================================
 
 pub async fn list_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(list_clusters));
     let items: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_default();
     Json(items)
 }
@@ -142,6 +149,7 @@ pub async fn create_cluster(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateClusterRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(create_cluster));
     let now = Utc::now();
     let cluster = Cluster {
         id: Uuid::new_v4().to_string(),
@@ -171,6 +179,7 @@ pub async fn get_cluster(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(get_cluster));
     match state.store.get_entity::<Cluster>("clusters", &id) {
         Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -183,6 +192,7 @@ pub async fn update_cluster(
     Path(id): Path<String>,
     Json(req): Json<UpdateClusterRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(update_cluster));
     let mut cluster = match state.store.get_entity::<Cluster>("clusters", &id) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -206,6 +216,7 @@ pub async fn delete_cluster(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(delete_cluster));
     if let Err(e) = state.store.delete_entity("clusters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -217,6 +228,7 @@ pub async fn delete_cluster(
 // ============================================================================
 
 pub async fn list_hosts(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(list_hosts));
     let items: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
     Json(items)
 }
@@ -225,6 +237,7 @@ pub async fn register_host(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RegisterHostRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(register_host));
     let now = Utc::now();
     let host = HostInfo {
         id: Uuid::new_v4().to_string(),
@@ -257,6 +270,7 @@ pub async fn get_host(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(get_host));
     match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => Json(h).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -269,6 +283,7 @@ pub async fn update_host(
     Path(id): Path<String>,
     Json(req): Json<UpdateHostRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(update_host));
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -291,6 +306,7 @@ pub async fn remove_host(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(remove_host));
     if let Err(e) = state.store.delete_entity("hosts", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -302,6 +318,7 @@ pub async fn host_heartbeat(
     Path(id): Path<String>,
     Json(hb): Json<HostHeartbeat>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(host_heartbeat));
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -322,6 +339,7 @@ pub async fn host_enter_maintenance(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(host_enter_maintenance));
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -339,6 +357,7 @@ pub async fn host_exit_maintenance(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(host_exit_maintenance));
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -377,6 +396,7 @@ pub async fn discover_host(
     State(state): State<Arc<AppState>>,
     Json(req): Json<DiscoverHostRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(discover_host));
     let port = req.port.unwrap_or(8080);
     let url = format!("http://{}:{}/health", req.address, port);
 
@@ -446,6 +466,7 @@ pub async fn get_cluster_health(
     State(state): State<Arc<AppState>>,
     Path(cluster_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("datacenter::{}", stringify!(get_cluster_health));
     // Verify cluster exists
     match state.store.get_entity::<Cluster>("clusters", &cluster_id) {
         Ok(Some(_)) => {}

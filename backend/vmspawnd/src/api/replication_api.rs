@@ -19,6 +19,7 @@ use replication::{
 // ============================================================================
 
 pub async fn list_sites(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(list_sites));
     let items: Vec<ReplicationSite> = state.store.list_entities("replication_sites").unwrap_or_default();
     Json(items)
 }
@@ -27,6 +28,7 @@ pub async fn register_site(
     State(state): State<Arc<AppState>>,
     Json(mut site): Json<ReplicationSite>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(register_site));
     if site.id.is_empty() { site.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     site.created = now;
@@ -41,6 +43,7 @@ pub async fn remove_site(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(remove_site));
     if let Err(e) = state.store.delete_entity("replication_sites", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -52,6 +55,7 @@ pub async fn remove_site(
 // ============================================================================
 
 pub async fn list_replications(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(list_replications));
     let items: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_default();
     Json(items)
 }
@@ -60,6 +64,7 @@ pub async fn configure_replication(
     State(state): State<Arc<AppState>>,
     Json(mut config): Json<ReplicationConfig>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(configure_replication));
     if config.id.is_empty() { config.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     config.created = now;
@@ -74,6 +79,7 @@ pub async fn get_replication(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(get_replication));
     match state.store.get_entity::<ReplicationConfig>("replications", &id) {
         Ok(Some(r)) => Json(r).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -85,6 +91,7 @@ pub async fn pause_replication(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(pause_replication));
     let mut repl = match state.store.get_entity::<ReplicationConfig>("replications", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -102,6 +109,7 @@ pub async fn resume_replication(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(resume_replication));
     let mut repl = match state.store.get_entity::<ReplicationConfig>("replications", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -119,6 +127,7 @@ pub async fn remove_replication(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(remove_replication));
     if let Err(e) = state.store.delete_entity("replications", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -134,6 +143,7 @@ pub async fn start_sync(
     State(state): State<Arc<AppState>>,
     Json(req): Json<StartSyncRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(start_sync));
     let repl = match state.store.get_entity::<ReplicationConfig>("replications", &req.replication_id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -146,6 +156,7 @@ pub async fn get_replication_metrics(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(get_replication_metrics));
     match state.store.get_entity::<ReplicationMetrics>("replication_metrics", &id) {
         Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -154,6 +165,7 @@ pub async fn get_replication_metrics(
 }
 
 pub async fn check_rpo_violations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(check_rpo_violations));
     let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_default();
     let now = Utc::now();
     let violations: Vec<_> = replications
@@ -167,6 +179,7 @@ pub async fn check_rpo_violations(State(state): State<Arc<AppState>>) -> impl In
 }
 
 pub async fn get_replication_health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(get_replication_health));
     let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_default();
     let now = Utc::now();
     let mut summary = ReplicationHealthSummary {
@@ -193,6 +206,7 @@ pub async fn get_replication_health(State(state): State<Arc<AppState>>) -> impl 
 }
 
 pub async fn list_recovery_instances(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("replication_api::{}", stringify!(list_recovery_instances));
     let items: Vec<ReplicationInstance> = state.store.list_entities("recovery_instances").unwrap_or_default();
     Json(items)
 }

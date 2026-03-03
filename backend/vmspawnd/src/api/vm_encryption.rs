@@ -16,6 +16,7 @@ use encryption::{EncryptionPolicy, KeyProvider, VmEncryptionStatus};
 // ============================================================================
 
 pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(list_providers));
     let items: Vec<KeyProvider> = state.store.list_entities("key_providers").unwrap_or_default();
     Json(items)
 }
@@ -24,6 +25,7 @@ pub async fn register_provider(
     State(state): State<Arc<AppState>>,
     Json(mut provider): Json<KeyProvider>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(register_provider));
     if provider.id.is_empty() { provider.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     provider.created = now;
@@ -38,6 +40,7 @@ pub async fn remove_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(remove_provider));
     if let Err(e) = state.store.delete_entity("key_providers", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -48,6 +51,7 @@ pub async fn test_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(test_provider));
     match state.store.get_entity::<KeyProvider>("key_providers", &id) {
         Ok(Some(p)) => {
             let ok = match p.provider_type {
@@ -66,6 +70,7 @@ pub async fn test_provider(
 // ============================================================================
 
 pub async fn list_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(list_policies));
     let items: Vec<EncryptionPolicy> = state.store.list_entities("encryption_policies").unwrap_or_default();
     Json(items)
 }
@@ -74,6 +79,7 @@ pub async fn create_policy(
     State(state): State<Arc<AppState>>,
     Json(mut policy): Json<EncryptionPolicy>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(create_policy));
     if policy.id.is_empty() { policy.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     policy.created = now;
@@ -88,6 +94,7 @@ pub async fn get_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(get_policy));
     match state.store.get_entity::<EncryptionPolicy>("encryption_policies", &id) {
         Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -100,6 +107,7 @@ pub async fn update_policy(
     Path(id): Path<String>,
     Json(mut policy): Json<EncryptionPolicy>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(update_policy));
     policy.id = id.clone();
     policy.updated = Utc::now();
     if let Err(e) = state.store.save_entity("encryption_policies", &id, &policy) {
@@ -112,6 +120,7 @@ pub async fn delete_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(delete_policy));
     if let Err(e) = state.store.delete_entity("encryption_policies", &id) {
         tracing::error!("Failed to delete: {}", e);
     }
@@ -132,6 +141,7 @@ pub async fn encrypt_vm(
     State(state): State<Arc<AppState>>,
     Json(req): Json<EncryptVmRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(encrypt_vm));
     let policy = match state.store.get_entity::<EncryptionPolicy>("encryption_policies", &req.policy_id) {
         Ok(Some(p)) => p,
         Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Policy not found"}))).into_response(),
@@ -161,6 +171,7 @@ pub async fn decrypt_vm(
     State(state): State<Arc<AppState>>,
     Json(req): Json<DecryptVmRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(decrypt_vm));
     let status = VmEncryptionStatus {
         vm_name: req.vm_name.clone(),
         encrypted: false,
@@ -180,6 +191,7 @@ pub async fn get_vm_encryption_status(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(get_vm_encryption_status));
     match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
         Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -188,6 +200,7 @@ pub async fn get_vm_encryption_status(
 }
 
 pub async fn list_encrypted_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(list_encrypted_vms));
     let items: Vec<VmEncryptionStatus> = state.store.list_entities("vm_encryption").unwrap_or_default();
     let encrypted: Vec<_> = items.into_iter().filter(|s| s.encrypted).collect();
     Json(encrypted)
@@ -197,6 +210,7 @@ pub async fn rotate_vm_key(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_encryption::{}", stringify!(rotate_vm_key));
     let mut status = match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
         Ok(Some(s)) => s,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),

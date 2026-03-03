@@ -24,6 +24,7 @@ pub async fn create_qos_policy(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateQoSPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(create_qos_policy));
     let now = Utc::now();
     let policy = QoSPolicy {
         id: Uuid::new_v4(),
@@ -59,6 +60,7 @@ pub async fn list_qos_policies(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(list_qos_policies));
     match state.store.list_entities::<QoSPolicy>(STORE_KEY) {
         Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
         Err(e) => (
@@ -74,6 +76,7 @@ pub async fn get_qos_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(get_qos_policy));
     match state.store.get_entity::<QoSPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
         Ok(None) => (
@@ -95,6 +98,7 @@ pub async fn update_qos_policy(
     Path(id): Path<String>,
     Json(req): Json<CreateQoSPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(update_qos_policy));
     let existing = match state.store.get_entity::<QoSPolicy>(STORE_KEY, &id) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -145,6 +149,7 @@ pub async fn delete_qos_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(delete_qos_policy));
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -166,6 +171,7 @@ pub async fn sync_qos_policies(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(sync_qos_policies));
     match reconcile_qos(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -180,6 +186,7 @@ pub async fn get_qos_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(get_qos_status));
     let policies: Vec<QoSPolicy> = match state.store.list_entities(STORE_KEY) {
         Ok(p) => p,
         Err(e) => {
@@ -215,6 +222,7 @@ pub async fn get_qos_status(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_qos(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("traffic_shaping::{}", stringify!(reconcile_qos));
     let policies: Vec<QoSPolicy> = state.store.list_entities(STORE_KEY)?;
 
     let vms = build_vm_snapshots(state);

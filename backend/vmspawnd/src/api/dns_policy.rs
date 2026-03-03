@@ -27,6 +27,7 @@ pub async fn create_zone(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDnsZoneRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(create_zone));
     let now = Utc::now();
     let zone = DnsZone {
         id: Uuid::new_v4(),
@@ -54,6 +55,7 @@ pub async fn list_zones(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(list_zones));
     match state.store.list_entities::<DnsZone>(ZONES_KEY) {
         Ok(zones) => (StatusCode::OK, Json(zones)).into_response(),
         Err(e) => (
@@ -69,6 +71,7 @@ pub async fn get_zone(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(get_zone));
     match state.store.get_entity::<DnsZone>(ZONES_KEY, &id) {
         Ok(Some(zone)) => (StatusCode::OK, Json(zone)).into_response(),
         Ok(None) => (
@@ -89,6 +92,7 @@ pub async fn delete_zone(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(delete_zone));
     if let Err(e) = state.store.delete_entity(ZONES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -107,6 +111,7 @@ pub async fn create_policy(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDnsPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(create_policy));
     let now = Utc::now();
     let policy = DnsPolicy {
         id: Uuid::new_v4(),
@@ -142,6 +147,7 @@ pub async fn list_policies(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(list_policies));
     match state.store.list_entities::<DnsPolicy>(POLICIES_KEY) {
         Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
         Err(e) => (
@@ -157,6 +163,7 @@ pub async fn get_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(get_policy));
     match state.store.get_entity::<DnsPolicy>(POLICIES_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
         Ok(None) => (
@@ -178,6 +185,7 @@ pub async fn update_policy(
     Path(id): Path<String>,
     Json(req): Json<CreateDnsPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(update_policy));
     let existing = match state.store.get_entity::<DnsPolicy>(POLICIES_KEY, &id) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -228,6 +236,7 @@ pub async fn delete_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(delete_policy));
     if let Err(e) = state.store.delete_entity(POLICIES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -249,6 +258,7 @@ pub async fn list_dns_records(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(list_dns_records));
     let policies: Vec<DnsPolicy> = match state.store.list_entities(POLICIES_KEY) {
         Ok(p) => p,
         Err(e) => {
@@ -284,6 +294,7 @@ pub async fn sync_dns_policies(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(sync_dns_policies));
     match reconcile_dns(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -297,6 +308,7 @@ pub async fn sync_dns_policies(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_dns(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("dns_policy::{}", stringify!(reconcile_dns));
     let policies: Vec<DnsPolicy> = state.store.list_entities(POLICIES_KEY)?;
     let zones: Vec<DnsZone> = state.store.list_entities(ZONES_KEY)?;
 

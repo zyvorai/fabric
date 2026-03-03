@@ -19,6 +19,7 @@ use site_recovery::{
 // ============================================================================
 
 pub async fn list_plans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(list_plans));
     let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_default();
     Json(items)
 }
@@ -27,6 +28,7 @@ pub async fn create_plan(
     State(state): State<Arc<AppState>>,
     Json(mut plan): Json<RecoveryPlan>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(create_plan));
     plan.id = Uuid::new_v4().to_string();
     plan.created = Utc::now();
     plan.updated = None;
@@ -42,6 +44,7 @@ pub async fn get_plan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(get_plan));
     match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
         Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -54,6 +57,7 @@ pub async fn update_plan(
     Path(id): Path<String>,
     Json(mut plan): Json<RecoveryPlan>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(update_plan));
     let existing = match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -73,6 +77,7 @@ pub async fn delete_plan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(delete_plan));
     if let Err(e) = state.store.delete_entity("recovery_plans", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -121,6 +126,7 @@ pub async fn execute_planned_migration(
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(execute_planned_migration));
     match start_execution(&state, &plan_id, ExecutionType::PlannedMigration) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
@@ -131,6 +137,7 @@ pub async fn execute_disaster_recovery(
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(execute_disaster_recovery));
     match start_execution(&state, &plan_id, ExecutionType::DisasterRecovery) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
@@ -141,6 +148,7 @@ pub async fn execute_test_failover(
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(execute_test_failover));
     match start_execution(&state, &plan_id, ExecutionType::TestFailover) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
@@ -151,6 +159,7 @@ pub async fn execute_reprotect(
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(execute_reprotect));
     match start_execution(&state, &plan_id, ExecutionType::Reprotect) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err(sc) => sc.into_response(),
@@ -158,6 +167,7 @@ pub async fn execute_reprotect(
 }
 
 pub async fn list_executions(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(list_executions));
     let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_default();
     Json(items)
 }
@@ -166,6 +176,7 @@ pub async fn get_execution(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(get_execution));
     match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
         Ok(Some(e)) => Json(e).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -177,6 +188,7 @@ pub async fn cancel_execution(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(cancel_execution));
     let mut exec = match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
         Ok(Some(e)) => e,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -195,6 +207,7 @@ pub async fn cancel_execution(
 // ============================================================================
 
 pub async fn get_dr_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("site_recovery_api::{}", stringify!(get_dr_dashboard));
     let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_default();
     let total_plans = plans.len() as u32;
     let ready_plans = plans.iter().filter(|p| p.status == PlanStatus::Ready).count() as u32;

@@ -152,6 +152,7 @@ pub async fn list_backups(
     State(state): State<Arc<AppState>>,
     Query(query): Query<BackupQuery>,
 ) -> Result<Json<Vec<Backup>>, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(list_backups));
     // Load from state store
     let mut backups = state.store.list_entities::<Backup>("backups")
         .unwrap_or_default();
@@ -168,6 +169,7 @@ pub async fn get_backup(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Backup>, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(get_backup));
     // Load from state store
     let backup = state.store.get_entity::<Backup>("backups", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -180,6 +182,7 @@ pub async fn create_backup(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupRequest>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
+    tracing::debug!("backups::{}", stringify!(create_backup));
     // Validate VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {
@@ -262,6 +265,7 @@ pub async fn delete_backup(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(delete_backup));
     // Get backup info before deleting (need storage_location)
     let backup = match state.store.get_entity::<Backup>("backups", &id) {
         Ok(Some(b)) => b,
@@ -301,6 +305,7 @@ pub async fn restore_backup(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RestoreOptions>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
+    tracing::debug!("backups::{}", stringify!(restore_backup));
     // Validate backup exists
     let backup = state.store.get_entity::<Backup>("backups", &req.backup_id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -381,6 +386,7 @@ pub async fn restore_backup(
 pub async fn get_backup_jobs(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupJob>>, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(get_backup_jobs));
     // Load from state store
     let jobs = state.store.list_entities::<BackupJob>("backup_jobs")
         .unwrap_or_default();
@@ -392,6 +398,7 @@ pub async fn get_backup_job(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<BackupJob>, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(get_backup_job));
     // Load from state store
     let job = state.store.get_entity::<BackupJob>("backup_jobs", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -407,6 +414,7 @@ pub async fn get_backup_job(
 pub async fn list_backup_policies(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupPolicy>>, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(list_backup_policies));
     // Load from state store, fall back to mock data if empty
     let policies = state.store.list_entities::<BackupPolicy>("backup_policies")
         .unwrap_or_else(|_| vec![
@@ -441,6 +449,7 @@ pub async fn create_backup_policy(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupPolicyRequest>,
 ) -> Result<(StatusCode, Json<BackupPolicy>), StatusCode> {
+    tracing::debug!("backups::{}", stringify!(create_backup_policy));
     let policy = BackupPolicy {
         id: Uuid::new_v4().to_string(),
         name: req.name,
@@ -466,6 +475,7 @@ pub async fn delete_backup_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(delete_backup_policy));
     // Remove from state store
     if let Err(e) = state.store.delete_entity("backup_policies", &id) {
         tracing::error!("Failed to delete backup policy: {}", e);
@@ -479,6 +489,7 @@ pub async fn enable_backup_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(enable_backup_policy));
     // Load policy from state store
     let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -503,6 +514,7 @@ pub async fn disable_backup_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(disable_backup_policy));
     // Load policy from state store
     let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -530,6 +542,7 @@ pub async fn disable_backup_policy(
 pub async fn get_backup_stats(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<BackupStats>, StatusCode> {
+    tracing::debug!("backups::{}", stringify!(get_backup_stats));
     // Calculate from state store
     let backups = state.store.list_entities::<Backup>("backups")
         .unwrap_or_default();

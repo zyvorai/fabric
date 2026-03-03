@@ -71,6 +71,7 @@ pub async fn create_template(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateTemplateRequest>,
 ) -> Result<(StatusCode, Json<VMTemplate>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("templates::{}", stringify!(create_template));
     let now = Utc::now();
 
     let (cpus, memory, disk, image, tags) = if let Some(ref vm_name) = req.from_vm {
@@ -128,6 +129,7 @@ pub async fn create_template(
 pub async fn list_templates(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<VMTemplate>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("templates::{}", stringify!(list_templates));
     let templates = state.store.list_entities::<VMTemplate>("templates").map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -143,6 +145,7 @@ pub async fn get_template(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<VMTemplate>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("templates::{}", stringify!(get_template));
     match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(template)) => Ok(Json(template)),
         Ok(None) => Err((
@@ -162,6 +165,7 @@ pub async fn update_template(
     Path(id): Path<String>,
     Json(req): Json<UpdateTemplateRequest>,
 ) -> Result<Json<VMTemplate>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("templates::{}", stringify!(update_template));
     let mut template = match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(t)) => t,
         Ok(None) => {
@@ -219,6 +223,7 @@ pub async fn delete_template(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("templates::{}", stringify!(delete_template));
     // Verify template exists
     match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(_)) => {}
@@ -252,6 +257,7 @@ pub async fn deploy_template(
     Path(id): Path<String>,
     Json(req): Json<DeployTemplateRequest>,
 ) -> Result<(StatusCode, Json<vm_model::VM>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("templates::{}", stringify!(deploy_template));
     let template = match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(t)) => t,
         Ok(None) => {

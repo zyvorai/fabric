@@ -30,6 +30,7 @@ pub async fn create_profile(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateFirewallProfileRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(create_profile));
     let now = Utc::now();
     let profile = FirewallProfile {
         id: Uuid::new_v4(),
@@ -59,6 +60,7 @@ pub async fn list_profiles(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(list_profiles));
     match state.store.list_entities::<FirewallProfile>(PROFILES_KEY) {
         Ok(profiles) => (StatusCode::OK, Json(profiles)).into_response(),
         Err(e) => (
@@ -74,6 +76,7 @@ pub async fn get_profile(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(get_profile));
     match state.store.get_entity::<FirewallProfile>(PROFILES_KEY, &id) {
         Ok(Some(profile)) => (StatusCode::OK, Json(profile)).into_response(),
         Ok(None) => (
@@ -95,6 +98,7 @@ pub async fn update_profile(
     Path(id): Path<String>,
     Json(req): Json<CreateFirewallProfileRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(update_profile));
     let existing = match state.store.get_entity::<FirewallProfile>(PROFILES_KEY, &id) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -143,6 +147,7 @@ pub async fn delete_profile(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(delete_profile));
     if let Err(e) = state.store.delete_entity(PROFILES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -165,6 +170,7 @@ pub async fn create_zone(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateFirewallZoneRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(create_zone));
     let now = Utc::now();
     let zone = FirewallZone {
         id: Uuid::new_v4(),
@@ -193,6 +199,7 @@ pub async fn list_zones(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(list_zones));
     match state.store.list_entities::<FirewallZone>(ZONES_KEY) {
         Ok(zones) => (StatusCode::OK, Json(zones)).into_response(),
         Err(e) => (
@@ -208,6 +215,7 @@ pub async fn get_zone(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(get_zone));
     match state.store.get_entity::<FirewallZone>(ZONES_KEY, &id) {
         Ok(Some(zone)) => (StatusCode::OK, Json(zone)).into_response(),
         Ok(None) => (
@@ -228,6 +236,7 @@ pub async fn delete_zone(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(delete_zone));
     if let Err(e) = state.store.delete_entity(ZONES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -246,6 +255,7 @@ pub async fn get_vm_firewall(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(get_vm_firewall));
     match state
         .store
         .get_entity::<VMFirewallAssignment>(ASSIGNMENTS_KEY, &name)
@@ -270,6 +280,7 @@ pub async fn assign_vm_firewall(
     Path(name): Path<String>,
     Json(req): Json<AssignFirewallRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(assign_vm_firewall));
     let assignment = VMFirewallAssignment {
         vm_name: name.clone(),
         profile_id: req.profile_id,
@@ -299,6 +310,7 @@ pub async fn remove_vm_firewall(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(remove_vm_firewall));
     if let Err(e) = state.store.delete_entity(ASSIGNMENTS_KEY, &name) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -320,6 +332,7 @@ pub async fn sync_firewall(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(sync_firewall));
     match reconcile_firewall(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -334,6 +347,7 @@ pub async fn get_firewall_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(get_firewall_status));
     let profiles: Vec<FirewallProfile> = match state.store.list_entities(PROFILES_KEY) {
         Ok(p) => p,
         Err(e) => {
@@ -374,6 +388,7 @@ pub async fn get_firewall_status(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_firewall(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("vm_firewall::{}", stringify!(reconcile_firewall));
     let assignments: Vec<VMFirewallAssignment> = state.store.list_entities(ASSIGNMENTS_KEY)?;
     let profiles_list: Vec<FirewallProfile> = state.store.list_entities(PROFILES_KEY)?;
 

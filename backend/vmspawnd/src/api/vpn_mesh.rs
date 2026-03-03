@@ -28,6 +28,7 @@ pub async fn create_vpn_tunnel(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVpnTunnelRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(create_vpn_tunnel));
     let now = Utc::now();
     let tunnel = VpnTunnel {
         id: Uuid::new_v4(),
@@ -65,6 +66,7 @@ pub async fn list_vpn_tunnels(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(list_vpn_tunnels));
     match state.store.list_entities::<VpnTunnel>(TUNNEL_STORE_KEY) {
         Ok(tunnels) => (StatusCode::OK, Json(tunnels)).into_response(),
         Err(e) => (
@@ -80,6 +82,7 @@ pub async fn get_vpn_tunnel(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_tunnel));
     match state.store.get_entity::<VpnTunnel>(TUNNEL_STORE_KEY, &id) {
         Ok(Some(tunnel)) => (StatusCode::OK, Json(tunnel)).into_response(),
         Ok(None) => (
@@ -101,6 +104,7 @@ pub async fn update_vpn_tunnel(
     Path(id): Path<String>,
     Json(req): Json<CreateVpnTunnelRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(update_vpn_tunnel));
     let existing = match state.store.get_entity::<VpnTunnel>(TUNNEL_STORE_KEY, &id) {
         Ok(Some(t)) => t,
         Ok(None) => {
@@ -153,6 +157,7 @@ pub async fn delete_vpn_tunnel(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(delete_vpn_tunnel));
     if let Err(e) = state.store.delete_entity(TUNNEL_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -175,6 +180,7 @@ pub async fn create_vpn_network(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVpnNetworkRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(create_vpn_network));
     let now = Utc::now();
     let network = VpnNetwork {
         id: Uuid::new_v4(),
@@ -211,6 +217,7 @@ pub async fn list_vpn_networks(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(list_vpn_networks));
     match state.store.list_entities::<VpnNetwork>(NETWORK_STORE_KEY) {
         Ok(networks) => (StatusCode::OK, Json(networks)).into_response(),
         Err(e) => (
@@ -226,6 +233,7 @@ pub async fn get_vpn_network(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_network));
     match state
         .store
         .get_entity::<VpnNetwork>(NETWORK_STORE_KEY, &id)
@@ -250,6 +258,7 @@ pub async fn update_vpn_network(
     Path(id): Path<String>,
     Json(req): Json<CreateVpnNetworkRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(update_vpn_network));
     let existing = match state
         .store
         .get_entity::<VpnNetwork>(NETWORK_STORE_KEY, &id)
@@ -304,6 +313,7 @@ pub async fn delete_vpn_network(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(delete_vpn_network));
     if let Err(e) = state.store.delete_entity(NETWORK_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -325,6 +335,7 @@ pub async fn sync_vpn_tunnels(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(sync_vpn_tunnels));
     match reconcile_vpn(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -339,6 +350,7 @@ pub async fn get_vpn_tunnel_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_tunnel_status));
     let tunnels: Vec<VpnTunnel> = match state.store.list_entities(TUNNEL_STORE_KEY) {
         Ok(t) => t,
         Err(e) => {
@@ -368,6 +380,7 @@ pub async fn get_vpn_network_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_network_status));
     let networks: Vec<VpnNetwork> = match state.store.list_entities(NETWORK_STORE_KEY) {
         Ok(n) => n,
         Err(e) => {
@@ -408,6 +421,7 @@ pub async fn get_vpn_network_status(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_vpn(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("vpn_mesh::{}", stringify!(reconcile_vpn));
     let tunnels: Vec<VpnTunnel> = state.store.list_entities(TUNNEL_STORE_KEY)?;
     let networks: Vec<VpnNetwork> = state.store.list_entities(NETWORK_STORE_KEY)?;
 

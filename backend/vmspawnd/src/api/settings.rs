@@ -92,6 +92,7 @@ impl Default for AppSettings {
 pub async fn get_settings(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AppSettings>, StatusCode> {
+    tracing::debug!("settings::{}", stringify!(get_settings));
     let settings = state.store.get_entity::<AppSettings>("config", "settings")
         .unwrap_or(None)
         .unwrap_or_default();
@@ -104,6 +105,7 @@ pub async fn update_settings(
     State(state): State<Arc<AppState>>,
     Json(settings): Json<AppSettings>,
 ) -> Result<Json<AppSettings>, StatusCode> {
+    tracing::debug!("settings::{}", stringify!(update_settings));
     // Validate
     if settings.refresh_interval == 0 {
         return Err(StatusCode::BAD_REQUEST);

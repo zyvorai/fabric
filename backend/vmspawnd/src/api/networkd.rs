@@ -30,6 +30,7 @@ fn networkd_manager(state: &AppState) -> NetworkdManager {
 // ============================================================================
 
 pub async fn list_bridges(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_bridges));
     let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_default();
     Json(items)
 }
@@ -38,6 +39,7 @@ pub async fn create_bridge(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBridgeRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_bridge));
     let now = Utc::now().to_rfc3339();
     let cfg = BridgeConfig {
         id: Uuid::new_v4().to_string(),
@@ -75,6 +77,7 @@ pub async fn get_bridge(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_bridge));
     match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -87,6 +90,7 @@ pub async fn update_bridge(
     Path(id): Path<String>,
     Json(req): Json<CreateBridgeRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(update_bridge));
     let existing = match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => b,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -135,6 +139,7 @@ pub async fn delete_bridge(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_bridge));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -149,6 +154,7 @@ pub async fn delete_bridge(
 // ============================================================================
 
 pub async fn list_vlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_vlans));
     let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_default();
     Json(items)
 }
@@ -157,6 +163,7 @@ pub async fn create_vlan(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVlanRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_vlan));
     let now = Utc::now().to_rfc3339();
     let cfg = VlanConfig {
         id: Uuid::new_v4().to_string(),
@@ -190,6 +197,7 @@ pub async fn get_vlan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_vlan));
     match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -202,6 +210,7 @@ pub async fn update_vlan(
     Path(id): Path<String>,
     Json(req): Json<CreateVlanRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(update_vlan));
     let existing = match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => v,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -244,6 +253,7 @@ pub async fn delete_vlan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_vlan));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -258,6 +268,7 @@ pub async fn delete_vlan(
 // ============================================================================
 
 pub async fn list_macvtaps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_macvtaps));
     let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_default();
     Json(items)
 }
@@ -266,6 +277,7 @@ pub async fn create_macvtap(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateMacvtapRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_macvtap));
     let now = Utc::now().to_rfc3339();
     let mac = req.mac_address.unwrap_or_else(|| NetworkdManager::generate_mac_address());
     let cfg = MacvtapConfig {
@@ -297,6 +309,7 @@ pub async fn get_macvtap(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_macvtap));
     match state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
         Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -308,6 +321,7 @@ pub async fn delete_macvtap(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_macvtap));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -322,6 +336,7 @@ pub async fn delete_macvtap(
 // ============================================================================
 
 pub async fn list_taps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_taps));
     let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_default();
     Json(items)
 }
@@ -330,6 +345,7 @@ pub async fn create_tap(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateTapRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_tap));
     let now = Utc::now().to_rfc3339();
     let cfg = TapConfig {
         id: Uuid::new_v4().to_string(),
@@ -363,6 +379,7 @@ pub async fn get_tap(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_tap));
     match state.store.get_entity::<TapConfig>("networkd_taps", &id) {
         Ok(Some(t)) => Json(t).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -374,6 +391,7 @@ pub async fn delete_tap(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_tap));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<TapConfig>("networkd_taps", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -388,6 +406,7 @@ pub async fn delete_tap(
 // ============================================================================
 
 pub async fn list_links(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_links));
     let mgr = networkd_manager(&state);
     match mgr.list_links() {
         Ok(links) => Json(links).into_response(),
@@ -399,6 +418,7 @@ pub async fn get_device_status(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_device_status));
     let mgr = networkd_manager(&state);
     match mgr.device_status(&name) {
         Ok(status) => Json(serde_json::json!({"name": name, "status": status})).into_response(),
@@ -407,6 +427,7 @@ pub async fn get_device_status(
 }
 
 pub async fn reload_networkd(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(reload_networkd));
     let mgr = networkd_manager(&state);
     match mgr.reload() {
         Ok(_) => Json(serde_json::json!({"status": "reloaded"})).into_response(),
@@ -415,6 +436,7 @@ pub async fn reload_networkd(State(state): State<Arc<AppState>>) -> impl IntoRes
 }
 
 pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_managed_files));
     let mgr = networkd_manager(&state);
     match mgr.list_managed_files() {
         Ok(files) => Json(files).into_response(),
@@ -427,6 +449,7 @@ pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl Into
 // ============================================================================
 
 pub async fn list_bonds(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_bonds));
     let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_default();
     Json(items)
 }
@@ -435,6 +458,7 @@ pub async fn create_bond(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBondRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_bond));
     let now = Utc::now().to_rfc3339();
     let cfg = BondConfig {
         id: Uuid::new_v4().to_string(),
@@ -477,6 +501,7 @@ pub async fn get_bond(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_bond));
     match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -489,6 +514,7 @@ pub async fn update_bond(
     Path(id): Path<String>,
     Json(req): Json<CreateBondRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(update_bond));
     let existing = match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => b,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -540,6 +566,7 @@ pub async fn delete_bond(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_bond));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -554,6 +581,7 @@ pub async fn delete_bond(
 // ============================================================================
 
 pub async fn list_network_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_network_files));
     let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_default();
     Json(items)
 }
@@ -562,6 +590,7 @@ pub async fn create_network_file(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNetworkFileRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_network_file));
     let now = Utc::now().to_rfc3339();
     let cfg = NetworkFileConfig {
         id: Uuid::new_v4().to_string(),
@@ -598,6 +627,7 @@ pub async fn get_network_file(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_network_file));
     match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
         Ok(Some(n)) => Json(n).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -609,6 +639,7 @@ pub async fn delete_network_file(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_network_file));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
         if let Err(e) = mgr.remove_device(&format!("net-{}", cfg.match_name)) { tracing::warn!("Failed to remove device: {}", e); }
@@ -623,6 +654,7 @@ pub async fn delete_network_file(
 // ============================================================================
 
 pub async fn list_link_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_link_files));
     let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_default();
     Json(items)
 }
@@ -631,6 +663,7 @@ pub async fn create_link_file(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLinkFileRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_link_file));
     let now = Utc::now().to_rfc3339();
     let cfg = LinkFileConfig {
         id: Uuid::new_v4().to_string(),
@@ -665,6 +698,7 @@ pub async fn delete_link_file(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_link_file));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<LinkFileConfig>("networkd_linkfiles", &id) {
         let file_id = cfg.name.as_deref()
@@ -682,6 +716,7 @@ pub async fn delete_link_file(
 // ============================================================================
 
 pub async fn list_port_forwards(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_port_forwards));
     let items: Vec<PortForwardConfig> = state
         .store
         .list_entities("networkd_port_forwards")
@@ -693,6 +728,7 @@ pub async fn create_port_forward(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreatePortForwardRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_port_forward));
     let now = Utc::now().to_rfc3339();
     let cfg = PortForwardConfig {
         id: Uuid::new_v4().to_string(),
@@ -740,6 +776,7 @@ pub async fn get_port_forward(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_port_forward));
     match state
         .store
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
@@ -754,6 +791,7 @@ pub async fn delete_port_forward(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_port_forward));
     if let Ok(Some(cfg)) = state
         .store
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
@@ -766,6 +804,7 @@ pub async fn delete_port_forward(
 }
 
 pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(sync_port_forwards));
     let configs: Vec<PortForwardConfig> = state
         .store
         .list_entities("networkd_port_forwards")
@@ -791,6 +830,7 @@ pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl Into
 // ============================================================================
 
 pub async fn list_vxlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_vxlans));
     let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_default();
     Json(items)
 }
@@ -799,6 +839,7 @@ pub async fn create_vxlan(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVxlanRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_vxlan));
     let now = Utc::now().to_rfc3339();
     let cfg = VxlanConfig {
         id: Uuid::new_v4().to_string(),
@@ -835,6 +876,7 @@ pub async fn get_vxlan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_vxlan));
     match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -846,6 +888,7 @@ pub async fn delete_vxlan(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_vxlan));
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -860,6 +903,7 @@ pub async fn delete_vxlan(
 // ============================================================================
 
 pub async fn list_sriov(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_sriov));
     let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_default();
     Json(items)
 }
@@ -868,6 +912,7 @@ pub async fn create_sriov(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSriovRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(create_sriov));
     let now = Utc::now().to_rfc3339();
     let cfg = SriovConfig {
         id: Uuid::new_v4().to_string(),
@@ -893,6 +938,7 @@ pub async fn get_sriov(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(get_sriov));
     match state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -904,6 +950,7 @@ pub async fn delete_sriov(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(delete_sriov));
     if let Ok(Some(cfg)) = state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         let mgr = networkd_manager(&state);
         if let Err(e) = mgr.remove_sriov(&cfg.pf_name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -917,6 +964,7 @@ pub async fn delete_sriov(
 // ============================================================================
 
 pub async fn scan_configs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(scan_configs));
     let dir = std::path::Path::new(&state.config.network.networkd_config_dir);
     match networking::parser::scan_networkd_dir(dir) {
         Ok(configs) => Json(configs).into_response(),

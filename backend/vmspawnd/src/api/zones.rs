@@ -51,6 +51,7 @@ pub async fn create_zone(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateZoneRequest>,
 ) -> Result<(StatusCode, Json<AvailabilityZone>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("zones::{}", stringify!(create_zone));
     let zone = AvailabilityZone {
         id: uuid::Uuid::new_v4().to_string(),
         name: req.name,
@@ -72,6 +73,7 @@ pub async fn create_zone(
 pub async fn list_zones(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<AvailabilityZone>> {
+    tracing::debug!("zones::{}", stringify!(list_zones));
     let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_default();
     Json(zones)
 }
@@ -81,6 +83,7 @@ pub async fn get_zone(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<AvailabilityZone>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("zones::{}", stringify!(get_zone));
     match state.store.get_entity::<AvailabilityZone>("zones", &id) {
         Ok(Some(zone)) => Ok(Json(zone)),
         Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Zone not found" })))),
@@ -93,6 +96,7 @@ pub async fn delete_zone(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("zones::{}", stringify!(delete_zone));
     state.store.delete_entity("zones", &id).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;
@@ -160,6 +164,7 @@ pub async fn create_spot_instance(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSpotRequest>,
 ) -> Result<(StatusCode, Json<SpotInstance>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("zones::{}", stringify!(create_spot_instance));
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {},
@@ -190,6 +195,7 @@ pub async fn create_spot_instance(
 pub async fn list_spot_instances(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<SpotInstance>> {
+    tracing::debug!("zones::{}", stringify!(list_spot_instances));
     let spots: Vec<SpotInstance> = state.store.list_entities("spot_instances").unwrap_or_default();
     Json(spots)
 }
@@ -199,6 +205,7 @@ pub async fn evict_spot_instance(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<SpotInstance>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("zones::{}", stringify!(evict_spot_instance));
     let mut spot = match state.store.get_entity::<SpotInstance>("spot_instances", &id) {
         Ok(Some(s)) => s,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Spot instance not found" })))),
@@ -254,6 +261,7 @@ pub async fn delete_spot_instance(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("zones::{}", stringify!(delete_spot_instance));
     state.store.delete_entity("spot_instances", &id).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;

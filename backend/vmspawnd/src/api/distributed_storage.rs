@@ -20,6 +20,7 @@ use distributed_storage::{
 // ============================================================================
 
 pub async fn list_storage_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(list_storage_pools));
     let items: Vec<DistributedStoragePool> = state.store.list_entities("dist_storage_pools").unwrap_or_default();
     Json(items)
 }
@@ -28,6 +29,7 @@ pub async fn create_storage_pool(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreatePoolRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(create_storage_pool));
     let total_capacity_gb: u64 = req.hosts.iter().flat_map(|h| h.disks.iter()).map(|d| d.capacity_gb).sum();
     let now = Utc::now();
     let pool = DistributedStoragePool {
@@ -56,6 +58,7 @@ pub async fn get_storage_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(get_storage_pool));
     match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &id) {
         Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -67,6 +70,7 @@ pub async fn delete_storage_pool(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(delete_storage_pool));
     if let Err(e) = state.store.delete_entity("dist_storage_pools", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -78,6 +82,7 @@ pub async fn add_storage_host(
     Path(pool_id): Path<String>,
     Json(host): Json<StorageHost>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(add_storage_host));
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -98,6 +103,7 @@ pub async fn remove_storage_host(
     State(state): State<Arc<AppState>>,
     Path((pool_id, host_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(remove_storage_host));
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -122,6 +128,7 @@ pub async fn report_disk_failure(
     Path(pool_id): Path<String>,
     Json(_req): Json<DiskFailureRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(report_disk_failure));
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -140,6 +147,7 @@ pub async fn get_pool_health(
     State(state): State<Arc<AppState>>,
     Path(pool_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(get_pool_health));
     let pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -175,6 +183,7 @@ pub async fn start_storage_migration(
     State(state): State<Arc<AppState>>,
     Json(req): Json<StartMigrationRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(start_storage_migration));
     let now = Utc::now();
     let migration = StorageMigration {
         id: Uuid::new_v4().to_string(),
@@ -199,6 +208,7 @@ pub async fn get_storage_migration(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(get_storage_migration));
     match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -207,6 +217,7 @@ pub async fn get_storage_migration(
 }
 
 pub async fn list_storage_migrations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(list_storage_migrations));
     let items: Vec<StorageMigration> = state.store.list_entities("storage_migrations").unwrap_or_default();
     Json(items)
 }
@@ -221,6 +232,7 @@ pub async fn update_migration_progress(
     Path(id): Path<String>,
     Json(req): Json<UpdateProgressRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(update_migration_progress));
     let mut m = match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => m,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -239,6 +251,7 @@ pub async fn complete_migration(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(complete_migration));
     let mut m = match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => m,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -257,6 +270,7 @@ pub async fn cancel_migration(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(cancel_migration));
     let mut m = match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => m,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -275,6 +289,7 @@ pub async fn cancel_migration(
 // ============================================================================
 
 pub async fn list_storage_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(list_storage_policies));
     let items: Vec<StoragePolicy> = state.store.list_entities("storage_policies").unwrap_or_default();
     Json(items)
 }
@@ -283,6 +298,7 @@ pub async fn create_storage_policy(
     State(state): State<Arc<AppState>>,
     Json(mut policy): Json<StoragePolicy>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(create_storage_policy));
     if policy.id.is_empty() { policy.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     policy.created = now;
@@ -297,6 +313,7 @@ pub async fn get_storage_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(get_storage_policy));
     match state.store.get_entity::<StoragePolicy>("storage_policies", &id) {
         Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -309,6 +326,7 @@ pub async fn update_storage_policy(
     Path(id): Path<String>,
     Json(mut policy): Json<StoragePolicy>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(update_storage_policy));
     policy.id = id.clone();
     policy.updated = Utc::now();
     if let Err(e) = state.store.save_entity("storage_policies", &id, &policy) {
@@ -321,6 +339,7 @@ pub async fn delete_storage_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(delete_storage_policy));
     if let Err(e) = state.store.delete_entity("storage_policies", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -338,6 +357,7 @@ pub async fn check_compliance(
     Path(policy_id): Path<String>,
     Json(req): Json<ComplianceCheckRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(check_compliance));
     match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &req.pool_id) {
         Ok(Some(_)) => {}
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -359,6 +379,7 @@ pub async fn check_compliance(
 // ============================================================================
 
 pub async fn list_datastore_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(list_datastore_clusters));
     let items: Vec<DatastoreCluster> = state.store.list_entities("datastore_clusters").unwrap_or_default();
     Json(items)
 }
@@ -367,6 +388,7 @@ pub async fn create_datastore_cluster(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDatastoreClusterRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(create_datastore_cluster));
     let now = Utc::now();
     let dsc = DatastoreCluster {
         id: Uuid::new_v4().to_string(),
@@ -390,6 +412,7 @@ pub async fn get_datastore_cluster(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(get_datastore_cluster));
     match state.store.get_entity::<DatastoreCluster>("datastore_clusters", &id) {
         Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -401,6 +424,7 @@ pub async fn delete_datastore_cluster(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(delete_datastore_cluster));
     if let Err(e) = state.store.delete_entity("datastore_clusters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -417,6 +441,7 @@ pub async fn recommend_datastore(
     Path(ds_cluster_id): Path<String>,
     Json(req): Json<RecommendDatastoreRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("distributed_storage::{}", stringify!(recommend_datastore));
     let dsc = match state.store.get_entity::<DatastoreCluster>("datastore_clusters", &ds_cluster_id) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),

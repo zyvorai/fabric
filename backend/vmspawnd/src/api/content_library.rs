@@ -19,6 +19,7 @@ use content_library::{
 // ============================================================================
 
 pub async fn list_libraries(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(list_libraries));
     let items: Vec<Library> = state.store.list_entities("libraries").unwrap_or_default();
     Json(items)
 }
@@ -27,6 +28,7 @@ pub async fn create_library(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLibraryRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(create_library));
     let now = Utc::now();
     let library = Library {
         id: Uuid::new_v4().to_string(),
@@ -54,6 +56,7 @@ pub async fn get_library(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(get_library));
     match state.store.get_entity::<Library>("libraries", &id) {
         Ok(Some(l)) => Json(l).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -65,6 +68,7 @@ pub async fn delete_library(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(delete_library));
     if let Err(e) = state.store.delete_entity("libraries", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -75,6 +79,7 @@ pub async fn sync_library(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(sync_library));
     let mut lib = match state.store.get_entity::<Library>("libraries", &id) {
         Ok(Some(l)) => l,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -112,6 +117,7 @@ pub async fn download_image(
     Path(library_id): Path<String>,
     Json(req): Json<DownloadImageRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(download_image));
     // Verify library exists
     match state.store.get_entity::<Library>("libraries", &library_id) {
         Ok(Some(_)) => {}
@@ -171,6 +177,7 @@ pub async fn download_image(
 // ============================================================================
 
 pub async fn list_library_items(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(list_library_items));
     let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_default();
     Json(items)
 }
@@ -179,6 +186,7 @@ pub async fn add_library_item(
     State(state): State<Arc<AppState>>,
     Json(mut item): Json<LibraryItem>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(add_library_item));
     item.id = Uuid::new_v4().to_string();
     let now = Utc::now();
     item.created = now;
@@ -194,6 +202,7 @@ pub async fn get_library_item(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(get_library_item));
     match state.store.get_entity::<LibraryItem>("library_items", &id) {
         Ok(Some(i)) => Json(i).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -205,6 +214,7 @@ pub async fn delete_library_item(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(delete_library_item));
     if let Err(e) = state.store.delete_entity("library_items", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -220,6 +230,7 @@ pub async fn search_items(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(search_items));
     let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_default();
     let q = query.q.to_lowercase();
     let matched: Vec<_> = items.into_iter().filter(|i| i.name.to_lowercase().contains(&q)).collect();
@@ -231,6 +242,7 @@ pub async fn search_items(
 // ============================================================================
 
 pub async fn list_customization_specs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(list_customization_specs));
     let items: Vec<GuestCustomizationSpec> = state.store.list_entities("customization_specs").unwrap_or_default();
     Json(items)
 }
@@ -239,6 +251,7 @@ pub async fn create_customization_spec(
     State(state): State<Arc<AppState>>,
     Json(mut spec): Json<GuestCustomizationSpec>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(create_customization_spec));
     spec.id = Uuid::new_v4().to_string();
     let now = Utc::now();
     spec.created = now;
@@ -253,6 +266,7 @@ pub async fn get_customization_spec(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(get_customization_spec));
     match state.store.get_entity::<GuestCustomizationSpec>("customization_specs", &id) {
         Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -264,6 +278,7 @@ pub async fn delete_customization_spec(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(delete_customization_spec));
     if let Err(e) = state.store.delete_entity("customization_specs", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -275,6 +290,7 @@ pub async fn delete_customization_spec(
 // ============================================================================
 
 pub async fn list_host_profiles(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(list_host_profiles));
     let items: Vec<HostProfile> = state.store.list_entities("host_profiles").unwrap_or_default();
     Json(items)
 }
@@ -283,6 +299,7 @@ pub async fn create_host_profile(
     State(state): State<Arc<AppState>>,
     Json(mut profile): Json<HostProfile>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(create_host_profile));
     profile.id = Uuid::new_v4().to_string();
     let now = Utc::now();
     profile.created = now;
@@ -297,6 +314,7 @@ pub async fn get_host_profile(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(get_host_profile));
     match state.store.get_entity::<HostProfile>("host_profiles", &id) {
         Ok(Some(p)) => Json(p).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -308,6 +326,7 @@ pub async fn delete_host_profile(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(delete_host_profile));
     if let Err(e) = state.store.delete_entity("host_profiles", &id) {
         tracing::error!("Failed to delete: {}", e);
     }
@@ -325,6 +344,7 @@ pub async fn check_host_compliance(
     Path(profile_id): Path<String>,
     Json(req): Json<HostComplianceRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("content_library::{}", stringify!(check_host_compliance));
     let mgr = content_library::ContentLibraryManager::new();
     // Load profile into the manager for compliance check
     if let Ok(Some(profile)) = state.store.get_entity::<HostProfile>("host_profiles", &profile_id) {

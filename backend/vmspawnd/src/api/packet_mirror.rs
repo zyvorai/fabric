@@ -24,6 +24,7 @@ pub async fn create_mirror_session(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateMirrorSessionRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(create_mirror_session));
     let now = Utc::now();
     let session = MirrorSession {
         id: Uuid::new_v4(),
@@ -61,6 +62,7 @@ pub async fn list_mirror_sessions(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(list_mirror_sessions));
     match state.store.list_entities::<MirrorSession>(STORE_KEY) {
         Ok(sessions) => (StatusCode::OK, Json(sessions)).into_response(),
         Err(e) => (
@@ -76,6 +78,7 @@ pub async fn get_mirror_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(get_mirror_session));
     match state.store.get_entity::<MirrorSession>(STORE_KEY, &id) {
         Ok(Some(session)) => (StatusCode::OK, Json(session)).into_response(),
         Ok(None) => (
@@ -97,6 +100,7 @@ pub async fn update_mirror_session(
     Path(id): Path<String>,
     Json(req): Json<CreateMirrorSessionRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(update_mirror_session));
     let existing = match state.store.get_entity::<MirrorSession>(STORE_KEY, &id) {
         Ok(Some(s)) => s,
         Ok(None) => {
@@ -149,6 +153,7 @@ pub async fn delete_mirror_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(delete_mirror_session));
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -170,6 +175,7 @@ pub async fn sync_mirror_sessions(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(sync_mirror_sessions));
     match reconcile_mirrors(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -184,6 +190,7 @@ pub async fn get_mirror_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(get_mirror_status));
     let sessions: Vec<MirrorSession> = match state.store.list_entities(STORE_KEY) {
         Ok(s) => s,
         Err(e) => {
@@ -220,6 +227,7 @@ pub async fn get_mirror_status(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_mirrors(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("packet_mirror::{}", stringify!(reconcile_mirrors));
     let sessions: Vec<MirrorSession> = state.store.list_entities(STORE_KEY)?;
 
     let vms = build_vm_snapshots(state);

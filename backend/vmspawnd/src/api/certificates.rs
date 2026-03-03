@@ -20,6 +20,7 @@ use certificate_manager::{
 // ============================================================================
 
 pub async fn list_cas(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(list_cas));
     let items: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_default();
     Json(items)
 }
@@ -28,6 +29,7 @@ pub async fn create_ca(
     State(state): State<Arc<AppState>>,
     Json(mut ca): Json<CertificateAuthority>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(create_ca));
     if ca.id.is_empty() { ca.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     ca.created = now;
@@ -42,6 +44,7 @@ pub async fn delete_ca(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(delete_ca));
     if let Err(e) = state.store.delete_entity("cert_cas", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -53,6 +56,7 @@ pub async fn delete_ca(
 // ============================================================================
 
 pub async fn list_certificates(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(list_certificates));
     let items: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_default();
     Json(items)
 }
@@ -61,6 +65,7 @@ pub async fn issue_certificate(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CertificateRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(issue_certificate));
     let now = Utc::now();
     let not_after = now + chrono::Duration::days(req.validity_days as i64);
     let cert = Certificate {
@@ -90,6 +95,7 @@ pub async fn revoke_certificate(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(revoke_certificate));
     let mut cert = match state.store.get_entity::<Certificate>("certificates", &id) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -107,6 +113,7 @@ pub async fn renew_certificate(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(renew_certificate));
     let old_cert = match state.store.get_entity::<Certificate>("certificates", &id) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -156,6 +163,7 @@ pub async fn check_expiring(
     State(state): State<Arc<AppState>>,
     axum::extract::Query(query): axum::extract::Query<ExpiringQuery>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(check_expiring));
     let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_default();
     let threshold = Utc::now() + chrono::Duration::days(query.days as i64);
     let expiring: Vec<_> = certs.into_iter()
@@ -169,6 +177,7 @@ pub async fn check_expiring(
 // ============================================================================
 
 pub async fn list_cert_requests(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(list_cert_requests));
     let items: Vec<CertificateRequest> = state.store.list_entities("cert_requests").unwrap_or_default();
     Json(items)
 }
@@ -177,6 +186,7 @@ pub async fn submit_cert_request(
     State(state): State<Arc<AppState>>,
     Json(mut req): Json<CertificateRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(submit_cert_request));
     if req.id.is_empty() { req.id = Uuid::new_v4().to_string(); }
     req.status = certificate_manager::CsrStatus::Pending;
     req.created = Utc::now();
@@ -190,6 +200,7 @@ pub async fn approve_cert_request(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(approve_cert_request));
     let mut req = match state.store.get_entity::<CertificateRequest>("cert_requests", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -206,6 +217,7 @@ pub async fn reject_cert_request(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(reject_cert_request));
     let mut req = match state.store.get_entity::<CertificateRequest>("cert_requests", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -223,6 +235,7 @@ pub async fn reject_cert_request(
 // ============================================================================
 
 pub async fn list_rotations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(list_rotations));
     let items: Vec<CertificateRotation> = state.store.list_entities("cert_rotations").unwrap_or_default();
     Json(items)
 }
@@ -237,6 +250,7 @@ pub async fn schedule_rotation(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ScheduleRotationRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(schedule_rotation));
     let cert = match state.store.get_entity::<Certificate>("certificates", &req.certificate_id) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -262,6 +276,7 @@ pub async fn execute_rotation(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(execute_rotation));
     let mut rotation = match state.store.get_entity::<CertificateRotation>("cert_rotations", &id) {
         Ok(Some(r)) => r,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -281,6 +296,7 @@ pub async fn execute_rotation(
 // ============================================================================
 
 pub async fn list_attestations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(list_attestations));
     let items: Vec<TrustAttestation> = state.store.list_entities("attestations").unwrap_or_default();
     Json(items)
 }
@@ -289,6 +305,7 @@ pub async fn submit_attestation(
     State(state): State<Arc<AppState>>,
     Json(att): Json<TrustAttestation>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(submit_attestation));
     match state.store.save_entity("attestations", &att.host_id, &att) {
         Ok(_) => (StatusCode::CREATED, Json(att)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
@@ -299,6 +316,7 @@ pub async fn verify_attestation(
     State(state): State<Arc<AppState>>,
     Path(host_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(verify_attestation));
     let mut att = match state.store.get_entity::<TrustAttestation>("attestations", &host_id) {
         Ok(Some(a)) => a,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -322,6 +340,7 @@ pub async fn verify_attestation(
 // ============================================================================
 
 pub async fn list_security_baselines(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(list_security_baselines));
     let items: Vec<VmSecurityBaseline> = state.store.list_entities("security_baselines").unwrap_or_default();
     Json(items)
 }
@@ -330,6 +349,7 @@ pub async fn create_security_baseline(
     State(state): State<Arc<AppState>>,
     Json(mut baseline): Json<VmSecurityBaseline>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(create_security_baseline));
     if baseline.id.is_empty() { baseline.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     baseline.created = now;
@@ -354,6 +374,7 @@ pub async fn check_vm_security_compliance(
     Path(baseline_id): Path<String>,
     Json(req): Json<VmComplianceRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(check_vm_security_compliance));
     let baseline = match state.store.get_entity::<VmSecurityBaseline>("security_baselines", &baseline_id) {
         Ok(Some(b)) => b,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -388,6 +409,7 @@ pub async fn check_vm_security_compliance(
 // ============================================================================
 
 pub async fn get_cert_health_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("certificates::{}", stringify!(get_cert_health_dashboard));
     let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_default();
     let cas: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_default();
     let requests: Vec<CertificateRequest> = state.store.list_entities("cert_requests").unwrap_or_default();

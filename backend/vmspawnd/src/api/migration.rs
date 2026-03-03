@@ -69,6 +69,7 @@ pub async fn start_migration(
     State(state): State<Arc<AppState>>,
     Json(req): Json<MigrationRequest>,
 ) -> Result<(StatusCode, Json<MigrationStatus>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("migration::{}", stringify!(start_migration));
     // Validate VM name
     validate_vm_name(&req.vm_name).map_err(|(_status, msg)| {
         (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
@@ -137,6 +138,7 @@ pub async fn list_migrations(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<MigrationStatus>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("migration::{}", stringify!(list_migrations));
     let migrations = state.store.list_entities::<MigrationStatus>("migrations").map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -152,6 +154,7 @@ pub async fn get_migration(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<MigrationStatus>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("migration::{}", stringify!(get_migration));
     match state.store.get_entity::<MigrationStatus>("migrations", &id) {
         Ok(Some(status)) => Ok(Json(status)),
         Ok(None) => Err((
@@ -171,6 +174,7 @@ pub async fn cancel_migration(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<MigrationStatus>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("migration::{}", stringify!(cancel_migration));
     let mut status = match state.store.get_entity::<MigrationStatus>("migrations", &id) {
         Ok(Some(s)) => s,
         Ok(None) => {

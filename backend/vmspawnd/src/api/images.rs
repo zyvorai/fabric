@@ -54,6 +54,7 @@ pub async fn build_image(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageBuildRequest>,
 ) -> Result<(StatusCode, Json<ImageBuildStatus>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(build_image));
     let build_id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -128,6 +129,7 @@ pub async fn build_image(
 pub async fn list_builds(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ImageBuildStatus>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(list_builds));
     let builds = state.store.list_entities::<ImageBuildStatus>("image_builds").map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;
@@ -137,6 +139,7 @@ pub async fn list_builds(
 
 /// GET /api/images/list - List available VM images
 pub async fn list_images() -> Json<Vec<ImageInfo>> {
+    tracing::debug!("images::{}", stringify!(list_images));
     let mut images = Vec::new();
 
     // Scan /var/lib/machines and /var/lib/vmspawnd/images

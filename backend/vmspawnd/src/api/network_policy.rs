@@ -26,6 +26,7 @@ pub async fn create_policy(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNetworkPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(create_policy));
     let now = Utc::now();
     let policy = NetworkPolicy {
         id: Uuid::new_v4(),
@@ -59,6 +60,7 @@ pub async fn list_policies(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(list_policies));
     match state.store.list_entities::<NetworkPolicy>(STORE_KEY) {
         Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
         Err(e) => (
@@ -74,6 +76,7 @@ pub async fn get_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(get_policy));
     match state.store.get_entity::<NetworkPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
         Ok(None) => (
@@ -95,6 +98,7 @@ pub async fn update_policy(
     Path(id): Path<String>,
     Json(req): Json<CreateNetworkPolicyRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(update_policy));
     let existing = match state.store.get_entity::<NetworkPolicy>(STORE_KEY, &id) {
         Ok(Some(p)) => p,
         Ok(None) => {
@@ -145,6 +149,7 @@ pub async fn delete_policy(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(delete_policy));
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -166,6 +171,7 @@ pub async fn list_identities(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(list_identities));
     let identities = state.policy_engine.allocator.list_identities();
     (StatusCode::OK, Json(identities)).into_response()
 }
@@ -175,6 +181,7 @@ pub async fn get_identity(
     State(state): State<Arc<AppState>>,
     Path(id): Path<u32>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(get_identity));
     match state.policy_engine.allocator.get_identity(id) {
         Some(identity) => (StatusCode::OK, Json(identity)).into_response(),
         None => (
@@ -191,6 +198,7 @@ pub async fn sync_policies(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(sync_policies));
     match reconcile_policies(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -205,6 +213,7 @@ pub async fn get_policy_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(get_policy_status));
     let policies: Vec<NetworkPolicy> = match state.store.list_entities(STORE_KEY) {
         Ok(p) => p,
         Err(e) => {
@@ -244,6 +253,7 @@ pub async fn get_policy_status(
 
 /// Shared reconciliation logic used by both API handlers and the background task.
 pub async fn reconcile_policies(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("network_policy::{}", stringify!(reconcile_policies));
     let policies: Vec<NetworkPolicy> = state.store.list_entities(STORE_KEY)?;
 
     let vms = build_vm_snapshots(state);

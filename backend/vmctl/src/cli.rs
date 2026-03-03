@@ -487,13 +487,16 @@ fn parse_label(s: &str) -> Result<(String, String), String> {
 }
 
 fn load_config_file(path: &str) -> Result<serde_json::Value> {
+    tracing::debug!("Loading config file: {}", path);
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read file: {}", path))?;
     if path.ends_with(".yaml") || path.ends_with(".yml") {
+        tracing::debug!("Parsing as YAML");
         let val: serde_json::Value = serde_yaml::from_str(&content)
             .with_context(|| "Failed to parse YAML")?;
         Ok(val)
     } else {
+        tracing::debug!("Parsing as JSON");
         let val: serde_json::Value = serde_json::from_str(&content)
             .with_context(|| "Failed to parse JSON")?;
         Ok(val)
@@ -562,10 +565,12 @@ fn extract_info(v: &serde_json::Value) -> String {
 }
 
 async fn api_get(client: &Client, path: &str) -> Result<serde_json::Value> {
+    tracing::debug!("GET {}{}", API_BASE, path);
     let res = client
         .get(format!("{}{}", API_BASE, path))
         .send()
         .await?;
+    tracing::debug!("Response: {}", res.status());
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -575,11 +580,13 @@ async fn api_get(client: &Client, path: &str) -> Result<serde_json::Value> {
 }
 
 async fn api_post(client: &Client, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
+    tracing::debug!("POST {}{}", API_BASE, path);
     let res = client
         .post(format!("{}{}", API_BASE, path))
         .json(body)
         .send()
         .await?;
+    tracing::debug!("Response: {}", res.status());
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -589,6 +596,7 @@ async fn api_post(client: &Client, path: &str, body: &serde_json::Value) -> Resu
 }
 
 async fn api_post_empty(client: &Client, path: &str) -> Result<serde_json::Value> {
+    tracing::debug!("POST {}{} (empty body)", API_BASE, path);
     let res = client
         .post(format!("{}{}", API_BASE, path))
         .send()
@@ -602,6 +610,7 @@ async fn api_post_empty(client: &Client, path: &str) -> Result<serde_json::Value
 }
 
 async fn api_put(client: &Client, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
+    tracing::debug!("PUT {}{}", API_BASE, path);
     let res = client
         .put(format!("{}{}", API_BASE, path))
         .json(body)
@@ -616,6 +625,7 @@ async fn api_put(client: &Client, path: &str, body: &serde_json::Value) -> Resul
 }
 
 async fn api_delete(client: &Client, path: &str) -> Result<()> {
+    tracing::debug!("DELETE {}{}", API_BASE, path);
     let res = client
         .delete(format!("{}{}", API_BASE, path))
         .send()
@@ -629,6 +639,7 @@ async fn api_delete(client: &Client, path: &str) -> Result<()> {
 }
 
 async fn api_post_void(client: &Client, path: &str) -> Result<()> {
+    tracing::debug!("POST {}{} (void)", API_BASE, path);
     let res = client
         .post(format!("{}{}", API_BASE, path))
         .send()

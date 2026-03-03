@@ -83,6 +83,7 @@ pub struct HugepageQuery {
 
 /// GET /api/system/cpu/topology - Get CPU topology
 pub async fn get_cpu_topology() -> Result<Json<CpuTopology>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_cpu_topology));
     match CpuTopology::detect() {
         Ok(topology) => Ok(Json(topology)),
         Err(e) => Err((
@@ -94,6 +95,7 @@ pub async fn get_cpu_topology() -> Result<Json<CpuTopology>, (StatusCode, String
 
 /// GET /api/system/numa/topology - Get NUMA topology
 pub async fn get_numa_topology() -> Result<Json<NumaTopology>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_numa_topology));
     match NumaTopology::detect() {
         Ok(topology) => Ok(Json(topology)),
         Err(e) => Err((
@@ -107,6 +109,7 @@ pub async fn get_numa_topology() -> Result<Json<NumaTopology>, (StatusCode, Stri
 pub async fn get_numa_node(
     Path(node_id): Path<u32>,
 ) -> Result<Json<vmspawnd_system::NumaNode>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_numa_node));
     let topology = NumaTopology::detect().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -127,6 +130,7 @@ pub async fn get_numa_node(
 pub async fn get_numa_placement(
     Query(params): Query<NumaPlacementQuery>,
 ) -> Result<Json<vmspawnd_system::NumaPlacement>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_numa_placement));
     let topology = NumaTopology::detect().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -148,6 +152,7 @@ pub async fn set_cpu_pinning(
     Path(vm_name): Path<String>,
     Json(req): Json<SetCpuPinningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(set_cpu_pinning));
     validate_vm_name(&vm_name)?;
     // Implement CPU pinning via systemd
     tracing::info!(
@@ -212,6 +217,7 @@ pub async fn set_cpu_pinning(
 pub async fn remove_cpu_pinning(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(remove_cpu_pinning));
     validate_vm_name(&vm_name)?;
     tracing::info!("Removing CPU pinning for VM '{}'", vm_name);
     Ok(StatusCode::OK)
@@ -221,6 +227,7 @@ pub async fn remove_cpu_pinning(
 pub async fn get_cpu_affinity(
     Path(vm_name): Path<String>,
 ) -> Result<Json<Vec<u32>>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_cpu_affinity));
     validate_vm_name(&vm_name)?;
     // Read CPU affinity from systemd service
     tracing::info!("Getting CPU affinity for VM '{}'", vm_name);
@@ -269,6 +276,7 @@ pub async fn set_memory_limit(
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryLimitRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(set_memory_limit));
     validate_vm_name(&vm_name)?;
     let controller = MemoryController::new(&vm_name);
 
@@ -302,6 +310,7 @@ pub async fn set_memory_limit(
 pub async fn get_memory_usage(
     Path(vm_name): Path<String>,
 ) -> Result<Json<vmspawnd_system::MemoryStats>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_memory_usage));
     validate_vm_name(&vm_name)?;
     let controller = MemoryController::new(&vm_name);
 
@@ -327,6 +336,7 @@ pub async fn set_memory_ballooning(
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryBallooningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(set_memory_ballooning));
     validate_vm_name(&vm_name)?;
     // Implement memory ballooning control via QEMU monitor
     tracing::info!(
@@ -395,6 +405,7 @@ pub async fn set_memory_ballooning(
 pub async fn get_hugepage_stats(
     Query(params): Query<HugepageQuery>,
 ) -> Result<Json<vmspawnd_system::HugepageStats>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_hugepage_stats));
     let size: HugepageSize = params.size.into();
 
     match HugepageManager::get_stats(size) {
@@ -410,6 +421,7 @@ pub async fn get_hugepage_stats(
 pub async fn allocate_hugepages(
     Json(req): Json<AllocateHugepagesRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(allocate_hugepages));
     let size: HugepageSize = req.size.into();
 
     HugepageManager::allocate(size, req.count).map_err(|e| {
@@ -425,6 +437,7 @@ pub async fn allocate_hugepages(
 /// GET /api/system/memory - Get system memory info
 pub async fn get_system_memory(
 ) -> Result<Json<vmspawnd_system::SystemMemory>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_system_memory));
     match HugepageManager::get_system_memory() {
         Ok(memory) => Ok(Json(memory)),
         Err(e) => Err((
@@ -464,6 +477,7 @@ pub struct OptimizationResult {
 pub async fn get_optimization_recommendations(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<OptimizationRecommendation>>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(get_optimization_recommendations));
     let vms = state.store.list_vms().unwrap_or_default();
 
     let numa_topology = NumaTopology::detect().ok();
@@ -559,6 +573,7 @@ pub async fn optimize_vm(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<OptimizationResult>, (StatusCode, String)> {
+    tracing::debug!("system::{}", stringify!(optimize_vm));
     validate_vm_name(&vm_name)?;
 
     let vm = match state.store.get_vm(&vm_name) {

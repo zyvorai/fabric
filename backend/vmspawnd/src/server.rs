@@ -769,10 +769,31 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 }
 
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("Failed to install Ctrl+C signal handler");
-    tracing::info!("Received Ctrl+C, starting graceful shutdown");
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C signal handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to install SIGTERM signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received Ctrl+C, starting graceful shutdown");
+        }
+        _ = terminate => {
+            tracing::info!("Received SIGTERM, starting graceful shutdown");
+        }
+    }
 }
 
 /// Background task that checks and executes due schedules every 30 seconds

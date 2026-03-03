@@ -42,6 +42,7 @@ pub async fn create_floating_ip(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateFloatingIpRequest>,
 ) -> Result<(StatusCode, Json<FloatingIp>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(create_floating_ip));
     // Validate IP address format
     crate::validation::validate_ip_address(&req.address).map_err(|msg| {
         (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
@@ -66,6 +67,7 @@ pub async fn list_floating_ips(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<FloatingIp>> {
+    tracing::debug!("network_cloud::{}", stringify!(list_floating_ips));
     let ips: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_default();
     Json(ips)
 }
@@ -77,6 +79,7 @@ pub async fn assign_floating_ip(
     Path(id): Path<String>,
     Json(req): Json<AssignFloatingIpRequest>,
 ) -> Result<Json<FloatingIp>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(assign_floating_ip));
     let mut fip = match state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         Ok(Some(f)) => f,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Floating IP not found" })))),
@@ -123,6 +126,7 @@ pub async fn unassign_floating_ip(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<FloatingIp>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(unassign_floating_ip));
     let mut fip = match state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         Ok(Some(f)) => f,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Floating IP not found" })))),
@@ -151,6 +155,7 @@ pub async fn delete_floating_ip(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(delete_floating_ip));
     if let Ok(Some(fip)) = state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         if let Err(e) = Command::new("ip")
             .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
@@ -215,6 +220,7 @@ pub async fn create_dhcp_server(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDhcpServerRequest>,
 ) -> Result<(StatusCode, Json<DhcpServerConfig>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(create_dhcp_server));
     let config = DhcpServerConfig {
         id: uuid::Uuid::new_v4().to_string(),
         bridge: req.bridge.clone(),
@@ -255,6 +261,7 @@ pub async fn create_dhcp_server(
 pub async fn list_dhcp_servers(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DhcpServerConfig>> {
+    tracing::debug!("network_cloud::{}", stringify!(list_dhcp_servers));
     let configs: Vec<DhcpServerConfig> = state.store.list_entities("dhcp_servers").unwrap_or_default();
     Json(configs)
 }
@@ -265,6 +272,7 @@ pub async fn delete_dhcp_server(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(delete_dhcp_server));
     if let Ok(Some(config)) = state.store.get_entity::<DhcpServerConfig>("dhcp_servers", &id) {
         let config_dir = &state.config.network.networkd_config_dir;
         let prefix = &state.config.network.networkd_file_prefix;
@@ -363,6 +371,7 @@ pub async fn create_dns_config(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDnsConfigRequest>,
 ) -> Result<(StatusCode, Json<DnsConfig>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(create_dns_config));
     let config = DnsConfig {
         id: uuid::Uuid::new_v4().to_string(),
         domain: req.domain,
@@ -409,6 +418,7 @@ pub async fn create_dns_config(
 pub async fn list_dns_configs(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DnsConfig>> {
+    tracing::debug!("network_cloud::{}", stringify!(list_dns_configs));
     let configs: Vec<DnsConfig> = state.store.list_entities("dns_configs").unwrap_or_default();
     Json(configs)
 }
@@ -419,6 +429,7 @@ pub async fn add_dns_record(
     Path(id): Path<String>,
     Json(req): Json<AddDnsRecordRequest>,
 ) -> Result<Json<DnsConfig>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(add_dns_record));
     let mut config = match state.store.get_entity::<DnsConfig>("dns_configs", &id) {
         Ok(Some(c)) => c,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "DNS config not found" })))),
@@ -446,6 +457,7 @@ pub async fn delete_dns_config(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(delete_dns_config));
     state.store.delete_entity("dns_configs", &id).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;

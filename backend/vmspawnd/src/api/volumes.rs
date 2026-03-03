@@ -44,6 +44,7 @@ pub async fn create_volume(
     Path(pool_name): Path<String>,
     Json(req): Json<CreateVolumeRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(create_volume));
     // Verify pool exists
     let manager = state.storage_manager.read().await;
     if manager.get_pool(&pool_name).await.is_err() {
@@ -81,6 +82,7 @@ pub async fn list_volumes(
     State(state): State<Arc<AppState>>,
     Path(pool_name): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(list_volumes));
     let store_key = format!("volumes_{}", pool_name);
     let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_default();
     Json(items)
@@ -91,6 +93,7 @@ pub async fn get_volume(
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(get_volume));
     let store_key = format!("volumes_{}", pool_name);
     match state.store.get_entity::<Volume>(&store_key, &id) {
         Ok(Some(v)) => Json(v).into_response(),
@@ -104,6 +107,7 @@ pub async fn delete_volume(
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(delete_volume));
     let store_key = format!("volumes_{}", pool_name);
     if let Err(e) = state.store.delete_entity(&store_key, &id) {
         tracing::error!("Failed to delete volume: {}", e);
@@ -117,6 +121,7 @@ pub async fn resize_volume(
     Path((pool_name, id)): Path<(String, String)>,
     Json(req): Json<ResizeVolumeRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(resize_volume));
     let store_key = format!("volumes_{}", pool_name);
     match state.store.get_entity::<Volume>(&store_key, &id) {
         Ok(Some(mut v)) => {
@@ -142,6 +147,7 @@ pub async fn attach_volume(
     Path((pool_name, id)): Path<(String, String)>,
     Json(req): Json<AttachVolumeRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(attach_volume));
     let store_key = format!("volumes_{}", pool_name);
     match state.store.get_entity::<Volume>(&store_key, &id) {
         Ok(Some(mut v)) => {
@@ -173,6 +179,7 @@ pub async fn detach_volume(
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    tracing::debug!("volumes::{}", stringify!(detach_volume));
     let store_key = format!("volumes_{}", pool_name);
     match state.store.get_entity::<Volume>(&store_key, &id) {
         Ok(Some(mut v)) => {

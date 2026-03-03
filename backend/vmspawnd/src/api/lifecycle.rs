@@ -19,6 +19,7 @@ use lifecycle_manager::{
 // ============================================================================
 
 pub async fn list_baselines(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(list_baselines));
     let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_default();
     Json(items)
 }
@@ -27,6 +28,7 @@ pub async fn create_baseline(
     State(state): State<Arc<AppState>>,
     Json(mut baseline): Json<Baseline>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(create_baseline));
     if baseline.id.is_empty() { baseline.id = Uuid::new_v4().to_string(); }
     baseline.created = Utc::now();
     baseline.updated = None;
@@ -40,6 +42,7 @@ pub async fn get_baseline(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(get_baseline));
     match state.store.get_entity::<Baseline>("lm_baselines", &id) {
         Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -52,6 +55,7 @@ pub async fn update_baseline(
     Path(id): Path<String>,
     Json(mut baseline): Json<Baseline>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(update_baseline));
     baseline.id = id.clone();
     baseline.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("lm_baselines", &id, &baseline) {
@@ -64,6 +68,7 @@ pub async fn delete_baseline(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(delete_baseline));
     if let Err(e) = state.store.delete_entity("lm_baselines", &id) {
         tracing::error!("Failed to delete entity: {}", e);
     }
@@ -86,6 +91,7 @@ pub async fn scan_host_compliance(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ScanComplianceRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(scan_host_compliance));
     let mgr = lifecycle_manager::LifecycleManager::new();
     // Load baseline into manager
     if let Ok(Some(baseline)) = state.store.get_entity::<Baseline>("lm_baselines", &req.baseline_id) {
@@ -109,6 +115,7 @@ pub async fn get_compliance_status(
     State(state): State<Arc<AppState>>,
     Path(host_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(get_compliance_status));
     let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_default();
     let filtered: Vec<_> = items.into_iter().filter(|s| s.host_id == host_id).collect();
     Json(filtered)
@@ -118,6 +125,7 @@ pub async fn get_cluster_compliance(
     State(state): State<Arc<AppState>>,
     Path(_cluster_id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(get_cluster_compliance));
     let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_default();
     let mut total_hosts = 0u32;
     let mut compliant_hosts = 0u32;
@@ -152,6 +160,7 @@ pub async fn get_cluster_compliance(
 // ============================================================================
 
 pub async fn list_remediations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(list_remediations));
     let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_default();
     Json(items)
 }
@@ -167,6 +176,7 @@ pub async fn create_remediation(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateRemediationRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(create_remediation));
     let mgr = lifecycle_manager::LifecycleManager::new();
     match mgr.create_remediation(&req.host_id, &req.hostname, &req.baseline_id) {
         Ok(task) => {
@@ -183,6 +193,7 @@ pub async fn get_remediation(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(get_remediation));
     match state.store.get_entity::<RemediationTask>("remediations", &id) {
         Ok(Some(t)) => Json(t).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -195,6 +206,7 @@ pub async fn get_remediation(
 // ============================================================================
 
 pub async fn list_rolling_updates(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(list_rolling_updates));
     let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_default();
     Json(items)
 }
@@ -203,6 +215,7 @@ pub async fn create_rolling_update(
     State(state): State<Arc<AppState>>,
     Json(mut plan): Json<RollingUpdatePlan>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(create_rolling_update));
     if plan.id.is_empty() { plan.id = Uuid::new_v4().to_string(); }
     plan.status = RollingUpdateStatus::Planned;
     plan.current_host_index = 0;
@@ -219,6 +232,7 @@ pub async fn start_rolling_update(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(start_rolling_update));
     let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -236,6 +250,7 @@ pub async fn pause_rolling_update(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(pause_rolling_update));
     let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -252,6 +267,7 @@ pub async fn advance_rolling_update(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(advance_rolling_update));
     let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
         Ok(Some(p)) => p,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),

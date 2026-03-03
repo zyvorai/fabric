@@ -239,6 +239,7 @@ fn calculate_next_run(
 pub async fn list_schedules(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Schedule>>, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(list_schedules));
     // Load from state store, fall back to mock data if empty
     let schedules = state.store.list_entities::<Schedule>("schedules")
         .unwrap_or_else(|_| vec![
@@ -281,6 +282,7 @@ pub async fn get_schedule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Schedule>, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(get_schedule));
     // Load from state store
     let schedule = state.store.get_entity::<Schedule>("schedules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -293,6 +295,7 @@ pub async fn create_schedule(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateScheduleRequest>,
 ) -> Result<(StatusCode, Json<Schedule>), StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(create_schedule));
     // Validate schedule
     if let Err(err) = validate_schedule(&req) {
         tracing::warn!("Invalid schedule: {}", err);
@@ -333,6 +336,7 @@ pub async fn update_schedule(
     Path(id): Path<String>,
     Json(req): Json<UpdateScheduleRequest>,
 ) -> Result<Json<Schedule>, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(update_schedule));
     // Load existing schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -400,6 +404,7 @@ pub async fn delete_schedule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(delete_schedule));
     // Remove from state store
     if let Err(e) = state.store.delete_entity("schedules", &id) {
         tracing::error!("Failed to delete schedule: {}", e);
@@ -413,6 +418,7 @@ pub async fn enable_schedule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(enable_schedule));
     // Load schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -437,6 +443,7 @@ pub async fn disable_schedule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(disable_schedule));
     // Load schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -461,6 +468,7 @@ pub async fn run_schedule_now(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(run_schedule_now));
     // Load schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -537,6 +545,7 @@ pub async fn get_schedule_history(
     State(state): State<Arc<AppState>>,
     Path(schedule_id): Path<String>,
 ) -> Result<Json<Vec<ScheduleHistory>>, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(get_schedule_history));
     // Load history for specific schedule from state store
     let all_history = state.store.list_entities::<ScheduleHistory>("schedule_history")
         .unwrap_or_default();
@@ -558,6 +567,7 @@ pub async fn get_schedule_history(
 pub async fn get_all_schedule_history(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ScheduleHistory>>, StatusCode> {
+    tracing::debug!("schedules::{}", stringify!(get_all_schedule_history));
     // Load all history from state store
     let mut history = state.store.list_entities::<ScheduleHistory>("schedule_history")
         .unwrap_or_default();

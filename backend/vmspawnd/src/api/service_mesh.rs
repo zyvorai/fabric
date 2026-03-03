@@ -26,6 +26,7 @@ pub async fn create_service(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateServiceRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(create_service));
     let now = Utc::now();
     let service = Service {
         id: Uuid::new_v4(),
@@ -63,6 +64,7 @@ pub async fn list_services(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(list_services));
     match state.store.list_entities::<Service>(STORE_KEY) {
         Ok(services) => (StatusCode::OK, Json(services)).into_response(),
         Err(e) => (
@@ -78,6 +80,7 @@ pub async fn get_service(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(get_service));
     match state.store.get_entity::<Service>(STORE_KEY, &id) {
         Ok(Some(service)) => (StatusCode::OK, Json(service)).into_response(),
         Ok(None) => (
@@ -99,6 +102,7 @@ pub async fn update_service(
     Path(id): Path<String>,
     Json(req): Json<CreateServiceRequest>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(update_service));
     let existing = match state.store.get_entity::<Service>(STORE_KEY, &id) {
         Ok(Some(s)) => s,
         Ok(None) => {
@@ -151,6 +155,7 @@ pub async fn delete_service(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(delete_service));
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -173,6 +178,7 @@ pub async fn get_service_backends(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(get_service_backends));
     let service = match state.store.get_entity::<Service>(STORE_KEY, &id) {
         Ok(Some(s)) => s,
         Ok(None) => {
@@ -207,6 +213,7 @@ pub async fn sync_services(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(sync_services));
     match reconcile_services(&state).await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "synced" }))).into_response(),
         Err(e) => (
@@ -221,6 +228,7 @@ pub async fn get_service_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(get_service_status));
     let services: Vec<Service> = match state.store.list_entities(STORE_KEY) {
         Ok(s) => s,
         Err(e) => {
@@ -260,6 +268,7 @@ pub async fn get_service_status(
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_services(state: &AppState) -> anyhow::Result<()> {
+    tracing::debug!("service_mesh::{}", stringify!(reconcile_services));
     let services: Vec<Service> = state.store.list_entities(STORE_KEY)?;
 
     let vms = build_vm_snapshots(state);
