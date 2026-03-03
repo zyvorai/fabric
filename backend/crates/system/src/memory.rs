@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use vmspawnd_cgroup::CgroupManager;
 
 #[derive(Debug, Error)]
 pub enum MemoryError {
@@ -22,6 +23,26 @@ pub enum MemoryError {
 
     #[error("Hugepage allocation failed: {0}")]
     HugepageAllocationFailed(String),
+}
+
+impl From<vmspawnd_cgroup::CgroupError> for MemoryError {
+    fn from(e: vmspawnd_cgroup::CgroupError) -> Self {
+        match &e {
+            vmspawnd_cgroup::CgroupError::NotFound(_) => {
+                MemoryError::CgroupNotFound(e.to_string())
+            }
+            vmspawnd_cgroup::CgroupError::ReadFailed { .. } => {
+                MemoryError::ReadStatsFailed(e.to_string())
+            }
+            vmspawnd_cgroup::CgroupError::WriteFailed { .. } => {
+                MemoryError::SetLimitFailed(e.to_string())
+            }
+            vmspawnd_cgroup::CgroupError::ParseError { .. } => {
+                MemoryError::ParseError(e.to_string())
+            }
+            _ => MemoryError::SetLimitFailed(e.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -74,49 +95,39 @@ pub struct MemoryStats {
 }
 
 pub struct MemoryController {
-    cgroup_path: PathBuf,
     vm_name: String,
+    mgr: Option<CgroupManager>,
 }
 
 impl MemoryController {
     pub fn new(vm_name: &str) -> Self {
+        let mgr = CgroupManager::for_machine(vm_name).ok();
         Self {
-            cgroup_path: PathBuf::from(format!(
-                "/sys/fs/cgroup/machine.slice/vmspawn-{}.scope",
-                vm_name
-            )),
             vm_name: vm_name.to_string(),
+            mgr,
         }
     }
 
     /// Check if cgroup exists
     pub fn exists(&self) -> bool {
-        self.cgroup_path.exists()
+        self.mgr.is_some()
+    }
+
+    fn manager(&self) -> Result<&CgroupManager, MemoryError> {
+        self.mgr
+            .as_ref()
+            .ok_or_else(|| MemoryError::CgroupNotFound(self.vm_name.clone()))
     }
 
     /// Set memory limit in bytes
     pub fn set_limit(&self, limit_bytes: u64) -> Result<(), MemoryError> {
-        if !self.exists() {
-            return Err(MemoryError::CgroupNotFound(self.vm_name.clone()));
-        }
-
-        let limit_path = self.cgroup_path.join("memory.max");
-        fs::write(&limit_path, limit_bytes.to_string())
-            .map_err(|e| MemoryError::SetLimitFailed(e.to_string()))?;
-
+        self.manager()?.memory().set_max(limit_bytes)?;
         Ok(())
     }
 
     /// Set swap limit in bytes
     pub fn set_swap_limit(&self, limit_bytes: u64) -> Result<(), MemoryError> {
-        if !self.exists() {
-            return Err(MemoryError::CgroupNotFound(self.vm_name.clone()));
-        }
-
-        let swap_path = self.cgroup_path.join("memory.swap.max");
-        fs::write(&swap_path, limit_bytes.to_string())
-            .map_err(|e| MemoryError::SetLimitFailed(e.to_string()))?;
-
+        self.manager()?.memory().set_swap_max(limit_bytes)?;
         Ok(())
     }
 
@@ -127,59 +138,20 @@ impl MemoryController {
 
     /// Get current memory usage
     pub fn get_current_usage(&self) -> Result<u64, MemoryError> {
-        if !self.exists() {
-            return Err(MemoryError::CgroupNotFound(self.vm_name.clone()));
-        }
-
-        let usage_path = self.cgroup_path.join("memory.current");
-        let usage = fs::read_to_string(&usage_path)
-            .map_err(|e| MemoryError::ReadStatsFailed(e.to_string()))?;
-
-        usage.trim()
-            .parse()
-            .map_err(|e| MemoryError::ParseError(format!("Failed to parse memory.current: {}", e)))
+        Ok(self.manager()?.memory().get_current()?)
     }
 
     /// Get memory limit
     pub fn get_limit(&self) -> Result<u64, MemoryError> {
-        if !self.exists() {
-            return Err(MemoryError::CgroupNotFound(self.vm_name.clone()));
-        }
-
-        let limit_path = self.cgroup_path.join("memory.max");
-        let limit = fs::read_to_string(&limit_path)
-            .map_err(|e| MemoryError::ReadStatsFailed(e.to_string()))?;
-
-        let limit_str = limit.trim();
-
-        // "max" means no limit
-        if limit_str == "max" {
-            return Ok(u64::MAX);
-        }
-
-        limit_str
-            .parse()
-            .map_err(|e| MemoryError::ParseError(format!("Failed to parse memory.max: {}", e)))
+        Ok(self.manager()?.memory().get_max()?)
     }
 
     /// Get swap usage
     pub fn get_swap_usage(&self) -> Result<u64, MemoryError> {
-        if !self.exists() {
-            return Err(MemoryError::CgroupNotFound(self.vm_name.clone()));
+        match self.manager()?.memory().get_swap_current() {
+            Ok(v) => Ok(v),
+            Err(_) => Ok(0),
         }
-
-        let swap_path = self.cgroup_path.join("memory.swap.current");
-
-        if !swap_path.exists() {
-            return Ok(0);
-        }
-
-        let swap = fs::read_to_string(&swap_path)
-            .map_err(|e| MemoryError::ReadStatsFailed(e.to_string()))?;
-
-        swap.trim()
-            .parse()
-            .map_err(|e| MemoryError::ParseError(format!("Failed to parse swap.current: {}", e)))
     }
 
     /// Get comprehensive memory statistics
@@ -194,26 +166,11 @@ impl MemoryController {
             (current_bytes as f64 / limit_bytes as f64) * 100.0
         };
 
-        // Read swap max from memory.swap.max
-        let swap_max_bytes = {
-            let swap_max_path = self.cgroup_path.join("memory.swap.max");
-            if swap_max_path.exists() {
-                match fs::read_to_string(&swap_max_path) {
-                    Ok(content) => {
-                        let value = content.trim();
-                        if value == "max" {
-                            // "max" means unlimited
-                            u64::MAX
-                        } else {
-                            value.parse::<u64>().unwrap_or(0)
-                        }
-                    }
-                    Err(_) => 0,
-                }
-            } else {
-                0
-            }
-        };
+        let swap_max_bytes = self
+            .manager()?
+            .memory()
+            .get_swap_max()
+            .unwrap_or(0);
 
         Ok(MemoryStats {
             current_bytes,
@@ -227,20 +184,9 @@ impl MemoryController {
 
     /// Enable OOM killer for this cgroup
     pub fn enable_oom_killer(&self, enable: bool) -> Result<(), MemoryError> {
-        if !self.exists() {
-            return Err(MemoryError::CgroupNotFound(self.vm_name.clone()));
-        }
-
-        let oom_path = self.cgroup_path.join("memory.oom.group");
-
-        if !oom_path.exists() {
-            // Not all kernels support this
-            return Ok(());
-        }
-
-        fs::write(&oom_path, if enable { "1" } else { "0" })
-            .map_err(|e| MemoryError::SetLimitFailed(e.to_string()))?;
-
+        let mgr = self.manager()?;
+        // Not all kernels support memory.oom.group — silently ignore if unavailable
+        let _ = mgr.memory().set_oom_group(enable);
         Ok(())
     }
 }

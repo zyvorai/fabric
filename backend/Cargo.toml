@@ -33,6 +33,7 @@ members = [
     "crates/machined-dbus",
     "crates/machinectl-driver",
     "crates/lock-manager",
+    "crates/cgroup",
     "network-policy",
     "service-mesh",
     "traffic-shaping",

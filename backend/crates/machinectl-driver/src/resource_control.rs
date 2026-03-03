@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use vmspawnd_cgroup::CgroupPath;
 use vmspawnd_driver_core::ResourceControlDriver;
 use vmspawnd_machined_dbus::SystemdManagerProxy;
 use zbus::zvariant::Value;
@@ -42,6 +43,57 @@ impl ResourceControlDriver for MachinectlDriver {
             .await?;
 
         tracing::info!("Set IO weight for '{}' to {}", name, weight);
+        Ok(())
+    }
+
+    async fn freeze(&self, name: &str) -> Result<()> {
+        let cgroup = CgroupPath::for_machine(name);
+        let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
+        freezer
+            .freeze()
+            .map_err(|e| anyhow!("Failed to freeze '{}': {}", name, e))?;
+        tracing::info!("Froze VM '{}'", name);
+        Ok(())
+    }
+
+    async fn thaw(&self, name: &str) -> Result<()> {
+        let cgroup = CgroupPath::for_machine(name);
+        let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
+        freezer
+            .thaw()
+            .map_err(|e| anyhow!("Failed to thaw '{}': {}", name, e))?;
+        tracing::info!("Thawed VM '{}'", name);
+        Ok(())
+    }
+
+    async fn is_frozen(&self, name: &str) -> Result<bool> {
+        let cgroup = CgroupPath::for_machine(name);
+        let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
+        freezer
+            .is_frozen()
+            .map_err(|e| anyhow!("Failed to check frozen state for '{}': {}", name, e))
+    }
+
+    async fn set_pids_max(&self, name: &str, max: u64) -> Result<()> {
+        let cgroup = CgroupPath::for_machine(name);
+        let pids = vmspawnd_cgroup::PidsController::new(cgroup.path().to_path_buf());
+        pids.set_max(max)
+            .map_err(|e| anyhow!("Failed to set pids.max for '{}': {}", name, e))?;
+        tracing::info!("Set pids.max for '{}' to {}", name, max);
+        Ok(())
+    }
+
+    async fn set_cpuset(&self, name: &str, cpus: &[u32]) -> Result<()> {
+        let cgroup = CgroupPath::for_machine(name);
+        let cpuset = vmspawnd_cgroup::CpusetController::new(cgroup.path().to_path_buf());
+        cpuset
+            .set_cpus(cpus)
+            .map_err(|e| anyhow!("Failed to set cpuset for '{}': {}", name, e))?;
+        tracing::info!(
+            "Set cpuset for '{}' to {}",
+            name,
+            vmspawnd_cgroup::format_set(cpus)
+        );
         Ok(())
     }
 }

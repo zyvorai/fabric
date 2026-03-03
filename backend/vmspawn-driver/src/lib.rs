@@ -238,10 +238,20 @@ pub fn get_vm_pid(name: &str) -> Result<u32> {
     Err(anyhow!("Leader PID not found for VM '{}'", name))
 }
 
-/// Pause a VM by sending SIGSTOP to the leader process
+/// Pause a VM using the cgroup v2 freezer.
+///
+/// Falls back to SIGSTOP on the leader process if the cgroup is unavailable.
 pub fn pause_vm(name: &str) -> Result<()> {
-    let pid = get_vm_pid(name)?;
+    let cgroup = vmspawnd_cgroup::CgroupPath::for_machine(name);
+    if cgroup.exists() {
+        let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
+        freezer.freeze().map_err(|e| anyhow!("Failed to freeze VM '{}': {}", name, e))?;
+        tracing::info!("Froze VM '{}' via cgroup freezer", name);
+        return Ok(());
+    }
 
+    // Fallback: SIGSTOP on leader process
+    let pid = get_vm_pid(name)?;
     let output = Command::new("kill")
         .arg("-STOP")
         .arg(pid.to_string())
@@ -255,10 +265,20 @@ pub fn pause_vm(name: &str) -> Result<()> {
     }
 }
 
-/// Resume a paused VM by sending SIGCONT to the leader process
+/// Resume a paused VM using the cgroup v2 freezer.
+///
+/// Falls back to SIGCONT on the leader process if the cgroup is unavailable.
 pub fn resume_vm(name: &str) -> Result<()> {
-    let pid = get_vm_pid(name)?;
+    let cgroup = vmspawnd_cgroup::CgroupPath::for_machine(name);
+    if cgroup.exists() {
+        let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
+        freezer.thaw().map_err(|e| anyhow!("Failed to thaw VM '{}': {}", name, e))?;
+        tracing::info!("Thawed VM '{}' via cgroup freezer", name);
+        return Ok(());
+    }
 
+    // Fallback: SIGCONT on leader process
+    let pid = get_vm_pid(name)?;
     let output = Command::new("kill")
         .arg("-CONT")
         .arg(pid.to_string())
@@ -274,11 +294,11 @@ pub fn resume_vm(name: &str) -> Result<()> {
 
 /// Collect real metrics from cgroup v2 for a VM
 pub fn get_metrics(name: &str) -> Result<VMMetrics> {
-    let cgroup_base = format!("/sys/fs/cgroup/machine.slice/machine-{}.scope", name);
+    let cgroup = vmspawnd_cgroup::CgroupPath::for_machine(name);
 
-    let cpu_usage = read_cpu_usage(&cgroup_base).unwrap_or(0.0);
-    let memory_usage = read_memory_usage(&cgroup_base).unwrap_or(0);
-    let (disk_read, disk_write) = read_disk_io(&cgroup_base).unwrap_or((0, 0));
+    let cpu_usage = read_cpu_usage(&cgroup).unwrap_or(0.0);
+    let memory_usage = read_memory_usage(&cgroup).unwrap_or(0);
+    let (disk_read, disk_write) = read_disk_io(&cgroup).unwrap_or((0, 0));
     let (network_rx, network_tx) = read_network_stats(name).unwrap_or((0, 0));
 
     Ok(VMMetrics {
@@ -291,28 +311,20 @@ pub fn get_metrics(name: &str) -> Result<VMMetrics> {
 }
 
 /// Read CPU usage percentage from cgroup v2 cpu.stat
-fn read_cpu_usage(cgroup_path: &str) -> Result<f64> {
-    let cpu_stat_path = format!("{}/cpu.stat", cgroup_path);
-    let content = fs::read_to_string(&cpu_stat_path)
-        .map_err(|e| anyhow!("Failed to read {}: {}", cpu_stat_path, e))?;
+fn read_cpu_usage(cgroup: &vmspawnd_cgroup::CgroupPath) -> Result<f64> {
+    let cpu = vmspawnd_cgroup::CpuController::new(cgroup.path().to_path_buf());
+    let stat = cpu.get_stat().map_err(|e| anyhow!("{}", e))?;
 
-    let mut usage_usec: u64 = 0;
-    for line in content.lines() {
-        if let Some(val) = line.strip_prefix("usage_usec ") {
-            usage_usec = val.trim().parse().unwrap_or(0);
-            break;
-        }
-    }
-
-    let cpuset_path = format!("{}/cpuset.cpus.effective", cgroup_path);
-    let num_cpus = if let Ok(cpuset) = fs::read_to_string(&cpuset_path) {
-        count_cpus_in_cpuset(cpuset.trim())
-    } else {
-        fs::read_to_string("/proc/cpuinfo")
-            .map(|c| c.lines().filter(|l| l.starts_with("processor")).count() as u32)
-            .unwrap_or(1)
-            .max(1)
-    };
+    let cpuset = vmspawnd_cgroup::CpusetController::new(cgroup.path().to_path_buf());
+    let num_cpus = cpuset
+        .get_cpus_effective()
+        .map(|cpus| (cpus.len() as u32).max(1))
+        .unwrap_or_else(|_| {
+            fs::read_to_string("/proc/cpuinfo")
+                .map(|c| c.lines().filter(|l| l.starts_with("processor")).count() as u32)
+                .unwrap_or(1)
+                .max(1)
+        });
 
     let uptime_content = fs::read_to_string("/proc/uptime")
         .map_err(|e| anyhow!("Failed to read /proc/uptime: {}", e))?;
@@ -328,53 +340,27 @@ fn read_cpu_usage(cgroup_path: &str) -> Result<f64> {
         return Ok(0.0);
     }
 
-    let percentage = (usage_usec as f64 / total_usec as f64) * 100.0;
-    Ok(percentage.min(100.0).max(0.0))
+    let percentage = (stat.usage_usec as f64 / total_usec as f64) * 100.0;
+    Ok(percentage.clamp(0.0, 100.0))
 }
 
-fn count_cpus_in_cpuset(cpuset: &str) -> u32 {
-    if cpuset.is_empty() {
-        return 1;
-    }
-    let mut count = 0u32;
-    for part in cpuset.split(',') {
-        if let Some((start, end)) = part.split_once('-') {
-            let s: u32 = start.trim().parse().unwrap_or(0);
-            let e: u32 = end.trim().parse().unwrap_or(0);
-            count += e - s + 1;
-        } else {
-            count += 1;
-        }
-    }
-    count.max(1)
+fn read_memory_usage(cgroup: &vmspawnd_cgroup::CgroupPath) -> Result<u64> {
+    let mem = vmspawnd_cgroup::MemoryController::new(cgroup.path().to_path_buf());
+    mem.get_current().map_err(|e| anyhow!("{}", e))
 }
 
-fn read_memory_usage(cgroup_path: &str) -> Result<u64> {
-    let memory_current_path = format!("{}/memory.current", cgroup_path);
-    let content = fs::read_to_string(&memory_current_path)
-        .map_err(|e| anyhow!("Failed to read {}: {}", memory_current_path, e))?;
-    let bytes: u64 = content.trim().parse().unwrap_or(0);
-    Ok(bytes)
-}
-
-fn read_disk_io(cgroup_path: &str) -> Result<(u64, u64)> {
-    let io_stat_path = format!("{}/io.stat", cgroup_path);
-    let content = match fs::read_to_string(&io_stat_path) {
-        Ok(c) => c,
+fn read_disk_io(cgroup: &vmspawnd_cgroup::CgroupPath) -> Result<(u64, u64)> {
+    let io = vmspawnd_cgroup::IoController::new(cgroup.path().to_path_buf());
+    let stats = match io.get_stat() {
+        Ok(s) => s,
         Err(_) => return Ok((0, 0)),
     };
 
     let mut total_read: u64 = 0;
     let mut total_write: u64 = 0;
-
-    for line in content.lines() {
-        for field in line.split_whitespace() {
-            if let Some(val) = field.strip_prefix("rbytes=") {
-                total_read += val.parse::<u64>().unwrap_or(0);
-            } else if let Some(val) = field.strip_prefix("wbytes=") {
-                total_write += val.parse::<u64>().unwrap_or(0);
-            }
-        }
+    for stat in &stats {
+        total_read += stat.rbytes;
+        total_write += stat.wbytes;
     }
 
     Ok((total_read, total_write))

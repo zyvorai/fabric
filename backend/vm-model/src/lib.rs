@@ -116,6 +116,35 @@ pub struct VMMetrics {
     pub network_tx: u64,
 }
 
+/// PSI pressure record for a single stall category (some or full).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PressureRecord {
+    pub avg10: f64,
+    pub avg60: f64,
+    pub avg300: f64,
+    pub total: u64,
+}
+
+/// PSI pressure metrics for a VM's cgroup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VMPressure {
+    /// CPU pressure (some only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_some: Option<PressureRecord>,
+    /// Memory pressure (some).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_some: Option<PressureRecord>,
+    /// Memory pressure (full).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_full: Option<PressureRecord>,
+    /// I/O pressure (some).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_some: Option<PressureRecord>,
+    /// I/O pressure (full).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_full: Option<PressureRecord>,
+}
+
 impl VM {
     pub fn new(name: String, image: String, cpus: u32, memory: u64) -> Self {
         Self::with_disk(name, image, cpus, memory, 20)

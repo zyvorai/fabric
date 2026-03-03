@@ -17,3 +17,4 @@ async-stream.workspace = true
 vm-model = { path = "../../vm-model" }
 vmspawnd-driver-core = { path = "../driver-core" }
 vmspawnd-machined-dbus = { path = "../machined-dbus" }
+vmspawnd-cgroup = { path = "../cgroup" }

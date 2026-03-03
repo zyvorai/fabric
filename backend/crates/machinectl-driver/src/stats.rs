@@ -1,16 +1,17 @@
-use anyhow::{anyhow, Result};
-use vm_model::VMMetrics;
+use anyhow::Result;
+use vm_model::{PressureRecord, VMMetrics, VMPressure};
+use vmspawnd_cgroup::CgroupPath;
 use vmspawnd_driver_core::ResourceStatsDriver;
 
 use crate::MachinectlDriver;
 
 impl ResourceStatsDriver for MachinectlDriver {
     async fn get_metrics(&self, name: &str) -> Result<VMMetrics> {
-        let cgroup_base = format!("/sys/fs/cgroup/machine.slice/machine-{}.scope", name);
+        let cgroup = CgroupPath::for_machine(name);
 
-        let cpu_usage = read_cpu_usage(&cgroup_base).await.unwrap_or(0.0);
-        let memory_usage = read_memory_usage(&cgroup_base).await.unwrap_or(0);
-        let (disk_read, disk_write) = read_disk_io(&cgroup_base).await.unwrap_or((0, 0));
+        let cpu_usage = read_cpu_usage(&cgroup).await.unwrap_or(0.0);
+        let memory_usage = read_memory_usage(&cgroup).unwrap_or(0);
+        let (disk_read, disk_write) = read_disk_io(&cgroup).unwrap_or((0, 0));
         let (network_rx, network_tx) = read_network_stats(name).await.unwrap_or((0, 0));
 
         Ok(VMMetrics {
@@ -21,41 +22,64 @@ impl ResourceStatsDriver for MachinectlDriver {
             network_tx,
         })
     }
+
+    async fn get_pressure(&self, name: &str) -> Result<VMPressure> {
+        let cgroup = CgroupPath::for_machine(name);
+        let path = cgroup.path().to_path_buf();
+
+        let cpu = vmspawnd_cgroup::CpuController::new(path.clone());
+        let mem = vmspawnd_cgroup::MemoryController::new(path.clone());
+        let io = vmspawnd_cgroup::IoController::new(path);
+
+        let cpu_pressure = cpu.get_pressure().ok();
+        let mem_pressure = mem.get_pressure().ok();
+        let io_pressure = io.get_pressure().ok();
+
+        Ok(VMPressure {
+            cpu_some: cpu_pressure.map(|p| to_pressure_record(&p.some)),
+            memory_some: mem_pressure.as_ref().map(|p| to_pressure_record(&p.some)),
+            memory_full: mem_pressure
+                .as_ref()
+                .and_then(|p| p.full.as_ref().map(to_pressure_record)),
+            io_some: io_pressure.as_ref().map(|p| to_pressure_record(&p.some)),
+            io_full: io_pressure
+                .as_ref()
+                .and_then(|p| p.full.as_ref().map(to_pressure_record)),
+        })
+    }
+}
+
+fn to_pressure_record(p: &vmspawnd_cgroup::PressureRecord) -> PressureRecord {
+    PressureRecord {
+        avg10: p.avg10,
+        avg60: p.avg60,
+        avg300: p.avg300,
+        total: p.total,
+    }
 }
 
 /// Read CPU usage percentage from cgroup v2 cpu.stat.
-async fn read_cpu_usage(cgroup_path: &str) -> Result<f64> {
-    let cpu_stat_path = format!("{}/cpu.stat", cgroup_path);
-    let content = tokio::fs::read_to_string(&cpu_stat_path)
-        .await
-        .map_err(|e| anyhow!("Failed to read {}: {}", cpu_stat_path, e))?;
+async fn read_cpu_usage(cgroup: &CgroupPath) -> Result<f64> {
+    let cpu = vmspawnd_cgroup::CpuController::new(cgroup.path().to_path_buf());
+    let stat = cpu.get_stat()?;
 
-    let mut usage_usec: u64 = 0;
-    for line in content.lines() {
-        if let Some(val) = line.strip_prefix("usage_usec ") {
-            usage_usec = val.trim().parse().unwrap_or(0);
-            break;
-        }
-    }
+    let cpuset = vmspawnd_cgroup::CpusetController::new(cgroup.path().to_path_buf());
+    let num_cpus = cpuset
+        .get_cpus_effective()
+        .map(|cpus| cpus.len() as u32)
+        .unwrap_or_else(|_| {
+            // Fall back to /proc/cpuinfo
+            std::fs::read_to_string("/proc/cpuinfo")
+                .map(|c| {
+                    c.lines()
+                        .filter(|l| l.starts_with("processor"))
+                        .count() as u32
+                })
+                .unwrap_or(1)
+                .max(1)
+        });
 
-    let cpuset_path = format!("{}/cpuset.cpus.effective", cgroup_path);
-    let num_cpus = if let Ok(cpuset) = tokio::fs::read_to_string(&cpuset_path).await {
-        count_cpus_in_cpuset(cpuset.trim())
-    } else {
-        tokio::fs::read_to_string("/proc/cpuinfo")
-            .await
-            .map(|c| {
-                c.lines()
-                    .filter(|l| l.starts_with("processor"))
-                    .count() as u32
-            })
-            .unwrap_or(1)
-            .max(1)
-    };
-
-    let uptime_content = tokio::fs::read_to_string("/proc/uptime")
-        .await
-        .map_err(|e| anyhow!("Failed to read /proc/uptime: {}", e))?;
+    let uptime_content = tokio::fs::read_to_string("/proc/uptime").await?;
     let uptime_secs: f64 = uptime_content
         .split_whitespace()
         .next()
@@ -68,54 +92,27 @@ async fn read_cpu_usage(cgroup_path: &str) -> Result<f64> {
         return Ok(0.0);
     }
 
-    let percentage = (usage_usec as f64 / total_usec as f64) * 100.0;
-    Ok(percentage.min(100.0).max(0.0))
+    let percentage = (stat.usage_usec as f64 / total_usec as f64) * 100.0;
+    Ok(percentage.clamp(0.0, 100.0))
 }
 
-fn count_cpus_in_cpuset(cpuset: &str) -> u32 {
-    if cpuset.is_empty() {
-        return 1;
-    }
-    let mut count = 0u32;
-    for part in cpuset.split(',') {
-        if let Some((start, end)) = part.split_once('-') {
-            let s: u32 = start.trim().parse().unwrap_or(0);
-            let e: u32 = end.trim().parse().unwrap_or(0);
-            count += e - s + 1;
-        } else {
-            count += 1;
-        }
-    }
-    count.max(1)
+fn read_memory_usage(cgroup: &CgroupPath) -> Result<u64> {
+    let mem = vmspawnd_cgroup::MemoryController::new(cgroup.path().to_path_buf());
+    Ok(mem.get_current()?)
 }
 
-async fn read_memory_usage(cgroup_path: &str) -> Result<u64> {
-    let memory_current_path = format!("{}/memory.current", cgroup_path);
-    let content = tokio::fs::read_to_string(&memory_current_path)
-        .await
-        .map_err(|e| anyhow!("Failed to read {}: {}", memory_current_path, e))?;
-    let bytes: u64 = content.trim().parse().unwrap_or(0);
-    Ok(bytes)
-}
-
-async fn read_disk_io(cgroup_path: &str) -> Result<(u64, u64)> {
-    let io_stat_path = format!("{}/io.stat", cgroup_path);
-    let content = match tokio::fs::read_to_string(&io_stat_path).await {
-        Ok(c) => c,
+fn read_disk_io(cgroup: &CgroupPath) -> Result<(u64, u64)> {
+    let io = vmspawnd_cgroup::IoController::new(cgroup.path().to_path_buf());
+    let stats = match io.get_stat() {
+        Ok(s) => s,
         Err(_) => return Ok((0, 0)),
     };
 
     let mut total_read: u64 = 0;
     let mut total_write: u64 = 0;
-
-    for line in content.lines() {
-        for field in line.split_whitespace() {
-            if let Some(val) = field.strip_prefix("rbytes=") {
-                total_read += val.parse::<u64>().unwrap_or(0);
-            } else if let Some(val) = field.strip_prefix("wbytes=") {
-                total_write += val.parse::<u64>().unwrap_or(0);
-            }
-        }
+    for stat in &stats {
+        total_read += stat.rbytes;
+        total_write += stat.wbytes;
     }
 
     Ok((total_read, total_write))

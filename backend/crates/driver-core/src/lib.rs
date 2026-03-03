@@ -5,7 +5,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
-use vm_model::{VMMetrics, VMState};
+use vm_model::{VMMetrics, VMPressure, VMState};
 
 // ============================================================================
 // Shared types
@@ -80,6 +80,12 @@ pub trait ResourceStatsDriver: Send + Sync {
         &self,
         name: &str,
     ) -> impl std::future::Future<Output = Result<VMMetrics>> + Send;
+
+    /// Collect PSI pressure metrics for a machine.
+    fn get_pressure(
+        &self,
+        name: &str,
+    ) -> impl std::future::Future<Output = Result<VMPressure>> + Send;
 }
 
 /// Runtime resource control via systemd unit properties.
@@ -103,6 +109,38 @@ pub trait ResourceControlDriver: Send + Sync {
         &self,
         name: &str,
         weight: u32,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    /// Freeze (pause) all processes in the machine's cgroup.
+    fn freeze(
+        &self,
+        name: &str,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    /// Thaw (resume) all processes in the machine's cgroup.
+    fn thaw(
+        &self,
+        name: &str,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    /// Check if the machine's cgroup is frozen.
+    fn is_frozen(
+        &self,
+        name: &str,
+    ) -> impl std::future::Future<Output = Result<bool>> + Send;
+
+    /// Set the maximum number of PIDs in the machine's cgroup.
+    fn set_pids_max(
+        &self,
+        name: &str,
+        max: u64,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    /// Pin the machine to specific CPU cores.
+    fn set_cpuset(
+        &self,
+        name: &str,
+        cpus: &[u32],
     ) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 
