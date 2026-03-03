@@ -70,6 +70,12 @@ pub struct App {
     pub ceph_images: Vec<String>,
     pub ceph_health: Option<serde_json::Value>,
     pub storage_selected: usize,
+    // Logs & system data
+    pub log_entries: Vec<serde_json::Value>,
+    pub system_info: Option<serde_json::Value>,
+    pub bridges: Vec<serde_json::Value>,
+    pub vlans: Vec<serde_json::Value>,
+    pub links: Vec<serde_json::Value>,
     client: Client,
 }
 
@@ -104,6 +110,11 @@ impl App {
             ceph_images: Vec::new(),
             ceph_health: None,
             storage_selected: 0,
+            log_entries: Vec::new(),
+            system_info: None,
+            bridges: Vec::new(),
+            vlans: Vec::new(),
+            links: Vec::new(),
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
@@ -344,8 +355,35 @@ impl App {
         self.update_metrics_history().await;
         self.refresh_netsec().await;
         self.refresh_storage().await;
+        self.refresh_logs().await;
+        self.refresh_system_info().await;
+        self.refresh_network().await;
 
         Ok(())
+    }
+
+    async fn refresh_logs(&mut self) {
+        self.log_entries = self.fetch_list("/audit/logs").await;
+        // Keep only last 50 for display
+        if self.log_entries.len() > 50 {
+            let start = self.log_entries.len() - 50;
+            self.log_entries = self.log_entries.split_off(start);
+        }
+    }
+
+    async fn refresh_system_info(&mut self) {
+        match self.client.get(format!("{}/system/memory", API_BASE)).send().await {
+            Ok(res) if res.status().is_success() => {
+                self.system_info = res.json().await.ok();
+            }
+            _ => {}
+        }
+    }
+
+    async fn refresh_network(&mut self) {
+        self.bridges = self.fetch_list("/networkd/bridges").await;
+        self.vlans = self.fetch_list("/networkd/vlans").await;
+        self.links = self.fetch_list("/networkd/links").await;
     }
 
     async fn refresh_storage(&mut self) {

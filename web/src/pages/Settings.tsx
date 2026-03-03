@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Settings as SettingsIcon, Save, RotateCcw, Bell, Globe, Shield, Database, Loader2 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'
 import { apiGet, apiPut } from '../api/client'
+import { listStoragePools } from '../api/storage'
 
 interface AppSettings {
   daemon_name: string
@@ -54,10 +55,21 @@ export default function Settings() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [poolNames, setPoolNames] = useState<string[]>([])
 
   useEffect(() => {
     loadSettings()
+    loadPools()
   }, [])
+
+  const loadPools = async () => {
+    try {
+      const pools = await listStoragePools()
+      setPoolNames(pools.map(p => p.name))
+    } catch {
+      // Fallback - keep empty, user can type
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -243,9 +255,13 @@ export default function Settings() {
                 onChange={(e) => update('default_pool', e.target.value)}
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               >
-                <option value="default">default</option>
-                <option value="ssd-pool">ssd-pool</option>
-                <option value="hdd-pool">hdd-pool</option>
+                {poolNames.length > 0 ? (
+                  poolNames.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))
+                ) : (
+                  <option value={settings.default_pool}>{settings.default_pool}</option>
+                )}
               </select>
             </div>
             <div>

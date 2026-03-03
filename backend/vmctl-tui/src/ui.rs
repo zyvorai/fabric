@@ -25,9 +25,9 @@ pub fn ui(f: &mut Frame, app: &App) {
     match app.current_view {
         View::Dashboard => views::render_dashboard(f, app, chunks[1]),
         View::VMs => views::render_vms_view(f, app, chunks[1]),
-        View::Logs => render_logs_view(f, chunks[1]),
+        View::Logs => render_logs_view(f, app, chunks[1]),
         View::Metrics => render_metrics_view(f, app, chunks[1]),
-        View::Network => render_network_view(f, chunks[1]),
+        View::Network => render_network_view(f, app, chunks[1]),
         View::NetSecurity => render_netsec_view(f, app, chunks[1]),
         View::Storage => render_storage_view(f, app, chunks[1]),
         View::Help => views::render_help(f, chunks[1]),
@@ -47,32 +47,54 @@ pub fn ui(f: &mut Frame, app: &App) {
     render_footer(f, app, footer_chunks[1]);
 }
 
-fn render_logs_view(f: &mut Frame, area: Rect) {
-    let logs = vec![
+fn render_logs_view(f: &mut Frame, app: &App, area: Rect) {
+    if app.log_entries.is_empty() {
+        let msg = Paragraph::new("  No audit log entries available. Logs are fetched from /api/audit/logs.")
+            .block(Block::default().borders(Borders::ALL).title(" System Logs "))
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(msg, area);
+        return;
+    }
+
+    let logs: Vec<Line> = app.log_entries.iter().map(|entry| {
+        let timestamp = entry.get("timestamp")
+            .or_else(|| entry.get("created"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let ts_short = if timestamp.len() > 19 { &timestamp[..19] } else { timestamp };
+
+        let level = entry.get("level")
+            .or_else(|| entry.get("severity"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("INFO");
+        let level_color = match level.to_uppercase().as_str() {
+            "ERROR" | "CRITICAL" => Color::Red,
+            "WARN" | "WARNING" => Color::Yellow,
+            "DEBUG" => Color::DarkGray,
+            _ => Color::Cyan,
+        };
+
+        let action = entry.get("action").and_then(|v| v.as_str()).unwrap_or("");
+        let resource = entry.get("resource_type").and_then(|v| v.as_str()).unwrap_or("");
+        let detail = entry.get("detail")
+            .or_else(|| entry.get("message"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let message = if !action.is_empty() {
+            format!("{} {} {}", action, resource, detail)
+        } else {
+            detail.to_string()
+        };
+
         Line::from(vec![
-            Span::styled("[2026-02-19 12:34:56] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("INFO  ", Style::default().fg(Color::Cyan)),
-            Span::raw("vmspawnd: VM 'web-01' started successfully"),
-        ]),
-        Line::from(vec![
-            Span::styled("[2026-02-19 12:34:45] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("WARN  ", Style::default().fg(Color::Yellow)),
-            Span::raw("vmspawnd: High memory usage on 'db-01': 95%"),
-        ]),
-        Line::from(vec![
-            Span::styled("[2026-02-19 12:34:30] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("INFO  ", Style::default().fg(Color::Cyan)),
-            Span::raw("vmspawnd: Network bridge 'br0' configured"),
-        ]),
-        Line::from(vec![
-            Span::styled("[2026-02-19 12:34:15] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("ERROR ", Style::default().fg(Color::Red)),
-            Span::raw("vmspawnd: Failed to start 'test-vm': insufficient resources"),
-        ]),
-    ];
+            Span::styled(format!("[{}] ", ts_short), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{:<6}", level.to_uppercase()), Style::default().fg(level_color)),
+            Span::raw(message),
+        ])
+    }).collect();
 
     let paragraph = Paragraph::new(logs)
-        .block(Block::default().borders(Borders::ALL).title(" System Logs "))
+        .block(Block::default().borders(Borders::ALL).title(format!(" System Logs ({}) ", app.log_entries.len())))
         .style(Style::default());
 
     f.render_widget(paragraph, area);
@@ -170,38 +192,121 @@ fn render_metrics_view(f: &mut Frame, app: &App, area: Rect) {
     };
     f.render_widget(tx_text, text_area);
 
-    // System Info
-    let info_text = vec![
+    // System Info - from API or fallback
+    let mut info_text = vec![
         Line::from(Span::styled("System Information", Style::default().add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from("  Uptime:    2 days, 5 hours"),
-        Line::from("  Load Avg:  1.23, 1.45, 1.67"),
-        Line::from("  Processes: 245 running, 12 sleeping"),
     ];
+    if let Some(ref sys) = app.system_info {
+        let total = sys.get("total_bytes").and_then(|v| v.as_u64()).unwrap_or(0);
+        let available = sys.get("available_bytes").and_then(|v| v.as_u64()).unwrap_or(0);
+        let used = total.saturating_sub(available);
+        let total_gb = total as f64 / (1024.0 * 1024.0 * 1024.0);
+        let used_gb = used as f64 / (1024.0 * 1024.0 * 1024.0);
+        info_text.push(Line::from(format!("  Memory:  {:.1} / {:.1} GB", used_gb, total_gb)));
+        if let Some(swap_total) = sys.get("swap_total_bytes").and_then(|v| v.as_u64()) {
+            let swap_gb = swap_total as f64 / (1024.0 * 1024.0 * 1024.0);
+            info_text.push(Line::from(format!("  Swap:    {:.1} GB total", swap_gb)));
+        }
+    }
+    let running = app.vms.iter().filter(|v| v.state == vm_model::VMState::Running).count();
+    let total_vms = app.vms.len();
+    info_text.push(Line::from(format!("  VMs:     {} total, {} running", total_vms, running)));
+    info_text.push(Line::from(format!("  Storage: {} pools", app.storage_pools.len())));
+
     let info = Paragraph::new(info_text)
         .block(Block::default().borders(Borders::ALL).title(" System Info "))
         .style(Style::default());
     f.render_widget(info, chunks[3]);
 }
 
-fn render_network_view(f: &mut Frame, area: Rect) {
-    let text = vec![
+fn render_network_view(f: &mut Frame, app: &App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(8),
+        ])
+        .split(area);
+
+    let mut text = vec![
         Line::from(Span::styled("Network Configuration", Style::default().add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from("Bridges:"),
-        Line::from("  br0  - 192.168.100.1/24  (UP)"),
-        Line::from("  br1  - 192.168.200.1/24  (UP)"),
-        Line::from(""),
-        Line::from("VLANs:"),
-        Line::from("  vlan100 on br0"),
-        Line::from("  vlan200 on br0"),
     ];
+
+    // Bridges from API
+    text.push(Line::from(Span::styled(
+        format!("Bridges ({})", app.bridges.len()),
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )));
+    if app.bridges.is_empty() {
+        text.push(Line::from(Span::styled("  No bridges configured", Style::default().fg(Color::DarkGray))));
+    } else {
+        for br in &app.bridges {
+            let name = br.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+            let addrs = br.get("addresses").and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+                .unwrap_or_else(|| "-".to_string());
+            let dhcp = br.get("dhcp").and_then(|v| v.as_str()).unwrap_or("no");
+            text.push(Line::from(vec![
+                Span::styled(format!("  {:<12}", name), Style::default().fg(Color::Green)),
+                Span::raw(format!("{:<30} dhcp={}", addrs, dhcp)),
+            ]));
+        }
+    }
+
+    text.push(Line::from(""));
+
+    // VLANs from API
+    text.push(Line::from(Span::styled(
+        format!("VLANs ({})", app.vlans.len()),
+        Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+    )));
+    if app.vlans.is_empty() {
+        text.push(Line::from(Span::styled("  No VLANs configured", Style::default().fg(Color::DarkGray))));
+    } else {
+        for vl in &app.vlans {
+            let name = vl.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+            let vid = vl.get("vlan_id").and_then(|v| v.as_u64()).unwrap_or(0);
+            let parent = vl.get("parent_interface").and_then(|v| v.as_str()).unwrap_or("?");
+            text.push(Line::from(vec![
+                Span::styled(format!("  {:<12}", name), Style::default().fg(Color::Yellow)),
+                Span::raw(format!("id={} on {}", vid, parent)),
+            ]));
+        }
+    }
 
     let paragraph = Paragraph::new(text)
         .block(Block::default().borders(Borders::ALL).title(" Network "))
         .style(Style::default());
+    f.render_widget(paragraph, chunks[0]);
 
-    f.render_widget(paragraph, area);
+    // Links status
+    let mut link_lines = vec![
+        Line::from(Span::styled("Link Status", Style::default().add_modifier(Modifier::BOLD))),
+    ];
+    if app.links.is_empty() {
+        link_lines.push(Line::from(Span::styled("  No link data available", Style::default().fg(Color::DarkGray))));
+    } else {
+        for lk in &app.links {
+            let name = lk.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+            let kind = lk.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+            let op_state = lk.get("operational_state").and_then(|v| v.as_str()).unwrap_or("?");
+            let state_color = if op_state.contains("routable") || op_state.contains("carrier") {
+                Color::Green
+            } else {
+                Color::Gray
+            };
+            link_lines.push(Line::from(vec![
+                Span::styled(format!("  {:<12}", name), Style::default()),
+                Span::styled(format!("{:<10}", kind), Style::default().fg(Color::Cyan)),
+                Span::styled(op_state, Style::default().fg(state_color)),
+            ]));
+        }
+    }
+    let links_p = Paragraph::new(link_lines)
+        .block(Block::default().borders(Borders::ALL).title(format!(" Links ({}) ", app.links.len())));
+    f.render_widget(links_p, chunks[1]);
 }
 
 fn render_netsec_view(f: &mut Frame, app: &App, area: Rect) {

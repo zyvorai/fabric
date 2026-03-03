@@ -214,24 +214,46 @@ fn render_vm_list_compact(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(list, area);
 }
 
-fn render_activity_log(f: &mut Frame, _app: &App, area: Rect) {
-    let logs = vec![
-        Line::from(vec![
-            Span::styled("[12:34:56] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("INFO  ", Style::default().fg(Color::Cyan)),
-            Span::raw("VM 'web-server' started successfully"),
-        ]),
-        Line::from(vec![
-            Span::styled("[12:34:45] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("WARN  ", Style::default().fg(Color::Yellow)),
-            Span::raw("VM 'db-server' memory usage high: 95%"),
-        ]),
-        Line::from(vec![
-            Span::styled("[12:34:30] ", Style::default().fg(Color::DarkGray)),
-            Span::styled("INFO  ", Style::default().fg(Color::Cyan)),
-            Span::raw("Network bridge 'br0' configured"),
-        ]),
-    ];
+fn render_activity_log(f: &mut Frame, app: &App, area: Rect) {
+    let logs: Vec<Line> = if app.log_entries.is_empty() {
+        vec![Line::from(Span::styled("  No recent activity", Style::default().fg(Color::DarkGray)))]
+    } else {
+        app.log_entries.iter().rev().take(5).map(|entry| {
+            let ts = entry.get("timestamp")
+                .or_else(|| entry.get("created"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let ts_short = if ts.len() >= 19 { &ts[11..19] } else { ts };
+
+            let level = entry.get("level")
+                .or_else(|| entry.get("severity"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("INFO");
+            let level_color = match level.to_uppercase().as_str() {
+                "ERROR" | "CRITICAL" => Color::Red,
+                "WARN" | "WARNING" => Color::Yellow,
+                _ => Color::Cyan,
+            };
+
+            let action = entry.get("action").and_then(|v| v.as_str()).unwrap_or("");
+            let resource = entry.get("resource_type").and_then(|v| v.as_str()).unwrap_or("");
+            let detail = entry.get("detail")
+                .or_else(|| entry.get("message"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let message = if !action.is_empty() {
+                format!("{} {} {}", action, resource, detail)
+            } else {
+                detail.to_string()
+            };
+
+            Line::from(vec![
+                Span::styled(format!("[{}] ", ts_short), Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{:<6}", level.to_uppercase()), Style::default().fg(level_color)),
+                Span::raw(message),
+            ])
+        }).collect()
+    };
 
     let paragraph = Paragraph::new(logs)
         .block(Block::default().borders(Borders::ALL).title(" Activity Log "))

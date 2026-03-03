@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
-import { Terminal, Filter, Download, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { Terminal, Filter, Download, Trash2, RefreshCw } from 'lucide-react'
+import { apiGet } from '../api/client'
 
 interface LogEntry {
+  id?: string
   timestamp: string
-  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'
+  level: string
   source: string
   message: string
+  action?: string
+  resource_type?: string
+  detail?: string
 }
 
 export default function Logs() {
@@ -13,31 +18,35 @@ export default function Logs() {
   const [filter, setFilter] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('ALL')
   const [autoScroll, setAutoScroll] = useState(true)
+  const [loading, setLoading] = useState(true)
   const logContainerRef = useRef<HTMLDivElement>(null)
+
+  const loadLogs = useCallback(async () => {
+    try {
+      const data = await apiGet<any[]>('/api/audit/logs')
+      const entries: LogEntry[] = data.map(entry => ({
+        id: entry.id,
+        timestamp: entry.timestamp || entry.created || new Date().toISOString(),
+        level: (entry.level || entry.severity || 'INFO').toUpperCase(),
+        source: entry.source || entry.user || 'vmspawnd',
+        message: entry.detail || entry.message || `${entry.action || ''} ${entry.resource_type || ''}`.trim(),
+        action: entry.action,
+        resource_type: entry.resource_type,
+        detail: entry.detail,
+      }))
+      setLogs(entries)
+    } catch (error) {
+      console.error('Failed to load logs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     loadLogs()
-    const interval = setInterval(loadLogs, 2000) // More frequent for logs
+    const interval = setInterval(loadLogs, 5000)
     return () => clearInterval(interval)
-  }, [])
-
-  const loadLogs = () => {
-    // Simulate log loading - in real app, fetch from WebSocket or API
-    const newLog: LogEntry = {
-      timestamp: new Date().toLocaleTimeString(),
-      level: ['INFO', 'WARN', 'ERROR', 'DEBUG'][Math.floor(Math.random() * 4)] as any,
-      source: ['vmspawnd', 'systemd', 'qemu', 'network'][Math.floor(Math.random() * 4)],
-      message: [
-        'VM web-server-01 started successfully',
-        'High memory usage detected on db-server',
-        'Network bridge br0 configured',
-        'Failed to connect to storage backend',
-        'VM backup completed successfully',
-        'TPM initialization complete',
-      ][Math.floor(Math.random() * 6)],
-    }
-    setLogs(prev => [...prev.slice(-99), newLog]) // Keep last 100 logs
-  }
+  }, [loadLogs])
 
   const filteredLogs = logs.filter(log => {
     const matchesText = log.message.toLowerCase().includes(filter.toLowerCase()) ||
@@ -72,8 +81,8 @@ export default function Logs() {
   const getLevelColor = (level: string) => {
     switch (level) {
       case 'INFO': return 'text-cyan-400'
-      case 'WARN': return 'text-yellow-400'
-      case 'ERROR': return 'text-red-400'
+      case 'WARN': case 'WARNING': return 'text-yellow-400'
+      case 'ERROR': case 'CRITICAL': return 'text-red-400'
       case 'DEBUG': return 'text-gray-400'
       default: return 'text-white'
     }
@@ -82,8 +91,8 @@ export default function Logs() {
   const getLevelBg = (level: string) => {
     switch (level) {
       case 'INFO': return 'bg-cyan-500/10 border-cyan-500/20'
-      case 'WARN': return 'bg-yellow-500/10 border-yellow-500/20'
-      case 'ERROR': return 'bg-red-500/10 border-red-500/20'
+      case 'WARN': case 'WARNING': return 'bg-yellow-500/10 border-yellow-500/20'
+      case 'ERROR': case 'CRITICAL': return 'bg-red-500/10 border-red-500/20'
       case 'DEBUG': return 'bg-gray-500/10 border-gray-500/20'
       default: return 'bg-gray-700'
     }
@@ -97,6 +106,13 @@ export default function Logs() {
           System Logs
         </h1>
         <div className="flex items-center gap-2">
+          <button
+            onClick={loadLogs}
+            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
           <span className="text-sm text-gray-400">{filteredLogs.length} entries</span>
         </div>
       </div>
@@ -169,7 +185,11 @@ export default function Logs() {
       {/* Log Stream */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
-          {filteredLogs.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              Loading logs...
+            </div>
+          ) : filteredLogs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-400">
               No logs to display
             </div>
@@ -177,12 +197,12 @@ export default function Logs() {
             <div className="divide-y divide-gray-700">
               {filteredLogs.map((log, index) => (
                 <div
-                  key={index}
+                  key={log.id || index}
                   className={`p-3 hover:bg-gray-700 transition ${getLevelBg(log.level)} border-l-4`}
                 >
                   <div className="flex items-start gap-4">
                     <span className="text-gray-500 text-xs whitespace-nowrap">
-                      {log.timestamp}
+                      {log.timestamp.length > 19 ? log.timestamp.slice(0, 19).replace('T', ' ') : log.timestamp}
                     </span>
                     <span className={`font-bold text-xs whitespace-nowrap ${getLevelColor(log.level)}`}>
                       {log.level}
