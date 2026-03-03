@@ -1,25 +1,34 @@
 Source: vmspawnd
 Section: admin
 Priority: optional
-Maintainer: vmspawnd contributors <vmspawnd@example.com>
+Maintainer: Susant Sahani <ssahani@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                cargo,
                rustc,
                nodejs,
                npm
 Standards-Version: 4.6.2
-Homepage: https://github.com/vmspawnd/vmspawnd
+Homepage: https://github.com/ssahani/vmspawn
 
 Package: vmspawnd
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, systemd
-Description: Virtual Machine Spawn Daemon
- vmspawnd is a daemon for managing virtual machines with
- systemd-vmspawn. Includes vmctl CLI and vmctl-tui terminal interface.
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         systemd (>= 256)
+Recommends: systemd-container,
+            nftables,
+            wireguard-tools
+Description: Virtual Machine Management Daemon
+ vmspawnd is a daemon for managing virtual machines with systemd-vmspawn
+ and systemd-machined. Provides REST API, WebSocket console, VNC proxy,
+ and comprehensive VM lifecycle management.
+ .
+ Includes vmctl CLI tool and vmctl-tui terminal interface.
 
 Package: vmspawnd-web
 Architecture: all
-Depends: ${misc:Depends}, vmspawnd (= ${binary:Version})
+Depends: ${misc:Depends},
+         vmspawnd (= ${binary:Version})
 Description: Web UI for vmspawnd
- Web-based management interface for vmspawnd. Provides a browser UI
- for managing virtual machines.
+ Web-based management interface for vmspawnd. Provides a React dashboard
+ with 37+ pages for managing VMs, storage, network security, and more.

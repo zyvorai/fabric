@@ -2,5 +2,11 @@ usr/bin/vmspawnd
 usr/bin/vmctl
 usr/bin/vmctl-tui
 usr/lib/systemd/system/vmspawnd.service
+usr/lib/systemd/system/vmspawnd.socket
 usr/lib/systemd/system/vm@.service
+usr/lib/systemd/system-preset/90-vmspawnd.preset
+usr/lib/sysusers.d/vmspawnd.conf
+usr/lib/tmpfiles.d/vmspawnd.conf
 etc/vmspawnd/vmspawnd.toml
+etc/vmspawnd/vmspawnd.env
+etc/modules-load.d/vmspawnd.conf
