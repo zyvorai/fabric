@@ -1,97 +1,113 @@
-# vmctl-tui - Terminal UI
+# vmctl-tui -- Terminal UI
 
-Interactive terminal interface for managing VMs, built with ratatui and crossterm.
+A k9s-style interactive terminal dashboard for managing VMs, built with ratatui and crossterm.
+
+---
 
 ## Features
 
-- 8 dedicated views for different management tasks
-- Vim-style keyboard navigation
-- Real-time search and filtering
+- 8 dedicated views: Dashboard, VMs, Logs, Metrics, Network, Net Security, Storage, Help
+- Vim-style keyboard navigation with search and filtering
 - Bulk operations on multiple VMs
+- Sparkline graphs for real-time resource metrics
+- Network security management with 9 sub-tabs (Cilium-style)
+- Live data from vmspawnd API -- no mock data
 - Auto-refresh with configurable interval
-- Sparkline graphs for live resource metrics
-- Network security management with 9 sub-tabs
-- Live data from API (logs, storage, network -- no mock data)
 - 256-color and true-color support
+
+---
 
 ## Usage
 
 ```bash
+# Connect to local daemon
 vmctl-tui
-```
 
-Connect to a remote daemon:
-
-```bash
+# Connect to remote daemon
 vmctl-tui --url http://remote-host:8080
+
+# Custom refresh interval (seconds)
+vmctl-tui --refresh-interval 10
 ```
+
+### Requirements
+
+- Terminal with 256-color support (true-color recommended)
+- Minimum 80x24 terminal size (larger recommended)
+- vmspawnd daemon running and accessible
+
+---
 
 ## Views
 
-### 1. Dashboard
+### 1. Dashboard (default)
 
-The default landing view. Displays a summary of the platform state:
+Platform-wide summary:
 - Total VM count with running/stopped/paused breakdown
-- Aggregate CPU and memory utilization
-- Sparkline graphs showing resource usage trends over time
+- Aggregate CPU and memory utilization gauges
+- Sparkline graphs showing resource trends
 - Recent activity log from audit API
 
 ### 2. VMs
 
-The primary VM management view:
-- Tabular list of all VMs with name, state, CPU, memory, IP, and uptime
-- Inline status indicators (color-coded)
-- Sort by any column
-- Start, stop, restart, and delete VMs directly from the list
-- Bulk operations for acting on multiple VMs at once
+Primary VM management:
+- Sortable table of all VMs (name, state, CPU, memory, IP, uptime)
+- Color-coded status indicators
+- Inline start, stop, restart, and delete actions
+- Bulk operations for acting on multiple VMs
 
 ### 3. Logs
 
 Live log viewer:
-- Real-time audit log entries fetched from `/api/audit/logs`
-- Color-coded log levels (INFO, WARN, ERROR, DEBUG)
-- Displays timestamp, level, action, resource type, and detail
+- Real-time audit log entries from `/api/audit/logs`
+- Color-coded levels: INFO, WARN, ERROR, DEBUG
+- Timestamp, action, resource type, and detail columns
 
 ### 4. Metrics
 
-Resource monitoring view:
+Resource monitoring:
 - Per-VM CPU and memory usage
 - Sparkline graphs for real-time visualization
 - Network I/O (RX/TX) statistics
-- System information from API (memory stats, VM counts, storage pool counts)
+- System info from API (memory, VM counts, storage pools)
 
 ### 5. Network
 
-Virtual network overview with live data:
-- Bridges from `/api/networkd/bridges` with addresses and DHCP config
-- VLANs from `/api/networkd/vlans` with VLAN ID and parent interface
-- Link status from `/api/networkd/links` with operational state
+Virtual network overview (live data):
+- Bridges with addresses and DHCP config
+- VLANs with VLAN ID and parent interface
+- Link status with operational state
 
 ### 6. Net Security
 
 Cilium-style network security management with 9 sub-tabs:
-- **Policies** -- Network policies with label selectors
-- **Firewall** -- VM firewall profiles and zones
-- **Services** -- Service mesh with load balancing
-- **QoS** -- Traffic shaping policies
-- **DNS** -- DNS zones and policies
-- **VPN** -- WireGuard tunnels and networks
-- **Mirror** -- Packet mirror sessions
-- **NAT** -- NAT rules, pools, and gateways
-- **Monitor** -- Network monitoring policies and alerts
 
-Each tab shows resource counts, a navigable list, and a detail panel for the selected item. Supports sync and delete operations.
+| Tab | Content |
+|-----|---------|
+| Policies | Network policies with label selectors |
+| Firewall | VM firewall profiles and zones |
+| Services | Service mesh with load balancing |
+| QoS | Traffic shaping policies |
+| DNS | DNS zones and policies |
+| VPN | WireGuard tunnels and networks |
+| Mirror | Packet mirror sessions |
+| NAT | NAT rules, pools, and gateways |
+| Monitor | Monitoring policies and alerts |
+
+Each tab shows resource counts, a navigable list, and a detail panel. Supports sync (`S`) and delete (`d`) operations.
 
 ### 7. Storage
 
-Storage management view with live data:
-- Storage pools from API with type detection (Local, NFS, LVM, ZFS, Ceph/RBD)
-- Pool details: name, state, path, capacity, available space
-- Ceph-specific details: monitors, pool name, cluster health, RBD image list
+Storage pool management (live data):
+- Pool list with type detection (Local, NFS, LVM, ZFS, Ceph/RBD)
+- Details: name, state, path, capacity, available space
+- Ceph-specific: monitors, pool name, cluster health, RBD images
 
 ### 8. Help
 
-In-app keyboard shortcut reference and usage guide.
+In-app keyboard shortcut reference.
+
+---
 
 ## Keyboard Shortcuts
 
@@ -101,21 +117,21 @@ In-app keyboard shortcut reference and usage guide.
 |-----|--------|
 | `j` / Down | Move cursor down |
 | `k` / Up | Move cursor up |
-| `g` | Jump to top of list |
-| `G` | Jump to bottom of list |
-| `Tab` | Switch to next view |
-| `Shift+Tab` | Switch to previous view |
-| `1`-`7` | Jump directly to a view |
+| `g` | Jump to top |
+| `G` | Jump to bottom |
+| `Tab` | Next view |
+| `Shift+Tab` | Previous view |
+| `1`-`7` | Jump to view by number |
 
-### Search and Filter
+### Search
 
 | Key | Action |
 |-----|--------|
-| `/` | Open search prompt |
+| `/` | Open search |
 | `Enter` | Confirm search |
-| `Esc` | Cancel search / clear filter |
-| `n` | Jump to next search match |
-| `N` | Jump to previous search match |
+| `Esc` | Cancel / clear filter |
+| `n` | Next match |
+| `N` | Previous match |
 
 ### VM Actions
 
@@ -125,27 +141,25 @@ In-app keyboard shortcut reference and usage guide.
 | `t` | Stop selected VM |
 | `r` | Restart selected VM |
 | `d` | Delete selected VM (with confirmation) |
-| `Enter` | Open detail view for selected VM |
+| `Enter` | Open VM detail view |
 
 ### Bulk Operations
 
 | Key | Action |
 |-----|--------|
-| `v` | Enter visual/selection mode |
-| `Space` | Toggle selection on current item |
-| `S` | Start all selected VMs |
-| `T` | Stop all selected VMs |
-| `D` | Delete all selected VMs (with confirmation) |
+| `v` | Enter selection mode |
+| `Space` | Toggle selection |
+| `S` | Start all selected |
+| `T` | Stop all selected |
+| `D` | Delete all selected (with confirmation) |
 | `Esc` | Clear selection |
 
-### Net Security View
+### Net Security
 
 | Key | Action |
 |-----|--------|
 | `h` / Left | Previous sub-tab |
 | `l` / Right | Next sub-tab |
-| `j` / Down | Navigate items |
-| `k` / Up | Navigate items |
 | `S` | Sync current resource type |
 | `d` | Delete selected resource |
 
@@ -154,26 +168,16 @@ In-app keyboard shortcut reference and usage guide.
 | Key | Action |
 |-----|--------|
 | `R` | Force refresh |
-| `q` | Quit |
 | `?` | Toggle help overlay |
+| `q` | Quit |
 
-## Auto-Refresh
+---
 
-The TUI polls the daemon API at a regular interval (default: 5 seconds) and updates all visible data automatically. The refresh interval can be adjusted:
-
-```bash
-vmctl-tui --refresh-interval 10
-```
-
-## Sparkline Graphs
-
-Resource metrics (CPU, memory, network, disk) are rendered as sparkline graphs directly in the terminal. These graphs display a rolling window of data points, providing a compact at-a-glance view of resource trends without leaving the terminal.
-
-## UI Layout
+## Layout
 
 ```
 +----------------------------------------------------+
-| vmspawnd TUI   [Dashboard] VMs Logs ... NetSec ...  |
+| vmspawnd TUI   [Dashboard] VMs Logs ... NetSec     |
 +----------------------------------------------------+
 | Running: 12  Stopped: 3  Paused: 1   Total: 16    |
 |                                                     |
@@ -189,15 +193,13 @@ Resource metrics (CPU, memory, network, disk) are rendered as sparkline graphs d
 +----------------------------------------------------+
 ```
 
-## Requirements
+---
 
-- Terminal with 256-color support (true-color recommended)
-- Minimum 80x24 terminal size (larger recommended for sparklines)
-- vmspawnd daemon running and accessible
+## Comparable Tools
 
-## Similar Tools
-
-- k9s (Kubernetes)
-- lazydocker (Docker)
-- htop (processes)
-- bottom (system monitor)
+| Tool | Domain |
+|------|--------|
+| [k9s](https://k9scli.io/) | Kubernetes |
+| [lazydocker](https://github.com/jesseduffield/lazydocker) | Docker |
+| [htop](https://htop.dev/) | Processes |
+| [bottom](https://github.com/ClementTsang/bottom) | System monitor |

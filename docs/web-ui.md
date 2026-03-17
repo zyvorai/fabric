@@ -1,31 +1,37 @@
 # Web UI
 
-Modern React-based web interface for vmspawnd with real-time updates, 37+ pages, 20+ network/security sub-pages, and 20+ reusable components.
+A modern React-based web interface for vmspawnd with real-time updates, 37+ pages, and comprehensive VM management.
+
+---
 
 ## Features
 
 - Real-time VM status updates via WebSocket
-- Interactive terminal console via xterm.js
-- Graphical VNC console via noVNC
+- Interactive terminal console (xterm.js) and graphical VNC console (noVNC)
 - Live metrics graphs and sparklines
-- VM template management and deployment
-- Command palette for quick navigation (Ctrl+K)
+- Cilium-style network security management with 9 tabs
+- Command palette for quick navigation (`Ctrl+K` / `Cmd+K`)
 - Toast notifications for operation feedback
 - Dark theme with system preference detection
 - Responsive design for desktop and tablet
-- Breadcrumb navigation and contextual sidebars
 
-## Technology Stack
+---
 
-- React 18
-- TypeScript
-- Vite
-- TailwindCSS
-- React Router
-- Recharts (metrics and analytics graphs)
-- Lucide React (icons)
-- xterm.js (terminal console)
-- noVNC (VNC display)
+## Tech Stack
+
+| Library | Purpose |
+|---------|---------|
+| React 18 | UI framework |
+| TypeScript | Type safety |
+| Vite | Build tooling |
+| TailwindCSS | Styling |
+| React Router | Navigation |
+| Recharts | Metrics graphs |
+| Lucide React | Icons |
+| xterm.js | Terminal console |
+| noVNC | VNC display |
+
+---
 
 ## Development
 
@@ -37,190 +43,151 @@ npm run dev
 
 Access at `http://localhost:3000`. The dev server proxies API requests to `http://localhost:8080/api`.
 
-## Production Build
+### Production Build
 
 ```bash
 npm run build
 ```
 
-Output in `dist/` directory. In production, the static files are served directly by the vmspawnd daemon.
+Output goes to `dist/`. In production, vmspawnd serves these static files directly.
+
+---
 
 ## Pages
 
-The web UI contains 37+ pages and 20+ sub-pages organized into the following sections:
-
 ### Dashboard
-- Platform-wide summary with VM count statistics (running, stopped, paused, error)
-- Real-time resource utilization gauges (CPU, memory, storage)
-- Recent activity feed
-- Quick-action buttons for common operations
+- VM count statistics (running, stopped, paused, error)
+- Real-time CPU, memory, and storage utilization gauges
+- Recent activity feed and quick-action buttons
 - Sparkline trend graphs
 
 ### VM Management
-- **VM List** -- Filterable, sortable grid of VM cards with inline status indicators and quick actions (start, stop, restart, delete)
-- **VM Detail** -- Full VM configuration, resource metrics graphs, attached storage, network interfaces, snapshots, and tags
-- **VM Create** -- Multi-step form with validation for creating new VMs, including cloud-init configuration, TPM options, and VNC settings
+- **VM List** -- Filterable, sortable grid with inline status and quick actions
+- **VM Detail** -- Configuration, metrics graphs, storage, network, snapshots, tags
+- **VM Create** -- Multi-step form with cloud-init, TPM, and VNC options
 - **VM Console** -- Interactive terminal via xterm.js over WebSocket
 - **VM VNC** -- Graphical display via noVNC over WebSocket
-- **VM Metrics** -- Detailed CPU, memory, disk, and network graphs with selectable time ranges
-- **VM Snapshots** -- Snapshot list with create, revert, and delete actions
+- **VM Metrics** -- CPU, memory, disk, and network graphs with selectable time ranges
+- **VM Snapshots** -- Create, revert, and delete
 - **VM Cloning** -- Full and linked clone creation
 
 ### Templates
 - Template list with metadata and usage counts
-- Template detail and editing
 - Deploy VM from template
 
 ### Storage
 - Storage pool management (Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD)
-- Volume list with capacity and attachment info (live data from API)
-- Volume create, resize, attach, detach, and delete
-- Ceph pool creation with monitor, pool name, user, and keyring config
-- Ceph health status display
-
-### Networking
-- Virtual network list and detail
-- Network create and edit
-- Interface attachment management
+- Volume list with capacity and attachment info
+- Ceph pool creation with health status display
 
 ### Network Security (`/network-security`)
-Cilium-style network policy management with 9 tabs:
-- **Policies** -- Label-based ingress/egress rules with direction badges, priority, and enforcement
-- **Firewall** -- Profiles with rule builder (protocol/port/CIDR/action), zones, VM assignments
-- **Services** -- Virtual IP services with load balancing algorithm selector and backend count
-- **QoS** -- Traffic shaping with guaranteed/max rate, burst, and priority
-- **DNS** -- Zone management with record type selector and TTL, policy with upstream servers and domain blocking
-- **VPN** -- WireGuard tunnel peer editor, network topology selector (full-mesh/hub-spoke/point-to-point)
-- **Mirror** -- Packet capture with direction selector, collector target, optional filters
-- **NAT** -- Rule type selector (masquerade/SNAT/DNAT/hairpin), pool editor, gateway config
-- **Monitor** -- Threshold builder (metric/value/unit/direction/severity), live metrics, alert management
 
-All tabs include: stat cards, create modals with label selector (Cilium-style key=value tag editor), sync buttons, delete with confirmation.
+9 tabs with Cilium-style label selectors, stat cards, and CRUD modals:
+
+| Tab | Features |
+|-----|----------|
+| Policies | Ingress/egress rules with direction badges, priority, enforcement |
+| Firewall | Rule builder (protocol/port/CIDR/action), zones, VM assignments |
+| Services | Virtual IP with load balancing algorithm selector |
+| QoS | Guaranteed/max rate, burst, priority |
+| DNS | Zone management with record types, domain blocking |
+| VPN | WireGuard peer editor, topology selector |
+| Mirror | Direction selector, collector target, filters |
+| NAT | Rule type selector (masquerade/SNAT/DNAT/hairpin), pool editor |
+| Monitor | Threshold builder, live metrics, alert management |
 
 ### Backups
-- Backup list and detail
-- Create and restore backups
-- Backup policy management
+- Backup list, create, restore, and policy management
 
 ### Monitoring and Analytics
-- Metrics dashboard with customizable time ranges
+- Customizable time-range metrics dashboard
 - Per-VM and aggregate resource graphs
-- Analytics reports and export
-- Prometheus endpoint status
+- Analytics reports with PDF/CSV export
 
 ### Scheduling
-- Schedule list and creation
-- Cron-style and one-time schedule configuration
-- Schedule history and execution logs
+- Cron-style and one-time schedules with execution history
 
 ### Quotas
-- Quota list and management
-- Per-user and per-project quota configuration
-- Usage-vs-limit visualization
+- Per-user and per-project quota configuration with usage-vs-limit visualization
 
 ### Notifications
-- Notification rule management
-- Channel configuration (email, webhook, Slack)
+- Multi-channel rule management (email, Slack, webhook, Teams)
 - Notification history and acknowledgment
 
 ### Audit
-- Searchable audit log viewer
-- Filter by user, action, resource, and time range
+- Searchable log viewer with user, action, resource, and time range filters
 
 ### Administration
 - User and role management
-- Certificate management
-- Encryption key management
-- System configuration
-- Resource pool management
-- Datacenter management
+- Certificate and encryption key management
+- Resource pools and datacenter management
 
 ### Site Operations
 - DRS configuration and recommendations
-- Fault tolerance settings
-- Replication management
-- Site recovery plans
+- Fault tolerance, replication, and site recovery
 
 ### Content Library
-- Shared image and template repository
-- Upload, download, and deploy library items
+- Shared image/template repository with upload and deploy
 
 ### Image Builder
-- Build recipe management
-- Build execution and status tracking
+- Build recipe management and execution tracking
 
-### Tags
-- Tag management and assignment
-- Tag-based filtering across resources
-
-### Autoscale
-- Autoscale policy management
-- Scaling history and event log
+### Tags and Autoscale
+- Tag management with cross-resource filtering
+- Autoscale policy management with scaling history
 
 ### Hotplug
 - Live CPU, memory, disk, and NIC modifications for running VMs
 
-## Components
-
-The UI includes 20+ reusable components, including:
-
-- **PageHeader** -- Consistent page title and breadcrumb rendering
-- **VMCard** -- VM summary card with status badge and action buttons
-- **MetricsChart** -- Recharts-based time-series graph
-- **SparklineGraph** -- Compact inline trend graph
-- **ConsoleTerminal** -- xterm.js terminal wrapper with WebSocket connection management
-- **VNCViewer** -- noVNC display wrapper
-- **ConfirmDialog** -- Modal confirmation for destructive actions
-- **CommandPalette** -- Ctrl+K quick-navigation overlay with fuzzy search
-- **ToastNotification** -- Stackable toast messages for operation results
-- **StatusBadge** -- Color-coded VM state indicator
-- **ResourceGauge** -- Circular or bar gauge for CPU/memory utilization
-- **DataTable** -- Sortable, filterable table with pagination
-- **SearchInput** -- Debounced search field
-- **Sidebar** -- Collapsible navigation sidebar
-- **ThemeToggle** -- Light/dark theme switcher
+---
 
 ## WebSocket Integration
 
-The web UI maintains persistent WebSocket connections for:
+The UI maintains persistent WebSocket connections for:
 
-1. **Live event stream** (`/ws/events`) -- Pushes VM state changes, alerts, and system events to the UI in real time, eliminating the need for polling.
-2. **Console** (`/ws/console/:vmname`) -- Bidirectional terminal I/O for interactive shell access.
-3. **VNC** (`/ws/vnc/:vmname`) -- Proxied VNC framebuffer data for graphical console display.
+| Endpoint | Purpose |
+|----------|---------|
+| `/ws/events` | Live VM state changes, alerts, and system events |
+| `/ws/console/:vmname` | Bidirectional terminal I/O |
+| `/ws/vnc/:vmname` | Proxied VNC framebuffer data |
 
-Connection state is managed globally; the UI automatically reconnects on disconnection.
+Connections auto-reconnect on disconnection.
+
+---
 
 ## Command Palette
 
-Press `Ctrl+K` (or `Cmd+K` on macOS) to open the command palette. It supports:
-
+Press `Ctrl+K` (or `Cmd+K` on macOS) to open:
 - Fuzzy search across all pages and VMs
 - Quick navigation to any view
 - Direct VM actions (start, stop, restart)
 - Keyboard-only workflow
 
-## Toast Notifications
+---
 
-All API operations surface results as toast notifications:
-- Success confirmations (green)
-- Error messages with details (red)
-- Warning notices (yellow)
-- Informational messages (blue)
+## Components
 
-Toasts auto-dismiss after a configurable duration and can be manually dismissed.
+20+ reusable components including:
 
-## Dark Theme
+| Component | Purpose |
+|-----------|---------|
+| PageHeader | Title and breadcrumb rendering |
+| VMCard | VM summary with status badge and actions |
+| MetricsChart | Recharts time-series graph |
+| SparklineGraph | Compact inline trend graph |
+| ConsoleTerminal | xterm.js wrapper with WebSocket management |
+| VNCViewer | noVNC display wrapper |
+| ConfirmDialog | Modal confirmation for destructive actions |
+| CommandPalette | Quick-navigation overlay with fuzzy search |
+| ToastNotification | Stackable toast messages |
+| StatusBadge | Color-coded VM state indicator |
+| ResourceGauge | CPU/memory utilization gauge |
+| DataTable | Sortable, filterable table with pagination |
+| Sidebar | Collapsible navigation sidebar |
+| ThemeToggle | Light/dark theme switcher |
 
-Dark theme is enabled by default and respects the system color scheme preference. Users can override the preference with the theme toggle in the top navigation bar. The choice is persisted in local storage.
-
-## API Integration
-
-All API calls are routed through a centralized HTTP client that handles:
-- Token-based authentication
-- Automatic token refresh
-- Request/response error handling
-- Loading state management
+---
 
 ## Customization
 
-Edit `tailwind.config.js` for theme customization including colors, spacing, and typography.
+Edit `tailwind.config.js` for theme customization (colors, spacing, typography).

@@ -1,34 +1,49 @@
-# High Availability Guide
+# High Availability
+
+vmspawnd supports multi-node clustering via etcd for fault-tolerant VM management with automatic leader election and failover.
+
+---
 
 ## Architecture
 
 ```
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│   Node 1    │       │   Node 2    │       │   Node 3    │
-│  (Leader)   │       │  (Follower) │       │  (Follower) │
-└──────┬──────┘       └──────┬──────┘       └──────┬──────┘
-       │                     │                     │
-       └─────────────────────┴─────────────────────┘
-                             │
-                        ┌────▼────┐
-                        │  etcd   │
-                        │ cluster │
-                        └─────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│     Node 1      │     │     Node 2      │     │     Node 3      │
+│    (Leader)     │     │   (Follower)    │     │   (Follower)    │
+│                 │     │                 │     │                 │
+│  vmspawnd       │     │  vmspawnd       │     │  vmspawnd       │
+│  VMs: A, B      │     │  VMs: C, D      │     │  VMs: E, F      │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                         ┌───────▼───────┐
+                         │  etcd cluster  │
+                         │  (3+ nodes)    │
+                         └───────────────┘
 ```
 
-## Setup etcd Cluster
+**How it works:**
+- Each node runs a vmspawnd instance managing local VMs
+- etcd stores cluster state, leader election, and VM placement metadata
+- The leader handles write operations; followers replicate state
+- On leader failure, a new leader is elected automatically
 
-### Install etcd
+---
+
+## Setup
+
+### 1. Install and Configure etcd
+
+Install etcd on all cluster nodes:
 
 ```bash
-# On all nodes
-sudo apt install etcd
-
-# Configure etcd
-sudo vi /etc/default/etcd
+sudo apt install etcd    # Debian/Ubuntu
+sudo dnf install etcd    # Fedora/RHEL
 ```
 
-Node 1:
+Configure each node in `/etc/default/etcd`. Example for Node 1:
+
 ```
 ETCD_NAME="node1"
 ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.1.10:2380"
@@ -40,21 +55,20 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 ETCD_INITIAL_CLUSTER_TOKEN="vmspawnd-cluster"
 ```
 
-### Start etcd
+Start etcd:
 
 ```bash
-sudo systemctl start etcd
-sudo systemctl enable etcd
+sudo systemctl enable --now etcd
 ```
 
-## Configure vmspawnd for HA
+### 2. Configure vmspawnd for HA
 
-`/etc/vmspawnd/vmspawnd.toml`:
+On each node, edit `/etc/vmspawnd/vmspawnd.toml`:
 
 ```toml
 [daemon]
 listen = "0.0.0.0:8080"
-node_id = "node1"
+node_id = "node1"                    # Unique per node
 hostname = "node1.example.com"
 
 [ha]
@@ -68,22 +82,22 @@ heartbeat_interval_seconds = 5
 leader_election = true
 ```
 
-## Leadership Election
+Restart vmspawnd on each node:
 
-vmspawnd uses etcd for leader election:
+```bash
+sudo systemctl restart vmspawnd
+```
 
-1. Each node attempts to acquire leadership
-2. Leader handles write operations
-3. Followers replicate state
-4. On leader failure, new leader elected
+---
 
-### Check Leader
+## Leader Election
+
+### Check the Current Leader
 
 ```bash
 curl http://localhost:8080/api/cluster/leader
 ```
 
-Response:
 ```json
 {
   "node_id": "node1",
@@ -92,69 +106,84 @@ Response:
 }
 ```
 
-### Manual Failover
+### Trigger Manual Failover
 
 ```bash
-# Trigger leadership re-election
 curl -X POST http://localhost:8080/api/cluster/resign-leadership
 ```
 
+### Automatic Failover
+
+When the leader fails:
+1. Follower nodes detect the missing heartbeat
+2. A new leader is elected via etcd
+3. VMs continue running on their respective nodes
+4. API requests are automatically routed to the new leader
+
+---
+
 ## VM Placement
 
-### Automatic Placement
+### Automatic (Default)
 
-vmspawnd automatically places VMs on least-loaded node:
+VMs are placed on the least-loaded node:
 
 ```bash
-# VM will be placed on optimal node
 curl -X POST http://localhost:8080/api/vms \
-  -d '{"name": "myvm", "image": "..."}'
+  -H "Content-Type: application/json" \
+  -d '{"name": "myvm", "image": "/path/to/image.qcow2"}'
 ```
 
-### Manual Placement
+### Manual
+
+Specify a target node:
 
 ```bash
 curl -X POST http://localhost:8080/api/vms \
+  -H "Content-Type: application/json" \
   -d '{
     "name": "myvm",
-    "image": "...",
+    "image": "/path/to/image.qcow2",
     "node_id": "node2"
   }'
 ```
+
+---
 
 ## VM Migration
 
 ### Live Migration
 
+Zero-downtime migration of a running VM (requires shared storage or high-bandwidth network):
+
 ```bash
 curl -X POST http://localhost:8080/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
-  -d '{
-    "target_node": "node2",
-    "live": true
-  }'
+  -d '{"target_node": "node2", "live": true}'
 ```
 
 ### Offline Migration
 
+Stop, copy, and restart on the target node:
+
 ```bash
 curl -X POST http://localhost:8080/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
-  -d '{
-    "target_node": "node2",
-    "live": false
-  }'
+  -d '{"target_node": "node2", "live": false}'
 ```
+
+See [migration.md](migration.md) for advanced options, status tracking, and performance tuning.
+
+---
 
 ## Health Checks
 
-### Node Health
+### Node Status
 
 ```bash
 curl http://localhost:8080/api/cluster/nodes
 ```
 
-Response:
 ```json
 [
   {
@@ -174,72 +203,59 @@ Response:
 ]
 ```
 
-### Automatic Failover
-
-If leader fails:
-1. Follower nodes detect missing heartbeat
-2. New leader elected
-3. VMs remain running on their nodes
-4. API requests automatically routed to new leader
+---
 
 ## Monitoring
 
-### Cluster Metrics
+### Prometheus Metrics
 
 ```bash
-# Prometheus metrics include:
-# - vmspawnd_cluster_nodes_total
-# - vmspawnd_cluster_leader{node="node1"}
-# - vmspawnd_cluster_node_health{node="node1"}
 curl http://localhost:8080/metrics | grep cluster
 ```
 
-### Alerts
+Key metrics:
+- `vmspawnd_cluster_nodes_total` -- Total cluster node count
+- `vmspawnd_cluster_leader{node="..."}` -- Current leader
+- `vmspawnd_cluster_node_health{node="..."}` -- Per-node health status
 
-Configure Prometheus alerts:
+### Prometheus Alert Rules
 
 ```yaml
-- alert: ClusterLeaderDown
-  expr: vmspawnd_cluster_leader == 0
-  for: 1m
-  annotations:
-    summary: "No cluster leader elected"
+groups:
+  - name: vmspawnd-cluster
+    rules:
+      - alert: ClusterLeaderDown
+        expr: vmspawnd_cluster_leader == 0
+        for: 1m
+        annotations:
+          summary: "No cluster leader elected"
 
-- alert: ClusterNodeUnhealthy
-  expr: vmspawnd_cluster_node_health == 0
-  for: 2m
-  annotations:
-    summary: "Cluster node {{ $labels.node }} is unhealthy"
+      - alert: ClusterNodeUnhealthy
+        expr: vmspawnd_cluster_node_health == 0
+        for: 2m
+        annotations:
+          summary: "Cluster node {{ $labels.node }} is unhealthy"
 ```
 
-## Best Practices
-
-1. **Use odd number of nodes** (3, 5, 7) for quorum
-2. **Monitor etcd health** regularly
-3. **Test failover** in staging environment
-4. **Use shared storage** (NFS, Ceph) for VM images
-5. **Regular backups** of etcd data
-6. **Geographic distribution** for disaster recovery
-7. **Network redundancy** between nodes
+---
 
 ## Disaster Recovery
 
 ### Backup etcd
 
 ```bash
-etcdctl snapshot save backup.db
+etcdctl snapshot save /backup/etcd-$(date +%Y%m%d).db
 ```
 
 ### Restore etcd
 
 ```bash
-etcdctl snapshot restore backup.db
+etcdctl snapshot restore /backup/etcd-20260218.db
 ```
 
 ### Backup VM State
 
 ```bash
-# Backup all VM configurations
 curl http://localhost:8080/api/backup/export > vmspawnd-backup.json
 ```
 
@@ -247,5 +263,18 @@ curl http://localhost:8080/api/backup/export > vmspawnd-backup.json
 
 ```bash
 curl -X POST http://localhost:8080/api/backup/import \
+  -H "Content-Type: application/json" \
   -d @vmspawnd-backup.json
 ```
+
+---
+
+## Best Practices
+
+1. **Use an odd number of nodes** (3, 5, 7) for proper quorum
+2. **Monitor etcd health** -- etcd is the single source of truth for cluster state
+3. **Test failover regularly** in a staging environment before relying on it in production
+4. **Use shared storage** (NFS, Ceph) for VM images when live migration is needed
+5. **Back up etcd** on a regular schedule and store snapshots off-site
+6. **Use a dedicated network** between nodes for heartbeat and migration traffic
+7. **Enable geographic distribution** for disaster recovery across failure domains

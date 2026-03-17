@@ -1,8 +1,6 @@
 # NFS Storage Guide
 
-## Overview
-
-vmspawnd supports NFS (Network File System) storage pools, allowing you to store VM disk images and templates on remote NFS servers. This provides centralized storage management, easier backup strategies, and the ability to share storage across multiple vmspawnd nodes.
+Store VM disk images and templates on remote NFS servers for centralized storage, simplified backups, and shared access across multiple vmspawnd nodes.
 
 ---
 

@@ -2,19 +2,13 @@
 
 ## WebSocket Console
 
-Real-time console access via WebSocket, providing an interactive terminal session to any running VM.
+Real-time interactive terminal access to any running VM via WebSocket.
 
-### Backend
+**Endpoint:** `ws://localhost:8080/ws/console/:vmname`
 
-WebSocket endpoint: `ws://localhost:8080/ws/console/:vmname`
+The server authenticates the WebSocket upgrade, attaches to the VM's serial console, and relays bidirectional I/O between the client and the VM.
 
-Implemented in `backend/vmspawnd/src/websocket.rs`
-
-The server authenticates the WebSocket upgrade request, attaches to the VM's serial console, and relays bidirectional I/O between the client and the VM.
-
-### Frontend
-
-Uses xterm.js for terminal emulation in the browser.
+### Browser (xterm.js)
 
 ```typescript
 const ws = new WebSocket(`ws://localhost:8080/ws/console/myvm?token=${token}`)
@@ -22,48 +16,47 @@ term.onData(data => ws.send(data))
 ws.onmessage = event => term.write(event.data)
 ```
 
-### Usage
+### Web UI
 
 1. Navigate to VM details
-2. Click "Console" button
+2. Click **Console**
 3. Interactive terminal opens in the browser
 
-## VNC/noVNC Integration
+---
+
+## VNC / noVNC Integration
 
 Graphical console access via VNC, proxied over WebSocket for browser-based display.
 
-### Backend
-
-WebSocket VNC proxy: `ws://localhost:8080/ws/vnc/:vmname`
-
-Implemented in `backend/vnc-proxy/src/lib.rs`
-
-### How It Works
+**Endpoint:** `ws://localhost:8080/ws/vnc/:vmname`
 
 ```
-Browser (noVNC over WebSocket) <-> vnc-proxy <-> VNC Server (TCP port 5900+)
+Browser (noVNC over WebSocket) <-> vnc-proxy <-> VNC Server (TCP 5900+)
 ```
 
-The VNC proxy translates between the WebSocket transport used by the browser and the raw TCP connection to the VM's VNC server. This avoids exposing VNC ports directly and allows TLS termination at the daemon level.
+The proxy translates between WebSocket (browser) and raw TCP (VNC server), avoiding direct VNC port exposure and enabling TLS termination at the daemon level.
 
-### Configuration
+Each VM gets a unique VNC display number on ports 5900+.
 
-VNC is automatically configured per VM on ports 5900+. Each VM gets a unique VNC display number.
-
-### Usage
+### Web UI
 
 1. Navigate to VM console
-2. Click "VNC" tab
-3. Graphical display appears in the browser via noVNC
+2. Click **VNC** tab
+3. Graphical display appears via noVNC
 
-## cloud-init Support
+---
 
-Automate VM initialization with cloud-init for unattended provisioning of users, packages, network configuration, and custom scripts.
+## cloud-init
 
-### API Endpoint
+Automated VM initialization with users, packages, network configuration, and custom scripts.
+
+### API
 
 ```
 POST /api/vms/:name/cloud-init
+```
+
+```json
 {
   "instance_id": "vm1",
   "hostname": "vm1",
@@ -89,36 +82,32 @@ runcmd:
   - systemctl start qemu-guest-agent
 ```
 
-### Implementation
+### How It Works
 
-- Generates an ISO image with NoCloud datasource containing meta-data, user-data, and optional network-config
-- Attaches the ISO as a CD-ROM drive to the VM
-- cloud-init inside the guest reads the configuration on first boot
-- Supports both cloud-init v1 and v2 network configuration formats
+1. vmspawnd generates an ISO with NoCloud datasource (meta-data, user-data, optional network-config)
+2. The ISO is attached as a CD-ROM drive to the VM
+3. cloud-init inside the guest reads the config on first boot
+4. Supports both v1 and v2 network configuration formats
 
-## TPM/vTPM Support
+---
+
+## TPM / vTPM
 
 Virtual Trusted Platform Module for secure boot, disk encryption, and remote attestation.
 
 ### Requirements
 
 ```bash
-sudo apt install swtpm swtpm-tools
-# or on Fedora:
-sudo dnf install swtpm swtpm-tools
+sudo dnf install swtpm swtpm-tools    # Fedora/RHEL
+sudo apt install swtpm swtpm-tools    # Debian/Ubuntu
 ```
 
-### API
-
-Implemented in `backend/tpm-support/src/lib.rs`
-
-### Features
+### Capabilities
 
 - TPM 1.2 and 2.0 support
-- Automatic state management and lifecycle tied to VM lifecycle
+- Automatic lifecycle tied to VM lifecycle
 - EK (Endorsement Key) and platform certificates
-- Per-VM isolated TPM instances
-- Persistent TPM state across VM reboots
+- Per-VM isolated TPM instances with persistent state
 - Compatible with Windows BitLocker and Linux LUKS
 
 ### Usage
@@ -137,9 +126,11 @@ let pid = tpm_manager.start_swtpm("myvm", TPMVersion::TPM20).await?;
 -device tpm-tis,tpmdev=tpm0
 ```
 
+---
+
 ## Kubernetes Operator
 
-Manage VMs as native Kubernetes resources using a custom controller and CRD.
+Manage VMs as native Kubernetes resources.
 
 ### CRD
 
@@ -165,59 +156,34 @@ spec:
 ### Installation
 
 ```bash
-# Install CRD
 kubectl apply -f operator/crd.yaml
-
-# Install operator
 helm install vmspawnd-operator operator/charts/vmspawnd-operator
 ```
 
 ### Usage
 
 ```bash
-# Create VM
 kubectl apply -f vm-example.yaml
-
-# List VMs
 kubectl get vm
-
-# Get VM details
 kubectl describe vm ubuntu-vm
-
-# Delete VM
 kubectl delete vm ubuntu-vm
 ```
 
 ### Architecture
 
 ```
-Kubernetes API
-      |
-      v
-  Controller (watches VirtualMachine resources)
-      |
-      v
-  vmspawnd REST API
-      |
-      v
-  Virtual Machine
+Kubernetes API --> Controller (watches VirtualMachine CRs) --> vmspawnd REST API --> VMs
 ```
 
-The operator continuously reconciles the desired state declared in VirtualMachine resources with the actual VM state managed by vmspawnd. It handles creation, updates, deletion, and status reporting.
+The operator continuously reconciles desired state with actual VM state, handling creation, updates, deletion, and status reporting.
 
-### Features
+See [operator/README.md](../operator/README.md) for full documentation.
 
-- Declarative VM management via `kubectl`
-- Status subresource reflects actual VM state
-- Supports all VM options: cloud-init, TPM, VNC, resource limits
-- Helm chart for production deployment with RBAC and resource limits
-- Leader election for high-availability operator deployments
+---
 
 ## Terraform Provider
 
 Declarative VM provisioning via HashiCorp Terraform.
-
-### Usage
 
 ```hcl
 provider "vmspawnd" {
@@ -242,33 +208,35 @@ resource "vmspawnd_vm" "web" {
 }
 ```
 
-### Features
+Features: full CRUD lifecycle, import existing VMs, plan/apply workflow with diffs, cloud-init/TPM/VNC/tags support.
 
-- Full CRUD lifecycle for VMs
-- Import existing VMs into Terraform state
-- Plan/apply workflow with accurate diffs
-- Supports cloud-init, TPM, VNC, tags, and resource pool assignment
+See [terraform-provider/README.md](../terraform-provider/README.md) for full documentation.
 
-## Metrics and Monitoring
+---
 
-### Prometheus Integration
+## Prometheus Metrics
 
-The daemon exposes a Prometheus-compatible metrics endpoint.
+**Endpoint:** `GET /metrics`
 
-Endpoint: `GET /metrics`
+### VM Metrics
 
-Metrics include:
+| Metric | Description |
+|--------|-------------|
+| `vmspawnd_vms_total` | Total VM count |
+| `vmspawnd_vms_running` | Running VM count |
+| `vmspawnd_vm_cpu_usage` | Per-VM CPU utilization |
+| `vmspawnd_vm_memory_usage` | Per-VM memory utilization |
+| `vmspawnd_vm_disk_read_bytes` | Per-VM disk read throughput |
+| `vmspawnd_vm_disk_write_bytes` | Per-VM disk write throughput |
+| `vmspawnd_vm_network_rx_bytes` | Per-VM network receive |
+| `vmspawnd_vm_network_tx_bytes` | Per-VM network transmit |
 
-- `vmspawnd_vms_total` -- Total number of VMs
-- `vmspawnd_vms_running` -- Number of currently running VMs
-- `vmspawnd_vm_cpu_usage` -- Per-VM CPU utilization (labeled by VM name)
-- `vmspawnd_vm_memory_usage` -- Per-VM memory utilization
-- `vmspawnd_vm_disk_read_bytes` -- Per-VM disk read throughput
-- `vmspawnd_vm_disk_write_bytes` -- Per-VM disk write throughput
-- `vmspawnd_vm_network_rx_bytes` -- Per-VM network receive throughput
-- `vmspawnd_vm_network_tx_bytes` -- Per-VM network transmit throughput
-- `vmspawnd_api_requests_total` -- Total API requests (labeled by method and path)
-- `vmspawnd_api_request_duration_seconds` -- API request latency histogram
+### API Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `vmspawnd_api_requests_total` | Total API requests (by method, path) |
+| `vmspawnd_api_request_duration_seconds` | Request latency histogram |
 
 ### Prometheus Configuration
 
@@ -283,29 +251,24 @@ scrape_configs:
 
 ### Grafana Dashboard
 
-A pre-built Grafana dashboard is included for VM monitoring. It provides:
-
+Import the pre-built dashboard from `monitoring/grafana-dashboard.json` for:
 - VM overview panel with running/stopped/error counts
-- Per-VM CPU and memory utilization graphs
+- Per-VM CPU and memory graphs
 - Network and disk I/O graphs
 - API request rate and latency panels
 - Alert panels for resource threshold violations
 
-Import the dashboard JSON from `monitoring/grafana-dashboard.json`.
+---
 
 ## High Availability
 
-Multi-node deployment for fault tolerance and zero-downtime operation.
+Multi-node deployment for fault-tolerant operation.
 
-### Architecture
-
-- **etcd-based state store** -- Replaces the single-node JSON file store with a distributed etcd backend for consistent, replicated state across nodes.
-- **Multi-node support** -- Multiple vmspawnd instances can run concurrently, each managing VMs on its respective host.
-- **VM migration** -- Live migration of running VMs between hosts with minimal downtime.
-- **Automatic failover** -- If a node becomes unreachable, its VMs are automatically restarted on healthy nodes.
-- **Health monitoring** -- Nodes exchange heartbeats and health status. Unhealthy nodes are fenced to prevent split-brain scenarios.
-
-### Configuration
+- **etcd-based state store** for consistent, replicated state
+- **Multi-node support** with concurrent vmspawnd instances
+- **Live migration** of running VMs between hosts
+- **Automatic failover** on node failure
+- **Health monitoring** with heartbeats and fencing
 
 ```toml
 [ha]
@@ -316,8 +279,6 @@ heartbeat_interval = "5s"
 failover_timeout = "30s"
 ```
 
-### Requirements
+Requirements: etcd cluster (3+ nodes), network connectivity between nodes, shared/replicated storage for live migration.
 
-- etcd cluster (3+ nodes recommended for quorum)
-- Network connectivity between all vmspawnd nodes
-- Shared or replicated storage for VM disk images (if live migration is used)
+See [high-availability.md](high-availability.md) for the full setup guide.

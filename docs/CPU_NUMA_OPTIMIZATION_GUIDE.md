@@ -1,8 +1,6 @@
-# CPU Pinning and NUMA Optimization Guide
+# CPU Pinning and NUMA Optimization
 
-## Overview
-
-vmspawnd provides advanced CPU topology detection and pinning capabilities, along with NUMA (Non-Uniform Memory Access) awareness for optimal VM performance. This guide covers CPU pinning strategies, NUMA optimization, and best practices for high-performance workloads.
+Optimize VM performance with CPU pinning strategies, NUMA-aware placement, and hugepage memory allocation.
 
 ---
 

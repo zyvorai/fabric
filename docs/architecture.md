@@ -2,153 +2,208 @@
 
 ## Overview
 
-vmspawnd is a comprehensive virtual machine management platform built in Rust. It serves as a modern, modular replacement for libvirtd, providing VM lifecycle management through a rich REST and WebSocket API, a React-based web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider.
+vmspawnd is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider -- all backed by systemd-vmspawn and systemd-machined.
 
-## Codebase Structure
+## System Diagram
 
-The backend is organized as a Cargo workspace containing 32 crates. This modular design enforces clear separation of concerns and allows individual components to be developed, tested, and versioned independently.
+```
+ +--------+   +-----------+   +----------+   +-----------+   +------------+
+ | vmctl  |   | vmctl-tui |   |  Web UI  |   |    K8s    |   | Terraform  |
+ | (CLI)  |   |   (TUI)   |   | (React)  |   | Operator  |   | Provider   |
+ +---+----+   +-----+-----+   +----+-----+   +-----+-----+   +------+-----+
+     |              |              |               |                 |
+     +--------------+--------------+---------------+-----------------+
+                                   |
+                    +--------------v--------------+
+                    |      vmspawnd daemon         |
+                    |  (Axum + Tokio async runtime)|
+                    +-+--+--+--+--+--+--+--+--+---+
+                      |  |  |  |  |  |  |  |  |
+        +-------------+  |  |  |  |  |  |  |  +-------------+
+        v                v  |  |  |  |  |  v                 v
+   +---------+    +------+  |  |  |  |  |  +------+   +-----------+
+   |cloud-init|   | VNC  |  |  |  |  |  |  | TPM  |   | WebSocket |
+   |Generator |   |Proxy |  |  |  |  |  |  |Mgr   |   | Console   |
+   +---------+    +------+  |  |  |  |  |  +------+   +-----------+
+                             |  |  |  |  |
+              +--------------+  |  |  |  +-----------+
+              v                 v  |  v              v
+        +---------+      +------+  |  +------+  +---------+
+        |Prometheus|     |State |  |  |  HA  |  | Backup  |
+        |Exporter  |     |Store |  |  |Cluster| | Restore |
+        +---------+      +------+  |  +------+  +---------+
+                                    v
+                        +-----------+-----------+
+                        |   systemd-vmspawn     |
+                        |   systemd-machined    |
+                        +-----------------------+
+```
 
-### Backend Crates (Cargo Workspace)
+## Crate Structure
 
-The workspace is divided into the following functional areas:
+The backend is a Cargo workspace with 40 crates organized into functional areas.
 
-**Core Daemon**
-- `vmspawnd` -- Main daemon process. Initializes the Axum HTTP/WebSocket server, loads configuration, registers routes, and orchestrates all subsystems.
+### Core
 
-**VM Drivers**
-- `vmspawn-driver` -- Integration with systemd-vmspawn for VM creation and management.
-- `systemd-driver` -- Low-level systemd and machinectl integration for machine management.
+| Crate | Purpose |
+|-------|---------|
+| `vmspawnd` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
+| `vmspawn-driver` | systemd-vmspawn integration for VM creation and management |
+| `vm-model` | Core data structures: VM definitions, state enums, request/response types |
+| `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
+| `vmctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
+| `vmctl-tui` | TUI -- k9s-style terminal dashboard with 8 views |
 
-**State and Models**
-- `state-store` -- Persistent VM state management with JSON-based storage, in-memory caching, and file-based persistence.
-- `vm-model` -- Core data structures: VM definitions, state enums, request/response types.
+### Core Library Crates (`backend/crates/`)
 
-**Networking**
-- Network configuration, bridge management, and virtual networking crates.
+| Crate | Purpose |
+|-------|---------|
+| `vmspawnd-cgroup` | cgroup v2 resource management |
+| `vmspawnd-system` | System integration utilities |
+| `vmspawnd-vm` | VM model and type definitions |
+| `vmspawnd-storage` | Storage backend abstraction |
+| `vmspawnd-driver-core` | Driver core functionality |
+| `vmspawnd-machinectl-driver` | machinectl/systemd-machined integration via D-Bus |
+| `vmspawnd-machined-dbus` | systemd-machined D-Bus bindings (zbus) |
+| `vmspawnd-lock-manager` | Distributed lock management |
 
-**Storage**
-- Disk image management, volume provisioning, and distributed storage support.
+### Networking
 
-**Security**
-- `tpm-support` -- Virtual TPM (vTPM) management with swtpm integration (TPM 1.2 and 2.0).
-- Certificate management and encryption crates.
+| Crate | Purpose |
+|-------|---------|
+| `networking` | Bridge, VLAN, and interface management |
+| `network-policy` | Cilium-style label-based ingress/egress rules |
+| `vm-firewall` | Per-VM firewall profiles and zones via nftables |
+| `service-mesh` | Virtual IP load-balanced services |
+| `traffic-shaping` | QoS -- guaranteed/max rate, burst, priority |
+| `dns-policy` | DNS zone management and domain blocking |
+| `vpn-mesh` | WireGuard tunnels (point-to-point, hub-spoke, full-mesh) |
+| `packet-mirror` | Traffic capture with tc mirred |
+| `nat-gateway` | Masquerade, SNAT, DNAT, hairpin NAT via nftables |
+| `net-monitor` | Per-VM bandwidth tracking with threshold alerts |
 
-**Console and Display**
-- `vnc-proxy` -- WebSocket-to-TCP VNC proxy for noVNC graphical console access.
-- WebSocket console handler for interactive terminal sessions via xterm.js.
+### Storage
 
-**Cloud-Init**
-- ISO generation with NoCloud datasource for automated VM initialization.
+| Crate | Purpose |
+|-------|---------|
+| `storage` | Local, NFS, LVM, LVM-thin, ZFS storage backends |
+| `distributed-storage` | Ceph/RBD distributed storage |
 
-**Monitoring and Metrics**
-- Prometheus metrics exporter (`/metrics` endpoint).
-- Analytics and audit logging subsystems.
+### Security and Identity
 
-**Advanced Features**
-- Snapshots, backups, replication, and site recovery.
-- DRS (Distributed Resource Scheduler) and fault tolerance.
-- Autoscaling, hotplug, and resource pool management.
-- Image builder, content library, and VM templates.
-- Scheduling, quotas, notifications, and tagging.
-- Lifecycle management and datacenter abstractions.
+| Crate | Purpose |
+|-------|---------|
+| `security` | JWT auth, RBAC, API keys, audit logging |
+| `tpm-support` | Virtual TPM management (swtpm, TPM 1.2/2.0) |
+| `encryption` | Encryption at rest |
+| `certificate-manager` | TLS certificate management |
 
-**CLI and TUI**
-- `vmctl` -- Command-line interface for scripting and interactive use.
-- `vmctl-tui` -- Terminal UI built with ratatui and crossterm for real-time VM monitoring and management.
+### Cloud and Console
 
-**Infrastructure Integrations**
-- `vmspawnd-operator` -- Kubernetes operator that manages VMs as custom resources (CRD: `VirtualMachine`).
-- `vmspawnd-terraform` -- Terraform provider for declarative VM provisioning.
+| Crate | Purpose |
+|-------|---------|
+| `cloud-init` | NoCloud ISO generation for automated VM initialization |
+| `vnc-proxy` | WebSocket-to-TCP VNC proxy for noVNC |
+| `gpu-passthrough` | VFIO GPU passthrough (NVIDIA, AMD, Intel GVT-g) |
+
+### High Availability
+
+| Crate | Purpose |
+|-------|---------|
+| `ha` | etcd-based clustering and leader election |
+| `migration` | Live and offline VM migration |
+| `fault-tolerance` | Automatic failover and fencing |
+| `replication` | Data replication across nodes |
+| `site-recovery` | Disaster recovery plans and execution |
+| `predictive-drs` | Distributed Resource Scheduling |
+
+### Operations
+
+| Crate | Purpose |
+|-------|---------|
+| `backup` | Backup/restore with retention policies |
+| `scheduler` | VM scheduling (once, daily, weekly) |
+| `lifecycle-manager` | VM lifecycle automation |
+| `resource-pools` | Resource pool management |
+| `datacenter` | Datacenter and cluster abstractions |
+| `content-library` | Shared image and template repository |
+| `prometheus-exporter` | Prometheus metrics endpoint |
+| `host-agent` | Host-level agent for cluster management |
 
 ## Technology Stack
 
 | Layer | Technology |
 |-------|------------|
-| Language | Rust |
-| Web framework | Axum |
-| Async runtime | Tokio |
-| Frontend | React 18, TypeScript, Vite, TailwindCSS |
-| TUI | ratatui, crossterm |
-| VM backend | systemd-vmspawn, machinectl |
-| Metrics | Prometheus |
-| Container orchestration | Kubernetes (operator) |
-| IaC | Terraform (provider) |
+| Language | Rust (2021 edition) |
+| Async runtime | Tokio 1.44 |
+| Web framework | Axum 0.8 |
+| Serialization | serde + serde_json |
+| CLI | clap 4.5 |
+| TUI | ratatui 0.29 + crossterm 0.28 |
+| D-Bus | zbus 4 |
+| Frontend | React 18 + TypeScript + Vite + TailwindCSS |
+| Terminal emulator | xterm.js |
+| VNC client | noVNC |
+| Monitoring | Prometheus |
 
 ## API Surface
 
-The daemon exposes:
-
-- **435 REST endpoints** covering VM management, snapshots, storage, networking, auth, quotas, schedules, audit, analytics, backups, notifications, templates, tags, cloning, DRS, fault tolerance, replication, site recovery, content library, lifecycle, certificates, encryption, resource pools, distributed storage, datacenters, machines, events, autoscaling, hotplug, and image building.
-- **3 WebSocket endpoints** for real-time console access, VNC proxying, and live event streaming.
+- **480+ REST endpoints** covering VM management, snapshots, storage, networking, auth, quotas, schedules, audit, analytics, backups, notifications, templates, tags, cloning, DRS, fault tolerance, replication, site recovery, content library, lifecycle, certificates, encryption, resource pools, distributed storage, datacenters, events, autoscaling, hotplug, and image building.
+- **3 WebSocket endpoints** for console access, VNC proxying, and live event streaming.
 
 All endpoints use JSON payloads and follow RESTful conventions.
-
-## User Interfaces
-
-### Web UI
-
-A React-based single-page application with 36+ pages and 20+ reusable components:
-- Dashboard with real-time statistics
-- VM management (list, detail, create, console, VNC)
-- Storage, networking, and metrics views
-- WebSocket integration for live updates
-- Command palette, toast notifications, dark theme
-
-### CLI (vmctl)
-
-Full-featured command-line client for scripting and automation. Supports all API operations with table-formatted output.
-
-### TUI (vmctl-tui)
-
-Interactive terminal UI with 7 views (Dashboard, VMs, Logs, Metrics, Network, Storage, Help), vim-style navigation, search, bulk operations, auto-refresh, and sparkline graphs.
 
 ## Data Flow
 
 ```
-User --> CLI / TUI / Web UI
+User --> CLI / TUI / Web UI / K8s Operator / Terraform Provider
+                      |
+                      v
+              REST API / WebSocket (Axum + Tokio)
+                      |
+                      v
+               Core Daemon (vmspawnd)
+                 /          \
+                v            v
+          VM Drivers     State Store (/var/lib/vmspawnd/)
               |
               v
-        REST API / WebSocket (Axum + Tokio)
-              |
-              v
-         Core Daemon (vmspawnd)
-           /      \
-          v        v
-    VM Drivers    State Store (/var/lib/vmspawnd/)
-        |
-        v
-  systemd-vmspawn --> Virtual Machines
+        systemd-vmspawn --> Virtual Machines
 ```
-
-Kubernetes and Terraform integrations communicate with the daemon through the same REST API.
 
 ## Storage Layout
 
 VM state and artifacts are stored under `/var/lib/vmspawnd/`:
 
-- `{vmname}.json` -- VM metadata and configuration
-- `images/` -- VM disk images
-- `tpm/` -- Per-VM vTPM state directories
-- `snapshots/` -- VM snapshot data
-- `backups/` -- Backup archives
+```
+/var/lib/vmspawnd/
+  *.json              VM metadata and configuration
+  images/             VM disk images
+  tpm/                Per-VM vTPM state directories
+  snapshots/          VM snapshot data
+  backups/            Backup archives
+  state/              Persistent daemon state
+```
 
 ## systemd Integration
 
-- `vmspawnd.service` -- Main daemon unit
-- `vm@.service` -- Per-VM service template
-- Uses systemd-machined for machine registration and management
+| Unit | Purpose |
+|------|---------|
+| `vmspawnd.service` | Main daemon (Type=notify, WatchdogSec=60s) |
+| `vmspawnd.socket` | Socket activation on 0.0.0.0:8080 |
+| `vm@.service` | Per-VM service template |
+| `vmspawnd.sysusers` | System group creation |
+| `vmspawnd.tmpfiles` | Directory creation |
+| `vmspawnd.preset` | Default enable state |
 
-## Security
+The daemon runs with systemd hardening: `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, and capability bounding.
+
+## Security Model
 
 - Runs as root (required for VM management and networking)
-- systemd hardening directives applied to service units
-- Token-based API authentication
+- systemd hardening directives restrict filesystem and network access
+- JWT-based API authentication with SQLite user store
+- RBAC with three roles: Admin, User, Viewer
 - TLS support for production deployments
 - vTPM for guest attestation and secure boot
 - Audit logging for all administrative actions
-
-## High Availability
-
-- etcd-based state store for multi-node deployments
-- VM migration between hosts
-- Automatic failover and health monitoring

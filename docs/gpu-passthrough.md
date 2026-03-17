@@ -1,57 +1,56 @@
-# GPU Passthrough Guide
+# GPU Passthrough
+
+Pass physical GPUs through to VMs for graphics workloads, machine learning, and gaming using VFIO and IOMMU.
+
+---
 
 ## Prerequisites
 
-### 1. Hardware Requirements
+### Hardware
 
 - CPU with IOMMU support (Intel VT-d or AMD-Vi)
-- Dedicated GPU for passthrough
-- Motherboard with IOMMU support
+- Dedicated GPU for passthrough (separate from the host display GPU)
+- Motherboard with IOMMU support enabled in BIOS/UEFI
 
-### 2. Enable IOMMU
+### Enable IOMMU
 
-#### Intel CPU
-
-Edit `/etc/default/grub`:
+Add the appropriate kernel parameter:
 
 ```bash
+# Intel CPU
 GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"
-```
 
-#### AMD CPU
-
-```bash
+# AMD CPU
 GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on iommu=pt"
 ```
 
-Update GRUB:
+Update bootloader and reboot:
 
 ```bash
-sudo update-grub
+sudo update-grub    # Debian/Ubuntu
+sudo grub2-mkconfig -o /boot/grub2/grub.cfg    # Fedora/RHEL
 sudo reboot
 ```
 
-### 3. Verify IOMMU
+### Verify IOMMU
 
 ```bash
-# Check if IOMMU is enabled
 dmesg | grep -i iommu
-
-# Check IOMMU groups
 find /sys/kernel/iommu_groups/ -type l
 ```
+
+---
 
 ## Detect Available GPUs
 
 ```bash
-# Using vmctl
+# CLI
 vmctl gpu list
 
-# Using API
+# API
 curl http://localhost:8080/api/gpu/devices
 ```
 
-Response:
 ```json
 [
   {
@@ -71,33 +70,31 @@ Response:
 ]
 ```
 
+A GPU is `is_available: true` when it is not bound to a host driver and can be assigned to a VM.
+
+---
+
 ## Bind GPU to VFIO
 
-### Method 1: Using vmctl
+Before passing a GPU to a VM, bind it to the `vfio-pci` driver:
 
 ```bash
+# CLI
 vmctl gpu bind 0000:02:00.0
-```
 
-### Method 2: Using API
-
-```bash
+# API
 curl -X POST http://localhost:8080/api/gpu/bind \
   -H "Content-Type: application/json" \
   -d '{"pci_address": "0000:02:00.0"}'
-```
 
-### Method 3: Manual
-
-```bash
-# Unbind from current driver
+# Manual
 echo "0000:02:00.0" > /sys/bus/pci/drivers/nouveau/unbind
-
-# Bind to vfio-pci
 echo "10de 1c03" > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
 
-## Create VM with GPU Passthrough
+---
+
+## Create a VM with GPU Passthrough
 
 ```bash
 curl -X POST http://localhost:8080/api/vms \
@@ -115,25 +112,10 @@ curl -X POST http://localhost:8080/api/vms \
   }'
 ```
 
-## Configuration
-
-### GPU ROM File
-
-Some GPUs require a ROM file for passthrough:
-
-```bash
-# Extract GPU ROM
-cd /sys/bus/pci/devices/0000:02:00.0
-echo 1 > rom
-cat rom > /usr/share/vgabios/GTX1050Ti.rom
-echo 0 > rom
-```
-
-### VM Configuration
-
-`/etc/vmspawnd/vms/gaming-vm.toml`:
+### VM Configuration File
 
 ```toml
+# /etc/vmspawnd/vms/gaming-vm.toml
 [vm]
 name = "gaming-vm"
 cpus = 8
@@ -146,16 +128,29 @@ multifunction = false
 romfile = "/usr/share/vgabios/GTX1050Ti.rom"
 
 [display]
-type = "none"  # Disable emulated display
+type = "none"     # Disable emulated display when using passthrough GPU
 vnc = false
 ```
 
-## NVIDIA Driver Setup (Guest)
+### Extract GPU ROM (if needed)
 
-### Windows Guest
+Some GPUs require a ROM file for passthrough:
+
+```bash
+cd /sys/bus/pci/devices/0000:02:00.0
+echo 1 > rom
+cat rom > /usr/share/vgabios/GTX1050Ti.rom
+echo 0 > rom
+```
+
+---
+
+## Guest Driver Setup
+
+### NVIDIA on Windows
 
 1. Install NVIDIA drivers normally
-2. If "Error 43", add to VM config:
+2. If you get "Error 43", add hypervisor hiding to the VM config:
 
 ```xml
 <hyperv>
@@ -166,120 +161,83 @@ vnc = false
 </kvm>
 ```
 
-### Linux Guest
+### NVIDIA on Linux
 
 ```bash
-# Install NVIDIA drivers
-sudo apt install nvidia-driver-xxx
-
-# Verify GPU
-nvidia-smi
+sudo apt install nvidia-driver-xxx    # Debian/Ubuntu
+sudo dnf install akmod-nvidia         # Fedora
+nvidia-smi                            # Verify
 ```
 
-## AMD GPU Passthrough
+### AMD GPUs
 
-### Reset Bug Workaround
-
-Some AMD GPUs need reset workaround:
+Some AMD GPUs have a reset bug. Workaround:
 
 ```bash
-# Add to kernel parameters
+# Kernel parameters
 amd_iommu=on iommu=pt video=efifb:off
-```
 
-### Vendor Reset Module
-
-```bash
-# Install vendor-reset
+# Install vendor-reset module
 git clone https://github.com/gnif/vendor-reset
-cd vendor-reset
-make
-sudo make install
-
-# Load module
+cd vendor-reset && make && sudo make install
 sudo modprobe vendor-reset
 ```
 
-## Multi-GPU Setup
+---
 
-### Pass Multiple GPUs
+## Multi-GPU Passthrough
+
+Pass multiple GPUs to a single VM:
 
 ```json
 {
   "name": "multi-gpu-vm",
   "gpus": [
-    {
-      "pci_address": "0000:01:00.0",
-      "primary": true
-    },
-    {
-      "pci_address": "0000:02:00.0",
-      "primary": false
-    }
+    {"pci_address": "0000:01:00.0", "primary": true},
+    {"pci_address": "0000:02:00.0", "primary": false}
   ]
 }
 ```
 
-### SLI/CrossFire
-
-Ensure GPUs are in same IOMMU group:
+For SLI/CrossFire, ensure GPUs are in the same IOMMU group:
 
 ```bash
-# Check IOMMU groups
 for d in /sys/kernel/iommu_groups/*/devices/*; do
-    n=${d#*/iommu_groups/*}
-    n=${n%%/*}
+    n=${d#*/iommu_groups/*}; n=${n%%/*}
     printf 'IOMMU Group %s ' "$n"
     lspci -nns "${d##*/}"
 done
 ```
 
-## Troubleshooting
+---
 
-### Error 43 (NVIDIA)
+## vGPU (Virtual GPU)
 
-Add to VM config:
-```xml
-<features>
-  <hyperv>
-    <vendor_id state='on' value='1234567890ab'/>
-  </hyperv>
-  <kvm>
-    <hidden state='on'/>
-  </kvm>
-</features>
-```
+### NVIDIA GRID
 
-### Black Screen
-
-- Check if GPU ROM is needed
-- Verify IOMMU groups
-- Try different display port/HDMI cable
-- Check BIOS settings
-
-### GPU Not Releasing
+For NVIDIA GRID/vGPU (requires license):
 
 ```bash
-# Force unbind
-vmctl gpu unbind 0000:02:00.0
-
-# Restart vfio module
-sudo modprobe -r vfio-pci
-sudo modprobe vfio-pci
+sudo systemctl start nvidia-vgpud
+vmctl gpu create-vgpu --physical-gpu 0000:02:00.0 --type nvidia-256
 ```
 
-### IOMMU Group Issues
+### Intel GVT-g
 
-If GPU shares IOMMU group with other devices, use ACS override patch (not recommended for production):
+For Intel integrated graphics virtualization:
 
 ```bash
-# Kernel parameter
-pcie_acs_override=downstream,multifunction
+echo "i915.enable_gvt=1" >> /etc/modprobe.d/i915.conf
+vmctl gpu create-vgpu --physical-gpu 0000:00:02.0 --type i915-GVTg_V5_4
 ```
+
+---
 
 ## Performance Optimization
 
 ### CPU Pinning
+
+Pin VM vCPUs for consistent GPU performance:
 
 ```toml
 [cpu]
@@ -289,81 +247,53 @@ pins = [0, 1, 2, 3, 4, 5, 6, 7]
 
 ### Huge Pages
 
-```bash
-# Enable huge pages
-echo 8192 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+Reduce memory overhead:
 
-# VM config
+```bash
+echo 8192 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+```
+
+```toml
 [memory]
 hugepages = true
 ```
 
 ### MSI Interrupts
 
+Enable MSI for better interrupt performance:
+
 ```bash
-# Enable MSI for better performance
 echo 1 > /sys/bus/pci/devices/0000:02:00.0/msi_bus
 ```
 
-## Best Practices
-
-1. **Dedicated GPU**: Use separate GPU for passthrough
-2. **IOMMU Groups**: Keep clean IOMMU groups
-3. **ROM Files**: Extract and use GPU ROM when needed
-4. **Driver Updates**: Keep guest drivers updated
-5. **Huge Pages**: Enable for better memory performance
-6. **CPU Pinning**: Pin CPU cores for better performance
-7. **Benchmarks**: Test performance vs bare metal
-
-## Advanced Features
-
-### vGPU (NVIDIA GRID)
-
-For NVIDIA GRID/vGPU support (requires license):
-
-```bash
-# Load vGPU manager
-sudo systemctl start nvidia-vgpud
-
-# Create vGPU
-vmctl gpu create-vgpu \
-  --physical-gpu 0000:02:00.0 \
-  --type nvidia-256
-```
-
-### Intel GVT-g
-
-For Intel integrated graphics virtualization:
-
-```bash
-# Enable GVT-g
-echo "i915.enable_gvt=1" >> /etc/modprobe.d/i915.conf
-
-# Create vGPU
-vmctl gpu create-vgpu \
-  --physical-gpu 0000:00:02.0 \
-  --type i915-GVTg_V5_4
-```
+---
 
 ## Monitoring
 
-### GPU Usage in VM
-
 ```bash
-# Get GPU stats
+# GPU assignment status
+vmctl gpu list --assigned
+
+# Per-VM GPU stats
 vmctl gpu stats gaming-vm
 ```
 
-### Host Monitoring
+---
 
-```bash
-# Check GPU assignment
-vmctl gpu list --assigned
-```
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| NVIDIA Error 43 | Add `<kvm><hidden state='on'/></kvm>` to VM config |
+| Black screen | Check if GPU ROM is needed; verify IOMMU groups; try different display port |
+| GPU not releasing after VM shutdown | `vmctl gpu unbind 0000:02:00.0` then `modprobe -r vfio-pci && modprobe vfio-pci` |
+| IOMMU group contains other devices | Use ACS override (`pcie_acs_override=downstream,multifunction`) -- not recommended for production |
+
+---
 
 ## Security Considerations
 
-- GPU can access all VM memory
-- DMA attacks possible
-- Use IOMMU for isolation
-- Verify driver signatures in guest
+- A passthrough GPU has direct memory access (DMA) to VM memory
+- IOMMU provides isolation between the GPU and other system memory
+- Always verify driver signatures in the guest OS
+- Do not pass through GPUs on multi-tenant hosts without understanding the DMA risk

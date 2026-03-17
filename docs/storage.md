@@ -1,34 +1,65 @@
 # Storage Management
 
-## Volume Operations
+vmspawnd supports multiple storage backends and provides a unified API for volume management, snapshots, and cloning.
 
-### Create Volume
+---
+
+## Storage Backends
+
+| Backend | Description | Best For |
+|---------|-------------|----------|
+| **Local** | Default filesystem storage | Single-node, development |
+| **NFS** | Network filesystem | Shared storage, multi-node |
+| **LVM** | Logical Volume Manager | Flexible local storage |
+| **LVM-thin** | Thin-provisioned LVM | Overcommitted storage |
+| **ZFS** | ZFS datasets with replication | Snapshots, data integrity |
+| **Ceph/RBD** | Distributed block storage | HA, multi-node, production |
+
+### Configuration
+
+```toml
+# /etc/vmspawnd/vmspawnd.toml
+
+# Local (default)
+[storage]
+backend = "local"
+path = "/var/lib/vmspawnd/volumes"
+
+# NFS
+[storage]
+backend = "nfs"
+server = "nfs.example.com"
+export = "/exports/vmspawnd"
+mount_point = "/mnt/vmspawnd"
+
+# Ceph/RBD
+[storage]
+backend = "rbd"
+pool = "vmspawnd"
+monitors = ["mon1.example.com", "mon2.example.com"]
+```
+
+See [NFS_STORAGE_GUIDE.md](NFS_STORAGE_GUIDE.md) for detailed NFS setup.
+
+---
+
+## Volumes
+
+### Create
 
 ```bash
 curl -X POST http://localhost:8080/api/volumes \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "data-volume",
-    "size_gb": 100,
-    "format": "qcow2"
-  }'
+  -d '{"name": "data-volume", "size_gb": 100, "format": "qcow2"}'
 ```
 
-### List Volumes
+### List
 
 ```bash
 curl http://localhost:8080/api/volumes
 ```
 
-### Clone Volume
-
-```bash
-curl -X POST http://localhost:8080/api/volumes/data-volume/clone \
-  -H "Content-Type: application/json" \
-  -d '{"name": "data-volume-copy"}'
-```
-
-### Resize Volume
+### Resize
 
 ```bash
 curl -X POST http://localhost:8080/api/volumes/data-volume/resize \
@@ -36,9 +67,19 @@ curl -X POST http://localhost:8080/api/volumes/data-volume/resize \
   -d '{"size_gb": 200}'
 ```
 
+### Clone
+
+```bash
+curl -X POST http://localhost:8080/api/volumes/data-volume/clone \
+  -H "Content-Type: application/json" \
+  -d '{"name": "data-volume-copy"}'
+```
+
+---
+
 ## Snapshots
 
-### Create Snapshot
+### Create
 
 ```bash
 curl -X POST http://localhost:8080/api/volumes/data-volume/snapshots \
@@ -46,13 +87,13 @@ curl -X POST http://localhost:8080/api/volumes/data-volume/snapshots \
   -d '{"name": "backup-2026-02-18"}'
 ```
 
-### List Snapshots
+### List
 
 ```bash
 curl http://localhost:8080/api/volumes/data-volume/snapshots
 ```
 
-### Restore from Snapshot
+### Restore
 
 ```bash
 curl -X POST http://localhost:8080/api/volumes/data-volume/restore \
@@ -60,45 +101,11 @@ curl -X POST http://localhost:8080/api/volumes/data-volume/restore \
   -d '{"snapshot_id": "abc123"}'
 ```
 
-## Storage Backends
+---
 
-### Local Storage
+## Ceph/RBD
 
-Default storage backend using local filesystem.
-
-Configuration:
-```toml
-[storage]
-backend = "local"
-path = "/var/lib/vmspawnd/volumes"
-```
-
-### NFS Storage
-
-Network filesystem for shared storage.
-
-Configuration:
-```toml
-[storage]
-backend = "nfs"
-server = "nfs.example.com"
-export = "/exports/vmspawnd"
-mount_point = "/mnt/vmspawnd"
-```
-
-### Ceph/RBD Storage
-
-Distributed storage for high availability.
-
-Configuration:
-```toml
-[storage]
-backend = "rbd"
-pool = "vmspawnd"
-monitors = ["mon1.example.com", "mon2.example.com"]
-```
-
-#### CLI (vmctl)
+### CLI (`vmctl`)
 
 ```bash
 # Create a Ceph storage pool
@@ -108,32 +115,23 @@ vmctl ceph create my-pool \
   --user=admin \
   --keyring=/etc/ceph/ceph.client.admin.keyring
 
-# Check cluster health
+# Health and stats
 vmctl ceph health my-pool
-
-# Get pool statistics
 vmctl ceph stats my-pool
 
-# List RBD images
+# RBD image management
 vmctl ceph images my-pool
-
-# Create an RBD image (10 GB)
 vmctl ceph create-image my-pool vm-disk-01 --size=10240
-
-# Delete an RBD image
 vmctl ceph delete-image my-pool vm-disk-01
 
-# Delete a Ceph pool
-vmctl ceph delete my-pool
-
-# Export pool config as YAML
+# Export as YAML
 vmctl ceph pools -o yaml
 ```
 
-#### API
+### API
 
 ```bash
-# Create Ceph pool
+# Create pool
 curl -X POST http://localhost:8080/api/storage/pools/ceph \
   -H "Content-Type: application/json" \
   -d '{
@@ -145,13 +143,9 @@ curl -X POST http://localhost:8080/api/storage/pools/ceph \
     "auto_start": true
   }'
 
-# Get Ceph health
+# Health, stats, images
 curl http://localhost:8080/api/storage/pools/my-pool/health
-
-# Get Ceph stats
 curl http://localhost:8080/api/storage/pools/my-pool/stats
-
-# List RBD images
 curl http://localhost:8080/api/storage/pools/my-pool/images
 
 # Create RBD image
@@ -160,40 +154,28 @@ curl -X POST http://localhost:8080/api/storage/pools/my-pool/images \
   -d '{"name": "vm-disk-01", "size_mb": 10240}'
 ```
 
-#### Web UI
+### Web UI
 
-Navigate to **Storage Pools** and click **Create Pool**. Select **Ceph** as the pool type and fill in:
-- Monitor addresses (comma-separated)
-- Ceph pool name (e.g., `rbd`)
-- User (optional, defaults to `admin`)
-- Keyring path (optional)
+Navigate to **Storage Pools** > **Create Pool** > select **Ceph**. Configure monitor addresses, pool name, user, and keyring. Ceph pools display health status (Ok/Warn/Error) in the pool list.
 
-Ceph pools show health status (Ok/Warn/Error) in the pool list.
+---
 
-### LVM Storage
+## Disk Formats
 
-Logical Volume Manager for flexible storage management.
+| Format | Snapshots | Performance | Thin Provisioning | Compatibility |
+|--------|:---------:|:-----------:|:-----------------:|:-------------:|
+| **qcow2** | Yes | Good | Yes | QEMU (default) |
+| **raw** | No | Best | No | Universal |
+| **vmdk** | No | Good | Varies | VMware |
+| **vdi** | No | Good | Varies | VirtualBox |
 
-### LVM-thin Storage
-
-Thin-provisioned LVM for overcommitted storage.
-
-### ZFS Storage
-
-ZFS pool and dataset storage with replication support.
-
-## Volume Formats
-
-- **qcow2**: QEMU Copy-On-Write (default, supports snapshots)
-- **raw**: Raw disk image (best performance)
-- **vmdk**: VMware disk format
-- **vdi**: VirtualBox disk format
+---
 
 ## Best Practices
 
-1. **Use qcow2** for production (snapshots, compression)
-2. **Use raw** for performance-critical workloads
-3. **Regular snapshots** before major changes
-4. **Monitor disk usage** to prevent running out of space
-5. **Use thin provisioning** to save space
-6. **Backup important volumes** regularly
+1. **Use qcow2** for production -- supports snapshots, compression, and thin provisioning
+2. **Use raw** for performance-critical workloads where snapshot support is not needed
+3. **Take snapshots before major changes** -- they are fast and cheap with qcow2
+4. **Monitor disk usage** -- set up alerts to prevent running out of space
+5. **Use thin provisioning** to overcommit storage where workloads permit
+6. **Back up important volumes** regularly and test restores
