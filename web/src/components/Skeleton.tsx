@@ -4,7 +4,7 @@ interface SkeletonProps {
 }
 
 function SkeletonBase({ className = '', style }: SkeletonProps) {
-  return <div className={`animate-pulse bg-gray-800 rounded-lg ${className}`} style={style} />
+  return <div className={`animate-pulse bg-gray-800/80 rounded-lg animate-shimmer ${className}`} style={style} />
 }
 
 export function SkeletonText({ className = '' }: SkeletonProps) {

@@ -27,19 +27,19 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
-      <div className="max-w-sm w-full">
+    <div className="min-h-screen mesh-bg flex items-center justify-center px-4">
+      <div className="max-w-sm w-full animate-fade-in">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 mb-4">
-            <Server className="w-6 h-6 text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 mb-5 shadow-xl shadow-blue-500/25">
+            <Server className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-white">vmspawnd</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">vmspawnd</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-6 space-y-4 border border-gray-800">
+        <form onSubmit={handleSubmit} className="glass rounded-2xl p-7 space-y-5 border border-white/[0.06] shadow-2xl">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-lg text-sm">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-lg text-sm animate-fade-in">
               {error}
             </div>
           )}
@@ -53,7 +53,7 @@ export default function Login() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm"
+              className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all text-sm"
               placeholder="Enter username"
               required
               autoFocus
@@ -69,7 +69,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm"
+              className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all text-sm"
               placeholder="Enter password"
               required
             />
@@ -78,7 +78,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 text-white font-semibold rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30 disabled:shadow-none"
           >
             {submitting ? (
               <>
@@ -90,6 +90,10 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        <p className="text-center text-[11px] text-gray-600 mt-6">
+          Virtual Machine Manager
+        </p>
       </div>
     </div>
   )

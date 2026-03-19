@@ -39,18 +39,10 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
     await handleDelete()
   }
 
-  const stateGlow: Record<string, string> = {
-    running: 'shadow-green-500/5',
-    stopped: 'shadow-red-500/5',
-    paused: 'shadow-yellow-500/5',
-  }
-
   return (
     <>
       <div
-        className={`group bg-gray-900 rounded-xl border border-gray-800 hover:border-gray-700 transition-all duration-200 hover:shadow-lg ${
-          stateGlow[vm.state] || ''
-        } overflow-hidden`}
+        className={`group bg-gray-900 rounded-xl border border-gray-800 hover:border-gray-700 card-hover gradient-border state-bar state-bar-${vm.state} overflow-hidden`}
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-3">

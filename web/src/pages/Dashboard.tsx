@@ -228,7 +228,7 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* CPU Chart */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
+        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 card-hover">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-blue-500/10">
@@ -260,7 +260,7 @@ export default function Dashboard() {
         </div>
 
         {/* Memory Chart */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
+        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 card-hover">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-emerald-500/10">
@@ -418,7 +418,7 @@ function StatCard({ icon, title, value, unit, subtitle, color, linkTo, sparkData
   const displayValue = typeof value === 'number' ? animatedValue : value
 
   const content = (
-    <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 hover:border-gray-700 transition-colors relative overflow-hidden group">
+    <div className={`bg-gray-900 rounded-xl p-5 border border-gray-800 hover:border-gray-700 card-hover gradient-border relative overflow-hidden group hover:glow-${color}`}>
       {/* Sparkline background */}
       {sparkData && sparkData.length > 2 && (
         <div className="absolute bottom-0 right-0 w-24 h-12 opacity-30 group-hover:opacity-50 transition-opacity">
