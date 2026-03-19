@@ -87,7 +87,7 @@ export default function LifecycleManager() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Lifecycle Manager</h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
@@ -96,31 +96,31 @@ export default function LifecycleManager() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Baselines</div>
-          <div className="text-3xl font-bold">{baselines.length}</div>
+          <div className="text-2xl font-bold">{baselines.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Non-Compliant Hosts</div>
-          <div className="text-3xl font-bold text-red-400">
+          <div className="text-2xl font-bold text-red-400">
             {scans.filter(s => s.status === 'non_compliant').length}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Active Tasks</div>
-          <div className="text-3xl font-bold text-blue-400">
+          <div className="text-2xl font-bold text-blue-400">
             {tasks.filter(t => t.status !== 'completed' && t.status !== 'failed').length}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Rolling Updates</div>
-          <div className="text-3xl font-bold">{updates.filter(u => u.status === 'running').length} active</div>
+          <div className="text-2xl font-bold">{updates.filter(u => u.status === 'running').length} active</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-gray-900 rounded-lg p-1">
         {(['baselines', 'compliance', 'remediation', 'updates'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
             {tab === 'updates' ? 'Rolling Updates' : tab === 'compliance' ? 'Compliance Scans' : tab}
           </button>
         ))}
@@ -135,8 +135,8 @@ export default function LifecycleManager() {
               <Plus className="w-4 h-4" /> Create Baseline
             </button>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-700">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-800">
               <thead>
                 <tr className="text-left text-xs text-gray-400 uppercase">
                   <th className="p-4">Name</th>
@@ -149,13 +149,13 @@ export default function LifecycleManager() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {baselines.length === 0 ? (
                   <tr><td colSpan={8} className="p-8 text-center text-gray-400">No baselines configured.</td></tr>
                 ) : baselines.map(bl => {
                   const compPct = bl.host_count > 0 ? (bl.compliant_count / bl.host_count * 100) : 0
                   return (
-                    <tr key={bl.id} className="hover:bg-gray-750">
+                    <tr key={bl.id} className="hover:bg-gray-900">
                       <td className="p-4">
                         <div className="font-medium">{bl.name}</div>
                         {bl.description && <div className="text-xs text-gray-400">{bl.description}</div>}
@@ -169,7 +169,7 @@ export default function LifecycleManager() {
                       <td className="p-4 text-sm text-green-400">{bl.compliant_count}</td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-20 bg-gray-700 rounded-full h-2">
+                          <div className="w-20 bg-gray-800 rounded-full h-2">
                             <div className={`h-2 rounded-full ${compPct === 100 ? 'bg-green-500' : compPct > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
                               style={{ width: `${compPct}%` }} />
                           </div>
@@ -197,8 +197,8 @@ export default function LifecycleManager() {
 
       {/* Compliance Scans Tab */}
       {activeTab === 'compliance' && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-700">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg">
+          <table className="min-w-full divide-y divide-gray-800">
             <thead>
               <tr className="text-left text-xs text-gray-400 uppercase">
                 <th className="p-4">Host</th>
@@ -208,11 +208,11 @@ export default function LifecycleManager() {
                 <th className="p-4">Scanned</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {scans.length === 0 ? (
                 <tr><td colSpan={5} className="p-8 text-center text-gray-400">No compliance scan results.</td></tr>
               ) : scans.map(scan => (
-                <tr key={scan.id} className="hover:bg-gray-750">
+                <tr key={scan.id} className="hover:bg-gray-900">
                   <td className="p-4 font-medium">{scan.hostname}</td>
                   <td className="p-4 text-sm text-gray-400">{scan.baseline_name}</td>
                   <td className="p-4">
@@ -233,8 +233,8 @@ export default function LifecycleManager() {
 
       {/* Remediation Tab */}
       {activeTab === 'remediation' && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-700">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg">
+          <table className="min-w-full divide-y divide-gray-800">
             <thead>
               <tr className="text-left text-xs text-gray-400 uppercase">
                 <th className="p-4">Host</th>
@@ -245,11 +245,11 @@ export default function LifecycleManager() {
                 <th className="p-4">Error</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {tasks.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-gray-400">No remediation tasks.</td></tr>
               ) : tasks.map(task => (
-                <tr key={task.id} className="hover:bg-gray-750">
+                <tr key={task.id} className="hover:bg-gray-900">
                   <td className="p-4 font-medium">{task.hostname}</td>
                   <td className="p-4 text-sm text-gray-400">{task.baseline_name}</td>
                   <td className="p-4">
@@ -257,7 +257,7 @@ export default function LifecycleManager() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-24 bg-gray-700 rounded-full h-2">
+                      <div className="w-24 bg-gray-800 rounded-full h-2">
                         <div className="h-2 rounded-full bg-blue-500" style={{ width: `${task.progress}%` }} />
                       </div>
                       <span className="text-xs text-gray-400">{task.progress}%</span>
@@ -276,9 +276,9 @@ export default function LifecycleManager() {
       {activeTab === 'updates' && (
         <div className="space-y-4">
           {updates.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 bg-gray-800 rounded-lg">No rolling updates.</div>
+            <div className="text-center py-12 text-gray-400 bg-gray-900 rounded-lg">No rolling updates.</div>
           ) : updates.map(update => (
-            <div key={update.id} className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <div key={update.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold">{update.name}</span>
@@ -293,7 +293,7 @@ export default function LifecycleManager() {
                   <span>{update.current_host ? `Current: ${update.current_host}` : 'Waiting...'}</span>
                   <span>{((update.completed_hosts / update.total_hosts) * 100).toFixed(0)}%</span>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-3">
+                <div className="w-full bg-gray-800 rounded-full h-3">
                   <div className={`h-3 rounded-full ${update.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'}`}
                     style={{ width: `${(update.completed_hosts / update.total_hosts) * 100}%` }} />
                 </div>
@@ -340,23 +340,23 @@ function CreateBaselineModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Baseline</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required /></div>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required /></div>
           <div><label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" /></div>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" /></div>
           <div><label className="block text-sm font-medium mb-1">Type</label>
-            <select value={baselineType} onChange={e => setBaselineType(e.target.value as 'patch' | 'upgrade' | 'extension')} className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+            <select value={baselineType} onChange={e => setBaselineType(e.target.value as 'patch' | 'upgrade' | 'extension')} className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
               <option value="patch">Patch</option><option value="upgrade">Upgrade</option><option value="extension">Extension</option>
             </select></div>
           <div><label className="block text-sm font-medium mb-1">Severity</label>
-            <select value={severity} onChange={e => setSeverity(e.target.value as 'critical' | 'important' | 'moderate' | 'low')} className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+            <select value={severity} onChange={e => setSeverity(e.target.value as 'critical' | 'important' | 'moderate' | 'low')} className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
               <option value="critical">Critical</option><option value="important">Important</option><option value="moderate">Moderate</option><option value="low">Low</option>
             </select></div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>

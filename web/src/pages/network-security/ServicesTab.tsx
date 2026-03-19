@@ -14,11 +14,11 @@ interface ServicesTabProps {
 
 function ServicesTabContent({ services, onDelete, onCreate, onSync }: ServicesTabProps) {
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-gray-900 rounded-lg border border-gray-800">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Service Mesh</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -31,7 +31,7 @@ function ServicesTabContent({ services, onDelete, onCreate, onSync }: ServicesTa
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-700">
+            <thead className="bg-gray-800">
               <tr>
                 <th className="text-left p-4 font-medium text-gray-300">Name</th>
                 <th className="text-left p-4 font-medium text-gray-300">Virtual IP</th>
@@ -43,9 +43,9 @@ function ServicesTabContent({ services, onDelete, onCreate, onSync }: ServicesTa
                 <th className="text-left p-4 font-medium text-gray-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {services.map(s => (
-                <tr key={s.id} className="hover:bg-gray-700 transition">
+                <tr key={s.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
                     <div className="font-medium">{s.name}</div>
                     {s.description && <div className="text-xs text-gray-500 mt-1">{s.description}</div>}
@@ -119,7 +119,7 @@ export function CreateServiceModal({ onClose, onCreated }: { onClose: () => void
           <InputField label="Port" value={port} onChange={setPort} placeholder="80" type="number" />
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Protocol</label>
-            <select value={protocol} onChange={e => setProtocol(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <select value={protocol} onChange={e => setProtocol(e.target.value)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
               <option value="tcp">TCP</option>
               <option value="udp">UDP</option>
             </select>
@@ -127,7 +127,7 @@ export function CreateServiceModal({ onClose, onCreated }: { onClose: () => void
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">Algorithm</label>
-          <select value={algorithm} onChange={e => setAlgorithm(e.target.value as LoadBalancerAlgorithm)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <select value={algorithm} onChange={e => setAlgorithm(e.target.value as LoadBalancerAlgorithm)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
             <option value="round-robin">Round Robin</option>
             <option value="least-conn">Least Connections</option>
             <option value="random">Random</option>

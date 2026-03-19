@@ -12,8 +12,8 @@ interface MacvtapTabProps {
 
 function MacvtapTabContent({ macvtaps, onDelete, onCreate }: MacvtapTabProps) {
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-gray-900 rounded-lg border border-gray-800">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Macvtap Devices</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Macvtap
@@ -24,7 +24,7 @@ function MacvtapTabContent({ macvtaps, onDelete, onCreate }: MacvtapTabProps) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-700">
+            <thead className="bg-gray-800">
               <tr>
                 <th className="text-left p-4 font-medium text-gray-300">Name</th>
                 <th className="text-left p-4 font-medium text-gray-300">Parent</th>
@@ -34,9 +34,9 @@ function MacvtapTabContent({ macvtaps, onDelete, onCreate }: MacvtapTabProps) {
                 <th className="text-left p-4 font-medium text-gray-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {macvtaps.map(m => (
-                <tr key={m.id} className="hover:bg-gray-700 transition">
+                <tr key={m.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{m.name}</td>
                   <td className="p-4 text-gray-400">{m.parent_interface}</td>
                   <td className="p-4">
@@ -94,7 +94,7 @@ export function CreateMacvtapModal({ onClose, onCreated }: { onClose: () => void
         <InputField label="Parent Interface" value={parent} onChange={setParent} placeholder="eth0" />
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">Mode</label>
-          <select value={mode} onChange={e => setMode(e.target.value as MacvtapMode)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <select value={mode} onChange={e => setMode(e.target.value as MacvtapMode)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
             <option value="bridge">bridge</option>
             <option value="vepa">vepa</option>
             <option value="private">private</option>

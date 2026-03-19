@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router'
-import { Search, ChevronRight } from 'lucide-react'
+import { Search, ArrowRight, Server, Plus, Home, Terminal, Network, HardDrive, Settings, BarChart3, FileText, Bell, Calendar, Shield, RotateCw, Play, Square, Cpu } from 'lucide-react'
+import { listVMs, startVM, stopVM, VM } from '../api/vm'
 
 interface Command {
   id: string
@@ -9,6 +10,7 @@ interface Command {
   action: () => void
   category: string
   keywords?: string[]
+  icon?: React.ReactNode
 }
 
 export default function CommandPalette() {
@@ -16,53 +18,118 @@ export default function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [vms, setVMs] = useState<VM[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
-  const commands: Command[] = [
+  const loadVMs = useCallback(async () => {
+    try {
+      const data = await listVMs()
+      setVMs(data)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      loadVMs()
+      // Focus input after animation
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [isOpen, loadVMs])
+
+  const close = () => {
+    setIsOpen(false)
+    setQuery('')
+    setSelectedIndex(0)
+  }
+
+  const execute = (cmd: Command) => {
+    cmd.action()
+    close()
+  }
+
+  // Build commands list including dynamic VM commands
+  const staticCommands: Command[] = [
     // Navigation
-    { id: 'nav-dashboard', label: 'Go to Dashboard', action: () => navigate('/'), category: 'Navigation', keywords: ['home'] },
-    { id: 'nav-vms', label: 'Go to Virtual Machines', action: () => navigate('/vms'), category: 'Navigation', keywords: ['vm', 'list'] },
-    { id: 'nav-logs', label: 'Go to Logs', action: () => navigate('/logs'), category: 'Navigation', keywords: ['log', 'events'] },
-    { id: 'nav-network', label: 'Go to Network', action: () => navigate('/network'), category: 'Navigation', keywords: ['bridge', 'vlan'] },
-    { id: 'nav-storage', label: 'Go to Storage', action: () => navigate('/storage'), category: 'Navigation', keywords: ['disk', 'pool', 'volume'] },
-    { id: 'nav-templates', label: 'Go to Templates', action: () => navigate('/templates'), category: 'Navigation', keywords: ['template'] },
-    { id: 'nav-quotas', label: 'Go to Quotas', action: () => navigate('/quotas'), category: 'Navigation', keywords: ['quota', 'limit', 'resource'] },
-    { id: 'nav-schedules', label: 'Go to Schedules', action: () => navigate('/schedules'), category: 'Navigation', keywords: ['schedule', 'automation', 'cron'] },
-    { id: 'nav-audit', label: 'Go to Audit Logs', action: () => navigate('/audit'), category: 'Navigation', keywords: ['audit', 'security', 'compliance', 'logs'] },
-    { id: 'nav-analytics', label: 'Go to Analytics', action: () => navigate('/analytics'), category: 'Navigation', keywords: ['analytics', 'performance', 'metrics', 'insights'] },
-    { id: 'nav-backups', label: 'Go to Backups', action: () => navigate('/backups'), category: 'Navigation', keywords: ['backup', 'restore', 'recovery'] },
-    { id: 'nav-notifications', label: 'Go to Notifications', action: () => navigate('/notifications'), category: 'Navigation', keywords: ['notifications', 'alerts', 'email', 'slack'] },
-    { id: 'nav-storage-pools', label: 'Go to Storage Pools', action: () => navigate('/storage-pools'), category: 'Navigation', keywords: ['storage', 'pools', 'nfs', 'local'] },
-    { id: 'nav-system', label: 'Go to System Resources', action: () => navigate('/system'), category: 'Navigation', keywords: ['system', 'cpu', 'numa', 'memory', 'hugepages', 'topology'] },
-    { id: 'nav-settings', label: 'Go to Settings', action: () => navigate('/settings'), category: 'Navigation', keywords: ['config', 'preferences'] },
+    { id: 'nav-dashboard', label: 'Dashboard', icon: <Home className="w-4 h-4" />, action: () => navigate('/'), category: 'Navigation', keywords: ['home', 'overview'] },
+    { id: 'nav-vms', label: 'Virtual Machines', icon: <Server className="w-4 h-4" />, action: () => navigate('/vms'), category: 'Navigation', keywords: ['vm', 'list'] },
+    { id: 'nav-create', label: 'Create VM', icon: <Plus className="w-4 h-4" />, action: () => navigate('/create'), category: 'Navigation', keywords: ['new', 'add', 'launch'] },
+    { id: 'nav-network', label: 'Network', icon: <Network className="w-4 h-4" />, action: () => navigate('/network'), category: 'Navigation', keywords: ['bridge', 'vlan', 'bond'] },
+    { id: 'nav-storage', label: 'Storage', icon: <HardDrive className="w-4 h-4" />, action: () => navigate('/storage'), category: 'Navigation', keywords: ['disk', 'volume'] },
+    { id: 'nav-logs', label: 'Logs', icon: <Terminal className="w-4 h-4" />, action: () => navigate('/logs'), category: 'Navigation', keywords: ['log', 'events', 'journal'] },
+    { id: 'nav-analytics', label: 'Analytics', icon: <BarChart3 className="w-4 h-4" />, action: () => navigate('/analytics'), category: 'Navigation', keywords: ['metrics', 'performance'] },
+    { id: 'nav-audit', label: 'Audit Logs', icon: <FileText className="w-4 h-4" />, action: () => navigate('/audit'), category: 'Navigation', keywords: ['audit', 'security'] },
+    { id: 'nav-notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" />, action: () => navigate('/notifications'), category: 'Navigation', keywords: ['alerts'] },
+    { id: 'nav-schedules', label: 'Schedules', icon: <Calendar className="w-4 h-4" />, action: () => navigate('/schedules'), category: 'Navigation', keywords: ['cron', 'automation'] },
+    { id: 'nav-system', label: 'System Resources', icon: <Cpu className="w-4 h-4" />, action: () => navigate('/system'), category: 'Navigation', keywords: ['cpu', 'numa', 'hugepages'] },
+    { id: 'nav-security', label: 'Network Security', icon: <Shield className="w-4 h-4" />, action: () => navigate('/network-security'), category: 'Navigation', keywords: ['firewall', 'dns', 'vpn'] },
+    { id: 'nav-settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, action: () => navigate('/settings'), category: 'Navigation', keywords: ['config', 'preferences'] },
 
     // Actions
-    { id: 'action-create-vm', label: 'Create New VM', action: () => navigate('/create'), category: 'Actions', keywords: ['new', 'add'] },
-    { id: 'action-refresh', label: 'Refresh Page', action: () => window.location.reload(), category: 'Actions', keywords: ['reload'] },
-    { id: 'action-help', label: 'Show Keyboard Shortcuts', action: () => {}, category: 'Actions', keywords: ['?', 'shortcuts', 'keys'] },
-
-    // Quick VM Actions (examples - in real app, would be dynamic based on VMs)
-    { id: 'vm-search', label: 'Search VMs', action: () => { navigate('/vms'); setTimeout(() => (document.querySelector('input[type="text"]') as HTMLElement)?.focus(), 100) }, category: 'VMs', keywords: ['find', 'filter'] },
-    { id: 'vm-tags', label: 'Filter VMs by Tags', action: () => navigate('/vms'), category: 'VMs', keywords: ['tag', 'label', 'organize'] },
+    { id: 'action-refresh', label: 'Refresh Page', icon: <RotateCw className="w-4 h-4" />, action: () => window.location.reload(), category: 'Actions', keywords: ['reload'] },
   ]
+
+  // Dynamic VM commands
+  const vmCommands: Command[] = vms.flatMap((vm) => {
+    const cmds: Command[] = [
+      {
+        id: `vm-view-${vm.name}`,
+        label: `View ${vm.name}`,
+        description: `${vm.state} - ${vm.cpus} vCPUs, ${vm.memory} MB`,
+        icon: <Server className="w-4 h-4" />,
+        action: () => navigate(`/vms/${vm.name}`),
+        category: 'Virtual Machines',
+        keywords: [vm.name, 'details'],
+      },
+      {
+        id: `vm-console-${vm.name}`,
+        label: `Console: ${vm.name}`,
+        icon: <Terminal className="w-4 h-4" />,
+        action: () => navigate(`/vms/${vm.name}/console`),
+        category: 'Virtual Machines',
+        keywords: [vm.name, 'terminal', 'shell'],
+      },
+    ]
+
+    if (vm.state === 'stopped') {
+      cmds.push({
+        id: `vm-start-${vm.name}`,
+        label: `Start ${vm.name}`,
+        icon: <Play className="w-4 h-4" />,
+        action: () => { startVM(vm.name) },
+        category: 'VM Actions',
+        keywords: [vm.name, 'boot', 'power on'],
+      })
+    }
+
+    if (vm.state === 'running') {
+      cmds.push({
+        id: `vm-stop-${vm.name}`,
+        label: `Stop ${vm.name}`,
+        icon: <Square className="w-4 h-4" />,
+        action: () => { stopVM(vm.name) },
+        category: 'VM Actions',
+        keywords: [vm.name, 'shutdown', 'power off'],
+      })
+    }
+
+    return cmds
+  })
+
+  const commands = [...staticCommands, ...vmCommands]
 
   const fuzzyMatch = (text: string, pattern: string): number => {
     const t = text.toLowerCase()
     const p = pattern.toLowerCase()
-
-    // Exact substring match gets high score
     if (t.includes(p)) return 100
-
-    // Fuzzy match: all pattern chars must appear in order
     let score = 0
     let pi = 0
     let consecutive = 0
-
     for (let ti = 0; ti < t.length && pi < p.length; ti++) {
       if (t[ti] === p[pi]) {
         score += 10
         consecutive++
-        score += consecutive * 5 // Bonus for consecutive chars
-        // Bonus for matching at word boundaries
+        score += consecutive * 5
         if (ti === 0 || t[ti - 1] === ' ' || t[ti - 1] === '-' || t[ti - 1] === '_') {
           score += 15
         }
@@ -71,20 +138,17 @@ export default function CommandPalette() {
         consecutive = 0
       }
     }
-
     return pi === p.length ? score : 0
   }
 
   const filteredCommands = query
     ? commands
         .map((cmd) => {
-          const searchStr = query.toLowerCase()
-          const labelScore = fuzzyMatch(cmd.label, searchStr)
-          const keywordScore = Math.max(
-            ...(cmd.keywords?.map((k) => fuzzyMatch(k, searchStr)) || [0])
-          )
-          const categoryScore = fuzzyMatch(cmd.category, searchStr)
-          const score = Math.max(labelScore, keywordScore, categoryScore)
+          const q = query.toLowerCase()
+          const labelScore = fuzzyMatch(cmd.label, q)
+          const keywordScore = Math.max(...(cmd.keywords?.map((k) => fuzzyMatch(k, q)) || [0]))
+          const descScore = cmd.description ? fuzzyMatch(cmd.description, q) : 0
+          const score = Math.max(labelScore, keywordScore, descScore)
           return { cmd, score }
         })
         .filter(({ score }) => score > 0)
@@ -93,16 +157,13 @@ export default function CommandPalette() {
     : commands
 
   const groupedCommands = filteredCommands.reduce((acc, cmd) => {
-    if (!acc[cmd.category]) {
-      acc[cmd.category] = []
-    }
+    if (!acc[cmd.category]) acc[cmd.category] = []
     acc[cmd.category].push(cmd)
     return acc
   }, {} as Record<string, Command[]>)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+K or Cmd+K to toggle
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         setIsOpen((prev) => !prev)
@@ -110,138 +171,128 @@ export default function CommandPalette() {
         setSelectedIndex(0)
         return
       }
-
-      // Escape to close
       if (e.key === 'Escape' && isOpen) {
         e.preventDefault()
-        setIsOpen(false)
-        setQuery('')
-        setSelectedIndex(0)
+        close()
         return
       }
-
-      // Arrow navigation
       if (isOpen) {
         if (e.key === 'ArrowDown') {
           e.preventDefault()
-          setSelectedIndex((prev) => (prev + 1) % filteredCommands.length)
+          setSelectedIndex((prev) => Math.min(prev + 1, filteredCommands.length - 1))
         } else if (e.key === 'ArrowUp') {
           e.preventDefault()
-          setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length)
+          setSelectedIndex((prev) => Math.max(prev - 1, 0))
         } else if (e.key === 'Enter') {
           e.preventDefault()
           const cmd = filteredCommands[selectedIndex]
-          if (cmd) {
-            cmd.action()
-            setIsOpen(false)
-            setQuery('')
-            setSelectedIndex(0)
-          }
+          if (cmd) execute(cmd)
         }
       }
     }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, filteredCommands, selectedIndex])
 
   useEffect(() => {
     setSelectedIndex(0)
   }, [query])
 
+  // Scroll selected item into view
+  useEffect(() => {
+    if (!listRef.current) return
+    const selected = listRef.current.querySelector('[data-selected="true"]')
+    selected?.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex])
+
   if (!isOpen) return null
 
   let cmdIndex = 0
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-2xl max-h-[600px] overflow-hidden">
-        {/* Search Input */}
-        <div className="flex items-center gap-3 p-4 border-b border-gray-700">
-          <Search className="w-5 h-5 text-gray-400" />
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm animate-fade-in"
+      onClick={close}
+    >
+      <div
+        className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 w-full max-w-xl max-h-[420px] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Search */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
+          <Search className="w-4 h-4 text-gray-500 shrink-0" />
           <input
+            ref={inputRef}
             type="text"
-            placeholder="Type a command or search..."
+            placeholder="Search commands, VMs, pages..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400"
+            className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-gray-500"
             autoFocus
           />
-          <kbd className="px-2 py-1 bg-gray-900 border border-gray-600 rounded text-xs text-gray-400">
+          <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-[10px] text-gray-500 font-mono shrink-0">
             ESC
           </kbd>
         </div>
 
         {/* Results */}
-        <div className="overflow-y-auto max-h-[500px]">
+        <div ref={listRef} className="overflow-y-auto max-h-[320px] sidebar-scroll">
           {filteredCommands.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
-              No commands found for "{query}"
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm text-gray-500">No results for "{query}"</p>
             </div>
           ) : (
             Object.entries(groupedCommands).map(([category, cmds]) => (
-              <div key={category} className="border-b border-gray-700 last:border-b-0">
-                <div className="px-4 py-2 bg-gray-750 text-xs font-semibold text-gray-400 uppercase">
+              <div key={category}>
+                <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-600 uppercase tracking-wider sticky top-0 bg-gray-900">
                   {category}
                 </div>
-                <div>
-                  {cmds.map((cmd) => {
-                    const isSelected = cmdIndex === selectedIndex
-                    cmdIndex++
-                    return (
-                      <button
-                        key={cmd.id}
-                        onClick={() => {
-                          cmd.action()
-                          setIsOpen(false)
-                          setQuery('')
-                          setSelectedIndex(0)
-                        }}
-                        className={`w-full flex items-center justify-between p-3 hover:bg-gray-700 transition ${
-                          isSelected ? 'bg-gray-700' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <div className="text-sm font-medium text-white text-left">
-                              {cmd.label}
-                            </div>
-                            {cmd.description && (
-                              <div className="text-xs text-gray-400 text-left">
-                                {cmd.description}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-500" />
-                      </button>
-                    )
-                  })}
-                </div>
+                {cmds.map((cmd) => {
+                  const isSelected = cmdIndex === selectedIndex
+                  const currentIndex = cmdIndex
+                  cmdIndex++
+                  return (
+                    <button
+                      key={cmd.id}
+                      data-selected={isSelected}
+                      onClick={() => execute(cmd)}
+                      onMouseEnter={() => setSelectedIndex(currentIndex)}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
+                        isSelected ? 'bg-blue-600/10 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {cmd.icon && (
+                        <span className={`shrink-0 ${isSelected ? 'text-blue-400' : 'text-gray-600'}`}>
+                          {cmd.icon}
+                        </span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{cmd.label}</div>
+                        {cmd.description && (
+                          <div className="text-[11px] text-gray-600 truncate">{cmd.description}</div>
+                        )}
+                      </div>
+                      {isSelected && <ArrowRight className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                    </button>
+                  )
+                })}
               </div>
             ))
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-3 border-t border-gray-700 bg-gray-750 text-xs text-gray-400">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-900 border border-gray-600 rounded text-xs">↑↓</kbd>
-              Navigate
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-900 border border-gray-600 rounded text-xs">↵</kbd>
-              Select
-            </span>
-          </div>
-          <span>
-            Press{' '}
-            <kbd className="px-2 py-1 bg-gray-900 border border-gray-600 rounded text-xs">
-              {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+K
-            </kbd>{' '}
-            to toggle
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-800 text-[10px] text-gray-600">
+          <span className="flex items-center gap-1">
+            <kbd className="px-1 py-0.5 bg-gray-800 border border-gray-700 rounded font-mono">↑↓</kbd>
+            navigate
           </span>
+          <span className="flex items-center gap-1">
+            <kbd className="px-1 py-0.5 bg-gray-800 border border-gray-700 rounded font-mono">↵</kbd>
+            select
+          </span>
+          <span className="ml-auto">{filteredCommands.length} results</span>
         </div>
       </div>
     </div>

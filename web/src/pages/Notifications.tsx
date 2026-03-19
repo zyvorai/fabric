@@ -133,7 +133,7 @@ export default function Notifications() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-gray-700">
+      <div className="flex gap-4 mb-6 border-b border-gray-800">
         <button
           onClick={() => setActiveTab('channels')}
           className={`px-4 py-2 font-medium transition ${
@@ -181,7 +181,7 @@ export default function Notifications() {
           </div>
 
           {channels.length === 0 ? (
-            <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+            <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
               <Bell className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-xl text-gray-400 mb-4">No notification channels</p>
               <p className="text-gray-500 mb-6">Add a channel to receive notifications</p>
@@ -198,7 +198,7 @@ export default function Notifications() {
               {channels.map((channel) => (
                 <div
                   key={channel.id}
-                  className="bg-gray-800 border border-gray-700 rounded-lg p-4"
+                  className="bg-gray-900 border border-gray-800 rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -256,7 +256,7 @@ export default function Notifications() {
           </div>
 
           {rules.length === 0 ? (
-            <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+            <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
               <Bell className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-xl text-gray-400 mb-4">No notification rules</p>
               <p className="text-gray-500 mb-6">Create rules to trigger notifications</p>
@@ -273,7 +273,7 @@ export default function Notifications() {
               {rules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="bg-gray-800 border border-gray-700 rounded-lg p-4"
+                  className="bg-gray-900 border border-gray-800 rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -300,7 +300,7 @@ export default function Notifications() {
                           </span>
                         ))}
                         {rule.event_types.length > 3 && (
-                          <span className="px-2 py-1 bg-gray-700 rounded text-xs">
+                          <span className="px-2 py-1 bg-gray-800 rounded text-xs">
                             +{rule.event_types.length - 3} more
                           </span>
                         )}
@@ -350,14 +350,14 @@ export default function Notifications() {
         <div>
           <h2 className="text-xl font-bold mb-4">Notification History</h2>
           {history.length === 0 ? (
-            <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+            <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
               <p className="text-gray-400">No notification history yet</p>
             </div>
           ) : (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-750">
+                  <thead className="bg-gray-900">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                         Timestamp
@@ -379,9 +379,9 @@ export default function Notifications() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-700">
+                  <tbody className="divide-y divide-gray-800">
                     {history.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-750">
+                      <tr key={item.id} className="hover:bg-gray-900">
                         <td className="px-4 py-3 text-sm text-gray-400">
                           {new Date(item.sent_at).toLocaleString()}
                         </td>
@@ -415,7 +415,7 @@ export default function Notifications() {
       {/* Placeholder dialogs */}
       {showCreateChannel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 max-w-md w-full">
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Add Notification Channel</h2>
             <p className="text-gray-400 mb-4">
               Configure email, Slack, webhook, or Teams integration
@@ -423,7 +423,7 @@ export default function Notifications() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateChannel(false)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
               >
                 Close
               </button>
@@ -434,7 +434,7 @@ export default function Notifications() {
 
       {showCreateRule && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 max-w-md w-full">
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Create Notification Rule</h2>
             <p className="text-gray-400 mb-4">
               Configure when and how to send notifications
@@ -442,7 +442,7 @@ export default function Notifications() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateRule(false)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
               >
                 Close
               </button>

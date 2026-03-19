@@ -171,7 +171,7 @@ export default function StoragePools() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Storage Pools</h1>
+          <h1 className="text-2xl font-bold mb-2">Storage Pools</h1>
           <p className="text-gray-400">Manage local and network storage pools</p>
         </div>
         <button
@@ -185,34 +185,34 @@ export default function StoragePools() {
 
       {/* Statistics */}
       <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="text-gray-400 text-sm mb-2">Total Pools</div>
-          <div className="text-3xl font-bold">{pools.length}</div>
+          <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="text-gray-400 text-sm mb-2">Active Pools</div>
-          <div className="text-3xl font-bold text-green-500">
+          <div className="text-2xl font-bold text-green-500">
             {pools.filter((p) => p.state === 'Active').length}
           </div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="text-gray-400 text-sm mb-2">Total Capacity</div>
-          <div className="text-3xl font-bold">
+          <div className="text-2xl font-bold">
             {formatBytes(pools.reduce((sum, p) => sum + p.capacity, 0))}
           </div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="text-gray-400 text-sm mb-2">Available</div>
-          <div className="text-3xl font-bold">
+          <div className="text-2xl font-bold">
             {formatBytes(pools.reduce((sum, p) => sum + p.available, 0))}
           </div>
         </div>
       </div>
 
       {/* Pools List */}
-      <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <div className="bg-gray-900 rounded-lg overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-750">
+          <thead className="bg-gray-900">
             <tr className="text-left text-gray-400 text-sm">
               <th className="p-4">Name</th>
               <th className="p-4">Type</th>
@@ -238,7 +238,7 @@ export default function StoragePools() {
                   pool.capacity > 0 ? ((pool.capacity - pool.available) / pool.capacity) * 100 : 0
 
                 return (
-                  <tr key={pool.id} className="border-t border-gray-700 hover:bg-gray-750">
+                  <tr key={pool.id} className="border-t border-gray-800 hover:bg-gray-900">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {typeof pool.pool_type === 'object' && 'NFS' in pool.pool_type ? (
@@ -255,7 +255,7 @@ export default function StoragePools() {
                     <td className="p-4 text-sm">{formatBytes(pool.available)}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
                           <div
                             className={`h-full ${
                               usagePercent > 90
@@ -292,7 +292,7 @@ export default function StoragePools() {
                         {pool.state === 'Inactive' ? (
                           <button
                             onClick={() => handleStart(pool.name)}
-                            className="p-2 hover:bg-gray-700 rounded transition"
+                            className="p-2 hover:bg-white/[0.03] rounded transition"
                             title="Start pool"
                           >
                             <Play className="w-4 h-4 text-green-500" />
@@ -300,7 +300,7 @@ export default function StoragePools() {
                         ) : pool.state === 'Active' ? (
                           <button
                             onClick={() => handleStop(pool.name)}
-                            className="p-2 hover:bg-gray-700 rounded transition"
+                            className="p-2 hover:bg-white/[0.03] rounded transition"
                             title="Stop pool"
                           >
                             <Square className="w-4 h-4 text-yellow-500" />
@@ -308,14 +308,14 @@ export default function StoragePools() {
                         ) : null}
                         <button
                           onClick={() => handleRefresh(pool.name)}
-                          className="p-2 hover:bg-gray-700 rounded transition"
+                          className="p-2 hover:bg-white/[0.03] rounded transition"
                           title="Refresh stats"
                         >
                           <RefreshCw className="w-4 h-4 text-blue-500" />
                         </button>
                         <button
                           onClick={() => handleDelete(pool.name)}
-                          className="p-2 hover:bg-gray-700 rounded transition"
+                          className="p-2 hover:bg-white/[0.03] rounded transition"
                           title="Delete pool"
                           disabled={pool.state === 'Active'}
                         >
@@ -432,7 +432,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-2xl">
         <h2 className="text-2xl font-bold mb-6">Create Storage Pool</h2>
 
         <form onSubmit={handleSubmit}>
@@ -455,7 +455,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   className={`p-3 rounded border-2 transition text-center ${
                     poolType === key
                       ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-700 hover:border-gray-600'
+                      : 'border-gray-800 hover:border-gray-800'
                   }`}
                 >
                   <Icon className="w-5 h-5 mx-auto mb-1" />
@@ -473,7 +473,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
               placeholder="storage-pool-1"
               required
             />
@@ -486,7 +486,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                 type="text"
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                 placeholder="/var/lib/vmspawnd/storage"
                 required
               />
@@ -499,7 +499,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={volumeGroup}
                   onChange={(e) => setVolumeGroup(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="vg0"
                   required
                 />
@@ -511,7 +511,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                     type="text"
                     value={thinPool}
                     onChange={(e) => setThinPool(e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                    className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                     placeholder="thinpool0"
                     required
                   />
@@ -526,7 +526,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={zpool}
                   onChange={(e) => setZpool(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="tank"
                   required
                 />
@@ -537,7 +537,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={dataset}
                   onChange={(e) => setDataset(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="vms"
                 />
               </div>
@@ -550,7 +550,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={cephMonitors}
                   onChange={(e) => setCephMonitors(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="10.0.0.1, 10.0.0.2, 10.0.0.3"
                   required
                 />
@@ -562,7 +562,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={cephPoolName}
                   onChange={(e) => setCephPoolName(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="rbd"
                   required
                 />
@@ -573,7 +573,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={cephUser}
                   onChange={(e) => setCephUser(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="admin"
                 />
               </div>
@@ -583,7 +583,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={cephKeyring}
                   onChange={(e) => setCephKeyring(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="/etc/ceph/ceph.client.admin.keyring"
                 />
               </div>
@@ -596,7 +596,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={nfsServer}
                   onChange={(e) => setNfsServer(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
                   placeholder="192.168.1.100"
                   required
                 />
@@ -607,7 +607,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={nfsExportPath}
                   onChange={(e) => setNfsExportPath(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="/export/vm-storage"
                   required
                 />
@@ -618,7 +618,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={nfsMountPath}
                   onChange={(e) => setNfsMountPath(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono"
                   placeholder="/mnt/nfs-pool"
                   required
                 />
@@ -628,7 +628,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                 <select
                   value={nfsVersion}
                   onChange={(e) => setNfsVersion(e.target.value as any)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
                 >
                   <option value="V3">NFSv3</option>
                   <option value="V4">NFSv4</option>
@@ -642,7 +642,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                   type="text"
                   value={mountOptions}
                   onChange={(e) => setMountOptions(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono text-sm"
+                  className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2 font-mono text-sm"
                   placeholder="rw,hard,intr,rsize=8192,wsize=8192"
                 />
                 <div className="text-xs text-gray-400 mt-1">
@@ -668,7 +668,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition"
+              className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded transition"
             >
               Cancel
             </button>

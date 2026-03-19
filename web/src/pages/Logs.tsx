@@ -94,21 +94,21 @@ export default function Logs() {
       case 'WARN': case 'WARNING': return 'bg-yellow-500/10 border-yellow-500/20'
       case 'ERROR': case 'CRITICAL': return 'bg-red-500/10 border-red-500/20'
       case 'DEBUG': return 'bg-gray-500/10 border-gray-500/20'
-      default: return 'bg-gray-700'
+      default: return 'bg-gray-800'
     }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-3">
           <Terminal className="w-8 h-8" />
           System Logs
         </h1>
         <div className="flex items-center gap-2">
           <button
             onClick={loadLogs}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm"
+            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -118,7 +118,7 @@ export default function Logs() {
       </div>
 
       {/* Controls */}
-      <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
@@ -129,7 +129,7 @@ export default function Logs() {
                 placeholder="Filter logs..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function Logs() {
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="ALL">All Levels</option>
               <option value="INFO">INFO</option>
@@ -174,7 +174,7 @@ export default function Logs() {
             id="autoScroll"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+            className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
           />
           <label htmlFor="autoScroll" className="text-sm text-gray-400">
             Auto-scroll to new logs
@@ -183,7 +183,7 @@ export default function Logs() {
       </div>
 
       {/* Log Stream */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+      <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
         <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
           {loading ? (
             <div className="flex items-center justify-center h-full text-gray-400">
@@ -194,11 +194,11 @@ export default function Logs() {
               No logs to display
             </div>
           ) : (
-            <div className="divide-y divide-gray-700">
+            <div className="divide-y divide-gray-800">
               {filteredLogs.map((log, index) => (
                 <div
                   key={log.id || index}
-                  className={`p-3 hover:bg-gray-700 transition ${getLevelBg(log.level)} border-l-4`}
+                  className={`p-3 hover:bg-white/[0.03] transition ${getLevelBg(log.level)} border-l-4`}
                 >
                   <div className="flex items-start gap-4">
                     <span className="text-gray-500 text-xs whitespace-nowrap">

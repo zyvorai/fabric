@@ -125,11 +125,11 @@ export default function Storage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-3">
           <HardDrive className="w-8 h-8" />
           Storage Management
         </h1>
-        <button onClick={loadData} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition">
+        <button onClick={loadData} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition">
           <RefreshCw className="w-4 h-4" />
           Refresh
         </button>
@@ -137,27 +137,27 @@ export default function Storage() {
 
       {/* Storage Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
           <div className="text-gray-400 text-sm mb-2">Total Capacity</div>
-          <div className="text-3xl font-bold text-blue-400">{formatBytes(totalCapacity)}</div>
+          <div className="text-2xl font-bold text-blue-400">{formatBytes(totalCapacity)}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
           <div className="text-gray-400 text-sm mb-2">Used</div>
-          <div className="text-3xl font-bold text-orange-400">{formatBytes(totalUsed)}</div>
+          <div className="text-2xl font-bold text-orange-400">{formatBytes(totalUsed)}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
           <div className="text-gray-400 text-sm mb-2">Volumes</div>
-          <div className="text-3xl font-bold text-green-400">{volumes.length}</div>
+          <div className="text-2xl font-bold text-green-400">{volumes.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
           <div className="text-gray-400 text-sm mb-2">Pools</div>
-          <div className="text-3xl font-bold text-purple-400">{pools.length}</div>
+          <div className="text-2xl font-bold text-purple-400">{pools.length}</div>
         </div>
       </div>
 
       {/* Storage Pools */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold">Storage Pools</h2>
         </div>
         {pools.length === 0 ? (
@@ -169,7 +169,7 @@ export default function Storage() {
               const percentage = pool.capacity > 0 ? Math.round((used / pool.capacity) * 100) : 0
               const typeStr = getPoolTypeString(pool.pool_type)
               return (
-                <div key={pool.id} className="bg-gray-700 rounded-lg p-4">
+                <div key={pool.id} className="bg-gray-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <Database className="w-5 h-5 text-blue-400" />
@@ -209,8 +209,8 @@ export default function Storage() {
       </div>
 
       {/* Volumes */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold">Volumes</h2>
         </div>
         {volumes.length === 0 ? (
@@ -218,7 +218,7 @@ export default function Storage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700">
+              <thead className="bg-gray-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-gray-300">Name</th>
                   <th className="text-left p-4 font-medium text-gray-300">Pool</th>
@@ -228,9 +228,9 @@ export default function Storage() {
                   <th className="text-left p-4 font-medium text-gray-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {volumes.map((volume) => (
-                  <tr key={volume.id} className="hover:bg-gray-700 transition">
+                  <tr key={volume.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <HardDrive className="w-4 h-4 text-gray-400" />
@@ -271,7 +271,7 @@ export default function Storage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-500 transition cursor-pointer">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition cursor-pointer">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-3 bg-blue-500/10 rounded-lg">
               <Plus className="w-6 h-6 text-blue-400" />
@@ -281,7 +281,7 @@ export default function Storage() {
           <p className="text-sm text-gray-400">Create a new disk image for VMs</p>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-purple-500 transition cursor-pointer">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-purple-500 transition cursor-pointer">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-3 bg-purple-500/10 rounded-lg">
               <RefreshCw className="w-6 h-6 text-purple-400" />
@@ -291,7 +291,7 @@ export default function Storage() {
           <p className="text-sm text-gray-400">Take a snapshot of existing volume</p>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-green-500 transition cursor-pointer">
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-green-500 transition cursor-pointer">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-3 bg-green-500/10 rounded-lg">
               <Copy className="w-6 h-6 text-green-400" />

@@ -39,13 +39,13 @@ export default function Profiles() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3"><Layers className="w-8 h-8" /> Instance Types</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-3"><Layers className="w-8 h-8" /> Instance Types</h1>
         <button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"><Plus className="w-4 h-4" />Create Profile</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {profiles.map(p => (
-          <div key={p.name} className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+          <div key={p.name} className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-gray-800 transition">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h3 className="text-lg font-bold">{p.name}</h3>
@@ -88,19 +88,19 @@ function CreateProfileDialog({ onClose, onSuccess }: { onClose: () => void; onSu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700"><h2 className="text-xl font-bold">Create Profile</h2><button onClick={onClose} className="p-2 hover:bg-gray-700 rounded"><span className="text-2xl">&times;</span></button></div>
+      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800"><h2 className="text-xl font-bold">Create Profile</h2><button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded"><span className="text-2xl">&times;</span></button></div>
         <div className="p-6 space-y-4">
-          <div><label className="block text-sm font-medium text-gray-300 mb-2">Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="my-profile" className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" autoFocus /></div>
-          <div><label className="block text-sm font-medium text-gray-300 mb-2">Category</label><select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white"><option value="general">General</option><option value="compute">Compute</option><option value="memory">Memory</option><option value="storage">Storage</option></select></div>
+          <div><label className="block text-sm font-medium text-gray-300 mb-2">Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="my-profile" className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" autoFocus /></div>
+          <div><label className="block text-sm font-medium text-gray-300 mb-2">Category</label><select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white"><option value="general">General</option><option value="compute">Compute</option><option value="memory">Memory</option><option value="storage">Storage</option></select></div>
           <div className="grid grid-cols-3 gap-3">
-            <div><label className="block text-sm text-gray-300 mb-1">CPUs</label><input type="number" value={cpus} onChange={e => setCpus(+e.target.value)} min={1} className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-3 text-white" /></div>
-            <div><label className="block text-sm text-gray-300 mb-1">Memory (MB)</label><input type="number" value={memory} onChange={e => setMemory(+e.target.value)} min={256} step={256} className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-3 text-white" /></div>
-            <div><label className="block text-sm text-gray-300 mb-1">Disk (GB)</label><input type="number" value={disk} onChange={e => setDisk(+e.target.value)} min={1} className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-3 text-white" /></div>
+            <div><label className="block text-sm text-gray-300 mb-1">CPUs</label><input type="number" value={cpus} onChange={e => setCpus(+e.target.value)} min={1} className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-3 text-white" /></div>
+            <div><label className="block text-sm text-gray-300 mb-1">Memory (MB)</label><input type="number" value={memory} onChange={e => setMemory(+e.target.value)} min={256} step={256} className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-3 text-white" /></div>
+            <div><label className="block text-sm text-gray-300 mb-1">Disk (GB)</label><input type="number" value={disk} onChange={e => setDisk(+e.target.value)} min={1} className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-3 text-white" /></div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 p-6 border-t border-gray-700">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Cancel</button>
+        <div className="flex justify-end gap-2 p-6 border-t border-gray-800">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg">Cancel</button>
           <button onClick={handleCreate} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Create</button>
         </div>
       </div>

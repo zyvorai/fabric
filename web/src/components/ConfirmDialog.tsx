@@ -20,28 +20,30 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const confirmRef = useRef<HTMLButtonElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel()
-      }
+      if (e.key === 'Escape') onCancel()
     }
     window.addEventListener('keydown', handleKeyDown)
-    // Focus the cancel button by default so Enter does NOT confirm accidentally
     cancelRef.current?.focus()
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onCancel])
 
   const confirmColors = {
-    danger: 'bg-red-600 hover:bg-red-700',
-    warning: 'bg-yellow-600 hover:bg-yellow-700',
-    info: 'bg-blue-600 hover:bg-blue-700',
+    danger: 'bg-red-600 hover:bg-red-500 text-white',
+    warning: 'bg-yellow-600 hover:bg-yellow-500 text-white',
+    info: 'bg-blue-600 hover:bg-blue-500 text-white',
   }[variant]
 
-  const iconColors = {
+  const iconBg = {
+    danger: 'bg-red-500/10',
+    warning: 'bg-yellow-500/10',
+    info: 'bg-blue-500/10',
+  }[variant]
+
+  const iconColor = {
     danger: 'text-red-400',
     warning: 'text-yellow-400',
     info: 'text-blue-400',
@@ -49,36 +51,41 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
       aria-describedby="confirm-message"
+      onClick={onCancel}
     >
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md p-6">
-        <div className="flex items-start gap-4 mb-4">
-          <AlertTriangle className={`w-6 h-6 mt-0.5 flex-shrink-0 ${iconColors}`} />
+      <div
+        className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-4 mb-5">
+          <div className={`p-2 rounded-lg shrink-0 ${iconBg}`}>
+            <AlertTriangle className={`w-5 h-5 ${iconColor}`} />
+          </div>
           <div>
-            <h3 id="confirm-title" className="text-lg font-bold text-white">
+            <h3 id="confirm-title" className="text-base font-semibold text-white">
               {title}
             </h3>
-            <p id="confirm-message" className="text-gray-400 mt-1 text-sm">
+            <p id="confirm-message" className="text-sm text-gray-400 mt-1 leading-relaxed">
               {message}
             </p>
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-6">
+        <div className="flex justify-end gap-2">
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition text-sm"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors text-sm text-gray-300"
           >
             {cancelLabel}
           </button>
           <button
-            ref={confirmRef}
             onClick={onConfirm}
-            className={`px-4 py-2 rounded transition text-sm text-white ${confirmColors}`}
+            className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${confirmColors}`}
           >
             {confirmLabel}
           </button>

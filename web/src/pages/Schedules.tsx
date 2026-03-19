@@ -127,7 +127,7 @@ export default function Schedules() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 showHistory
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+                  : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'
               }`}
             >
               <Clock className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function Schedules() {
       {!showHistory && (
         <>
           {schedules.length === 0 ? (
-            <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+            <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
               <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-xl text-gray-400 mb-4">No schedules configured</p>
               <p className="text-gray-500 mb-6">Create schedules to automate VM operations</p>
@@ -165,7 +165,7 @@ export default function Schedules() {
               {schedules.map((schedule) => (
                 <div
                   key={schedule.id}
-                  className="bg-gray-800 rounded-lg border border-gray-700 p-6"
+                  className="bg-gray-900 rounded-lg border border-gray-800 p-6"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -252,8 +252,8 @@ export default function Schedules() {
 
       {/* History */}
       {showHistory && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700">
-          <div className="p-4 border-b border-gray-700">
+        <div className="bg-gray-900 rounded-lg border border-gray-800">
+          <div className="p-4 border-b border-gray-800">
             <h2 className="text-lg font-bold">Execution History</h2>
             <p className="text-sm text-gray-400">Latest 20 executions</p>
           </div>
@@ -264,7 +264,7 @@ export default function Schedules() {
               </div>
             ) : (
               <table className="w-full">
-                <thead className="bg-gray-750">
+                <thead className="bg-gray-900">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                       Schedule
@@ -283,9 +283,9 @@ export default function Schedules() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700">
+                <tbody className="divide-y divide-gray-800">
                   {history.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-gray-750">
+                    <tr key={idx} className="hover:bg-gray-900">
                       <td className="px-4 py-3 text-sm">{item.schedule_name}</td>
                       <td className="px-4 py-3 text-sm font-medium">{item.vm_name}</td>
                       <td className="px-4 py-3">

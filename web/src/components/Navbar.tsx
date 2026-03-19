@@ -93,7 +93,7 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
       to={item.to}
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-2 rounded transition text-sm ${
-        isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'
+        isActive ? 'bg-blue-600 text-white' : 'hover:bg-white/[0.03] text-gray-300'
       }`}
     >
       {item.icon}
@@ -115,7 +115,7 @@ function DesktopDropdown({ group }: { group: NavGroup }) {
     >
       <button
         className={`flex items-center gap-1 px-3 py-2 rounded transition text-sm ${
-          hasActive ? 'text-blue-400' : 'text-gray-300 hover:bg-gray-700'
+          hasActive ? 'text-blue-400' : 'text-gray-300 hover:bg-white/[0.03]'
         }`}
         aria-expanded={open}
         aria-haspopup="true"
@@ -124,7 +124,7 @@ function DesktopDropdown({ group }: { group: NavGroup }) {
         <ChevronDown className={`w-3 h-3 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px] z-40">
+        <div className="absolute top-full left-0 mt-1 bg-gray-900 border border-gray-800 rounded-lg shadow-xl py-1 min-w-[160px] z-40">
           {group.items.map((item) => (
             <Link
               key={item.to}
@@ -133,7 +133,7 @@ function DesktopDropdown({ group }: { group: NavGroup }) {
               className={`flex items-center gap-2 px-4 py-2 transition text-sm ${
                 location.pathname === item.to
                   ? 'bg-blue-600 text-white'
-                  : 'hover:bg-gray-700 text-gray-300'
+                  : 'hover:bg-white/[0.03] text-gray-300'
               }`}
             >
               {item.icon}
@@ -150,7 +150,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <nav className="bg-gray-800 border-b border-gray-700" role="navigation" aria-label="Main navigation">
+    <nav className="bg-gray-900 border-b border-gray-800" role="navigation" aria-label="Main navigation">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -185,7 +185,7 @@ export default function Navbar() {
 
             {/* Mobile hamburger */}
             <button
-              className="lg:hidden p-2 hover:bg-gray-700 rounded transition"
+              className="lg:hidden p-2 hover:bg-white/[0.03] rounded transition"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-expanded={mobileOpen}
               aria-label="Toggle navigation menu"
@@ -198,7 +198,7 @@ export default function Navbar() {
 
       {/* Mobile slide-out menu */}
       {mobileOpen && (
-        <div className="lg:hidden border-t border-gray-700 bg-gray-800 pb-4">
+        <div className="lg:hidden border-t border-gray-800 bg-gray-900 pb-4">
           <div className="container mx-auto px-4 pt-2 space-y-4">
             {navGroups.map((group) => (
               <div key={group.label}>

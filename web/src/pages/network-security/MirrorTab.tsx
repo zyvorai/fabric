@@ -14,11 +14,11 @@ interface MirrorTabProps {
 
 function MirrorTabContent({ sessions, onDelete, onCreate, onSync }: MirrorTabProps) {
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-gray-900 rounded-lg border border-gray-800">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Packet Mirror</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -31,7 +31,7 @@ function MirrorTabContent({ sessions, onDelete, onCreate, onSync }: MirrorTabPro
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-700">
+            <thead className="bg-gray-800">
               <tr>
                 <th className="text-left p-4 font-medium text-gray-300">Name</th>
                 <th className="text-left p-4 font-medium text-gray-300">Source VM</th>
@@ -42,9 +42,9 @@ function MirrorTabContent({ sessions, onDelete, onCreate, onSync }: MirrorTabPro
                 <th className="text-left p-4 font-medium text-gray-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {sessions.map(s => (
-                <tr key={s.id} className="hover:bg-gray-700 transition">
+                <tr key={s.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
                     <div className="font-medium">{s.name}</div>
                     {s.description && <div className="text-xs text-gray-500 mt-1">{s.description}</div>}
@@ -131,7 +131,7 @@ export function CreateMirrorModal({ onClose, onCreated }: { onClose: () => void;
         <InputField label="Source VM" value={sourceVm} onChange={setSourceVm} placeholder="web-server-01" />
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">Direction</label>
-          <select value={direction} onChange={e => setDirection(e.target.value as MirrorDirection)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <select value={direction} onChange={e => setDirection(e.target.value as MirrorDirection)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
             <option value="both">Both</option>
             <option value="ingress">Ingress</option>
             <option value="egress">Egress</option>
@@ -141,7 +141,7 @@ export function CreateMirrorModal({ onClose, onCreated }: { onClose: () => void;
           <InputField label="Collector Address" value={collectorAddress} onChange={setCollectorAddress} placeholder="10.0.0.50" />
           <InputField label="Collector Port" value={collectorPort} onChange={setCollectorPort} placeholder="4789" type="number" />
         </div>
-        <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
           <div className="text-sm font-medium text-gray-300">Filters (optional)</div>
           <div className="grid grid-cols-3 gap-2">
             <InputField label="Protocol" value={filterProtocol} onChange={setFilterProtocol} placeholder="tcp" />

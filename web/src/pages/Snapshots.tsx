@@ -60,13 +60,13 @@ export default function Snapshots() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">VM Snapshots</h1>
+          <h1 className="text-2xl font-bold mb-2">VM Snapshots</h1>
           <p className="text-gray-400">Create and manage VM snapshots</p>
         </div>
       </div>
 
       {/* VM selector */}
-      <div className="bg-gray-800 rounded-lg p-6 mb-8">
+      <div className="bg-gray-900 rounded-lg p-6 mb-8">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium mb-2">VM Name</label>
@@ -74,7 +74,7 @@ export default function Snapshots() {
               type="text"
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
               placeholder="Enter VM name"
             />
           </div>
@@ -98,7 +98,7 @@ export default function Snapshots() {
 
       {/* Snapshots list */}
       {vmName && (
-        <div className="bg-gray-800 rounded-lg overflow-hidden">
+        <div className="bg-gray-900 rounded-lg overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="text-left text-gray-400 text-sm">
@@ -124,7 +124,7 @@ export default function Snapshots() {
                 </tr>
               ) : (
                 snapshots.map((snap) => (
-                  <tr key={snap.id} className="border-t border-gray-700 hover:bg-gray-750">
+                  <tr key={snap.id} className="border-t border-gray-800 hover:bg-gray-900">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <Camera className="w-4 h-4 text-blue-400" />
@@ -140,14 +140,14 @@ export default function Snapshots() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleRevert(snap.id)}
-                          className="p-2 hover:bg-gray-700 rounded transition"
+                          className="p-2 hover:bg-white/[0.03] rounded transition"
                           title="Revert to snapshot"
                         >
                           <RotateCcw className="w-4 h-4 text-yellow-500" />
                         </button>
                         <button
                           onClick={() => handleDelete(snap.id)}
-                          className="p-2 hover:bg-gray-700 rounded transition"
+                          className="p-2 hover:bg-white/[0.03] rounded transition"
                           title="Delete snapshot"
                         >
                           <Trash2 className="w-4 h-4 text-red-500" />
@@ -215,7 +215,7 @@ function CreateSnapshotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold mb-6">Create Snapshot</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -224,7 +224,7 @@ function CreateSnapshotDialog({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
               placeholder="my-snapshot"
               required
             />
@@ -235,7 +235,7 @@ function CreateSnapshotDialog({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
               placeholder="Optional description"
             />
           </div>
@@ -244,7 +244,7 @@ function CreateSnapshotDialog({
             <select
               value={snapshotType}
               onChange={(e) => setSnapshotType(e.target.value as 'Disk' | 'Full')}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
             >
               <option value="Disk">Disk Only</option>
               <option value="Full">Full (Disk + State)</option>
@@ -254,7 +254,7 @@ function CreateSnapshotDialog({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition"
+              className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded transition"
             >
               Cancel
             </button>

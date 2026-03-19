@@ -87,17 +87,17 @@ export default function Replication() {
       <PageHeader
         title="Replication"
         actions={
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
         }
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-gray-900 rounded-lg p-1">
         {(['dashboard', 'sites', 'configs', 'violations'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
             {tab === 'configs' ? 'Replications' : tab === 'violations' ? 'RPO Violations' : tab}
           </button>
         ))}
@@ -109,22 +109,22 @@ export default function Replication() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Active Replications</div>
-              <div className="text-3xl font-bold text-green-400">{health.active}</div>
+              <div className="text-2xl font-bold text-green-400">{health.active}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">RPO Violations</div>
-              <div className="text-3xl font-bold text-red-400">{health.rpo_violations}</div>
+              <div className="text-2xl font-bold text-red-400">{health.rpo_violations}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Avg RPO</div>
-              <div className="text-3xl font-bold">{health.avg_rpo_minutes.toFixed(0)} min</div>
+              <div className="text-2xl font-bold">{health.avg_rpo_minutes.toFixed(0)} min</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Paused / Error</div>
-              <div className="text-3xl font-bold text-yellow-400">{health.paused} / {health.error}</div>
+              <div className="text-2xl font-bold text-yellow-400">{health.paused} / {health.error}</div>
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Site Health</h2>
             <div className="space-y-3">
               {health.sites.map(site => (
@@ -150,8 +150,8 @@ export default function Replication() {
               <Plus className="w-4 h-4" /> Add Site
             </button>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-700">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-800">
               <thead>
                 <tr className="text-left text-xs text-gray-400 uppercase">
                   <th className="p-4">Name</th>
@@ -163,11 +163,11 @@ export default function Replication() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {sites.length === 0 ? (
                   <tr><td colSpan={7} className="p-8 text-center text-gray-400">No replication sites.</td></tr>
                 ) : sites.map(site => (
-                  <tr key={site.id} className="hover:bg-gray-750">
+                  <tr key={site.id} className="hover:bg-gray-900">
                     <td className="p-4 font-medium">{site.name}</td>
                     <td className="p-4 text-sm">{site.site_type}</td>
                     <td className="p-4 text-sm font-mono text-gray-400">{site.endpoint}</td>
@@ -198,8 +198,8 @@ export default function Replication() {
               <Plus className="w-4 h-4" /> Configure Replication
             </button>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-700">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-800">
               <thead>
                 <tr className="text-left text-xs text-gray-400 uppercase">
                   <th className="p-4">VM</th>
@@ -211,11 +211,11 @@ export default function Replication() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {replications.length === 0 ? (
                   <tr><td colSpan={7} className="p-8 text-center text-gray-400">No replication configurations.</td></tr>
                 ) : replications.map(rep => (
-                  <tr key={rep.id} className="hover:bg-gray-750">
+                  <tr key={rep.id} className="hover:bg-gray-900">
                     <td className="p-4 font-medium">{rep.vm_name}</td>
                     <td className="p-4 text-sm">{rep.rpo_minutes} min</td>
                     <td className="p-4">
@@ -224,7 +224,7 @@ export default function Replication() {
                     <td className="p-4">
                       {rep.sync_progress_pct !== undefined && rep.sync_progress_pct !== null ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-20 bg-gray-700 rounded-full h-2">
+                          <div className="w-20 bg-gray-800 rounded-full h-2">
                             <div className="h-2 rounded-full bg-blue-500" style={{ width: `${rep.sync_progress_pct}%` }} />
                           </div>
                           <span className="text-xs text-gray-400">{rep.sync_progress_pct}%</span>
@@ -256,8 +256,8 @@ export default function Replication() {
 
       {/* RPO Violations Tab */}
       {activeTab === 'violations' && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-700">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg">
+          <table className="min-w-full divide-y divide-gray-800">
             <thead>
               <tr className="text-left text-xs text-gray-400 uppercase">
                 <th className="p-4">VM</th>
@@ -269,11 +269,11 @@ export default function Replication() {
                 <th className="p-4">Failures</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {violations.length === 0 ? (
                 <tr><td colSpan={7} className="p-8 text-center text-gray-400">No RPO violations. All replications are compliant.</td></tr>
               ) : violations.map(v => (
-                <tr key={v.replication_id} className="hover:bg-gray-750">
+                <tr key={v.replication_id} className="hover:bg-gray-900">
                   <td className="p-4 font-medium">{v.vm_name}</td>
                   <td className="p-4 text-sm">{v.rpo_target_minutes} min</td>
                   <td className="p-4 text-sm text-red-400 font-bold">{v.current_rpo_minutes.toFixed(0)} min</td>
@@ -326,30 +326,30 @@ function CreateSiteModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Add Replication Site</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Site Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Endpoint</label>
             <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" placeholder="https://site.example.com" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" placeholder="https://site.example.com" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
             <select value={siteType} onChange={e => setSiteType(e.target.value as any)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
               <option value="primary">Primary</option>
               <option value="secondary">Secondary</option>
               <option value="bidirectional">Bidirectional</option>
             </select>
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Add Site</button>
           </div>
         </form>
@@ -374,35 +374,35 @@ function CreateConfigModal({ sites, onClose, onCreated }: { sites: ReplicationSi
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Configure Replication</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">VM ID</label>
             <input type="text" value={vmId} onChange={e => setVmId(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Source Site</label>
             <select value={sourceSite} onChange={e => setSourceSite(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
               {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Target Site</label>
             <select value={targetSite} onChange={e => setTargetSite(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
               {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">RPO (minutes)</label>
             <input type="number" value={rpo} onChange={e => setRpo(Number(e.target.value))}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" min={1} required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" min={1} required />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Configure</button>
           </div>
         </form>

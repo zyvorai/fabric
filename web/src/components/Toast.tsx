@@ -18,50 +18,30 @@ interface ToastProps {
 export function ToastItem({ toast, onClose }: ToastProps) {
   useEffect(() => {
     const duration = toast.duration || 5000
-    const timer = setTimeout(() => {
-      onClose(toast.id)
-    }, duration)
-
+    const timer = setTimeout(() => onClose(toast.id), duration)
     return () => clearTimeout(timer)
   }, [toast, onClose])
 
-  const getIcon = () => {
-    switch (toast.type) {
-      case 'success':
-        return <CheckCircle className="w-5 h-5" />
-      case 'error':
-        return <XCircle className="w-5 h-5" />
-      case 'warning':
-        return <AlertCircle className="w-5 h-5" />
-      case 'info':
-        return <Info className="w-5 h-5" />
-    }
-  }
+  const config = {
+    success: { icon: CheckCircle, bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' },
+    error: { icon: XCircle, bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
+    warning: { icon: AlertCircle, bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400' },
+    info: { icon: Info, bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
+  }[toast.type]
 
-  const getStyles = () => {
-    switch (toast.type) {
-      case 'success':
-        return 'bg-green-500/10 border-green-500/50 text-green-400'
-      case 'error':
-        return 'bg-red-500/10 border-red-500/50 text-red-400'
-      case 'warning':
-        return 'bg-yellow-500/10 border-yellow-500/50 text-yellow-400'
-      case 'info':
-        return 'bg-blue-500/10 border-blue-500/50 text-blue-400'
-    }
-  }
+  const Icon = config.icon
 
   return (
     <div
-      className={`flex items-center gap-3 p-4 rounded-lg border backdrop-blur-sm shadow-lg animate-slide-in ${getStyles()}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-lg animate-slide-in ${config.bg} ${config.border}`}
     >
-      <div className="flex-shrink-0">{getIcon()}</div>
-      <div className="flex-1 text-sm font-medium">{toast.message}</div>
+      <Icon className={`w-4 h-4 shrink-0 ${config.text}`} />
+      <span className="flex-1 text-sm text-gray-200">{toast.message}</span>
       <button
         onClick={() => onClose(toast.id)}
-        className="flex-shrink-0 hover:opacity-70 transition"
+        className="shrink-0 p-0.5 rounded-md text-gray-500 hover:text-gray-300 transition-colors"
       >
-        <X className="w-4 h-4" />
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   )
@@ -74,7 +54,7 @@ interface ToastContainerProps {
 
 export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onClose={onClose} />
       ))}

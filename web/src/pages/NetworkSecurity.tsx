@@ -234,11 +234,11 @@ export default function NetworkSecurity() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-3">
           <Shield className="w-8 h-8" />
           Network Security
         </h1>
-        <button onClick={() => fetchAll()} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition">
+        <button onClick={() => fetchAll()} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition">
           <RefreshCw className="w-4 h-4" />
           Refresh
         </button>
@@ -253,46 +253,46 @@ export default function NetworkSecurity() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-4">
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">Policies</div>
           <div className="text-2xl font-bold text-blue-400">{policies.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">Firewall</div>
           <div className="text-2xl font-bold text-red-400">{fwProfiles.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">Services</div>
           <div className="text-2xl font-bold text-cyan-400">{services.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">QoS</div>
           <div className="text-2xl font-bold text-purple-400">{qosPolicies.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">DNS</div>
           <div className="text-2xl font-bold text-green-400">{dnsZones.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">VPN</div>
           <div className="text-2xl font-bold text-orange-400">{vpnTunnels.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">Mirror</div>
           <div className="text-2xl font-bold text-yellow-400">{mirrorSessions.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">NAT</div>
           <div className="text-2xl font-bold text-pink-400">{natRules.length}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
           <div className="text-gray-400 text-xs mb-1">Monitor</div>
           <div className="text-2xl font-bold text-teal-400">{monitorPolicies.length}</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-700">
+      <div className="border-b border-gray-800">
         <div className="flex gap-1 overflow-x-auto">
           {tabs.map(t => (
             <button

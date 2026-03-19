@@ -85,7 +85,7 @@ export default function Templates() {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-gray-800 rounded-lg border border-gray-700">
+        <div className="bg-gray-900 rounded-lg border border-gray-800">
           <EmptyState
             icon={<Layers className="w-16 h-16" />}
             title="No templates yet"
@@ -151,7 +151,7 @@ function TemplateCard({
   onInstantiate: () => void
 }) {
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+    <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-gray-800 transition">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold mb-2">{template.name}</h3>
@@ -236,10 +236,10 @@ function CreateVMFromTemplateDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
           <h2 className="text-xl font-bold">Create VM from Template</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded transition">
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
             <span className="text-2xl">&times;</span>
           </button>
         </div>
@@ -252,17 +252,17 @@ function CreateVMFromTemplateDialog({
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
               placeholder="Enter VM name"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               autoFocus
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 p-6 border-t border-gray-700">
+        <div className="flex justify-end gap-2 p-6 border-t border-gray-800">
           <button
             onClick={onClose}
             disabled={isCreating}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 text-white rounded-lg transition disabled:opacity-50"
           >
             Cancel
           </button>

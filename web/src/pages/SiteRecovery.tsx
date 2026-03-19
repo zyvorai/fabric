@@ -95,7 +95,7 @@ export default function SiteRecovery() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Site Recovery</h1>
         <div className="flex gap-2">
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
           <button onClick={() => setShowCreatePlan(true)}
@@ -106,10 +106,10 @@ export default function SiteRecovery() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-gray-900 rounded-lg p-1">
         {(['dashboard', 'plans', 'executions'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
             {tab === 'executions' ? 'Execution History' : tab === 'plans' ? 'Recovery Plans' : 'DR Dashboard'}
           </button>
         ))}
@@ -121,21 +121,21 @@ export default function SiteRecovery() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Protected VMs</div>
-              <div className="text-3xl font-bold text-green-400">{dashboard.total_protected_vms}</div>
+              <div className="text-2xl font-bold text-green-400">{dashboard.total_protected_vms}</div>
               <div className="text-xs text-gray-400 mt-1">{dashboard.total_unprotected_vms} unprotected</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Avg RTO</div>
-              <div className="text-3xl font-bold">{(dashboard.avg_rto_seconds / 60).toFixed(0)} min</div>
+              <div className="text-2xl font-bold">{(dashboard.avg_rto_seconds / 60).toFixed(0)} min</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Avg RPO</div>
-              <div className="text-3xl font-bold">{dashboard.avg_rpo_minutes.toFixed(0)} min</div>
+              <div className="text-2xl font-bold">{dashboard.avg_rpo_minutes.toFixed(0)} min</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-gray-400 text-sm mb-1">Plans Ready</div>
               <div className="flex items-center gap-2">
-                <span className="text-3xl font-bold text-green-400">{dashboard.plans_tested}</span>
+                <span className="text-2xl font-bold text-green-400">{dashboard.plans_tested}</span>
                 <span className="text-gray-400">/</span>
                 <span className="text-xl text-gray-400">{dashboard.total_plans}</span>
               </div>
@@ -143,7 +143,7 @@ export default function SiteRecovery() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Sites</h3>
               <div className="space-y-2">
                 {dashboard.sites.map(site => (
@@ -158,7 +158,7 @@ export default function SiteRecovery() {
               </div>
             </div>
 
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Recent Executions</h3>
               {dashboard.recent_executions.length === 0 ? (
                 <div className="text-gray-400 text-sm">No recent executions.</div>
@@ -168,7 +168,7 @@ export default function SiteRecovery() {
                     <div key={exec.id} className="flex items-center justify-between p-3 bg-gray-900 rounded">
                       <div>
                         <span className="font-medium">{exec.plan_name}</span>
-                        <span className="ml-2 text-xs px-2 py-0.5 bg-gray-700 rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
+                        <span className="ml-2 text-xs px-2 py-0.5 bg-gray-800 rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
                       </div>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(exec.status)}`}>{exec.status}</span>
                     </div>
@@ -182,8 +182,8 @@ export default function SiteRecovery() {
 
       {/* Plans Tab */}
       {activeTab === 'plans' && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-700">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg">
+          <table className="min-w-full divide-y divide-gray-800">
             <thead>
               <tr className="text-left text-xs text-gray-400 uppercase">
                 <th className="p-4">Plan</th>
@@ -194,11 +194,11 @@ export default function SiteRecovery() {
                 <th className="p-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {plans.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-gray-400">No recovery plans.</td></tr>
               ) : plans.map(plan => (
-                <tr key={plan.id} className="hover:bg-gray-750">
+                <tr key={plan.id} className="hover:bg-gray-900">
                   <td className="p-4">
                     <div className="font-medium">{plan.name}</div>
                     {plan.description && <div className="text-xs text-gray-400">{plan.description}</div>}
@@ -232,17 +232,17 @@ export default function SiteRecovery() {
 
       {/* Executions Tab */}
       {activeTab === 'executions' && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg">
           {executions.length === 0 ? (
             <div className="p-8 text-center text-gray-400">No execution history.</div>
           ) : (
-            <div className="divide-y divide-gray-700">
+            <div className="divide-y divide-gray-800">
               {executions.map(exec => (
                 <div key={exec.id} className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold">{exec.plan_name}</span>
-                      <span className="text-xs px-2 py-0.5 bg-gray-700 rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
+                      <span className="text-xs px-2 py-0.5 bg-gray-800 rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(exec.status)}`}>{exec.status}</span>
                     </div>
                     <div className="text-sm text-gray-400">
@@ -255,7 +255,7 @@ export default function SiteRecovery() {
                       <span>Progress: {exec.current_step}</span>
                       <span>{exec.progress_pct}%</span>
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div className="w-full bg-gray-800 rounded-full h-2">
                       <div className="h-2 rounded-full bg-blue-500" style={{ width: `${exec.progress_pct}%` }} />
                     </div>
                   </div>
@@ -280,7 +280,7 @@ export default function SiteRecovery() {
       {/* Execute Modal */}
       {showExecute && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Execute Recovery Plan</h2>
             <div className="space-y-3">
               <button onClick={() => handleExecute(showExecute, 'test_failover')}
@@ -300,7 +300,7 @@ export default function SiteRecovery() {
                 </div>
                 <div className="text-xs text-red-200">Emergency failover - some data loss possible</div>
               </button>
-              <button onClick={() => setShowExecute(null)} className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+              <button onClick={() => setShowExecute(null)} className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
             </div>
           </div>
         </div>
@@ -347,43 +347,43 @@ function CreatePlanModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Recovery Plan</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Plan Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Source Site ID</label>
               <input type="text" value={sourceSite} onChange={e => setSourceSite(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Target Site ID</label>
               <input type="text" value={targetSite} onChange={e => setTargetSite(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">VM Group Name</label>
             <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">VM IDs (comma-separated)</label>
             <input type="text" value={vmIds} onChange={e => setVmIds(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>

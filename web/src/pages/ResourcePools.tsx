@@ -88,7 +88,7 @@ export default function ResourcePools() {
     return (
       <div key={pool.id}>
         <div
-          className="flex items-center justify-between p-3 hover:bg-gray-750 cursor-pointer border-b border-gray-700"
+          className="flex items-center justify-between p-3 hover:bg-gray-900 cursor-pointer border-b border-gray-800"
           style={{ paddingLeft: `${depth * 24 + 16}px` }}
           onClick={() => togglePool(pool.id)}
         >
@@ -104,14 +104,14 @@ export default function ResourcePools() {
           <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-400">CPU</span>
-              <div className="w-20 bg-gray-700 rounded-full h-2">
+              <div className="w-20 bg-gray-800 rounded-full h-2">
                 <div className={`h-2 rounded-full ${cpuPct > 80 ? 'bg-red-500' : 'bg-blue-500'}`}
                   style={{ width: `${Math.min(cpuPct, 100)}%` }} />
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-400">Mem</span>
-              <div className="w-20 bg-gray-700 rounded-full h-2">
+              <div className="w-20 bg-gray-800 rounded-full h-2">
                 <div className={`h-2 rounded-full ${memPct > 80 ? 'bg-red-500' : 'bg-purple-500'}`}
                   style={{ width: `${Math.min(memPct, 100)}%` }} />
               </div>
@@ -162,20 +162,20 @@ export default function ResourcePools() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Total Pools</div>
-          <div className="text-3xl font-bold">{pools.length}</div>
+          <div className="text-2xl font-bold">{pools.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Total CPU Shares</div>
-          <div className="text-3xl font-bold">{pools.reduce((s, p) => s + p.cpu_shares, 0)}</div>
+          <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.cpu_shares, 0)}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-gray-400 text-sm mb-1">Total VMs</div>
-          <div className="text-3xl font-bold">{pools.reduce((s, p) => s + p.vm_count, 0)}</div>
+          <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.vm_count, 0)}</div>
         </div>
       </div>
 
       {/* Tree */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg">
+      <div className="bg-gray-900 border border-gray-800 rounded-lg">
         {rootPools.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No resource pools configured.</div>
         ) : (
@@ -247,23 +247,23 @@ function CreatePoolModal({ pools, onClose, onCreated }: { pools: ResourcePool[];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-lg">
         <h2 className="text-xl font-bold mb-4">Create Resource Pool</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Cluster ID</label>
             <input type="text" value={clusterId} onChange={e => setClusterId(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" required />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Parent Pool (optional)</label>
             <select value={parentId} onChange={e => setParentId(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
               <option value="">None (root pool)</option>
               {pools.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -272,36 +272,36 @@ function CreatePoolModal({ pools, onClose, onCreated }: { pools: ResourcePool[];
             <div>
               <label className="block text-sm font-medium mb-1">CPU Shares</label>
               <input type="number" value={cpuShares} onChange={e => setCpuShares(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Memory Shares</label>
               <input type="number" value={memoryShares} onChange={e => setMemoryShares(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">CPU Reservation (MHz)</label>
               <input type="number" value={cpuReservation} onChange={e => setCpuReservation(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Memory Reservation (MB)</label>
               <input type="number" value={memoryReservation} onChange={e => setMemoryReservation(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">CPU Limit (MHz, -1=unlimited)</label>
               <input type="number" value={cpuLimit} onChange={e => setCpuLimit(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Memory Limit (MB, -1=unlimited)</label>
               <input type="number" value={memoryLimit} onChange={e => setMemoryLimit(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
             </div>
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>
@@ -321,18 +321,18 @@ function AdmissionTestModal({ poolId, result, onTest, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Admission Control Test</h2>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Required CPU (MHz)</label>
             <input type="number" value={cpu} onChange={e => setCpu(Number(e.target.value))}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Required Memory (MB)</label>
             <input type="number" value={memory} onChange={e => setMemory(Number(e.target.value))}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" />
+              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
           </div>
           <button onClick={() => onTest(poolId, cpu, memory)}
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Run Test</button>
@@ -345,7 +345,7 @@ function AdmissionTestModal({ poolId, result, onTest, onClose }: {
               </div>
             </div>
           )}
-          <button onClick={onClose} className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">Close</button>
+          <button onClick={onClose} className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Close</button>
         </div>
       </div>
     </div>

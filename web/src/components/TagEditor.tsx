@@ -71,9 +71,9 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-2xl">
+      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
           <div className="flex items-center gap-3">
             <Tag className="w-6 h-6 text-blue-500" />
             <div>
@@ -95,7 +95,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
           <div>
             <label className="block text-sm font-medium mb-3">Current Tags</label>
             {tags.length === 0 ? (
-              <div className="text-center py-8 bg-gray-900 rounded-lg border border-gray-700">
+              <div className="text-center py-8 bg-gray-900 rounded-lg border border-gray-800">
                 <p className="text-gray-400">No tags assigned</p>
               </div>
             ) : (
@@ -128,7 +128,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="Enter tag name..."
-                className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
               />
               <button
                 onClick={handleAddTag}
@@ -161,10 +161,10 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-700 bg-gray-750">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-800 bg-gray-900">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
           >
             Cancel
           </button>

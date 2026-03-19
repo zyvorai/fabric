@@ -62,14 +62,14 @@ export default function Migrations() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-3">
           <ArrowRightLeft className="w-8 h-8" />
           VM Migrations
         </h1>
         <div className="flex gap-2">
           <button
             onClick={loadMigrations}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 text-white rounded-lg transition"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -102,7 +102,7 @@ export default function Migrations() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Migration History</h2>
         {completedMigrations.length === 0 && activeMigrations.length === 0 ? (
-          <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+          <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
             <ArrowRightLeft className="w-16 h-16 mx-auto mb-4 text-gray-600" />
             <p className="text-xl text-gray-400 mb-4">No migrations yet</p>
             <p className="text-gray-500 mb-6">Migrate VMs between hosts for load balancing or maintenance</p>
@@ -114,10 +114,10 @@ export default function Migrations() {
             </button>
           </div>
         ) : (
-          <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <div className="bg-gray-900 rounded-lg border border-gray-800">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-700">
+                <thead className="bg-gray-800">
                   <tr>
                     <th className="text-left p-4 font-medium text-gray-300">VM</th>
                     <th className="text-left p-4 font-medium text-gray-300">Target Host</th>
@@ -126,9 +126,9 @@ export default function Migrations() {
                     <th className="text-left p-4 font-medium text-gray-300">Started</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700">
+                <tbody className="divide-y divide-gray-800">
                   {completedMigrations.map(migration => (
-                    <tr key={migration.id} className="hover:bg-gray-700 transition">
+                    <tr key={migration.id} className="hover:bg-white/[0.03] transition">
                       <td className="p-4 font-medium">{migration.vm_name}</td>
                       <td className="p-4 font-mono text-sm text-gray-400">{migration.target_host}</td>
                       <td className="p-4 capitalize">{migration.migration_type}</td>
@@ -187,7 +187,7 @@ function MigrationCard({
   onCancel: () => void
 }) {
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+    <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold">{migration.vm_name}</h3>
@@ -210,7 +210,7 @@ function MigrationCard({
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+      <div className="w-full bg-gray-800 rounded-full h-2 mb-2">
         <div
           className="bg-blue-500 h-2 rounded-full transition-all duration-500"
           style={{ width: `${migration.progress_percent}%` }}
@@ -274,10 +274,10 @@ function StartMigrationDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
           <h2 className="text-xl font-bold">Start Migration</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded transition">
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
             <span className="text-2xl">&times;</span>
           </button>
         </div>
@@ -288,7 +288,7 @@ function StartMigrationDialog({
             <select
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="">Select a VM</option>
               {vms.map(vm => (
@@ -304,7 +304,7 @@ function StartMigrationDialog({
               value={targetHost}
               onChange={(e) => setTargetHost(e.target.value)}
               placeholder="hostname or IP address"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -313,7 +313,7 @@ function StartMigrationDialog({
             <select
               value={migrationType}
               onChange={(e) => setMigrationType(e.target.value as MigrationType)}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="offline">Offline - Stop VM, copy data, start on target</option>
               <option value="live">Live - Minimal downtime migration</option>
@@ -322,11 +322,11 @@ function StartMigrationDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 p-6 border-t border-gray-700">
+        <div className="flex justify-end gap-2 p-6 border-t border-gray-800">
           <button
             onClick={onClose}
             disabled={isStarting}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 text-white rounded-lg transition disabled:opacity-50"
           >
             Cancel
           </button>

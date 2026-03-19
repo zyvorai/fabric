@@ -142,7 +142,7 @@ export default function Backups() {
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Total Backups</p>
@@ -151,7 +151,7 @@ export default function Backups() {
               <HardDrive className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Total Size</p>
@@ -160,7 +160,7 @@ export default function Backups() {
               <Save className="w-8 h-8 text-green-500" />
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div>
               <p className="text-sm text-gray-400 mb-2">By Type</p>
               <div className="space-y-1">
@@ -173,7 +173,7 @@ export default function Backups() {
               </div>
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div>
               <p className="text-sm text-gray-400 mb-2">Latest</p>
               <p className="text-xs text-gray-500">
@@ -186,7 +186,7 @@ export default function Backups() {
 
       {/* Active Jobs */}
       {jobs.filter(j => j.status === 'running' || j.status === 'queued').length > 0 && (
-        <div className="mb-6 bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="mb-6 bg-gray-900 border border-gray-800 rounded-lg p-4">
           <h2 className="text-lg font-bold mb-4">Active Jobs</h2>
           <div className="space-y-3">
             {jobs.filter(j => j.status === 'running' || j.status === 'queued').map((job) => (
@@ -197,7 +197,7 @@ export default function Backups() {
                   <p className="text-sm text-gray-400 capitalize">{job.operation}</p>
                 </div>
                 <div className="w-32">
-                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-blue-500 transition-all"
                       style={{ width: `${job.progress}%` }}
@@ -212,8 +212,8 @@ export default function Backups() {
       )}
 
       {/* Backups List */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg">
-        <div className="p-4 border-b border-gray-700">
+      <div className="bg-gray-900 border border-gray-800 rounded-lg">
+        <div className="p-4 border-b border-gray-800">
           <h2 className="text-lg font-bold">Available Backups</h2>
         </div>
         {backups.length === 0 ? (
@@ -232,7 +232,7 @@ export default function Backups() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-750">
+              <thead className="bg-gray-900">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">VM</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
@@ -243,9 +243,9 @@ export default function Backups() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {backups.map((backup) => (
-                  <tr key={backup.id} className="hover:bg-gray-750">
+                  <tr key={backup.id} className="hover:bg-gray-900">
                     <td className="px-4 py-3 text-sm font-medium">{backup.vm_name}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -342,8 +342,8 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-bold">Create Backup</h2>
         </div>
         <div className="p-6 space-y-4">
@@ -352,7 +352,7 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
             <select
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               {vms.map((vm: VM) => (
                 <option key={vm.name} value={vm.name}>{vm.name}</option>
@@ -364,17 +364,17 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
             <select
               value={backupType}
               onChange={(e) => setBackupType(e.target.value as 'full' | 'incremental')}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="full">Full Backup</option>
               <option value="incremental">Incremental Backup</option>
             </select>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-700">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-800">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
           >
             Cancel
           </button>
@@ -403,12 +403,12 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-bold">Restore from Backup</h2>
         </div>
         <div className="p-6 space-y-4">
-          <div className="p-3 bg-gray-900 rounded border border-gray-700">
+          <div className="p-3 bg-gray-900 rounded border border-gray-800">
             <p className="text-sm text-gray-400">Source VM</p>
             <p className="font-medium">{backup.vm_name}</p>
             <p className="text-xs text-gray-500 mt-1">
@@ -421,7 +421,7 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
               id="create-new"
               checked={createNew}
               onChange={(e) => setCreateNew(e.target.checked)}
-              className="w-4 h-4 bg-gray-900 border-gray-700 rounded focus:ring-blue-500"
+              className="w-4 h-4 bg-gray-900 border-gray-800 rounded focus:ring-blue-500"
             />
             <label htmlFor="create-new" className="text-sm font-medium">
               Restore to new VM
@@ -435,15 +435,15 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
                 value={targetName}
                 onChange={(e) => setTargetName(e.target.value)}
                 placeholder={`${backup.vm_name}-restored`}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
               />
             </div>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-700">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-800">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
           >
             Cancel
           </button>

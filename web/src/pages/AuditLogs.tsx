@@ -107,7 +107,7 @@ export default function AuditLogs() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 showFilters
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+                  : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'
               }`}
             >
               <Filter className="w-4 h-4" />
@@ -117,24 +117,24 @@ export default function AuditLogs() {
               <button
                 onClick={() => document.getElementById('export-menu')?.classList.toggle('hidden')}
                 disabled={exporting}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 hover:bg-white/[0.03] rounded-lg transition disabled:opacity-50"
               >
                 <Download className="w-4 h-4" />
                 Export
               </button>
               <div
                 id="export-menu"
-                className="hidden absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10"
+                className="hidden absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-10"
               >
                 <button
                   onClick={() => { handleExport('json'); document.getElementById('export-menu')?.classList.add('hidden') }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-t-lg transition"
+                  className="w-full px-4 py-2 text-left hover:bg-white/[0.03] rounded-t-lg transition"
                 >
                   Export as JSON
                 </button>
                 <button
                   onClick={() => { handleExport('csv'); document.getElementById('export-menu')?.classList.add('hidden') }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-700 rounded-b-lg transition"
+                  className="w-full px-4 py-2 text-left hover:bg-white/[0.03] rounded-b-lg transition"
                 >
                   Export as CSV
                 </button>
@@ -147,7 +147,7 @@ export default function AuditLogs() {
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Total Logs</p>
@@ -156,7 +156,7 @@ export default function AuditLogs() {
               <FileText className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Success Rate</p>
@@ -167,7 +167,7 @@ export default function AuditLogs() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Recent Failures</p>
@@ -176,7 +176,7 @@ export default function AuditLogs() {
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
           </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div>
               <p className="text-sm text-gray-400 mb-2">Top Actions</p>
               <div className="space-y-1">
@@ -205,7 +205,7 @@ export default function AuditLogs() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg py-3 pl-10 pr-10 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-900 border border-gray-800 rounded-lg py-3 pl-10 pr-10 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
           />
           {searchQuery && (
             <button
@@ -220,14 +220,14 @@ export default function AuditLogs() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="mb-6 bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="mb-6 bg-gray-900 border border-gray-800 rounded-lg p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Status</label>
               <select
                 value={filters.status || ''}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value as any || undefined })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="">All</option>
                 <option value="success">Success</option>
@@ -239,7 +239,7 @@ export default function AuditLogs() {
               <select
                 value={filters.resource_type || ''}
                 onChange={(e) => setFilters({ ...filters, resource_type: e.target.value || undefined })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="">All</option>
                 <option value="vm">VM</option>
@@ -253,7 +253,7 @@ export default function AuditLogs() {
             <div className="flex items-end">
               <button
                 onClick={handleClearFilters}
-                className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+                className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
               >
                 Clear Filters
               </button>
@@ -263,7 +263,7 @@ export default function AuditLogs() {
       )}
 
       {/* Logs Table */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+      <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
         <div className="overflow-x-auto">
           {filteredLogs.length === 0 ? (
             <div className="text-center py-12">
@@ -272,7 +272,7 @@ export default function AuditLogs() {
             </div>
           ) : (
             <table className="w-full">
-              <thead className="bg-gray-750">
+              <thead className="bg-gray-900">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                     Timestamp
@@ -294,9 +294,9 @@ export default function AuditLogs() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-750">
+                  <tr key={log.id} className="hover:bg-gray-900">
                     <td className="px-4 py-3 text-sm text-gray-400">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>

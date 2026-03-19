@@ -17,11 +17,11 @@ interface VpnTabProps {
 function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onCreate, onSync }: VpnTabProps) {
   const [view, setView] = useState<'tunnels' | 'networks'>('tunnels')
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-gray-900 rounded-lg border border-gray-800">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">VPN Mesh</h2>
-          <div className="flex bg-gray-700 rounded-lg p-0.5">
+          <div className="flex bg-gray-800 rounded-lg p-0.5">
             {(['tunnels', 'networks'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -30,7 +30,7 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -45,7 +45,7 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700">
+              <thead className="bg-gray-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-gray-300">Name</th>
                   <th className="text-left p-4 font-medium text-gray-300">Interface</th>
@@ -56,9 +56,9 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
                   <th className="text-left p-4 font-medium text-gray-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {tunnels.map(t => (
-                  <tr key={t.id} className="hover:bg-gray-700 transition">
+                  <tr key={t.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
                       <div className="font-medium">{t.name}</div>
                       {t.description && <div className="text-xs text-gray-500 mt-1">{t.description}</div>}
@@ -91,7 +91,7 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700">
+              <thead className="bg-gray-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-gray-300">Name</th>
                   <th className="text-left p-4 font-medium text-gray-300">Topology</th>
@@ -101,9 +101,9 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
                   <th className="text-left p-4 font-medium text-gray-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {networks.map(n => (
-                  <tr key={n.id} className="hover:bg-gray-700 transition">
+                  <tr key={n.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{n.name}</td>
                     <td className="p-4">
                       <StatusBadge status={n.topology} color="blue" />
@@ -184,7 +184,7 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
           <InputField label="Listen Port" value={listenPort} onChange={setListenPort} placeholder="51820" type="number" />
         </div>
         <InputField label="Private Key" value={privateKey} onChange={setPrivateKey} placeholder="Base64 private key" />
-        <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
           <div className="text-sm font-medium text-gray-300">Add Peer</div>
           <InputField label="Public Key" value={peerKey} onChange={setPeerKey} placeholder="Base64 public key" />
           <div className="grid grid-cols-2 gap-2">
@@ -197,7 +197,7 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
           {peers.length > 0 && (
             <div className="space-y-1 mt-2">
               {peers.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-700 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
                   <span className="text-gray-300 truncate">{p.public_key.slice(0, 20)}...</span>
                   {p.endpoint && <span className="text-gray-400">{p.endpoint}</span>}
                   <button onClick={() => setPeers(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
@@ -254,7 +254,7 @@ export function CreateVpnNetworkModal({ onClose, onCreated }: { onClose: () => v
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Multi-site VPN network" />
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">Topology</label>
-          <select value={topology} onChange={e => setTopology(e.target.value as VpnTopology)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <select value={topology} onChange={e => setTopology(e.target.value as VpnTopology)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
             <option value="full-mesh">Full Mesh</option>
             <option value="hub-spoke">Hub & Spoke</option>
             <option value="point-to-point">Point to Point</option>

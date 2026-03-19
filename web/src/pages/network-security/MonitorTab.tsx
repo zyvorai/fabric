@@ -28,11 +28,11 @@ function formatBytes(bytes: number): string {
 function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge, onCreate, onSync }: MonitorTabProps) {
   const [view, setView] = useState<'policies' | 'metrics' | 'alerts'>('policies')
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-gray-900 rounded-lg border border-gray-800">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">Network Monitor</h2>
-          <div className="flex bg-gray-700 rounded-lg p-0.5">
+          <div className="flex bg-gray-800 rounded-lg p-0.5">
             {(['policies', 'metrics', 'alerts'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -44,7 +44,7 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -59,7 +59,7 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700">
+              <thead className="bg-gray-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-gray-300">Name</th>
                   <th className="text-left p-4 font-medium text-gray-300">Labels</th>
@@ -69,9 +69,9 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
                   <th className="text-left p-4 font-medium text-gray-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {policies.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-700 transition">
+                  <tr key={p.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
                       <div className="font-medium">{p.name}</div>
                       {p.description && <div className="text-xs text-gray-500 mt-1">{p.description}</div>}
@@ -101,7 +101,7 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700">
+              <thead className="bg-gray-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-gray-300">VM</th>
                   <th className="text-left p-4 font-medium text-gray-300">Interface</th>
@@ -113,9 +113,9 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
                   <th className="text-left p-4 font-medium text-gray-300">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {metrics.map((m, i) => (
-                  <tr key={i} className="hover:bg-gray-700 transition">
+                  <tr key={i} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{m.vm_name}</td>
                     <td className="p-4 font-mono text-sm text-blue-400">{m.interface_name}</td>
                     <td className="p-4 font-mono text-sm text-green-400">{formatBytes(m.rx_bytes)}</td>
@@ -144,7 +144,7 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700">
+              <thead className="bg-gray-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-gray-300">VM</th>
                   <th className="text-left p-4 font-medium text-gray-300">Metric</th>
@@ -155,9 +155,9 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge,
                   <th className="text-left p-4 font-medium text-gray-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {alerts.map(a => (
-                  <tr key={a.id} className={`hover:bg-gray-700 transition ${a.acknowledged ? 'opacity-50' : ''}`}>
+                  <tr key={a.id} className={`hover:bg-white/[0.03] transition ${a.acknowledged ? 'opacity-50' : ''}`}>
                     <td className="p-4 font-medium">{a.vm_name}</td>
                     <td className="p-4 font-mono text-sm text-gray-400">{a.metric}</td>
                     <td className="p-4 font-mono text-sm text-red-400">{a.value}</td>
@@ -241,12 +241,12 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Alert on high bandwidth" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
         <InputField label="Interval (seconds)" value={interval} onChange={setInterval} placeholder="60" type="number" />
-        <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
           <div className="text-sm font-medium text-gray-300">Add Threshold</div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Metric</label>
-              <select value={thMetric} onChange={e => setThMetric(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <select value={thMetric} onChange={e => setThMetric(e.target.value)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 <option value="bandwidth">Bandwidth</option>
                 <option value="packets">Packets</option>
                 <option value="errors">Errors</option>
@@ -258,7 +258,7 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Unit</label>
-              <select value={thUnit} onChange={e => setThUnit(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <select value={thUnit} onChange={e => setThUnit(e.target.value)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 <option value="mbps">Mbps</option>
                 <option value="gbps">Gbps</option>
                 <option value="kpps">Kpps</option>
@@ -267,7 +267,7 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Direction</label>
-              <select value={thDirection} onChange={e => setThDirection(e.target.value as MetricDirection)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <select value={thDirection} onChange={e => setThDirection(e.target.value as MetricDirection)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 <option value="both">Both</option>
                 <option value="inbound">Inbound</option>
                 <option value="outbound">Outbound</option>
@@ -275,7 +275,7 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Severity</label>
-              <select value={thSeverity} onChange={e => setThSeverity(e.target.value as AlertSeverity)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <select value={thSeverity} onChange={e => setThSeverity(e.target.value as AlertSeverity)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 <option value="info">Info</option>
                 <option value="warning">Warning</option>
                 <option value="critical">Critical</option>
@@ -288,7 +288,7 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
           {thresholds.length > 0 && (
             <div className="space-y-1 mt-2">
               {thresholds.map((t, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-700 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
                   <StatusBadge status={t.severity} color={t.severity === 'critical' ? 'red' : t.severity === 'warning' ? 'yellow' : 'blue'} />
                   <span className="text-gray-300">{t.metric}</span>
                   <span className="text-gray-400">{t.value} {t.unit}</span>

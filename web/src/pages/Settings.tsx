@@ -114,14 +114,14 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-3">
           <SettingsIcon className="w-8 h-8" />
           Settings
         </h1>
         <div className="flex gap-2">
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 text-white rounded-lg transition"
           >
             <RotateCcw className="w-4 h-4" />
             Reset
@@ -138,8 +138,8 @@ export default function Settings() {
       </div>
 
       {/* General Settings */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Globe className="w-5 h-5 text-blue-400" />
             General
@@ -153,7 +153,7 @@ export default function Settings() {
                 type="text"
                 value={settings.daemon_name}
                 onChange={(e) => update('daemon_name', e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -161,7 +161,7 @@ export default function Settings() {
               <select
                 value={settings.log_level}
                 onChange={(e) => update('log_level', e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="debug">Debug</option>
                 <option value="info">Info</option>
@@ -178,7 +178,7 @@ export default function Settings() {
                 value={settings.refresh_interval}
                 onChange={(e) => update('refresh_interval', parseInt(e.target.value) || 5)}
                 disabled={!settings.auto_refresh}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
               />
             </div>
           </div>
@@ -188,7 +188,7 @@ export default function Settings() {
               id="autoRefresh"
               checked={settings.auto_refresh}
               onChange={(e) => update('auto_refresh', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
             />
             <label htmlFor="autoRefresh" className="text-sm text-gray-300">Enable auto-refresh</label>
           </div>
@@ -196,8 +196,8 @@ export default function Settings() {
       </div>
 
       {/* Network Settings */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Globe className="w-5 h-5 text-green-400" />
             Network
@@ -211,7 +211,7 @@ export default function Settings() {
                 type="text"
                 value={settings.default_bridge}
                 onChange={(e) => update('default_bridge', e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -221,7 +221,7 @@ export default function Settings() {
                 value={settings.dns_servers}
                 onChange={(e) => update('dns_servers', e.target.value)}
                 placeholder="Comma-separated"
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function Settings() {
               id="enableIPv6"
               checked={settings.enable_ipv6}
               onChange={(e) => update('enable_ipv6', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
             />
             <label htmlFor="enableIPv6" className="text-sm text-gray-300">Enable IPv6 networking</label>
           </div>
@@ -239,8 +239,8 @@ export default function Settings() {
       </div>
 
       {/* Storage Settings */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Database className="w-5 h-5 text-purple-400" />
             Storage
@@ -253,7 +253,7 @@ export default function Settings() {
               <select
                 value={settings.default_pool}
                 onChange={(e) => update('default_pool', e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               >
                 {poolNames.length > 0 ? (
                   poolNames.map(name => (
@@ -269,7 +269,7 @@ export default function Settings() {
               <select
                 value={settings.default_format}
                 onChange={(e) => update('default_format', e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="qcow2">QCOW2</option>
                 <option value="raw">RAW</option>
@@ -283,7 +283,7 @@ export default function Settings() {
               type="number"
               value={settings.snapshot_retention}
               onChange={(e) => update('snapshot_retention', parseInt(e.target.value) || 30)}
-              className="w-full md:w-1/2 bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full md:w-1/2 bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -292,7 +292,7 @@ export default function Settings() {
               id="enableCompression"
               checked={settings.enable_compression}
               onChange={(e) => update('enable_compression', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
             />
             <label htmlFor="enableCompression" className="text-sm text-gray-300">Enable disk compression for QCOW2</label>
           </div>
@@ -300,8 +300,8 @@ export default function Settings() {
       </div>
 
       {/* Security Settings */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Shield className="w-5 h-5 text-red-400" />
             Security
@@ -314,7 +314,7 @@ export default function Settings() {
               type="number"
               value={settings.session_timeout}
               onChange={(e) => update('session_timeout', parseInt(e.target.value) || 3600)}
-              className="w-full md:w-1/2 bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full md:w-1/2 bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="space-y-2">
@@ -329,7 +329,7 @@ export default function Settings() {
                   id={id}
                   checked={settings[field] as boolean}
                   onChange={(e) => update(field, e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
                 />
                 <label htmlFor={id} className="text-sm text-gray-300">{label}</label>
               </div>
@@ -339,8 +339,8 @@ export default function Settings() {
       </div>
 
       {/* Notification Settings */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="p-6 border-b border-gray-800">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Bell className="w-5 h-5 text-yellow-400" />
             Notifications
@@ -354,7 +354,7 @@ export default function Settings() {
               value={settings.webhook_url}
               onChange={(e) => update('webhook_url', e.target.value)}
               placeholder="https://hooks.slack.com/..."
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="space-y-2">
@@ -364,7 +364,7 @@ export default function Settings() {
                 id="emailNotifications"
                 checked={settings.email_notifications}
                 onChange={(e) => update('email_notifications', e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
               />
               <label htmlFor="emailNotifications" className="text-sm text-gray-300">Enable email notifications</label>
             </div>
@@ -380,7 +380,7 @@ export default function Settings() {
                     id={id}
                     checked={settings[field] as boolean}
                     onChange={(e) => update(field, e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
                   />
                   <label htmlFor={id}>{label}</label>
                 </div>

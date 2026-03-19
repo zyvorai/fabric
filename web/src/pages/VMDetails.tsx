@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router'
-import { getVM, deleteVM, VM } from '../api/vm'
+import { useParams, useNavigate, Link } from 'react-router'
+import { getVM, getMetrics, deleteVM, VM, VMMetrics } from '../api/vm'
 import {
   Play, Square, RotateCw, Trash2, ArrowLeft, Info, Activity, HardDrive,
-  Network, Camera, Terminal, Cpu, MemoryStick, Clock, Pause, Copy
+  Network, Camera, Terminal, Cpu, MemoryStick, Pause, Copy, Wifi,
 } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useToastContext } from '../contexts/ToastContext'
 import { useVMActions } from '../hooks/useVMActions'
-import { getStateColor } from '../utils/vm'
+import { StatusBadge } from '../components/ui'
 import ConfirmDialog from '../components/ConfirmDialog'
 import CloneVMDialog from '../components/CloneVMDialog'
 
@@ -61,19 +62,40 @@ export default function VMDetails() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-5 w-24 bg-gray-800 rounded" />
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-gray-800 rounded" />
+            <div className="h-4 w-32 bg-gray-800 rounded" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-20 bg-gray-800 rounded-lg" />
+            <div className="h-9 w-20 bg-gray-800 rounded-lg" />
+          </div>
+        </div>
+        <div className="h-10 bg-gray-800 rounded" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="h-48 bg-gray-800 rounded-xl" />
+          <div className="h-48 bg-gray-800 rounded-xl" />
+        </div>
       </div>
     )
   }
 
   if (!vm) {
-    return <div className="text-center py-8 text-gray-400">VM not found</div>
+    return (
+      <div className="text-center py-16">
+        <div className="text-gray-600 text-6xl font-bold mb-3">?</div>
+        <p className="text-gray-400 mb-4">VM not found</p>
+        <Link to="/vms" className="text-sm text-blue-400 hover:text-blue-300">
+          Back to Virtual Machines
+        </Link>
+      </div>
+    )
   }
 
-  const stateColor = getStateColor(vm.state)
-
-  const tabs = [
+  const tabs: { id: Tab; label: string; icon: typeof Info }[] = [
     { id: 'overview', label: 'Overview', icon: Info },
     { id: 'metrics', label: 'Metrics', icon: Activity },
     { id: 'disks', label: 'Disks', icon: HardDrive },
@@ -84,103 +106,92 @@ export default function VMDetails() {
 
   return (
     <div className="space-y-6">
+      {/* Back */}
+      <button
+        onClick={() => navigate('/vms')}
+        className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors text-sm"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Virtual Machines
+      </button>
+
       {/* Header */}
-      <div>
-        <button
-          onClick={() => navigate('/vms')}
-          className="flex items-center gap-2 mb-4 text-gray-400 hover:text-white transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to VMs
-        </button>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{vm.name}</h1>
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${stateColor}`}></span>
-              <span className="text-sm text-gray-400 capitalize">{vm.state}</span>
-            </div>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-bold text-white">{vm.name}</h1>
+            <StatusBadge status={vm.state} />
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            {vm.state === 'stopped' ? (
-              <button
-                onClick={handleStart}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
-              >
-                <Play className="w-4 h-4" />
-                Start
-              </button>
-            ) : vm.state === 'paused' ? (
-              <button
-                onClick={handleResume}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
-              >
-                <Play className="w-4 h-4" />
-                Resume
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleStop}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition"
-                >
-                  <Square className="w-4 h-4" />
-                  Stop
-                </button>
-                <button
-                  onClick={handlePause}
-                  className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition"
-                >
-                  <Pause className="w-4 h-4" />
-                  Pause
-                </button>
-                <button
-                  onClick={handleRestart}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
-                >
-                  <RotateCw className="w-4 h-4" />
-                  Restart
-                </button>
-              </>
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5" />
+              {vm.cpus} vCPU{vm.cpus !== 1 ? 's' : ''}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MemoryStick className="w-3.5 h-3.5" />
+              {vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}
+            </span>
+            {vm.ip && (
+              <span className="flex items-center gap-1.5 font-mono text-xs">
+                <Wifi className="w-3.5 h-3.5" />
+                {vm.ip}
+              </span>
             )}
-            <button
-              onClick={() => setShowCloneDialog(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition"
-            >
-              <Copy className="w-4 h-4" />
-              Clone
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {vm.state === 'stopped' ? (
+            <ActionBtn onClick={handleStart} color="green" icon={Play} label="Start" />
+          ) : vm.state === 'paused' ? (
+            <ActionBtn onClick={handleResume} color="green" icon={Play} label="Resume" />
+          ) : (
+            <>
+              <ActionBtn onClick={handleStop} color="red" icon={Square} label="Stop" />
+              <ActionBtn onClick={handlePause} color="yellow" icon={Pause} label="Pause" />
+              <ActionBtn onClick={handleRestart} color="blue" icon={RotateCw} label="Restart" />
+            </>
+          )}
+          <div className="w-px h-6 bg-gray-800 mx-1" />
+          <ActionBtn onClick={() => setShowCloneDialog(true)} color="purple" icon={Copy} label="Clone" />
+          <Link
+            to={`/vms/${vm.name}/console`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-600 transition-colors"
+          >
+            <Terminal className="w-3.5 h-3.5" />
+            Console
+          </Link>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+            title="Delete VM"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-700">
-        <div className="flex gap-4">
+      <div className="border-b border-gray-800">
+        <div className="flex gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon
+            const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as Tab)}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
+                  isActive
+                    ? 'text-blue-400'
+                    : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full" />
+                )}
               </button>
             )
           })}
@@ -188,7 +199,7 @@ export default function VMDetails() {
       </div>
 
       {/* Tab Content */}
-      <div>
+      <div className="animate-fade-in">
         {activeTab === 'overview' && <OverviewTab vm={vm} />}
         {activeTab === 'metrics' && <MetricsTab vm={vm} />}
         {activeTab === 'disks' && <DisksTab vm={vm} />}
@@ -207,7 +218,6 @@ export default function VMDetails() {
           onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
-
       {showCloneDialog && name && (
         <CloneVMDialog
           vmName={name}
@@ -219,245 +229,342 @@ export default function VMDetails() {
   )
 }
 
+function ActionBtn({ onClick, color, icon: Icon, label }: {
+  onClick: () => void
+  color: string
+  icon: typeof Play
+  label: string
+}) {
+  const colors: Record<string, string> = {
+    green: 'bg-green-600/15 text-green-400 hover:bg-green-600/25',
+    red: 'bg-red-600/15 text-red-400 hover:bg-red-600/25',
+    yellow: 'bg-yellow-600/15 text-yellow-400 hover:bg-yellow-600/25',
+    blue: 'bg-blue-600/15 text-blue-400 hover:bg-blue-600/25',
+    purple: 'bg-purple-600/15 text-purple-400 hover:bg-purple-600/25',
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${colors[color]}`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
+  )
+}
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-gray-800/50 last:border-b-0">
+      <dt className="text-sm text-gray-500">{label}</dt>
+      <dd className={`text-sm text-white ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
+    </div>
+  )
+}
+
 function OverviewTab({ vm }: { vm: VM }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Basic Info */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
-        <dl className="space-y-3">
-          <div>
-            <dt className="text-sm text-gray-400">Name</dt>
-            <dd className="text-white font-medium">{vm.name}</dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-400">State</dt>
-            <dd className="text-white font-medium capitalize">{vm.state}</dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-400">Image</dt>
-            <dd className="text-white font-medium font-mono text-sm">{vm.image}</dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-400">Created</dt>
-            <dd className="text-white font-medium">2024-02-15 14:30:00</dd>
-          </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h3 className="text-sm font-medium text-gray-400 mb-3">Configuration</h3>
+        <dl>
+          <InfoRow label="Name" value={vm.name} />
+          <InfoRow label="State" value={vm.state} />
+          <InfoRow label="Image" value={vm.image} mono />
+          {vm.ip && <InfoRow label="IP Address" value={vm.ip} mono />}
+          {vm.pid && <InfoRow label="PID" value={String(vm.pid)} mono />}
         </dl>
       </div>
 
-      {/* Resources */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold mb-4">Resources</h3>
-        <dl className="space-y-3">
-          <div className="flex items-center justify-between">
-            <dt className="text-sm text-gray-400 flex items-center gap-2">
-              <Cpu className="w-4 h-4" />
-              CPUs
-            </dt>
-            <dd className="text-white font-medium">{vm.cpus}</dd>
-          </div>
-          <div className="flex items-center justify-between">
-            <dt className="text-sm text-gray-400 flex items-center gap-2">
-              <MemoryStick className="w-4 h-4" />
-              Memory
-            </dt>
-            <dd className="text-white font-medium">{vm.memory} MB</dd>
-          </div>
-          <div className="flex items-center justify-between">
-            <dt className="text-sm text-gray-400 flex items-center gap-2">
-              <HardDrive className="w-4 h-4" />
-              Disk
-            </dt>
-            <dd className="text-white font-medium">20 GB</dd>
-          </div>
-          <div className="flex items-center justify-between">
-            <dt className="text-sm text-gray-400 flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Uptime
-            </dt>
-            <dd className="text-white font-medium">2 days, 5 hours</dd>
-          </div>
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h3 className="text-sm font-medium text-gray-400 mb-3">Resources</h3>
+        <dl>
+          <InfoRow label="vCPUs" value={`${vm.cpus}`} />
+          <InfoRow label="Memory" value={vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`} />
         </dl>
+
+        {vm.tags && vm.tags.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-800">
+            <span className="text-sm text-gray-500 block mb-2">Tags</span>
+            <div className="flex flex-wrap gap-1.5">
+              {vm.tags.map((tag) => (
+                <span key={tag} className="px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-400">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function MetricsTab(_: { vm: VM }) {
+interface MetricsPoint { time: string; cpu: number; memory: number; disk_read: number; disk_write: number; net_rx: number; net_tx: number }
+
+function MetricsTab({ vm }: { vm: VM }) {
+  const [history, setHistory] = useState<MetricsPoint[]>([])
+  const [latest, setLatest] = useState<VMMetrics | null>(null)
+
+  useEffect(() => {
+    if (vm.state !== 'running') return
+    const load = async () => {
+      try {
+        const m = await getMetrics(vm.name)
+        setLatest(m)
+        setHistory((prev) => [...prev.slice(-29), {
+          time: new Date().toLocaleTimeString(),
+          cpu: parseFloat(m.cpu_usage.toFixed(1)),
+          memory: parseFloat(m.memory_usage.toFixed(1)),
+          disk_read: m.disk_usage,
+          disk_write: m.disk_usage,
+          net_rx: m.network_rx,
+          net_tx: m.network_tx,
+        }])
+      } catch { /* running VM may not have metrics yet */ }
+    }
+    load()
+    const interval = setInterval(load, 5000)
+    return () => clearInterval(interval)
+  }, [vm.name, vm.state])
+
+  if (vm.state !== 'running') {
+    return (
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center">
+        <Activity className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+        <p className="text-gray-500 text-sm">Metrics are only available for running VMs</p>
+      </div>
+    )
+  }
+
+  const tooltipStyle = {
+    backgroundColor: '#111827',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '0.5rem',
+    fontSize: '12px',
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="text-sm text-gray-400 mb-2">CPU Usage</div>
-          <div className="text-3xl font-bold text-cyan-400">45.2%</div>
-          <div className="text-xs text-gray-500 mt-1">2 of 4 cores</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="text-sm text-gray-400 mb-2">Memory Usage</div>
-          <div className="text-3xl font-bold text-green-400">62.7%</div>
-          <div className="text-xs text-gray-500 mt-1">2.5 of 4 GB</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="text-sm text-gray-400 mb-2">Disk I/O</div>
-          <div className="text-3xl font-bold text-purple-400">125 MB/s</div>
-          <div className="text-xs text-gray-500 mt-1">Read: 80 | Write: 45</div>
-        </div>
+    <div className="space-y-4">
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <MetricStat label="CPU" value={latest ? `${latest.cpu_usage.toFixed(1)}%` : '--'} color="blue" />
+        <MetricStat label="Memory" value={latest ? `${latest.memory_usage.toFixed(1)}%` : '--'} color="emerald" />
+        <MetricStat label="Net RX" value={latest ? `${(latest.network_rx / 1024).toFixed(1)} KB/s` : '--'} color="purple" />
+        <MetricStat label="Net TX" value={latest ? `${(latest.network_tx / 1024).toFixed(1)} KB/s` : '--'} color="orange" />
       </div>
 
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold mb-4">Resource History</h3>
-        <p className="text-gray-400">Charts would be rendered here using Recharts</p>
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">CPU Usage</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={history}>
+              <defs>
+                <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="time" stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 100]} stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'CPU']} />
+              <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={1.5} fill="url(#cpuGrad)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Memory Usage</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={history}>
+              <defs>
+                <linearGradient id="memGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="time" stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 100]} stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'Memory']} />
+              <Area type="monotone" dataKey="memory" stroke="#10b981" strokeWidth={1.5} fill="url(#memGrad)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   )
 }
 
-function DisksTab(_: { vm: VM }) {
+function MetricStat({ label, value, color }: { label: string; value: string; color: string }) {
+  const bgMap: Record<string, string> = {
+    blue: 'bg-blue-500/10 text-blue-400',
+    emerald: 'bg-emerald-500/10 text-emerald-400',
+    purple: 'bg-purple-500/10 text-purple-400',
+    orange: 'bg-orange-500/10 text-orange-400',
+  }
+  return (
+    <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+      <div className="text-xs text-gray-500 mb-1">{label}</div>
+      <div className={`text-xl font-bold tabular-nums ${bgMap[color]?.split(' ')[1] || 'text-white'}`}>{value}</div>
+    </div>
+  )
+}
+
+function DisksTab({ vm }: { vm: VM }) {
   const disks = [
-    { name: 'vda', path: '/var/lib/vmspawnd/images/vm1.qcow2', size: '20 GB', format: 'qcow2' },
+    { name: 'vda', path: vm.image, size: '20 GB', format: 'qcow2', bus: 'virtio' },
   ]
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-700">
-            <tr>
-              <th className="text-left p-4 font-medium text-gray-300">Device</th>
-              <th className="text-left p-4 font-medium text-gray-300">Path</th>
-              <th className="text-left p-4 font-medium text-gray-300">Size</th>
-              <th className="text-left p-4 font-medium text-gray-300">Format</th>
+    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-800">
+            <th className="py-3 px-5">Device</th>
+            <th className="py-3 px-4">Path</th>
+            <th className="py-3 px-4">Size</th>
+            <th className="py-3 px-4">Format</th>
+            <th className="py-3 px-4">Bus</th>
+          </tr>
+        </thead>
+        <tbody>
+          {disks.map((disk) => (
+            <tr key={disk.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors">
+              <td className="py-3 px-5 font-medium text-white">{disk.name}</td>
+              <td className="py-3 px-4 font-mono text-xs text-gray-400 max-w-[300px] truncate">{disk.path}</td>
+              <td className="py-3 px-4 text-gray-400">{disk.size}</td>
+              <td className="py-3 px-4">
+                <span className="px-2 py-0.5 text-[11px] font-medium rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  {disk.format.toUpperCase()}
+                </span>
+              </td>
+              <td className="py-3 px-4 text-gray-400">{disk.bus}</td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-700">
-            {disks.map((disk) => (
-              <tr key={disk.name} className="hover:bg-gray-700 transition">
-                <td className="p-4 font-medium">{disk.name}</td>
-                <td className="p-4 font-mono text-sm text-gray-400">{disk.path}</td>
-                <td className="p-4">{disk.size}</td>
-                <td className="p-4">
-                  <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs font-medium">
-                    {disk.format.toUpperCase()}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function NetworkTab(_: { vm: VM }) {
+function NetworkTab({ vm }: { vm: VM }) {
   const interfaces = [
-    { name: 'eth0', mac: '52:54:00:12:34:56', ip: '192.168.100.10', bridge: 'br0', state: 'UP' },
+    { name: 'eth0', mac: '52:54:00:12:34:56', ip: vm.ip || '192.168.100.10', model: 'virtio-net', state: 'up' },
   ]
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-700">
-            <tr>
-              <th className="text-left p-4 font-medium text-gray-300">Interface</th>
-              <th className="text-left p-4 font-medium text-gray-300">MAC Address</th>
-              <th className="text-left p-4 font-medium text-gray-300">IP Address</th>
-              <th className="text-left p-4 font-medium text-gray-300">Bridge</th>
-              <th className="text-left p-4 font-medium text-gray-300">State</th>
+    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-800">
+            <th className="py-3 px-5">Interface</th>
+            <th className="py-3 px-4">MAC Address</th>
+            <th className="py-3 px-4">IP Address</th>
+            <th className="py-3 px-4">Model</th>
+            <th className="py-3 px-4">State</th>
+          </tr>
+        </thead>
+        <tbody>
+          {interfaces.map((iface) => (
+            <tr key={iface.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors">
+              <td className="py-3 px-5 font-medium text-white">{iface.name}</td>
+              <td className="py-3 px-4 font-mono text-xs text-gray-400">{iface.mac}</td>
+              <td className="py-3 px-4 font-mono text-xs text-gray-300">{iface.ip}</td>
+              <td className="py-3 px-4 text-gray-400">{iface.model}</td>
+              <td className="py-3 px-4">
+                <StatusBadge status={iface.state === 'up' ? 'running' : 'stopped'} />
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-700">
-            {interfaces.map((iface) => (
-              <tr key={iface.name} className="hover:bg-gray-700 transition">
-                <td className="p-4 font-medium">{iface.name}</td>
-                <td className="p-4 font-mono text-sm text-gray-400">{iface.mac}</td>
-                <td className="p-4 font-mono text-sm">{iface.ip}</td>
-                <td className="p-4">{iface.bridge}</td>
-                <td className="p-4">
-                  <span className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    {iface.state}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function SnapshotsTab(_: { vm: VM }) {
+function SnapshotsTab(_props: { vm: VM }) {
   const snapshots = [
-    { name: 'before-update', created: '2024-02-18 10:30:00', size: '2.5 GB' },
-    { name: 'initial', created: '2024-02-15 14:30:00', size: '1.8 GB' },
+    { name: 'before-update', created: '2024-02-18 10:30:00', size: '2.5 GB', type: 'disk-only' },
+    { name: 'initial', created: '2024-02-15 14:30:00', size: '1.8 GB', type: 'full' },
   ]
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
-          <Camera className="w-4 h-4" />
+        <button className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 rounded-lg transition-colors text-sm font-medium">
+          <Camera className="w-3.5 h-3.5" />
           Create Snapshot
         </button>
       </div>
 
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                <th className="text-left p-4 font-medium text-gray-300">Created</th>
-                <th className="text-left p-4 font-medium text-gray-300">Size</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-800">
+              <th className="py-3 px-5">Name</th>
+              <th className="py-3 px-4">Type</th>
+              <th className="py-3 px-4">Created</th>
+              <th className="py-3 px-4">Size</th>
+              <th className="py-3 px-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {snapshots.map((snap) => (
+              <tr key={snap.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors group">
+                <td className="py-3 px-5 font-medium text-white">{snap.name}</td>
+                <td className="py-3 px-4">
+                  <span className="px-2 py-0.5 text-[11px] font-medium rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    {snap.type}
+                  </span>
+                </td>
+                <td className="py-3 px-4 text-gray-400">{snap.created}</td>
+                <td className="py-3 px-4 text-gray-400 tabular-nums">{snap.size}</td>
+                <td className="py-3 px-4">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="px-2.5 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 rounded text-xs font-medium transition-colors">
+                      Restore
+                    </button>
+                    <button className="px-2.5 py-1 bg-red-600/15 text-red-400 hover:bg-red-600/25 rounded text-xs font-medium transition-colors">
+                      Delete
+                    </button>
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {snapshots.map((snapshot) => (
-                <tr key={snapshot.name} className="hover:bg-gray-700 transition">
-                  <td className="p-4 font-medium">{snapshot.name}</td>
-                  <td className="p-4 text-gray-400">{snapshot.created}</td>
-                  <td className="p-4">{snapshot.size}</td>
-                  <td className="p-4">
-                    <div className="flex gap-2">
-                      <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
-                        Restore
-                      </button>
-                      <button className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition">
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
 
-function LogsTab(_: { vm: VM }) {
+function LogsTab(_props: { vm: VM }) {
   const logs = [
     { time: '14:35:22', level: 'INFO', message: 'VM started successfully' },
     { time: '14:35:15', level: 'INFO', message: 'Initializing network interface eth0' },
     { time: '14:35:10', level: 'INFO', message: 'Loading disk image' },
+    { time: '14:35:08', level: 'INFO', message: 'Configuring vCPUs' },
+    { time: '14:35:05', level: 'INFO', message: 'Allocating memory' },
   ]
 
+  const levelStyles: Record<string, string> = {
+    INFO: 'text-cyan-400',
+    WARN: 'text-yellow-400',
+    ERROR: 'text-red-400',
+    DEBUG: 'text-gray-500',
+  }
+
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-      <div className="space-y-2 font-mono text-sm">
+    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="font-mono text-xs">
         {logs.map((log, index) => (
-          <div key={index} className="flex gap-4 p-2 hover:bg-gray-700 rounded transition">
-            <span className="text-gray-500">{log.time}</span>
-            <span className={log.level === 'INFO' ? 'text-cyan-400' : 'text-red-400'}>
+          <div key={index} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-gray-800/30 last:border-b-0">
+            <span className="text-gray-600 shrink-0 tabular-nums">{log.time}</span>
+            <span className={`shrink-0 w-12 ${levelStyles[log.level] || 'text-gray-400'}`}>
               {log.level}
             </span>
-            <span className="text-gray-300 flex-1">{log.message}</span>
+            <span className="text-gray-300">{log.message}</span>
           </div>
         ))}
       </div>

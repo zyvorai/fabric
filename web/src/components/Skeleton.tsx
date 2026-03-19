@@ -4,7 +4,7 @@ interface SkeletonProps {
 }
 
 function SkeletonBase({ className = '', style }: SkeletonProps) {
-  return <div className={`animate-pulse bg-gray-700 rounded ${className}`} style={style} />
+  return <div className={`animate-pulse bg-gray-800 rounded-lg ${className}`} style={style} />
 }
 
 export function SkeletonText({ className = '' }: SkeletonProps) {
@@ -13,21 +13,23 @@ export function SkeletonText({ className = '' }: SkeletonProps) {
 
 export function SkeletonCard() {
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <SkeletonBase className="h-6 w-40 mb-2" />
+    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="p-5 space-y-3">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2 flex-1">
+            <SkeletonBase className="h-5 w-36" />
+            <SkeletonBase className="h-3 w-24" />
+          </div>
+          <SkeletonBase className="h-5 w-16 rounded-full" />
+        </div>
+        <div className="flex gap-4">
+          <SkeletonBase className="h-4 w-20" />
           <SkeletonBase className="h-4 w-20" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <SkeletonBase className="h-4 w-24" />
-        <SkeletonBase className="h-4 w-24" />
-      </div>
-      <div className="flex gap-2">
-        <SkeletonBase className="h-9 w-20" />
-        <SkeletonBase className="h-9 w-20" />
-        <SkeletonBase className="h-9 w-16" />
+      <div className="px-5 py-3 border-t border-gray-800 flex gap-2">
+        <SkeletonBase className="h-8 w-16 rounded-md" />
+        <SkeletonBase className="h-8 w-16 rounded-md" />
       </div>
     </div>
   )
@@ -35,16 +37,16 @@ export function SkeletonCard() {
 
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-      <div className="grid gap-4 p-4 border-b border-gray-700" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="grid gap-4 p-4 border-b border-gray-800" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {Array.from({ length: cols }).map((_, i) => (
-          <SkeletonBase key={i} className="h-4" />
+          <SkeletonBase key={i} className="h-3" />
         ))}
       </div>
       {Array.from({ length: rows }).map((_, row) => (
         <div
           key={row}
-          className="grid gap-4 p-4 border-b border-gray-700 last:border-b-0"
+          className="grid gap-4 p-4 border-b border-gray-800/50 last:border-b-0"
           style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
         >
           {Array.from({ length: cols }).map((_, col) => (
@@ -58,14 +60,17 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
 
 export function SkeletonChart() {
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-      <SkeletonBase className="h-5 w-32 mb-4" />
-      <div className="flex items-end gap-2 h-40">
-        {Array.from({ length: 12 }).map((_, i) => (
+    <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <div className="flex items-center justify-between mb-4">
+        <SkeletonBase className="h-4 w-28" />
+        <SkeletonBase className="h-5 w-12" />
+      </div>
+      <div className="flex items-end gap-1.5 h-[180px]">
+        {Array.from({ length: 20 }).map((_, i) => (
           <SkeletonBase
             key={i}
-            className="flex-1"
-            style={{ height: `${20 + Math.random() * 80}%` } as React.CSSProperties}
+            className="flex-1 rounded-sm"
+            style={{ height: `${15 + Math.random() * 75}%` } as React.CSSProperties}
           />
         ))}
       </div>
@@ -76,15 +81,20 @@ export function SkeletonChart() {
 export function SkeletonDashboard() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-1">
+        <SkeletonBase className="h-7 w-32" />
+        <SkeletonBase className="h-4 w-56" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <SkeletonBase className="h-4 w-24 mb-2" />
-            <SkeletonBase className="h-8 w-16" />
+          <div key={i} className="bg-gray-900 rounded-xl p-5 border border-gray-800">
+            <SkeletonBase className="h-8 w-8 rounded-lg mb-3" />
+            <SkeletonBase className="h-7 w-16 mb-1" />
+            <SkeletonBase className="h-3 w-20" />
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SkeletonChart />
         <SkeletonChart />
       </div>

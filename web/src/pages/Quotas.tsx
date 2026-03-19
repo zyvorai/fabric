@@ -104,7 +104,7 @@ export default function Quotas() {
       />
 
       {quotas.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+        <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
           <p className="text-xl text-gray-400 mb-4">No quotas configured</p>
           <p className="text-gray-500 mb-6">Create quotas to limit resource usage</p>
           <button
@@ -124,8 +124,8 @@ export default function Quotas() {
             return (
               <div
                 key={quota.id}
-                className={`bg-gray-800 rounded-lg border ${
-                  isExceeded ? 'border-red-500' : 'border-gray-700'
+                className={`bg-gray-900 rounded-lg border ${
+                  isExceeded ? 'border-red-500' : 'border-gray-800'
                 } p-6`}
               >
                 {/* Header */}
@@ -155,7 +155,7 @@ export default function Quotas() {
                         {quota.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="px-2 py-0.5 bg-gray-700 rounded text-xs"
+                            className="px-2 py-0.5 bg-gray-800 rounded text-xs"
                           >
                             {tag}
                           </span>
@@ -210,7 +210,7 @@ export default function Quotas() {
                         {quota.used_cpus} / {quota.max_cpus}
                       </span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.cpu_percent || 0)}`}
                         style={{
@@ -233,7 +233,7 @@ export default function Quotas() {
                         {quota.used_memory}MB / {quota.max_memory}MB
                       </span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.memory_percent || 0)}`}
                         style={{
@@ -256,7 +256,7 @@ export default function Quotas() {
                         {quota.used_disk}GB / {quota.max_disk}GB
                       </span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.disk_percent || 0)}`}
                         style={{
@@ -279,7 +279,7 @@ export default function Quotas() {
                         {quota.used_vms} / {quota.max_vms}
                       </span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.vms_percent || 0)}`}
                         style={{

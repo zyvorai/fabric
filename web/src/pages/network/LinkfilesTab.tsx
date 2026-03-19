@@ -12,8 +12,8 @@ interface LinkfilesTabProps {
 
 function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProps) {
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-gray-900 rounded-lg border border-gray-800">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Link Configuration (.link)</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Link File
@@ -24,7 +24,7 @@ function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProp
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-700">
+            <thead className="bg-gray-800">
               <tr>
                 <th className="text-left p-4 font-medium text-gray-300">Match</th>
                 <th className="text-left p-4 font-medium text-gray-300">Rename To</th>
@@ -34,9 +34,9 @@ function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProp
                 <th className="text-left p-4 font-medium text-gray-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {linkfiles.map(l => (
-                <tr key={l.id} className="hover:bg-gray-700 transition">
+                <tr key={l.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-mono text-sm text-gray-400">
                     {l.match_mac ?? l.match_original_name ?? l.match_driver ?? l.match_path ?? '-'}
                   </td>

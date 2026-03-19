@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { listVMs, getMetrics, VM, VMMetrics } from '../api/vm'
 import { apiGet } from '../api/client'
-import { getStateColor } from '../utils/vm'
-import { Activity, Cpu, HardDrive, Server } from 'lucide-react'
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Activity, Cpu, HardDrive, Server, ArrowUpRight, TrendingUp, Clock } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
 import { SkeletonDashboard } from '../components/Skeleton'
+import { StatusBadge } from '../components/ui'
 import { Link } from 'react-router'
 
 interface MetricsPoint {
@@ -20,6 +20,37 @@ interface AuditEntry {
   resource: string
   status: string
   user_id: string
+}
+
+// Animated counter hook
+function useAnimatedValue(target: number, duration = 600): number {
+  const [value, setValue] = useState(0)
+  const prevTarget = useRef(0)
+
+  useEffect(() => {
+    const start = prevTarget.current
+    prevTarget.current = target
+    if (start === target) {
+      setValue(target)
+      return
+    }
+    const startTime = performance.now()
+    let raf: number
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setValue(Math.round(start + (target - start) * eased))
+      if (progress < 1) raf = requestAnimationFrame(animate)
+    }
+
+    raf = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(raf)
+  }, [target, duration])
+
+  return value
 }
 
 export default function Dashboard() {
@@ -53,7 +84,6 @@ export default function Dashboard() {
         return
       }
 
-      // Fetch real metrics from running VMs
       const metricsResults = await Promise.allSettled(
         runningVMs.map((vm) => getMetrics(vm.name))
       )
@@ -84,10 +114,10 @@ export default function Dashboard() {
 
   const loadActivityFeed = useCallback(async () => {
     try {
-      const data = await apiGet<AuditEntry[]>('/api/audit/logs?limit=5')
+      const data = await apiGet<AuditEntry[]>('/api/audit/logs?limit=8')
       setActivityFeed(data)
     } catch (_error) {
-      // Audit logs may not be available, fall back silently
+      // Audit logs may not be available
     }
   }, [])
 
@@ -103,7 +133,6 @@ export default function Dashboard() {
     }
   }, [loadVMs, loadMetrics, loadActivityFeed])
 
-  // Subscribe to WebSocket updates
   useEffect(() => {
     const unsubscribe = subscribe((message) => {
       if (message.type === 'vm_state_changed' || message.type === 'vm_created' || message.type === 'vm_deleted') {
@@ -113,7 +142,6 @@ export default function Dashboard() {
     return unsubscribe
   }, [subscribe, loadVMs])
 
-  // Apply WebSocket updates to VM list
   useEffect(() => {
     if (vmUpdates.size > 0) {
       setVMs((prevVMs) =>
@@ -138,136 +166,227 @@ export default function Dashboard() {
     return <SkeletonDashboard />
   }
 
+  const latestCpu = metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].cpu : 0
+  const latestMem = metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].memory : 0
+
+  const tooltipStyle = {
+    backgroundColor: '#111827',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '0.5rem',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+    padding: '8px 12px',
+    fontSize: '12px',
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Overview of your virtual infrastructure</p>
+      </div>
+
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          icon={<Server className="w-8 h-8" />}
+          icon={<Server className="w-5 h-5" />}
           title="Total VMs"
           value={stats.total}
           color="blue"
+          linkTo="/vms"
+          sparkData={metricsHistory.map((p) => p.cpu)}
         />
         <StatCard
-          icon={<Activity className="w-8 h-8" />}
+          icon={<Activity className="w-5 h-5" />}
           title="Running"
           value={stats.running}
+          subtitle={stats.total > 0 ? `${Math.round((stats.running / stats.total) * 100)}% of fleet` : undefined}
           color="green"
+          linkTo="/vms"
         />
         <StatCard
-          icon={<Cpu className="w-8 h-8" />}
+          icon={<Cpu className="w-5 h-5" />}
           title="Total vCPUs"
           value={stats.totalCPU}
+          subtitle={latestCpu > 0 ? `${latestCpu}% avg usage` : undefined}
           color="purple"
+          linkTo="/system"
+          sparkData={metricsHistory.map((p) => p.cpu)}
         />
         <StatCard
-          icon={<HardDrive className="w-8 h-8" />}
+          icon={<HardDrive className="w-5 h-5" />}
           title="Total Memory"
-          value={`${(stats.totalMemory / 1024).toFixed(1)}GB`}
+          value={stats.totalMemory >= 1024 ? `${(stats.totalMemory / 1024).toFixed(1)}` : `${stats.totalMemory}`}
+          unit={stats.totalMemory >= 1024 ? 'GB' : 'MB'}
+          subtitle={latestMem > 0 ? `${latestMem}% avg usage` : undefined}
           color="orange"
+          linkTo="/system"
+          sparkData={metricsHistory.map((p) => p.memory)}
         />
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CPU Usage Chart */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* CPU Chart */}
+        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-blue-500" />
-              CPU Usage
-            </h3>
-            <span className="text-sm text-gray-400">
-              {metricsHistory.length > 0
-                ? `${metricsHistory[metricsHistory.length - 1].cpu}%`
-                : 'No data'}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-blue-500/10">
+                <Cpu className="w-4 h-4 text-blue-400" />
+              </div>
+              <h3 className="text-sm font-medium text-gray-300">CPU Usage</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-lg font-semibold tabular-nums ${latestCpu > 80 ? 'text-red-400' : latestCpu > 50 ? 'text-yellow-400' : 'text-blue-400'}`}>
+                {metricsHistory.length > 0 ? `${latestCpu}%` : '--'}
+              </span>
+            </div>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={metricsHistory}>
               <defs>
                 <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="time" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 100]} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '0.5rem',
-                }}
-              />
-              <Area type="monotone" dataKey="cpu" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCpu)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="time" stroke="rgba(255,255,255,0.15)" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="rgba(255,255,255,0.15)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} formatter={(value: number) => [`${value}%`, 'CPU']} />
+              <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCpu)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Memory Usage Chart */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        {/* Memory Chart */}
+        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <HardDrive className="w-5 h-5 text-green-500" />
-              Memory Usage
-            </h3>
-            <span className="text-sm text-gray-400">
-              {metricsHistory.length > 0
-                ? `${metricsHistory[metricsHistory.length - 1].memory}%`
-                : 'No data'}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-emerald-500/10">
+                <HardDrive className="w-4 h-4 text-emerald-400" />
+              </div>
+              <h3 className="text-sm font-medium text-gray-300">Memory Usage</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-lg font-semibold tabular-nums ${latestMem > 80 ? 'text-red-400' : latestMem > 50 ? 'text-yellow-400' : 'text-emerald-400'}`}>
+                {metricsHistory.length > 0 ? `${latestMem}%` : '--'}
+              </span>
+            </div>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={metricsHistory}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="time" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 100]} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '0.5rem',
-                }}
-              />
-              <Line type="monotone" dataKey="memory" stroke="#10b981" strokeWidth={2} dot={false} />
-            </LineChart>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={metricsHistory}>
+              <defs>
+                <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.3}/>
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="time" stroke="rgba(255,255,255,0.15)" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="rgba(255,255,255,0.15)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} formatter={(value: number) => [`${value}%`, 'Memory']} />
+              <Area type="monotone" dataKey="memory" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorMem)" dot={false} />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* VM List */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-xl font-semibold">Recent Virtual Machines</h2>
-        </div>
-        <div className="divide-y divide-gray-700">
-          {vms.slice(0, 5).map((vm) => (
-            <VMRow key={vm.name} vm={vm} />
-          ))}
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          Recent Activity
-        </h2>
-        <div className="space-y-3">
-          {activityFeed.length > 0 ? (
-            activityFeed.map((entry, idx) => (
-              <ActivityItem
-                key={idx}
-                time={new Date(entry.timestamp).toLocaleString()}
-                type={entry.status === 'success' ? 'success' : 'error'}
-                message={`${entry.action} on ${entry.resource}`}
-              />
-            ))
+      {/* Bottom: VM List + Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* VM List - 2/3 width */}
+        <div className="lg:col-span-2 bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+            <h2 className="text-sm font-medium text-gray-300">Virtual Machines</h2>
+            <Link
+              to="/vms"
+              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              View all
+              <ArrowUpRight className="w-3 h-3" />
+            </Link>
+          </div>
+          {vms.length === 0 ? (
+            <div className="p-8 text-center">
+              <Server className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">No virtual machines yet</p>
+              <Link to="/create" className="text-sm text-blue-400 hover:text-blue-300 mt-1 inline-block">
+                Create your first VM
+              </Link>
+            </div>
           ) : (
-            <p className="text-gray-500 text-sm">No recent activity</p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-b border-gray-800/50">
+                  <th className="py-2.5 px-5">Name</th>
+                  <th className="py-2.5 px-4">Status</th>
+                  <th className="py-2.5 px-4">CPU</th>
+                  <th className="py-2.5 px-4">Memory</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vms.slice(0, 6).map((vm) => (
+                  <tr key={vm.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2.5 px-5">
+                      <Link
+                        to={`/vms/${vm.name}`}
+                        className="font-medium text-white hover:text-blue-400 transition-colors"
+                      >
+                        {vm.name}
+                      </Link>
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <StatusBadge status={vm.state} />
+                    </td>
+                    <td className="py-2.5 px-4 text-gray-400 tabular-nums">
+                      {vm.cpus} vCPU{vm.cpus !== 1 ? 's' : ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-gray-400 tabular-nums">
+                      {vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
+        </div>
+
+        {/* Activity Feed - 1/3 width */}
+        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+            <h2 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-gray-500" />
+              Recent Activity
+            </h2>
+            <Link
+              to="/audit"
+              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              View all
+              <ArrowUpRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="px-5 py-3">
+            {activityFeed.length > 0 ? (
+              <div className="space-y-0">
+                {activityFeed.map((entry, idx) => (
+                  <ActivityItem
+                    key={idx}
+                    time={new Date(entry.timestamp).toLocaleString()}
+                    type={entry.status === 'success' ? 'success' : 'error'}
+                    action={entry.action}
+                    resource={entry.resource}
+                    isLast={idx === activityFeed.length - 1}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Activity className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No recent activity</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -278,69 +397,93 @@ interface StatCardProps {
   icon: React.ReactNode
   title: string
   value: string | number
+  unit?: string
+  subtitle?: string
   color: string
+  linkTo?: string
+  sparkData?: number[]
 }
 
-function StatCard({ icon, title, value, color }: StatCardProps) {
-  const colors: Record<string, string> = {
-    blue: 'text-blue-500',
-    green: 'text-green-500',
-    purple: 'text-purple-500',
-    orange: 'text-orange-500',
+function StatCard({ icon, title, value, unit, subtitle, color, linkTo, sparkData }: StatCardProps) {
+  const colorMap: Record<string, { text: string; bg: string; spark: string }> = {
+    blue: { text: 'text-blue-400', bg: 'bg-blue-500/10', spark: '#3b82f6' },
+    green: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', spark: '#10b981' },
+    purple: { text: 'text-purple-400', bg: 'bg-purple-500/10', spark: '#a855f7' },
+    orange: { text: 'text-orange-400', bg: 'bg-orange-500/10', spark: '#f97316' },
   }
 
-  return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-      <div className="flex items-center justify-between">
-        <div className={colors[color]}>{icon}</div>
+  const c = colorMap[color] || colorMap.blue
+  const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0
+  const animatedValue = useAnimatedValue(typeof value === 'number' ? numericValue : 0)
+  const displayValue = typeof value === 'number' ? animatedValue : value
+
+  const content = (
+    <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 hover:border-gray-700 transition-colors relative overflow-hidden group">
+      {/* Sparkline background */}
+      {sparkData && sparkData.length > 2 && (
+        <div className="absolute bottom-0 right-0 w-24 h-12 opacity-30 group-hover:opacity-50 transition-opacity">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={sparkData.map((v, i) => ({ v, i }))}>
+              <Line type="monotone" dataKey="v" stroke={c.spark} strokeWidth={1.5} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-3">
+        <div className={`p-2 rounded-lg ${c.bg}`}>
+          <span className={c.text}>{icon}</span>
+        </div>
+        {linkTo && (
+          <ArrowUpRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
+        )}
       </div>
-      <div className="mt-4">
-        <div className="text-3xl font-bold">{value}</div>
-        <div className="text-gray-400 text-sm mt-1">{title}</div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-2xl font-bold text-white tabular-nums">{displayValue}</span>
+        {unit && <span className="text-sm text-gray-500 font-medium">{unit}</span>}
       </div>
+      <div className="text-xs text-gray-500 mt-1">{title}</div>
+      {subtitle && (
+        <div className="flex items-center gap-1 mt-1.5">
+          <TrendingUp className="w-3 h-3 text-gray-600" />
+          <span className="text-[11px] text-gray-500">{subtitle}</span>
+        </div>
+      )}
     </div>
   )
-}
 
-function VMRow({ vm }: { vm: VM }) {
-  return (
-    <Link to={`/vms/${vm.name}`} className="block p-4 hover:bg-gray-700 transition cursor-pointer">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className={`w-3 h-3 rounded-full ${getStateColor(vm.state)}`}></div>
-          <div>
-            <div className="font-medium">{vm.name}</div>
-            <div className="text-sm text-gray-400">
-              {vm.cpus} vCPUs &middot; {vm.memory}MB RAM
-            </div>
-          </div>
-        </div>
-        <div className="text-sm text-gray-400 capitalize">{vm.state}</div>
-      </div>
-    </Link>
-  )
+  if (linkTo) {
+    return <Link to={linkTo} className="block">{content}</Link>
+  }
+  return content
 }
 
 interface ActivityItemProps {
   time: string
   type: string
-  message: string
+  action: string
+  resource: string
+  isLast: boolean
 }
 
-function ActivityItem({ time, type, message }: ActivityItemProps) {
-  const typeColors: Record<string, string> = {
-    success: 'text-green-500',
-    warning: 'text-yellow-500',
-    info: 'text-blue-500',
-    error: 'text-red-500',
-  }
+function ActivityItem({ time, type, action, resource, isLast }: ActivityItemProps) {
+  const dotColor = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-gray-500'
 
   return (
-    <div className="flex items-start gap-3">
-      <div className={`w-2 h-2 rounded-full mt-2 ${typeColors[type].replace('text', 'bg')}`}></div>
-      <div className="flex-1">
-        <div className="text-sm">{message}</div>
-        <div className="text-xs text-gray-500 mt-1">{time}</div>
+    <div className="flex gap-3 relative">
+      {/* Timeline */}
+      <div className="flex flex-col items-center pt-1.5">
+        <div className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0 ring-2 ring-gray-900`} />
+        {!isLast && <div className="w-px flex-1 bg-gray-800 mt-1" />}
+      </div>
+      {/* Content */}
+      <div className={`pb-4 min-w-0 ${isLast ? '' : ''}`}>
+        <p className="text-sm text-gray-300 leading-snug">
+          <span className="font-medium text-white">{action}</span>
+          {' '}on{' '}
+          <span className="text-gray-400">{resource}</span>
+        </p>
+        <p className="text-[11px] text-gray-600 mt-0.5">{time}</p>
       </div>
     </div>
   )

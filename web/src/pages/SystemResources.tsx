@@ -71,12 +71,12 @@ export default function SystemResources() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">System Resources</h1>
+          <h1 className="text-2xl font-bold mb-2">System Resources</h1>
           <p className="text-gray-400">Hardware topology and resource allocation</p>
         </div>
         <button
           onClick={loadResources}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded transition"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -85,34 +85,34 @@ export default function SystemResources() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <Cpu className="w-5 h-5 text-blue-400" />
             <div className="text-gray-400 text-sm">Total CPUs</div>
           </div>
-          <div className="text-3xl font-bold">{cpuTopology?.total_cpus || 0}</div>
+          <div className="text-2xl font-bold">{cpuTopology?.total_cpus || 0}</div>
           <div className="text-sm text-gray-400 mt-1">
             {cpuTopology?.sockets || 0} socket(s) × {cpuTopology?.cores_per_socket || 0} cores
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <Server className="w-5 h-5 text-green-400" />
             <div className="text-gray-400 text-sm">NUMA Nodes</div>
           </div>
-          <div className="text-3xl font-bold">{numaTopology?.nodes.length || 0}</div>
+          <div className="text-2xl font-bold">{numaTopology?.nodes.length || 0}</div>
           <div className="text-sm text-gray-400 mt-1">
             {numaTopology ? 'Available' : 'Not available'}
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <MemoryStick className="w-5 h-5 text-purple-400" />
             <div className="text-gray-400 text-sm">Total Memory</div>
           </div>
-          <div className="text-3xl font-bold">
+          <div className="text-2xl font-bold">
             {systemMemory ? formatMemory(systemMemory.total_kb) : 'N/A'}
           </div>
           <div className="text-sm text-gray-400 mt-1">
@@ -120,12 +120,12 @@ export default function SystemResources() {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <HardDrive className="w-5 h-5 text-yellow-400" />
             <div className="text-gray-400 text-sm">Hugepages (2MB)</div>
           </div>
-          <div className="text-3xl font-bold">{hugepages2mb?.total || 0}</div>
+          <div className="text-2xl font-bold">{hugepages2mb?.total || 0}</div>
           <div className="text-sm text-gray-400 mt-1">
             {hugepages2mb?.free || 0} free
           </div>
@@ -133,15 +133,15 @@ export default function SystemResources() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-gray-800 rounded-lg overflow-hidden">
-        <div className="border-b border-gray-700">
+      <div className="bg-gray-900 rounded-lg overflow-hidden">
+        <div className="border-b border-gray-800">
           <div className="flex">
             <button
               onClick={() => setActiveTab('cpu')}
               className={`px-6 py-3 ${
                 activeTab === 'cpu'
-                  ? 'bg-gray-700 border-b-2 border-blue-500'
-                  : 'hover:bg-gray-750'
+                  ? 'bg-gray-800 border-b-2 border-blue-500'
+                  : 'hover:bg-gray-900'
               }`}
             >
               CPU Topology
@@ -150,8 +150,8 @@ export default function SystemResources() {
               onClick={() => setActiveTab('numa')}
               className={`px-6 py-3 ${
                 activeTab === 'numa'
-                  ? 'bg-gray-700 border-b-2 border-blue-500'
-                  : 'hover:bg-gray-750'
+                  ? 'bg-gray-800 border-b-2 border-blue-500'
+                  : 'hover:bg-gray-900'
               }`}
             >
               NUMA Topology
@@ -160,8 +160,8 @@ export default function SystemResources() {
               onClick={() => setActiveTab('memory')}
               className={`px-6 py-3 ${
                 activeTab === 'memory'
-                  ? 'bg-gray-700 border-b-2 border-blue-500'
-                  : 'hover:bg-gray-750'
+                  ? 'bg-gray-800 border-b-2 border-blue-500'
+                  : 'hover:bg-gray-900'
               }`}
             >
               Memory & Hugepages
@@ -170,8 +170,8 @@ export default function SystemResources() {
               onClick={() => setActiveTab('optimization')}
               className={`px-6 py-3 flex items-center gap-2 ${
                 activeTab === 'optimization'
-                  ? 'bg-gray-700 border-b-2 border-blue-500'
-                  : 'hover:bg-gray-750'
+                  ? 'bg-gray-800 border-b-2 border-blue-500'
+                  : 'hover:bg-gray-900'
               }`}
             >
               <Zap className="w-4 h-4" />
@@ -248,14 +248,14 @@ function CpuTopologyView({ topology }: { topology: CpuTopology | null }) {
 
       <div className="space-y-6">
         {Array.from(cpusBySocket.entries()).map(([socketId, cpus]) => (
-          <div key={socketId} className="bg-gray-750 rounded-lg p-4">
+          <div key={socketId} className="bg-gray-900 rounded-lg p-4">
             <div className="font-medium mb-3">Socket {socketId}</div>
             <div className="grid grid-cols-8 gap-2">
               {cpus.map((cpu) => (
                 <div
                   key={cpu.id}
                   className={`p-2 rounded text-center text-sm ${
-                    cpu.online ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-500'
+                    cpu.online ? 'bg-green-500/20 text-green-400' : 'bg-gray-800 text-gray-500'
                   }`}
                   title={`CPU ${cpu.id}\nCore ${cpu.core_id}\nThread ${cpu.thread_id}\nNUMA ${
                     cpu.numa_node ?? 'N/A'
@@ -287,7 +287,7 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
   return (
     <div className="space-y-6">
       {topology.nodes.map((node) => (
-        <div key={node.id} className="bg-gray-750 rounded-lg p-6">
+        <div key={node.id} className="bg-gray-900 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xl font-bold mb-1">Node {node.id}</div>
@@ -309,7 +309,7 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
             <div>
               <div className="text-sm text-gray-400 mb-1">Memory Usage</div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
                   <div
                     className="h-full bg-blue-500"
                     style={{
@@ -332,7 +332,7 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
           </div>
 
           {(node.hugepages_2mb_total > 0 || node.hugepages_1gb_total > 0) && (
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-700">
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-800">
               <div>
                 <div className="text-sm text-gray-400 mb-1">Hugepages 2MB</div>
                 <div className="text-sm">
@@ -351,7 +351,7 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
       ))}
 
       {topology.distances.length > 0 && (
-        <div className="bg-gray-750 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="font-medium mb-3">Inter-Node Distances</div>
           <table className="w-full">
             <thead>
@@ -417,7 +417,7 @@ function MemoryView({
 
   return (
     <div>
-      <div className="bg-gray-750 rounded-lg p-6 mb-6">
+      <div className="bg-gray-900 rounded-lg p-6 mb-6">
         <div className="text-lg font-medium mb-4">System Memory</div>
         <div className="grid grid-cols-3 gap-6 mb-4">
           <div>
@@ -433,7 +433,7 @@ function MemoryView({
           <div>
             <div className="text-sm text-gray-400 mb-1">Usage</div>
             <div className="flex items-center gap-2">
-              <div className="flex-1 bg-gray-700 rounded-full h-3 overflow-hidden">
+              <div className="flex-1 bg-gray-800 rounded-full h-3 overflow-hidden">
                 <div
                   className={`h-full ${
                     usagePercent > 90 ? 'bg-red-500' : usagePercent > 75 ? 'bg-yellow-500' : 'bg-blue-500'
@@ -446,7 +446,7 @@ function MemoryView({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-700">
+        <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-800">
           <div>
             <div className="text-sm text-gray-400 mb-1">Buffers</div>
             <div className="text-sm">{formatMemory(memory.buffers_kb)}</div>
@@ -469,7 +469,7 @@ function MemoryView({
       </div>
 
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-gray-750 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="text-lg font-medium mb-4">2MB Hugepages</div>
           {hugepages2mb ? (
             <div className="space-y-3">
@@ -494,7 +494,7 @@ function MemoryView({
           )}
         </div>
 
-        <div className="bg-gray-750 rounded-lg p-6">
+        <div className="bg-gray-900 rounded-lg p-6">
           <div className="text-lg font-medium mb-4">1GB Hugepages</div>
           {hugepages1gb ? (
             <div className="space-y-3">
@@ -554,7 +554,7 @@ function OptimizationView({
         Recommendations based on system topology analysis. Click "Apply" to auto-configure optimal settings.
       </p>
       {recommendations.map((rec) => (
-        <div key={rec.vm_name} className="bg-gray-750 rounded-lg p-6">
+        <div key={rec.vm_name} className="bg-gray-900 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold">{rec.vm_name}</h3>
             <button
@@ -567,7 +567,7 @@ function OptimizationView({
           </div>
           <div className="space-y-3">
             {rec.recommendations.map((r, idx) => (
-              <div key={idx} className="bg-gray-800 rounded p-4">
+              <div key={idx} className="bg-gray-900 rounded p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-blue-400">{r.resource}</span>
                   <span className="text-xs text-gray-500">
@@ -607,7 +607,7 @@ function AllocateHugepagesDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Allocate Hugepages</h2>
 
         <div className="mb-4">
@@ -615,7 +615,7 @@ function AllocateHugepagesDialog({
           <select
             value={size}
             onChange={(e) => setSize(e.target.value as any)}
-            className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+            className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
           >
             <option value="Size2MB">2MB</option>
             <option value="Size1GB">1GB</option>
@@ -629,7 +629,7 @@ function AllocateHugepagesDialog({
             value={count}
             onChange={(e) => setCount(parseInt(e.target.value) || 0)}
             min="0"
-            className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2"
+            className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
           />
           <div className="text-sm text-gray-400 mt-1">
             Total: {size === 'Size2MB' ? (count * 2) / 1024 : count} GB
@@ -639,7 +639,7 @@ function AllocateHugepagesDialog({
         <div className="flex gap-4">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition"
+            className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded transition"
           >
             Cancel
           </button>
