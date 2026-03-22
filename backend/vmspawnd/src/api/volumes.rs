@@ -10,6 +10,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Volume {
@@ -40,6 +41,7 @@ pub struct AttachVolumeRequest {
 
 /// POST /api/storage/pools/:name/volumes - Create a volume in a pool
 pub async fn create_volume(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(pool_name): Path<String>,
     Json(req): Json<CreateVolumeRequest>,
@@ -79,17 +81,19 @@ pub async fn create_volume(
 
 /// GET /api/storage/pools/:name/volumes - List volumes in a pool
 pub async fn list_volumes(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(pool_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("volumes::{}", stringify!(list_volumes));
     let store_key = format!("volumes_{}", pool_name);
-    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_default();
+    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 /// GET /api/storage/pools/:name/volumes/:id - Get a volume
 pub async fn get_volume(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -104,6 +108,7 @@ pub async fn get_volume(
 
 /// DELETE /api/storage/pools/:name/volumes/:id - Delete a volume
 pub async fn delete_volume(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -117,6 +122,7 @@ pub async fn delete_volume(
 
 /// POST /api/storage/pools/:name/volumes/:id/resize - Resize a volume
 pub async fn resize_volume(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
     Json(req): Json<ResizeVolumeRequest>,
@@ -143,6 +149,7 @@ pub async fn resize_volume(
 
 /// POST /api/storage/pools/:name/volumes/:id/attach - Attach volume to VM
 pub async fn attach_volume(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
     Json(req): Json<AttachVolumeRequest>,
@@ -176,6 +183,7 @@ pub async fn attach_volume(
 
 /// POST /api/storage/pools/:name/volumes/:id/detach - Detach volume from VM
 pub async fn detach_volume(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((pool_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {

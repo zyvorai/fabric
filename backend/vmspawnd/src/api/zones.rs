@@ -9,6 +9,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Availability Zones
@@ -48,6 +49,7 @@ fn default_region() -> String { "default".to_string() }
 
 /// POST /api/zones - Create an availability zone
 pub async fn create_zone(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateZoneRequest>,
 ) -> Result<(StatusCode, Json<AvailabilityZone>), (StatusCode, Json<serde_json::Value>)> {
@@ -71,15 +73,17 @@ pub async fn create_zone(
 
 /// GET /api/zones - List availability zones
 pub async fn list_zones(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<AvailabilityZone>> {
     tracing::debug!("zones::{}", stringify!(list_zones));
-    let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_default();
+    let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(zones)
 }
 
 /// GET /api/zones/:id - Get zone details
 pub async fn get_zone(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<AvailabilityZone>, (StatusCode, Json<serde_json::Value>)> {
@@ -93,6 +97,7 @@ pub async fn get_zone(
 
 /// DELETE /api/zones/:id - Delete an availability zone
 pub async fn delete_zone(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -161,6 +166,7 @@ fn default_eviction_policy() -> Option<EvictionPolicy> { Some(EvictionPolicy::St
 
 /// POST /api/spot-instances - Create a spot instance request
 pub async fn create_spot_instance(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSpotRequest>,
 ) -> Result<(StatusCode, Json<SpotInstance>), (StatusCode, Json<serde_json::Value>)> {
@@ -193,15 +199,17 @@ pub async fn create_spot_instance(
 
 /// GET /api/spot-instances - List spot instances
 pub async fn list_spot_instances(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<SpotInstance>> {
     tracing::debug!("zones::{}", stringify!(list_spot_instances));
-    let spots: Vec<SpotInstance> = state.store.list_entities("spot_instances").unwrap_or_default();
+    let spots: Vec<SpotInstance> = state.store.list_entities("spot_instances").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(spots)
 }
 
 /// POST /api/spot-instances/:id/evict - Evict a spot instance
 pub async fn evict_spot_instance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<SpotInstance>, (StatusCode, Json<serde_json::Value>)> {
@@ -258,6 +266,7 @@ pub async fn evict_spot_instance(
 
 /// DELETE /api/spot-instances/:id - Delete spot instance record
 pub async fn delete_spot_instance(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {

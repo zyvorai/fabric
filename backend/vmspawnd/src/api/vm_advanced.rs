@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use crate::validation::validate_vm_name;
 
 // ============================================================================
@@ -172,6 +173,7 @@ pub struct CreateCheckpointRequest {
 
 /// POST /api/vms/:name/checkpoints - Create a checkpoint (QEMU savevm)
 pub async fn create_checkpoint(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<CreateCheckpointRequest>,
@@ -219,13 +221,14 @@ pub async fn create_checkpoint(
 
 /// GET /api/vms/:name/checkpoints - List checkpoints for a VM
 pub async fn list_checkpoints(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<Vec<VMCheckpoint>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("vm_advanced::{}", stringify!(list_checkpoints));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
-    let all: Vec<VMCheckpoint> = state.store.list_entities("checkpoints").unwrap_or_default();
+    let all: Vec<VMCheckpoint> = state.store.list_entities("checkpoints").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let filtered: Vec<VMCheckpoint> = all.into_iter()
         .filter(|c| c.vm_name == vm_name)
         .collect();
@@ -235,6 +238,7 @@ pub async fn list_checkpoints(
 
 /// POST /api/vms/:name/checkpoints/:id/restore - Restore a checkpoint
 pub async fn restore_checkpoint(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -266,6 +270,7 @@ pub async fn restore_checkpoint(
 
 /// DELETE /api/vms/:name/checkpoints/:id - Delete a checkpoint
 pub async fn delete_checkpoint(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -301,6 +306,7 @@ pub struct ForkVMRequest {
 
 /// POST /api/vms/:name/fork - Instantly fork a VM using CoW backing file
 pub async fn fork_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(source_name): Path<String>,
     Json(req): Json<ForkVMRequest>,

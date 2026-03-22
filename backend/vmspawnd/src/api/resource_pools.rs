@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use resource_pools::{
     AdmissionControlResult, CreateResourcePoolRequest, ResourcePool,
     ResourcePoolSummary, UpdateResourcePoolRequest,
@@ -16,11 +17,12 @@ use resource_pools::{
 
 pub async fn list_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("resource_pools::{}", stringify!(list_pools));
-    let items: Vec<ResourcePool> = state.store.list_entities("resource_pools").unwrap_or_default();
+    let items: Vec<ResourcePool> = state.store.list_entities("resource_pools").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateResourcePoolRequest>,
 ) -> impl IntoResponse {
@@ -51,6 +53,7 @@ pub async fn create_pool(
 }
 
 pub async fn get_pool(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -63,6 +66,7 @@ pub async fn get_pool(
 }
 
 pub async fn update_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateResourcePoolRequest>,
@@ -90,6 +94,7 @@ pub async fn update_pool(
 }
 
 pub async fn delete_pool(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -101,6 +106,7 @@ pub async fn delete_pool(
 }
 
 pub async fn get_pool_summary(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -133,6 +139,7 @@ pub struct VmAssignment {
 }
 
 pub async fn assign_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<VmAssignment>,
@@ -155,6 +162,7 @@ pub async fn assign_vm(
 }
 
 pub async fn unassign_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((id, vm_name)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -179,6 +187,7 @@ pub struct MoveVmRequest {
 }
 
 pub async fn move_vm(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(from_id): Path<String>,
     Json(req): Json<MoveVmRequest>,
@@ -215,6 +224,7 @@ pub struct AdmissionCheckRequest {
 }
 
 pub async fn check_admission(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<AdmissionCheckRequest>,

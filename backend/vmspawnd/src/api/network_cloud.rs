@@ -72,7 +72,7 @@ pub async fn list_floating_ips(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<FloatingIp>> {
     tracing::debug!("network_cloud::{}", stringify!(list_floating_ips));
-    let ips: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_default();
+    let ips: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(ips)
 }
 
@@ -266,7 +266,7 @@ pub async fn list_dhcp_servers(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DhcpServerConfig>> {
     tracing::debug!("network_cloud::{}", stringify!(list_dhcp_servers));
-    let configs: Vec<DhcpServerConfig> = state.store.list_entities("dhcp_servers").unwrap_or_default();
+    let configs: Vec<DhcpServerConfig> = state.store.list_entities("dhcp_servers").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(configs)
 }
 
@@ -423,7 +423,7 @@ pub async fn list_dns_configs(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DnsConfig>> {
     tracing::debug!("network_cloud::{}", stringify!(list_dns_configs));
-    let configs: Vec<DnsConfig> = state.store.list_entities("dns_configs").unwrap_or_default();
+    let configs: Vec<DnsConfig> = state.store.list_entities("dns_configs").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(configs)
 }
 

@@ -60,14 +60,12 @@ Core virtual machine lifecycle operations.
 | GET | `/vms` | List all VMs |
 | POST | `/vms` | Create a new VM |
 | GET | `/vms/:name` | Get VM details |
-| PUT | `/vms/:name` | Update VM configuration |
 | DELETE | `/vms/:name` | Delete a VM |
 | POST | `/vms/:name/start` | Start a VM |
 | POST | `/vms/:name/stop` | Stop a VM |
 | POST | `/vms/:name/restart` | Restart a VM |
 | POST | `/vms/:name/pause` | Pause a VM |
 | POST | `/vms/:name/resume` | Resume a paused VM |
-| POST | `/vms/:name/reset` | Hard reset a VM |
 | GET | `/vms/:name/metrics` | Get VM resource metrics |
 | GET | `/vms/:name/status` | Get detailed VM status |
 

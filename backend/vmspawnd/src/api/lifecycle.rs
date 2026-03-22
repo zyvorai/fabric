@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use lifecycle_manager::{
     Baseline, ComplianceSummary, HostComplianceStatus, RemediationTask, RollingUpdatePlan,
     RollingUpdateStatus,
@@ -20,11 +21,12 @@ use lifecycle_manager::{
 
 pub async fn list_baselines(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_baselines));
-    let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_default();
+    let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_baseline(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut baseline): Json<Baseline>,
 ) -> impl IntoResponse {
@@ -39,6 +41,7 @@ pub async fn create_baseline(
 }
 
 pub async fn get_baseline(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -51,6 +54,7 @@ pub async fn get_baseline(
 }
 
 pub async fn update_baseline(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(mut baseline): Json<Baseline>,
@@ -65,6 +69,7 @@ pub async fn update_baseline(
 }
 
 pub async fn delete_baseline(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -88,6 +93,7 @@ pub struct ScanComplianceRequest {
 }
 
 pub async fn scan_host_compliance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Json(req): Json<ScanComplianceRequest>,
 ) -> impl IntoResponse {
@@ -112,21 +118,23 @@ pub async fn scan_host_compliance(
 }
 
 pub async fn get_compliance_status(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(host_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_compliance_status));
-    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_default();
+    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let filtered: Vec<_> = items.into_iter().filter(|s| s.host_id == host_id).collect();
     Json(filtered)
 }
 
 pub async fn get_cluster_compliance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(_cluster_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_cluster_compliance));
-    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_default();
+    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let mut total_hosts = 0u32;
     let mut compliant_hosts = 0u32;
     let mut non_compliant_hosts = 0u32;
@@ -161,7 +169,7 @@ pub async fn get_cluster_compliance(
 
 pub async fn list_remediations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_remediations));
-    let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_default();
+    let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -173,6 +181,7 @@ pub struct CreateRemediationRequest {
 }
 
 pub async fn create_remediation(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateRemediationRequest>,
 ) -> impl IntoResponse {
@@ -190,6 +199,7 @@ pub async fn create_remediation(
 }
 
 pub async fn get_remediation(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -207,11 +217,12 @@ pub async fn get_remediation(
 
 pub async fn list_rolling_updates(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_rolling_updates));
-    let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_default();
+    let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_rolling_update(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut plan): Json<RollingUpdatePlan>,
 ) -> impl IntoResponse {
@@ -229,6 +240,7 @@ pub async fn create_rolling_update(
 }
 
 pub async fn start_rolling_update(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -247,6 +259,7 @@ pub async fn start_rolling_update(
 }
 
 pub async fn pause_rolling_update(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -264,6 +277,7 @@ pub async fn pause_rolling_update(
 }
 
 pub async fn advance_rolling_update(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {

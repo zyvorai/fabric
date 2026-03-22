@@ -12,6 +12,7 @@ use vmspawnd_system::{
 };
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite};
 use crate::validation::validate_vm_name;
 
 // Request/Response types
@@ -490,10 +491,11 @@ pub struct OptimizationResult {
 
 /// GET /api/system/optimization/recommendations - Get resource optimization suggestions
 pub async fn get_optimization_recommendations(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<OptimizationRecommendation>>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_optimization_recommendations));
-    let vms = state.store.list_vms().unwrap_or_default();
+    let vms = state.store.list_vms().unwrap_or_else(|e| { tracing::warn!("Failed to list VMs: {}", e); Vec::new() });
 
     let numa_topology = NumaTopology::detect().ok();
     let cpu_topology = CpuTopology::detect().ok();
@@ -585,6 +587,7 @@ pub async fn get_optimization_recommendations(
 
 /// POST /api/vms/:name/optimize - Auto-apply optimal NUMA/CPU settings
 pub async fn optimize_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<OptimizationResult>, (StatusCode, String)> {

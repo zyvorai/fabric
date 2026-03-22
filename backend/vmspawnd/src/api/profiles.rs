@@ -8,6 +8,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -138,6 +139,7 @@ fn builtin_profiles() -> Vec<VMProfile> {
 
 /// GET /api/profiles - List all VM profiles (built-in + custom)
 pub async fn list_profiles(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<VMProfile>> {
     tracing::debug!("profiles::{}", stringify!(list_profiles));
@@ -153,6 +155,7 @@ pub async fn list_profiles(
 
 /// GET /api/profiles/:name - Get a specific profile
 pub async fn get_profile(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<VMProfile>, (StatusCode, Json<serde_json::Value>)> {
@@ -172,6 +175,7 @@ pub async fn get_profile(
 
 /// POST /api/profiles - Create a custom profile
 pub async fn create_profile(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateProfileRequest>,
 ) -> Result<(StatusCode, Json<VMProfile>), (StatusCode, Json<serde_json::Value>)> {
@@ -201,6 +205,7 @@ pub async fn create_profile(
 
 /// DELETE /api/profiles/:name - Delete a custom profile
 pub async fn delete_profile(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {

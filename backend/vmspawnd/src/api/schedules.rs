@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc, Timelike, Datelike, Duration};
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -237,6 +238,7 @@ fn calculate_next_run(
 // ============================================================================
 
 pub async fn list_schedules(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Schedule>>, StatusCode> {
     tracing::debug!("schedules::{}", stringify!(list_schedules));
@@ -279,6 +281,7 @@ pub async fn list_schedules(
 }
 
 pub async fn get_schedule(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Schedule>, StatusCode> {
@@ -292,6 +295,7 @@ pub async fn get_schedule(
 }
 
 pub async fn create_schedule(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateScheduleRequest>,
 ) -> Result<(StatusCode, Json<Schedule>), StatusCode> {
@@ -332,6 +336,7 @@ pub async fn create_schedule(
 }
 
 pub async fn update_schedule(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateScheduleRequest>,
@@ -401,6 +406,7 @@ pub async fn update_schedule(
 }
 
 pub async fn delete_schedule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -415,6 +421,7 @@ pub async fn delete_schedule(
 }
 
 pub async fn enable_schedule(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -440,6 +447,7 @@ pub async fn enable_schedule(
 }
 
 pub async fn disable_schedule(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -465,6 +473,7 @@ pub async fn disable_schedule(
 }
 
 pub async fn run_schedule_now(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -542,6 +551,7 @@ pub async fn run_schedule_now(
 // ============================================================================
 
 pub async fn get_schedule_history(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(schedule_id): Path<String>,
 ) -> Result<Json<Vec<ScheduleHistory>>, StatusCode> {
@@ -565,6 +575,7 @@ pub async fn get_schedule_history(
 }
 
 pub async fn get_all_schedule_history(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ScheduleHistory>>, StatusCode> {
     tracing::debug!("schedules::{}", stringify!(get_all_schedule_history));

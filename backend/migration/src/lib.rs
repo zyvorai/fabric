@@ -90,12 +90,10 @@ impl MigrationManager {
         tracing::info!("Preparing target node {}", config.target_node);
 
         // Create VM directory on target
-        let cmd = format!(
-            "ssh {} 'mkdir -p /var/lib/vmspawnd/vms/{}'",
-            config.target_node, config.vm_name
-        );
-
-        let output = Command::new("sh").arg("-c").arg(&cmd).output()?;
+        let output = Command::new("ssh")
+            .arg(&config.target_node)
+            .args(["mkdir", "-p", &format!("/var/lib/vmspawnd/vms/{}", config.vm_name)])
+            .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

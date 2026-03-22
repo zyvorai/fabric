@@ -9,6 +9,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use crate::validation::validate_vm_name;
 
 // ============================================================================
@@ -87,6 +88,7 @@ pub enum ScaleAction {
 
 /// POST /api/autoscale - Create an auto-scaling policy
 pub async fn create_scaling_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateScalingPolicyRequest>,
 ) -> Result<(StatusCode, Json<ScalingPolicy>), (StatusCode, Json<serde_json::Value>)> {
@@ -125,15 +127,17 @@ pub async fn create_scaling_policy(
 
 /// GET /api/autoscale - List all scaling policies
 pub async fn list_scaling_policies(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScalingPolicy>> {
     tracing::debug!("autoscale::{}", stringify!(list_scaling_policies));
-    let policies: Vec<ScalingPolicy> = state.store.list_entities("autoscale_policies").unwrap_or_default();
+    let policies: Vec<ScalingPolicy> = state.store.list_entities("autoscale_policies").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(policies)
 }
 
 /// GET /api/autoscale/:vm_name - Get scaling policy for a VM
 pub async fn get_scaling_policy(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<ScalingPolicy>, (StatusCode, Json<serde_json::Value>)> {
@@ -147,6 +151,7 @@ pub async fn get_scaling_policy(
 
 /// DELETE /api/autoscale/:vm_name - Delete scaling policy
 pub async fn delete_scaling_policy(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -160,10 +165,11 @@ pub async fn delete_scaling_policy(
 
 /// GET /api/autoscale/events - List recent scaling events
 pub async fn list_scale_events(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScaleEvent>> {
     tracing::debug!("autoscale::{}", stringify!(list_scale_events));
-    let mut events: Vec<ScaleEvent> = state.store.list_entities("scale_events").unwrap_or_default();
+    let mut events: Vec<ScaleEvent> = state.store.list_entities("scale_events").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     events.truncate(100);
     Json(events)

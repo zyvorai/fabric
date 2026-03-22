@@ -12,6 +12,7 @@ use vmspawnd_storage::{
 };
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // Request/Response types
 #[derive(Debug, Deserialize)]
@@ -100,6 +101,7 @@ impl From<NfsVersion> for NfsVersionDto {
 
 /// GET /api/storage/pools - List all storage pools
 pub async fn list_pools(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<StoragePool>>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(list_pools));
@@ -113,6 +115,7 @@ pub async fn list_pools(
 
 /// GET /api/storage/pools/:name - Get storage pool details
 pub async fn get_pool(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
@@ -130,6 +133,7 @@ pub async fn get_pool(
 
 /// POST /api/storage/pools/local - Create local storage pool
 pub async fn create_local_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLocalPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
@@ -153,6 +157,7 @@ pub async fn create_local_pool(
 
 /// POST /api/storage/pools/nfs - Create NFS storage pool
 pub async fn create_nfs_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
@@ -188,6 +193,7 @@ pub async fn create_nfs_pool(
 
 /// DELETE /api/storage/pools/:name - Delete storage pool
 pub async fn delete_pool(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -205,6 +211,7 @@ pub async fn delete_pool(
 
 /// POST /api/storage/pools/:name/start - Start storage pool
 pub async fn start_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -221,6 +228,7 @@ pub async fn start_pool(
 
 /// POST /api/storage/pools/:name/stop - Stop storage pool
 pub async fn stop_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -237,6 +245,7 @@ pub async fn stop_pool(
 
 /// GET /api/storage/pools/:name/health - Get NFS pool health
 pub async fn get_pool_health(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
@@ -253,13 +262,16 @@ pub async fn get_pool_health(
 
 /// GET /api/storage/pools/:name/stats - Get NFS pool stats
 pub async fn get_pool_stats(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(get_pool_stats));
-    let manager = state.storage_manager.read().await;
-
-    match manager.get_nfs_stats(&name).await {
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.get_nfs_stats(&name).await
+    };
+    match result {
         Ok(stats) => Ok(Json(stats)),
         Err(e) => Err((StatusCode::NOT_FOUND, format!("Failed to get stats: {}", e))),
     }
@@ -267,13 +279,16 @@ pub async fn get_pool_stats(
 
 /// POST /api/storage/pools/:name/refresh - Refresh pool statistics
 pub async fn refresh_pool_stats(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(refresh_pool_stats));
-    let manager = state.storage_manager.read().await;
-
-    match manager.refresh_pool_stats(&name).await {
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.refresh_pool_stats(&name).await
+    };
+    match result {
         Ok(_) => Ok(StatusCode::OK),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to refresh stats: {}", e))),
     }
@@ -281,15 +296,16 @@ pub async fn refresh_pool_stats(
 
 /// POST /api/storage/pools/lvm - Create LVM storage pool
 pub async fn create_lvm_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLvmPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_lvm_pool));
-    let manager = state.storage_manager.read().await;
-
-    match manager
-        .create_lvm_pool(req.name, req.volume_group, req.auto_start)
-        .await
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.create_lvm_pool(req.name, req.volume_group, req.auto_start).await
+    };
+    match result
     {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
@@ -301,15 +317,16 @@ pub async fn create_lvm_pool(
 
 /// POST /api/storage/pools/lvm-thin - Create LVM thin storage pool
 pub async fn create_lvm_thin_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLvmThinPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_lvm_thin_pool));
-    let manager = state.storage_manager.read().await;
-
-    match manager
-        .create_lvm_thin_pool(req.name, req.volume_group, req.thin_pool, req.auto_start)
-        .await
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.create_lvm_thin_pool(req.name, req.volume_group, req.thin_pool, req.auto_start).await
+    };
+    match result
     {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
@@ -321,15 +338,16 @@ pub async fn create_lvm_thin_pool(
 
 /// POST /api/storage/pools/zfs - Create ZFS storage pool
 pub async fn create_zfs_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateZfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_zfs_pool));
-    let manager = state.storage_manager.read().await;
-
-    match manager
-        .create_zfs_pool(req.name, req.zpool, req.dataset, req.auto_start)
-        .await
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.create_zfs_pool(req.name, req.zpool, req.dataset, req.auto_start).await
+    };
+    match result
     {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
@@ -351,16 +369,18 @@ pub struct CreateCephPoolRequest {
 }
 
 pub async fn create_ceph_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateCephPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_ceph_pool));
-    let manager = state.storage_manager.read().await;
-
-    match manager
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager
         .create_ceph_pool(req.name, req.monitors, req.pool_name, req.user, req.keyring, req.auto_start)
         .await
-    {
+    };
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
             StatusCode::BAD_REQUEST,

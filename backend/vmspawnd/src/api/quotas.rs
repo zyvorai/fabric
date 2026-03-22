@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -162,6 +163,7 @@ impl QuotaUsage {
 // ============================================================================
 
 pub async fn list_quotas(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ResourceQuota>>, StatusCode> {
     // Load from state store, fall back to mock data if empty
@@ -205,6 +207,7 @@ pub async fn list_quotas(
 }
 
 pub async fn get_quota(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<ResourceQuota>, StatusCode> {
@@ -217,6 +220,7 @@ pub async fn get_quota(
 }
 
 pub async fn create_quota(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateQuotaRequest>,
 ) -> Result<(StatusCode, Json<ResourceQuota>), StatusCode> {
@@ -254,6 +258,7 @@ pub async fn create_quota(
 }
 
 pub async fn update_quota(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateQuotaRequest>,
@@ -313,6 +318,7 @@ pub async fn update_quota(
 }
 
 pub async fn delete_quota(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -334,6 +340,7 @@ pub async fn delete_quota(
 }
 
 pub async fn enable_quota(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -356,6 +363,7 @@ pub async fn enable_quota(
 }
 
 pub async fn disable_quota(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -382,6 +390,7 @@ pub async fn disable_quota(
 // ============================================================================
 
 pub async fn get_quota_usage(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<QuotaUsage>, StatusCode> {
@@ -398,6 +407,7 @@ pub async fn get_quota_usage(
 }
 
 pub async fn get_all_quota_usage(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<QuotaUsage>>, StatusCode> {
     // Check cache first

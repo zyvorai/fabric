@@ -9,6 +9,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite};
 
 // ============================================================================
 // Data Structures
@@ -51,6 +52,7 @@ pub enum BuildState {
 
 /// POST /api/images/build - Build a new VM image using mkosi
 pub async fn build_image(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageBuildRequest>,
 ) -> Result<(StatusCode, Json<ImageBuildStatus>), (StatusCode, Json<serde_json::Value>)> {
@@ -127,6 +129,7 @@ pub async fn build_image(
 
 /// GET /api/images/builds - List all image builds
 pub async fn list_builds(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ImageBuildStatus>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(list_builds));

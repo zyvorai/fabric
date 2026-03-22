@@ -276,11 +276,17 @@ impl Agent {
                 if let Err(e) = vmspawn_driver::stop_vm(&vm_name) {
                     warn!(vm = %vm_name, error = %e, "graceful stop failed, attempting kill");
                     // Fallback: find the leader PID and kill -9
-                    let kill_cmd = format!(
-                        "machinectl show {} --property=Leader --value 2>/dev/null | xargs -r kill -9",
-                        vm_name
-                    );
-                    match std::process::Command::new("sh").arg("-c").arg(&kill_cmd).output() {
+                    let leader_result = std::process::Command::new("machinectl")
+                        .args(["show", &vm_name, "--property=Leader", "--value"])
+                        .output();
+                    let kill_result = leader_result.and_then(|out| {
+                        let pid = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                        if pid.is_empty() {
+                            return Ok(out); // No PID found
+                        }
+                        std::process::Command::new("kill").args(["-9", &pid]).output()
+                    });
+                    match kill_result {
                         Ok(out) if out.status.success() => {
                             info!(vm = %vm_name, "VM forcefully killed via leader PID");
                         }
@@ -295,8 +301,7 @@ impl Agent {
             HostCommand::PromoteStorage { vm_name, dataset } => {
                 info!(vm = %vm_name, dataset = %dataset, "promoting ZFS storage for failover");
                 // Promote the received ZFS dataset on this host
-                let cmd = format!("zfs promote {}", dataset);
-                match std::process::Command::new("sh").arg("-c").arg(&cmd).output() {
+                match std::process::Command::new("zfs").args(["promote", &dataset]).output() {
                     Ok(out) if out.status.success() => {
                         info!(vm = %vm_name, dataset = %dataset, "ZFS storage promoted");
                     }

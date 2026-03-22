@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -68,6 +69,7 @@ pub struct DeployTemplateRequest {
 
 /// POST /api/templates - Create a new template
 pub async fn create_template(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateTemplateRequest>,
 ) -> Result<(StatusCode, Json<VMTemplate>), (StatusCode, Json<serde_json::Value>)> {
@@ -127,6 +129,7 @@ pub async fn create_template(
 
 /// GET /api/templates - List all templates
 pub async fn list_templates(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<VMTemplate>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("templates::{}", stringify!(list_templates));
@@ -142,6 +145,7 @@ pub async fn list_templates(
 
 /// GET /api/templates/:id - Get a template by ID
 pub async fn get_template(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<VMTemplate>, (StatusCode, Json<serde_json::Value>)> {
@@ -161,6 +165,7 @@ pub async fn get_template(
 
 /// PUT /api/templates/:id - Update a template
 pub async fn update_template(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateTemplateRequest>,
@@ -220,6 +225,7 @@ pub async fn update_template(
 
 /// DELETE /api/templates/:id - Delete a template
 pub async fn delete_template(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -253,6 +259,7 @@ pub async fn delete_template(
 
 /// POST /api/templates/:id/deploy - Deploy a new VM from a template
 pub async fn deploy_template(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<DeployTemplateRequest>,

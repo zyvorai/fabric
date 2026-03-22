@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -149,6 +150,7 @@ pub struct BackupQuery {
 // ============================================================================
 
 pub async fn list_backups(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<BackupQuery>,
 ) -> Result<Json<Vec<Backup>>, StatusCode> {
@@ -166,6 +168,7 @@ pub async fn list_backups(
 }
 
 pub async fn get_backup(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Backup>, StatusCode> {
@@ -179,6 +182,7 @@ pub async fn get_backup(
 }
 
 pub async fn create_backup(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupRequest>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
@@ -262,6 +266,7 @@ pub async fn create_backup(
 }
 
 pub async fn delete_backup(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -302,6 +307,7 @@ pub async fn delete_backup(
 }
 
 pub async fn restore_backup(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<RestoreOptions>,
 ) -> Result<(StatusCode, Json<BackupJob>), StatusCode> {
@@ -384,6 +390,7 @@ pub async fn restore_backup(
 // ============================================================================
 
 pub async fn get_backup_jobs(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupJob>>, StatusCode> {
     tracing::debug!("backups::{}", stringify!(get_backup_jobs));
@@ -395,6 +402,7 @@ pub async fn get_backup_jobs(
 }
 
 pub async fn get_backup_job(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<BackupJob>, StatusCode> {
@@ -412,6 +420,7 @@ pub async fn get_backup_job(
 // ============================================================================
 
 pub async fn list_backup_policies(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupPolicy>>, StatusCode> {
     tracing::debug!("backups::{}", stringify!(list_backup_policies));
@@ -446,6 +455,7 @@ pub async fn list_backup_policies(
 }
 
 pub async fn create_backup_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBackupPolicyRequest>,
 ) -> Result<(StatusCode, Json<BackupPolicy>), StatusCode> {
@@ -472,6 +482,7 @@ pub async fn create_backup_policy(
 }
 
 pub async fn delete_backup_policy(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -486,6 +497,7 @@ pub async fn delete_backup_policy(
 }
 
 pub async fn enable_backup_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -511,6 +523,7 @@ pub async fn enable_backup_policy(
 }
 
 pub async fn disable_backup_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -540,6 +553,7 @@ pub async fn disable_backup_policy(
 // ============================================================================
 
 pub async fn get_backup_stats(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<BackupStats>, StatusCode> {
     tracing::debug!("backups::{}", stringify!(get_backup_stats));

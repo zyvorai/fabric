@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::qmp::QmpClient;
 use crate::server::AppState;
+use security::RequireWrite;
 
 #[derive(Debug, Deserialize)]
 pub struct HotplugCpuRequest {
@@ -49,6 +50,7 @@ fn not_available_response() -> impl IntoResponse {
 
 /// POST /api/vms/:name/hotplug/cpu - Hot-add vCPUs
 pub async fn hotplug_cpu(
+    RequireWrite(_claims): RequireWrite,
     State(_state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugCpuRequest>,
@@ -113,6 +115,7 @@ pub async fn hotplug_cpu(
 
 /// POST /api/vms/:name/hotplug/memory - Hot-add memory
 pub async fn hotplug_memory(
+    RequireWrite(_claims): RequireWrite,
     State(_state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugMemoryRequest>,
@@ -172,11 +175,18 @@ pub async fn hotplug_memory(
 
 /// POST /api/vms/:name/hotplug/disk - Hot-add a disk
 pub async fn hotplug_disk(
+    RequireWrite(_claims): RequireWrite,
     State(_state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugDiskRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_disk));
+
+    // Validate disk path to prevent traversal
+    if let Err((status, msg)) = crate::validation::validate_host_path(&req.path) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -233,6 +243,7 @@ pub async fn hotplug_disk(
 
 /// DELETE /api/vms/:name/hotplug/disk/:id - Hot-remove a disk
 pub async fn hotremove_disk(
+    RequireWrite(_claims): RequireWrite,
     State(_state): State<Arc<AppState>>,
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -259,6 +270,7 @@ pub async fn hotremove_disk(
 
 /// POST /api/vms/:name/hotplug/nic - Hot-add a NIC
 pub async fn hotplug_nic(
+    RequireWrite(_claims): RequireWrite,
     State(_state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugNicRequest>,
@@ -313,6 +325,7 @@ pub async fn hotplug_nic(
 
 /// DELETE /api/vms/:name/hotplug/nic/:id - Hot-remove a NIC
 pub async fn hotremove_nic(
+    RequireWrite(_claims): RequireWrite,
     State(_state): State<Arc<AppState>>,
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {

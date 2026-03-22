@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use datacenter::{
     Cluster, CreateClusterRequest, CreateDatacenterRequest, Datacenter, DatacenterStatus,
     DatacenterSummary, HostHeartbeat, HostInfo, HostStatus, RegisterHostRequest,
@@ -21,11 +22,12 @@ use datacenter::{
 
 pub async fn list_datacenters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_datacenters));
-    let items: Vec<Datacenter> = state.store.list_entities("datacenters").unwrap_or_default();
+    let items: Vec<Datacenter> = state.store.list_entities("datacenters").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_datacenter(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDatacenterRequest>,
 ) -> impl IntoResponse {
@@ -51,6 +53,7 @@ pub async fn create_datacenter(
 }
 
 pub async fn get_datacenter(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -67,6 +70,7 @@ pub async fn get_datacenter(
 }
 
 pub async fn update_datacenter(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateDatacenterRequest>,
@@ -101,6 +105,7 @@ pub async fn update_datacenter(
 }
 
 pub async fn delete_datacenter(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -112,6 +117,7 @@ pub async fn delete_datacenter(
 }
 
 pub async fn get_datacenter_summary(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -121,7 +127,7 @@ pub async fn get_datacenter_summary(
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let dc_hosts: Vec<&HostInfo> = hosts.iter().filter(|h| h.datacenter_id == id).collect();
     let summary = DatacenterSummary {
         id: dc.id,
@@ -141,11 +147,12 @@ pub async fn get_datacenter_summary(
 
 pub async fn list_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_clusters));
-    let items: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_default();
+    let items: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_cluster(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateClusterRequest>,
 ) -> impl IntoResponse {
@@ -176,6 +183,7 @@ pub async fn create_cluster(
 }
 
 pub async fn get_cluster(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -188,6 +196,7 @@ pub async fn get_cluster(
 }
 
 pub async fn update_cluster(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateClusterRequest>,
@@ -213,6 +222,7 @@ pub async fn update_cluster(
 }
 
 pub async fn delete_cluster(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -229,11 +239,12 @@ pub async fn delete_cluster(
 
 pub async fn list_hosts(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_hosts));
-    let items: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    let items: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn register_host(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Json(req): Json<RegisterHostRequest>,
 ) -> impl IntoResponse {
@@ -267,6 +278,7 @@ pub async fn register_host(
 }
 
 pub async fn get_host(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -279,6 +291,7 @@ pub async fn get_host(
 }
 
 pub async fn update_host(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateHostRequest>,
@@ -303,6 +316,7 @@ pub async fn update_host(
 }
 
 pub async fn remove_host(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -314,6 +328,7 @@ pub async fn remove_host(
 }
 
 pub async fn host_heartbeat(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(hb): Json<HostHeartbeat>,
@@ -336,6 +351,7 @@ pub async fn host_heartbeat(
 }
 
 pub async fn host_enter_maintenance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -354,6 +370,7 @@ pub async fn host_enter_maintenance(
 }
 
 pub async fn host_exit_maintenance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -393,6 +410,7 @@ pub struct DiscoverHostResult {
 
 /// POST /api/hosts/discover - Probe a host to check reachability and gather info
 pub async fn discover_host(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Json(req): Json<DiscoverHostRequest>,
 ) -> impl IntoResponse {
@@ -401,7 +419,7 @@ pub async fn discover_host(
     let url = format!("http://{}:{}/health", req.address, port);
 
     // Check if already registered
-    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let already_registered = hosts.iter().any(|h| h.address == req.address);
 
     // Probe the host
@@ -463,6 +481,7 @@ pub struct ClusterHealth {
 
 /// GET /api/clusters/:id/health - Get cluster health summary
 pub async fn get_cluster_health(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(cluster_id): Path<String>,
 ) -> impl IntoResponse {
@@ -474,7 +493,7 @@ pub async fn get_cluster_health(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 
-    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let cluster_hosts: Vec<&HostInfo> = hosts.iter()
         .filter(|h| h.cluster_id == cluster_id)
         .collect();

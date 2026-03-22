@@ -9,12 +9,14 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use predictive_drs::{
     AffinityRule, DrsConfig, HostSnapshot, MigrationRecommendation,
     PlacementRequest, VmSnapshot,
 };
 
 pub async fn configure_drs(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(config): Json<DrsConfig>,
 ) -> impl IntoResponse {
@@ -26,6 +28,7 @@ pub async fn configure_drs(
 }
 
 pub async fn get_drs_config(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(cluster_id): Path<String>,
 ) -> impl IntoResponse {
@@ -38,12 +41,13 @@ pub async fn get_drs_config(
 }
 
 pub async fn compute_placement(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Json(req): Json<PlacementRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(compute_placement));
     let mgr = predictive_drs::DrsManager::new();
-    let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_default();
+    let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     match mgr.compute_placement(&hosts, &req) {
         Ok(result) => Json(result).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
@@ -56,6 +60,7 @@ pub struct BalanceRequest {
 }
 
 pub async fn analyze_balance(
+    RequireRead(_claims): RequireRead,
     State(_state): State<Arc<AppState>>,
     Json(req): Json<BalanceRequest>,
 ) -> impl IntoResponse {
@@ -73,6 +78,7 @@ pub struct RecommendationRequest {
 }
 
 pub async fn generate_recommendations(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Json(req): Json<RecommendationRequest>,
 ) -> impl IntoResponse {
@@ -88,14 +94,16 @@ pub async fn generate_recommendations(
 }
 
 pub async fn list_recommendations(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(list_recommendations));
-    let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_default();
+    let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn approve_recommendation(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -113,6 +121,7 @@ pub async fn approve_recommendation(
 }
 
 pub async fn reject_recommendation(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -135,11 +144,12 @@ pub async fn reject_recommendation(
 
 pub async fn list_affinity_rules(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(list_affinity_rules));
-    let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_default();
+    let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_affinity_rule(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut rule): Json<AffinityRule>,
 ) -> impl IntoResponse {
@@ -156,6 +166,7 @@ pub async fn create_affinity_rule(
 }
 
 pub async fn get_affinity_rule(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -168,6 +179,7 @@ pub async fn get_affinity_rule(
 }
 
 pub async fn update_affinity_rule(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(mut rule): Json<AffinityRule>,
@@ -182,6 +194,7 @@ pub async fn update_affinity_rule(
 }
 
 pub async fn delete_affinity_rule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {

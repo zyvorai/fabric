@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use encryption::{EncryptionPolicy, KeyProvider, VmEncryptionStatus};
 
 // ============================================================================
@@ -17,11 +18,12 @@ use encryption::{EncryptionPolicy, KeyProvider, VmEncryptionStatus};
 
 pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(list_providers));
-    let items: Vec<KeyProvider> = state.store.list_entities("key_providers").unwrap_or_default();
+    let items: Vec<KeyProvider> = state.store.list_entities("key_providers").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn register_provider(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Json(mut provider): Json<KeyProvider>,
 ) -> impl IntoResponse {
@@ -37,6 +39,7 @@ pub async fn register_provider(
 }
 
 pub async fn remove_provider(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -48,6 +51,7 @@ pub async fn remove_provider(
 }
 
 pub async fn test_provider(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -71,11 +75,12 @@ pub async fn test_provider(
 
 pub async fn list_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(list_policies));
-    let items: Vec<EncryptionPolicy> = state.store.list_entities("encryption_policies").unwrap_or_default();
+    let items: Vec<EncryptionPolicy> = state.store.list_entities("encryption_policies").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut policy): Json<EncryptionPolicy>,
 ) -> impl IntoResponse {
@@ -91,6 +96,7 @@ pub async fn create_policy(
 }
 
 pub async fn get_policy(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -103,6 +109,7 @@ pub async fn get_policy(
 }
 
 pub async fn update_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(mut policy): Json<EncryptionPolicy>,
@@ -117,6 +124,7 @@ pub async fn update_policy(
 }
 
 pub async fn delete_policy(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -138,6 +146,7 @@ pub struct EncryptVmRequest {
 }
 
 pub async fn encrypt_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<EncryptVmRequest>,
 ) -> impl IntoResponse {
@@ -168,6 +177,7 @@ pub struct DecryptVmRequest {
 }
 
 pub async fn decrypt_vm(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<DecryptVmRequest>,
 ) -> impl IntoResponse {
@@ -188,6 +198,7 @@ pub async fn decrypt_vm(
 }
 
 pub async fn get_vm_encryption_status(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -201,12 +212,13 @@ pub async fn get_vm_encryption_status(
 
 pub async fn list_encrypted_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(list_encrypted_vms));
-    let items: Vec<VmEncryptionStatus> = state.store.list_entities("vm_encryption").unwrap_or_default();
+    let items: Vec<VmEncryptionStatus> = state.store.list_entities("vm_encryption").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let encrypted: Vec<_> = items.into_iter().filter(|s| s.encrypted).collect();
     Json(encrypted)
 }
 
 pub async fn rotate_vm_key(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use site_recovery::{
     DrDashboard, DrHealth, ExecutionStatus, ExecutionType, PlanStatus, RecoveryExecution,
     RecoveryPlan, SiteRecoveryManager,
@@ -20,11 +21,12 @@ use site_recovery::{
 
 pub async fn list_plans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_plans));
-    let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_default();
+    let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_plan(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut plan): Json<RecoveryPlan>,
 ) -> impl IntoResponse {
@@ -41,6 +43,7 @@ pub async fn create_plan(
 }
 
 pub async fn get_plan(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -53,6 +56,7 @@ pub async fn get_plan(
 }
 
 pub async fn update_plan(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(mut plan): Json<RecoveryPlan>,
@@ -74,6 +78,7 @@ pub async fn update_plan(
 }
 
 pub async fn delete_plan(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -123,6 +128,7 @@ fn start_execution(
 }
 
 pub async fn execute_planned_migration(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
@@ -134,6 +140,7 @@ pub async fn execute_planned_migration(
 }
 
 pub async fn execute_disaster_recovery(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
@@ -145,6 +152,7 @@ pub async fn execute_disaster_recovery(
 }
 
 pub async fn execute_test_failover(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
@@ -156,6 +164,7 @@ pub async fn execute_test_failover(
 }
 
 pub async fn execute_reprotect(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
@@ -168,11 +177,12 @@ pub async fn execute_reprotect(
 
 pub async fn list_executions(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_executions));
-    let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_default();
+    let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn get_execution(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -185,6 +195,7 @@ pub async fn get_execution(
 }
 
 pub async fn cancel_execution(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -208,7 +219,7 @@ pub async fn cancel_execution(
 
 pub async fn get_dr_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(get_dr_dashboard));
-    let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_default();
+    let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let total_plans = plans.len() as u32;
     let ready_plans = plans.iter().filter(|p| p.status == PlanStatus::Ready).count() as u32;
     let failed_plans = plans.iter().filter(|p| p.status == PlanStatus::Failed).count() as u32;

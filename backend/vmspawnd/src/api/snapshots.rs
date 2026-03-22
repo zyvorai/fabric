@@ -11,6 +11,7 @@ use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SnapshotType {
@@ -51,6 +52,7 @@ fn default_snapshot_type() -> SnapshotType {
 
 /// POST /api/vms/:name/snapshots - Create a snapshot
 pub async fn create_snapshot(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<CreateSnapshotRequest>,
@@ -115,17 +117,19 @@ pub async fn create_snapshot(
 
 /// GET /api/vms/:name/snapshots - List snapshots for a VM
 pub async fn list_snapshots(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(list_snapshots));
     let store_key = format!("snapshots_{}", vm_name);
-    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_default();
+    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 /// GET /api/vms/:name/snapshots/:id - Get snapshot details
 pub async fn get_snapshot(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -140,6 +144,7 @@ pub async fn get_snapshot(
 
 /// DELETE /api/vms/:name/snapshots/:id - Delete a snapshot
 pub async fn delete_snapshot(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -167,6 +172,7 @@ pub async fn delete_snapshot(
 
 /// POST /api/vms/:name/snapshots/:id/revert - Revert to a snapshot
 pub async fn revert_snapshot(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -211,12 +217,13 @@ pub async fn revert_snapshot(
 
 /// GET /api/vms/:name/snapshots/tree - Get snapshot tree
 pub async fn snapshot_tree(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(snapshot_tree));
     let store_key = format!("snapshots_{}", vm_name);
-    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_default();
+    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
 
     // Build tree from parent_id relationships
     let roots: Vec<SnapshotTreeNode> = build_snapshot_tree(&snapshots);

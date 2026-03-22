@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use content_library::{
     CreateLibraryRequest, GuestCustomizationSpec, HostProfile, Library,
     LibraryItem, LibraryType,
@@ -20,11 +21,12 @@ use content_library::{
 
 pub async fn list_libraries(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_libraries));
-    let items: Vec<Library> = state.store.list_entities("libraries").unwrap_or_default();
+    let items: Vec<Library> = state.store.list_entities("libraries").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_library(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLibraryRequest>,
 ) -> impl IntoResponse {
@@ -53,6 +55,7 @@ pub async fn create_library(
 }
 
 pub async fn get_library(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -65,6 +68,7 @@ pub async fn get_library(
 }
 
 pub async fn delete_library(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -76,6 +80,7 @@ pub async fn delete_library(
 }
 
 pub async fn sync_library(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -113,6 +118,7 @@ fn default_item_type() -> content_library::ItemType {
 }
 
 pub async fn download_image(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(library_id): Path<String>,
     Json(req): Json<DownloadImageRequest>,
@@ -178,11 +184,12 @@ pub async fn download_image(
 
 pub async fn list_library_items(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_library_items));
-    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_default();
+    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn add_library_item(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut item): Json<LibraryItem>,
 ) -> impl IntoResponse {
@@ -199,6 +206,7 @@ pub async fn add_library_item(
 }
 
 pub async fn get_library_item(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -211,6 +219,7 @@ pub async fn get_library_item(
 }
 
 pub async fn delete_library_item(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -227,11 +236,12 @@ pub struct SearchQuery {
 }
 
 pub async fn search_items(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
 ) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(search_items));
-    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_default();
+    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     let q = query.q.to_lowercase();
     let matched: Vec<_> = items.into_iter().filter(|i| i.name.to_lowercase().contains(&q)).collect();
     Json(matched)
@@ -243,11 +253,12 @@ pub async fn search_items(
 
 pub async fn list_customization_specs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_customization_specs));
-    let items: Vec<GuestCustomizationSpec> = state.store.list_entities("customization_specs").unwrap_or_default();
+    let items: Vec<GuestCustomizationSpec> = state.store.list_entities("customization_specs").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_customization_spec(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut spec): Json<GuestCustomizationSpec>,
 ) -> impl IntoResponse {
@@ -263,6 +274,7 @@ pub async fn create_customization_spec(
 }
 
 pub async fn get_customization_spec(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -275,6 +287,7 @@ pub async fn get_customization_spec(
 }
 
 pub async fn delete_customization_spec(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -291,11 +304,12 @@ pub async fn delete_customization_spec(
 
 pub async fn list_host_profiles(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_host_profiles));
-    let items: Vec<HostProfile> = state.store.list_entities("host_profiles").unwrap_or_default();
+    let items: Vec<HostProfile> = state.store.list_entities("host_profiles").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_host_profile(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut profile): Json<HostProfile>,
 ) -> impl IntoResponse {
@@ -311,6 +325,7 @@ pub async fn create_host_profile(
 }
 
 pub async fn get_host_profile(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -323,6 +338,7 @@ pub async fn get_host_profile(
 }
 
 pub async fn delete_host_profile(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -340,6 +356,7 @@ pub struct HostComplianceRequest {
 }
 
 pub async fn check_host_compliance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(profile_id): Path<String>,
     Json(req): Json<HostComplianceRequest>,

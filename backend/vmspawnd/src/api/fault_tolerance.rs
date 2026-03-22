@@ -7,6 +7,7 @@ use axum::{
 use chrono::Utc;
 use std::sync::Arc;
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite};
 use fault_tolerance::{
     FailoverResult, FtConfig, FtEvent, FtMetrics, FtStatus, ReplicationState,
 };
@@ -19,6 +20,7 @@ pub struct EnableFtRequest {
 }
 
 pub async fn enable_ft(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<EnableFtRequest>,
 ) -> impl IntoResponse {
@@ -47,6 +49,7 @@ pub async fn enable_ft(
 }
 
 pub async fn disable_ft(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -61,6 +64,7 @@ pub async fn disable_ft(
 }
 
 pub async fn get_ft_config(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -74,7 +78,7 @@ pub async fn get_ft_config(
 
 pub async fn list_ft_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(list_ft_vms));
-    let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_default();
+    let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -86,6 +90,7 @@ pub struct CompatibilityRequest {
 }
 
 pub async fn check_ft_compatibility(
+    RequireRead(_claims): RequireRead,
     State(_state): State<Arc<AppState>>,
     Json(req): Json<CompatibilityRequest>,
 ) -> impl IntoResponse {
@@ -96,6 +101,7 @@ pub async fn check_ft_compatibility(
 }
 
 pub async fn trigger_failover(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -132,6 +138,7 @@ pub async fn trigger_failover(
 }
 
 pub async fn test_failover(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -157,6 +164,7 @@ pub async fn test_failover(
 }
 
 pub async fn suspend_replication(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -175,6 +183,7 @@ pub async fn suspend_replication(
 }
 
 pub async fn resume_replication(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -193,6 +202,7 @@ pub async fn resume_replication(
 }
 
 pub async fn get_ft_metrics(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -206,6 +216,6 @@ pub async fn get_ft_metrics(
 
 pub async fn get_ft_events(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(get_ft_events));
-    let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_default();
+    let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use distributed_storage::{
     ComplianceReport, CreateDatastoreClusterRequest, CreatePoolRequest, DatastoreCluster,
     DistributedStoragePool, MigrationStatus, PoolHealth, PoolHealthReport, PoolStatus,
@@ -21,11 +22,12 @@ use distributed_storage::{
 
 pub async fn list_storage_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_pools));
-    let items: Vec<DistributedStoragePool> = state.store.list_entities("dist_storage_pools").unwrap_or_default();
+    let items: Vec<DistributedStoragePool> = state.store.list_entities("dist_storage_pools").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_storage_pool(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreatePoolRequest>,
 ) -> impl IntoResponse {
@@ -55,6 +57,7 @@ pub async fn create_storage_pool(
 }
 
 pub async fn get_storage_pool(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -67,6 +70,7 @@ pub async fn get_storage_pool(
 }
 
 pub async fn delete_storage_pool(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -78,6 +82,7 @@ pub async fn delete_storage_pool(
 }
 
 pub async fn add_storage_host(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(pool_id): Path<String>,
     Json(host): Json<StorageHost>,
@@ -100,6 +105,7 @@ pub async fn add_storage_host(
 }
 
 pub async fn remove_storage_host(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path((pool_id, host_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -124,6 +130,7 @@ pub struct DiskFailureRequest {
 }
 
 pub async fn report_disk_failure(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(pool_id): Path<String>,
     Json(_req): Json<DiskFailureRequest>,
@@ -144,6 +151,7 @@ pub async fn report_disk_failure(
 }
 
 pub async fn get_pool_health(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(pool_id): Path<String>,
 ) -> impl IntoResponse {
@@ -180,6 +188,7 @@ pub struct StartMigrationRequest {
 }
 
 pub async fn start_storage_migration(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<StartMigrationRequest>,
 ) -> impl IntoResponse {
@@ -205,6 +214,7 @@ pub async fn start_storage_migration(
 }
 
 pub async fn get_storage_migration(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -218,7 +228,7 @@ pub async fn get_storage_migration(
 
 pub async fn list_storage_migrations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_migrations));
-    let items: Vec<StorageMigration> = state.store.list_entities("storage_migrations").unwrap_or_default();
+    let items: Vec<StorageMigration> = state.store.list_entities("storage_migrations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -228,6 +238,7 @@ pub struct UpdateProgressRequest {
 }
 
 pub async fn update_migration_progress(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateProgressRequest>,
@@ -248,6 +259,7 @@ pub async fn update_migration_progress(
 }
 
 pub async fn complete_migration(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -267,6 +279,7 @@ pub async fn complete_migration(
 }
 
 pub async fn cancel_migration(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -290,11 +303,12 @@ pub async fn cancel_migration(
 
 pub async fn list_storage_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_policies));
-    let items: Vec<StoragePolicy> = state.store.list_entities("storage_policies").unwrap_or_default();
+    let items: Vec<StoragePolicy> = state.store.list_entities("storage_policies").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_storage_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut policy): Json<StoragePolicy>,
 ) -> impl IntoResponse {
@@ -310,6 +324,7 @@ pub async fn create_storage_policy(
 }
 
 pub async fn get_storage_policy(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -322,6 +337,7 @@ pub async fn get_storage_policy(
 }
 
 pub async fn update_storage_policy(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(mut policy): Json<StoragePolicy>,
@@ -336,6 +352,7 @@ pub async fn update_storage_policy(
 }
 
 pub async fn delete_storage_policy(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -353,6 +370,7 @@ pub struct ComplianceCheckRequest {
 }
 
 pub async fn check_compliance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(policy_id): Path<String>,
     Json(req): Json<ComplianceCheckRequest>,
@@ -380,11 +398,12 @@ pub async fn check_compliance(
 
 pub async fn list_datastore_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_datastore_clusters));
-    let items: Vec<DatastoreCluster> = state.store.list_entities("datastore_clusters").unwrap_or_default();
+    let items: Vec<DatastoreCluster> = state.store.list_entities("datastore_clusters").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_datastore_cluster(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateDatastoreClusterRequest>,
 ) -> impl IntoResponse {
@@ -409,6 +428,7 @@ pub async fn create_datastore_cluster(
 }
 
 pub async fn get_datastore_cluster(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -421,6 +441,7 @@ pub async fn get_datastore_cluster(
 }
 
 pub async fn delete_datastore_cluster(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -437,6 +458,7 @@ pub struct RecommendDatastoreRequest {
 }
 
 pub async fn recommend_datastore(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(ds_cluster_id): Path<String>,
     Json(req): Json<RecommendDatastoreRequest>,

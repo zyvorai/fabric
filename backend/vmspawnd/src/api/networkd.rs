@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use networking::models::{
     BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest, CreateLinkFileRequest,
     CreateMacvtapRequest, CreateNetworkFileRequest, CreatePortForwardRequest, CreateSriovRequest,
@@ -31,11 +32,12 @@ fn networkd_manager(state: &AppState) -> NetworkdManager {
 
 pub async fn list_bridges(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bridges));
-    let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_default();
+    let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_bridge(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBridgeRequest>,
 ) -> impl IntoResponse {
@@ -74,6 +76,7 @@ pub async fn create_bridge(
 }
 
 pub async fn get_bridge(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -86,6 +89,7 @@ pub async fn get_bridge(
 }
 
 pub async fn update_bridge(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<CreateBridgeRequest>,
@@ -136,6 +140,7 @@ pub async fn update_bridge(
 }
 
 pub async fn delete_bridge(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -155,11 +160,12 @@ pub async fn delete_bridge(
 
 pub async fn list_vlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vlans));
-    let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_default();
+    let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_vlan(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVlanRequest>,
 ) -> impl IntoResponse {
@@ -194,6 +200,7 @@ pub async fn create_vlan(
 }
 
 pub async fn get_vlan(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -206,6 +213,7 @@ pub async fn get_vlan(
 }
 
 pub async fn update_vlan(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<CreateVlanRequest>,
@@ -250,6 +258,7 @@ pub async fn update_vlan(
 }
 
 pub async fn delete_vlan(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -269,11 +278,12 @@ pub async fn delete_vlan(
 
 pub async fn list_macvtaps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_macvtaps));
-    let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_default();
+    let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_macvtap(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateMacvtapRequest>,
 ) -> impl IntoResponse {
@@ -306,6 +316,7 @@ pub async fn create_macvtap(
 }
 
 pub async fn get_macvtap(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -318,6 +329,7 @@ pub async fn get_macvtap(
 }
 
 pub async fn delete_macvtap(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -337,11 +349,12 @@ pub async fn delete_macvtap(
 
 pub async fn list_taps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_taps));
-    let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_default();
+    let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_tap(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateTapRequest>,
 ) -> impl IntoResponse {
@@ -376,6 +389,7 @@ pub async fn create_tap(
 }
 
 pub async fn get_tap(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -388,6 +402,7 @@ pub async fn get_tap(
 }
 
 pub async fn delete_tap(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -415,6 +430,7 @@ pub async fn list_links(State(state): State<Arc<AppState>>) -> impl IntoResponse
 }
 
 pub async fn get_device_status(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
@@ -450,11 +466,12 @@ pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl Into
 
 pub async fn list_bonds(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bonds));
-    let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_default();
+    let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_bond(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateBondRequest>,
 ) -> impl IntoResponse {
@@ -498,6 +515,7 @@ pub async fn create_bond(
 }
 
 pub async fn get_bond(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -510,6 +528,7 @@ pub async fn get_bond(
 }
 
 pub async fn update_bond(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<CreateBondRequest>,
@@ -563,6 +582,7 @@ pub async fn update_bond(
 }
 
 pub async fn delete_bond(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -582,11 +602,12 @@ pub async fn delete_bond(
 
 pub async fn list_network_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_network_files));
-    let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_default();
+    let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_network_file(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateNetworkFileRequest>,
 ) -> impl IntoResponse {
@@ -624,6 +645,7 @@ pub async fn create_network_file(
 }
 
 pub async fn get_network_file(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -636,6 +658,7 @@ pub async fn get_network_file(
 }
 
 pub async fn delete_network_file(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -655,11 +678,12 @@ pub async fn delete_network_file(
 
 pub async fn list_link_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_link_files));
-    let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_default();
+    let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_link_file(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLinkFileRequest>,
 ) -> impl IntoResponse {
@@ -695,6 +719,7 @@ pub async fn create_link_file(
 }
 
 pub async fn delete_link_file(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -725,6 +750,7 @@ pub async fn list_port_forwards(State(state): State<Arc<AppState>>) -> impl Into
 }
 
 pub async fn create_port_forward(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreatePortForwardRequest>,
 ) -> impl IntoResponse {
@@ -773,6 +799,7 @@ pub async fn create_port_forward(
 }
 
 pub async fn get_port_forward(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -788,6 +815,7 @@ pub async fn get_port_forward(
 }
 
 pub async fn delete_port_forward(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -831,11 +859,12 @@ pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl Into
 
 pub async fn list_vxlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vxlans));
-    let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_default();
+    let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_vxlan(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVxlanRequest>,
 ) -> impl IntoResponse {
@@ -873,6 +902,7 @@ pub async fn create_vxlan(
 }
 
 pub async fn get_vxlan(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -885,6 +915,7 @@ pub async fn get_vxlan(
 }
 
 pub async fn delete_vxlan(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -904,11 +935,12 @@ pub async fn delete_vxlan(
 
 pub async fn list_sriov(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_sriov));
-    let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_default();
+    let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn create_sriov(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSriovRequest>,
 ) -> impl IntoResponse {
@@ -935,6 +967,7 @@ pub async fn create_sriov(
 }
 
 pub async fn get_sriov(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -947,6 +980,7 @@ pub async fn get_sriov(
 }
 
 pub async fn delete_sriov(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {

@@ -8,6 +8,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireWrite};
 
 // ============================================================================
 // Declarative VM Configuration (TOML/YAML-style via JSON API)
@@ -154,6 +155,7 @@ fn parse_disk_gb(s: &str) -> u64 {
 
 /// POST /api/vms/apply - Apply a declarative VM spec (create + configure)
 pub async fn apply_vm_spec(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(spec): Json<VMSpec>,
 ) -> Result<(StatusCode, Json<ApplyResult>), (StatusCode, Json<serde_json::Value>)> {
@@ -244,6 +246,7 @@ pub async fn apply_vm_spec(
 
 /// GET /api/vms/:name/spec - Export VM as declarative spec
 pub async fn export_vm_spec(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<Json<VMSpec>, (StatusCode, Json<serde_json::Value>)> {
