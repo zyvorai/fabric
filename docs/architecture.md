@@ -203,7 +203,12 @@ The daemon runs with systemd hardening: `ProtectSystem=strict`, `ProtectHome=yes
 - Runs as root (required for VM management and networking)
 - systemd hardening directives restrict filesystem and network access
 - JWT-based API authentication with SQLite user store
+- Auto-generated JWT secret persisted to `/var/lib/vmspawnd/.jwt_secret` (mode `0600`)
+- Auto-generated admin password written to `/var/lib/vmspawnd/.admin_password` (mode `0600`) on first startup
 - RBAC with three roles: Admin, User, Viewer
 - TLS support for production deployments
 - vTPM for guest attestation and secure boot
 - Audit logging for all administrative actions
+- Input validation on all user-facing parameters (VM names, IP addresses, paths, storage names)
+- Parameterized SQL queries throughout (no injection risk)
+- No shell pipelines — all subprocess calls use direct argument passing

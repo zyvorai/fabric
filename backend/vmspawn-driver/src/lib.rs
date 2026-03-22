@@ -209,10 +209,12 @@ pub fn stop_vm(name: &str) -> Result<()> {
 
 pub fn restart_vm(name: &str) -> Result<()> {
     stop_vm(name)?;
+    // Brief pause to allow the VM to fully stop before restarting
     std::thread::sleep(std::time::Duration::from_secs(2));
     start_vm(name)?;
     Ok(())
 }
+
 
 /// Get the leader PID for a VM via machinectl
 pub fn get_vm_pid(name: &str) -> Result<u32> {

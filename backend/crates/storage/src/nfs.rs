@@ -84,9 +84,26 @@ impl NfsPool {
         if config.server.is_empty() {
             return Err(NfsError::InvalidPath("Server cannot be empty".to_string()));
         }
+        if !config.server.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '_')) {
+            return Err(NfsError::InvalidPath(format!(
+                "Server '{}' contains invalid characters", config.server
+            )));
+        }
 
         if config.export_path.is_empty() {
             return Err(NfsError::InvalidPath("Export path cannot be empty".to_string()));
+        }
+        if !config.export_path.starts_with('/') {
+            return Err(NfsError::InvalidPath("Export path must be absolute".to_string()));
+        }
+
+        // Validate mount options — reject shell metacharacters
+        for opt in &config.mount_options {
+            if opt.chars().any(|c| matches!(c, ';' | '|' | '&' | '$' | '`' | '\'' | '"' | '\\' | '\n')) {
+                return Err(NfsError::InvalidPath(format!(
+                    "Mount option '{}' contains invalid characters", opt
+                )));
+            }
         }
 
         Ok(Self {

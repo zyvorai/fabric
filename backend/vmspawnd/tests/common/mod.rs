@@ -73,6 +73,8 @@ pub async fn create_test_app() -> Router {
         packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
         nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
         net_monitor: Arc::new(net_monitor::NetMonitor::new()),
+        vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+        shutdown: tokio_util::sync::CancellationToken::new(),
     });
 
     vmspawnd::server::build_router(state)

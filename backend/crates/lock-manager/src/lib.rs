@@ -107,6 +107,14 @@ pub enum LockError {
 
     #[error("Fencing required before lock can be stolen for VM '{0}'")]
     FencingRequired(String),
+
+    #[error("Internal lock error: {0}")]
+    Internal(String),
+}
+
+/// Helper to convert a poisoned lock error into a LockError.
+fn lock_err<T>(e: std::sync::PoisonError<T>) -> LockError {
+    LockError::Internal(format!("Lock poisoned: {}", e))
 }
 
 // ---------------------------------------------------------------------------
@@ -156,10 +164,10 @@ impl LockManager {
         }
     }
 
-    fn next_fence_token(&self) -> u64 {
-        let mut counter = self.fence_token_counter.write().unwrap();
+    fn next_fence_token(&self) -> Result<u64, LockError> {
+        let mut counter = self.fence_token_counter.write().map_err(lock_err)?;
         *counter += 1;
-        *counter
+        Ok(*counter)
     }
 
     fn record_event(&self, event: LockEvent) {
@@ -169,7 +177,7 @@ impl LockManager {
     }
 
     pub fn acquire_lock(&self, vm_name: &str, host_id: &str) -> Result<VmLock, LockError> {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().map_err(lock_err)?;
 
         if let Some(existing) = locks.get(vm_name) {
             if existing.status == LockStatus::Active {
@@ -181,7 +189,7 @@ impl LockManager {
         }
 
         let now = Utc::now();
-        let fence_token = self.next_fence_token();
+        let fence_token = self.next_fence_token()?;
         let lease_id = Uuid::new_v4().to_string();
         let expires_at = now + chrono::Duration::seconds(self.config.lease_duration_secs as i64);
 
@@ -224,7 +232,7 @@ impl LockManager {
         host_id: &str,
         lease_id: &str,
     ) -> Result<VmLock, LockError> {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().map_err(lock_err)?;
 
         let lock = locks
             .get_mut(vm_name)
@@ -268,7 +276,7 @@ impl LockManager {
     }
 
     pub fn release_lock(&self, vm_name: &str, host_id: &str) -> Result<(), LockError> {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().map_err(lock_err)?;
 
         let lock = locks
             .get_mut(vm_name)
@@ -304,7 +312,13 @@ impl LockManager {
         let grace = chrono::Duration::seconds(self.config.grace_period_secs as i64);
         let mut expired = Vec::new();
 
-        let locks = self.locks.read().unwrap();
+        let locks = match self.locks.read() {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::error!("Failed to read locks: {}", e);
+                return expired;
+            }
+        };
         for lock in locks.values() {
             if lock.status == LockStatus::Active && now > lock.expires_at + grace {
                 expired.push(lock.clone());
@@ -319,7 +333,8 @@ impl LockManager {
         vm_name: &str,
         fence_type: FenceType,
     ) -> Result<FenceAction, LockError> {
-        let mut locks = self.locks.write().unwrap();
+        // Lock ordering: always acquire `locks` first, then `fence_actions`
+        let mut locks = self.locks.write().map_err(lock_err)?;
 
         let lock = locks
             .get_mut(vm_name)
@@ -341,7 +356,7 @@ impl LockManager {
             error: None,
         };
 
-        let mut fences = self.fence_actions.write().unwrap();
+        let mut fences = self.fence_actions.write().map_err(lock_err)?;
         fences.insert(vm_name.to_string(), action.clone());
 
         tracing::info!(
@@ -368,7 +383,9 @@ impl LockManager {
         vm_name: &str,
         fence_action_id: &str,
     ) -> Result<(), LockError> {
-        let mut fences = self.fence_actions.write().unwrap();
+        // Lock ordering: always acquire `locks` first, then `fence_actions`
+        let mut locks = self.locks.write().map_err(lock_err)?;
+        let mut fences = self.fence_actions.write().map_err(lock_err)?;
 
         let action = fences
             .get_mut(vm_name)
@@ -382,7 +399,6 @@ impl LockManager {
         action.completed_at = Some(Utc::now());
 
         // Mark lock as expired
-        let mut locks = self.locks.write().unwrap();
         if let Some(lock) = locks.get_mut(vm_name) {
             let fence_token = lock.fence_token;
             lock.status = LockStatus::Expired;
@@ -408,7 +424,9 @@ impl LockManager {
         fence_action_id: &str,
         error: String,
     ) -> Result<(), LockError> {
-        let mut fences = self.fence_actions.write().unwrap();
+        // Lock ordering: always acquire `locks` first (read), then `fence_actions` (write)
+        let locks = self.locks.read().map_err(lock_err)?;
+        let mut fences = self.fence_actions.write().map_err(lock_err)?;
 
         let action = fences
             .get_mut(vm_name)
@@ -422,7 +440,6 @@ impl LockManager {
         action.completed_at = Some(Utc::now());
         action.error = Some(error.clone());
 
-        let locks = self.locks.read().unwrap();
         if let Some(lock) = locks.get(vm_name) {
             self.record_event(LockEvent {
                 id: Uuid::new_v4().to_string(),
@@ -440,7 +457,8 @@ impl LockManager {
     }
 
     pub fn steal_lock(&self, vm_name: &str, new_host_id: &str) -> Result<VmLock, LockError> {
-        let mut locks = self.locks.write().unwrap();
+        // Lock ordering: always acquire `locks` first, then `fence_actions`
+        let mut locks = self.locks.write().map_err(lock_err)?;
 
         // Pre-condition: current lock must be Expired or fencing must be Completed
         if let Some(existing) = locks.get(vm_name) {
@@ -450,7 +468,7 @@ impl LockManager {
                 }
                 LockStatus::Fencing => {
                     // Check if fence action is completed
-                    let fences = self.fence_actions.read().unwrap();
+                    let fences = self.fence_actions.read().map_err(lock_err)?;
                     if let Some(action) = fences.get(vm_name) {
                         if action.status != FenceStatus::Completed {
                             return Err(LockError::FencingRequired(vm_name.to_string()));
@@ -466,7 +484,7 @@ impl LockManager {
         }
 
         let now = Utc::now();
-        let fence_token = self.next_fence_token();
+        let fence_token = self.next_fence_token()?;
         let lease_id = Uuid::new_v4().to_string();
         let expires_at = now + chrono::Duration::seconds(self.config.lease_duration_secs as i64);
 
@@ -504,7 +522,13 @@ impl LockManager {
     }
 
     pub fn renew_all_locks_for_host(&self, host_id: &str) -> u32 {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = match self.locks.write() {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::error!("Failed to acquire lock for bulk renewal: {}", e);
+                return 0;
+            }
+        };
         let now = Utc::now();
         let new_expiry = now + chrono::Duration::seconds(self.config.lease_duration_secs as i64);
         let mut count = 0;
@@ -525,17 +549,29 @@ impl LockManager {
     }
 
     pub fn get_lock(&self, vm_name: &str) -> Option<VmLock> {
-        let locks = self.locks.read().unwrap();
+        let locks = self.locks.read().ok()?;
         locks.get(vm_name).cloned()
     }
 
     pub fn list_locks(&self) -> Vec<VmLock> {
-        let locks = self.locks.read().unwrap();
+        let locks = match self.locks.read() {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::error!("Failed to read locks: {}", e);
+                return Vec::new();
+            }
+        };
         locks.values().cloned().collect()
     }
 
     pub fn get_events(&self, vm_name: &str) -> Vec<LockEvent> {
-        let events = self.events.read().unwrap();
+        let events = match self.events.read() {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::error!("Failed to read events: {}", e);
+                return Vec::new();
+            }
+        };
         events
             .iter()
             .filter(|e| e.vm_name == vm_name)

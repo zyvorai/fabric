@@ -125,7 +125,13 @@ impl UserDb {
                 let created: String = row.get(3)?;
                 Ok((id, username, role_str, created))
             })?
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!("Failed to read user row: {}", e);
+                    None
+                }
+            })
             .map(|(id, username, role_str, created)| {
                 let role: Role = serde_json::from_str(&role_str).unwrap_or(Role::Viewer);
                 UserInfo {

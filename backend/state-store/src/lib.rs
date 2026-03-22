@@ -110,22 +110,19 @@ impl StateStore {
     }
 
     pub fn save_vm(&self, vm: &VM) -> Result<()> {
-        // Serialize and prepare data before acquiring the lock
+        // Serialize and write file FIRST — if this fails, in-memory state stays consistent
         let content = serde_json::to_string_pretty(vm)?;
-
-        {
-            let mut vms = self
-                .vms
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
-            vms.insert(vm.name.clone(), vm.clone());
-        }
-
-        // Perform file I/O outside the lock scope
         let vm_file = self.path.join(format!("{}.json", vm.name));
         let tmp_file = self.path.join(format!("{}.json.tmp", vm.name));
-        fs::write(&tmp_file, content)?;
+        fs::write(&tmp_file, &content)?;
         fs::rename(&tmp_file, &vm_file)?;
+
+        // Only update in-memory state after file write succeeds
+        let mut vms = self
+            .vms
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        vms.insert(vm.name.clone(), vm.clone());
 
         Ok(())
     }
@@ -147,13 +144,15 @@ impl StateStore {
     }
 
     pub fn delete_vm(&self, name: &str) -> Result<()> {
-        let mut vms = self.vms.write().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
-        vms.remove(name);
-
+        // Delete file FIRST — if this fails, in-memory state stays consistent
         let vm_file = self.path.join(format!("{}.json", name));
         if vm_file.exists() {
             fs::remove_file(vm_file)?;
         }
+
+        // Only update in-memory state after file deletion succeeds
+        let mut vms = self.vms.write().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        vms.remove(name);
 
         Ok(())
     }

@@ -14,14 +14,28 @@ use crate::server::AppState;
 use crate::validation::validate_vm_name;
 use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
 
+/// Helper: record an audit log entry.
+fn audit(_state: &AppState, user: &str, action: &str, resource: &str, status: &str) {
+    let entry = security::AuditLog::new(
+        user.to_string(),
+        action.to_string(),
+        resource.to_string(),
+        status.to_string(),
+    );
+    if let Err(e) = entry.log() {
+        tracing::warn!("Failed to write audit log: {}", e);
+    }
+}
+
+/// Standard JSON error response.
+fn json_error(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
+    (status, Json(json!({ "error": msg.into() })))
+}
+
 pub async fn list_vms(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match state.store.list_vms() {
-        Ok(vms) => (StatusCode::OK, Json(vms)).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Ok(vms) => (StatusCode::OK, Json(json!(vms))).into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -31,35 +45,27 @@ pub async fn get_vm(
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
     match state.store.get_vm(&name) {
         Ok(Some(vm)) => (StatusCode::OK, Json(vm)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({ "error": "VM not found" }))).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Ok(None) => json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
 pub async fn create_vm(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateVMRequest>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&req.name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
     match vmspawn_driver::create_vm(&req) {
         Ok(vm) => {
             if let Err(e) = state.store.save_vm(&vm) {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": e.to_string() })),
-                )
-                    .into_response();
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
             }
 
             // Allocate security identity if VM has labels
@@ -68,7 +74,9 @@ pub async fn create_vm(
                     match state.policy_engine.allocator.allocate_or_get(labels, &vm.name) {
                         Ok(id) => {
                             if let Some(ref ip) = vm.ip {
-                                let _ = state.policy_engine.allocator.update_ip_mapping(ip, id);
+                                if let Err(e) = state.policy_engine.allocator.update_ip_mapping(ip, id) {
+                                    tracing::warn!("Failed to update IP mapping for VM '{}': {}", vm.name, e);
+                                }
                             }
                             tracing::debug!("Allocated identity {} for VM '{}'", id, vm.name);
                         }
@@ -79,24 +87,26 @@ pub async fn create_vm(
                 }
             }
 
+            audit(&state, &claims.sub, "CREATE", &format!("vm/{}", vm.name), "SUCCESS");
             (StatusCode::CREATED, Json(vm)).into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            audit(&state, &claims.sub, "CREATE", &format!("vm/{}", req.name), "FAILED");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
 pub async fn delete_vm(
-    RequireAdmin(_claims): RequireAdmin,
+    RequireAdmin(claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
 
     // Deallocate security identity before deleting VM
     if let Ok(Some(vm)) = state.store.get_vm(&name) {
@@ -108,50 +118,77 @@ pub async fn delete_vm(
             }
         }
         if let Some(ref ip) = vm.ip {
-            let _ = state.policy_engine.allocator.remove_ip_mapping(ip);
+            if let Err(e) = state.policy_engine.allocator.remove_ip_mapping(ip) {
+                tracing::warn!("Failed to remove IP mapping for VM '{}': {}", name, e);
+            }
         }
     }
 
     match state.store.delete_vm(&name) {
-        Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Ok(_) => {
+            audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "SUCCESS");
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(e) => {
+            audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "FAILED");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
 pub async fn start_vm(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
 
-    // Mark as running immediately (machinectl start blocks until boot completes)
-    if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
-        vm.state = vm_model::VMState::Running;
-        if let Err(e) = state.store.save_vm(&vm) {
-            tracing::error!("Failed to save VM state: {}", e);
+    // Acquire per-VM lock to serialize state transitions
+    let vm_mutex = state.vm_lock(&name);
+    let _lock = vm_mutex.lock().await;
+
+    // Check current state before transitioning
+    if let Ok(Some(vm)) = state.store.get_vm(&name) {
+        match vm.state {
+            vm_model::VMState::Running | vm_model::VMState::Starting => {
+                return json_error(StatusCode::CONFLICT, format!("VM is already {:?}", vm.state)).into_response();
+            }
+            _ => {}
         }
     }
+
+    // Mark as starting (not running — that happens after success)
+    if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
+        vm.state = vm_model::VMState::Starting;
+        if let Err(e) = state.store.save_vm(&vm) {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save VM state: {}", e)).into_response();
+        }
+    }
+
+    audit(&state, &claims.sub, "START", &format!("vm/{}", name), "ACCEPTED");
 
     // Spawn start in background so API returns immediately
     let vm_name = name.clone();
     let state_clone = state.clone();
     tokio::spawn(async move {
-        use vmspawnd_driver_core::VMDriver;
+        // Re-acquire lock in background task
+        let vm_mutex = state_clone.vm_lock(&vm_name);
+        let _lock = vm_mutex.lock().await;
 
         match state_clone.driver.start(&vm_name).await {
             Ok(_) => {
                 tracing::info!("VM '{}' started successfully", vm_name);
+                if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
+                    vm.state = vm_model::VMState::Running;
+                    if let Err(e) = state_clone.store.save_vm(&vm) {
+                        tracing::error!("Failed to save VM state: {}", e);
+                    }
+                }
             }
             Err(e) => {
                 tracing::error!("Failed to start VM '{}': {}", vm_name, e);
-                // Revert state on failure
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
                     vm.state = vm_model::VMState::Stopped;
                     if let Err(e) = state_clone.store.save_vm(&vm) {
@@ -166,13 +203,16 @@ pub async fn start_vm(
 }
 
 pub async fn stop_vm(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+
     match state.driver.poweroff(&name).await {
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
@@ -181,42 +221,56 @@ pub async fn stop_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
+            audit(&state, &claims.sub, "STOP", &format!("vm/{}", name), "SUCCESS");
             (StatusCode::OK, Json(json!({ "status": "stopped" }))).into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            audit(&state, &claims.sub, "STOP", &format!("vm/{}", name), "FAILED");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
 pub async fn restart_vm(
-    RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
-    Path(name): Path<String>,
-) -> impl IntoResponse {
-    if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
-    }
-    match vmspawn_driver::restart_vm(&name) {
-        Ok(_) => (StatusCode::OK, Json(json!({ "status": "restarted" }))).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
-    }
-}
-
-pub async fn pause_vm(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+
+    match state.driver.reboot(&name).await {
+        Ok(_) => {
+            if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
+                vm.state = vm_model::VMState::Running;
+                if let Err(e) = state.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM state: {}", e);
+                }
+            }
+            audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "SUCCESS");
+            (StatusCode::OK, Json(json!({ "status": "restarted" }))).into_response()
+        }
+        Err(e) => {
+            audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "FAILED");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
+
+pub async fn pause_vm(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+
     match vmspawn_driver::pause_vm(&name) {
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
@@ -225,24 +279,24 @@ pub async fn pause_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
+            audit(&state, &claims.sub, "PAUSE", &format!("vm/{}", name), "SUCCESS");
             (StatusCode::OK, Json(json!({ "status": "paused" }))).into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
 pub async fn resume_vm(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+
     match vmspawn_driver::resume_vm(&name) {
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
@@ -251,13 +305,10 @@ pub async fn resume_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
+            audit(&state, &claims.sub, "RESUME", &format!("vm/{}", name), "SUCCESS");
             (StatusCode::OK, Json(json!({ "status": "running" }))).into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -269,101 +320,98 @@ pub struct CloneVMRequest {
 }
 
 pub async fn clone_vm(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(source_name): Path<String>,
     Json(req): Json<CloneVMRequest>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&source_name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
     if let Err((status, msg)) = validate_vm_name(&req.target_name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
+
+    // Prevent cloning to same name
+    if source_name == req.target_name {
+        return json_error(StatusCode::BAD_REQUEST, "Source and target VM names must be different").into_response();
+    }
+
+    // Lock both VMs to prevent concurrent operations
+    let _source_lock = state.vm_lock(&source_name).lock_owned().await;
+    let _target_lock = state.vm_lock(&req.target_name).lock_owned().await;
 
     // Check source VM exists
     let source_vm = match state.store.get_vm(&source_name) {
         Ok(Some(vm)) => vm,
         Ok(None) => {
-            return (StatusCode::NOT_FOUND, Json(json!({ "error": "Source VM not found" }))).into_response();
+            return json_error(StatusCode::NOT_FOUND, "Source VM not found").into_response();
         }
         Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response();
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     };
 
     // Check target name not taken
     if let Ok(Some(_)) = state.store.get_vm(&req.target_name) {
-        return (StatusCode::CONFLICT, Json(json!({ "error": "Target VM name already exists" }))).into_response();
+        return json_error(StatusCode::CONFLICT, "Target VM name already exists").into_response();
     }
 
-    // Copy disk image
-    let source_image_candidates = [
-        format!("/var/lib/machines/{}.qcow2", source_name),
-        format!("/var/lib/machines/{}/{}.qcow2", source_name, source_name),
-        format!("/var/lib/vmspawnd/images/{}.qcow2", source_name),
-    ];
-
-    let source_image = source_image_candidates.iter()
-        .find(|p| std::path::Path::new(p).exists());
-
-    if let Some(src_path) = source_image {
-        // Build target path by replacing only the filename, not arbitrary path components.
-        // Using String::replace on the full path is dangerous because the VM name could
-        // appear in directory components too, producing unexpected results.
-        let src = std::path::Path::new(src_path.as_str());
-        let target_path = if let Some(parent) = src.parent() {
-            let parent_str = parent.to_string_lossy();
-            let safe_parent = if parent_str.ends_with(&source_name) {
-                format!("{}{}", &parent_str[..parent_str.len() - source_name.len()], &req.target_name)
-            } else {
-                parent_str.to_string()
-            };
-            format!("{}/{}.qcow2", safe_parent, &req.target_name)
-        } else {
-            format!("{}.qcow2", &req.target_name)
-        };
-
-        // Ensure target directory exists
-        if let Some(parent) = std::path::Path::new(&target_path).parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Failed to create directory: {}", e) })),
-                ).into_response();
-            }
+    // Find source disk image — fail if not found
+    let src_path = match crate::validation::find_vm_image(&source_name) {
+        Some(p) => p,
+        None => {
+            return json_error(
+                StatusCode::NOT_FOUND,
+                format!("No disk image found for source VM '{}'", source_name),
+            ).into_response();
         }
+    };
 
-        let result = if req.linked_clone {
-            // Linked clone: use qemu-img create with backing file
-            tokio::process::Command::new("qemu-img")
-                .args(["create", "-f", "qcow2", "-b", src_path, "-F", "qcow2", &target_path])
-                .output()
-                .await
+    // Build target path
+    let src = std::path::Path::new(&src_path);
+    let target_path = if let Some(parent) = src.parent() {
+        let parent_str = parent.to_string_lossy();
+        let safe_parent = if parent_str.ends_with(&source_name) {
+            format!("{}{}", &parent_str[..parent_str.len() - source_name.len()], &req.target_name)
         } else {
-            // Full clone: use cp --reflink=auto for CoW on supported filesystems
-            tokio::process::Command::new("cp")
-                .args(["--reflink=auto", src_path, &target_path])
-                .output()
-                .await
+            parent_str.to_string()
         };
+        format!("{}/{}.qcow2", safe_parent, &req.target_name)
+    } else {
+        format!("{}.qcow2", &req.target_name)
+    };
 
-        match result {
-            Ok(output) if !output.status.success() => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Failed to clone disk: {}", stderr) })),
-                ).into_response();
-            }
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Failed to clone disk: {}", e) })),
-                ).into_response();
-            }
-            _ => {}
+    // Ensure target directory exists
+    if let Some(parent) = std::path::Path::new(&target_path).parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)).into_response();
         }
+    }
+
+    let result = if req.linked_clone {
+        tokio::process::Command::new("qemu-img")
+            .args(["create", "-f", "qcow2", "-b", &src_path, "-F", "qcow2", &target_path])
+            .output()
+            .await
+    } else {
+        tokio::process::Command::new("cp")
+            .args(["--reflink=auto", &src_path, &target_path])
+            .output()
+            .await
+    };
+
+    match result {
+        Ok(output) if !output.status.success() => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "FAILED");
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", stderr)).into_response();
+        }
+        Err(e) => {
+            audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "FAILED");
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", e)).into_response();
+        }
+        _ => {}
     }
 
     // Create new VM entry
@@ -376,11 +424,11 @@ pub async fn clone_vm(
     new_vm.updated = Some(chrono::Utc::now());
 
     match state.store.save_vm(&new_vm) {
-        Ok(_) => (StatusCode::CREATED, Json(new_vm)).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        ).into_response(),
+        Ok(_) => {
+            audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "SUCCESS");
+            (StatusCode::CREATED, Json(new_vm)).into_response()
+        }
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -390,15 +438,11 @@ pub async fn get_metrics(
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
     match state.driver.get_metrics(&name).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -409,16 +453,12 @@ pub async fn configure_cloud_init(
     Json(config): Json<CloudInitConfig>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&vm_name) {
-        return (status, Json(json!({ "error": msg }))).into_response();
+        return json_error(status, msg).into_response();
     }
     let generator = match CloudInitGenerator::new("/var/lib/vmspawnd/cloud-init") {
         Ok(gen) => gen,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": e.to_string() })),
-            )
-                .into_response()
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     };
 
@@ -431,10 +471,6 @@ pub async fn configure_cloud_init(
             })),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }

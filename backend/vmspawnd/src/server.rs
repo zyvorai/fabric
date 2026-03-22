@@ -34,6 +34,20 @@ pub struct AppState {
     pub packet_mirror: Arc<packet_mirror::PacketMirror>,
     pub nat_gateway: Arc<nat_gateway::NatGateway>,
     pub net_monitor: Arc<net_monitor::NetMonitor>,
+    /// Per-VM mutex to serialize state-changing operations on the same VM.
+    pub vm_locks: Arc<std::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+    /// Cancellation token for graceful background task shutdown.
+    pub shutdown: tokio_util::sync::CancellationToken,
+}
+
+impl AppState {
+    /// Acquire a per-VM lock. Creates one if it doesn't exist yet.
+    pub fn vm_lock(&self, name: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut locks = self.vm_locks.lock().unwrap_or_else(|e| e.into_inner());
+        locks.entry(name.to_string())
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    }
 }
 
 pub struct QuotaCache {
@@ -114,6 +128,8 @@ impl Server {
             packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
             nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
             net_monitor: Arc::new(net_monitor::NetMonitor::new()),
+            vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            shutdown: tokio_util::sync::CancellationToken::new(),
         });
 
         Ok(Self { state })
@@ -128,128 +144,61 @@ impl Server {
         tracing::info!("Listening on {}", addr);
 
         let mut bg_tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+        let shutdown = self.state.shutdown.clone();
+
+        // Helper macro to spawn cancellable background tasks
+        macro_rules! spawn_bg {
+            ($state:expr, $name:expr, $func:expr) => {{
+                let s = $state.clone();
+                let token = $state.shutdown.clone();
+                bg_tasks.push(tokio::spawn(async move {
+                    tokio::select! {
+                        _ = token.cancelled() => {
+                            tracing::debug!("Background task '{}' cancelled", $name);
+                        }
+                        _ = $func(s) => {
+                            tracing::debug!("Background task '{}' exited", $name);
+                        }
+                    }
+                }));
+            }};
+        }
 
         // Start background scheduler for automated schedule execution
-        let scheduler_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_schedule_checker(scheduler_state).await;
-        }));
+        spawn_bg!(self.state, "schedule_checker", run_schedule_checker);
 
         // Start background metrics collector
-        let metrics_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_metrics_collector(metrics_state).await;
-        }));
+        spawn_bg!(self.state, "metrics_collector", run_metrics_collector);
 
         // Start stale host detector
-        let host_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_stale_host_detector(host_state).await;
-        }));
+        spawn_bg!(self.state, "stale_host_detector", run_stale_host_detector);
 
-        // Start DRS auto-executor
-        let drs_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_drs_executor(drs_state).await;
-        }));
-
-        // Start lock renewal task
-        let lock_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_lock_renewal(lock_state).await;
-        }));
-
-        // Start ZFS replication scheduler
-        let repl_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_replication_scheduler(repl_state).await;
-        }));
-
-        // Start HA failover monitor
-        let ha_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_ha_monitor(ha_state).await;
-        }));
-
-        // Start VM auto-healer
-        let heal_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_vm_autohealer(heal_state).await;
-        }));
-
-        // Start auto-scaling engine
-        let scale_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_autoscaler(scale_state).await;
-        }));
-
-        // Start network policy reconciler
-        let policy_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_policy_reconciler(policy_state).await;
-        }));
-
-        // Start service mesh health checker (10s interval)
-        let svc_health_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_service_health_checker(svc_health_state).await;
-        }));
-
-        // Start service mesh reconciler (30s interval)
-        let svc_reconcile_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_service_reconciler(svc_reconcile_state).await;
-        }));
-
-        // Start traffic shaping reconciler (30s interval)
-        let qos_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_qos_reconciler(qos_state).await;
-        }));
-
-        // Start DNS policy reconciler (30s interval)
-        let dns_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_dns_reconciler(dns_state).await;
-        }));
-
-        // Start VM firewall reconciler (30s interval)
-        let fw_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_firewall_reconciler(fw_state).await;
-        }));
-
-        // Start VPN mesh reconciler (30s interval)
-        let vpn_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_vpn_reconciler(vpn_state).await;
-        }));
-
-        // Start packet mirror reconciler (30s interval)
-        let mirror_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_mirror_reconciler(mirror_state).await;
-        }));
-
-        // Start NAT gateway reconciler (30s interval)
-        let nat_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_nat_reconciler(nat_state).await;
-        }));
-
-        // Start network monitor collector + evaluator (10s interval)
-        let monitor_state = self.state.clone();
-        bg_tasks.push(tokio::spawn(async move {
-            run_net_monitor(monitor_state).await;
-        }));
+        spawn_bg!(self.state, "drs_executor", run_drs_executor);
+        spawn_bg!(self.state, "lock_renewal", run_lock_renewal);
+        spawn_bg!(self.state, "replication_scheduler", run_replication_scheduler);
+        spawn_bg!(self.state, "ha_monitor", run_ha_monitor);
+        spawn_bg!(self.state, "vm_autohealer", run_vm_autohealer);
+        spawn_bg!(self.state, "autoscaler", run_autoscaler);
+        spawn_bg!(self.state, "policy_reconciler", run_policy_reconciler);
+        spawn_bg!(self.state, "service_health_checker", run_service_health_checker);
+        spawn_bg!(self.state, "service_reconciler", run_service_reconciler);
+        spawn_bg!(self.state, "qos_reconciler", run_qos_reconciler);
+        spawn_bg!(self.state, "dns_reconciler", run_dns_reconciler);
+        spawn_bg!(self.state, "firewall_reconciler", run_firewall_reconciler);
+        spawn_bg!(self.state, "vpn_reconciler", run_vpn_reconciler);
+        spawn_bg!(self.state, "mirror_reconciler", run_mirror_reconciler);
+        spawn_bg!(self.state, "nat_reconciler", run_nat_reconciler);
+        spawn_bg!(self.state, "net_monitor", run_net_monitor);
 
         axum::serve(listener, app)
             .with_graceful_shutdown(shutdown_signal())
             .await?;
 
-        tracing::info!("Shutdown signal received, aborting background tasks");
+        tracing::info!("Shutdown signal received, cancelling background tasks");
+        shutdown.cancel();
+        // Give tasks a moment to finish cleanly
         for handle in bg_tasks {
-            handle.abort();
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), handle).await;
         }
 
         Ok(())
@@ -854,15 +803,9 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                     crate::api::schedules::VMAction::Snapshot => {
                         // Create a disk snapshot using qemu-img
                         let snap_name = format!("scheduled-{}", Utc::now().format("%Y%m%d-%H%M%S"));
-                        let image_candidates = [
-                            format!("/var/lib/machines/{}.qcow2", schedule_clone.vm_name),
-                            format!("/var/lib/machines/{}/{}.qcow2", schedule_clone.vm_name, schedule_clone.vm_name),
-                            format!("/var/lib/vmspawnd/images/{}.qcow2", schedule_clone.vm_name),
-                        ];
-
-                        let image_path = image_candidates.iter().find(|p| std::path::Path::new(p).exists());
+                        let image_path = crate::validation::find_vm_image(&schedule_clone.vm_name);
                         match image_path {
-                            Some(path) => {
+                            Some(ref path) => {
                                 let output = std::process::Command::new("qemu-img")
                                     .args(["snapshot", "-c", &snap_name, path])
                                     .output();
@@ -1354,18 +1297,31 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                 // Level 2: SSH kill -9 on leader PID
                 if !fenced {
                     if let Some(host) = primary_host {
-                        let host_addr = &host.address;
-                        let kill_cmd = format!(
-                            "ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no root@{} 'machinectl show {} --property=Leader --value 2>/dev/null | xargs -r kill -9'",
-                            host_addr, ft.vm_name
-                        );
+                        let host_addr = host.address.clone();
+                        let vm_name_for_fence = ft.vm_name.clone();
 
                         match tokio::time::timeout(
                             tokio::time::Duration::from_secs(15),
                             tokio::task::spawn_blocking(move || {
-                                std::process::Command::new("sh")
-                                    .arg("-c")
-                                    .arg(&kill_cmd)
+                                // Get leader PID via SSH (proper argument passing, no shell)
+                                let leader_output = std::process::Command::new("ssh")
+                                    .args(["-o", "ConnectTimeout=10", &format!("root@{}", host_addr)])
+                                    .args(["machinectl", "show", &vm_name_for_fence, "--property=Leader", "--value"])
+                                    .output()?;
+
+                                if !leader_output.status.success() {
+                                    return Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to get leader PID"));
+                                }
+
+                                let pid_str = String::from_utf8_lossy(&leader_output.stdout).trim().to_string();
+                                if pid_str.is_empty() {
+                                    return Err(std::io::Error::new(std::io::ErrorKind::Other, "Empty leader PID"));
+                                }
+
+                                // Kill the leader PID via SSH
+                                std::process::Command::new("ssh")
+                                    .args(["-o", "ConnectTimeout=10", &format!("root@{}", host_addr)])
+                                    .args(["kill", "-9", &pid_str])
                                     .output()
                             })
                         ).await {

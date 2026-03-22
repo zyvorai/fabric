@@ -43,9 +43,38 @@ pub struct LvmPool {
     vg_name: String,
 }
 
+/// Validate an LVM name to prevent argument injection.
+/// LVM names may contain alphanumeric, hyphens, underscores, dots, and plus signs.
+fn validate_lvm_name(name: &str, label: &str) -> Result<(), LvmError> {
+    if name.is_empty() || name.len() > 128 {
+        return Err(LvmError::CommandFailed(format!("{} must be 1-128 characters", label)));
+    }
+    if name.starts_with('-') {
+        return Err(LvmError::CommandFailed(format!("{} must not start with a hyphen", label)));
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+')) {
+        return Err(LvmError::CommandFailed(format!(
+            "{} '{}' contains invalid characters", label, name
+        )));
+    }
+    Ok(())
+}
+
+/// Validate an LVM size string (e.g. "10G", "500M").
+fn validate_lvm_size(size: &str) -> Result<(), LvmError> {
+    if size.is_empty() || size.len() > 20 {
+        return Err(LvmError::CommandFailed("Invalid size string".to_string()));
+    }
+    if !size.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '+' || c == '-') {
+        return Err(LvmError::CommandFailed(format!("Size '{}' contains invalid characters", size)));
+    }
+    Ok(())
+}
+
 impl LvmPool {
     /// Create a new LVM pool, validating the VG exists
     pub fn new(vg_name: &str) -> Result<Self, LvmError> {
+        validate_lvm_name(vg_name, "VG name")?;
         let output = Command::new("vgs")
             .args(["--noheadings", "--nosuffix", "--units", "b", "-o", "vg_name", vg_name])
             .output()?;
@@ -70,6 +99,8 @@ impl LvmPool {
 
     /// Create a regular logical volume
     pub fn create_volume(&self, name: &str, size: &str) -> Result<(), LvmError> {
+        validate_lvm_name(name, "LV name")?;
+        validate_lvm_size(size)?;
         let output = Command::new("lvcreate")
             .args(["-n", name, "-L", size, &self.vg_name])
             .output()?;
@@ -92,6 +123,9 @@ impl LvmPool {
         size: &str,
         thin_pool: &str,
     ) -> Result<(), LvmError> {
+        validate_lvm_name(name, "LV name")?;
+        validate_lvm_name(thin_pool, "Thin pool name")?;
+        validate_lvm_size(size)?;
         let pool_path = format!("{}/{}", self.vg_name, thin_pool);
         let output = Command::new("lvcreate")
             .args(["-V", size, "-T", &pool_path, "-n", name])
@@ -113,6 +147,7 @@ impl LvmPool {
 
     /// Delete a logical volume
     pub fn delete_volume(&self, name: &str) -> Result<(), LvmError> {
+        validate_lvm_name(name, "LV name")?;
         let lv_path = format!("{}/{}", self.vg_name, name);
         let output = Command::new("lvremove")
             .args(["-f", &lv_path])
@@ -131,6 +166,8 @@ impl LvmPool {
 
     /// Resize a logical volume
     pub fn resize_volume(&self, name: &str, new_size: &str) -> Result<(), LvmError> {
+        validate_lvm_name(name, "LV name")?;
+        validate_lvm_size(new_size)?;
         let lv_path = format!("{}/{}", self.vg_name, name);
         let output = Command::new("lvresize")
             .args(["-L", new_size, &lv_path])
@@ -224,6 +261,9 @@ impl LvmPool {
 
     /// Create a snapshot of an existing LV
     pub fn snapshot(&self, source: &str, snap_name: &str, size: &str) -> Result<(), LvmError> {
+        validate_lvm_name(source, "Source LV name")?;
+        validate_lvm_name(snap_name, "Snapshot name")?;
+        validate_lvm_size(size)?;
         let source_path = format!("{}/{}", self.vg_name, source);
         let output = Command::new("lvcreate")
             .args(["-s", "-n", snap_name, "-L", size, &source_path])

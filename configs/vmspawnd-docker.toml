@@ -10,4 +10,5 @@ image_path = "/var/lib/vmspawnd/images"
 bridge = "br0"
 
 [auth]
+# Disable auth for local Docker development; enable in production
 enabled = false

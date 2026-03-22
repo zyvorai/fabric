@@ -208,13 +208,17 @@ bridge = "br0"
 
 [auth]
 enabled = true
-jwt_secret = "change-me-in-production"
-db_path = "/var/lib/vmspawnd/auth.db"
-default_admin_password = "admin"
-token_expiration_hours = 24
+# jwt_secret = "..."       # Optional: auto-generated and persisted if omitted
+# db_path = "/var/lib/vmspawnd/auth.db"
+# token_expiration_hours = 24
 ```
 
-A default `admin` user is created on first startup when authentication is enabled.
+### First Startup
+
+When authentication is enabled, a default `admin` user is created automatically. Security credentials are handled as follows:
+
+- **Admin password**: A random password is generated and written to `/var/lib/vmspawnd/.admin_password` (mode `0600`). Read it with `sudo cat /var/lib/vmspawnd/.admin_password`. To set a custom password, use the `VMSPAWND_ADMIN_PASSWORD` environment variable or set `default_admin_password` in the config file.
+- **JWT secret**: A random 64-character secret is generated and persisted to `/var/lib/vmspawnd/.jwt_secret` (mode `0600`). Tokens survive daemon restarts. To provide your own, set the `VMSPAWND_JWT_SECRET` environment variable.
 
 ### RBAC Roles
 

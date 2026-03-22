@@ -47,6 +47,10 @@ pub async fn create_floating_ip(
     crate::validation::validate_ip_address(&req.address).map_err(|msg| {
         (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
     })?;
+    // Validate interface name
+    crate::validation::validate_hostname(&req.interface).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid interface name: {}", msg) })))
+    })?;
     let fip = FloatingIp {
         id: uuid::Uuid::new_v4().to_string(),
         address: req.address,

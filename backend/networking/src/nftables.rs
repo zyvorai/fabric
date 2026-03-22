@@ -52,7 +52,7 @@ impl NftManager {
     pub fn add_dnat_rule(&self, cfg: &PortForwardConfig) -> Result<()> {
         let protos = protocol_list(cfg.protocol);
         for proto in protos {
-            let args = build_dnat_args(proto, cfg);
+            let args = build_dnat_args(proto, cfg)?;
             let refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
             run_nft(&refs).with_context(|| {
                 format!(
@@ -77,12 +77,18 @@ impl NftManager {
     /// We derive a /24 from the guest IP so that all VMs on the same subnet
     /// share one masquerade rule.  Duplicate adds are harmless in nftables.
     pub fn add_masquerade_rule(&self, cfg: &PortForwardConfig) -> Result<()> {
+        validate_nft_ip(&cfg.guest_ip)
+            .context("Invalid guest IP for masquerade rule")?;
+        validate_nft_identifier(&cfg.name, "Port forward name")
+            .context("Invalid name for masquerade rule")?;
+
         let subnet = subnet_from_ip(&cfg.guest_ip);
         let comment = format!("vm-nat-{}", cfg.name);
-        let rule_str = format!(
-            "add rule {TABLE_FAMILY} {TABLE_NAME} postrouting ip daddr {subnet} masquerade comment \"{comment}\""
-        );
-        run_nft_raw(&rule_str)
+        run_nft(&[
+            "add", "rule", TABLE_FAMILY, TABLE_NAME, "postrouting",
+            "ip", "daddr", &subnet, "masquerade",
+            "comment", &format!("\"{}\"", comment),
+        ])
             .with_context(|| format!("Failed to add masquerade rule for {subnet}"))?;
         tracing::info!("Added masquerade rule for subnet {subnet}");
         Ok(())
@@ -180,7 +186,33 @@ fn protocol_list(proto: Protocol) -> Vec<&'static str> {
     }
 }
 
-fn build_dnat_args(proto: &str, cfg: &PortForwardConfig) -> Vec<String> {
+/// Validate a name/interface for safe use in nftables rules.
+/// Only allows alphanumeric, hyphens, underscores, and dots.
+fn validate_nft_identifier(s: &str, label: &str) -> Result<()> {
+    if s.is_empty() || s.len() > 64 {
+        return Err(anyhow::anyhow!("{} must be 1-64 characters", label));
+    }
+    if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.') {
+        return Err(anyhow::anyhow!(
+            "{} '{}' contains invalid characters (only alphanumeric, hyphens, underscores, dots allowed)",
+            label, s
+        ));
+    }
+    Ok(())
+}
+
+/// Validate an IP address string for safe use in nftables rules.
+fn validate_nft_ip(ip: &str) -> Result<()> {
+    ip.parse::<std::net::IpAddr>()
+        .map(|_| ())
+        .map_err(|_| anyhow::anyhow!("Invalid IP address: '{}'", ip))
+}
+
+fn build_dnat_args(proto: &str, cfg: &PortForwardConfig) -> Result<Vec<String>> {
+    // Validate inputs before building the rule
+    validate_nft_identifier(&cfg.name, "Port forward name")?;
+    validate_nft_ip(&cfg.guest_ip)?;
+
     let mut args: Vec<String> = vec![
         "add".into(),
         "rule".into(),
@@ -190,6 +222,7 @@ fn build_dnat_args(proto: &str, cfg: &PortForwardConfig) -> Vec<String> {
     ];
 
     if let Some(ref iface) = cfg.interface {
+        validate_nft_identifier(iface, "Interface name")?;
         args.extend_from_slice(&[
             "iifname".into(),
             format!("\"{}\"", iface),
@@ -207,7 +240,7 @@ fn build_dnat_args(proto: &str, cfg: &PortForwardConfig) -> Vec<String> {
         format!("\"{}\"", cfg.name),
     ]);
 
-    args
+    Ok(args)
 }
 
 /// Derive a /24 subnet from an IP address (e.g. 192.168.100.10 → 192.168.100.0/24).
@@ -282,18 +315,6 @@ fn run_nft(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn run_nft_raw(rule: &str) -> Result<()> {
-    let output = Command::new("nft")
-        .arg(rule)
-        .output()
-        .with_context(|| format!("Failed to execute nft {rule}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("nft {rule} failed: {stderr}"));
-    }
-    Ok(())
-}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -321,7 +342,7 @@ mod tests {
     #[test]
     fn test_build_dnat_args_tcp() {
         let cfg = test_config();
-        let args = build_dnat_args("tcp", &cfg);
+        let args = build_dnat_args("tcp", &cfg).unwrap();
 
         assert_eq!(args[0], "add");
         assert_eq!(args[1], "rule");
@@ -342,7 +363,7 @@ mod tests {
     fn test_build_dnat_args_with_interface() {
         let mut cfg = test_config();
         cfg.interface = Some("eth0".into());
-        let args = build_dnat_args("tcp", &cfg);
+        let args = build_dnat_args("tcp", &cfg).unwrap();
 
         assert_eq!(args[5], "iifname");
         assert_eq!(args[6], "\"eth0\"");

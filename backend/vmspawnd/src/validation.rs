@@ -11,7 +11,16 @@ pub fn validate_vm_name(name: &str) -> Result<(), (StatusCode, String)> {
         ));
     }
 
-    let first = name.chars().next().unwrap();
+    // Safety: name is non-empty (checked above), so .next() always returns Some
+    let first = match name.chars().next() {
+        Some(c) => c,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "VM name must not be empty".to_string(),
+            ));
+        }
+    };
     if !first.is_ascii_alphanumeric() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -109,10 +118,12 @@ pub fn validate_ip_address(addr: &str) -> Result<(), String> {
 
 /// Validate that a host path is within allowed directories.
 /// Prevents arbitrary file access by restricting to safe prefixes.
+/// Canonicalizes the path to resolve symlinks and prevent traversal.
 pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
-    let canonical = std::path::Path::new(path);
+    let raw = std::path::Path::new(path);
 
-    for component in canonical.components() {
+    // Reject .. components before canonicalization
+    for component in raw.components() {
         if let std::path::Component::ParentDir = component {
             return Err((
                 StatusCode::BAD_REQUEST,
@@ -127,7 +138,13 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
         "/tmp",
     ];
 
-    if !allowed_prefixes.iter().any(|prefix| path.starts_with(prefix)) {
+    // Try to canonicalize to resolve symlinks; fall back to the raw path
+    // if the target doesn't exist yet (e.g. creating a new file).
+    let resolved = std::fs::canonicalize(raw)
+        .unwrap_or_else(|_| raw.to_path_buf());
+    let resolved_str = resolved.to_string_lossy();
+
+    if !allowed_prefixes.iter().any(|prefix| resolved_str.starts_with(prefix)) {
         return Err((
             StatusCode::FORBIDDEN,
             format!(

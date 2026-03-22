@@ -128,8 +128,12 @@ pub async fn create_local_pool(
     Json(req): Json<CreateLocalPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_local_pool));
-    let manager = state.storage_manager.read().await;
 
+    // Validate path is within allowed directories
+    crate::validation::validate_host_path(&req.path)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
+    let manager = state.storage_manager.read().await;
     let path = std::path::PathBuf::from(&req.path);
 
     match manager.create_local_pool(req.name, path, req.auto_start).await {
@@ -144,6 +148,15 @@ pub async fn create_nfs_pool(
     Json(req): Json<CreateNfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_nfs_pool));
+
+    // Validate NFS server hostname
+    crate::validation::validate_hostname(&req.config.server)
+        .map_err(|msg| (StatusCode::BAD_REQUEST, format!("Invalid NFS server: {}", msg)))?;
+
+    // Validate mount path
+    crate::validation::validate_host_path(&req.config.mount_path)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     let manager = state.storage_manager.read().await;
 
     let nfs_config = NfsConfig {

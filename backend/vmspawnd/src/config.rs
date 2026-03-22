@@ -131,6 +131,13 @@ fn default_jwt_secret() -> String {
                      Set VMSPAWND_JWT_SECRET or fix file permissions.",
                     secret_path, e
                 );
+            } else {
+                // Set restrictive permissions on the secret file
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(secret_path, std::fs::Permissions::from_mode(0o600));
+                }
             }
             secret
         }
@@ -163,8 +170,23 @@ fn default_admin_password() -> String {
             "Set VMSPAWND_ADMIN_PASSWORD or auth.default_admin_password in config."
         );
         tracing::warn!(
-            "Generated admin password: {}", password
+            "Generated admin password has been written to /var/lib/vmspawnd/.admin_password"
         );
+        // Persist to a file instead of logging the password
+        let pw_path = "/var/lib/vmspawnd/.admin_password";
+        if let Some(parent) = std::path::Path::new(pw_path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Err(e) = std::fs::write(pw_path, &password) {
+            tracing::error!("Failed to write admin password file: {}", e);
+        } else {
+            // Set restrictive permissions on the password file
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(pw_path, std::fs::Permissions::from_mode(0o600));
+            }
+        }
         tracing::warn!(
             "================================================================"
         );

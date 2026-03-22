@@ -79,7 +79,34 @@ pub struct EgressRule {
 #[serde(rename_all = "snake_case")]
 pub enum PeerSelector {
     Endpoint(LabelSelector),
-    Cidr(String),
+    Cidr(#[serde(deserialize_with = "deserialize_validated_cidr")] String),
+}
+
+/// Validate CIDR notation on deserialization.
+fn deserialize_validated_cidr<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    validate_cidr(&s).map_err(serde::de::Error::custom)?;
+    Ok(s)
+}
+
+/// Validate that a string is a valid CIDR (e.g. "10.0.0.0/24" or "::1/128").
+pub fn validate_cidr(s: &str) -> std::result::Result<(), String> {
+    let parts: Vec<&str> = s.splitn(2, '/').collect();
+    if parts.len() != 2 {
+        return Err(format!("Invalid CIDR '{}': missing /prefix", s));
+    }
+    parts[0].parse::<std::net::IpAddr>()
+        .map_err(|_| format!("Invalid CIDR '{}': bad IP address", s))?;
+    let prefix: u8 = parts[1].parse()
+        .map_err(|_| format!("Invalid CIDR '{}': bad prefix length", s))?;
+    let max_prefix = if parts[0].contains(':') { 128 } else { 32 };
+    if prefix > max_prefix {
+        return Err(format!("Invalid CIDR '{}': prefix length {} exceeds maximum {}", s, prefix, max_prefix));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

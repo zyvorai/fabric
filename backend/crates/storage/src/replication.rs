@@ -71,20 +71,19 @@ impl ZfsReplicationDriver {
         dataset: &str,
         target: &ZfsReplicationTarget,
     ) -> Result<(), ZfsError> {
-        let ssh = format!(
-            "ssh -p {} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {}@{}",
-            target.ssh_port, target.ssh_user, target.host
-        );
+        ZfsPool::validate_zfs_name(dataset, "Dataset")?;
+        ZfsPool::validate_target(target)?;
+
         let target_ds = match &target.target_dataset {
             Some(ds) => format!("{}/{}", target.target_pool, ds),
             None => format!("{}/{}", target.target_pool, dataset),
         };
 
-        let cmd = format!("{} zfs promote {}", ssh, target_ds);
+        let ssh_args = ZfsPool::ssh_args(target);
 
-        let output = std::process::Command::new("sh")
-            .arg("-c")
-            .arg(&cmd)
+        let output = std::process::Command::new(&ssh_args[0])
+            .args(&ssh_args[1..])
+            .args(["zfs", "promote", &target_ds])
             .output()
             .map_err(|e| ZfsError::SshError(target.host.clone(), e.to_string()))?;
 

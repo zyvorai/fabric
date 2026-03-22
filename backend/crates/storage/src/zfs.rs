@@ -342,12 +342,47 @@ impl ZfsPool {
 
     // -- Replication methods ------------------------------------------------
 
-    /// Build the SSH command prefix for a replication target
-    fn ssh_cmd(target: &ZfsReplicationTarget) -> String {
-        format!(
-            "ssh -p {} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {}@{}",
-            target.ssh_port, target.ssh_user, target.host
-        )
+    /// Validate a ZFS name (dataset, snapshot, pool) to prevent injection.
+    /// ZFS names may contain alphanumeric, hyphens, underscores, dots, colons, and slashes.
+    pub(crate) fn validate_zfs_name(name: &str, label: &str) -> Result<(), ZfsError> {
+        if name.is_empty() || name.len() > 256 {
+            return Err(ZfsError::CommandFailed(format!("{} must be 1-256 characters", label)));
+        }
+        if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':' | '/' | '@')) {
+            return Err(ZfsError::CommandFailed(format!(
+                "{} '{}' contains invalid characters", label, name
+            )));
+        }
+        Ok(())
+    }
+
+    /// Validate a replication target's fields to prevent command injection.
+    pub(crate) fn validate_target(target: &ZfsReplicationTarget) -> Result<(), ZfsError> {
+        // Validate hostname — only allow safe characters
+        if target.host.is_empty() || !target.host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':')) {
+            return Err(ZfsError::SshError(target.host.clone(), "Invalid hostname".to_string()));
+        }
+        // Validate SSH user — only allow safe characters
+        if target.ssh_user.is_empty() || !target.ssh_user.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+            return Err(ZfsError::SshError(target.host.clone(), format!("Invalid SSH user: {}", target.ssh_user)));
+        }
+        Self::validate_zfs_name(&target.target_pool, "Target pool")?;
+        if let Some(ref ds) = target.target_dataset {
+            Self::validate_zfs_name(ds, "Target dataset")?;
+        }
+        Ok(())
+    }
+
+    /// Build SSH command arguments for a replication target.
+    pub(crate) fn ssh_args(target: &ZfsReplicationTarget) -> Vec<String> {
+        vec![
+            "ssh".to_string(),
+            "-p".to_string(),
+            target.ssh_port.to_string(),
+            "-o".to_string(),
+            "ConnectTimeout=10".to_string(),
+            format!("{}@{}", target.ssh_user, target.host),
+        ]
     }
 
     /// Build the target dataset path on the remote host
@@ -358,6 +393,32 @@ impl ZfsPool {
         }
     }
 
+    /// Pipe `zfs send` stdout into `ssh <target> zfs recv` using proper process piping.
+    fn pipe_zfs_send_recv(
+        send_args: &[&str],
+        target: &ZfsReplicationTarget,
+        target_ds: &str,
+    ) -> Result<std::process::Output, ZfsError> {
+        use std::process::Stdio;
+
+        let send_child = Command::new("zfs")
+            .args(send_args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let send_stdout = send_child.stdout.expect("piped stdout");
+
+        let ssh_args = Self::ssh_args(target);
+        let output = Command::new(&ssh_args[0])
+            .args(&ssh_args[1..])
+            .args(["zfs", "recv", "-F", target_ds])
+            .stdin(send_stdout)
+            .output()?;
+
+        Ok(output)
+    }
+
     /// Send a full ZFS snapshot to a remote host
     pub fn send_full(
         &self,
@@ -365,25 +426,15 @@ impl ZfsPool {
         snap_name: &str,
         target: &ZfsReplicationTarget,
     ) -> Result<ZfsSendResult, ZfsError> {
+        Self::validate_target(target)?;
+        Self::validate_zfs_name(dataset, "Dataset")?;
+        Self::validate_zfs_name(snap_name, "Snapshot")?;
+
         let snap_path = format!("{}/{}@{}", self.base_path(), dataset, snap_name);
         let target_ds = Self::target_path(target, dataset);
-        let ssh = Self::ssh_cmd(target);
-
-        let mut pipeline = format!("zfs send {} | {} zfs recv -F {}", snap_path, ssh, target_ds);
-
-        if let Some(limit) = target.bandwidth_limit_kbps {
-            pipeline = format!(
-                "zfs send {} | pv -qL {}k | {} zfs recv -F {}",
-                snap_path, limit, ssh, target_ds
-            );
-        }
 
         let start = std::time::Instant::now();
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&pipeline)
-            .output()?;
-
+        let output = Self::pipe_zfs_send_recv(&[&snap_path], target, &target_ds)?;
         let duration = start.elapsed().as_secs();
 
         if !output.status.success() {
@@ -406,7 +457,7 @@ impl ZfsPool {
             dataset: dataset.to_string(),
             from_snapshot: None,
             to_snapshot: snap_name.to_string(),
-            bytes_sent: 0, // Actual bytes not available without -v parsing
+            bytes_sent: 0,
             duration_secs: duration,
             incremental: false,
         })
@@ -420,29 +471,17 @@ impl ZfsPool {
         to_snap: &str,
         target: &ZfsReplicationTarget,
     ) -> Result<ZfsSendResult, ZfsError> {
+        Self::validate_target(target)?;
+        Self::validate_zfs_name(dataset, "Dataset")?;
+        Self::validate_zfs_name(from_snap, "From snapshot")?;
+        Self::validate_zfs_name(to_snap, "To snapshot")?;
+
         let from_path = format!("{}/{}@{}", self.base_path(), dataset, from_snap);
         let to_path = format!("{}/{}@{}", self.base_path(), dataset, to_snap);
         let target_ds = Self::target_path(target, dataset);
-        let ssh = Self::ssh_cmd(target);
-
-        let mut pipeline = format!(
-            "zfs send -i {} {} | {} zfs recv -F {}",
-            from_path, to_path, ssh, target_ds
-        );
-
-        if let Some(limit) = target.bandwidth_limit_kbps {
-            pipeline = format!(
-                "zfs send -i {} {} | pv -qL {}k | {} zfs recv -F {}",
-                from_path, to_path, limit, ssh, target_ds
-            );
-        }
 
         let start = std::time::Instant::now();
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&pipeline)
-            .output()?;
-
+        let output = Self::pipe_zfs_send_recv(&["-i", &from_path, &to_path], target, &target_ds)?;
         let duration = start.elapsed().as_secs();
 
         if !output.status.success() {
@@ -479,19 +518,24 @@ impl ZfsPool {
         from_snap: Option<&str>,
         to_snap: &str,
     ) -> Result<u64, ZfsError> {
+        Self::validate_zfs_name(dataset, "Dataset")?;
+        Self::validate_zfs_name(to_snap, "To snapshot")?;
+        if let Some(from) = from_snap {
+            Self::validate_zfs_name(from, "From snapshot")?;
+        }
+
         let to_path = format!("{}/{}@{}", self.base_path(), dataset, to_snap);
 
-        let args = match from_snap {
-            Some(from) => {
-                let from_path = format!("{}/{}@{}", self.base_path(), dataset, from);
-                format!("zfs send -nv -i {} {}", from_path, to_path)
-            }
-            None => format!("zfs send -nv {}", to_path),
-        };
+        let mut args = vec!["send", "-nv"];
+        let from_path;
+        if let Some(from) = from_snap {
+            from_path = format!("{}/{}@{}", self.base_path(), dataset, from);
+            args.extend_from_slice(&["-i", &from_path]);
+        }
+        args.push(&to_path);
 
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&args)
+        let output = Command::new("zfs")
+            .args(&args)
             .output()?;
 
         // zfs send -nv outputs to stderr
@@ -609,6 +653,9 @@ impl ZfsPool {
         dataset: &str,
         target: &ZfsReplicationTarget,
     ) -> Result<Option<String>, ZfsError> {
+        Self::validate_target(target)?;
+        Self::validate_zfs_name(dataset, "Dataset")?;
+
         // List local snapshots
         let local_snaps = self.list_snapshots()?;
         let dataset_prefix = format!("{}/{}", self.base_path(), dataset);
@@ -618,17 +665,13 @@ impl ZfsPool {
             .filter_map(|s| s.name.split('@').nth(1).map(String::from))
             .collect();
 
-        // List remote snapshots via SSH
-        let ssh = Self::ssh_cmd(target);
+        // List remote snapshots via SSH (using proper argument passing)
         let target_ds = Self::target_path(target, dataset);
-        let cmd = format!(
-            "{} zfs list -t snapshot -H -o name -r {}",
-            ssh, target_ds
-        );
+        let ssh_args = Self::ssh_args(target);
 
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&cmd)
+        let output = Command::new(&ssh_args[0])
+            .args(&ssh_args[1..])
+            .args(["zfs", "list", "-t", "snapshot", "-H", "-o", "name", "-r", &target_ds])
             .output()?;
 
         if !output.status.success() {

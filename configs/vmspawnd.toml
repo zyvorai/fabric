@@ -15,4 +15,15 @@ image_path = "/var/lib/vmspawnd/images"
 bridge = "br0"
 
 [auth]
-enabled = false
+# Enable JWT-based authentication (default: true)
+enabled = true
+# JWT signing secret: auto-generated and persisted to /var/lib/vmspawnd/.jwt_secret
+# if not set here or via VMSPAWND_JWT_SECRET env var.
+# jwt_secret = "..."
+# SQLite user database path
+# db_path = "/var/lib/vmspawnd/auth.db"
+# Token lifetime in hours (default: 24)
+# token_expiration_hours = 24
+# Admin password: auto-generated and written to /var/lib/vmspawnd/.admin_password
+# if not set here or via VMSPAWND_ADMIN_PASSWORD env var. Only used on first startup.
+# default_admin_password = "..."

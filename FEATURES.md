@@ -108,11 +108,13 @@
 
 ### Authentication
 
-- JWT-based authentication
-- User management
-- Password hashing (bcrypt)
-- Token generation, validation, and expiration
-- API key support
+- JWT-based authentication with auto-generated signing secret (persisted to `/var/lib/vmspawnd/.jwt_secret`, mode `0600`)
+- Auto-generated admin password on first startup (written to `/var/lib/vmspawnd/.admin_password`, mode `0600`)
+- Configurable via `VMSPAWND_JWT_SECRET` and `VMSPAWND_ADMIN_PASSWORD` environment variables
+- User management with SQLite backend
+- Password hashing (bcrypt with DEFAULT_COST)
+- Token generation, validation, and configurable expiration
+- API key support for service-to-service auth
 
 ### Authorization (RBAC)
 
@@ -125,9 +127,13 @@
 
 - TLS/HTTPS support
 - Certificate management
-- Encryption
-- Security middleware
-- Request validation
+- Encryption at rest
+- Security middleware with per-endpoint role checks
+- Input validation on all user-facing parameters (VM names, IP addresses, file paths, storage identifiers)
+- Parameterized SQL queries (no injection risk)
+- No shell pipelines — all subprocess calls use direct argument passing
+- CIDR validation on network policy rules
+- Storage name validation (LVM, ZFS, NFS)
 
 ### Audit Logging
 

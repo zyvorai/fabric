@@ -8,13 +8,25 @@ http://localhost:8080/api
 
 ## Authentication
 
-Most endpoints require a valid API token passed via the `Authorization` header:
+Most endpoints require a valid JWT token passed via the `Authorization` header:
 
 ```
 Authorization: Bearer <token>
 ```
 
-Unauthenticated requests receive a `401 Unauthorized` response. Some read-only system health endpoints (e.g., `/api/health`) may be accessible without authentication depending on configuration.
+**Obtain a token:**
+
+```bash
+# Read the auto-generated admin password (first startup)
+PASSWORD=$(sudo cat /var/lib/vmspawnd/.admin_password)
+
+# Login
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\": \"admin\", \"password\": \"$PASSWORD\"}"
+```
+
+Unauthenticated requests receive a `401 Unauthorized` response. The `/api/auth/login` and `/health` endpoints are accessible without authentication. When auth is disabled in config, all endpoints are accessible without a token.
 
 ## Overview
 
@@ -561,8 +573,9 @@ term.onData((data) => ws.send(data));
 | `running` | VM is running |
 | `stopped` | VM is stopped |
 | `paused` | VM is paused |
-| `migrating` | VM is being migrated |
-| `error` | VM encountered an error |
+| `starting` | VM is being started (async, returns 202 Accepted) |
+| `stopping` | VM is being stopped |
+| `failed` | VM encountered an error |
 | `unknown` | VM state cannot be determined |
 
 ## Error Responses

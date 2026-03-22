@@ -213,10 +213,12 @@ impl PolicyEnforcer {
     }
 }
 
-/// Execute an nft command. Logs errors but returns them for callers to handle.
+/// Execute an nft command passed as a single rule string.
+/// Uses `nft` with the full string as a single argument (not split on whitespace)
+/// to correctly handle nftables syntax containing braces and commas.
 fn run_nft(cmd: &str) -> Result<()> {
     let output = std::process::Command::new("nft")
-        .args(cmd.split_whitespace())
+        .arg(cmd)
         .output();
 
     match output {

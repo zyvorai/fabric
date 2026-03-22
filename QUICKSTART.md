@@ -98,14 +98,39 @@ Once vmspawnd is running, access:
 http://localhost:8080
 ```
 
+## Authentication
+
+When auth is enabled (default), vmspawnd creates an `admin` user on first startup:
+
+```bash
+# Read the auto-generated admin password
+sudo cat /var/lib/vmspawnd/.admin_password
+
+# Login to get a JWT token
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "<password-from-file>"}' | jq -r .token)
+
+# Use the token for API calls
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/vms
+```
+
+To set a custom admin password, use the `VMSPAWND_ADMIN_PASSWORD` environment variable before first startup.
+
+When auth is disabled (`enabled = false` in config), API calls work without a token.
+
 ## Test the API
 
 ```bash
-# List VMs
+# With auth disabled:
 curl http://localhost:8080/api/vms
+
+# With auth enabled (see Authentication above):
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/vms
 
 # Create a VM
 curl -X POST http://localhost:8080/api/vms \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "test-vm",
@@ -115,7 +140,8 @@ curl -X POST http://localhost:8080/api/vms \
   }'
 
 # Start a VM
-curl -X POST http://localhost:8080/api/vms/test-vm/start
+curl -X POST http://localhost:8080/api/vms/test-vm/start \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Directory Structure

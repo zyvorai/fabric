@@ -36,24 +36,21 @@ pub async fn console_handler(
     // Validate VM name to prevent command injection
     validate_vm_name(&vm_name).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Require authentication token
-    let token = query.token.as_deref().ok_or_else(|| {
-        tracing::warn!(
-            "WebSocket console connection rejected: no auth token for VM '{}'",
-            vm_name
-        );
-        StatusCode::UNAUTHORIZED
-    })?;
+    // Validate authentication if auth is enabled
+    if let Some(jwt_config) = state.jwt_config.as_ref() {
+        let token = query.token.as_deref().ok_or_else(|| {
+            tracing::warn!(
+                "WebSocket console connection rejected: no auth token for VM '{}'",
+                vm_name
+            );
+            StatusCode::UNAUTHORIZED
+        })?;
 
-    // Validate JWT token using the same config as the REST API
-    let jwt_config = state.jwt_config.as_ref().ok_or_else(|| {
-        tracing::error!("WebSocket console rejected: authentication is not configured");
-        StatusCode::UNAUTHORIZED
-    })?;
-    let _claims = jwt_config.validate_token(token).map_err(|e| {
-        tracing::warn!("WebSocket auth failed for VM '{}': {}", vm_name, e);
-        StatusCode::UNAUTHORIZED
-    })?;
+        let _claims = jwt_config.validate_token(token).map_err(|e| {
+            tracing::warn!("WebSocket auth failed for VM '{}': {}", vm_name, e);
+            StatusCode::UNAUTHORIZED
+        })?;
+    }
 
     Ok(ws
         .max_message_size(MAX_MESSAGE_SIZE)
@@ -81,8 +78,22 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
         }
     };
 
-    let mut stdin = child.stdin.take().unwrap();
-    let mut stdout = child.stdout.take().unwrap();
+    let mut stdin = match child.stdin.take() {
+        Some(s) => s,
+        None => {
+            tracing::error!("Failed to capture stdin for machinectl shell");
+            let _ = child.kill().await;
+            return;
+        }
+    };
+    let mut stdout = match child.stdout.take() {
+        Some(s) => s,
+        None => {
+            tracing::error!("Failed to capture stdout for machinectl shell");
+            let _ = child.kill().await;
+            return;
+        }
+    };
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
 

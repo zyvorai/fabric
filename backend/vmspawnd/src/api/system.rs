@@ -371,19 +371,34 @@ pub async fn set_memory_ballooning(
             target_bytes
         );
 
-        let output = Command::new("socat")
+        // Write QMP command to socat via stdin (no shell interpolation)
+        let mut child = Command::new("socat")
             .arg("-")
             .arg(format!("UNIX-CONNECT:{}", monitor_socket))
-            .arg("EXEC:'echo {}'")
-            .arg(&qmp_command)
-            .output()
-            .await
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to communicate with QEMU monitor: {}", e),
+                    format!("Failed to spawn socat: {}", e),
                 )
             })?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            use tokio::io::AsyncWriteExt;
+            let _ = stdin.write_all(qmp_command.as_bytes()).await;
+            let _ = stdin.write_all(b"\n").await;
+            drop(stdin); // close stdin to signal EOF
+        }
+
+        let output = child.wait_with_output().await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to communicate with QEMU monitor: {}", e),
+            )
+        })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

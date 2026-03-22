@@ -310,7 +310,7 @@ impl QemuBuilder {
             QemuDisplay::Spice { port } => {
                 args.extend_from_slice(&[
                     "-spice".to_string(),
-                    format!("port={},disable-ticketing=on", port),
+                    format!("port={}", port),
                 ]);
             }
             QemuDisplay::Gtk => {
@@ -364,12 +364,15 @@ impl QemuBuilder {
         // actual QEMU runs in background. Read PID from pidfile if set.
         if self.daemonize {
             if let Some(ref pidfile) = self.pidfile {
-                // Wait briefly for pidfile
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                if let Ok(content) = std::fs::read_to_string(pidfile) {
-                    if let Ok(real_pid) = content.trim().parse::<u32>() {
-                        return Ok(real_pid);
+                // Poll for pidfile with timeout instead of fixed sleep
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                while std::time::Instant::now() < deadline {
+                    if let Ok(content) = std::fs::read_to_string(pidfile) {
+                        if let Ok(real_pid) = content.trim().parse::<u32>() {
+                            return Ok(real_pid);
+                        }
                     }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
                 }
             }
         }
