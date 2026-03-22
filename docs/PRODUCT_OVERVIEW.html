@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>vmspawnd — Enterprise VM Management Platform</title>
+  <title>vmspawnd -- Enterprise VM Management Platform</title>
   <style>
     html {
       color: #1a1a1a;
@@ -235,7 +235,7 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">vmspawnd — Enterprise VM Management Platform</h1>
+<h1 class="title">vmspawnd -- Enterprise VM Management Platform</h1>
 </header>
 <nav id="TOC" role="doc-toc">
 <ul>
@@ -292,7 +292,7 @@ complete management layer:</p>
 <ul>
 <li><strong>One binary, one config file, one systemd service</strong> —
 deploys in under 5 minutes</li>
-<li><strong>480+ REST API endpoints</strong> with JWT authentication,
+<li><strong>520+ REST API endpoints</strong> with JWT authentication,
 RBAC, and audit logging</li>
 <li><strong>5 management interfaces</strong> — CLI, terminal UI, web
 dashboard, Kubernetes operator, Terraform provider</li>
@@ -360,7 +360,7 @@ Dependencies</h3>
 </tbody>
 </table>
 <h3 id="security-first-architecture">3. Security-First Architecture</h3>
-<p>The entire codebase has undergone a <strong>9-round security
+<p>The entire codebase has undergone a <strong>13-round security
 audit</strong> with verified fixes:</p>
 <ul>
 <li><strong>Zero unsafe Rust</strong> — memory-safe by construction</li>
@@ -397,10 +397,16 @@ conditions</li>
 <ul>
 <li>Create, start, stop, restart, pause, resume, delete</li>
 <li>Full and linked cloning with CoW support</li>
+<li><strong>Hibernate (suspend-to-disk)</strong> and resume from
+snapshot</li>
 <li>Templates for rapid deployment</li>
 <li>Declarative config via YAML
 (<code>vmctl apply -f config.yaml</code>)</li>
 <li>Multiple disk formats: qcow2, raw, vmdk, vdi</li>
+<li><strong>VM import</strong> from VMDK, VDI, VHD (auto-convert to
+qcow2)</li>
+<li><strong>Online disk resize</strong> (qemu-img + QMP
+block_resize)</li>
 </ul>
 <h3 id="storage">Storage</h3>
 <ul>
@@ -410,6 +416,12 @@ Ceph/RBD</li>
 <li>Snapshot create/restore with retention policies</li>
 <li>ZFS replication with incremental send/receive</li>
 <li>Ceph cluster health monitoring and RBD image management</li>
+<li><strong>Storage live migration</strong> — move VM disks between
+pools without downtime</li>
+<li><strong>Cloud image downloader</strong> — built-in catalog (Ubuntu,
+Fedora, Debian, Alma)</li>
+<li><strong>ISO management</strong> — download, list, delete ISO
+images</li>
 </ul>
 <h3 id="networking">Networking</h3>
 <ul>
@@ -431,33 +443,47 @@ NAT</li>
 <li><strong>Network Monitor</strong> — Per-VM bandwidth tracking with
 threshold alerts</li>
 </ul>
-<h3 id="security">Security</h3>
+<h3 id="security-identity">Security &amp; Identity</h3>
 <ul>
 <li>JWT authentication with configurable token expiration</li>
+<li><strong>LDAP and OIDC/OAuth2</strong> integration for enterprise
+SSO</li>
 <li>3-tier RBAC (Admin / User / Viewer) enforced on every endpoint</li>
+<li><strong>Multi-tenancy</strong> — project isolation with member roles
+and quotas</li>
 <li>API keys for service-to-service authentication</li>
 <li>TLS/HTTPS with certificate management</li>
 <li>Audit logging with JSON/CSV export</li>
 <li>Encryption at rest</li>
-<li>Rate limiting on authentication</li>
+<li>Rate limiting on authentication and API keys</li>
+<li><strong>13-round security audit</strong> — zero outstanding
+vulnerabilities</li>
 </ul>
 <h3 id="high-availability">High Availability</h3>
 <ul>
 <li>etcd-based clustering with leader election</li>
 <li>Predictive DRS (Distributed Resource Scheduling)</li>
+<li><strong>Affinity / anti-affinity rules</strong> for VM placement
+constraints</li>
 <li>Fault tolerance with automatic failover and fencing</li>
 <li>Distributed storage replication</li>
 <li>Site recovery with failover/reprotect workflows</li>
+<li><strong>Resource overcommit policies</strong> (CPU/memory/storage
+ratios)</li>
 </ul>
 <h3 id="monitoring-automation">Monitoring &amp; Automation</h3>
 <ul>
 <li>Prometheus metrics exporter (<code>/metrics</code> endpoint)</li>
+<li><strong>Metrics retention policies</strong> with configurable
+cleanup</li>
 <li>Analytics dashboard with historical data</li>
-<li>Multi-channel notifications: Email, Slack, Webhook, Microsoft
-Teams</li>
+<li>Multi-channel notifications: Email, Slack, <strong>Webhook with
+retry + backoff</strong>, Microsoft Teams</li>
 <li>VM scheduling (once, daily, weekly)</li>
 <li>Backup/restore with retention policies and incremental backups</li>
 <li>Resource quotas, pools, and datacenter abstractions</li>
+<li><strong>Database schema migrations</strong> with version
+tracking</li>
 </ul>
 <h3 id="console-access">Console Access</h3>
 <ul>
@@ -470,8 +496,12 @@ Teams</li>
 <li>cloud-init integration (NoCloud datasource)</li>
 <li>TPM/vTPM support (1.2 and 2.0 via swtpm)</li>
 <li>GPU passthrough (NVIDIA, AMD, Intel GVT-g)</li>
-<li>Live and offline VM migration</li>
+<li><strong>Live migration</strong> with iterative rsync pre-copy and
+cutover</li>
 <li>CPU pinning and NUMA optimization</li>
+<li><strong>IPv6 support</strong> — dual-stack nftables (ip + ip6)</li>
+<li><strong>API versioning</strong> — all endpoints under
+<code>/api/</code> and <code>/api/v1/</code></li>
 </ul>
 <hr />
 <h2 id="management-interfaces">Management Interfaces</h2>
@@ -569,7 +599,7 @@ operator deployed</p>
 </tr>
 <tr>
 <td>REST API</td>
-<td style="text-align: center;">480+ endpoints</td>
+<td style="text-align: center;">520+ endpoints</td>
 <td style="text-align: center;">~50</td>
 <td style="text-align: center;">~200</td>
 <td style="text-align: center;">XML-RPC</td>
@@ -645,11 +675,46 @@ operator deployed</p>
 <td style="text-align: center;">Yes</td>
 </tr>
 <tr>
+<td>LDAP/OIDC SSO</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes (Keystone)</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Multi-tenancy</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
 <td>RBAC</td>
 <td style="text-align: center;">3-tier</td>
 <td style="text-align: center;">3-tier</td>
 <td style="text-align: center;">Keystone</td>
 <td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>VM Hibernate</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr>
+<td>Storage Live Migration</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr>
+<td>VM Import (VMDK/VDI)</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Limited</td>
+<td style="text-align: center;">qemu-img</td>
 </tr>
 <tr>
 <td>Audit Logging</td>
@@ -760,7 +825,7 @@ operator deployed</p>
 </tr>
 <tr>
 <td>REST API endpoints</td>
-<td>480+</td>
+<td>520+</td>
 </tr>
 <tr>
 <td>WebSocket endpoints</td>
@@ -772,7 +837,7 @@ operator deployed</p>
 </tr>
 <tr>
 <td>Security audit rounds</td>
-<td>9</td>
+<td>13</td>
 </tr>
 <tr>
 <td>Test suite</td>

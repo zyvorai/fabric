@@ -17,7 +17,7 @@ Organizations running Linux infrastructure need a unified way to manage virtual 
 vmspawnd is a production-grade virtual machine management platform built in Rust. It wraps systemd-vmspawn and systemd-machined with a complete management layer:
 
 - **One binary, one config file, one systemd service** — deploys in under 5 minutes
-- **480+ REST API endpoints** with JWT authentication, RBAC, and audit logging
+- **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
 - **5 management interfaces** — CLI, terminal UI, web dashboard, Kubernetes operator, Terraform provider
 - **Enterprise features** — HA clustering, live migration, GPU passthrough, backup/restore, network policies
 
@@ -51,7 +51,7 @@ vmspawnd leverages systemd-vmspawn and systemd-machined — the VM management to
 
 ### 3. Security-First Architecture
 
-The entire codebase has undergone a **9-round security audit** with verified fixes:
+The entire codebase has undergone a **13-round security audit** with verified fixes:
 
 - **Zero unsafe Rust** — memory-safe by construction
 - **Zero shell pipelines** — all subprocess calls use safe argument passing
@@ -77,9 +77,12 @@ The entire codebase has undergone a **9-round security audit** with verified fix
 ### VM Lifecycle
 - Create, start, stop, restart, pause, resume, delete
 - Full and linked cloning with CoW support
+- **Hibernate (suspend-to-disk)** and resume from snapshot
 - Templates for rapid deployment
 - Declarative config via YAML (`vmctl apply -f config.yaml`)
 - Multiple disk formats: qcow2, raw, vmdk, vdi
+- **VM import** from VMDK, VDI, VHD (auto-convert to qcow2)
+- **Online disk resize** (qemu-img + QMP block_resize)
 
 ### Storage
 - **6 backends**: Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD
@@ -87,6 +90,9 @@ The entire codebase has undergone a **9-round security audit** with verified fix
 - Snapshot create/restore with retention policies
 - ZFS replication with incremental send/receive
 - Ceph cluster health monitoring and RBD image management
+- **Storage live migration** — move VM disks between pools without downtime
+- **Cloud image downloader** — built-in catalog (Ubuntu, Fedora, Debian, Alma)
+- **ISO management** — download, list, delete ISO images
 
 ### Networking
 - **Network Policies** — Cilium-style label-based ingress/egress rules
@@ -99,29 +105,36 @@ The entire codebase has undergone a **9-round security audit** with verified fix
 - **NAT Gateway** — Masquerade, SNAT, DNAT, hairpin NAT
 - **Network Monitor** — Per-VM bandwidth tracking with threshold alerts
 
-### Security
+### Security & Identity
 - JWT authentication with configurable token expiration
+- **LDAP and OIDC/OAuth2** integration for enterprise SSO
 - 3-tier RBAC (Admin / User / Viewer) enforced on every endpoint
+- **Multi-tenancy** — project isolation with member roles and quotas
 - API keys for service-to-service authentication
 - TLS/HTTPS with certificate management
 - Audit logging with JSON/CSV export
 - Encryption at rest
-- Rate limiting on authentication
+- Rate limiting on authentication and API keys
+- **13-round security audit** — zero outstanding vulnerabilities
 
 ### High Availability
 - etcd-based clustering with leader election
 - Predictive DRS (Distributed Resource Scheduling)
+- **Affinity / anti-affinity rules** for VM placement constraints
 - Fault tolerance with automatic failover and fencing
 - Distributed storage replication
 - Site recovery with failover/reprotect workflows
+- **Resource overcommit policies** (CPU/memory/storage ratios)
 
 ### Monitoring & Automation
 - Prometheus metrics exporter (`/metrics` endpoint)
+- **Metrics retention policies** with configurable cleanup
 - Analytics dashboard with historical data
-- Multi-channel notifications: Email, Slack, Webhook, Microsoft Teams
+- Multi-channel notifications: Email, Slack, **Webhook with retry + backoff**, Microsoft Teams
 - VM scheduling (once, daily, weekly)
 - Backup/restore with retention policies and incremental backups
 - Resource quotas, pools, and datacenter abstractions
+- **Database schema migrations** with version tracking
 
 ### Console Access
 - WebSocket terminal via xterm.js (browser-based SSH)
@@ -132,8 +145,10 @@ The entire codebase has undergone a **9-round security audit** with verified fix
 - cloud-init integration (NoCloud datasource)
 - TPM/vTPM support (1.2 and 2.0 via swtpm)
 - GPU passthrough (NVIDIA, AMD, Intel GVT-g)
-- Live and offline VM migration
+- **Live migration** with iterative rsync pre-copy and cutover
 - CPU pinning and NUMA optimization
+- **IPv6 support** — dual-stack nftables (ip + ip6)
+- **API versioning** — all endpoints under `/api/` and `/api/v1/`
 
 ---
 
@@ -242,7 +257,7 @@ vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside
 | Feature | vmspawnd | Proxmox VE | OpenStack | libvirt/virsh |
 |---------|:--------:|:----------:|:---------:|:-------------:|
 | Single-binary deployment | Yes | No | No | N/A |
-| REST API | 480+ endpoints | ~50 | ~200 | XML-RPC |
+| REST API | 520+ endpoints | ~50 | ~200 | XML-RPC |
 | Web UI | Yes | Yes | Yes (Horizon) | No |
 | CLI | Yes | Yes | Yes | Yes |
 | Terminal UI | Yes | No | No | No |
@@ -253,7 +268,12 @@ vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside
 | VPN Mesh | WireGuard | No | No | No |
 | GPU Passthrough | Yes | Yes | Yes | Yes |
 | Live Migration | Yes | Yes | Yes | Yes |
+| LDAP/OIDC SSO | Yes | Yes | Yes (Keystone) | No |
+| Multi-tenancy | Yes | Yes | Yes | No |
 | RBAC | 3-tier | 3-tier | Keystone | No |
+| VM Hibernate | Yes | Yes | No | Yes |
+| Storage Live Migration | Yes | Yes | Yes | Yes |
+| VM Import (VMDK/VDI) | Yes | Yes | Limited | qemu-img |
 | Audit Logging | Yes | Yes | Yes | No |
 | Written in | Rust | Perl/C | Python | C |
 | Memory Safety | Guaranteed | No | N/A | No |
@@ -285,10 +305,10 @@ vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside
 | Rust source files | 165 |
 | TypeScript source files | 130 |
 | Total lines of code | ~87,000 |
-| REST API endpoints | 480+ |
+| REST API endpoints | 520+ |
 | WebSocket endpoints | 3 |
 | Web pages | 37+ |
-| Security audit rounds | 9 |
+| Security audit rounds | 13 |
 | Test suite | Passing |
 
 ---
