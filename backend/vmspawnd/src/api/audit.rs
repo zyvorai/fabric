@@ -86,48 +86,62 @@ pub async fn list_audit_logs(
     Query(filters): Query<AuditLogFilters>,
 ) -> Result<Json<Vec<AuditLog>>, StatusCode> {
     tracing::debug!("audit::{}", stringify!(list_audit_logs));
-    // Load from state store
-    let mut logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .unwrap_or_default();
 
-    // Apply filters
-    if let Some(action) = &filters.action {
-        logs.retain(|log| log.action.contains(action));
-    }
+    // Clone filter values for the closure
+    let action = filters.action.clone();
+    let user = filters.user.clone();
+    let resource_type = filters.resource_type.clone();
+    let resource_name = filters.resource_name.clone();
+    let status = filters.status.clone();
+    let search = filters.search.as_ref().map(|s| s.to_lowercase());
+    let limit = filters.limit;
 
-    if let Some(user) = &filters.user {
-        logs.retain(|log| log.user.contains(user));
-    }
-
-    if let Some(resource_type) = &filters.resource_type {
-        logs.retain(|log| log.resource_type.contains(resource_type));
-    }
-
-    if let Some(resource_name) = &filters.resource_name {
-        logs.retain(|log| log.resource_name.contains(resource_name));
-    }
-
-    if let Some(status) = &filters.status {
-        logs.retain(|log| {
-            match status.as_str() {
-                "success" => matches!(log.status, AuditStatus::Success),
-                "failed" => matches!(log.status, AuditStatus::Failed),
-                _ => true,
+    // Filter at storage layer — only loads and deserializes entries that match
+    let logs = state.store.list_entities_filtered::<AuditLog, _>(
+        "audit_logs",
+        |log| {
+            if let Some(ref a) = action {
+                if !log.action.to_lowercase().contains(&a.to_lowercase()) {
+                    return false;
+                }
             }
-        });
-    }
-
-    if let Some(search) = &filters.search {
-        let search_lower = search.to_lowercase();
-        logs.retain(|log| {
-            log.action.to_lowercase().contains(&search_lower)
-                || log.resource_name.to_lowercase().contains(&search_lower)
-                || log.user.to_lowercase().contains(&search_lower)
-        });
-    }
-
-    // Apply limit
-    logs.truncate(filters.limit);
+            if let Some(ref u) = user {
+                if !log.user.to_lowercase().contains(&u.to_lowercase()) {
+                    return false;
+                }
+            }
+            if let Some(ref rt) = resource_type {
+                if !log.resource_type.to_lowercase().contains(&rt.to_lowercase()) {
+                    return false;
+                }
+            }
+            if let Some(ref rn) = resource_name {
+                if !log.resource_name.to_lowercase().contains(&rn.to_lowercase()) {
+                    return false;
+                }
+            }
+            if let Some(ref s) = status {
+                let matches = match s.as_str() {
+                    "success" => matches!(log.status, AuditStatus::Success),
+                    "failed" => matches!(log.status, AuditStatus::Failed),
+                    _ => true,
+                };
+                if !matches {
+                    return false;
+                }
+            }
+            if let Some(ref s) = search {
+                if !log.action.to_lowercase().contains(s)
+                    && !log.resource_name.to_lowercase().contains(s)
+                    && !log.user.to_lowercase().contains(s)
+                {
+                    return false;
+                }
+            }
+            true
+        },
+        limit,
+    ).unwrap_or_default();
 
     Ok(Json(logs))
 }

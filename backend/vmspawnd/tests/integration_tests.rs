@@ -982,3 +982,146 @@ async fn test_datacenter_host_lifecycle() {
     let response = app.oneshot(delete_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
 }
+
+// ─── Concurrency tests ──────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_concurrent_start_same_vm() {
+    let app = common::create_test_app().await;
+
+    // Create a VM
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/api/vms")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "name": "concurrent-vm",
+                "image": "test.qcow2",
+                "cpus": 1,
+                "memory": 512
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    app.clone().oneshot(create_request).await.unwrap();
+
+    // Send two concurrent start requests
+    let app2 = app.clone();
+    let start1 = tokio::spawn(async move {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/vms/concurrent-vm/start")
+            .body(Body::empty())
+            .unwrap();
+        app.oneshot(req).await.unwrap().status()
+    });
+
+    let start2 = tokio::spawn(async move {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/vms/concurrent-vm/start")
+            .body(Body::empty())
+            .unwrap();
+        app2.oneshot(req).await.unwrap().status()
+    });
+
+    let (r1, r2) = tokio::join!(start1, start2);
+    let s1 = r1.unwrap();
+    let s2 = r2.unwrap();
+
+    // One should get 202 Accepted, the other should get 409 Conflict
+    let statuses = vec![s1, s2];
+    let accepted = statuses.iter().filter(|s| **s == StatusCode::ACCEPTED).count();
+    let conflict = statuses.iter().filter(|s| **s == StatusCode::CONFLICT).count();
+
+    // At most one should be accepted
+    assert!(accepted <= 1, "Expected at most 1 ACCEPTED, got {}", accepted);
+    // If one was accepted, the other should be conflict (or error from driver)
+    if accepted == 1 {
+        assert!(conflict >= 1 || statuses.contains(&StatusCode::INTERNAL_SERVER_ERROR),
+            "Expected CONFLICT or error for second start, got {:?}", statuses);
+    }
+}
+
+#[tokio::test]
+async fn test_clone_self_rejected() {
+    let app = common::create_test_app().await;
+
+    // Create a VM
+    let create_request = Request::builder()
+        .method("POST")
+        .uri("/api/vms")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "name": "self-clone",
+                "image": "test.qcow2",
+                "cpus": 1,
+                "memory": 512
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    app.clone().oneshot(create_request).await.unwrap();
+
+    // Try to clone to same name
+    let clone_request = Request::builder()
+        .method("POST")
+        .uri("/api/vms/self-clone/clone")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({ "target_name": "self-clone" }).to_string(),
+        ))
+        .unwrap();
+
+    let response = app.oneshot(clone_request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let error: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert!(error["error"].as_str().unwrap().contains("different"));
+}
+
+#[tokio::test]
+async fn test_list_vms_pagination() {
+    let app = common::create_test_app().await;
+
+    // Create 3 VMs
+    for i in 0..3 {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/vms")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                json!({
+                    "name": format!("page-vm-{}", i),
+                    "image": "test.qcow2",
+                    "cpus": 1,
+                    "memory": 512
+                })
+                .to_string(),
+            ))
+            .unwrap();
+        app.clone().oneshot(req).await.unwrap();
+    }
+
+    // List with limit=2
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/vms?limit=2&offset=0")
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    // Should return at most 2 items (limit=2), with total >= 3
+    assert!(result["items"].as_array().unwrap().len() <= 2);
+    assert!(result["total"].as_u64().unwrap() >= 3);
+    assert_eq!(result["limit"].as_u64().unwrap(), 2);
+}

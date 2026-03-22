@@ -73,6 +73,51 @@ impl StateStore {
         Ok(entities)
     }
 
+    /// List entities with a filter predicate and limit, avoiding loading all into memory.
+    pub fn list_entities_filtered<T, F>(
+        &self,
+        subdir: &str,
+        predicate: F,
+        limit: usize,
+    ) -> Result<Vec<T>>
+    where
+        T: for<'de> Deserialize<'de>,
+        F: Fn(&T) -> bool,
+    {
+        let dir = self.path.join(subdir);
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut entities = Vec::new();
+        for entry in fs::read_dir(&dir)? {
+            if entities.len() >= limit {
+                break;
+            }
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                match fs::read_to_string(&path) {
+                    Ok(content) => match serde_json::from_str::<T>(&content) {
+                        Ok(entity) => {
+                            if predicate(&entity) {
+                                entities.push(entity);
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to deserialize entity from {}: {}", path.display(), e);
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Failed to read entity file {}: {}", path.display(), e);
+                    }
+                }
+            }
+        }
+
+        Ok(entities)
+    }
+
     /// Delete an entity by ID
     pub fn delete_entity(&self, subdir: &str, id: &str) -> Result<()> {
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
@@ -141,6 +186,30 @@ impl StateStore {
             .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         Ok(vms.values().cloned().collect())
+    }
+
+    /// List VMs with pagination. Returns (items, total_count).
+    pub fn list_vms_paginated(&self, offset: usize, limit: usize) -> Result<(Vec<VM>, usize)> {
+        let vms = self
+            .vms
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        let total = vms.len();
+        let items: Vec<VM> = vms.values()
+            .skip(offset)
+            .take(limit)
+            .cloned()
+            .collect();
+        Ok((items, total))
+    }
+
+    /// Count VMs without cloning.
+    pub fn count_vms(&self) -> Result<usize> {
+        let vms = self
+            .vms
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        Ok(vms.len())
     }
 
     pub fn delete_vm(&self, name: &str) -> Result<()> {

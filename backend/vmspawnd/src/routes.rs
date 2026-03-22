@@ -1,9 +1,10 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use vm_model::CreateVMRequest;
@@ -13,6 +14,14 @@ use security::{RequireRead, RequireWrite, RequireAdmin};
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
 use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
+
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
 
 /// Helper: record an audit log entry.
 fn audit(_state: &AppState, user: &str, action: &str, resource: &str, status: &str) {
@@ -32,9 +41,32 @@ fn json_error(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<s
     (status, Json(json!({ "error": msg.into() })))
 }
 
-pub async fn list_vms(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.store.list_vms() {
-        Ok(vms) => (StatusCode::OK, Json(json!(vms))).into_response(),
+/// JSON error with path sanitization for non-admin users.
+fn json_error_safe(status: StatusCode, msg: impl Into<String>, claims: &security::Claims) -> (StatusCode, Json<serde_json::Value>) {
+    let msg = msg.into();
+    let safe_msg = if claims.role.can_manage() {
+        msg
+    } else {
+        crate::validation::sanitize_error(&msg)
+    };
+    (status, Json(json!({ "error": safe_msg })))
+}
+
+pub async fn list_vms(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Query(pagination): Query<PaginationQuery>,
+) -> impl IntoResponse {
+    let offset = pagination.offset.unwrap_or(0);
+    let limit = pagination.limit.unwrap_or(200);
+    // Cap limit to prevent abuse
+    let limit = limit.min(1000);
+
+    match state.store.list_vms_paginated(offset, limit) {
+        Ok((vms, total)) => (
+            StatusCode::OK,
+            Json(json!({ "items": vms, "total": total, "offset": offset, "limit": limit })),
+        ).into_response(),
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
@@ -385,7 +417,7 @@ pub async fn clone_vm(
     // Ensure target directory exists
     if let Some(parent) = std::path::Path::new(&target_path).parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)).into_response();
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e), &claims).into_response();
         }
     }
 
@@ -405,11 +437,11 @@ pub async fn clone_vm(
         Ok(output) if !output.status.success() => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "FAILED");
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", stderr)).into_response();
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", stderr), &claims).into_response();
         }
         Err(e) => {
             audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "FAILED");
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", e)).into_response();
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", e), &claims).into_response();
         }
         _ => {}
     }

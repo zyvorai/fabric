@@ -103,8 +103,11 @@ pub async fn list_pools(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<StoragePool>>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(list_pools));
-    let manager = state.storage_manager.read().await;
-    let pools = manager.list_pools().await;
+    // Clone the pool list under the lock, then release it before returning
+    let pools = {
+        let manager = state.storage_manager.read().await;
+        manager.list_pools().await
+    };
     Ok(Json(pools))
 }
 
@@ -114,9 +117,12 @@ pub async fn get_pool(
     Path(name): Path<String>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(get_pool));
-    let manager = state.storage_manager.read().await;
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.get_pool(&name).await
+    };
 
-    match manager.get_pool(&name).await {
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((StatusCode::NOT_FOUND, format!("Pool not found: {}", e))),
     }
@@ -133,10 +139,13 @@ pub async fn create_local_pool(
     crate::validation::validate_host_path(&req.path)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
-    let manager = state.storage_manager.read().await;
     let path = std::path::PathBuf::from(&req.path);
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.create_local_pool(req.name, path, req.auto_start).await
+    };
 
-    match manager.create_local_pool(req.name, path, req.auto_start).await {
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to create pool: {}", e))),
     }
@@ -157,8 +166,6 @@ pub async fn create_nfs_pool(
     crate::validation::validate_host_path(&req.config.mount_path)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
-    let manager = state.storage_manager.read().await;
-
     let nfs_config = NfsConfig {
         server: req.config.server,
         export_path: req.config.export_path,
@@ -168,7 +175,12 @@ pub async fn create_nfs_pool(
         nfs_version: req.config.nfs_version.into(),
     };
 
-    match manager.create_nfs_pool(req.name, nfs_config).await {
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.create_nfs_pool(req.name, nfs_config).await
+    };
+
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to create NFS pool: {}", e))),
     }
@@ -180,9 +192,12 @@ pub async fn delete_pool(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(delete_pool));
-    let manager = state.storage_manager.read().await;
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.delete_pool(&name).await
+    };
 
-    match manager.delete_pool(&name).await {
+    match result {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to delete pool: {}", e))),
     }
@@ -194,9 +209,11 @@ pub async fn start_pool(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(start_pool));
-    let manager = state.storage_manager.read().await;
-
-    match manager.start_pool(&name).await {
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.start_pool(&name).await
+    };
+    match result {
         Ok(_) => Ok(StatusCode::OK),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to start pool: {}", e))),
     }
@@ -208,9 +225,11 @@ pub async fn stop_pool(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(stop_pool));
-    let manager = state.storage_manager.read().await;
-
-    match manager.stop_pool(&name).await {
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.stop_pool(&name).await
+    };
+    match result {
         Ok(_) => Ok(StatusCode::OK),
         Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to stop pool: {}", e))),
     }
@@ -222,9 +241,11 @@ pub async fn get_pool_health(
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(get_pool_health));
-    let manager = state.storage_manager.read().await;
-
-    match manager.get_nfs_health(&name).await {
+    let result = {
+        let manager = state.storage_manager.read().await;
+        manager.get_nfs_health(&name).await
+    };
+    match result {
         Ok(health) => Ok(Json(health)),
         Err(e) => Err((StatusCode::NOT_FOUND, format!("Failed to get health: {}", e))),
     }

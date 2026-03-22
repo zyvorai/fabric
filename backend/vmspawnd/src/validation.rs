@@ -175,6 +175,38 @@ pub fn escape_csv_field(field: &str) -> String {
     escaped
 }
 
+/// Sanitize an error message by redacting filesystem paths.
+/// Replaces absolute paths like /var/lib/vmspawnd/images/foo.qcow2 with <path>.
+/// Use for error messages returned to non-admin users.
+pub fn sanitize_error(msg: &str) -> String {
+    let mut result = String::with_capacity(msg.len());
+    let mut chars = msg.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '/' && result.is_empty() || (c == '/' && result.ends_with(|ch: char| ch.is_whitespace() || ch == '\'' || ch == '"' || ch == ':')) {
+            // Start of a path — consume path characters
+            let mut path_len = 1;
+            while let Some(&next) = chars.peek() {
+                if next.is_ascii_alphanumeric() || matches!(next, '/' | '.' | '-' | '_') {
+                    chars.next();
+                    path_len += 1;
+                } else {
+                    break;
+                }
+            }
+            if path_len > 1 {
+                result.push_str("<path>");
+            } else {
+                result.push(c);
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
