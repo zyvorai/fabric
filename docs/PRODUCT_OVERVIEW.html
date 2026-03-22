@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>vmspawnd — Enterprise VM Management Platform</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">vmspawnd — Enterprise VM Management Platform</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#vmspawnd-enterprise-vm-management-platform"
+id="toc-vmspawnd-enterprise-vm-management-platform">vmspawnd —
+Enterprise VM Management Platform</a>
+<ul>
+<li><a href="#the-problem" id="toc-the-problem">The Problem</a></li>
+<li><a href="#what-is-vmspawnd" id="toc-what-is-vmspawnd">What Is
+vmspawnd?</a></li>
+<li><a href="#key-differentiators" id="toc-key-differentiators">Key
+Differentiators</a></li>
+<li><a href="#feature-overview" id="toc-feature-overview">Feature
+Overview</a></li>
+<li><a href="#management-interfaces"
+id="toc-management-interfaces">Management Interfaces</a></li>
+<li><a href="#architecture" id="toc-architecture">Architecture</a></li>
+<li><a href="#deployment-models" id="toc-deployment-models">Deployment
+Models</a></li>
+<li><a href="#comparison" id="toc-comparison">Comparison</a></li>
+<li><a href="#technology-stack" id="toc-technology-stack">Technology
+Stack</a></li>
+<li><a href="#project-statistics" id="toc-project-statistics">Project
+Statistics</a></li>
+<li><a href="#license" id="toc-license">License</a></li>
+<li><a href="#getting-started" id="toc-getting-started">Getting
+Started</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="vmspawnd-enterprise-vm-management-platform">vmspawnd —
+Enterprise VM Management Platform</h1>
+<h2 id="the-problem">The Problem</h2>
+<p>Organizations running Linux infrastructure need a unified way to
+manage virtual machines. Existing solutions are either:</p>
+<ul>
+<li><strong>Too heavy</strong> — VMware vSphere, Proxmox, and OpenStack
+require complex multi-server deployments, dedicated storage
+infrastructure, and specialized operations teams</li>
+<li><strong>Too basic</strong> — Manual QEMU/KVM management with shell
+scripts doesn’t scale and lacks security, monitoring, or multi-user
+access</li>
+<li><strong>Too locked-in</strong> — Cloud-only solutions (AWS, Azure,
+GCP) create vendor dependency with unpredictable costs</li>
+</ul>
+<p><strong>vmspawnd fills the gap</strong> — a single-binary VM
+management platform that runs on any Linux server with systemd,
+providing enterprise features without enterprise complexity.</p>
+<hr />
+<h2 id="what-is-vmspawnd">What Is vmspawnd?</h2>
+<p>vmspawnd is a production-grade virtual machine management platform
+built in Rust. It wraps systemd-vmspawn and systemd-machined with a
+complete management layer:</p>
+<ul>
+<li><strong>One binary, one config file, one systemd service</strong> —
+deploys in under 5 minutes</li>
+<li><strong>480+ REST API endpoints</strong> with JWT authentication,
+RBAC, and audit logging</li>
+<li><strong>5 management interfaces</strong> — CLI, terminal UI, web
+dashboard, Kubernetes operator, Terraform provider</li>
+<li><strong>Enterprise features</strong> — HA clustering, live
+migration, GPU passthrough, backup/restore, network policies</li>
+</ul>
+<pre><code>sudo systemctl enable --now vmspawnd
+# That&#39;s it. Platform is running.</code></pre>
+<hr />
+<h2 id="key-differentiators">Key Differentiators</h2>
+<h3 id="built-on-systemd-not-a-custom-hypervisor">1. Built on systemd
+(Not a Custom Hypervisor)</h3>
+<p>vmspawnd leverages systemd-vmspawn and systemd-machined — the VM
+management tools built into every modern Linux distribution. This
+means:</p>
+<ul>
+<li>No custom kernel modules or hypervisor patches</li>
+<li>VMs are first-class systemd units with journal logging, socket
+activation, and watchdog support</li>
+<li>Works on Fedora, Ubuntu, Debian, RHEL, SUSE — any distro with
+systemd 256+</li>
+<li>Upstream-maintained VM lifecycle, not a fork</li>
+</ul>
+<h3 id="single-binary-zero-dependencies">2. Single Binary, Zero
+Dependencies</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 30%" />
+<col style="width: 36%" />
+</colgroup>
+<thead>
+<tr>
+<th>vmspawnd</th>
+<th>Proxmox</th>
+<th>OpenStack</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 binary (15MB)</td>
+<td>200+ packages</td>
+<td>1000+ packages</td>
+</tr>
+<tr>
+<td>1 config file</td>
+<td>50+ config files</td>
+<td>100+ config files</td>
+</tr>
+<tr>
+<td>5 min setup</td>
+<td>2+ hours</td>
+<td>2+ days</td>
+</tr>
+<tr>
+<td>Runs on any Linux</td>
+<td>Debian only</td>
+<td>Ubuntu/RHEL</td>
+</tr>
+<tr>
+<td>SQLite user store</td>
+<td>PostgreSQL required</td>
+<td>MySQL + RabbitMQ + Memcached</td>
+</tr>
+</tbody>
+</table>
+<h3 id="security-first-architecture">3. Security-First Architecture</h3>
+<p>The entire codebase has undergone a <strong>9-round security
+audit</strong> with verified fixes:</p>
+<ul>
+<li><strong>Zero unsafe Rust</strong> — memory-safe by construction</li>
+<li><strong>Zero shell pipelines</strong> — all subprocess calls use
+safe argument passing</li>
+<li><strong>JWT + RBAC</strong> on every API endpoint (Admin/User/Viewer
+roles)</li>
+<li><strong>bcrypt password hashing</strong> with auto-generated secrets
+(0600 file permissions)</li>
+<li><strong>Rate limiting</strong> on authentication (5 attempts/5
+min)</li>
+<li><strong>Input validation</strong> on every user-facing
+parameter</li>
+<li><strong>Audit logging</strong> on all VM lifecycle operations</li>
+<li><strong>Path traversal protection</strong> with
+canonicalization</li>
+<li><strong>SQL injection prevention</strong> — all queries
+parameterized</li>
+</ul>
+<h3 id="rust-performance">4. Rust Performance</h3>
+<ul>
+<li><strong>Sub-millisecond API response times</strong> — async Axum +
+Tokio runtime</li>
+<li><strong>Low memory footprint</strong> — ~20MB RSS for the
+daemon</li>
+<li><strong>No garbage collection pauses</strong> — predictable
+latency</li>
+<li><strong>Safe concurrency</strong> — per-VM mutexes prevent race
+conditions</li>
+</ul>
+<hr />
+<h2 id="feature-overview">Feature Overview</h2>
+<h3 id="vm-lifecycle">VM Lifecycle</h3>
+<ul>
+<li>Create, start, stop, restart, pause, resume, delete</li>
+<li>Full and linked cloning with CoW support</li>
+<li>Templates for rapid deployment</li>
+<li>Declarative config via YAML
+(<code>vmctl apply -f config.yaml</code>)</li>
+<li>Multiple disk formats: qcow2, raw, vmdk, vdi</li>
+</ul>
+<h3 id="storage">Storage</h3>
+<ul>
+<li><strong>6 backends</strong>: Local, NFS, LVM, LVM-thin, ZFS,
+Ceph/RBD</li>
+<li>Volume CRUD with attach/detach, resize, clone</li>
+<li>Snapshot create/restore with retention policies</li>
+<li>ZFS replication with incremental send/receive</li>
+<li>Ceph cluster health monitoring and RBD image management</li>
+</ul>
+<h3 id="networking">Networking</h3>
+<ul>
+<li><strong>Network Policies</strong> — Cilium-style label-based
+ingress/egress rules</li>
+<li><strong>VM Firewall</strong> — Per-VM firewall profiles and zones
+via nftables</li>
+<li><strong>Service Mesh</strong> — Virtual IP load balancing
+(round-robin, least-conn, random, IP-hash)</li>
+<li><strong>QoS / Traffic Shaping</strong> — Guaranteed/max rate, burst,
+priority-based bandwidth</li>
+<li><strong>DNS Policy</strong> — Zone management, upstream servers,
+domain blocking</li>
+<li><strong>VPN Mesh</strong> — WireGuard tunnels (point-to-point,
+hub-spoke, full-mesh)</li>
+<li><strong>Packet Mirror</strong> — Traffic capture for debugging</li>
+<li><strong>NAT Gateway</strong> — Masquerade, SNAT, DNAT, hairpin
+NAT</li>
+<li><strong>Network Monitor</strong> — Per-VM bandwidth tracking with
+threshold alerts</li>
+</ul>
+<h3 id="security">Security</h3>
+<ul>
+<li>JWT authentication with configurable token expiration</li>
+<li>3-tier RBAC (Admin / User / Viewer) enforced on every endpoint</li>
+<li>API keys for service-to-service authentication</li>
+<li>TLS/HTTPS with certificate management</li>
+<li>Audit logging with JSON/CSV export</li>
+<li>Encryption at rest</li>
+<li>Rate limiting on authentication</li>
+</ul>
+<h3 id="high-availability">High Availability</h3>
+<ul>
+<li>etcd-based clustering with leader election</li>
+<li>Predictive DRS (Distributed Resource Scheduling)</li>
+<li>Fault tolerance with automatic failover and fencing</li>
+<li>Distributed storage replication</li>
+<li>Site recovery with failover/reprotect workflows</li>
+</ul>
+<h3 id="monitoring-automation">Monitoring &amp; Automation</h3>
+<ul>
+<li>Prometheus metrics exporter (<code>/metrics</code> endpoint)</li>
+<li>Analytics dashboard with historical data</li>
+<li>Multi-channel notifications: Email, Slack, Webhook, Microsoft
+Teams</li>
+<li>VM scheduling (once, daily, weekly)</li>
+<li>Backup/restore with retention policies and incremental backups</li>
+<li>Resource quotas, pools, and datacenter abstractions</li>
+</ul>
+<h3 id="console-access">Console Access</h3>
+<ul>
+<li>WebSocket terminal via xterm.js (browser-based SSH)</li>
+<li>VNC graphical console via noVNC proxy</li>
+<li>Authenticated with same JWT tokens as API</li>
+</ul>
+<h3 id="cloud-virtualization">Cloud &amp; Virtualization</h3>
+<ul>
+<li>cloud-init integration (NoCloud datasource)</li>
+<li>TPM/vTPM support (1.2 and 2.0 via swtpm)</li>
+<li>GPU passthrough (NVIDIA, AMD, Intel GVT-g)</li>
+<li>Live and offline VM migration</li>
+<li>CPU pinning and NUMA optimization</li>
+</ul>
+<hr />
+<h2 id="management-interfaces">Management Interfaces</h2>
+<h3 id="cli-vmctl">CLI (<code>vmctl</code>)</h3>
+<p>Scriptable command-line tool with JSON/YAML/table output:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> list <span class="at">-o</span> json</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> create myvm <span class="at">--image</span><span class="op">=</span>ubuntu.qcow2 <span class="at">--cpus</span><span class="op">=</span>4 <span class="at">--memory</span><span class="op">=</span>4G</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> start myvm</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> apply <span class="at">-f</span> infrastructure.yaml</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> policy list</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> ceph health my-pool</span></code></pre></div>
+<h3 id="terminal-ui-vmctl-tui">Terminal UI (<code>vmctl-tui</code>)</h3>
+<p>k9s-style dashboard with 8 views, vim keybindings, sparkline graphs,
+and live API data.</p>
+<h3 id="web-dashboard">Web Dashboard</h3>
+<p>React-based UI with 37+ pages, command palette (Ctrl+K), dark theme,
+real-time WebSocket updates, and bulk operations.</p>
+<h3 id="kubernetes-operator">Kubernetes Operator</h3>
+<p>Manage VMs as <code>VirtualMachine</code> CRDs with automatic
+reconciliation:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> vmspawnd.io/v1</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> VirtualMachine</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> web-server</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">image</span><span class="kw">:</span><span class="at"> ubuntu-22.04.qcow2</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cpus</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="dv">4096</span></span></code></pre></div>
+<h3 id="terraform-provider">Terraform Provider</h3>
+<p>Declarative VM provisioning with full plan/apply workflow:</p>
+<pre class="hcl"><code>resource &quot;vmspawnd_vm&quot; &quot;web&quot; {
+  name   = &quot;web-server&quot;
+  image  = &quot;ubuntu-22.04.qcow2&quot;
+  cpus   = 4
+  memory = 4096
+}</code></pre>
+<hr />
+<h2 id="architecture">Architecture</h2>
+<pre><code>                    +-----------+    +-----------+    +----------+
+                    |   vmctl   |    | vmctl-tui |    |  Web UI  |
+                    |   (CLI)   |    |   (TUI)   |    | (React)  |
+                    +-----+-----+    +-----+-----+    +----+-----+
+                          |                |               |
+                +---------+----------+     |      +--------+
+                |         |          |     |      |
+           +----v----+   |   +------v-----v------v-------+
+           |   K8s   |   |   |       vmspawnd daemon      |
+           |Operator |   |   |   REST API + WebSocket      |
+           +---------+   |   +---+----+----+----+----+----+
+                          |       |    |    |    |    |
+           +-----------+  |       |    |    |    |    |
+           | Terraform |--+       |    |    |    |    |
+           | Provider  |         |    |    |    |    |
+           +-----------+         |    |    |    |    |
+                                  v    v    v    v    v
+                           systemd-vmspawn + systemd-machined</code></pre>
+<hr />
+<h2 id="deployment-models">Deployment Models</h2>
+<h3 id="single-server">Single Server</h3>
+<p>One Linux server running vmspawnd with local storage. Suitable for
+development, testing, small teams, and edge deployments.</p>
+<p><strong>Requirements:</strong> Linux with systemd 256+, 4GB RAM
+minimum</p>
+<h3 id="multi-node-cluster">Multi-Node Cluster</h3>
+<p>Multiple vmspawnd nodes with etcd-based clustering, shared storage
+(NFS/Ceph), live migration, and HA failover.</p>
+<p><strong>Requirements:</strong> 3+ nodes, shared storage, etcd
+cluster</p>
+<h3 id="kubernetes-managed">Kubernetes-Managed</h3>
+<p>vmspawnd nodes managed by the Kubernetes operator. VMs defined as
+CRDs alongside containerized workloads.</p>
+<p><strong>Requirements:</strong> Kubernetes cluster with vmspawnd
+operator deployed</p>
+<hr />
+<h2 id="comparison">Comparison</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th style="text-align: center;">vmspawnd</th>
+<th style="text-align: center;">Proxmox VE</th>
+<th style="text-align: center;">OpenStack</th>
+<th style="text-align: center;">libvirt/virsh</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Single-binary deployment</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">N/A</td>
+</tr>
+<tr>
+<td>REST API</td>
+<td style="text-align: center;">480+ endpoints</td>
+<td style="text-align: center;">~50</td>
+<td style="text-align: center;">~200</td>
+<td style="text-align: center;">XML-RPC</td>
+</tr>
+<tr>
+<td>Web UI</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes (Horizon)</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr>
+<td>Terminal UI</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Kubernetes Operator</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Terraform Provider</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr>
+<td>Network Policies</td>
+<td style="text-align: center;">Cilium-style</td>
+<td style="text-align: center;">Basic</td>
+<td style="text-align: center;">Neutron</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Service Mesh</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>VPN Mesh</td>
+<td style="text-align: center;">WireGuard</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>GPU Passthrough</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr>
+<td>Live Migration</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr>
+<td>RBAC</td>
+<td style="text-align: center;">3-tier</td>
+<td style="text-align: center;">3-tier</td>
+<td style="text-align: center;">Keystone</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Audit Logging</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Written in</td>
+<td style="text-align: center;">Rust</td>
+<td style="text-align: center;">Perl/C</td>
+<td style="text-align: center;">Python</td>
+<td style="text-align: center;">C</td>
+</tr>
+<tr>
+<td>Memory Safety</td>
+<td style="text-align: center;">Guaranteed</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">N/A</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr>
+<td>Setup Time</td>
+<td style="text-align: center;">5 min</td>
+<td style="text-align: center;">2 hours</td>
+<td style="text-align: center;">2 days</td>
+<td style="text-align: center;">Manual</td>
+</tr>
+<tr>
+<td>License</td>
+<td style="text-align: center;">MIT</td>
+<td style="text-align: center;">AGPL</td>
+<td style="text-align: center;">Apache 2.0</td>
+<td style="text-align: center;">LGPL</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="technology-stack">Technology Stack</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language</td>
+<td>Rust (2021 edition)</td>
+</tr>
+<tr>
+<td>Async Runtime</td>
+<td>Tokio 1.44</td>
+</tr>
+<tr>
+<td>Web Framework</td>
+<td>Axum 0.8</td>
+</tr>
+<tr>
+<td>Terminal UI</td>
+<td>ratatui + crossterm</td>
+</tr>
+<tr>
+<td>Web UI</td>
+<td>React 18 + TypeScript + Vite + TailwindCSS</td>
+</tr>
+<tr>
+<td>VM Backend</td>
+<td>systemd-vmspawn + systemd-machined</td>
+</tr>
+<tr>
+<td>D-Bus</td>
+<td>zbus 4</td>
+</tr>
+<tr>
+<td>Monitoring</td>
+<td>Prometheus</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="project-statistics">Project Statistics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend crates</td>
+<td>40</td>
+</tr>
+<tr>
+<td>Rust source files</td>
+<td>165</td>
+</tr>
+<tr>
+<td>TypeScript source files</td>
+<td>130</td>
+</tr>
+<tr>
+<td>Total lines of code</td>
+<td>~87,000</td>
+</tr>
+<tr>
+<td>REST API endpoints</td>
+<td>480+</td>
+</tr>
+<tr>
+<td>WebSocket endpoints</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Web pages</td>
+<td>37+</td>
+</tr>
+<tr>
+<td>Security audit rounds</td>
+<td>9</td>
+</tr>
+<tr>
+<td>Test suite</td>
+<td>Passing</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="license">License</h2>
+<p>MIT — free for commercial use, modification, and distribution.</p>
+<hr />
+<h2 id="getting-started">Getting Started</h2>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> backend <span class="kw">&amp;&amp;</span> <span class="ex">cargo</span> build <span class="at">--release</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Install</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> make install</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Start</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl enable <span class="at">--now</span> vmspawnd</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Read admin password</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cat /var/lib/vmspawnd/.admin_password</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Login</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST http://localhost:8080/api/auth/login <span class="dt">\</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">&quot;Content-Type: application/json&quot;</span> <span class="dt">\</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&#39;{&quot;username&quot;: &quot;admin&quot;, &quot;password&quot;: &quot;&lt;password&gt;&quot;}&#39;</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Create your first VM</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> create myvm <span class="at">--image</span><span class="op">=</span>/path/to/image.qcow2 <span class="at">--cpus</span><span class="op">=</span>4 <span class="at">--memory</span><span class="op">=</span>4096</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> start myvm</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Open web dashboard</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="ex">open</span> http://localhost:8080</span></code></pre></div>
+<hr />
+<p><em>For technical details, see the <a
+href="architecture.md">Architecture Guide</a>, <a href="api.md">API
+Reference</a>, and <a href="security.md">Security
+Documentation</a>.</em></p>
+</body>
+</html>
