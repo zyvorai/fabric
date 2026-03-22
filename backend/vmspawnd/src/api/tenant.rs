@@ -9,7 +9,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireRead, RequireAdmin};
 
 // ============================================================================
 // Multi-Tenancy — Project/Namespace Isolation

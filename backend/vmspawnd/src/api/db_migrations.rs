@@ -54,7 +54,7 @@ pub async fn apply_migrations(
     let applied_versions: std::collections::HashSet<u32> = applied.iter().map(|m| m.version).collect();
     let mut newly_applied = Vec::new();
 
-    let user_db = state.user_db.as_ref()
+    let _user_db = state.user_db.as_ref()
         .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Database not available"}))))?;
 
     for (version, name, sql) in all_migrations() {

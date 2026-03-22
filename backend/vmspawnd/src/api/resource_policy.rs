@@ -8,7 +8,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireRead, RequireAdmin};
 
 // ============================================================================
 // Resource Overcommit Policy

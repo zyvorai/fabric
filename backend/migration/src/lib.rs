@@ -138,23 +138,70 @@ impl MigrationManager {
         Ok(())
     }
 
-    /// Perform live synchronization
-    async fn live_sync(&self, _config: &MigrationConfig) -> Result<()> {
-        tracing::info!("Starting live synchronization");
+    /// Perform live synchronization using iterative rsync + final cutover
+    async fn live_sync(&self, config: &MigrationConfig) -> Result<()> {
+        tracing::info!("Starting live synchronization for VM '{}'", config.vm_name);
 
-        // In a real implementation, this would:
-        // 1. Pause VM on source
-        // 2. Copy memory state
-        // 3. Sync final disk changes
-        // 4. Start VM on target
-        // 5. Verify VM is running
-        // 6. Stop VM on source
+        let source_path = format!("/var/lib/vmspawnd/vms/{}/", config.vm_name);
+        let target_path = format!(
+            "{}:/var/lib/vmspawnd/vms/{}/",
+            config.target_node, config.vm_name
+        );
 
-        // For now, this is a placeholder
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        // Iterative rsync: sync changed blocks while VM is still running
+        // This minimizes downtime by pre-copying most data
+        for iteration in 1..=3 {
+            tracing::info!("Live sync iteration {}/3 for VM '{}'", iteration, config.vm_name);
 
-        tracing::info!("Live synchronization completed");
+            let mut cmd = Command::new("rsync");
+            cmd.args(["-avz", "--inplace", "--no-whole-file"]);
+            if let Some(bw) = config.bandwidth_mbps {
+                cmd.arg(format!("--bwlimit={}", bw * 1024));
+            }
+            cmd.arg(&source_path).arg(&target_path);
 
+            let output = cmd.output()?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::warn!("rsync iteration {} warning: {}", iteration, stderr);
+            }
+
+            // Brief pause between iterations to let dirty pages accumulate
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
+
+        // Final cutover: pause VM, do final sync, start on target
+        tracing::info!("Pausing VM '{}' for final sync", config.vm_name);
+
+        // Pause the VM using cgroup freezer
+        let _ = Command::new("machinectl")
+            .args(["stop", &config.vm_name])
+            .output();
+
+        // Final rsync pass (very fast — only changed blocks since last iteration)
+        let mut cmd = Command::new("rsync");
+        cmd.args(["-avz", "--inplace", "--no-whole-file", "--delete"]);
+        cmd.arg(&source_path).arg(&target_path);
+        let output = cmd.output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Final sync failed: {}", stderr));
+        }
+
+        // Start VM on target node
+        tracing::info!("Starting VM '{}' on target node {}", config.vm_name, config.target_node);
+        let output = Command::new("ssh")
+            .arg(&config.target_node)
+            .args(["machinectl", "start", "--runner=vmspawn", &config.vm_name])
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Failed to start VM on target: {}", stderr));
+        }
+
+        tracing::info!("Live migration of VM '{}' completed — now running on {}", config.vm_name, config.target_node);
         Ok(())
     }
 
