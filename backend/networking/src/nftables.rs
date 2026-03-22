@@ -11,38 +11,55 @@ pub struct NftManager;
 
 const TABLE_NAME: &str = "vmspawnd";
 const TABLE_FAMILY: &str = "ip";
+const TABLE_NAME_V6: &str = "vmspawnd6";
+const TABLE_FAMILY_V6: &str = "ip6";
 
 impl NftManager {
     pub fn new() -> Self {
         Self
     }
 
-    /// Create `table ip vmspawnd` if it does not already exist.
+    /// Create `table ip vmspawnd` and `table ip6 vmspawnd6` if they do not already exist.
     pub fn ensure_table(&self) -> Result<()> {
         // `add table` is idempotent in nftables — it won't fail if the table
         // already exists.
         run_nft(&["add", "table", TABLE_FAMILY, TABLE_NAME])
-            .context("Failed to create nftables table")?;
-        tracing::debug!("Ensured nftables table {TABLE_FAMILY} {TABLE_NAME}");
+            .context("Failed to create nftables IPv4 table")?;
+        run_nft(&["add", "table", TABLE_FAMILY_V6, TABLE_NAME_V6])
+            .context("Failed to create nftables IPv6 table")?;
+        tracing::debug!("Ensured nftables tables {TABLE_FAMILY} {TABLE_NAME} + {TABLE_FAMILY_V6} {TABLE_NAME_V6}");
         Ok(())
     }
 
-    /// Create the prerouting (DNAT) and postrouting (masquerade) chains.
+    /// Create the prerouting (DNAT) and postrouting (masquerade) chains for IPv4 and IPv6.
     pub fn ensure_chains(&self) -> Result<()> {
-        // `add chain` is also idempotent.
+        // IPv4 chains
         run_nft(&[
             "add", "chain", TABLE_FAMILY, TABLE_NAME, "prerouting",
             "{ type nat hook prerouting priority dstnat; }",
         ])
-        .context("Failed to create prerouting chain")?;
+        .context("Failed to create IPv4 prerouting chain")?;
 
         run_nft(&[
             "add", "chain", TABLE_FAMILY, TABLE_NAME, "postrouting",
             "{ type nat hook postrouting priority srcnat; }",
         ])
-        .context("Failed to create postrouting chain")?;
+        .context("Failed to create IPv4 postrouting chain")?;
 
-        tracing::debug!("Ensured nftables chains prerouting + postrouting");
+        // IPv6 chains
+        run_nft(&[
+            "add", "chain", TABLE_FAMILY_V6, TABLE_NAME_V6, "prerouting",
+            "{ type nat hook prerouting priority dstnat; }",
+        ])
+        .context("Failed to create IPv6 prerouting chain")?;
+
+        run_nft(&[
+            "add", "chain", TABLE_FAMILY_V6, TABLE_NAME_V6, "postrouting",
+            "{ type nat hook postrouting priority srcnat; }",
+        ])
+        .context("Failed to create IPv6 postrouting chain")?;
+
+        tracing::debug!("Ensured nftables chains prerouting + postrouting (IPv4 + IPv6)");
         Ok(())
     }
 

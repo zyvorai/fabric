@@ -120,6 +120,7 @@ pub async fn create_vm(
             }
 
             audit(&state, &claims.sub, "CREATE", &format!("vm/{}", vm.name), "SUCCESS");
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Created, &vm.name, None);
             (StatusCode::CREATED, Json(vm)).into_response()
         }
         Err(e) => {
@@ -159,6 +160,7 @@ pub async fn delete_vm(
     match state.store.delete_vm(&name) {
         Ok(_) => {
             audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "SUCCESS");
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Deleted, &name, None);
             StatusCode::NO_CONTENT.into_response()
         }
         Err(e) => {
@@ -256,6 +258,7 @@ pub async fn stop_vm(
                 }
             }
             audit(&state, &claims.sub, "STOP", &format!("vm/{}", name), "SUCCESS");
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Stopped, &name, None);
             (StatusCode::OK, Json(json!({ "status": "stopped" }))).into_response()
         }
         Err(e) => {
@@ -314,6 +317,7 @@ pub async fn pause_vm(
                 }
             }
             audit(&state, &claims.sub, "PAUSE", &format!("vm/{}", name), "SUCCESS");
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Paused, &name, None);
             (StatusCode::OK, Json(json!({ "status": "paused" }))).into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -340,6 +344,7 @@ pub async fn resume_vm(
                 }
             }
             audit(&state, &claims.sub, "RESUME", &format!("vm/{}", name), "SUCCESS");
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Resumed, &name, None);
             (StatusCode::OK, Json(json!({ "status": "running" }))).into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -452,6 +457,7 @@ pub async fn clone_vm(
     match state.store.save_vm(&new_vm) {
         Ok(_) => {
             audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "SUCCESS");
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Cloned, &req.target_name, Some(format!("Cloned from {}", source_name)));
             (StatusCode::CREATED, Json(new_vm)).into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),

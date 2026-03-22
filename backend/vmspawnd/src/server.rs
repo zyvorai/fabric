@@ -365,6 +365,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/images/build", post(api::images::build_image))
             .route("/images/builds", get(api::images::list_builds))
             .route("/images", get(api::images::list_images))
+            // Cloud image management
+            .route("/images/cloud", get(api::images::list_cloud_images))
+            .route("/images/cloud/download", post(api::images::download_cloud_image))
+            .route("/images/downloads", get(api::images::list_downloads))
+            // ISO management
+            .route("/images/iso", get(api::images::list_iso_images))
+            .route("/images/iso/download", post(api::images::download_iso))
+            .route("/images/iso/{name}", delete(api::images::delete_iso))
+            // VM image import (OVA/VMDK/VDI)
+            .route("/images/import", post(api::images::import_vm_image))
+            // Online disk resize
+            .route("/vms/{name}/disk/resize", post(api::images::resize_disk))
             // VM profile / instance type routes
             .route("/profiles", get(api::profiles::list_profiles).post(api::profiles::create_profile))
             .route("/profiles/{name}", get(api::profiles::get_profile).delete(api::profiles::delete_profile))
@@ -701,8 +713,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/vnc/{name}", get(vnc_proxy::vnc_handler))
             .with_state(state.clone());
 
+        // Clone routes for /api/v1/ prefix (versioned API)
+        let versioned_routes = public_auth_routes.clone().merge(api_routes.clone());
+
         Router::new()
             .nest("/api", public_auth_routes.merge(api_routes))
+            .nest("/api/v1", versioned_routes)
             .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
             .route("/metrics", get(prometheus_exporter::metrics_handler))

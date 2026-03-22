@@ -9,7 +9,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite};
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -176,4 +176,539 @@ pub struct ImageInfo {
     pub path: String,
     pub format: String,
     pub size_bytes: u64,
+}
+
+// ============================================================================
+// Cloud Image Download
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudImage {
+    pub name: String,
+    pub distro: String,
+    pub version: String,
+    pub url: String,
+    pub format: String,
+    pub arch: String,
+}
+
+/// Well-known cloud image URLs
+fn cloud_image_catalog() -> Vec<CloudImage> {
+    vec![
+        CloudImage {
+            name: "ubuntu-24.04".into(),
+            distro: "ubuntu".into(),
+            version: "24.04".into(),
+            url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img".into(),
+            format: "qcow2".into(),
+            arch: "amd64".into(),
+        },
+        CloudImage {
+            name: "ubuntu-22.04".into(),
+            distro: "ubuntu".into(),
+            version: "22.04".into(),
+            url: "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img".into(),
+            format: "qcow2".into(),
+            arch: "amd64".into(),
+        },
+        CloudImage {
+            name: "fedora-41".into(),
+            distro: "fedora".into(),
+            version: "41".into(),
+            url: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-41-1.4.x86_64.qcow2".into(),
+            format: "qcow2".into(),
+            arch: "x86_64".into(),
+        },
+        CloudImage {
+            name: "debian-12".into(),
+            distro: "debian".into(),
+            version: "12".into(),
+            url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2".into(),
+            format: "qcow2".into(),
+            arch: "amd64".into(),
+        },
+        CloudImage {
+            name: "alma-9".into(),
+            distro: "almalinux".into(),
+            version: "9".into(),
+            url: "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2".into(),
+            format: "qcow2".into(),
+            arch: "x86_64".into(),
+        },
+    ]
+}
+
+/// GET /api/images/cloud - List available cloud images for download
+pub async fn list_cloud_images(
+    RequireRead(_claims): RequireRead,
+) -> Json<Vec<CloudImage>> {
+    tracing::debug!("images::{}", stringify!(list_cloud_images));
+    Json(cloud_image_catalog())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DownloadCloudImageRequest {
+    pub name: String,
+    /// Optional: override the URL from the catalog
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadStatus {
+    pub id: String,
+    pub name: String,
+    pub state: BuildState,
+    pub output_path: Option<String>,
+    pub error: Option<String>,
+    pub started: DateTime<Utc>,
+    pub completed: Option<DateTime<Utc>>,
+}
+
+/// POST /api/images/cloud/download - Download a cloud image
+pub async fn download_cloud_image(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<DownloadCloudImageRequest>,
+) -> Result<(StatusCode, Json<DownloadStatus>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(download_cloud_image));
+
+    let catalog = cloud_image_catalog();
+    let url = if let Some(ref custom_url) = req.url {
+        custom_url.clone()
+    } else {
+        catalog.iter()
+            .find(|img| img.name == req.name)
+            .map(|img| img.url.clone())
+            .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Cloud image '{}' not found in catalog", req.name)}))))?
+    };
+
+    let download_id = uuid::Uuid::new_v4().to_string();
+    let status = DownloadStatus {
+        id: download_id.clone(),
+        name: req.name.clone(),
+        state: BuildState::Pending,
+        output_path: None,
+        error: None,
+        started: Utc::now(),
+        completed: None,
+    };
+
+    state.store.save_entity("image_downloads", &download_id, &status).map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+    })?;
+
+    // Spawn background download
+    let state_clone = state.clone();
+    let dl_id = download_id.clone();
+    let image_name = req.name.clone();
+
+    tokio::spawn(async move {
+        // Update state
+        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+            s.state = BuildState::Building;
+            let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+        }
+
+        let dest_dir = "/var/lib/vmspawnd/images";
+        let _ = tokio::fs::create_dir_all(dest_dir).await;
+
+        // Determine extension from URL
+        let ext = url.rsplit('.').next().unwrap_or("qcow2");
+        let dest_path = format!("{}/{}.{}", dest_dir, image_name, ext);
+
+        // Download using reqwest
+        match state_clone.http_client.get(&url).send().await {
+            Ok(response) => {
+                if !response.status().is_success() {
+                    if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                        s.state = BuildState::Failed;
+                        s.error = Some(format!("HTTP {}", response.status()));
+                        s.completed = Some(Utc::now());
+                        let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                    }
+                    return;
+                }
+
+                match response.bytes().await {
+                    Ok(bytes) => {
+                        match tokio::fs::write(&dest_path, &bytes).await {
+                            Ok(_) => {
+                                tracing::info!("Downloaded cloud image '{}' to {}", image_name, dest_path);
+                                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                                    s.state = BuildState::Completed;
+                                    s.output_path = Some(dest_path);
+                                    s.completed = Some(Utc::now());
+                                    let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to write image: {}", e);
+                                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                                    s.state = BuildState::Failed;
+                                    s.error = Some(e.to_string());
+                                    s.completed = Some(Utc::now());
+                                    let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to download image: {}", e);
+                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                            s.state = BuildState::Failed;
+                            s.error = Some(e.to_string());
+                            s.completed = Some(Utc::now());
+                            let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to start download: {}", e);
+                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                    s.state = BuildState::Failed;
+                    s.error = Some(e.to_string());
+                    s.completed = Some(Utc::now());
+                    let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                }
+            }
+        }
+    });
+
+    Ok((StatusCode::ACCEPTED, Json(status)))
+}
+
+/// GET /api/images/downloads - List download status
+pub async fn list_downloads(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<DownloadStatus>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(list_downloads));
+    let downloads = state.store.list_entities::<DownloadStatus>("image_downloads").map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+    })?;
+    Ok(Json(downloads))
+}
+
+// ============================================================================
+// ISO Management
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IsoImage {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub uploaded: DateTime<Utc>,
+}
+
+/// GET /api/images/iso - List available ISO images
+pub async fn list_iso_images(
+    RequireRead(_claims): RequireRead,
+) -> Json<Vec<IsoImage>> {
+    tracing::debug!("images::{}", stringify!(list_iso_images));
+    let mut isos = Vec::new();
+    let iso_dir = "/var/lib/vmspawnd/iso";
+
+    if let Ok(entries) = std::fs::read_dir(iso_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("iso") {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                let modified = entry.metadata()
+                    .and_then(|m| m.modified())
+                    .map(|t| DateTime::<Utc>::from(t))
+                    .unwrap_or_else(|_| Utc::now());
+
+                isos.push(IsoImage {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    name: name.trim_end_matches(".iso").to_string(),
+                    path: path.display().to_string(),
+                    size_bytes: size,
+                    uploaded: modified,
+                });
+            }
+        }
+    }
+
+    Json(isos)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UploadIsoRequest {
+    pub name: String,
+    pub url: String,
+}
+
+/// POST /api/images/iso/download - Download an ISO from URL
+pub async fn download_iso(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<UploadIsoRequest>,
+) -> Result<(StatusCode, Json<DownloadStatus>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(download_iso));
+
+    // Validate name
+    if req.name.contains('/') || req.name.contains('\\') || req.name.contains("..") {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid ISO name"}))));
+    }
+
+    let download_id = uuid::Uuid::new_v4().to_string();
+    let status = DownloadStatus {
+        id: download_id.clone(),
+        name: req.name.clone(),
+        state: BuildState::Pending,
+        output_path: None,
+        error: None,
+        started: Utc::now(),
+        completed: None,
+    };
+
+    state.store.save_entity("iso_downloads", &download_id, &status).map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+    })?;
+
+    let state_clone = state.clone();
+    let dl_id = download_id.clone();
+    let iso_name = req.name.clone();
+    let url = req.url.clone();
+
+    tokio::spawn(async move {
+        let iso_dir = "/var/lib/vmspawnd/iso";
+        let _ = tokio::fs::create_dir_all(iso_dir).await;
+        let dest_path = format!("{}/{}.iso", iso_dir, iso_name);
+
+        match state_clone.http_client.get(&url).send().await {
+            Ok(response) if response.status().is_success() => {
+                match response.bytes().await {
+                    Ok(bytes) => {
+                        if let Err(e) = tokio::fs::write(&dest_path, &bytes).await {
+                            tracing::error!("Failed to write ISO: {}", e);
+                            if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
+                                s.state = BuildState::Failed;
+                                s.error = Some(e.to_string());
+                                s.completed = Some(Utc::now());
+                                let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                            }
+                            return;
+                        }
+                        tracing::info!("Downloaded ISO '{}' to {}", iso_name, dest_path);
+                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
+                            s.state = BuildState::Completed;
+                            s.output_path = Some(dest_path);
+                            s.completed = Some(Utc::now());
+                            let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                        }
+                    }
+                    Err(e) => {
+                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
+                            s.state = BuildState::Failed;
+                            s.error = Some(e.to_string());
+                            s.completed = Some(Utc::now());
+                            let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                        }
+                    }
+                }
+            }
+            Ok(response) => {
+                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
+                    s.state = BuildState::Failed;
+                    s.error = Some(format!("HTTP {}", response.status()));
+                    s.completed = Some(Utc::now());
+                    let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                }
+            }
+            Err(e) => {
+                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
+                    s.state = BuildState::Failed;
+                    s.error = Some(e.to_string());
+                    s.completed = Some(Utc::now());
+                    let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                }
+            }
+        }
+    });
+
+    Ok((StatusCode::ACCEPTED, Json(status)))
+}
+
+/// DELETE /api/images/iso/:name - Delete an ISO
+pub async fn delete_iso(
+    RequireAdmin(_claims): RequireAdmin,
+    axum::extract::Path(name): axum::extract::Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(delete_iso));
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid ISO name"}))));
+    }
+    let path = format!("/var/lib/vmspawnd/iso/{}.iso", name);
+    if let Err(e) = tokio::fs::remove_file(&path).await {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))));
+        }
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ============================================================================
+// Online Disk Resize
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct ResizeDiskRequest {
+    /// New size (e.g. "50G", "100G")
+    pub size: String,
+    /// If true, resize while VM is running via QMP block_resize
+    #[serde(default)]
+    pub online: bool,
+}
+
+/// POST /api/vms/:name/disk/resize - Resize a VM's disk image
+pub async fn resize_disk(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(vm_name): axum::extract::Path<String>,
+    Json(req): Json<ResizeDiskRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(resize_disk));
+    crate::validation::validate_vm_name(&vm_name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
+    let image_path = crate::validation::find_vm_image(&vm_name)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("No disk image found for VM '{}'", vm_name)}))))?;
+
+    // Resize with qemu-img
+    let output = tokio::process::Command::new("qemu-img")
+        .args(["resize", &image_path, &req.size])
+        .output()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("qemu-img resize failed: {}", stderr)}))));
+    }
+
+    // If online and VM is running, also resize the block device via QMP
+    if req.online {
+        if let Ok(Some(vm)) = state.store.get_vm(&vm_name) {
+            if vm.state == vm_model::VMState::Running {
+                let qmp = crate::qmp::QmpClient::new(&vm_name);
+                if qmp.is_available() {
+                    // Parse size to bytes for QMP
+                    let size_bytes = parse_size_to_bytes(&req.size);
+                    if let Err(e) = qmp.execute("block_resize", json!({"device": "virtio0", "size": size_bytes})) {
+                        tracing::warn!("Online resize via QMP failed (offline resize succeeded): {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    tracing::info!("Resized disk for VM '{}' to {}", vm_name, req.size);
+    Ok(Json(json!({"status": "resized", "vm": vm_name, "new_size": req.size})))
+}
+
+fn parse_size_to_bytes(size: &str) -> u64 {
+    let s = size.trim();
+    if let Some(n) = s.strip_suffix('T') {
+        n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024 * 1024 * 1024
+    } else if let Some(n) = s.strip_suffix('G') {
+        n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024 * 1024
+    } else if let Some(n) = s.strip_suffix('M') {
+        n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024
+    } else {
+        s.parse::<u64>().unwrap_or(0)
+    }
+}
+
+// ============================================================================
+// VM Import (OVA/VMDK)
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct ImportVMRequest {
+    /// Path to the source image file (OVA, VMDK, VDI, VHD)
+    pub source_path: String,
+    /// Name for the imported VM
+    pub name: String,
+    /// Target format (default: qcow2)
+    #[serde(default = "default_qcow2")]
+    pub target_format: String,
+    /// CPUs for the imported VM
+    #[serde(default = "default_cpus")]
+    pub cpus: u32,
+    /// Memory in MB
+    #[serde(default = "default_memory")]
+    pub memory: u64,
+}
+
+fn default_qcow2() -> String { "qcow2".into() }
+fn default_cpus() -> u32 { 2 }
+fn default_memory() -> u64 { 2048 }
+
+#[derive(Debug, Serialize)]
+pub struct ImportResult {
+    pub vm_name: String,
+    pub image_path: String,
+    pub source_format: String,
+    pub target_format: String,
+    pub size_bytes: u64,
+}
+
+/// POST /api/images/import - Import a VM image (VMDK, VDI, VHD -> qcow2)
+pub async fn import_vm_image(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ImportVMRequest>,
+) -> Result<(StatusCode, Json<ImportResult>), (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("images::{}", stringify!(import_vm_image));
+
+    crate::validation::validate_vm_name(&req.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    crate::validation::validate_host_path(&req.source_path)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
+    // Detect source format from extension
+    let source_format = std::path::Path::new(&req.source_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("raw")
+        .to_string();
+
+    let dest_dir = "/var/lib/vmspawnd/images";
+    let _ = tokio::fs::create_dir_all(dest_dir).await;
+    let dest_path = format!("{}/{}.{}", dest_dir, req.name, req.target_format);
+
+    // Convert using qemu-img convert
+    let output = tokio::process::Command::new("qemu-img")
+        .args(["convert", "-f", &source_format, "-O", &req.target_format, &req.source_path, &dest_path])
+        .output()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("qemu-img convert failed: {}", e)}))))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Image conversion failed: {}", stderr)}))));
+    }
+
+    let size = tokio::fs::metadata(&dest_path).await.map(|m| m.len()).unwrap_or(0);
+
+    // Create VM entry
+    let vm = vm_model::VM::new(req.name.clone(), dest_path.clone(), req.cpus, req.memory);
+    state.store.save_vm(&vm).map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+    })?;
+
+    tracing::info!("Imported VM '{}' from {} ({} -> {})", req.name, req.source_path, source_format, req.target_format);
+
+    Ok((StatusCode::CREATED, Json(ImportResult {
+        vm_name: req.name,
+        image_path: dest_path,
+        source_format,
+        target_format: req.target_format,
+        size_bytes: size,
+    })))
 }
