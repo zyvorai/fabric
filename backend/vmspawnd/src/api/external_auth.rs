@@ -60,6 +60,9 @@ pub struct LdapConfig {
 pub struct OidcConfig {
     pub issuer_url: String,
     pub client_id: String,
+    /// Client secret — never returned in API responses.
+    /// Set via config or environment variable.
+    #[serde(skip_serializing)]
     pub client_secret: String,
     pub redirect_uri: String,
     pub scopes: Vec<String>,

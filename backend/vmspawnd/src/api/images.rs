@@ -141,7 +141,7 @@ pub async fn list_builds(
 }
 
 /// GET /api/images/list - List available VM images
-pub async fn list_images() -> Json<Vec<ImageInfo>> {
+pub async fn list_images(RequireRead(_claims): RequireRead) -> Json<Vec<ImageInfo>> {
     tracing::debug!("images::{}", stringify!(list_images));
     let mut images = Vec::new();
 
@@ -306,11 +306,11 @@ pub async fn download_cloud_image(
         // Update state
         if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
             s.state = BuildState::Building;
-            let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
         }
 
         let dest_dir = "/var/lib/vmspawnd/images";
-        let _ = tokio::fs::create_dir_all(dest_dir).await;
+        if let Err(e) = tokio::fs::create_dir_all(dest_dir).await { tracing::error!("Failed to create dir: {}", e); return; }
 
         // Determine extension from URL
         let ext = url.rsplit('.').next().unwrap_or("qcow2");
@@ -324,7 +324,7 @@ pub async fn download_cloud_image(
                         s.state = BuildState::Failed;
                         s.error = Some(format!("HTTP {}", response.status()));
                         s.completed = Some(Utc::now());
-                        let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                        if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                     }
                     return;
                 }
@@ -338,7 +338,7 @@ pub async fn download_cloud_image(
                                     s.state = BuildState::Completed;
                                     s.output_path = Some(dest_path);
                                     s.completed = Some(Utc::now());
-                                    let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                                    if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                                 }
                             }
                             Err(e) => {
@@ -347,7 +347,7 @@ pub async fn download_cloud_image(
                                     s.state = BuildState::Failed;
                                     s.error = Some(e.to_string());
                                     s.completed = Some(Utc::now());
-                                    let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                                    if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                                 }
                             }
                         }
@@ -358,7 +358,7 @@ pub async fn download_cloud_image(
                             s.state = BuildState::Failed;
                             s.error = Some(e.to_string());
                             s.completed = Some(Utc::now());
-                            let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                         }
                     }
                 }
@@ -369,7 +369,7 @@ pub async fn download_cloud_image(
                     s.state = BuildState::Failed;
                     s.error = Some(e.to_string());
                     s.completed = Some(Utc::now());
-                    let _ = state_clone.store.save_entity("image_downloads", &dl_id, &s);
+                    if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                 }
             }
         }
@@ -477,7 +477,7 @@ pub async fn download_iso(
 
     tokio::spawn(async move {
         let iso_dir = "/var/lib/vmspawnd/iso";
-        let _ = tokio::fs::create_dir_all(iso_dir).await;
+        if let Err(e) = tokio::fs::create_dir_all(iso_dir).await { tracing::error!("Failed to create ISO dir: {}", e); return; }
         let dest_path = format!("{}/{}.iso", iso_dir, iso_name);
 
         match state_clone.http_client.get(&url).send().await {
@@ -490,7 +490,7 @@ pub async fn download_iso(
                                 s.state = BuildState::Failed;
                                 s.error = Some(e.to_string());
                                 s.completed = Some(Utc::now());
-                                let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                                if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                             }
                             return;
                         }
@@ -499,7 +499,7 @@ pub async fn download_iso(
                             s.state = BuildState::Completed;
                             s.output_path = Some(dest_path);
                             s.completed = Some(Utc::now());
-                            let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                            if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                         }
                     }
                     Err(e) => {
@@ -507,7 +507,7 @@ pub async fn download_iso(
                             s.state = BuildState::Failed;
                             s.error = Some(e.to_string());
                             s.completed = Some(Utc::now());
-                            let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                            if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                         }
                     }
                 }
@@ -517,7 +517,7 @@ pub async fn download_iso(
                     s.state = BuildState::Failed;
                     s.error = Some(format!("HTTP {}", response.status()));
                     s.completed = Some(Utc::now());
-                    let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                    if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                 }
             }
             Err(e) => {
@@ -525,7 +525,7 @@ pub async fn download_iso(
                     s.state = BuildState::Failed;
                     s.error = Some(e.to_string());
                     s.completed = Some(Utc::now());
-                    let _ = state_clone.store.save_entity("iso_downloads", &dl_id, &s);
+                    if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                 }
             }
         }
@@ -679,7 +679,8 @@ pub async fn import_vm_image(
         .to_string();
 
     let dest_dir = "/var/lib/vmspawnd/images";
-    let _ = tokio::fs::create_dir_all(dest_dir).await;
+    tokio::fs::create_dir_all(dest_dir).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to create directory: {}", e)}))))?;
     let dest_path = format!("{}/{}.{}", dest_dir, req.name, req.target_format);
 
     // Convert using qemu-img convert

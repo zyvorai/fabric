@@ -80,8 +80,8 @@ pub async fn get_capacity(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
     // Physical resources (from system)
-    let physical_cpus = num_cpus();
-    let physical_memory_mb = total_memory_mb();
+    let physical_cpus = num_cpus().await;
+    let physical_memory_mb = total_memory_mb().await;
 
     // Allocated resources
     let allocated_cpus: u32 = vms.iter().map(|v| v.cpus).sum();
@@ -117,15 +117,15 @@ pub async fn get_capacity(
     })))
 }
 
-fn num_cpus() -> u32 {
-    std::fs::read_to_string("/proc/cpuinfo")
+async fn num_cpus() -> u32 {
+    tokio::fs::read_to_string("/proc/cpuinfo").await
         .map(|c| c.lines().filter(|l| l.starts_with("processor")).count() as u32)
         .unwrap_or(1)
         .max(1)
 }
 
-fn total_memory_mb() -> u64 {
-    std::fs::read_to_string("/proc/meminfo")
+async fn total_memory_mb() -> u64 {
+    tokio::fs::read_to_string("/proc/meminfo").await
         .ok()
         .and_then(|c| {
             c.lines()
