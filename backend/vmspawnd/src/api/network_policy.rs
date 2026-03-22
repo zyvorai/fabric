@@ -263,7 +263,9 @@ pub async fn reconcile_policies(state: &AppState) -> anyhow::Result<()> {
         if !vm.labels.is_empty() {
             if let Ok(id) = state.policy_engine.allocator.allocate_or_get(&vm.labels, &vm.name) {
                 if let Some(ref ip) = vm.ip {
-                    let _ = state.policy_engine.allocator.update_ip_mapping(ip, id);
+                    if let Err(e) = state.policy_engine.allocator.update_ip_mapping(ip, id) {
+                        tracing::error!("Failed to update IP mapping for VM '{}': {}", vm.name, e);
+                    }
                 }
             }
         }

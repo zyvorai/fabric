@@ -47,14 +47,16 @@ pub async fn create_volume(
     Json(req): Json<CreateVolumeRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("volumes::{}", stringify!(create_volume));
-    // Verify pool exists
-    let manager = state.storage_manager.read().await;
-    if manager.get_pool(&pool_name).await.is_err() {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": format!("Pool '{}' not found", pool_name)})),
-        )
-            .into_response();
+    // Verify pool exists — scope the lock so it's released before save_entity
+    {
+        let manager = state.storage_manager.read().await;
+        if manager.get_pool(&pool_name).await.is_err() {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": format!("Pool '{}' not found", pool_name)})),
+            )
+                .into_response();
+        }
     }
 
     let now = Utc::now().to_rfc3339();
