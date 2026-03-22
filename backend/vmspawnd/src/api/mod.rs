@@ -52,3 +52,9 @@ pub mod vpn_mesh;
 pub mod packet_mirror;
 pub mod nat_gateway;
 pub mod net_monitor;
+
+// Phase 5 API modules for platform features
+pub mod tenant;
+pub mod external_auth;
+pub mod db_migrations;
+pub mod resource_policy;

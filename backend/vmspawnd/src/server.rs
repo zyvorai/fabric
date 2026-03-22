@@ -698,6 +698,28 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/certificates/security-baselines", get(api::certificates::list_security_baselines).post(api::certificates::create_security_baseline))
             .route("/certificates/security-baselines/{id}/compliance", post(api::certificates::check_vm_security_compliance))
             .route("/certificates/health", get(api::certificates::get_cert_health_dashboard))
+            // Multi-tenancy / Projects
+            .route("/projects", get(api::tenant::list_projects).post(api::tenant::create_project))
+            .route("/projects/{id}", get(api::tenant::get_project).delete(api::tenant::delete_project))
+            .route("/projects/{id}/members", post(api::tenant::add_member))
+            .route("/projects/{id}/members/{user_id}", delete(api::tenant::remove_member))
+            .route("/projects/{id}/vms", get(api::tenant::list_project_vms))
+            // External auth providers (LDAP/OIDC)
+            .route("/auth/providers", get(api::external_auth::list_providers).post(api::external_auth::create_provider))
+            .route("/auth/providers/{id}", delete(api::external_auth::delete_provider))
+            .route("/auth/providers/{id}/test", post(api::external_auth::test_provider))
+            .route("/auth/oidc/login/{provider_id}", get(api::external_auth::oidc_login_url))
+            .route("/auth/oidc/callback", post(api::external_auth::oidc_callback))
+            // Database migrations
+            .route("/system/migrations", get(api::db_migrations::list_migrations))
+            .route("/system/migrations/apply", post(api::db_migrations::apply_migrations))
+            .route("/system/migrations/status", get(api::db_migrations::migration_status))
+            // Resource overcommit policy
+            .route("/system/overcommit", get(api::resource_policy::get_overcommit_policy).put(api::resource_policy::update_overcommit_policy))
+            .route("/system/capacity", get(api::resource_policy::get_capacity))
+            // Metrics retention
+            .route("/system/metrics/retention", get(api::resource_policy::get_metrics_retention).put(api::resource_policy::update_metrics_retention))
+            .route("/system/metrics/cleanup", post(api::resource_policy::cleanup_metrics))
             .with_state(state.clone());
 
         // Apply auth middleware if enabled
