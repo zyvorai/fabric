@@ -727,12 +727,21 @@ impl ContentLibraryManager {
 
         let content_length = response.content_length().unwrap_or(0);
 
+        // Validate name to prevent path traversal
+        if name.contains('/') || name.contains('\\') || name.contains("..") {
+            return Err(anyhow!("Item name must not contain path separators or '..'"));
+        }
+
         // Determine file extension from URL
         let extension = url
             .rsplit('/')
             .next()
             .and_then(|f| f.rsplit('.').next())
             .unwrap_or("img");
+        // Validate extension too
+        if extension.contains('/') || extension.contains('\\') || extension.contains("..") {
+            return Err(anyhow!("Invalid file extension"));
+        }
         let filename = format!("{}.{}", name, extension);
         let dest_path = format!("{}/{}", storage_path, filename);
 
@@ -797,6 +806,11 @@ impl ContentLibraryManager {
         let source = std::path::Path::new(source_path);
         if !source.exists() {
             return Err(anyhow!("Source path '{}' does not exist", source_path));
+        }
+
+        // Validate name to prevent path traversal
+        if name.contains('/') || name.contains('\\') || name.contains("..") {
+            return Err(anyhow!("Item name must not contain path separators or '..'"));
         }
 
         let extension = source

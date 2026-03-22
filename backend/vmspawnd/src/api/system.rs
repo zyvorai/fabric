@@ -83,7 +83,7 @@ pub struct HugepageQuery {
 // API Handlers
 
 /// GET /api/system/cpu/topology - Get CPU topology
-pub async fn get_cpu_topology() -> Result<Json<CpuTopology>, (StatusCode, String)> {
+pub async fn get_cpu_topology(RequireRead(_claims): RequireRead) -> Result<Json<CpuTopology>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_cpu_topology));
     match CpuTopology::detect() {
         Ok(topology) => Ok(Json(topology)),
@@ -95,7 +95,7 @@ pub async fn get_cpu_topology() -> Result<Json<CpuTopology>, (StatusCode, String
 }
 
 /// GET /api/system/numa/topology - Get NUMA topology
-pub async fn get_numa_topology() -> Result<Json<NumaTopology>, (StatusCode, String)> {
+pub async fn get_numa_topology(RequireRead(_claims): RequireRead) -> Result<Json<NumaTopology>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_numa_topology));
     match NumaTopology::detect() {
         Ok(topology) => Ok(Json(topology)),
@@ -108,6 +108,7 @@ pub async fn get_numa_topology() -> Result<Json<NumaTopology>, (StatusCode, Stri
 
 /// GET /api/system/numa/nodes/:id - Get NUMA node details
 pub async fn get_numa_node(
+    RequireRead(_claims): RequireRead,
     Path(node_id): Path<u32>,
 ) -> Result<Json<vmspawnd_system::NumaNode>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_numa_node));
@@ -129,6 +130,7 @@ pub async fn get_numa_node(
 
 /// GET /api/system/numa/placement - Get recommended NUMA placement
 pub async fn get_numa_placement(
+    RequireRead(_claims): RequireRead,
     Query(params): Query<NumaPlacementQuery>,
 ) -> Result<Json<vmspawnd_system::NumaPlacement>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_numa_placement));
@@ -150,6 +152,7 @@ pub async fn get_numa_placement(
 
 /// POST /api/vms/:name/cpu/pin - Set CPU pinning for a VM
 pub async fn set_cpu_pinning(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
     Json(req): Json<SetCpuPinningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -216,6 +219,7 @@ pub async fn set_cpu_pinning(
 
 /// DELETE /api/vms/:name/cpu/pin - Remove CPU pinning from a VM
 pub async fn remove_cpu_pinning(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(remove_cpu_pinning));
@@ -226,6 +230,7 @@ pub async fn remove_cpu_pinning(
 
 /// GET /api/vms/:name/cpu/affinity - Get CPU affinity for a VM
 pub async fn get_cpu_affinity(
+    RequireRead(_claims): RequireRead,
     Path(vm_name): Path<String>,
 ) -> Result<Json<Vec<u32>>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_cpu_affinity));
@@ -274,6 +279,7 @@ pub async fn get_cpu_affinity(
 
 /// PUT /api/vms/:name/memory/limit - Set memory limit for a VM
 pub async fn set_memory_limit(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryLimitRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -309,6 +315,7 @@ pub async fn set_memory_limit(
 
 /// GET /api/vms/:name/memory/usage - Get memory usage for a VM
 pub async fn get_memory_usage(
+    RequireRead(_claims): RequireRead,
     Path(vm_name): Path<String>,
 ) -> Result<Json<vmspawnd_system::MemoryStats>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_memory_usage));
@@ -334,6 +341,7 @@ pub async fn get_memory_usage(
 
 /// POST /api/vms/:name/memory/balloon - Enable/disable memory ballooning
 pub async fn set_memory_ballooning(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryBallooningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -419,6 +427,7 @@ pub async fn set_memory_ballooning(
 
 /// GET /api/system/memory/hugepages - Get hugepage statistics
 pub async fn get_hugepage_stats(
+    RequireRead(_claims): RequireRead,
     Query(params): Query<HugepageQuery>,
 ) -> Result<Json<vmspawnd_system::HugepageStats>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_hugepage_stats));
@@ -435,6 +444,7 @@ pub async fn get_hugepage_stats(
 
 /// POST /api/system/memory/hugepages - Allocate hugepages
 pub async fn allocate_hugepages(
+    RequireWrite(_claims): RequireWrite,
     Json(req): Json<AllocateHugepagesRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(allocate_hugepages));
@@ -452,6 +462,7 @@ pub async fn allocate_hugepages(
 
 /// GET /api/system/memory - Get system memory info
 pub async fn get_system_memory(
+    RequireRead(_claims): RequireRead,
 ) -> Result<Json<vmspawnd_system::SystemMemory>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_system_memory));
     match HugepageManager::get_system_memory() {

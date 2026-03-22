@@ -56,7 +56,7 @@ impl JwtConfig {
     pub fn generate_token(&self, user_id: &str, role: Role) -> Result<String> {
         let expiration = chrono::Utc::now()
             .checked_add_signed(chrono::Duration::hours(self.expiration_hours))
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("Token expiration time overflow"))?
             .timestamp() as usize;
 
         let claims = Claims {

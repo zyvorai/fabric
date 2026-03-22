@@ -59,16 +59,21 @@ pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Act
                 "network_config": cloud_init.network_config,
             });
 
-            let _ = http_client
+            if let Err(e) = http_client
                 .post(&cloud_init_url)
                 .json(&cloud_init_req)
                 .send()
-                .await;
+                .await
+            {
+                tracing::warn!("Failed to configure cloud-init for VM '{}': {}", name, e);
+            }
         }
 
         // Start VM
         let start_url = format!("{}/api/vms/{}/start", ctx.vmspawnd_url, name);
-        let _ = http_client.post(&start_url).send().await;
+        if let Err(e) = http_client.post(&start_url).send().await {
+            tracing::error!("Failed to start VM '{}': {}", name, e);
+        }
     }
 
     // Update status
