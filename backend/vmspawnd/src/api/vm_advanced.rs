@@ -67,17 +67,17 @@ pub async fn configure_ksm(
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("vm_advanced::{}", stringify!(configure_ksm));
     let run_value = if req.enabled { "1" } else { "0" };
-    std::fs::write("/sys/kernel/mm/ksm/run", run_value)
+    tokio::fs::write("/sys/kernel/mm/ksm/run", run_value).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to set KSM: {}", e)))?;
 
     if let Some(sleep_ms) = req.sleep_ms {
-        if let Err(e) = std::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string()) {
+        if let Err(e) = tokio::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string()).await {
             tracing::warn!("Failed to write: {}", e);
         }
     }
 
     if let Some(pages) = req.pages_to_scan {
-        if let Err(e) = std::fs::write("/sys/kernel/mm/ksm/pages_to_scan", pages.to_string()) {
+        if let Err(e) = tokio::fs::write("/sys/kernel/mm/ksm/pages_to_scan", pages.to_string()).await {
             tracing::warn!("Failed to write: {}", e);
         }
     }
@@ -112,7 +112,7 @@ pub async fn get_nested_virt_status() -> Json<NestedVirtStatus> {
         });
     };
 
-    let enabled = std::fs::read_to_string(path)
+    let enabled = tokio::fs::read_to_string(path).await
         .map(|v| {
             let v = v.trim();
             v == "1" || v == "Y"
@@ -145,7 +145,7 @@ pub async fn set_nested_virt(
     };
 
     let value = if req.enabled { "1" } else { "0" };
-    std::fs::write(path, value)
+    tokio::fs::write(path, value).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to set nested virt: {}", e)))?;
 
     Ok(StatusCode::OK)
@@ -201,7 +201,7 @@ pub async fn create_checkpoint(
         return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Checkpoint failed: {}", stderr) }))));
     }
 
-    let size = std::fs::metadata(&image_path).map(|m| m.len()).unwrap_or(0);
+    let size = tokio::fs::metadata(&image_path).await.map(|m| m.len()).unwrap_or(0);
 
     let checkpoint = VMCheckpoint {
         id: uuid::Uuid::new_v4().to_string(),
@@ -228,7 +228,7 @@ pub async fn list_checkpoints(
     tracing::debug!("vm_advanced::{}", stringify!(list_checkpoints));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
-    let all: Vec<VMCheckpoint> = state.store.list_entities("checkpoints").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let all: Vec<VMCheckpoint> = state.store.list_entities("checkpoints").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let filtered: Vec<VMCheckpoint> = all.into_iter()
         .filter(|c| c.vm_name == vm_name)
         .collect();
@@ -330,7 +330,7 @@ pub async fn fork_vm(
     let fork_image = format!("/var/lib/vmspawnd/images/{}.qcow2", req.new_name);
 
     if let Some(parent) = std::path::Path::new(&fork_image).parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
+        if let Err(e) = tokio::fs::create_dir_all(parent).await {
             tracing::warn!("Failed to create dir: {}", e);
         }
     }

@@ -299,7 +299,7 @@ pub async fn deploy_template(
         let target_image = format!("/var/lib/vmspawnd/images/{}.{}", req.vm_name, ext);
 
         if let Some(parent) = std::path::Path::new(&target_image).parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
+            if let Err(e) = tokio::fs::create_dir_all(parent).await {
                 tracing::warn!("Failed to create directory: {}", e);
             }
         }

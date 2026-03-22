@@ -21,7 +21,7 @@ use content_library::{
 
 pub async fn list_libraries(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_libraries));
-    let items: Vec<Library> = state.store.list_entities("libraries").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<Library> = state.store.list_entities("libraries").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -184,7 +184,7 @@ pub async fn download_image(
 
 pub async fn list_library_items(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_library_items));
-    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -241,7 +241,7 @@ pub async fn search_items(
     Query(query): Query<SearchQuery>,
 ) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(search_items));
-    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let q = query.q.to_lowercase();
     let matched: Vec<_> = items.into_iter().filter(|i| i.name.to_lowercase().contains(&q)).collect();
     Json(matched)
@@ -253,7 +253,7 @@ pub async fn search_items(
 
 pub async fn list_customization_specs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_customization_specs));
-    let items: Vec<GuestCustomizationSpec> = state.store.list_entities("customization_specs").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<GuestCustomizationSpec> = state.store.list_entities("customization_specs").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -304,7 +304,7 @@ pub async fn delete_customization_spec(
 
 pub async fn list_host_profiles(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(list_host_profiles));
-    let items: Vec<HostProfile> = state.store.list_entities("host_profiles").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<HostProfile> = state.store.list_entities("host_profiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 

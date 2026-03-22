@@ -21,7 +21,7 @@ use replication::{
 
 pub async fn list_sites(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_sites));
-    let items: Vec<ReplicationSite> = state.store.list_entities("replication_sites").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<ReplicationSite> = state.store.list_entities("replication_sites").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -59,7 +59,7 @@ pub async fn remove_site(
 
 pub async fn list_replications(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_replications));
-    let items: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -176,7 +176,7 @@ pub async fn get_replication_metrics(
 
 pub async fn check_rpo_violations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(check_rpo_violations));
-    let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let now = Utc::now();
     let violations: Vec<_> = replications
         .into_iter()
@@ -190,7 +190,7 @@ pub async fn check_rpo_violations(State(state): State<Arc<AppState>>) -> impl In
 
 pub async fn get_replication_health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(get_replication_health));
-    let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let now = Utc::now();
     let mut summary = ReplicationHealthSummary {
         total: replications.len() as u32,
@@ -217,6 +217,6 @@ pub async fn get_replication_health(State(state): State<Arc<AppState>>) -> impl 
 
 pub async fn list_recovery_instances(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_recovery_instances));
-    let items: Vec<ReplicationInstance> = state.store.list_entities("recovery_instances").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<ReplicationInstance> = state.store.list_entities("recovery_instances").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }

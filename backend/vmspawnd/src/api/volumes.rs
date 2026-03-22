@@ -87,7 +87,7 @@ pub async fn list_volumes(
 ) -> impl IntoResponse {
     tracing::debug!("volumes::{}", stringify!(list_volumes));
     let store_key = format!("volumes_{}", pool_name);
-    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
     Json(items)
 }
 

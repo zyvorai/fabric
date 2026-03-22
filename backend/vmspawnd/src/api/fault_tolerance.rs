@@ -78,7 +78,7 @@ pub async fn get_ft_config(
 
 pub async fn list_ft_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(list_ft_vms));
-    let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -216,6 +216,6 @@ pub async fn get_ft_metrics(
 
 pub async fn get_ft_events(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(get_ft_events));
-    let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }

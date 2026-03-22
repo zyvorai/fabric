@@ -22,7 +22,7 @@ use datacenter::{
 
 pub async fn list_datacenters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_datacenters));
-    let items: Vec<Datacenter> = state.store.list_entities("datacenters").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<Datacenter> = state.store.list_entities("datacenters").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -127,7 +127,7 @@ pub async fn get_datacenter_summary(
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let dc_hosts: Vec<&HostInfo> = hosts.iter().filter(|h| h.datacenter_id == id).collect();
     let summary = DatacenterSummary {
         id: dc.id,
@@ -147,7 +147,7 @@ pub async fn get_datacenter_summary(
 
 pub async fn list_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_clusters));
-    let items: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -239,7 +239,7 @@ pub async fn delete_cluster(
 
 pub async fn list_hosts(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_hosts));
-    let items: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -419,7 +419,7 @@ pub async fn discover_host(
     let url = format!("http://{}:{}/health", req.address, port);
 
     // Check if already registered
-    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let already_registered = hosts.iter().any(|h| h.address == req.address);
 
     // Probe the host
@@ -493,7 +493,7 @@ pub async fn get_cluster_health(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 
-    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let cluster_hosts: Vec<&HostInfo> = hosts.iter()
         .filter(|h| h.cluster_id == cluster_id)
         .collect();

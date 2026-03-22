@@ -21,7 +21,7 @@ use lifecycle_manager::{
 
 pub async fn list_baselines(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_baselines));
-    let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -123,7 +123,7 @@ pub async fn get_compliance_status(
     Path(host_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_compliance_status));
-    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let filtered: Vec<_> = items.into_iter().filter(|s| s.host_id == host_id).collect();
     Json(filtered)
 }
@@ -134,7 +134,7 @@ pub async fn get_cluster_compliance(
     Path(_cluster_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_cluster_compliance));
-    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let mut total_hosts = 0u32;
     let mut compliant_hosts = 0u32;
     let mut non_compliant_hosts = 0u32;
@@ -169,7 +169,7 @@ pub async fn get_cluster_compliance(
 
 pub async fn list_remediations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_remediations));
-    let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -217,7 +217,7 @@ pub async fn get_remediation(
 
 pub async fn list_rolling_updates(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_rolling_updates));
-    let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 

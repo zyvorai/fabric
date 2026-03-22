@@ -32,7 +32,7 @@ fn networkd_manager(state: &AppState) -> NetworkdManager {
 
 pub async fn list_bridges(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bridges));
-    let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -160,7 +160,7 @@ pub async fn delete_bridge(
 
 pub async fn list_vlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vlans));
-    let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -278,7 +278,7 @@ pub async fn delete_vlan(
 
 pub async fn list_macvtaps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_macvtaps));
-    let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -349,7 +349,7 @@ pub async fn delete_macvtap(
 
 pub async fn list_taps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_taps));
-    let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -466,7 +466,7 @@ pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl Into
 
 pub async fn list_bonds(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bonds));
-    let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -602,7 +602,7 @@ pub async fn delete_bond(
 
 pub async fn list_network_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_network_files));
-    let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -678,7 +678,7 @@ pub async fn delete_network_file(
 
 pub async fn list_link_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_link_files));
-    let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -859,7 +859,7 @@ pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl Into
 
 pub async fn list_vxlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vxlans));
-    let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -935,7 +935,7 @@ pub async fn delete_vxlan(
 
 pub async fn list_sriov(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_sriov));
-    let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 

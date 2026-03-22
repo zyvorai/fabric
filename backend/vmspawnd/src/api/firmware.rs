@@ -65,7 +65,7 @@ pub async fn get_firmware_status(
     }
 
     // Read VM configuration
-    let config_str = std::fs::read_to_string(&config_path)
+    let config_str = tokio::fs::read_to_string(&config_path).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -134,7 +134,7 @@ pub async fn enable_uefi(
     }
 
     // 1. Load VM config
-    let config_str = std::fs::read_to_string(&config_path)
+    let config_str = tokio::fs::read_to_string(&config_path).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -142,7 +142,7 @@ pub async fn enable_uefi(
 
     // 2. Create OvmfConfig with specified settings
     let vm_dir = std::path::Path::new(&config_dir).join(&vm_name);
-    std::fs::create_dir_all(&vm_dir)
+    tokio::fs::create_dir_all(&vm_dir).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let ovmf_config = vmspawnd_vm::OvmfConfig::new(&vm_name, &vm_dir, req.secure_boot)
@@ -168,7 +168,7 @@ pub async fn enable_uefi(
     let updated_config = serde_json::to_string_pretty(&vm_config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    std::fs::write(&config_path, updated_config)
+    tokio::fs::write(&config_path, updated_config).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!("UEFI enabled for VM '{}'", vm_name);
@@ -207,7 +207,7 @@ pub async fn enable_secureboot(
     }
 
     // Load VM config
-    let config_str = std::fs::read_to_string(&config_path)
+    let config_str = tokio::fs::read_to_string(&config_path).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -227,7 +227,7 @@ pub async fn enable_secureboot(
     let updated_config = serde_json::to_string_pretty(&vm_config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    std::fs::write(&config_path, updated_config)
+    tokio::fs::write(&config_path, updated_config).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!("Secure Boot enabled for VM '{}'", vm_name);
@@ -258,7 +258,7 @@ pub async fn disable_secureboot(
     }
 
     // Load VM config
-    let config_str = std::fs::read_to_string(&config_path)
+    let config_str = tokio::fs::read_to_string(&config_path).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -278,7 +278,7 @@ pub async fn disable_secureboot(
     let updated_config = serde_json::to_string_pretty(&vm_config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    std::fs::write(&config_path, updated_config)
+    tokio::fs::write(&config_path, updated_config).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!("Secure Boot disabled for VM '{}'", vm_name);
@@ -309,7 +309,7 @@ pub async fn reset_nvram(
     }
 
     // 1. Load VM config
-    let config_str = std::fs::read_to_string(&config_path)
+    let config_str = tokio::fs::read_to_string(&config_path).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)

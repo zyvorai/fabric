@@ -131,7 +131,7 @@ pub async fn list_scaling_policies(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScalingPolicy>> {
     tracing::debug!("autoscale::{}", stringify!(list_scaling_policies));
-    let policies: Vec<ScalingPolicy> = state.store.list_entities("autoscale_policies").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let policies: Vec<ScalingPolicy> = state.store.list_entities("autoscale_policies").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(policies)
 }
 
@@ -169,7 +169,7 @@ pub async fn list_scale_events(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScaleEvent>> {
     tracing::debug!("autoscale::{}", stringify!(list_scale_events));
-    let mut events: Vec<ScaleEvent> = state.store.list_entities("scale_events").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let mut events: Vec<ScaleEvent> = state.store.list_entities("scale_events").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     events.truncate(100);
     Json(events)

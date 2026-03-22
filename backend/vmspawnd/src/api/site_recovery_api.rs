@@ -21,7 +21,7 @@ use site_recovery::{
 
 pub async fn list_plans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_plans));
-    let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -177,7 +177,7 @@ pub async fn execute_reprotect(
 
 pub async fn list_executions(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_executions));
-    let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -219,7 +219,7 @@ pub async fn cancel_execution(
 
 pub async fn get_dr_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(get_dr_dashboard));
-    let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let total_plans = plans.len() as u32;
     let ready_plans = plans.iter().filter(|p| p.status == PlanStatus::Ready).count() as u32;
     let failed_plans = plans.iter().filter(|p| p.status == PlanStatus::Failed).count() as u32;

@@ -287,7 +287,7 @@ pub async fn delete_backup(
     // Remove actual backup files from storage
     let storage_path = std::path::Path::new(&backup.storage_location);
     if storage_path.exists() {
-        if let Err(e) = std::fs::remove_file(storage_path) {
+        if let Err(e) = tokio::fs::remove_file(storage_path).await {
             tracing::error!("Failed to delete backup file {}: {}", backup.storage_location, e);
             // Don't fail the request if file deletion fails - continue to remove from state store
         } else {
@@ -638,7 +638,7 @@ async fn process_backup_job(
     // Create backup storage directory
     let backup_dir = std::env::var("BACKUP_DIR")
         .unwrap_or_else(|_| "/var/lib/vmspawnd/backups".to_string());
-    std::fs::create_dir_all(&backup_dir)
+    tokio::fs::create_dir_all(&backup_dir).await
         .map_err(|e| format!("Failed to create backup directory: {}", e))?;
 
     // Generate backup file path

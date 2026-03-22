@@ -18,7 +18,7 @@ use encryption::{EncryptionPolicy, KeyProvider, VmEncryptionStatus};
 
 pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(list_providers));
-    let items: Vec<KeyProvider> = state.store.list_entities("key_providers").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<KeyProvider> = state.store.list_entities("key_providers").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -75,7 +75,7 @@ pub async fn test_provider(
 
 pub async fn list_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(list_policies));
-    let items: Vec<EncryptionPolicy> = state.store.list_entities("encryption_policies").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<EncryptionPolicy> = state.store.list_entities("encryption_policies").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -212,7 +212,7 @@ pub async fn get_vm_encryption_status(
 
 pub async fn list_encrypted_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(list_encrypted_vms));
-    let items: Vec<VmEncryptionStatus> = state.store.list_entities("vm_encryption").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<VmEncryptionStatus> = state.store.list_entities("vm_encryption").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let encrypted: Vec<_> = items.into_iter().filter(|s| s.encrypted).collect();
     Json(encrypted)
 }

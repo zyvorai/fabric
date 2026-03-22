@@ -123,7 +123,7 @@ pub async fn list_snapshots(
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(list_snapshots));
     let store_key = format!("snapshots_{}", vm_name);
-    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -223,7 +223,7 @@ pub async fn snapshot_tree(
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(snapshot_tree));
     let store_key = format!("snapshots_{}", vm_name);
-    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
 
     // Build tree from parent_id relationships
     let roots: Vec<SnapshotTreeNode> = build_snapshot_tree(&snapshots);

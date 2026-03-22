@@ -22,7 +22,7 @@ use certificate_manager::{
 
 pub async fn list_cas(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(list_cas));
-    let items: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -60,7 +60,7 @@ pub async fn delete_ca(
 
 pub async fn list_certificates(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(list_certificates));
-    let items: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -171,7 +171,7 @@ pub async fn check_expiring(
     axum::extract::Query(query): axum::extract::Query<ExpiringQuery>,
 ) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(check_expiring));
-    let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let threshold = Utc::now() + chrono::Duration::days(query.days as i64);
     let expiring: Vec<_> = certs.into_iter()
         .filter(|c| c.status == CertStatus::Active && c.not_after <= threshold)
@@ -185,7 +185,7 @@ pub async fn check_expiring(
 
 pub async fn list_cert_requests(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(list_cert_requests));
-    let items: Vec<CertificateRequest> = state.store.list_entities("cert_requests").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<CertificateRequest> = state.store.list_entities("cert_requests").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -246,7 +246,7 @@ pub async fn reject_cert_request(
 
 pub async fn list_rotations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(list_rotations));
-    let items: Vec<CertificateRotation> = state.store.list_entities("cert_rotations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<CertificateRotation> = state.store.list_entities("cert_rotations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -309,7 +309,7 @@ pub async fn execute_rotation(
 
 pub async fn list_attestations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(list_attestations));
-    let items: Vec<TrustAttestation> = state.store.list_entities("attestations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<TrustAttestation> = state.store.list_entities("attestations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -355,7 +355,7 @@ pub async fn verify_attestation(
 
 pub async fn list_security_baselines(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(list_security_baselines));
-    let items: Vec<VmSecurityBaseline> = state.store.list_entities("security_baselines").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<VmSecurityBaseline> = state.store.list_entities("security_baselines").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -426,10 +426,10 @@ pub async fn check_vm_security_compliance(
 
 pub async fn get_cert_health_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(get_cert_health_dashboard));
-    let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
-    let cas: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
-    let requests: Vec<CertificateRequest> = state.store.list_entities("cert_requests").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
-    let rotations: Vec<CertificateRotation> = state.store.list_entities("cert_rotations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let cas: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let requests: Vec<CertificateRequest> = state.store.list_entities("cert_requests").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let rotations: Vec<CertificateRotation> = state.store.list_entities("cert_rotations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let now = Utc::now();
     let expiry_threshold = now + chrono::Duration::days(30);
     let mut active = 0u32;

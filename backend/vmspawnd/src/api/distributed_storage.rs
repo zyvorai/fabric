@@ -22,7 +22,7 @@ use distributed_storage::{
 
 pub async fn list_storage_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_pools));
-    let items: Vec<DistributedStoragePool> = state.store.list_entities("dist_storage_pools").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<DistributedStoragePool> = state.store.list_entities("dist_storage_pools").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -228,7 +228,7 @@ pub async fn get_storage_migration(
 
 pub async fn list_storage_migrations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_migrations));
-    let items: Vec<StorageMigration> = state.store.list_entities("storage_migrations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<StorageMigration> = state.store.list_entities("storage_migrations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -303,7 +303,7 @@ pub async fn cancel_migration(
 
 pub async fn list_storage_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_policies));
-    let items: Vec<StoragePolicy> = state.store.list_entities("storage_policies").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<StoragePolicy> = state.store.list_entities("storage_policies").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -398,7 +398,7 @@ pub async fn check_compliance(
 
 pub async fn list_datastore_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_datastore_clusters));
-    let items: Vec<DatastoreCluster> = state.store.list_entities("datastore_clusters").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<DatastoreCluster> = state.store.list_entities("datastore_clusters").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 

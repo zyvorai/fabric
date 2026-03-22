@@ -77,7 +77,7 @@ pub async fn list_zones(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<AvailabilityZone>> {
     tracing::debug!("zones::{}", stringify!(list_zones));
-    let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(zones)
 }
 
@@ -203,7 +203,7 @@ pub async fn list_spot_instances(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<SpotInstance>> {
     tracing::debug!("zones::{}", stringify!(list_spot_instances));
-    let spots: Vec<SpotInstance> = state.store.list_entities("spot_instances").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let spots: Vec<SpotInstance> = state.store.list_entities("spot_instances").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(spots)
 }
 

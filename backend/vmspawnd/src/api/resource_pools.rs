@@ -17,7 +17,7 @@ use resource_pools::{
 
 pub async fn list_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("resource_pools::{}", stringify!(list_pools));
-    let items: Vec<ResourcePool> = state.store.list_entities("resource_pools").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<ResourcePool> = state.store.list_entities("resource_pools").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 

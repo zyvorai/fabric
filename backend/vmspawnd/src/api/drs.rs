@@ -47,7 +47,7 @@ pub async fn compute_placement(
 ) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(compute_placement));
     let mgr = predictive_drs::DrsManager::new();
-    let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let hosts: Vec<HostSnapshot> = state.store.list_entities("host_snapshots").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     match mgr.compute_placement(&hosts, &req) {
         Ok(result) => Json(result).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
@@ -98,7 +98,7 @@ pub async fn list_recommendations(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(list_recommendations));
-    let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
@@ -144,7 +144,7 @@ pub async fn reject_recommendation(
 
 pub async fn list_affinity_rules(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(list_affinity_rules));
-    let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_else(|e| { tracing::warn!("Failed to load data: {}", e); Vec::new() });
+    let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
