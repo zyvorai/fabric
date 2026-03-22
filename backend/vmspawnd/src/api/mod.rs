@@ -58,3 +58,5 @@ pub mod tenant;
 pub mod external_auth;
 pub mod db_migrations;
 pub mod resource_policy;
+pub mod webhook_retry;
+pub mod vm_power;

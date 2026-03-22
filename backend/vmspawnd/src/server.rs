@@ -720,6 +720,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             // Metrics retention
             .route("/system/metrics/retention", get(api::resource_policy::get_metrics_retention).put(api::resource_policy::update_metrics_retention))
             .route("/system/metrics/cleanup", post(api::resource_policy::cleanup_metrics))
+            // VM power management (hibernate/resume)
+            .route("/vms/{name}/hibernate", post(api::vm_power::hibernate_vm))
+            .route("/vms/{name}/resume-hibernate", post(api::vm_power::resume_hibernate))
+            // Storage live migration
+            .route("/vms/{name}/storage/migrate", post(api::vm_power::migrate_storage))
+            // Affinity / Anti-affinity rules
+            .route("/affinity-rules", get(api::vm_power::list_affinity_rules).post(api::vm_power::create_affinity_rule))
+            .route("/affinity-rules/{id}", delete(api::vm_power::delete_affinity_rule))
+            // API key rate limiting
+            .route("/system/rate-limits", get(api::vm_power::get_rate_limits).put(api::vm_power::update_rate_limits))
+            // Webhook delivery tracking
+            .route("/webhooks/deliveries", get(api::webhook_retry::list_deliveries))
             .with_state(state.clone());
 
         // Apply auth middleware if enabled
