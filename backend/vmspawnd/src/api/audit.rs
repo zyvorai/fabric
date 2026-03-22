@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -82,6 +83,7 @@ use crate::validation::escape_csv_field;
 // ============================================================================
 
 pub async fn list_audit_logs(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(filters): Query<AuditLogFilters>,
 ) -> Result<Json<Vec<AuditLog>>, StatusCode> {
@@ -141,12 +143,13 @@ pub async fn list_audit_logs(
             true
         },
         limit,
-    ).unwrap_or_default();
+    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(logs))
 }
 
 pub async fn get_audit_log(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<AuditLog>, StatusCode> {
@@ -160,13 +163,14 @@ pub async fn get_audit_log(
 }
 
 pub async fn export_audit_logs(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
     tracing::debug!("audit::{}", stringify!(export_audit_logs));
     // Load from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .unwrap_or_default();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match query.format.as_str() {
         "json" => {
@@ -203,12 +207,13 @@ pub async fn export_audit_logs(
 }
 
 pub async fn get_audit_stats(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AuditStats>, StatusCode> {
     tracing::debug!("audit::{}", stringify!(get_audit_stats));
     // Calculate from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .unwrap_or_default();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let total_logs = logs.len() as u64;
 

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireAdmin};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -90,11 +91,12 @@ impl Default for AppSettings {
 
 /// GET /api/settings
 pub async fn get_settings(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AppSettings>, StatusCode> {
     tracing::debug!("settings::{}", stringify!(get_settings));
     let settings = state.store.get_entity::<AppSettings>("config", "settings")
-        .unwrap_or(None)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .unwrap_or_default();
 
     Ok(Json(settings))
@@ -102,6 +104,7 @@ pub async fn get_settings(
 
 /// PUT /api/settings
 pub async fn update_settings(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(settings): Json<AppSettings>,
 ) -> Result<Json<AppSettings>, StatusCode> {

@@ -9,6 +9,7 @@ use std::convert::Infallible;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
+use security::RequireRead;
 
 // ============================================================================
 // Data Structures
@@ -50,6 +51,7 @@ pub enum VMEventType {
 
 /// GET /api/events/stream - Server-Sent Events stream for real-time VM events
 pub async fn event_stream(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<Event, Infallible>>> {
     tracing::debug!("events::{}", stringify!(event_stream));
@@ -95,6 +97,7 @@ pub async fn event_stream(
 
 /// GET /api/events - List recent events
 pub async fn list_events(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<VMEvent>> {
     tracing::debug!("events::{}", stringify!(list_events));

@@ -175,6 +175,31 @@ pub fn escape_csv_field(field: &str) -> String {
     escaped
 }
 
+/// Validate a snapshot or checkpoint name.
+/// Allows alphanumeric characters, hyphens, underscores, and dots.
+/// Must not start with a hyphen (prevents argument injection).
+pub fn validate_snapshot_name(name: &str) -> Result<(), (StatusCode, String)> {
+    if name.is_empty() || name.len() > 64 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Snapshot name must be between 1 and 64 characters".to_string(),
+        ));
+    }
+    if name.starts_with('-') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Snapshot name must not start with a hyphen".to_string(),
+        ));
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Snapshot name may only contain alphanumeric characters, hyphens, underscores, and dots".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Sanitize an error message by redacting filesystem paths.
 /// Replaces absolute paths like /var/lib/vmspawnd/images/foo.qcow2 with <path>.
 /// Use for error messages returned to non-admin users.

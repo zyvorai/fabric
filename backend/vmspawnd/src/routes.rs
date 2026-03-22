@@ -214,6 +214,7 @@ pub async fn start_vm(
                 tracing::info!("VM '{}' started successfully", vm_name);
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
                     vm.state = vm_model::VMState::Running;
+                    vm.last_error = None; // Clear any previous error
                     if let Err(e) = state_clone.store.save_vm(&vm) {
                         tracing::error!("Failed to save VM state: {}", e);
                     }
@@ -222,7 +223,8 @@ pub async fn start_vm(
             Err(e) => {
                 tracing::error!("Failed to start VM '{}': {}", vm_name, e);
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
-                    vm.state = vm_model::VMState::Stopped;
+                    vm.state = vm_model::VMState::Failed;
+                    vm.last_error = Some(e.to_string());
                     if let Err(e) = state_clone.store.save_vm(&vm) {
                         tracing::error!("Failed to save VM state: {}", e);
                     }
@@ -400,19 +402,11 @@ pub async fn clone_vm(
         }
     };
 
-    // Build target path
+    // Build target path using proper Path API
     let src = std::path::Path::new(&src_path);
-    let target_path = if let Some(parent) = src.parent() {
-        let parent_str = parent.to_string_lossy();
-        let safe_parent = if parent_str.ends_with(&source_name) {
-            format!("{}{}", &parent_str[..parent_str.len() - source_name.len()], &req.target_name)
-        } else {
-            parent_str.to_string()
-        };
-        format!("{}/{}.qcow2", safe_parent, &req.target_name)
-    } else {
-        format!("{}.qcow2", &req.target_name)
-    };
+    let target_path = src.with_file_name(format!("{}.qcow2", &req.target_name))
+        .to_string_lossy()
+        .to_string();
 
     // Ensure target directory exists
     if let Some(parent) = std::path::Path::new(&target_path).parent() {

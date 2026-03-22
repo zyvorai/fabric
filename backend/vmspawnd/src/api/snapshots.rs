@@ -59,16 +59,9 @@ pub async fn create_snapshot(
     // Find the VM's disk image path
     let image_path = crate::validation::find_vm_image(&vm_name);
 
-    // Validate snapshot name (prevent argument injection via --flags)
-    if req.name.is_empty() || req.name.len() > 64
-        || !req.name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
-        || req.name.starts_with('-')
-    {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "Snapshot name must be 1-64 alphanumeric characters, hyphens, underscores, or dots, and must not start with a hyphen"})),
-        )
-            .into_response();
+    // Validate snapshot name
+    if let Err((status, msg)) = crate::validation::validate_snapshot_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
 
     // Attempt qemu-img snapshot

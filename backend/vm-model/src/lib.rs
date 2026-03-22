@@ -27,6 +27,10 @@ pub struct VM {
     pub created: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated: Option<DateTime<Utc>>,
+    /// Last error message from an async operation (e.g. failed start).
+    /// Cleared on next successful state transition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -167,6 +171,7 @@ impl VM {
             vnc_port: None,
             created: Utc::now(),
             updated: None,
+            last_error: None,
         }
     }
 
@@ -187,6 +192,7 @@ impl VM {
             vnc_port: None,
             created: Utc::now(),
             updated: None,
+            last_error: None,
         }
     }
 }

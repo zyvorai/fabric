@@ -156,11 +156,17 @@ pub async fn hotplug_memory(
             "dimm_id": dimm_id,
         }))
         .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("DIMM hotplug failed: {}", e)})),
-        )
-            .into_response(),
+        Err(e) => {
+            // Rollback: remove the memory backend object since device_add failed
+            if let Err(rollback_err) = qmp.execute("object-del", serde_json::json!({"id": backend_id})) {
+                tracing::warn!("Failed to rollback memory backend '{}': {}", backend_id, rollback_err);
+            }
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("DIMM hotplug failed: {}", e)})),
+            )
+                .into_response()
+        }
     }
 }
 

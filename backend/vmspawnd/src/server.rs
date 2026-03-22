@@ -709,8 +709,17 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .fallback_service(ServeDir::new(
                 if std::path::Path::new("/usr/share/vmspawnd/web").exists() {
                     "/usr/share/vmspawnd/web"
+                } else if std::path::Path::new("/var/lib/vmspawnd/web").exists() {
+                    "/var/lib/vmspawnd/web"
                 } else {
-                    "../web/dist"
+                    // Development fallback — resolve to absolute path
+                    // to avoid serving files relative to an unexpected working directory
+                    static DEV_WEB: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+                        std::fs::canonicalize("../web/dist")
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|_| "/usr/share/vmspawnd/web".to_string())
+                    });
+                    &DEV_WEB
                 },
             ))
             .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
@@ -783,7 +792,12 @@ async fn run_schedule_checker(state: Arc<AppState>) {
             let permit = match semaphore.clone().try_acquire_owned() {
                 Ok(p) => p,
                 Err(_) => {
-                    tracing::warn!("Schedule checker: too many concurrent executions, skipping '{}'", schedule.name);
+                    tracing::warn!("Schedule checker: too many concurrent executions, deferring '{}'", schedule.name);
+                    // Update next_run so it doesn't retry immediately on next tick
+                    if let Ok(Some(mut sched)) = state.store.get_entity::<Schedule>("schedules", &schedule.id) {
+                        sched.next_run = Some(now + chrono::Duration::seconds(60));
+                        let _ = state.store.save_entity("schedules", &sched.id, &sched);
+                    }
                     continue;
                 }
             };

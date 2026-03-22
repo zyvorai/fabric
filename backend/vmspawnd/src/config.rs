@@ -122,7 +122,9 @@ fn default_jwt_secret() -> String {
             }
             // Persist the newly generated secret
             if let Some(parent) = std::path::Path::new(secret_path).parent() {
-                let _ = std::fs::create_dir_all(parent);
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    tracing::warn!("Failed to create directory for JWT secret: {}", e);
+                }
             }
             if let Err(e) = std::fs::write(secret_path, &secret) {
                 tracing::warn!(
@@ -136,7 +138,9 @@ fn default_jwt_secret() -> String {
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    let _ = std::fs::set_permissions(secret_path, std::fs::Permissions::from_mode(0o600));
+                    if let Err(e) = std::fs::set_permissions(secret_path, std::fs::Permissions::from_mode(0o600)) {
+                        tracing::warn!("Failed to set permissions on JWT secret file: {}", e);
+                    }
                 }
             }
             secret
@@ -175,7 +179,9 @@ fn default_admin_password() -> String {
         // Persist to a file instead of logging the password
         let pw_path = "/var/lib/vmspawnd/.admin_password";
         if let Some(parent) = std::path::Path::new(pw_path).parent() {
-            let _ = std::fs::create_dir_all(parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                tracing::warn!("Failed to create directory for admin password: {}", e);
+            }
         }
         if let Err(e) = std::fs::write(pw_path, &password) {
             tracing::error!("Failed to write admin password file: {}", e);
@@ -184,7 +190,9 @@ fn default_admin_password() -> String {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(pw_path, std::fs::Permissions::from_mode(0o600));
+                if let Err(e) = std::fs::set_permissions(pw_path, std::fs::Permissions::from_mode(0o600)) {
+                    tracing::warn!("Failed to set permissions on admin password file: {}", e);
+                }
             }
         }
         tracing::warn!(

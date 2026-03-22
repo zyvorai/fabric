@@ -8,6 +8,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc, Duration};
 
 use crate::server::AppState;
+use security::RequireRead;
 
 // ============================================================================
 // Data Structures
@@ -168,6 +169,7 @@ fn generate_mock_metrics(count: usize, interval_minutes: i64) -> Vec<Performance
 // ============================================================================
 
 pub async fn get_vm_performance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Query(query): Query<TimeRangeQuery>,
@@ -204,6 +206,7 @@ pub async fn get_vm_performance(
 }
 
 pub async fn get_system_performance(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<TimeRangeQuery>,
 ) -> Result<Json<Vec<SystemPerformance>>, StatusCode> {
@@ -252,13 +255,14 @@ pub async fn get_system_performance(
 }
 
 pub async fn get_performance_insights(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<PerformanceInsight>>, StatusCode> {
     // Generate real insights from metrics analysis
     let mut insights = Vec::new();
 
     // Try to load all VMs to analyze their metrics
-    let vms = state.store.list_vms().unwrap_or_default();
+    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     for vm in vms {
         // Try to load recent metrics for this VM
@@ -399,6 +403,7 @@ pub async fn get_performance_insights(
 }
 
 pub async fn get_top_vms_by_resource(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<TopResourceQuery>,
 ) -> Result<Json<Vec<TopVMResource>>, StatusCode> {
@@ -406,7 +411,7 @@ pub async fn get_top_vms_by_resource(
     let mut vm_resources = Vec::new();
 
     // Load all VMs and their latest metrics
-    let vms = state.store.list_vms().unwrap_or_default();
+    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     for vm in vms {
         let metrics_key = format!("metrics/vm/{}/1h", vm.name);
@@ -477,10 +482,11 @@ pub async fn get_top_vms_by_resource(
 }
 
 pub async fn get_resource_utilization(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ResourceUtilization>, StatusCode> {
     // Calculate from real metrics
-    let vms = state.store.list_vms().unwrap_or_default();
+    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut total_cpu = 0.0;
     let mut total_memory = 0.0;
@@ -523,11 +529,12 @@ pub async fn get_resource_utilization(
 }
 
 pub async fn export_performance_report(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
     // Generate real report from metrics
-    let vms = state.store.list_vms().unwrap_or_default();
+    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let total_vms = vms.len();
     let running_vms = vms.iter().filter(|vm| matches!(vm.state, vm_model::VMState::Running)).count();
 

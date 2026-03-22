@@ -180,11 +180,8 @@ pub async fn create_checkpoint(
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     // Validate checkpoint name
-    if req.name.is_empty() || req.name.len() > 64
-        || !req.name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
-        || req.name.starts_with('-')
-    {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Checkpoint name must be 1-64 alphanumeric characters, hyphens, underscores, or dots" }))));
+    if let Err((status, msg)) = crate::validation::validate_snapshot_name(&req.name) {
+        return Err((status, Json(json!({ "error": msg }))));
     }
 
     // Find the disk image for this VM

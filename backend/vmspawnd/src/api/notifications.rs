@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::server::AppState;
+use security::{RequireRead, RequireAdmin};
 
 // ============================================================================
 // Data Structures
@@ -275,17 +276,19 @@ fn validate_external_url(url: &str) -> Result<(), String> {
 // ============================================================================
 
 pub async fn list_channels(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationChannel>>, StatusCode> {
     tracing::debug!("notifications::{}", stringify!(list_channels));
     // Load from state store
     let channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
-        .unwrap_or_default();
+        .map_err(|e| { tracing::error!("Failed to load channels: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     Ok(Json(channels))
 }
 
 pub async fn create_channel(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateChannelRequest>,
 ) -> Result<(StatusCode, Json<NotificationChannel>), StatusCode> {
@@ -316,6 +319,7 @@ pub async fn create_channel(
 }
 
 pub async fn update_channel(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateChannelRequest>,
@@ -352,13 +356,14 @@ pub async fn update_channel(
 }
 
 pub async fn delete_channel(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     tracing::debug!("notifications::{}", stringify!(delete_channel));
     // Check if channel is used by any rules
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .unwrap_or_default();
+        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     for rule in rules {
         if rule.channels.contains(&id) {
@@ -377,6 +382,7 @@ pub async fn delete_channel(
 }
 
 pub async fn test_channel(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -417,17 +423,19 @@ pub async fn test_channel(
 // ============================================================================
 
 pub async fn list_rules(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationRule>>, StatusCode> {
     tracing::debug!("notifications::{}", stringify!(list_rules));
     // Load from state store
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .unwrap_or_default();
+        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     Ok(Json(rules))
 }
 
 pub async fn create_rule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateRuleRequest>,
 ) -> Result<(StatusCode, Json<NotificationRule>), StatusCode> {
@@ -471,6 +479,7 @@ pub async fn create_rule(
 }
 
 pub async fn update_rule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateRuleRequest>,
@@ -522,6 +531,7 @@ pub async fn update_rule(
 }
 
 pub async fn delete_rule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -536,6 +546,7 @@ pub async fn delete_rule(
 }
 
 pub async fn enable_rule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -558,6 +569,7 @@ pub async fn enable_rule(
 }
 
 pub async fn disable_rule(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
@@ -584,13 +596,14 @@ pub async fn disable_rule(
 // ============================================================================
 
 pub async fn get_history(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<HistoryQuery>,
 ) -> Result<Json<Vec<NotificationHistory>>, StatusCode> {
     tracing::debug!("notifications::{}", stringify!(get_history));
     // Load from state store
     let mut history = state.store.list_entities::<NotificationHistory>("notification_history")
-        .unwrap_or_default();
+        .map_err(|e| { tracing::error!("Failed to load history: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     // Sort by sent_at (most recent first)
     history.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
