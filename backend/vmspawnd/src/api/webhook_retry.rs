@@ -67,7 +67,7 @@ pub async fn send_webhook_with_retry(
     for attempt in 0..max_attempts {
         delivery.attempt = attempt + 1;
         delivery.status = DeliveryStatus::Sending;
-        let _ = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery);
+        if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
 
         match state.http_client
             .post(url)
@@ -85,7 +85,7 @@ pub async fn send_webhook_with_retry(
                 if response.status().is_success() {
                     delivery.status = DeliveryStatus::Delivered;
                     delivery.completed = Some(Utc::now());
-                    let _ = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery);
+                    if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
                     tracing::info!("Webhook delivered to {} (attempt {})", url, attempt + 1);
                     return;
                 }
@@ -96,7 +96,7 @@ pub async fn send_webhook_with_retry(
                     delivery.status = DeliveryStatus::Retrying;
                     delivery.error = Some(format!("HTTP {}", status_code));
                     delivery.next_retry = Some(Utc::now() + chrono::Duration::seconds(delay as i64));
-                    let _ = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery);
+                    if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
 
                     tracing::warn!("Webhook {} returned {}, retrying in {}s (attempt {}/{})",
                         url, status_code, delay, attempt + 1, max_attempts);
@@ -108,7 +108,7 @@ pub async fn send_webhook_with_retry(
                 delivery.status = DeliveryStatus::Failed;
                 delivery.error = Some(format!("HTTP {} (not retryable)", status_code));
                 delivery.completed = Some(Utc::now());
-                let _ = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery);
+                if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
                 tracing::warn!("Webhook {} returned {} (not retryable)", url, status_code);
                 return;
             }
@@ -117,7 +117,7 @@ pub async fn send_webhook_with_retry(
                 delivery.status = DeliveryStatus::Retrying;
                 delivery.error = Some(e.to_string());
                 delivery.next_retry = Some(Utc::now() + chrono::Duration::seconds(delay as i64));
-                let _ = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery);
+                if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
 
                 tracing::warn!("Webhook {} failed: {}, retrying in {}s (attempt {}/{})",
                     url, e, delay, attempt + 1, max_attempts);
@@ -130,7 +130,7 @@ pub async fn send_webhook_with_retry(
     delivery.status = DeliveryStatus::Failed;
     delivery.error = Some(format!("All {} attempts failed", max_attempts));
     delivery.completed = Some(Utc::now());
-    let _ = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery);
+    if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
     tracing::error!("Webhook delivery to {} failed after {} attempts", url, max_attempts);
 }
 

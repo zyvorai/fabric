@@ -62,7 +62,7 @@ pub async fn hibernate_vm(
             snapshot_name: snap_name.clone(),
             created: chrono::Utc::now(),
         };
-        let _ = state.store.save_entity("hibernate", &vm_name, &info);
+        if let Err(e) = state.store.save_entity("hibernate", &vm_name, &info) { tracing::error!("Store error: {}", e); }
 
         tracing::info!("VM '{}' hibernated with snapshot '{}'", vm_name, snap_name);
         Ok(Json(json!({"status": "hibernated", "snapshot": snap_name})))
@@ -77,7 +77,7 @@ pub async fn hibernate_vm(
 
         if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
             vm.state = vm_model::VMState::Stopped;
-            let _ = state.store.save_vm(&vm);
+            if let Err(e) = state.store.save_vm(&vm) { tracing::error!("Failed to save VM state: {}", e); }
         }
 
         Ok(Json(json!({"status": "stopped", "note": "QMP not available — VM stopped instead of hibernated"})))
@@ -126,9 +126,9 @@ pub async fn resume_hibernate(
     if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
         vm.state = vm_model::VMState::Running;
         vm.last_error = None;
-        let _ = state.store.save_vm(&vm);
+        if let Err(e) = state.store.save_vm(&vm) { tracing::error!("Failed to save VM state: {}", e); }
     }
-    let _ = state.store.delete_entity("hibernate", &vm_name);
+    if let Err(e) = state.store.delete_entity("hibernate", &vm_name) { tracing::error!("Store error: {}", e); }
 
     tracing::info!("VM '{}' resumed from hibernation snapshot '{}'", vm_name, info.snapshot_name);
     Ok(Json(json!({"status": "resumed", "snapshot": info.snapshot_name})))
@@ -174,6 +174,11 @@ pub async fn migrate_storage(
         .unwrap_or("qcow2");
 
     let target_format = req.target_format.as_deref().unwrap_or(source_format);
+
+    // Validate pool name to prevent path traversal
+    if req.target_pool.contains('/') || req.target_pool.contains('\\') || req.target_pool.contains("..") || req.target_pool.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid pool name"}))));
+    }
 
     // Determine target path based on pool
     let target_dir = format!("/var/lib/vmspawnd/pools/{}", req.target_pool);
