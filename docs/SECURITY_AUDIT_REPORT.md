@@ -346,6 +346,8 @@ On first startup with authentication enabled:
 ### 4.3 Password Retrieval
 
 ```bash
+./vmspawnctl password
+# or directly:
 sudo cat /var/lib/vmspawnd/.admin_password
 ```
 

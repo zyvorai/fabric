@@ -327,23 +327,36 @@ MIT — free for commercial use, modification, and distribution.
 
 ## Getting Started
 
+### One-Command Deployment
+
 ```bash
+# Deploy everything (auto-sudo — no manual sudo needed)
+./vmspawnctl deploy
+
+# That's it. vmspawnd is running.
+```
+
+### Step-by-Step
+
+```bash
+# Install dependencies (auto-sudo)
+./vmspawnctl deps
+
 # Build
-cd backend && cargo build --release
+./vmspawnctl build
 
-# Install
-sudo make install
+# Run tests
+./vmspawnctl test
 
-# Start
-sudo systemctl enable --now vmspawnd
+# Install and start (auto-sudo)
+./vmspawnctl install
+./vmspawnctl start
 
 # Read admin password
-sudo cat /var/lib/vmspawnd/.admin_password
+./vmspawnctl password
 
-# Login
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "<password>"}'
+# Run interactive demo
+./vmspawnctl demo
 
 # Create your first VM
 vmctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
@@ -351,6 +364,17 @@ vmctl start myvm
 
 # Open web dashboard
 open http://localhost:8080
+```
+
+### Management Commands
+
+```bash
+./vmspawnctl status      # Check service status
+./vmspawnctl logs        # Follow logs
+./vmspawnctl restart     # Restart service (auto-sudo)
+./vmspawnctl reinstall   # Rebuild + reinstall + restart (auto-sudo)
+./vmspawnctl uninstall   # Remove everything (auto-sudo)
+./vmspawnctl doctor      # System readiness check
 ```
 
 ---

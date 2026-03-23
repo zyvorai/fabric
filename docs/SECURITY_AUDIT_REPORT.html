@@ -1341,7 +1341,9 @@ bcrypt-hashed password</li>
 </table>
 <h3 id="password-retrieval">4.3 Password Retrieval</h3>
 <div class="sourceCode" id="cb2"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cat /var/lib/vmspawnd/.admin_password</span></code></pre></div>
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> password</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># or directly:</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cat /var/lib/vmspawnd/.admin_password</span></code></pre></div>
 <hr />
 <h2 id="api-security">5. API Security</h2>
 <h3 id="rbac-matrix">5.1 RBAC Matrix</h3>
