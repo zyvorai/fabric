@@ -13,6 +13,7 @@ PRESETDIR   = $(PREFIX)/lib/systemd/system-preset
 SYSUSERSDIR = $(PREFIX)/lib/sysusers.d
 TMPFILESDIR = $(PREFIX)/lib/tmpfiles.d
 MODULESDIR  = $(SYSCONFDIR)/modules-load.d
+LIBEXECDIR  = $(PREFIX)/libexec/vmspawnd
 
 all: build
 
@@ -40,15 +41,19 @@ install-conf:
 
 install-systemd:
 	install -d $(DESTDIR)$(UNITDIR)
-	install -m 0644 systemd/vmspawnd.service $(DESTDIR)$(UNITDIR)/vmspawnd.service
-	install -m 0644 systemd/vmspawnd.socket  $(DESTDIR)$(UNITDIR)/vmspawnd.socket
-	install -m 0644 systemd/vm@.service      $(DESTDIR)$(UNITDIR)/vm@.service
+	install -m 0644 systemd/vmspawnd.service         $(DESTDIR)$(UNITDIR)/vmspawnd.service
+	install -m 0644 systemd/vmspawnd.socket          $(DESTDIR)$(UNITDIR)/vmspawnd.socket
+	install -m 0644 systemd/vm@.service              $(DESTDIR)$(UNITDIR)/vm@.service
+	install -m 0644 systemd/vmspawnd-backup.service  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
+	install -m 0644 systemd/vmspawnd-backup.timer    $(DESTDIR)$(UNITDIR)/vmspawnd-backup.timer
 	install -d $(DESTDIR)$(PRESETDIR)
 	install -m 0644 systemd/vmspawnd.preset  $(DESTDIR)$(PRESETDIR)/90-vmspawnd.preset
 	install -d $(DESTDIR)$(SYSUSERSDIR)
 	install -m 0644 systemd/vmspawnd.sysusers $(DESTDIR)$(SYSUSERSDIR)/vmspawnd.conf
 	install -d $(DESTDIR)$(TMPFILESDIR)
 	install -m 0644 systemd/vmspawnd.tmpfiles $(DESTDIR)$(TMPFILESDIR)/vmspawnd.conf
+	install -d $(DESTDIR)$(LIBEXECDIR)
+	install -m 0755 scripts/backup-vms $(DESTDIR)$(LIBEXECDIR)/backup-vms
 
 install-web:
 	install -d $(DESTDIR)$(DATADIR)/vmspawnd/web
@@ -65,6 +70,9 @@ uninstall:
 	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd.service
 	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd.socket
 	rm -f  $(DESTDIR)$(UNITDIR)/vm@.service
+	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
+	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.timer
+	rm -rf $(DESTDIR)$(LIBEXECDIR)
 	rm -f  $(DESTDIR)$(PRESETDIR)/90-vmspawnd.preset
 	rm -f  $(DESTDIR)$(SYSUSERSDIR)/vmspawnd.conf
 	rm -f  $(DESTDIR)$(TMPFILESDIR)/vmspawnd.conf

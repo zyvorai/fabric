@@ -1,3 +1,4 @@
 # Enable vmspawnd by default on install
 enable vmspawnd.socket
 enable vmspawnd.service
+enable vmspawnd-backup.timer

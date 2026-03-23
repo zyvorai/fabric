@@ -473,6 +473,63 @@ cmd_reinstall() {
     fi
 }
 
+# ── backup: Run backup now or manage backup timer ───────────────────────
+cmd_backup() {
+    local subcmd="${1:-now}"
+
+    case "$subcmd" in
+        now)
+            need_root
+            step "Running VM backup now"
+            if [[ -x /usr/libexec/vmspawnd/backup-vms ]]; then
+                /usr/libexec/vmspawnd/backup-vms
+            elif [[ -x "$SCRIPT_DIR/scripts/backup-vms" ]]; then
+                "$SCRIPT_DIR/scripts/backup-vms"
+            else
+                err "Backup script not found. Run: ./vmspawnctl install"
+                exit 1
+            fi
+            ;;
+        enable)
+            need_root
+            systemctl enable --now vmspawnd-backup.timer
+            ok "Backup timer enabled (daily at 2:00 AM)"
+            systemctl list-timers vmspawnd-backup.timer --no-pager
+            ;;
+        disable)
+            need_root
+            systemctl disable --now vmspawnd-backup.timer
+            ok "Backup timer disabled"
+            ;;
+        status)
+            echo ""
+            if systemctl is-active --quiet vmspawnd-backup.timer 2>/dev/null; then
+                ok "Backup timer is ${GREEN}active${NC}"
+            else
+                warn "Backup timer is ${RED}inactive${NC}"
+            fi
+            echo ""
+            systemctl list-timers vmspawnd-backup.timer --no-pager 2>/dev/null || true
+            echo ""
+            info "Backup directory: ${BOLD}/var/lib/vmspawnd/backups${NC}"
+            if [[ -d /var/lib/vmspawnd/backups ]]; then
+                local count
+                count=$(find /var/lib/vmspawnd/backups -name "*.qcow2" 2>/dev/null | wc -l)
+                info "Backup files: $count"
+                local size
+                size=$(du -sh /var/lib/vmspawnd/backups 2>/dev/null | cut -f1)
+                info "Total size: ${size:-0}"
+            fi
+            ;;
+        logs)
+            journalctl -u vmspawnd-backup -f --no-hostname
+            ;;
+        *)
+            echo "Usage: vmspawnctl backup <now|enable|disable|status|logs>"
+            ;;
+    esac
+}
+
 # ── start/stop/restart/status/logs ──────────────────────────────────────
 cmd_start() {
     need_root
@@ -827,6 +884,13 @@ cmd_help() {
     echo "  status            Show service status"
     echo "  logs              Follow service logs (journalctl)"
     echo ""
+    echo -e "${BOLD}Backup:${NC}"
+    echo "  backup now        Run VM backup immediately (auto-sudo)"
+    echo "  backup enable     Enable daily backup timer (2:00 AM)"
+    echo "  backup disable    Disable backup timer"
+    echo "  backup status     Show backup timer and storage info"
+    echo "  backup logs       Follow backup logs"
+    echo ""
     echo -e "${BOLD}Utilities:${NC}"
     echo "  doctor            Check system readiness"
     echo "  password          Show the admin password"
@@ -863,6 +927,7 @@ main() {
         uninstall)  cmd_uninstall "$@" ;;
         deploy)     cmd_deploy "$@" ;;
         reinstall)  cmd_reinstall "$@" ;;
+        backup)     cmd_backup "$@" ;;
         start)      cmd_start "$@" ;;
         stop)       cmd_stop "$@" ;;
         restart)    cmd_restart "$@" ;;
