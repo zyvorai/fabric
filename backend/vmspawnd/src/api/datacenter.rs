@@ -20,7 +20,10 @@ use datacenter::{
 // Datacenter handlers
 // ============================================================================
 
-pub async fn list_datacenters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_datacenters(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_datacenters));
     let items: Vec<Datacenter> = state.store.list_entities("datacenters").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -145,7 +148,10 @@ pub async fn get_datacenter_summary(
 // Cluster handlers
 // ============================================================================
 
-pub async fn list_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_clusters(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_clusters));
     let items: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -237,14 +243,17 @@ pub async fn delete_cluster(
 // Host handlers
 // ============================================================================
 
-pub async fn list_hosts(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_hosts(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(list_hosts));
     let items: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn register_host(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<RegisterHostRequest>,
 ) -> impl IntoResponse {
@@ -328,7 +337,7 @@ pub async fn remove_host(
 }
 
 pub async fn host_heartbeat(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(hb): Json<HostHeartbeat>,
@@ -351,7 +360,7 @@ pub async fn host_heartbeat(
 }
 
 pub async fn host_enter_maintenance(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -370,7 +379,7 @@ pub async fn host_enter_maintenance(
 }
 
 pub async fn host_exit_maintenance(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {

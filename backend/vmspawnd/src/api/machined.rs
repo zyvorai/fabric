@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
-use security::RequireAdmin;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use vmspawn_driver::machinectl;
 use vmspawnd_driver_core::{MachineInfo, VMDriver};
 
@@ -27,6 +27,7 @@ use vmspawnd_driver_core::{MachineInfo, VMDriver};
 
 /// GET /api/machines - List running machines from machined
 pub async fn list_machines(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<MachineInfo>>, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(list_machines));
@@ -40,6 +41,7 @@ pub async fn list_machines(
 
 /// GET /api/machines/:name/properties - Show machine properties
 pub async fn show_machine(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<std::collections::HashMap<String, String>>, (StatusCode, String)> {
@@ -54,6 +56,7 @@ pub async fn show_machine(
 
 /// POST /api/machines/:name/poweroff - Graceful poweroff
 pub async fn poweroff_machine(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -68,6 +71,7 @@ pub async fn poweroff_machine(
 
 /// POST /api/machines/:name/reboot - Reboot machine
 pub async fn reboot_machine(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -98,6 +102,7 @@ pub async fn terminate_machine(
 
 /// POST /api/machines/:name/enable - Enable auto-start at boot
 pub async fn enable_machine(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -112,6 +117,7 @@ pub async fn enable_machine(
 
 /// POST /api/machines/:name/disable - Disable auto-start
 pub async fn disable_machine(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -155,6 +161,7 @@ pub struct SshInfo {
 
 /// GET /api/machines/:name/ssh - Get SSH connection info
 pub async fn ssh_info(
+    RequireRead(_claims): RequireRead,
     Path(name): Path<String>,
 ) -> Result<Json<SshInfo>, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(ssh_info));
@@ -240,7 +247,9 @@ pub async fn bind_machine(
 // ============================================================================
 
 /// GET /api/machines/images - List images from /var/lib/machines
-pub async fn list_machine_images() -> Result<Json<Vec<machinectl::ImageInfo>>, (StatusCode, String)> {
+pub async fn list_machine_images(
+    RequireRead(_claims): RequireRead,
+) -> Result<Json<Vec<machinectl::ImageInfo>>, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(list_machine_images));
     machinectl::list_images()
         .map(Json)
@@ -254,6 +263,7 @@ pub struct CloneImageRequest {
 
 /// POST /api/machines/images/:name/clone - Clone an image
 pub async fn clone_machine_image(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<CloneImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -270,6 +280,7 @@ pub struct RenameImageRequest {
 
 /// POST /api/machines/images/:name/rename - Rename an image
 pub async fn rename_machine_image(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<RenameImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -281,6 +292,7 @@ pub async fn rename_machine_image(
 
 /// DELETE /api/machines/images/:name - Remove an image
 pub async fn remove_machine_image(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(remove_machine_image));
@@ -296,6 +308,7 @@ pub struct SetReadOnlyRequest {
 
 /// POST /api/machines/images/:name/read-only - Toggle read-only
 pub async fn set_image_read_only(
+    RequireAdmin(_claims): RequireAdmin,
     Path(name): Path<String>,
     Json(req): Json<SetReadOnlyRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -319,9 +332,12 @@ pub struct PullImageRequest {
 
 /// POST /api/machines/images/pull-raw - Pull raw image from URL
 pub async fn pull_raw_image(
+    RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(pull_raw_image));
+    crate::api::notifications::validate_external_url_public(&req.url)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     machinectl::pull_raw(&req.url, &req.name, req.verify)
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -329,9 +345,12 @@ pub async fn pull_raw_image(
 
 /// POST /api/machines/images/pull-tar - Pull tar image from URL
 pub async fn pull_tar_image(
+    RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(pull_tar_image));
+    crate::api::notifications::validate_external_url_public(&req.url)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     machinectl::pull_tar(&req.url, &req.name, req.verify)
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

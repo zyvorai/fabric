@@ -58,6 +58,9 @@ pub async fn create_snapshot(
     Json(req): Json<CreateSnapshotRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(create_snapshot));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     // Find the VM's disk image path
     let image_path = crate::validation::find_vm_image(&vm_name);
 
@@ -122,9 +125,12 @@ pub async fn list_snapshots(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(list_snapshots));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let store_key = format!("snapshots_{}", vm_name);
     let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
-    Json(items)
+    Json(items).into_response()
 }
 
 /// GET /api/vms/:name/snapshots/:id - Get snapshot details
@@ -134,6 +140,9 @@ pub async fn get_snapshot(
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(get_snapshot));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         Ok(Some(s)) => Json(s).into_response(),
@@ -149,6 +158,9 @@ pub async fn delete_snapshot(
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(delete_snapshot));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let store_key = format!("snapshots_{}", vm_name);
 
     // Get snapshot info to delete from qemu-img
@@ -167,7 +179,7 @@ pub async fn delete_snapshot(
     if let Err(e) = state.store.delete_entity(&store_key, &id) {
         tracing::error!("Failed to delete: {}", e);
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 /// POST /api/vms/:name/snapshots/:id/revert - Revert to a snapshot
@@ -177,6 +189,9 @@ pub async fn revert_snapshot(
     Path((vm_name, id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(revert_snapshot));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let store_key = format!("snapshots_{}", vm_name);
 
     let snapshot = match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
@@ -222,12 +237,15 @@ pub async fn snapshot_tree(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("snapshots::{}", stringify!(snapshot_tree));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let store_key = format!("snapshots_{}", vm_name);
     let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
 
     // Build tree from parent_id relationships
     let roots: Vec<SnapshotTreeNode> = build_snapshot_tree(&snapshots);
-    Json(roots)
+    Json(roots).into_response()
 }
 
 fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {

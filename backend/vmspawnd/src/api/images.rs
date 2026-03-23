@@ -11,16 +11,9 @@ use chrono::{DateTime, Utc};
 use crate::server::AppState;
 use security::{RequireRead, RequireWrite, RequireAdmin};
 
-/// Allowed disk image formats for qemu-img operations.
-const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd", "vhdx", "qed"];
-
 fn validate_image_format(format: &str) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
-    if !ALLOWED_IMAGE_FORMATS.contains(&format) {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({
-            "error": format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
-        }))));
-    }
-    Ok(())
+    crate::validation::validate_image_format(format)
+        .map_err(|(s, v)| (s, Json(v)))
 }
 
 // ============================================================================
@@ -330,6 +323,9 @@ pub async fn download_cloud_image(
 
     let catalog = cloud_image_catalog();
     let url = if let Some(ref custom_url) = req.url {
+        // Validate user-provided URL against SSRF
+        crate::api::notifications::validate_external_url_public(custom_url)
+            .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
         custom_url.clone()
     } else {
         catalog.iter()
@@ -505,6 +501,10 @@ pub async fn download_iso(
     if req.name.contains('/') || req.name.contains('\\') || req.name.contains("..") {
         return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid ISO name"}))));
     }
+
+    // Validate URL against SSRF
+    crate::api::notifications::validate_external_url_public(&req.url)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
 
     let download_id = uuid::Uuid::new_v4().to_string();
     let status = DownloadStatus {

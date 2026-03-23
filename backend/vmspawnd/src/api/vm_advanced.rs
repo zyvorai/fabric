@@ -37,7 +37,9 @@ pub struct KsmConfigRequest {
 }
 
 /// GET /api/system/ksm - Get KSM status
-pub async fn get_ksm_status() -> Result<Json<KsmStatus>, (StatusCode, String)> {
+pub async fn get_ksm_status(
+    RequireAdmin(_claims): RequireAdmin,
+) -> Result<Json<KsmStatus>, (StatusCode, String)> {
     tracing::debug!("vm_advanced::{}", stringify!(get_ksm_status));
     let read_ksm = |file: &str| -> u64 {
         std::fs::read_to_string(format!("/sys/kernel/mm/ksm/{}", file))
@@ -63,6 +65,7 @@ pub async fn get_ksm_status() -> Result<Json<KsmStatus>, (StatusCode, String)> {
 
 /// POST /api/system/ksm - Enable/disable/configure KSM
 pub async fn configure_ksm(
+    RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<KsmConfigRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("vm_advanced::{}", stringify!(configure_ksm));
@@ -97,7 +100,9 @@ pub struct NestedVirtStatus {
 }
 
 /// GET /api/system/nested-virt - Get nested virtualization status
-pub async fn get_nested_virt_status() -> Json<NestedVirtStatus> {
+pub async fn get_nested_virt_status(
+    RequireAdmin(_claims): RequireAdmin,
+) -> Json<NestedVirtStatus> {
     tracing::debug!("vm_advanced::{}", stringify!(get_nested_virt_status));
     // Check for Intel (kvm_intel) or AMD (kvm_amd)
     let (hypervisor, path) = if std::path::Path::new("/sys/module/kvm_intel").exists() {
@@ -133,6 +138,7 @@ pub struct SetNestedVirtRequest {
 
 /// POST /api/system/nested-virt - Enable/disable nested virtualization
 pub async fn set_nested_virt(
+    RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<SetNestedVirtRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("vm_advanced::{}", stringify!(set_nested_virt));

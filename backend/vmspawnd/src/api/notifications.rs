@@ -216,6 +216,11 @@ fn validate_notification_rule(rule: &CreateRuleRequest) -> Result<(), String> {
 
 /// Validate that a URL points to an external host, not internal/private networks.
 /// Prevents SSRF attacks against internal services like metadata endpoints.
+/// Validate that a URL does not target internal/private addresses (SSRF prevention).
+pub fn validate_external_url_public(url: &str) -> Result<(), String> {
+    validate_external_url(url)
+}
+
 fn validate_external_url(url: &str) -> Result<(), String> {
     // Parse the URL to extract the host
     let host = url
@@ -275,14 +280,26 @@ fn validate_external_url(url: &str) -> Result<(), String> {
 // Channel Handlers
 // ============================================================================
 
+/// Sensitive config keys that should be redacted in API responses.
+const REDACTED_CONFIG_KEYS: &[&str] = &["password", "client_secret", "api_key", "token", "secret"];
+
 pub async fn list_channels(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<NotificationChannel>>, StatusCode> {
     tracing::debug!("notifications::{}", stringify!(list_channels));
     // Load from state store
-    let channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
+    let mut channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
         .map_err(|e| { tracing::error!("Failed to load channels: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+
+    // Redact sensitive config fields
+    for channel in &mut channels {
+        for key in REDACTED_CONFIG_KEYS {
+            if channel.config.contains_key(*key) {
+                channel.config.insert(key.to_string(), serde_json::json!("**REDACTED**"));
+            }
+        }
+    }
 
     Ok(Json(channels))
 }
@@ -608,8 +625,8 @@ pub async fn get_history(
     // Sort by sent_at (most recent first)
     history.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
 
-    // Apply limit
-    history.truncate(query.limit);
+    // Apply limit (cap at 500)
+    history.truncate(query.limit.min(500));
 
     Ok(Json(history))
 }

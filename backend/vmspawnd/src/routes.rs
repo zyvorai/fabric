@@ -376,9 +376,16 @@ pub async fn clone_vm(
         return json_error(StatusCode::BAD_REQUEST, "Source and target VM names must be different").into_response();
     }
 
-    // Lock both VMs to prevent concurrent operations
-    let _source_lock = state.vm_lock(&source_name).lock_owned().await;
-    let _target_lock = state.vm_lock(&req.target_name).lock_owned().await;
+    // Lock both VMs in canonical (lexicographic) order to prevent deadlock
+    let (_first_lock, _second_lock) = if source_name < req.target_name {
+        let first = state.vm_lock(&source_name).lock_owned().await;
+        let second = state.vm_lock(&req.target_name).lock_owned().await;
+        (first, second)
+    } else {
+        let first = state.vm_lock(&req.target_name).lock_owned().await;
+        let second = state.vm_lock(&source_name).lock_owned().await;
+        (first, second)
+    };
 
     // Check source VM exists
     let source_vm = match state.store.get_vm(&source_name) {

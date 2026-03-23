@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::validation::validate_vm_name;
+use security::{RequireRead, RequireWrite, RequireAdmin};
 use vmspawnd_vm::{is_ovmf_available, is_secureboot_available, FirmwareStatus, TpmVersion};
 
 // Request/Response types
@@ -43,6 +44,7 @@ pub struct FirmwareCapabilities {
 
 /// GET /api/vms/:name/firmware/status - Get firmware status for a VM
 pub async fn get_firmware_status(
+    RequireRead(_claims): RequireRead,
     Path(vm_name): Path<String>,
 ) -> Result<Json<FirmwareStatus>, (StatusCode, String)> {
     tracing::debug!("firmware::{}", stringify!(get_firmware_status));
@@ -107,6 +109,7 @@ pub async fn get_firmware_status(
 
 /// POST /api/vms/:name/firmware/uefi - Enable UEFI firmware for a VM
 pub async fn enable_uefi(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
     Json(req): Json<EnableUefiRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -177,6 +180,7 @@ pub async fn enable_uefi(
 
 /// POST /api/vms/:name/firmware/secureboot - Enable Secure Boot for a VM
 pub async fn enable_secureboot(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("firmware::{}", stringify!(enable_secureboot));
@@ -236,6 +240,7 @@ pub async fn enable_secureboot(
 
 /// DELETE /api/vms/:name/firmware/secureboot - Disable Secure Boot for a VM
 pub async fn disable_secureboot(
+    RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("firmware::{}", stringify!(disable_secureboot));
@@ -287,6 +292,7 @@ pub async fn disable_secureboot(
 
 /// POST /api/vms/:name/firmware/reset - Reset NVRAM to defaults
 pub async fn reset_nvram(
+    RequireAdmin(_claims): RequireAdmin,
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("firmware::{}", stringify!(reset_nvram));
@@ -343,6 +349,7 @@ pub async fn reset_nvram(
 
 /// GET /api/system/firmware/capabilities - Get system firmware capabilities
 pub async fn get_firmware_capabilities(
+    RequireRead(_claims): RequireRead,
 ) -> Result<Json<FirmwareCapabilities>, (StatusCode, String)> {
     tracing::debug!("firmware::{}", stringify!(get_firmware_capabilities));
     let capabilities = FirmwareCapabilities {

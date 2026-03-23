@@ -473,7 +473,7 @@ pub async fn disable_schedule(
 }
 
 pub async fn run_schedule_now(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {

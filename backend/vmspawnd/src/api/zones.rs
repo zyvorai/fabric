@@ -209,7 +209,7 @@ pub async fn list_spot_instances(
 
 /// POST /api/spot-instances/:id/evict - Evict a spot instance
 pub async fn evict_spot_instance(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<SpotInstance>, (StatusCode, Json<serde_json::Value>)> {

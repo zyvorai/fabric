@@ -200,6 +200,19 @@ pub fn validate_snapshot_name(name: &str) -> Result<(), (StatusCode, String)> {
     Ok(())
 }
 
+/// Allowed disk image formats for qemu-img operations.
+pub const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd", "vhdx", "qed"];
+
+/// Validate a disk image format against the allowlist.
+pub fn validate_image_format(format: &str) -> Result<(), (StatusCode, serde_json::Value)> {
+    if !ALLOWED_IMAGE_FORMATS.contains(&format) {
+        return Err((StatusCode::BAD_REQUEST, serde_json::json!({
+            "error": std::format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
+        })));
+    }
+    Ok(())
+}
+
 /// Sanitize an error message by redacting filesystem paths.
 /// Replaces absolute paths like /var/lib/vmspawnd/images/foo.qcow2 with <path>.
 /// Use for error messages returned to non-admin users.

@@ -742,10 +742,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             ));
         }
 
-        let ws_routes = Router::new()
+        let mut ws_routes = Router::new()
             .route("/console/{name}", get(websocket::console_handler))
             .route("/vnc/{name}", get(vnc_proxy::vnc_handler))
             .with_state(state.clone());
+
+        // Apply auth middleware to WebSocket routes if enabled
+        if let Some(ref jwt_config) = state.jwt_config {
+            ws_routes = ws_routes.route_layer(axum::middleware::from_fn_with_state(
+                jwt_config.clone(),
+                security::auth_middleware,
+            ));
+        }
 
         // Clone routes for /api/v1/ prefix (versioned API)
         let versioned_routes = public_auth_routes.clone().merge(api_routes.clone());

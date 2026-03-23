@@ -151,6 +151,7 @@ pub async fn list_migrations(
 
 /// GET /api/migrations/:id - Get migration status
 pub async fn get_migration(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<MigrationStatus>, (StatusCode, Json<serde_json::Value>)> {

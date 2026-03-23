@@ -51,6 +51,8 @@ pub struct AuditLogFilters {
     pub limit: usize,
 }
 
+const MAX_AUDIT_LIMIT: usize = 1000;
+
 #[derive(Debug, Deserialize)]
 pub struct ExportQuery {
     #[serde(flatten)]
@@ -96,7 +98,7 @@ pub async fn list_audit_logs(
     let resource_name = filters.resource_name.clone();
     let status = filters.status.clone();
     let search = filters.search.as_ref().map(|s| s.to_lowercase());
-    let limit = filters.limit;
+    let limit = filters.limit.min(MAX_AUDIT_LIMIT);
 
     // Filter at storage layer — only loads and deserializes entries that match
     let logs = state.store.list_entities_filtered::<AuditLog, _>(

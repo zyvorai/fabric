@@ -11,16 +11,9 @@ use crate::server::AppState;
 use security::RequireWrite;
 use crate::validation::validate_vm_name;
 
-/// Allowed disk image formats for qemu-img operations.
-const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd", "vhdx", "qed"];
-
 fn validate_image_format(format: &str) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
-    if !ALLOWED_IMAGE_FORMATS.contains(&format) {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({
-            "error": format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
-        }))));
-    }
-    Ok(())
+    crate::validation::validate_image_format(format)
+        .map_err(|(s, v)| (s, Json(v)))
 }
 
 // ============================================================================
