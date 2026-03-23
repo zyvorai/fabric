@@ -292,7 +292,7 @@ pub async fn list_affinity_rules(
     security::RequireRead(_claims): security::RequireRead,
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
 ) -> Result<Json<Vec<AffinityRule>>, (StatusCode, Json<serde_json::Value>)> {
-    let rules = state.store.list_entities::<AffinityRule>("affinity_rules")
+    let rules = state.store.list_entities::<AffinityRule>("vm_affinity_rules")
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     Ok(Json(rules))
 }
@@ -328,7 +328,7 @@ pub async fn create_affinity_rule(
         created: chrono::Utc::now(),
     };
 
-    state.store.save_entity("affinity_rules", &rule.id, &rule)
+    state.store.save_entity("vm_affinity_rules", &rule.id, &rule)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
     Ok((StatusCode::CREATED, Json(rule)))
@@ -341,11 +341,11 @@ pub async fn delete_affinity_rule(
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     // Check existence first
-    let _rule = state.store.get_entity::<AffinityRule>("affinity_rules", &id)
+    let _rule = state.store.get_entity::<AffinityRule>("vm_affinity_rules", &id)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Affinity rule not found"}))))?;
 
-    state.store.delete_entity("affinity_rules", &id)
+    state.store.delete_entity("vm_affinity_rules", &id)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -62,10 +62,13 @@ pub async fn apply_migrations(
             continue;
         }
 
-        // Apply migration
+        // Execute migration SQL against the database
         tracing::info!("Applying migration v{}: {}", version, name);
 
-        // Record migration
+        _user_db.execute_raw(sql)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Migration v{} failed: {}", version, e)}))))?;
+
+        // Record migration as applied
         let migration = Migration {
             version,
             name: name.to_string(),
@@ -76,10 +79,6 @@ pub async fn apply_migrations(
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
         newly_applied.push(name.to_string());
-
-        // Note: The actual SQL execution would happen via the UserDb connection
-        // For now, we track the migration state. The SQL statements are for reference.
-        let _ = sql; // SQL tracked but executed via schema init
     }
 
     Ok(Json(json!({

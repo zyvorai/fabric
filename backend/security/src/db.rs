@@ -158,6 +158,13 @@ impl UserDb {
         Ok(count as usize)
     }
 
+    /// Execute a raw SQL statement (for schema migrations).
+    pub fn execute_raw(&self, sql: &str) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+        conn.execute_batch(sql).context("Failed to execute SQL")?;
+        Ok(())
+    }
+
     pub fn seed_admin(&self, password: &str) -> Result<Option<User>> {
         if self.count_users()? == 0 {
             let user = self.create_user("admin", password, Role::Admin)?;

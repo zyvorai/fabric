@@ -256,13 +256,13 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .filter_map(|vm| {
+        .map(|vm| {
             let tap = Some(format!("tap-{}", vm.name));
-            Some(VMSnapshot {
+            VMSnapshot {
                 name: vm.name,
                 labels: vm.labels.clone().unwrap_or_default(),
                 tap_interface: tap,
-            })
+            }
         })
         .collect()
 }

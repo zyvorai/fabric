@@ -298,12 +298,12 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .filter_map(|vm| {
-            Some(VMSnapshot {
+        .map(|vm| {
+            VMSnapshot {
                 name: vm.name,
                 labels: vm.labels.clone().unwrap_or_default(),
                 ip: vm.ip,
-            })
+            }
         })
         .collect()
 }

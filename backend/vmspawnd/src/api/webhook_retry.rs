@@ -114,6 +114,8 @@ pub async fn send_webhook_with_retry(
         completed: None,
     };
 
+    let body = payload.to_string();
+
     for attempt in 0..max_attempts {
         delivery.attempt = attempt + 1;
         delivery.status = DeliveryStatus::Sending;
@@ -123,7 +125,7 @@ pub async fn send_webhook_with_retry(
             .post(url)
             .header("Content-Type", "application/json")
             .header("User-Agent", "vmspawnd-webhook/1.0")
-            .body(payload.to_string())
+            .body(body.clone())
             .timeout(std::time::Duration::from_secs(10))
             .send()
             .await

@@ -543,8 +543,8 @@ pub async fn get_backup_stats(
     let mut by_type: HashMap<String, u64> = HashMap::new();
     let mut by_vm: HashMap<String, u64> = HashMap::new();
 
-    let mut oldest_backup = Utc::now();
-    let mut newest_backup = Utc::now() - Duration::days(365);
+    let mut oldest_backup: Option<DateTime<Utc>> = None;
+    let mut newest_backup: Option<DateTime<Utc>> = None;
 
     for backup in &backups {
         // Count by type
@@ -558,11 +558,11 @@ pub async fn get_backup_stats(
         *by_vm.entry(backup.vm_name.clone()).or_insert(0) += 1;
 
         // Track oldest and newest
-        if backup.created < oldest_backup {
-            oldest_backup = backup.created;
+        if oldest_backup.map_or(true, |o| backup.created < o) {
+            oldest_backup = Some(backup.created);
         }
-        if backup.created > newest_backup {
-            newest_backup = backup.created;
+        if newest_backup.map_or(true, |n| backup.created > n) {
+            newest_backup = Some(backup.created);
         }
     }
 
@@ -571,8 +571,8 @@ pub async fn get_backup_stats(
         total_size_bytes,
         by_type,
         by_vm,
-        oldest_backup: if total_backups > 0 { Some(oldest_backup) } else { None },
-        newest_backup: if total_backups > 0 { Some(newest_backup) } else { None },
+        oldest_backup,
+        newest_backup,
     };
 
     Ok(Json(stats))

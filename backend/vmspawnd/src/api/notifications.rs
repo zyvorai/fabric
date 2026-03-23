@@ -760,13 +760,17 @@ async fn send_email_notification(
                 .build()
         };
 
-        // Send the email
-        match mailer.send(&email) {
-            Ok(_) => {
-                tracing::info!("Email sent successfully to {}", to);
+        // Send the email via spawn_blocking to avoid blocking the async runtime
+        let to_str = to.to_string();
+        match tokio::task::spawn_blocking(move || mailer.send(&email)).await {
+            Ok(Ok(_)) => {
+                tracing::info!("Email sent successfully to {}", to_str);
+            }
+            Ok(Err(e)) => {
+                return Err(format!("Failed to send email to {}: {}", to_str, e));
             }
             Err(e) => {
-                return Err(format!("Failed to send email to {}: {}", to, e));
+                return Err(format!("Email send task panicked: {}", e));
             }
         }
     }

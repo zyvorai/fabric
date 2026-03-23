@@ -169,6 +169,11 @@ pub async fn remove_member(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Project not found"}))))?;
 
+    // Cannot remove the project owner
+    if user_id == project.owner {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Cannot remove the project owner. Transfer ownership first."}))));
+    }
+
     let before = project.members.len();
     project.members.retain(|m| m.user_id != user_id);
 
