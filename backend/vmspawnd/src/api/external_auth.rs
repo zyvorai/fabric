@@ -217,50 +217,52 @@ pub async fn oidc_login_url(
 
     let state_param = uuid::Uuid::new_v4().to_string();
     let scopes = oidc_config.scopes.join(" ");
+
+    // Use proper percent-encoding (RFC 3986)
+    let encoded_redirect = percent_encode(&oidc_config.redirect_uri);
+    let encoded_scopes = percent_encode(&scopes);
+
     let url = format!(
         "{}/authorize?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
         oidc_config.issuer_url.trim_end_matches('/'),
-        oidc_config.client_id,
-        urlencoding(&oidc_config.redirect_uri),
-        urlencoding(&scopes),
+        percent_encode(&oidc_config.client_id),
+        encoded_redirect,
+        encoded_scopes,
         state_param,
     );
 
     Ok(Json(OidcLoginUrl { url, state: state_param }))
 }
 
-fn urlencoding(s: &str) -> String {
-    s.replace(' ', "%20")
-        .replace('&', "%26")
-        .replace('=', "%3D")
-        .replace('?', "%3F")
-        .replace('#', "%23")
+/// RFC 3986 percent-encoding for URL components.
+fn percent_encode(s: &str) -> String {
+    let mut encoded = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        match byte {
+            // Unreserved characters (RFC 3986 2.3)
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char);
+            }
+            _ => {
+                encoded.push_str(&format!("%{:02X}", byte));
+            }
+        }
+    }
+    encoded
 }
 
 /// POST /api/auth/oidc/callback - Handle OIDC callback
+///
+/// NOTE: This endpoint is not yet fully implemented. OIDC code exchange
+/// and token validation must be completed before production use.
 pub async fn oidc_callback(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<OidcCallbackRequest>,
+    State(_state): State<Arc<AppState>>,
+    Json(_req): Json<OidcCallbackRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    tracing::info!("OIDC callback received with state: {}", req.state);
-
-    // In a full implementation, this would:
-    // 1. Exchange the code for tokens at the provider's token endpoint
-    // 2. Validate the ID token
-    // 3. Extract user info from claims
-    // 4. Create or update the local user
-    // 5. Generate a vmspawnd JWT token
-
-    let jwt_config = state.jwt_config.as_ref()
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Auth not configured"}))))?;
-
-    // Placeholder: generate token for OIDC user
-    let token = jwt_config.generate_token(&format!("oidc-{}", req.state), security::Role::User)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-
-    Ok(Json(json!({
-        "token": token,
-        "auth_method": "oidc",
-        "message": "OIDC authentication successful"
-    })))
+    // OIDC callback is not yet implemented. To prevent issuing tokens
+    // without proper verification, this endpoint returns an error until
+    // the full OIDC code exchange flow is implemented.
+    Err((StatusCode::NOT_IMPLEMENTED, Json(json!({
+        "error": "OIDC callback not yet implemented. Code exchange and token validation are required."
+    }))))
 }

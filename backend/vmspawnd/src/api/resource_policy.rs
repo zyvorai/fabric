@@ -200,25 +200,36 @@ pub async fn cleanup_metrics(
     let now = chrono::Utc::now();
     let raw_cutoff = now - chrono::Duration::hours(policy.raw_retention_hours as i64);
 
-    // Clean up old performance metrics
-    let all_metrics: Vec<crate::api::analytics::PerformanceMetrics> = state.store
-        .list_entities("performance")
-        .unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    // Metrics are stored as VMPerformance objects keyed by VM name.
+    // Load each VM's metrics, filter out old entries, and re-save.
+    let vms = state.store.list_vms()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
-    let before = all_metrics.len();
-    let mut deleted = 0u32;
+    let mut total_metrics = 0usize;
+    let mut deleted = 0usize;
 
-    for metric in &all_metrics {
-        if metric.timestamp < raw_cutoff {
-            // Metrics stored by timestamp-based keys would be cleaned up
-            deleted += 1;
+    for vm in &vms {
+        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+        if let Ok(Some(mut vm_perf)) = state.store.get_entity::<crate::api::analytics::VMPerformance>("performance", &metrics_key) {
+            let before = vm_perf.metrics.len();
+            vm_perf.metrics.retain(|m| m.timestamp >= raw_cutoff);
+            let after = vm_perf.metrics.len();
+            let removed = before - after;
+            total_metrics += before;
+            deleted += removed;
+
+            if removed > 0 {
+                if let Err(e) = state.store.save_entity("performance", &metrics_key, &vm_perf) {
+                    tracing::error!("Failed to save pruned metrics for VM '{}': {}", vm.name, e);
+                }
+            }
         }
     }
 
-    tracing::info!("Metrics cleanup: {} total, {} eligible for deletion", before, deleted);
+    tracing::info!("Metrics cleanup: {} total, {} deleted", total_metrics, deleted);
 
     Ok(Json(json!({
-        "total_metrics": before,
+        "total_metrics": total_metrics,
         "deleted": deleted,
         "cutoff": raw_cutoff.to_rfc3339(),
     })))

@@ -11,6 +11,18 @@ use crate::server::AppState;
 use security::RequireWrite;
 use crate::validation::validate_vm_name;
 
+/// Allowed disk image formats for qemu-img operations.
+const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd", "vhdx", "qed"];
+
+fn validate_image_format(format: &str) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if !ALLOWED_IMAGE_FORMATS.contains(&format) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({
+            "error": format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
+        }))));
+    }
+    Ok(())
+}
+
 // ============================================================================
 // VM Suspend-to-Disk (Hibernate) and Storage Migration
 // ============================================================================
@@ -25,11 +37,13 @@ pub async fn hibernate_vm(
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
-    // Check VM is running
-    if let Ok(Some(vm)) = state.store.get_vm(&vm_name) {
-        if vm.state != vm_model::VMState::Running {
-            return Err((StatusCode::CONFLICT, Json(json!({"error": "VM must be running to hibernate"}))));
-        }
+    // Check VM is running — fail explicitly if not found
+    let vm = state.store.get_vm(&vm_name)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("VM '{}' not found", vm_name)}))))?;
+
+    if vm.state != vm_model::VMState::Running {
+        return Err((StatusCode::CONFLICT, Json(json!({"error": "VM must be running to hibernate"}))));
     }
 
     // Use QMP to save VM state via savevm
@@ -67,13 +81,18 @@ pub async fn hibernate_vm(
         tracing::info!("VM '{}' hibernated with snapshot '{}'", vm_name, snap_name);
         Ok(Json(json!({"status": "hibernated", "snapshot": snap_name})))
     } else {
-        // Fallback: use cgroup freezer + dump memory
-        // Stop VM via machinectl
-        let _output = tokio::process::Command::new("machinectl")
+        // Fallback: stop VM via machinectl
+        let output = tokio::process::Command::new("machinectl")
             .args(["poweroff", &vm_name])
             .output()
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err((StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("machinectl poweroff failed: {}", stderr)}))));
+        }
 
         if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
             vm.state = vm_model::VMState::Stopped;
@@ -175,6 +194,9 @@ pub async fn migrate_storage(
 
     let target_format = req.target_format.as_deref().unwrap_or(source_format);
 
+    // Validate target format against allowlist
+    validate_image_format(target_format)?;
+
     // Validate pool name to prevent path traversal
     if req.target_pool.contains('/') || req.target_pool.contains('\\') || req.target_pool.contains("..") || req.target_pool.is_empty() {
         return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid pool name"}))));
@@ -202,15 +224,17 @@ pub async fn migrate_storage(
             Json(json!({"error": format!("Storage migration failed: {}", stderr)}))));
     }
 
-    // Update VM image path
-    if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
-        vm.image = target_path.clone();
-        vm.updated = Some(chrono::Utc::now());
-        state.store.save_vm(&vm)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-    }
+    // Update VM image path — fail explicitly if VM not found
+    let mut vm = state.store.get_vm(&vm_name)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "VM record not found after migration — not deleting old image"}))))?;
 
-    // Remove old image
+    vm.image = target_path.clone();
+    vm.updated = Some(chrono::Utc::now());
+    state.store.save_vm(&vm)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    // Remove old image only after successful store update
     if let Err(e) = tokio::fs::remove_file(&source_path).await {
         tracing::warn!("Failed to remove old image {}: {}", source_path, e);
     }
@@ -268,6 +292,8 @@ pub struct CreateAffinityRuleRequest {
     pub enabled: bool,
 }
 
+const MAX_AFFINITY_VM_NAMES: usize = 100;
+
 /// GET /api/affinity-rules - List affinity rules
 pub async fn list_affinity_rules(
     security::RequireRead(_claims): security::RequireRead,
@@ -284,6 +310,21 @@ pub async fn create_affinity_rule(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     Json(req): Json<CreateAffinityRuleRequest>,
 ) -> Result<(StatusCode, Json<AffinityRule>), (StatusCode, Json<serde_json::Value>)> {
+    // Validate name
+    if req.name.is_empty() || req.name.len() > 128 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Rule name must be between 1 and 128 characters"}))));
+    }
+
+    // Validate vm_names count
+    if req.vm_names.len() > MAX_AFFINITY_VM_NAMES {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": format!("Too many VM names (max {})", MAX_AFFINITY_VM_NAMES)}))));
+    }
+
+    // Validate each VM name
+    for name in &req.vm_names {
+        validate_vm_name(name).map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid VM name '{}': {}", name, m)}))))?;
+    }
+
     let rule = AffinityRule {
         id: uuid::Uuid::new_v4().to_string(),
         name: req.name,
@@ -306,6 +347,11 @@ pub async fn delete_affinity_rule(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    // Check existence first
+    let _rule = state.store.get_entity::<AffinityRule>("affinity_rules", &id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Affinity rule not found"}))))?;
+
     state.store.delete_entity("affinity_rules", &id)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     Ok(StatusCode::NO_CONTENT)
@@ -351,6 +397,19 @@ pub async fn update_rate_limits(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     Json(config): Json<ApiKeyRateLimit>,
 ) -> Result<Json<ApiKeyRateLimit>, (StatusCode, Json<serde_json::Value>)> {
+    // Validate rate limit bounds
+    if config.enabled {
+        if config.requests_per_minute < 1 || config.requests_per_minute > 10000 {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "requests_per_minute must be between 1 and 10000"}))));
+        }
+        if config.requests_per_hour < 1 || config.requests_per_hour > 100000 {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "requests_per_hour must be between 1 and 100000"}))));
+        }
+        if config.requests_per_hour < config.requests_per_minute {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "requests_per_hour must be >= requests_per_minute"}))));
+        }
+    }
+
     state.store.save_entity("config", "rate_limits", &config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
     Ok(Json(config))

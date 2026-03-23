@@ -11,6 +11,18 @@ use chrono::{DateTime, Utc};
 use crate::server::AppState;
 use security::{RequireRead, RequireWrite, RequireAdmin};
 
+/// Allowed disk image formats for qemu-img operations.
+const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd", "vhdx", "qed"];
+
+fn validate_image_format(format: &str) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    if !ALLOWED_IMAGE_FORMATS.contains(&format) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({
+            "error": format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
+        }))));
+    }
+    Ok(())
+}
+
 // ============================================================================
 // Data Structures
 // ============================================================================
@@ -145,23 +157,25 @@ pub async fn list_images(RequireRead(_claims): RequireRead) -> Json<Vec<ImageInf
     tracing::debug!("images::{}", stringify!(list_images));
     let mut images = Vec::new();
 
-    // Scan /var/lib/machines and /var/lib/vmspawnd/images
+    // Scan /var/lib/machines and /var/lib/vmspawnd/images using async read_dir
     for dir in &["/var/lib/machines", "/var/lib/vmspawnd/images"] {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = entry.file_name().to_string_lossy().to_string();
+        let mut entries = match tokio::fs::read_dir(dir).await {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
 
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if matches!(ext, "raw" | "qcow2" | "img") {
-                        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                        images.push(ImageInfo {
-                            name: name.trim_end_matches(&format!(".{}", ext)).to_string(),
-                            path: path.display().to_string(),
-                            format: ext.to_string(),
-                            size_bytes: size,
-                        });
-                    }
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if matches!(ext, "raw" | "qcow2" | "img") {
+                    let size = entry.metadata().await.map(|m| m.len()).unwrap_or(0);
+                    images.push(ImageInfo {
+                        name: name.trim_end_matches(&format!(".{}", ext)).to_string(),
+                        path: path.display().to_string(),
+                        format: ext.to_string(),
+                        size_bytes: size,
+                    });
                 }
             }
         }
@@ -264,6 +278,48 @@ pub struct DownloadStatus {
     pub completed: Option<DateTime<Utc>>,
 }
 
+/// Helper to stream an HTTP response body to a file on disk.
+async fn stream_response_to_file(
+    response: reqwest::Response,
+    dest_path: &str,
+) -> Result<u64, String> {
+    use tokio::io::AsyncWriteExt;
+
+    let mut file = tokio::fs::File::create(dest_path).await
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    let mut written: u64 = 0;
+    let mut stream = response.bytes_stream();
+
+    use futures::StreamExt;
+    while let Some(chunk_result) = stream.next().await {
+        let chunk = chunk_result.map_err(|e| format!("Download stream error: {}", e))?;
+        file.write_all(&chunk).await
+            .map_err(|e| format!("Failed to write chunk: {}", e))?;
+        written += chunk.len() as u64;
+    }
+
+    file.flush().await.map_err(|e| format!("Failed to flush file: {}", e))?;
+    Ok(written)
+}
+
+/// Helper to mark a download as failed in the store.
+async fn mark_download_failed(
+    store: &state_store::StateStore,
+    collection: &str,
+    dl_id: &str,
+    error: String,
+) {
+    if let Ok(Some(mut s)) = store.get_entity::<DownloadStatus>(collection, dl_id) {
+        s.state = BuildState::Failed;
+        s.error = Some(error);
+        s.completed = Some(Utc::now());
+        if let Err(e) = store.save_entity(collection, dl_id, &s) {
+            tracing::error!("Failed to save download state: {}", e);
+        }
+    }
+}
+
 /// POST /api/images/cloud/download - Download a cloud image
 pub async fn download_cloud_image(
     RequireWrite(_claims): RequireWrite,
@@ -316,61 +372,36 @@ pub async fn download_cloud_image(
         let ext = url.rsplit('.').next().unwrap_or("qcow2");
         let dest_path = format!("{}/{}.{}", dest_dir, image_name, ext);
 
-        // Download using reqwest
+        // Download using streaming to avoid loading entire image into memory
         match state_clone.http_client.get(&url).send().await {
             Ok(response) => {
                 if !response.status().is_success() {
-                    if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
-                        s.state = BuildState::Failed;
-                        s.error = Some(format!("HTTP {}", response.status()));
-                        s.completed = Some(Utc::now());
-                        if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                    }
+                    let status_code = response.status();
+                    mark_download_failed(&state_clone.store, "image_downloads", &dl_id, format!("HTTP {}", status_code)).await;
                     return;
                 }
 
-                match response.bytes().await {
-                    Ok(bytes) => {
-                        match tokio::fs::write(&dest_path, &bytes).await {
-                            Ok(_) => {
-                                tracing::info!("Downloaded cloud image '{}' to {}", image_name, dest_path);
-                                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
-                                    s.state = BuildState::Completed;
-                                    s.output_path = Some(dest_path);
-                                    s.completed = Some(Utc::now());
-                                    if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                                }
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to write image: {}", e);
-                                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
-                                    s.state = BuildState::Failed;
-                                    s.error = Some(e.to_string());
-                                    s.completed = Some(Utc::now());
-                                    if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                                }
-                            }
+                match stream_response_to_file(response, &dest_path).await {
+                    Ok(_) => {
+                        tracing::info!("Downloaded cloud image '{}' to {}", image_name, dest_path);
+                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                            s.state = BuildState::Completed;
+                            s.output_path = Some(dest_path);
+                            s.completed = Some(Utc::now());
+                            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
                         }
                     }
                     Err(e) => {
                         tracing::error!("Failed to download image: {}", e);
-                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
-                            s.state = BuildState::Failed;
-                            s.error = Some(e.to_string());
-                            s.completed = Some(Utc::now());
-                            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                        }
+                        // Clean up partial file
+                        let _ = tokio::fs::remove_file(&dest_path).await;
+                        mark_download_failed(&state_clone.store, "image_downloads", &dl_id, e).await;
                     }
                 }
             }
             Err(e) => {
                 tracing::error!("Failed to start download: {}", e);
-                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
-                    s.state = BuildState::Failed;
-                    s.error = Some(e.to_string());
-                    s.completed = Some(Utc::now());
-                    if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                }
+                mark_download_failed(&state_clone.store, "image_downloads", &dl_id, e.to_string()).await;
             }
         }
     });
@@ -403,6 +434,21 @@ pub struct IsoImage {
     pub uploaded: DateTime<Utc>,
 }
 
+/// Derive a deterministic UUID from a file path so IDs are stable across calls.
+fn stable_id_from_path(path: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    path.hash(&mut hasher);
+    let hash = hasher.finish();
+    // Format as a UUID-like string from the hash
+    format!("{:016x}-{:04x}-{:04x}",
+        hash,
+        (hash >> 48) as u16,
+        (hash >> 32) as u16,
+    )
+}
+
 /// GET /api/images/iso - List available ISO images
 pub async fn list_iso_images(
     RequireRead(_claims): RequireRead,
@@ -411,25 +457,30 @@ pub async fn list_iso_images(
     let mut isos = Vec::new();
     let iso_dir = "/var/lib/vmspawnd/iso";
 
-    if let Ok(entries) = std::fs::read_dir(iso_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("iso") {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                let modified = entry.metadata()
-                    .and_then(|m| m.modified())
-                    .map(|t| DateTime::<Utc>::from(t))
-                    .unwrap_or_else(|_| Utc::now());
+    let mut entries = match tokio::fs::read_dir(iso_dir).await {
+        Ok(e) => e,
+        Err(_) => return Json(isos),
+    };
 
-                isos.push(IsoImage {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    name: name.trim_end_matches(".iso").to_string(),
-                    path: path.display().to_string(),
-                    size_bytes: size,
-                    uploaded: modified,
-                });
-            }
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("iso") {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let metadata = entry.metadata().await;
+            let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified = metadata
+                .and_then(|m| m.modified())
+                .map(|t| DateTime::<Utc>::from(t))
+                .unwrap_or_else(|_| Utc::now());
+
+            let path_str = path.display().to_string();
+            isos.push(IsoImage {
+                id: stable_id_from_path(&path_str),
+                name: name.trim_end_matches(".iso").to_string(),
+                path: path_str,
+                size_bytes: size,
+                uploaded: modified,
+            });
         }
     }
 
@@ -482,18 +533,9 @@ pub async fn download_iso(
 
         match state_clone.http_client.get(&url).send().await {
             Ok(response) if response.status().is_success() => {
-                match response.bytes().await {
-                    Ok(bytes) => {
-                        if let Err(e) = tokio::fs::write(&dest_path, &bytes).await {
-                            tracing::error!("Failed to write ISO: {}", e);
-                            if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
-                                s.state = BuildState::Failed;
-                                s.error = Some(e.to_string());
-                                s.completed = Some(Utc::now());
-                                if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                            }
-                            return;
-                        }
+                // Stream to disk instead of buffering in memory
+                match stream_response_to_file(response, &dest_path).await {
+                    Ok(_) => {
                         tracing::info!("Downloaded ISO '{}' to {}", iso_name, dest_path);
                         if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
                             s.state = BuildState::Completed;
@@ -503,30 +545,17 @@ pub async fn download_iso(
                         }
                     }
                     Err(e) => {
-                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
-                            s.state = BuildState::Failed;
-                            s.error = Some(e.to_string());
-                            s.completed = Some(Utc::now());
-                            if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                        }
+                        tracing::error!("Failed to download ISO: {}", e);
+                        let _ = tokio::fs::remove_file(&dest_path).await;
+                        mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, e).await;
                     }
                 }
             }
             Ok(response) => {
-                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
-                    s.state = BuildState::Failed;
-                    s.error = Some(format!("HTTP {}", response.status()));
-                    s.completed = Some(Utc::now());
-                    if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                }
+                mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, format!("HTTP {}", response.status())).await;
             }
             Err(e) => {
-                if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
-                    s.state = BuildState::Failed;
-                    s.error = Some(e.to_string());
-                    s.completed = Some(Utc::now());
-                    if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
-                }
+                mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, e.to_string()).await;
             }
         }
     });
@@ -670,6 +699,9 @@ pub async fn import_vm_image(
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     crate::validation::validate_host_path(&req.source_path)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
+    // Validate target format
+    validate_image_format(&req.target_format)?;
 
     // Detect source format from extension
     let source_format = std::path::Path::new(&req.source_path)

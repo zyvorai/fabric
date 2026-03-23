@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
+use axum::{http::StatusCode, Json};
+use serde_json::json;
 
 use crate::server::AppState;
 
@@ -8,11 +10,18 @@ use crate::server::AppState;
 // Webhook Retry with Exponential Backoff
 // ============================================================================
 
+/// Maximum payload size stored per delivery (4 KB).
+const MAX_STORED_PAYLOAD_SIZE: usize = 4096;
+
+/// Maximum retry attempts allowed.
+const MAX_RETRY_ATTEMPTS: u32 = 10;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookDelivery {
     pub id: String,
     pub channel_id: String,
     pub url: String,
+    /// Truncated payload (first 4 KB). Full payload is not persisted.
     pub payload: String,
     pub attempt: u32,
     pub max_attempts: u32,
@@ -22,6 +31,38 @@ pub struct WebhookDelivery {
     pub next_retry: Option<DateTime<Utc>>,
     pub created: DateTime<Utc>,
     pub completed: Option<DateTime<Utc>>,
+}
+
+/// Summary view returned by list endpoint (payload omitted).
+#[derive(Debug, Clone, Serialize)]
+pub struct WebhookDeliverySummary {
+    pub id: String,
+    pub channel_id: String,
+    pub attempt: u32,
+    pub max_attempts: u32,
+    pub status: DeliveryStatus,
+    pub response_code: Option<u16>,
+    pub error: Option<String>,
+    pub next_retry: Option<DateTime<Utc>>,
+    pub created: DateTime<Utc>,
+    pub completed: Option<DateTime<Utc>>,
+}
+
+impl From<WebhookDelivery> for WebhookDeliverySummary {
+    fn from(d: WebhookDelivery) -> Self {
+        Self {
+            id: d.id,
+            channel_id: d.channel_id,
+            attempt: d.attempt,
+            max_attempts: d.max_attempts,
+            status: d.status,
+            response_code: d.response_code,
+            error: d.error,
+            next_retry: d.next_retry,
+            created: d.created,
+            completed: d.completed,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,12 +89,21 @@ pub async fn send_webhook_with_retry(
     payload: &str,
     max_attempts: u32,
 ) {
+    let max_attempts = max_attempts.min(MAX_RETRY_ATTEMPTS);
     let delivery_id = uuid::Uuid::new_v4().to_string();
+
+    // Truncate stored payload to limit storage usage
+    let stored_payload = if payload.len() > MAX_STORED_PAYLOAD_SIZE {
+        format!("{}... (truncated, {} bytes total)", &payload[..MAX_STORED_PAYLOAD_SIZE], payload.len())
+    } else {
+        payload.to_string()
+    };
+
     let mut delivery = WebhookDelivery {
         id: delivery_id.clone(),
         channel_id: channel_id.to_string(),
         url: url.to_string(),
-        payload: payload.to_string(),
+        payload: stored_payload,
         attempt: 0,
         max_attempts,
         status: DeliveryStatus::Pending,
@@ -134,12 +184,13 @@ pub async fn send_webhook_with_retry(
     tracing::error!("Webhook delivery to {} failed after {} attempts", url, max_attempts);
 }
 
-/// GET /api/webhooks/deliveries - List recent webhook deliveries
+/// GET /api/webhooks/deliveries - List recent webhook deliveries (payload omitted)
 pub async fn list_deliveries(
     security::RequireRead(_claims): security::RequireRead,
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
-) -> Result<axum::Json<Vec<WebhookDelivery>>, axum::http::StatusCode> {
+) -> Result<Json<Vec<WebhookDeliverySummary>>, (StatusCode, Json<serde_json::Value>)> {
     let deliveries = state.store.list_entities::<WebhookDelivery>("webhook_deliveries")
-        .map_err(|e| { tracing::error!("Storage error: {}", e); axum::http::StatusCode::INTERNAL_SERVER_ERROR })?;
-    Ok(axum::Json(deliveries))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Storage error: {}", e)}))))?;
+    let summaries: Vec<WebhookDeliverySummary> = deliveries.into_iter().map(Into::into).collect();
+    Ok(Json(summaries))
 }
