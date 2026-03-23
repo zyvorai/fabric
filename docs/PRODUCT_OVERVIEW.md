@@ -138,6 +138,7 @@ The entire codebase has undergone a **25-round security audit** with 174 issues 
 - Multi-channel notifications: Email, Slack, **Webhook with retry + backoff**, Microsoft Teams
 - VM scheduling (once, daily, weekly)
 - Backup/restore with retention policies and incremental backups
+- **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
 - Resource quotas, pools, and datacenter abstractions
 - **Database schema migrations** with version tracking
 
@@ -375,6 +376,16 @@ open http://localhost:8080
 ./vmspawnctl reinstall   # Rebuild + reinstall + restart (auto-sudo)
 ./vmspawnctl uninstall   # Remove everything (auto-sudo)
 ./vmspawnctl doctor      # System readiness check
+```
+
+### Backup Commands
+
+```bash
+./vmspawnctl backup now      # Run backup immediately
+./vmspawnctl backup enable   # Enable daily backup timer (2:00 AM)
+./vmspawnctl backup disable  # Disable backup timer
+./vmspawnctl backup status   # Show timer state + storage info
+./vmspawnctl backup logs     # Follow backup logs
 ```
 
 ---

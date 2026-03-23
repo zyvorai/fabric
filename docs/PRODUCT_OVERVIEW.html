@@ -460,6 +460,8 @@ cleanup</li>
 retry + backoff</strong>, Microsoft Teams</li>
 <li>VM scheduling (once, daily, weekly)</li>
 <li>Backup/restore with retention policies and incremental backups</li>
+<li><strong>Automated daily backups</strong> via systemd timer
+(configurable schedule, retention, cleanup)</li>
 <li>Resource quotas, pools, and datacenter abstractions</li>
 <li><strong>Database schema migrations</strong> with version
 tracking</li>
@@ -874,6 +876,13 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> reinstall   <span class="co"># Rebuild + reinstall + restart (auto-sudo)</span></span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> uninstall   <span class="co"># Remove everything (auto-sudo)</span></span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> doctor      <span class="co"># System readiness check</span></span></code></pre></div>
+<h3 id="backup-commands">Backup Commands</h3>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup now      <span class="co"># Run backup immediately</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup enable   <span class="co"># Enable daily backup timer (2:00 AM)</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup disable  <span class="co"># Disable backup timer</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup status   <span class="co"># Show timer state + storage info</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup logs     <span class="co"># Follow backup logs</span></span></code></pre></div>
 <hr />
 <p><em>For technical details, see the <a
 href="architecture.md">Architecture Guide</a>, <a href="api.md">API
