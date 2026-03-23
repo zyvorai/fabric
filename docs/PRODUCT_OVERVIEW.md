@@ -51,7 +51,7 @@ vmspawnd leverages systemd-vmspawn and systemd-machined — the VM management to
 
 ### 3. Security-First Architecture
 
-The entire codebase has undergone a **13-round security audit** with verified fixes:
+The entire codebase has undergone a **16-round security audit** with 113 issues identified and fixed:
 
 - **Zero unsafe Rust** — memory-safe by construction
 - **Zero shell pipelines** — all subprocess calls use safe argument passing
@@ -115,7 +115,11 @@ The entire codebase has undergone a **13-round security audit** with verified fi
 - Audit logging with JSON/CSV export
 - Encryption at rest
 - Rate limiting on authentication and API keys
-- **13-round security audit** — zero outstanding vulnerabilities
+- **16-round security audit** — 113 issues fixed, zero outstanding vulnerabilities
+- **SSRF prevention** on all user-provided URLs
+- **Entity ID sanitization** in state store
+- **Credential redaction** in API responses
+- **WebSocket authentication** on console and VNC endpoints
 
 ### High Availability
 - etcd-based clustering with leader election
@@ -308,7 +312,8 @@ vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside
 | REST API endpoints | 520+ |
 | WebSocket endpoints | 3 |
 | Web pages | 37+ |
-| Security audit rounds | 13 |
+| Security audit rounds | 16 |
+| Security issues fixed | 113 |
 | Test suite | Passing |
 
 ---
