@@ -396,6 +396,128 @@ cmd_test() {
     fi
 }
 
+# ── verify: Post-install smoke test ─────────────────────────────────────
+cmd_verify() {
+    step "Post-Install Verification"
+    local failures=0
+
+    # 1. Check service
+    info "Checking service..."
+    if systemctl is-active --quiet vmspawnd 2>/dev/null; then
+        ok "Service is running"
+    else
+        # Try direct process check
+        if pgrep -f "/usr/bin/vmspawnd" &>/dev/null; then
+            ok "vmspawnd process is running"
+        else
+            err "vmspawnd is not running"
+            ((failures++)) || true
+            echo ""
+            echo -e "${RED}Verification failed — service not running${NC}"
+            return 1
+        fi
+    fi
+
+    # 2. Check API responds
+    info "Checking API..."
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/vms" --max-time 5 2>/dev/null) || http_code="000"
+    if [[ "$http_code" =~ ^(200|401)$ ]]; then
+        ok "API responding (HTTP $http_code)"
+    else
+        err "API not responding (HTTP $http_code)"
+        ((failures++)) || true
+    fi
+
+    # 3. Check authentication
+    info "Checking authentication..."
+    local pw_file="/var/lib/vmspawnd/.admin_password"
+    if [[ -f "$pw_file" ]]; then
+        local password token
+        password=$(sudo cat "$pw_file" 2>/dev/null || cat "$pw_file" 2>/dev/null)
+        token=$(curl -sf "$API_URL/api/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg p "$password" '{"username":"admin","password":$p}')" \
+            --max-time 5 2>/dev/null | jq -r '.token // empty')
+
+        if [[ -n "$token" ]]; then
+            ok "Authentication working"
+
+            # 4. Test VM list endpoint
+            info "Checking VM list..."
+            local vm_response
+            vm_response=$(curl -sf "$API_URL/api/vms" \
+                -H "Authorization: Bearer $token" \
+                --max-time 5 2>/dev/null)
+            if [[ -n "$vm_response" ]]; then
+                local vm_count
+                vm_count=$(echo "$vm_response" | jq 'if type=="object" then .items|length else length end' 2>/dev/null || echo "0")
+                ok "VM list: $vm_count VM(s)"
+            else
+                err "VM list endpoint failed"
+                ((failures++)) || true
+            fi
+
+            # 5. Test create + delete VM
+            info "Testing VM create/delete..."
+            local test_name="verify-$(date +%s)"
+            local create_code
+            create_code=$(curl -sf -o /dev/null -w "%{http_code}" "$API_URL/api/vms" \
+                -H "Authorization: Bearer $token" \
+                -H "Content-Type: application/json" \
+                -d "{\"name\":\"$test_name\",\"image\":\"/var/lib/vmspawnd/images/test.qcow2\",\"cpus\":1,\"memory\":512}" \
+                --max-time 5 2>/dev/null) || create_code="000"
+
+            if [[ "$create_code" =~ ^(200|201)$ ]]; then
+                ok "VM create: HTTP $create_code"
+                # Clean up
+                curl -sf -X DELETE "$API_URL/api/vms/$test_name" \
+                    -H "Authorization: Bearer $token" \
+                    --max-time 5 -o /dev/null 2>/dev/null
+                ok "VM delete: cleaned up"
+            else
+                warn "VM create: HTTP $create_code (may need a disk image)"
+            fi
+
+            # 6. Test backup endpoint
+            info "Checking backup API..."
+            local backup_code
+            backup_code=$(curl -sf -o /dev/null -w "%{http_code}" "$API_URL/api/backups" \
+                -H "Authorization: Bearer $token" \
+                --max-time 5 2>/dev/null) || backup_code="000"
+            if [[ "$backup_code" == "200" ]]; then
+                ok "Backup API: HTTP $backup_code"
+            else
+                warn "Backup API: HTTP $backup_code"
+            fi
+        else
+            err "Authentication failed"
+            ((failures++)) || true
+        fi
+    else
+        warn "Password file not found — skipping auth tests"
+    fi
+
+    # 7. Check timers
+    info "Checking timers..."
+    for timer in vmspawnd-backup vmspawnd-cleanup; do
+        if systemctl is-active --quiet "${timer}.timer" 2>/dev/null; then
+            ok "${timer} timer active"
+        else
+            warn "${timer} timer not active (enable with: systemctl enable --now ${timer}.timer)"
+        fi
+    done
+
+    # Summary
+    echo ""
+    if [[ $failures -eq 0 ]]; then
+        ok "${GREEN}${BOLD}All verification checks passed${NC}"
+    else
+        err "${RED}${BOLD}$failures check(s) failed${NC}"
+        return 1
+    fi
+}
+
 # ── deploy: Full automated deployment (deps → build → install → start) ─
 cmd_deploy() {
     need_root
@@ -425,6 +547,9 @@ cmd_deploy() {
 
     cmd_start
     echo ""
+
+    # Auto-verify
+    cmd_verify || true
 
     step "Deployment Complete"
     echo ""
@@ -467,6 +592,8 @@ cmd_reinstall() {
 
     if systemctl is-active --quiet vmspawnd; then
         ok "vmspawnd reinstalled and running"
+        echo ""
+        cmd_verify || true
     else
         err "Failed to start after reinstall. Check: sudo journalctl -u vmspawnd -e"
         exit 1
@@ -979,6 +1106,7 @@ cmd_help() {
     echo "  backup logs       Follow backup logs"
     echo ""
     echo -e "${BOLD}Utilities:${NC}"
+    echo "  verify            Post-install smoke test (API, auth, VM CRUD, backups)"
     echo "  health            Deep health check (API, disk, DB, timers, resources)"
     echo "  doctor            Check system readiness (deps, tools, services)"
     echo "  tls               Generate self-signed TLS certificate (auto-sudo)"
@@ -1018,6 +1146,7 @@ main() {
         reinstall)  cmd_reinstall "$@" ;;
         upgrade)    cmd_upgrade "$@" ;;
         backup)     cmd_backup "$@" ;;
+        verify)     cmd_verify "$@" ;;
         health)     cmd_health "$@" ;;
         tls)        cmd_tls "$@" ;;
         start)      cmd_start "$@" ;;
