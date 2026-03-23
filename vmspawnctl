@@ -75,150 +75,231 @@ cmd_deps() {
 
     info "Detected: $distro (package manager: $pkg_mgr)"
 
-    # Common packages needed across all distros
-    local common_rust=0
-
     case "$pkg_mgr" in
         dnf)
             info "Installing packages via dnf..."
+            echo ""
+
+            # ── Build dependencies ──
+            info "Build tools & libraries..."
+            dnf install -y \
+                gcc gcc-c++ make git \
+                pkg-config \
+                openssl-devel \
+                systemd-devel \
+                dbus-devel \
+                || { err "Failed to install build deps"; exit 1; }
+
+            # ── Runtime: VM management ──
+            info "VM management tools..."
             dnf install -y \
                 systemd-container \
                 qemu-img \
-                qemu-system-x86 \
-                swtpm \
-                swtpm-tools \
+                qemu-system-x86-core \
+                qemu-char-spice \
+                qemu-device-display-virtio-gpu \
+                qemu-device-display-virtio-vga \
+                qemu-device-usb-redirect \
+                edk2-ovmf \
+                || { err "Failed to install VM packages"; exit 1; }
+
+            # ── Runtime: TPM & image building ──
+            info "TPM support & image tools..."
+            dnf install -y \
+                swtpm swtpm-tools \
                 mkosi \
+                || { err "Failed to install TPM/mkosi"; exit 1; }
+
+            # ── Runtime: Networking ──
+            info "Networking tools..."
+            dnf install -y \
                 nftables \
                 wireguard-tools \
                 socat \
-                curl \
-                jq \
-                sqlite \
-                gcc \
-                openssl-devel \
-                pkg-config \
-                systemd-devel \
-                dbus-devel \
-                pandoc \
-                2>&1 | tail -1
-            ok "System packages installed"
+                iproute \
+                bridge-utils \
+                || { err "Failed to install networking packages"; exit 1; }
+
+            # ── Utilities ──
+            info "Utilities..."
+            dnf install -y \
+                curl jq sqlite pandoc \
+                || { err "Failed to install utilities"; exit 1; }
+
+            ok "All Fedora/RHEL packages installed"
             ;;
+
         apt)
             info "Installing packages via apt..."
-            apt-get update -qq
+            echo ""
+
+            apt-get update -qq || { err "apt-get update failed"; exit 1; }
+
+            # ── Build dependencies ──
+            info "Build tools & libraries..."
+            apt-get install -y \
+                gcc g++ make git \
+                pkg-config \
+                libssl-dev \
+                libsystemd-dev \
+                libdbus-1-dev \
+                || { err "Failed to install build deps"; exit 1; }
+
+            # ── Runtime: VM management ──
+            info "VM management tools..."
             apt-get install -y \
                 systemd-container \
                 qemu-utils \
                 qemu-system-x86 \
-                swtpm \
-                swtpm-tools \
-                mkosi \
+                ovmf \
+                || { err "Failed to install VM packages"; exit 1; }
+
+            # ── Runtime: TPM & image building ──
+            info "TPM support & image tools..."
+            apt-get install -y \
+                swtpm swtpm-tools \
+                || { err "Failed to install TPM packages"; exit 1; }
+            # mkosi may not be in all Ubuntu versions
+            apt-get install -y mkosi 2>/dev/null || warn "mkosi not available — image building will be limited"
+
+            # ── Runtime: Networking ──
+            info "Networking tools..."
+            apt-get install -y \
                 nftables \
                 wireguard-tools \
                 socat \
-                curl \
-                jq \
-                sqlite3 \
-                gcc \
-                libssl-dev \
-                pkg-config \
-                libsystemd-dev \
-                libdbus-1-dev \
-                pandoc \
-                2>&1 | tail -1
-            ok "System packages installed"
+                iproute2 \
+                bridge-utils \
+                || { err "Failed to install networking packages"; exit 1; }
+
+            # ── Utilities ──
+            info "Utilities..."
+            apt-get install -y \
+                curl jq sqlite3 pandoc \
+                || { err "Failed to install utilities"; exit 1; }
+
+            ok "All Ubuntu/Debian packages installed"
             ;;
+
         zypper)
             info "Installing packages via zypper..."
+            echo ""
+
             zypper install -y \
+                gcc gcc-c++ make git \
+                pkg-config libopenssl-devel systemd-devel dbus-1-devel \
                 systemd-container \
-                qemu-tools \
-                qemu-x86 \
-                swtpm \
-                mkosi \
-                nftables \
-                wireguard-tools \
-                socat \
-                curl \
-                jq \
-                sqlite3 \
-                gcc \
-                libopenssl-devel \
-                pkg-config \
-                systemd-devel \
-                dbus-1-devel \
-                2>&1 | tail -1
-            ok "System packages installed"
+                qemu-tools qemu-x86 qemu-ovmf-x86_64 \
+                swtpm mkosi \
+                nftables wireguard-tools socat iproute2 bridge-utils \
+                curl jq sqlite3 \
+                || { err "Failed to install packages"; exit 1; }
+
+            ok "All openSUSE packages installed"
             ;;
+
         pacman)
             info "Installing packages via pacman..."
+            echo ""
+
             pacman -S --noconfirm --needed \
+                gcc make git \
+                pkgconf openssl \
                 systemd \
-                qemu-base \
-                swtpm \
-                mkosi \
-                nftables \
-                wireguard-tools \
-                socat \
-                curl \
-                jq \
-                sqlite \
-                gcc \
-                openssl \
-                pkgconf \
-                dbus \
-                2>&1 | tail -1
-            ok "System packages installed"
+                qemu-base edk2-ovmf \
+                swtpm mkosi \
+                nftables wireguard-tools socat iproute2 bridge-utils \
+                curl jq sqlite dbus \
+                || { err "Failed to install packages"; exit 1; }
+
+            ok "All Arch Linux packages installed"
             ;;
+
         *)
             err "Unsupported distribution: $distro"
+            echo ""
             echo "Please install the following manually:"
-            echo "  systemd-container, qemu-img, qemu-system-x86, swtpm, mkosi,"
-            echo "  nftables, wireguard-tools, socat, curl, jq, sqlite,"
-            echo "  gcc, openssl-dev, pkg-config, systemd-devel, dbus-devel"
+            echo ""
+            echo "  Build:    gcc, g++, make, git, pkg-config,"
+            echo "            openssl-dev, systemd-dev, dbus-dev"
+            echo ""
+            echo "  VM:       systemd-container, qemu-img, qemu-system-x86,"
+            echo "            edk2-ovmf (UEFI firmware)"
+            echo ""
+            echo "  TPM:      swtpm, swtpm-tools"
+            echo "  Images:   mkosi"
+            echo ""
+            echo "  Network:  nftables, wireguard-tools, socat,"
+            echo "            iproute2, bridge-utils"
+            echo ""
+            echo "  Utils:    curl, jq, sqlite, pandoc"
             exit 1
             ;;
     esac
 
-    # Install Rust toolchain if not present
+    # ── Rust toolchain ──
+    step "Rust toolchain"
     if ! command -v cargo &>/dev/null; then
-        info "Installing Rust toolchain..."
+        info "Installing Rust via rustup..."
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+        # shellcheck source=/dev/null
         source "$HOME/.cargo/env" 2>/dev/null || true
-        ok "Rust toolchain installed"
+        ok "Rust toolchain installed ($(rustc --version 2>/dev/null || echo 'reload shell'))"
     else
-        ok "Rust toolchain already installed ($(rustc --version))"
+        ok "Rust already installed ($(rustc --version))"
     fi
 
-    # Install Node.js if not present (for web UI)
+    # ── Node.js (for web UI) ──
+    step "Node.js (for web UI)"
     if ! command -v node &>/dev/null; then
         info "Installing Node.js..."
-        if command -v dnf &>/dev/null; then
-            dnf install -y nodejs npm 2>&1 | tail -1
-        elif command -v apt-get &>/dev/null; then
-            apt-get install -y nodejs npm 2>&1 | tail -1
-        elif command -v pacman &>/dev/null; then
-            pacman -S --noconfirm nodejs npm 2>&1 | tail -1
+        case "$pkg_mgr" in
+            dnf)    dnf install -y nodejs npm || warn "Node.js install failed" ;;
+            apt)    apt-get install -y nodejs npm || warn "Node.js install failed" ;;
+            zypper) zypper install -y nodejs npm || warn "Node.js install failed" ;;
+            pacman) pacman -S --noconfirm --needed nodejs npm || warn "Node.js install failed" ;;
+        esac
+        if command -v node &>/dev/null; then
+            ok "Node.js installed ($(node --version))"
+        else
+            warn "Node.js not available — web UI build will be skipped"
         fi
-        ok "Node.js installed"
     else
         ok "Node.js already installed ($(node --version))"
     fi
 
-    # Enable required services
+    # ── System services ──
     step "Enabling system services"
-    systemctl enable --now systemd-machined.service 2>/dev/null || true
-    systemctl enable --now systemd-networkd.service 2>/dev/null || true
-    systemctl enable --now systemd-resolved.service 2>/dev/null || true
+    systemctl enable --now systemd-machined.service 2>/dev/null && ok "systemd-machined enabled" || warn "systemd-machined not available"
+    systemctl enable --now systemd-networkd.service 2>/dev/null && ok "systemd-networkd enabled" || warn "systemd-networkd not available"
+    systemctl enable --now systemd-resolved.service 2>/dev/null && ok "systemd-resolved enabled" || warn "systemd-resolved not available"
 
-    # Load kernel modules
-    modprobe kvm 2>/dev/null || warn "KVM module not available (nested virt may not work)"
-    modprobe wireguard 2>/dev/null || warn "WireGuard module not available"
+    # ── Kernel modules ──
+    step "Kernel modules"
+    modprobe kvm 2>/dev/null && ok "kvm loaded" || warn "KVM not available (VMs will be slow)"
+    if grep -q vmx /proc/cpuinfo 2>/dev/null; then
+        modprobe kvm_intel 2>/dev/null && ok "kvm_intel loaded" || true
+    elif grep -q svm /proc/cpuinfo 2>/dev/null; then
+        modprobe kvm_amd 2>/dev/null && ok "kvm_amd loaded" || true
+    fi
+    modprobe wireguard 2>/dev/null && ok "wireguard loaded" || warn "WireGuard module not available"
     modprobe nft_masq 2>/dev/null || true
+    modprobe vhost_net 2>/dev/null && ok "vhost_net loaded" || true
 
+    # ── Summary ──
+    step "Summary"
+    echo ""
+    echo -e "  ${BOLD}Build deps:${NC}     gcc, make, pkg-config, openssl-dev, systemd-dev, dbus-dev"
+    echo -e "  ${BOLD}VM tools:${NC}       systemd-vmspawn, machinectl, qemu-img, OVMF/UEFI"
+    echo -e "  ${BOLD}TPM:${NC}            swtpm"
+    echo -e "  ${BOLD}Networking:${NC}     nftables, wireguard, socat, iproute2"
+    echo -e "  ${BOLD}Rust:${NC}           $(rustc --version 2>/dev/null || echo 'not in PATH — reload shell')"
+    echo -e "  ${BOLD}Node.js:${NC}        $(node --version 2>/dev/null || echo 'not installed')"
+    echo ""
     ok "All dependencies installed"
     echo ""
     info "Next: run ${BOLD}./vmspawnctl build${NC} to build the project"
+    info "  Or: run ${BOLD}./vmspawnctl doctor${NC} to verify readiness"
 }
 
 # ── build: Build the project ────────────────────────────────────────────
