@@ -170,9 +170,33 @@ pub async fn export_audit_logs(
     Query(query): Query<ExportQuery>,
 ) -> Result<(StatusCode, String), StatusCode> {
     tracing::debug!("audit::{}", stringify!(export_audit_logs));
-    // Load from state store
-    let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // Apply the same filters as list_audit_logs
+    let action = query.filters.action.clone();
+    let user = query.filters.user.clone();
+    let resource_type = query.filters.resource_type.clone();
+    let resource_name = query.filters.resource_name.clone();
+    let status = query.filters.status.clone();
+    let search = query.filters.search.as_ref().map(|s| s.to_lowercase());
+
+    let logs: Vec<AuditLog> = state.store.list_entities("audit_logs")
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .into_iter()
+        .filter(|log: &AuditLog| {
+            if let Some(ref a) = action { if log.action != *a { return false; } }
+            if let Some(ref u) = user { if log.user != *u { return false; } }
+            if let Some(ref rt) = resource_type { if log.resource_type != *rt { return false; } }
+            if let Some(ref rn) = resource_name { if log.resource_name != *rn { return false; } }
+            if let Some(ref s) = status {
+                let log_status = match log.status { AuditStatus::Success => "success", AuditStatus::Failed => "failed" };
+                if log_status != s { return false; }
+            }
+            if let Some(ref q) = search {
+                let haystack = format!("{} {} {} {} {}", log.user, log.action, log.resource_type, log.resource_name, log.details.as_deref().unwrap_or("")).to_lowercase();
+                if !haystack.contains(q) { return false; }
+            }
+            true
+        })
+        .collect();
 
     match query.format.as_str() {
         "json" => {

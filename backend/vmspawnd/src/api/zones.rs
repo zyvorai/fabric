@@ -171,6 +171,8 @@ pub async fn create_spot_instance(
     Json(req): Json<CreateSpotRequest>,
 ) -> Result<(StatusCode, Json<SpotInstance>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("zones::{}", stringify!(create_spot_instance));
+    crate::validation::validate_vm_name(&req.vm_name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {},

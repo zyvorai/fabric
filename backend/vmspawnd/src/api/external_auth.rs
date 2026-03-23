@@ -119,6 +119,12 @@ pub async fn create_provider(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateAuthProviderRequest>,
 ) -> Result<(StatusCode, Json<AuthProvider>), (StatusCode, Json<serde_json::Value>)> {
+    // Validate OIDC issuer URL against SSRF
+    if let AuthProviderConfig::Oidc(ref oidc) = req.config {
+        crate::api::notifications::validate_external_url_public(&oidc.issuer_url)
+            .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid issuer URL: {}", e)}))))?;
+    }
+
     let now = Utc::now();
     let provider = AuthProvider {
         id: uuid::Uuid::new_v4().to_string(),

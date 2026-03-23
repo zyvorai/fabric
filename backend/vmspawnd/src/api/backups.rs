@@ -136,8 +136,8 @@ pub struct BackupStats {
     pub total_size_bytes: u64,
     pub by_type: HashMap<String, u64>,
     pub by_vm: HashMap<String, u64>,
-    pub oldest_backup: DateTime<Utc>,
-    pub newest_backup: DateTime<Utc>,
+    pub oldest_backup: Option<DateTime<Utc>>,
+    pub newest_backup: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -566,19 +566,13 @@ pub async fn get_backup_stats(
         }
     }
 
-    // If no backups, use reasonable defaults
-    if total_backups == 0 {
-        oldest_backup = Utc::now() - Duration::days(30);
-        newest_backup = Utc::now();
-    }
-
     let stats = BackupStats {
         total_backups,
         total_size_bytes,
         by_type,
         by_vm,
-        oldest_backup,
-        newest_backup,
+        oldest_backup: if total_backups > 0 { Some(oldest_backup) } else { None },
+        newest_backup: if total_backups > 0 { Some(newest_backup) } else { None },
     };
 
     Ok(Json(stats))

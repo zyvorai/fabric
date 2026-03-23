@@ -115,7 +115,15 @@ pub async fn remove_storage_host(
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
+    // Calculate capacity being removed
+    let removed_capacity: u64 = pool.hosts.iter()
+        .filter(|h| h.host_id == host_id)
+        .flat_map(|h| h.disks.iter())
+        .map(|d| d.capacity_gb)
+        .sum();
     pool.hosts.retain(|h| h.host_id != host_id);
+    pool.total_capacity_gb = pool.total_capacity_gb.saturating_sub(removed_capacity);
+    pool.free_capacity_gb = pool.free_capacity_gb.saturating_sub(removed_capacity);
     pool.updated = Utc::now();
     if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);

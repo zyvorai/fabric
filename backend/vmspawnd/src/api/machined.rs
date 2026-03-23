@@ -348,6 +348,7 @@ pub async fn pull_raw_image(
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(pull_raw_image));
+    validate_vm_name(&req.name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     machinectl::pull_raw(&req.url, &req.name, req.verify)
@@ -361,6 +362,7 @@ pub async fn pull_tar_image(
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(pull_tar_image));
+    validate_vm_name(&req.name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     machinectl::pull_tar(&req.url, &req.name, req.verify)
@@ -380,6 +382,7 @@ pub async fn import_raw_image(
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(import_raw_image));
+    validate_vm_name(&req.name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)?;
     machinectl::import_raw(&req.path, &req.name)
         .map(|_| StatusCode::ACCEPTED)
@@ -392,6 +395,7 @@ pub async fn import_tar_image(
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(import_tar_image));
+    validate_vm_name(&req.name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)?;
     machinectl::import_tar(&req.path, &req.name)
         .map(|_| StatusCode::ACCEPTED)
@@ -410,6 +414,7 @@ pub async fn export_raw_image(
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(export_raw_image));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)?;
     machinectl::export_raw(&name, &req.path)
         .map(|_| StatusCode::OK)
@@ -423,6 +428,7 @@ pub async fn export_tar_image(
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(export_tar_image));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)?;
     machinectl::export_tar(&name, &req.path)
         .map(|_| StatusCode::OK)

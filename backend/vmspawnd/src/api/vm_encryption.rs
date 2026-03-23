@@ -125,8 +125,9 @@ pub async fn update_policy(
     policy.updated = Utc::now();
     if let Err(e) = state.store.save_entity("encryption_policies", &id, &policy) {
         tracing::error!("Failed to save: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    Json(policy)
+    Json(policy).into_response()
 }
 
 pub async fn delete_policy(
@@ -157,6 +158,9 @@ pub async fn encrypt_vm(
     Json(req): Json<EncryptVmRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(encrypt_vm));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&req.vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let policy = match state.store.get_entity::<EncryptionPolicy>("encryption_policies", &req.policy_id) {
         Ok(Some(p)) => p,
         Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Policy not found"}))).into_response(),
@@ -188,6 +192,9 @@ pub async fn decrypt_vm(
     Json(req): Json<DecryptVmRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(decrypt_vm));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&req.vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let status = VmEncryptionStatus {
         vm_name: req.vm_name.clone(),
         encrypted: false,
@@ -200,7 +207,7 @@ pub async fn decrypt_vm(
     if let Err(e) = state.store.save_entity("vm_encryption", &req.vm_name, &status) {
         tracing::error!("Failed to save: {}", e);
     }
-    StatusCode::OK
+    StatusCode::OK.into_response()
 }
 
 pub async fn get_vm_encryption_status(
@@ -209,6 +216,9 @@ pub async fn get_vm_encryption_status(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(get_vm_encryption_status));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
         Ok(Some(s)) => Json(s).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -232,6 +242,9 @@ pub async fn rotate_vm_key(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(rotate_vm_key));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let mut status = match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
         Ok(Some(s)) => s,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),

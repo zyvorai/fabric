@@ -47,6 +47,10 @@ pub async fn create_volume(
     Json(req): Json<CreateVolumeRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("volumes::{}", stringify!(create_volume));
+    // Validate pool name to prevent path traversal in store subdirectory
+    if let Err((s, m)) = crate::validation::validate_vm_name(&pool_name) {
+        return (s, Json(serde_json::json!({"error": format!("Invalid pool name: {}", m)}))).into_response();
+    }
     // Verify pool exists — scope the lock so it's released before save_entity
     {
         let manager = state.storage_manager.read().await;
@@ -88,9 +92,12 @@ pub async fn list_volumes(
     Path(pool_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("volumes::{}", stringify!(list_volumes));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&pool_name) {
+        return (s, Json(serde_json::json!({"error": format!("Invalid pool name: {}", m)}))).into_response();
+    }
     let store_key = format!("volumes_{}", pool_name);
     let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
-    Json(items)
+    Json(items).into_response()
 }
 
 /// GET /api/storage/pools/:name/volumes/:id - Get a volume

@@ -133,37 +133,6 @@ fn parse_time_range(range: &str) -> Duration {
     }
 }
 
-fn generate_mock_metrics(count: usize, interval_minutes: i64) -> Vec<PerformanceMetrics> {
-    let mut metrics = Vec::new();
-    let now = Utc::now();
-
-    for i in 0..count {
-        let timestamp = now - Duration::minutes(i as i64 * interval_minutes);
-
-        // Generate realistic-looking metrics with some variance
-        let t = (i as f64 * 0.1).sin();
-        let cpu_usage = 45.0 + (t * 20.0);
-        let memory_usage = 60.0 + (t * 15.0);
-        let disk_io_read = 1024 * 1024 * (100 + (t * 50.0) as u64);
-        let disk_io_write = 1024 * 1024 * (50 + (t * 25.0) as u64);
-        let network_rx = 1024 * 1024 * (200 + (t * 100.0) as u64);
-        let network_tx = 1024 * 1024 * (150 + (t * 75.0) as u64);
-
-        metrics.push(PerformanceMetrics {
-            timestamp,
-            cpu_usage: cpu_usage.max(0.0).min(100.0),
-            memory_usage: memory_usage.max(0.0).min(100.0),
-            disk_io_read,
-            disk_io_write,
-            network_rx,
-            network_tx,
-        });
-    }
-
-    metrics.reverse();
-    metrics
-}
-
 // ============================================================================
 // Analytics Handlers
 // ============================================================================
@@ -181,20 +150,9 @@ pub async fn get_vm_performance(
         tracing::debug!("Loaded {} stored metrics for VM {}", stored_performance.metrics.len(), vm_name);
         stored_performance.metrics
     } else {
-        // Fall back to mock data for demonstration
-        tracing::debug!("No stored metrics found for VM {}, using mock data", vm_name);
-
-        let duration = parse_time_range(&query.range);
-        let count = match query.range.as_str() {
-            "1h" => 60,
-            "6h" => 72,
-            "24h" => 96,
-            "7d" => 168,
-            "30d" => 720,
-            _ => 96,
-        };
-
-        generate_mock_metrics(count, duration.num_minutes() / count as i64)
+        // No metrics available — return empty set
+        tracing::debug!("No stored metrics found for VM {}", vm_name);
+        Vec::new()
     };
 
     let performance = VMPerformance {

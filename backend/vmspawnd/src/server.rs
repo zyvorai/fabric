@@ -868,32 +868,35 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                 tracing::info!("Auto-executing schedule '{}': {:?} on VM '{}'",
                     schedule_clone.name, schedule_clone.action, schedule_clone.vm_name);
 
-                let result = match schedule_clone.action {
-                    crate::api::schedules::VMAction::Start => vmspawn_driver::start_vm(&schedule_clone.vm_name),
-                    crate::api::schedules::VMAction::Stop => vmspawn_driver::stop_vm(&schedule_clone.vm_name),
-                    crate::api::schedules::VMAction::Restart => vmspawn_driver::restart_vm(&schedule_clone.vm_name),
-                    crate::api::schedules::VMAction::Snapshot => {
-                        // Create a disk snapshot using qemu-img
-                        let snap_name = format!("scheduled-{}", Utc::now().format("%Y%m%d-%H%M%S"));
-                        let image_path = crate::validation::find_vm_image(&schedule_clone.vm_name);
-                        match image_path {
-                            Some(ref path) => {
-                                let output = std::process::Command::new("qemu-img")
-                                    .args(["snapshot", "-c", &snap_name, path])
-                                    .output();
-                                match output {
-                                    Ok(o) if o.status.success() => Ok(()),
-                                    Ok(o) => Err(anyhow::anyhow!("qemu-img snapshot failed: {}", String::from_utf8_lossy(&o.stderr))),
-                                    Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
+                let schedule_action = schedule_clone.action.clone();
+                let schedule_vm = schedule_clone.vm_name.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    match schedule_action {
+                        crate::api::schedules::VMAction::Start => vmspawn_driver::start_vm(&schedule_vm),
+                        crate::api::schedules::VMAction::Stop => vmspawn_driver::stop_vm(&schedule_vm),
+                        crate::api::schedules::VMAction::Restart => vmspawn_driver::restart_vm(&schedule_vm),
+                        crate::api::schedules::VMAction::Snapshot => {
+                            let snap_name = format!("scheduled-{}", Utc::now().format("%Y%m%d-%H%M%S"));
+                            let image_path = crate::validation::find_vm_image(&schedule_vm);
+                            match image_path {
+                                Some(ref path) => {
+                                    let output = std::process::Command::new("qemu-img")
+                                        .args(["snapshot", "-c", &snap_name, path])
+                                        .output();
+                                    match output {
+                                        Ok(o) if o.status.success() => Ok(()),
+                                        Ok(o) => Err(anyhow::anyhow!("qemu-img snapshot failed: {}", String::from_utf8_lossy(&o.stderr))),
+                                        Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
+                                    }
                                 }
-                            }
-                            None => {
-                                tracing::warn!("No disk image found for VM '{}'", schedule_clone.vm_name);
-                                Ok(())
+                                None => {
+                                    tracing::warn!("No disk image found for VM '{}'", schedule_vm);
+                                    Ok(())
+                                }
                             }
                         }
                     }
-                };
+                }).await.unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
 
                 let executed_at = Utc::now();
                 let (success, error) = match result {

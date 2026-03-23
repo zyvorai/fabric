@@ -475,6 +475,11 @@ pub async fn add_dns_record(
     crate::validation::validate_hostname(&req.value).map_err(|msg| {
         (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record value: {}", msg) })))
     })?;
+    // Validate record type against allowlist
+    let allowed_types = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "PTR"];
+    if !allowed_types.contains(&req.record_type.as_str()) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record type '{}'. Allowed: {}", req.record_type, allowed_types.join(", ")) }))));
+    }
 
     config.records.push(DnsRecord {
         name: req.name,
