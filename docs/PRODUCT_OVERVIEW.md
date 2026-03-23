@@ -142,6 +142,7 @@ The entire codebase has undergone a **30-round security audit** with 174 issues 
 - **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
 - **Automated weekly state store cleanup** via systemd timer (events, audit logs, webhook deliveries, history)
 - **Backup configuration** via `[backup]` section in config file or `VMSPAWND_BACKUP_DIR`/`VMSPAWND_BACKUP_RETAIN`/`VMSPAWND_BACKUP_TYPE` env vars
+- **Post-install auto-verify** — smoke test runs automatically after deploy/reinstall (API, auth, VM CRUD, backups)
 - **Deep health check** — API, disk space, DB integrity, credentials, timers, memory, KVM
 - **TLS certificate generation** — self-signed certs with SAN via `vmspawnctl tls`
 - **Shell completions** — Bash tab completion for `vmctl` and `vmspawnctl`
@@ -377,11 +378,15 @@ open http://localhost:9095
 
 ```bash
 ./vmspawnctl status      # Check service status
+./vmspawnctl verify      # Post-install smoke test (API, auth, VM CRUD, backups)
+./vmspawnctl health      # Deep health check (disk, DB, timers, resources)
 ./vmspawnctl logs        # Follow logs
 ./vmspawnctl restart     # Restart service (auto-sudo)
-./vmspawnctl reinstall   # Rebuild + reinstall + restart (auto-sudo)
+./vmspawnctl reinstall   # Rebuild + reinstall + auto-verify (auto-sudo)
+./vmspawnctl upgrade     # Git pull + reinstall (auto-sudo)
 ./vmspawnctl uninstall   # Remove everything (auto-sudo)
 ./vmspawnctl doctor      # System readiness check
+./vmspawnctl tls         # Generate self-signed TLS certificate
 ```
 
 ### Backup Commands

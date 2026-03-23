@@ -471,6 +471,8 @@ timer (events, audit logs, webhook deliveries, history)</li>
 section in config file or
 <code>VMSPAWND_BACKUP_DIR</code>/<code>VMSPAWND_BACKUP_RETAIN</code>/<code>VMSPAWND_BACKUP_TYPE</code>
 env vars</li>
+<li><strong>Post-install auto-verify</strong> — smoke test runs
+automatically after deploy/reinstall (API, auth, VM CRUD, backups)</li>
 <li><strong>Deep health check</strong> — API, disk space, DB integrity,
 credentials, timers, memory, KVM</li>
 <li><strong>TLS certificate generation</strong> — self-signed certs with
@@ -890,11 +892,15 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="
 <h3 id="management-commands">Management Commands</h3>
 <div class="sourceCode" id="cb8"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> status      <span class="co"># Check service status</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> logs        <span class="co"># Follow logs</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> restart     <span class="co"># Restart service (auto-sudo)</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> reinstall   <span class="co"># Rebuild + reinstall + restart (auto-sudo)</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> uninstall   <span class="co"># Remove everything (auto-sudo)</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> doctor      <span class="co"># System readiness check</span></span></code></pre></div>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> verify      <span class="co"># Post-install smoke test (API, auth, VM CRUD, backups)</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> health      <span class="co"># Deep health check (disk, DB, timers, resources)</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> logs        <span class="co"># Follow logs</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> restart     <span class="co"># Restart service (auto-sudo)</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> reinstall   <span class="co"># Rebuild + reinstall + auto-verify (auto-sudo)</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> upgrade     <span class="co"># Git pull + reinstall (auto-sudo)</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> uninstall   <span class="co"># Remove everything (auto-sudo)</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> doctor      <span class="co"># System readiness check</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> tls         <span class="co"># Generate self-signed TLS certificate</span></span></code></pre></div>
 <h3 id="backup-commands">Backup Commands</h3>
 <div class="sourceCode" id="cb9"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup now      <span class="co"># Run backup immediately</span></span>
