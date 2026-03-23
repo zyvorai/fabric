@@ -18,8 +18,8 @@ impl StateStore {
     /// Save any serializable entity to a subdirectory (atomic write)
     /// Validate that an entity ID does not contain path traversal characters.
     fn validate_entity_id(id: &str) -> Result<()> {
-        if id.contains('\\') || id.contains("..") || id.is_empty() {
-            anyhow::bail!("Invalid entity ID: must not contain path traversal sequences or be empty");
+        if id.contains('\\') || id.contains("..") || id.is_empty() || id.starts_with('/') {
+            anyhow::bail!("Invalid entity ID: must not contain path traversal sequences, start with '/', or be empty");
         }
         Ok(())
     }

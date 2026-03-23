@@ -129,7 +129,7 @@ pub async fn list_snapshots(
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
     let store_key = format!("snapshots_{}", vm_name);
-    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
+    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading {}: {}", store_key, e); Vec::new() });
     Json(items).into_response()
 }
 
@@ -241,7 +241,7 @@ pub async fn snapshot_tree(
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
     let store_key = format!("snapshots_{}", vm_name);
-    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
+    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading {}: {}", store_key, e); Vec::new() });
 
     // Build tree from parent_id relationships
     let roots: Vec<SnapshotTreeNode> = build_snapshot_tree(&snapshots);

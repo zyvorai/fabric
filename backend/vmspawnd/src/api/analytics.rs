@@ -132,6 +132,8 @@ pub async fn get_vm_performance(
     Path(vm_name): Path<String>,
     Query(query): Query<TimeRangeQuery>,
 ) -> Result<Json<VMPerformance>, StatusCode> {
+    crate::validation::validate_vm_name(&vm_name)
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
     // Try to load real metrics from state store
     let metrics_key = format!("metrics/vm/{}/{}", vm_name, query.range);
     let metrics = if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {

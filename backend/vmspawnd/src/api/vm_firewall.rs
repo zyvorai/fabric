@@ -32,6 +32,20 @@ pub async fn create_profile(
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(create_profile));
     let now = Utc::now();
+    // Validate firewall rule fields
+    for rule in &req.rules {
+        if let Some(ref cidr) = rule.source_cidr {
+            if let Err(e) = crate::validation::validate_cidr(cidr) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();
+            }
+        }
+        if let Some(ref prefix) = rule.log_prefix {
+            if let Err(e) = crate::validation::validate_log_prefix(prefix) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid log_prefix: {}", e)}))).into_response();
+            }
+        }
+    }
+
     let profile = FirewallProfile {
         id: Uuid::new_v4(),
         name: req.name,
@@ -99,6 +113,19 @@ pub async fn update_profile(
     Json(req): Json<CreateFirewallProfileRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(update_profile));
+    // Validate firewall rule fields
+    for rule in &req.rules {
+        if let Some(ref cidr) = rule.source_cidr {
+            if let Err(e) = crate::validation::validate_cidr(cidr) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();
+            }
+        }
+        if let Some(ref prefix) = rule.log_prefix {
+            if let Err(e) = crate::validation::validate_log_prefix(prefix) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid log_prefix: {}", e)}))).into_response();
+            }
+        }
+    }
     let existing = match state.store.get_entity::<FirewallProfile>(PROFILES_KEY, &id) {
         Ok(Some(p)) => p,
         Ok(None) => {

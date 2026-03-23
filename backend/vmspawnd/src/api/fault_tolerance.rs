@@ -25,6 +25,9 @@ pub async fn enable_ft(
     Json(req): Json<EnableFtRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(enable_ft));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&req.vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let now = Utc::now();
     let config = FtConfig {
         vm_name: req.vm_name.clone(),
@@ -54,6 +57,9 @@ pub async fn disable_ft(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(disable_ft));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     if let Err(e) = state.store.delete_entity("ft_configs", &vm_name) {
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
@@ -71,6 +77,9 @@ pub async fn get_ft_config(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(get_ft_config));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => Json(c).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
@@ -108,6 +117,9 @@ pub async fn trigger_failover(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(trigger_failover));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -145,6 +157,9 @@ pub async fn test_failover(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(test_failover));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -171,6 +186,9 @@ pub async fn suspend_replication(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(suspend_replication));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -191,6 +209,9 @@ pub async fn resume_replication(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(resume_replication));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -211,6 +232,9 @@ pub async fn get_ft_metrics(
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(get_ft_metrics));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     match state.store.get_entity::<FtMetrics>("ft_metrics", &vm_name) {
         Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),

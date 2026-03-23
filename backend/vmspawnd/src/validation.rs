@@ -199,6 +199,38 @@ pub fn validate_snapshot_name(name: &str) -> Result<(), (StatusCode, String)> {
     Ok(())
 }
 
+/// Validate a CIDR notation string (e.g., "10.0.0.0/8", "192.168.1.0/24").
+pub fn validate_cidr(cidr: &str) -> Result<(), String> {
+    let parts: Vec<&str> = cidr.split('/').collect();
+    if parts.len() != 2 {
+        return Err("CIDR must be in format IP/prefix".to_string());
+    }
+    parts[0].parse::<std::net::IpAddr>()
+        .map_err(|_| format!("Invalid IP address in CIDR: '{}'", parts[0]))?;
+    let prefix: u8 = parts[1].parse()
+        .map_err(|_| format!("Invalid prefix length: '{}'", parts[1]))?;
+    let is_v4 = parts[0].parse::<std::net::Ipv4Addr>().is_ok();
+    if is_v4 && prefix > 32 {
+        return Err("IPv4 prefix length must be <= 32".to_string());
+    }
+    if !is_v4 && prefix > 128 {
+        return Err("IPv6 prefix length must be <= 128".to_string());
+    }
+    Ok(())
+}
+
+/// Validate a log prefix for nftables rules.
+/// Allows alphanumeric characters, hyphens, underscores, colons, dots, and spaces.
+pub fn validate_log_prefix(prefix: &str) -> Result<(), String> {
+    if prefix.is_empty() || prefix.len() > 64 {
+        return Err("Log prefix must be between 1 and 64 characters".to_string());
+    }
+    if !prefix.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.' | ' ')) {
+        return Err("Log prefix may only contain alphanumeric characters, hyphens, underscores, colons, dots, and spaces".to_string());
+    }
+    Ok(())
+}
+
 /// Allowed disk image formats for qemu-img operations.
 pub const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd", "vhdx", "qed"];
 
