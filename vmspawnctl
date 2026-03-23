@@ -377,6 +377,97 @@ cmd_uninstall() {
     warn "To remove all data: ${BOLD}sudo rm -rf /var/lib/vmspawnd${NC}"
 }
 
+# ── test: Run test suite ────────────────────────────────────────────────
+cmd_test() {
+    step "Running test suite"
+
+    cd "$SCRIPT_DIR/backend"
+    info "Running cargo test..."
+    if cargo test 2>&1; then
+        ok "All tests passed"
+    else
+        err "Some tests failed"
+        exit 1
+    fi
+}
+
+# ── deploy: Full automated deployment (deps → build → install → start) ─
+cmd_deploy() {
+    need_root
+    step "Full Deployment"
+    echo ""
+    echo -e "${BOLD}This will:${NC}"
+    echo "  1. Install all system dependencies"
+    echo "  2. Build the backend (release mode)"
+    echo "  3. Install binaries, configs, and systemd units"
+    echo "  4. Start the vmspawnd service"
+    echo ""
+
+    cmd_deps "$@"
+    echo ""
+
+    # Build as the original user if running via sudo
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        info "Building as $SUDO_USER..."
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./vmspawnctl build --no-web"
+    else
+        cmd_build --no-web
+    fi
+    echo ""
+
+    cmd_install
+    echo ""
+
+    cmd_start
+    echo ""
+
+    step "Deployment Complete"
+    echo ""
+    echo -e "  ${BOLD}API:${NC}        ${CYAN}$API_URL${NC}"
+    echo -e "  ${BOLD}Password:${NC}   ${CYAN}sudo cat /var/lib/vmspawnd/.admin_password${NC}"
+    echo -e "  ${BOLD}Status:${NC}     ${CYAN}./vmspawnctl status${NC}"
+    echo -e "  ${BOLD}Demo:${NC}       ${CYAN}./vmspawnctl demo${NC}"
+    echo -e "  ${BOLD}Logs:${NC}       ${CYAN}sudo journalctl -u vmspawnd -f${NC}"
+    echo ""
+}
+
+# ── reinstall: Stop → rebuild → reinstall → start ──────────────────────
+cmd_reinstall() {
+    need_root
+    step "Reinstalling vmspawnd"
+
+    # Stop if running
+    if systemctl is-active --quiet vmspawnd 2>/dev/null; then
+        info "Stopping vmspawnd..."
+        systemctl stop vmspawnd
+    fi
+
+    # Rebuild
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        info "Rebuilding as $SUDO_USER..."
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./vmspawnctl build --no-web"
+    else
+        cmd_build --no-web
+    fi
+    echo ""
+
+    # Reinstall
+    cd "$SCRIPT_DIR"
+    make install
+    systemctl daemon-reload
+
+    # Start
+    systemctl start vmspawnd
+    sleep 1
+
+    if systemctl is-active --quiet vmspawnd; then
+        ok "vmspawnd reinstalled and running"
+    else
+        err "Failed to start after reinstall. Check: sudo journalctl -u vmspawnd -e"
+        exit 1
+    fi
+}
+
 # ── start/stop/restart/status/logs ──────────────────────────────────────
 cmd_start() {
     need_root
@@ -716,8 +807,13 @@ cmd_help() {
     echo -e "${BOLD}Setup:${NC}"
     echo "  deps              Install all system dependencies (requires root)"
     echo "  build [--no-web]  Build backend (and web UI unless --no-web)"
+    echo "  test              Run the test suite (cargo test)"
     echo "  install           Install vmspawnd to the system (requires root)"
     echo "  uninstall         Remove vmspawnd from the system (requires root)"
+    echo ""
+    echo -e "${BOLD}Lifecycle:${NC}"
+    echo "  deploy            Full deployment: deps → build → install → start (requires root)"
+    echo "  reinstall         Rebuild and reinstall: stop → build → install → start (requires root)"
     echo ""
     echo -e "${BOLD}Service:${NC}"
     echo "  start             Start the vmspawnd service"
@@ -732,12 +828,16 @@ cmd_help() {
     echo "  demo              Run interactive API demo"
     echo "  help              Show this help"
     echo ""
-    echo -e "${BOLD}Quick start:${NC}"
+    echo -e "${BOLD}Quick start (manual):${NC}"
     echo "  sudo ./vmspawnctl deps      # Install dependencies"
     echo "  ./vmspawnctl build           # Build everything"
+    echo "  ./vmspawnctl test            # Run tests"
     echo "  sudo ./vmspawnctl install    # Install to system"
     echo "  sudo ./vmspawnctl start      # Start the service"
     echo "  ./vmspawnctl demo            # Run the demo"
+    echo ""
+    echo -e "${BOLD}Quick start (automated):${NC}"
+    echo "  sudo ./vmspawnctl deploy    # Does everything in one command"
     echo ""
     echo -e "${BOLD}Environment:${NC}"
     echo "  VMSPAWND_URL    API URL (default: http://127.0.0.1:8080)"
@@ -752,8 +852,11 @@ main() {
     case "$cmd" in
         deps)       cmd_deps "$@" ;;
         build)      cmd_build "$@" ;;
+        test)       cmd_test "$@" ;;
         install)    cmd_install "$@" ;;
         uninstall)  cmd_uninstall "$@" ;;
+        deploy)     cmd_deploy "$@" ;;
+        reinstall)  cmd_reinstall "$@" ;;
         start)      cmd_start "$@" ;;
         stop)       cmd_stop "$@" ;;
         restart)    cmd_restart "$@" ;;
