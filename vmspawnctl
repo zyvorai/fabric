@@ -1,0 +1,691 @@
+#!/usr/bin/env bash
+# vmspawnctl — Install, manage, and demo the vmspawnd VM management platform
+#
+# Usage: vmspawnctl <command> [options]
+#
+# Commands:
+#   deps          Install all system dependencies
+#   build         Build the backend (and optionally web UI)
+#   install       Install vmspawnd to the system
+#   uninstall     Remove vmspawnd from the system
+#   start         Start the vmspawnd service
+#   stop          Stop the vmspawnd service
+#   restart       Restart the vmspawnd service
+#   status        Show service status
+#   logs          Show service logs
+#   demo          Run interactive demo (create VM, list, snapshot, etc.)
+#   doctor        Check system readiness
+#   password      Show the admin password
+#   help          Show this help
+
+set -euo pipefail
+
+# ── Colors ──────────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# ── Globals ─────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_URL="${VMSPAWND_URL:-http://127.0.0.1:8080}"
+TOKEN=""
+
+# ── Helpers ─────────────────────────────────────────────────────────────
+info()  { echo -e "${BLUE}▸${NC} $*"; }
+ok()    { echo -e "${GREEN}✓${NC} $*"; }
+warn()  { echo -e "${YELLOW}▸${NC} $*"; }
+err()   { echo -e "${RED}✗${NC} $*" >&2; }
+step()  { echo -e "\n${BOLD}${CYAN}── $* ──${NC}"; }
+need_root() { [[ $EUID -eq 0 ]] || { err "This command must be run as root (sudo)"; exit 1; }; }
+
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    else
+        echo "unknown"
+    fi
+}
+
+detect_pkg_manager() {
+    local distro
+    distro=$(detect_distro)
+    case "$distro" in
+        fedora|rhel|centos|rocky|alma)  echo "dnf" ;;
+        debian|ubuntu|linuxmint|pop)    echo "apt" ;;
+        opensuse*|sles)                 echo "zypper" ;;
+        arch|manjaro)                   echo "pacman" ;;
+        *)                              echo "unknown" ;;
+    esac
+}
+
+# ── deps: Install all system dependencies ───────────────────────────────
+cmd_deps() {
+    need_root
+    step "Installing system dependencies"
+
+    local pkg_mgr
+    pkg_mgr=$(detect_pkg_manager)
+    local distro
+    distro=$(detect_distro)
+
+    info "Detected: $distro (package manager: $pkg_mgr)"
+
+    # Common packages needed across all distros
+    local common_rust=0
+
+    case "$pkg_mgr" in
+        dnf)
+            info "Installing packages via dnf..."
+            dnf install -y \
+                systemd-container \
+                qemu-img \
+                qemu-system-x86 \
+                swtpm \
+                swtpm-tools \
+                mkosi \
+                nftables \
+                wireguard-tools \
+                socat \
+                curl \
+                jq \
+                sqlite \
+                gcc \
+                openssl-devel \
+                pkg-config \
+                systemd-devel \
+                dbus-devel \
+                pandoc \
+                2>&1 | tail -1
+            ok "System packages installed"
+            ;;
+        apt)
+            info "Installing packages via apt..."
+            apt-get update -qq
+            apt-get install -y \
+                systemd-container \
+                qemu-utils \
+                qemu-system-x86 \
+                swtpm \
+                swtpm-tools \
+                mkosi \
+                nftables \
+                wireguard-tools \
+                socat \
+                curl \
+                jq \
+                sqlite3 \
+                gcc \
+                libssl-dev \
+                pkg-config \
+                libsystemd-dev \
+                libdbus-1-dev \
+                pandoc \
+                2>&1 | tail -1
+            ok "System packages installed"
+            ;;
+        zypper)
+            info "Installing packages via zypper..."
+            zypper install -y \
+                systemd-container \
+                qemu-tools \
+                qemu-x86 \
+                swtpm \
+                mkosi \
+                nftables \
+                wireguard-tools \
+                socat \
+                curl \
+                jq \
+                sqlite3 \
+                gcc \
+                libopenssl-devel \
+                pkg-config \
+                systemd-devel \
+                dbus-1-devel \
+                2>&1 | tail -1
+            ok "System packages installed"
+            ;;
+        pacman)
+            info "Installing packages via pacman..."
+            pacman -S --noconfirm --needed \
+                systemd \
+                qemu-base \
+                swtpm \
+                mkosi \
+                nftables \
+                wireguard-tools \
+                socat \
+                curl \
+                jq \
+                sqlite \
+                gcc \
+                openssl \
+                pkgconf \
+                dbus \
+                2>&1 | tail -1
+            ok "System packages installed"
+            ;;
+        *)
+            err "Unsupported distribution: $distro"
+            echo "Please install the following manually:"
+            echo "  systemd-container, qemu-img, qemu-system-x86, swtpm, mkosi,"
+            echo "  nftables, wireguard-tools, socat, curl, jq, sqlite,"
+            echo "  gcc, openssl-dev, pkg-config, systemd-devel, dbus-devel"
+            exit 1
+            ;;
+    esac
+
+    # Install Rust toolchain if not present
+    if ! command -v cargo &>/dev/null; then
+        info "Installing Rust toolchain..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+        source "$HOME/.cargo/env" 2>/dev/null || true
+        ok "Rust toolchain installed"
+    else
+        ok "Rust toolchain already installed ($(rustc --version))"
+    fi
+
+    # Install Node.js if not present (for web UI)
+    if ! command -v node &>/dev/null; then
+        info "Installing Node.js..."
+        if command -v dnf &>/dev/null; then
+            dnf install -y nodejs npm 2>&1 | tail -1
+        elif command -v apt-get &>/dev/null; then
+            apt-get install -y nodejs npm 2>&1 | tail -1
+        elif command -v pacman &>/dev/null; then
+            pacman -S --noconfirm nodejs npm 2>&1 | tail -1
+        fi
+        ok "Node.js installed"
+    else
+        ok "Node.js already installed ($(node --version))"
+    fi
+
+    # Enable required services
+    step "Enabling system services"
+    systemctl enable --now systemd-machined.service 2>/dev/null || true
+    systemctl enable --now systemd-networkd.service 2>/dev/null || true
+    systemctl enable --now systemd-resolved.service 2>/dev/null || true
+
+    # Load kernel modules
+    modprobe kvm 2>/dev/null || warn "KVM module not available (nested virt may not work)"
+    modprobe wireguard 2>/dev/null || warn "WireGuard module not available"
+    modprobe nft_masq 2>/dev/null || true
+
+    ok "All dependencies installed"
+    echo ""
+    info "Next: run ${BOLD}./vmspawnctl build${NC} to build the project"
+}
+
+# ── build: Build the project ────────────────────────────────────────────
+cmd_build() {
+    step "Building vmspawnd"
+
+    local build_web=1
+    if [[ "${1:-}" == "--no-web" ]]; then
+        build_web=0
+    fi
+
+    info "Building backend (Rust)..."
+    cd "$SCRIPT_DIR/backend"
+    cargo build --release 2>&1
+    ok "Backend built: target/release/vmspawnd, vmctl, vmctl-tui"
+
+    if [[ $build_web -eq 1 ]] && [[ -d "$SCRIPT_DIR/web" ]]; then
+        if command -v node &>/dev/null; then
+            info "Building web UI..."
+            cd "$SCRIPT_DIR/web"
+            npm install --silent 2>&1 | tail -1
+            npm run build 2>&1 | tail -1
+            ok "Web UI built"
+        else
+            warn "Node.js not found — skipping web UI build"
+        fi
+    fi
+
+    echo ""
+    ok "Build complete"
+    info "Next: run ${BOLD}sudo ./vmspawnctl install${NC} to install"
+}
+
+# ── install: Install to the system ──────────────────────────────────────
+cmd_install() {
+    need_root
+    step "Installing vmspawnd"
+
+    # Check if built
+    if [[ ! -f "$SCRIPT_DIR/backend/target/release/vmspawnd" ]]; then
+        err "Not built yet. Run: ./vmspawnctl build"
+        exit 1
+    fi
+
+    cd "$SCRIPT_DIR"
+    make install
+    systemctl daemon-reload
+
+    ok "vmspawnd installed"
+    echo ""
+    info "Start with: ${BOLD}sudo ./vmspawnctl start${NC}"
+    info "Or enable on boot: ${BOLD}sudo systemctl enable --now vmspawnd${NC}"
+}
+
+# ── uninstall: Remove from the system ───────────────────────────────────
+cmd_uninstall() {
+    need_root
+    step "Uninstalling vmspawnd"
+
+    # Stop if running
+    if systemctl is-active --quiet vmspawnd 2>/dev/null; then
+        info "Stopping vmspawnd..."
+        systemctl stop vmspawnd
+    fi
+    systemctl disable vmspawnd 2>/dev/null || true
+
+    cd "$SCRIPT_DIR"
+    make uninstall
+    systemctl daemon-reload
+
+    ok "vmspawnd uninstalled"
+
+    echo ""
+    warn "State data preserved at /var/lib/vmspawnd"
+    warn "To remove all data: ${BOLD}sudo rm -rf /var/lib/vmspawnd${NC}"
+}
+
+# ── start/stop/restart/status/logs ──────────────────────────────────────
+cmd_start() {
+    need_root
+    step "Starting vmspawnd"
+
+    if ! command -v vmspawnd &>/dev/null && [[ ! -f /usr/bin/vmspawnd ]]; then
+        err "vmspawnd not installed. Run: sudo ./vmspawnctl install"
+        exit 1
+    fi
+
+    systemctl start vmspawnd
+    sleep 1
+
+    if systemctl is-active --quiet vmspawnd; then
+        ok "vmspawnd is running"
+        info "API: ${BOLD}$API_URL${NC}"
+        info "Web: ${BOLD}$API_URL${NC}"
+        info "Logs: ${BOLD}sudo journalctl -u vmspawnd -f${NC}"
+    else
+        err "Failed to start. Check: sudo journalctl -u vmspawnd -e"
+        exit 1
+    fi
+}
+
+cmd_stop() {
+    need_root
+    systemctl stop vmspawnd
+    ok "vmspawnd stopped"
+}
+
+cmd_restart() {
+    need_root
+    systemctl restart vmspawnd
+    sleep 1
+    if systemctl is-active --quiet vmspawnd; then
+        ok "vmspawnd restarted"
+    else
+        err "Failed to restart. Check: sudo journalctl -u vmspawnd -e"
+    fi
+}
+
+cmd_status() {
+    echo ""
+    if systemctl is-active --quiet vmspawnd 2>/dev/null; then
+        ok "vmspawnd is ${GREEN}running${NC}"
+    else
+        warn "vmspawnd is ${RED}stopped${NC}"
+    fi
+    echo ""
+    systemctl status vmspawnd --no-pager 2>/dev/null || true
+}
+
+cmd_logs() {
+    journalctl -u vmspawnd -f --no-hostname "${@}"
+}
+
+# ── password: Show admin password ───────────────────────────────────────
+cmd_password() {
+    local pw_file="/var/lib/vmspawnd/.admin_password"
+    if [[ -f "$pw_file" ]]; then
+        echo -e "${BOLD}Admin password:${NC} $(sudo cat "$pw_file" 2>/dev/null || cat "$pw_file")"
+    else
+        warn "Password file not found at $pw_file"
+        info "vmspawnd generates the password on first startup"
+    fi
+}
+
+# ── doctor: Check system readiness ──────────────────────────────────────
+cmd_doctor() {
+    step "System Readiness Check"
+    local issues=0
+
+    # Check OS
+    local distro
+    distro=$(detect_distro)
+    info "Distribution: $distro"
+
+    # Check systemd version
+    local sd_ver
+    sd_ver=$(systemctl --version 2>/dev/null | head -1 | awk '{print $2}') || sd_ver="unknown"
+    if [[ "$sd_ver" =~ ^[0-9]+$ ]] && [[ "$sd_ver" -ge 256 ]]; then
+        ok "systemd $sd_ver (>= 256 required)"
+    else
+        warn "systemd $sd_ver (256+ recommended for systemd-vmspawn)"
+        ((issues++)) || true
+    fi
+
+    # Check KVM
+    if [[ -e /dev/kvm ]]; then
+        ok "KVM available (/dev/kvm exists)"
+    else
+        err "KVM not available — VMs will be very slow"
+        ((issues++)) || true
+    fi
+
+    # Check required commands
+    local cmds=("systemd-vmspawn" "machinectl" "qemu-img" "curl" "jq")
+    for cmd in "${cmds[@]}"; do
+        if command -v "$cmd" &>/dev/null; then
+            ok "$cmd found"
+        else
+            err "$cmd not found"
+            ((issues++)) || true
+        fi
+    done
+
+    # Check optional commands
+    local opt_cmds=("swtpm" "mkosi" "nft" "wg" "socat" "pandoc")
+    for cmd in "${opt_cmds[@]}"; do
+        if command -v "$cmd" &>/dev/null; then
+            ok "$cmd found (optional)"
+        else
+            warn "$cmd not found (optional — some features may be limited)"
+        fi
+    done
+
+    # Check Rust toolchain
+    if command -v cargo &>/dev/null; then
+        ok "Rust $(rustc --version | awk '{print $2}')"
+    else
+        err "Rust toolchain not installed"
+        ((issues++)) || true
+    fi
+
+    # Check services
+    for svc in systemd-machined systemd-networkd; do
+        if systemctl is-active --quiet "$svc" 2>/dev/null; then
+            ok "$svc is running"
+        else
+            warn "$svc is not running"
+        fi
+    done
+
+    # Check vmspawnd
+    if command -v vmspawnd &>/dev/null || [[ -f /usr/bin/vmspawnd ]]; then
+        ok "vmspawnd is installed"
+    else
+        warn "vmspawnd not yet installed"
+    fi
+
+    if systemctl is-active --quiet vmspawnd 2>/dev/null; then
+        ok "vmspawnd is running"
+    else
+        warn "vmspawnd is not running"
+    fi
+
+    echo ""
+    if [[ $issues -eq 0 ]]; then
+        ok "System is ready"
+    else
+        warn "$issues issue(s) found — run ${BOLD}sudo ./vmspawnctl deps${NC} to fix"
+    fi
+}
+
+# ── API helpers ─────────────────────────────────────────────────────────
+api_login() {
+    local password
+    password=$(sudo cat /var/lib/vmspawnd/.admin_password 2>/dev/null) || {
+        err "Cannot read admin password. Is vmspawnd running?"
+        return 1
+    }
+
+    TOKEN=$(curl -sf "$API_URL/api/auth/login" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"admin\",\"password\":\"$password\"}" | jq -r '.token // empty')
+
+    if [[ -z "$TOKEN" ]]; then
+        err "Login failed"
+        return 1
+    fi
+    ok "Authenticated as admin"
+}
+
+api() {
+    local method="$1" path="$2"
+    shift 2
+    curl -sf "$API_URL$path" \
+        -X "$method" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        "$@"
+}
+
+demo_pause() {
+    echo ""
+    echo -e "${CYAN}Press Enter to continue...${NC}"
+    read -r
+}
+
+# ── demo: Interactive demo ──────────────────────────────────────────────
+cmd_demo() {
+    step "vmspawnd Interactive Demo"
+    echo ""
+    echo -e "${BOLD}This demo will:${NC}"
+    echo "  1. Log in to the API"
+    echo "  2. Show system info and health"
+    echo "  3. List VMs"
+    echo "  4. Create a demo VM"
+    echo "  5. Show VM details"
+    echo "  6. Show API capabilities"
+    echo "  7. Clean up"
+    echo ""
+
+    # Check vmspawnd is running
+    if ! curl -sf "$API_URL/health" &>/dev/null; then
+        err "vmspawnd is not running at $API_URL"
+        info "Start it with: ${BOLD}sudo ./vmspawnctl start${NC}"
+        exit 1
+    fi
+    ok "vmspawnd is running at $API_URL"
+
+    demo_pause
+
+    # ── Step 1: Login ──
+    step "1. Authentication"
+    info "Logging in as admin..."
+    api_login || exit 1
+
+    demo_pause
+
+    # ── Step 2: System info ──
+    step "2. System Information"
+    info "GET /api/system/info"
+    api GET /api/system/info | jq '.' 2>/dev/null || info "(system info endpoint)"
+
+    echo ""
+    info "GET /health"
+    curl -sf "$API_URL/health"
+    echo ""
+
+    demo_pause
+
+    # ── Step 3: List VMs ──
+    step "3. Current VMs"
+    info "GET /api/vms"
+    local vms
+    vms=$(api GET /api/vms 2>/dev/null) || vms="[]"
+    echo "$vms" | jq '.' 2>/dev/null || echo "$vms"
+
+    local vm_count
+    vm_count=$(echo "$vms" | jq 'if type == "object" then (.vms // []) | length else length end' 2>/dev/null || echo "0")
+    info "Found $vm_count VM(s)"
+
+    demo_pause
+
+    # ── Step 4: Create demo VM ──
+    step "4. Create Demo VM"
+    local demo_name="demo-vm-$(date +%s)"
+    info "POST /api/vms — Creating '$demo_name'"
+    local create_result
+    create_result=$(api POST /api/vms -d "{
+        \"name\": \"$demo_name\",
+        \"image\": \"/var/lib/machines/demo.qcow2\",
+        \"cpus\": 2,
+        \"memory\": 1024
+    }" 2>/dev/null) || create_result='{"note": "VM creation requires a disk image"}'
+    echo "$create_result" | jq '.' 2>/dev/null || echo "$create_result"
+
+    demo_pause
+
+    # ── Step 5: Show VM details ──
+    step "5. VM Details"
+    info "GET /api/vms/$demo_name"
+    api GET "/api/vms/$demo_name" 2>/dev/null | jq '.' 2>/dev/null || info "VM details (VM may not exist without image)"
+
+    demo_pause
+
+    # ── Step 6: API capabilities ──
+    step "6. API Capabilities"
+    echo ""
+    echo -e "${BOLD}Available API endpoints (sample):${NC}"
+    echo ""
+
+    local endpoints=(
+        "GET    /api/vms                    List VMs (paginated)"
+        "POST   /api/vms                    Create VM"
+        "POST   /api/vms/:name/start        Start VM"
+        "POST   /api/vms/:name/stop         Stop VM"
+        "POST   /api/vms/:name/clone        Clone VM"
+        "POST   /api/vms/:name/hibernate    Hibernate VM"
+        "POST   /api/vms/:name/snapshots    Create snapshot"
+        "POST   /api/vms/:name/disk/resize  Resize disk"
+        "POST   /api/vms/apply              Declarative VM spec"
+        "GET    /api/machines               List machined containers"
+        "GET    /api/storage/pools          List storage pools"
+        "GET    /api/affinity-rules         List affinity rules"
+        "GET    /api/system/capacity        System capacity"
+        "GET    /api/system/ksm             KSM memory dedup status"
+        "GET    /api/floating-ips           List floating IPs"
+        "GET    /api/dns                    DNS configurations"
+        "GET    /api/auth/providers         Auth providers (LDAP/OIDC)"
+        "GET    /api/webhooks/deliveries    Webhook delivery status"
+        "GET    /api/audit/logs             Audit log"
+        "GET    /api/system/rate-limits     Rate limit config"
+        "GET    /metrics                    Prometheus metrics"
+        "WS     /ws/console/:name           VM console (WebSocket)"
+        "WS     /ws/vnc/:name              VNC console (WebSocket)"
+    )
+
+    for ep in "${endpoints[@]}"; do
+        echo -e "  ${GREEN}${ep}${NC}"
+    done
+
+    echo ""
+    info "Total: 520+ REST endpoints, 3 WebSocket endpoints"
+
+    demo_pause
+
+    # ── Step 7: Cleanup ──
+    step "7. Cleanup"
+    info "DELETE /api/vms/$demo_name"
+    api DELETE "/api/vms/$demo_name" 2>/dev/null || true
+    ok "Demo VM cleaned up"
+
+    echo ""
+    step "Demo Complete"
+    echo ""
+    echo -e "${BOLD}Quick reference:${NC}"
+    echo -e "  API:       ${CYAN}$API_URL${NC}"
+    echo -e "  Web UI:    ${CYAN}$API_URL${NC}"
+    echo -e "  CLI:       ${CYAN}vmctl list${NC}"
+    echo -e "  TUI:       ${CYAN}vmctl-tui${NC}"
+    echo -e "  Docs:      ${CYAN}$API_URL/api${NC}"
+    echo -e "  Metrics:   ${CYAN}$API_URL/metrics${NC}"
+    echo ""
+}
+
+# ── help ────────────────────────────────────────────────────────────────
+cmd_help() {
+    echo ""
+    echo -e "${BOLD}vmspawnctl${NC} — vmspawnd management tool"
+    echo ""
+    echo -e "${BOLD}Usage:${NC} ./vmspawnctl <command> [options]"
+    echo ""
+    echo -e "${BOLD}Setup:${NC}"
+    echo "  deps              Install all system dependencies (requires root)"
+    echo "  build [--no-web]  Build backend (and web UI unless --no-web)"
+    echo "  install           Install vmspawnd to the system (requires root)"
+    echo "  uninstall         Remove vmspawnd from the system (requires root)"
+    echo ""
+    echo -e "${BOLD}Service:${NC}"
+    echo "  start             Start the vmspawnd service"
+    echo "  stop              Stop the vmspawnd service"
+    echo "  restart           Restart the vmspawnd service"
+    echo "  status            Show service status"
+    echo "  logs              Follow service logs (journalctl)"
+    echo ""
+    echo -e "${BOLD}Utilities:${NC}"
+    echo "  doctor            Check system readiness"
+    echo "  password          Show the admin password"
+    echo "  demo              Run interactive API demo"
+    echo "  help              Show this help"
+    echo ""
+    echo -e "${BOLD}Quick start:${NC}"
+    echo "  sudo ./vmspawnctl deps      # Install dependencies"
+    echo "  ./vmspawnctl build           # Build everything"
+    echo "  sudo ./vmspawnctl install    # Install to system"
+    echo "  sudo ./vmspawnctl start      # Start the service"
+    echo "  ./vmspawnctl demo            # Run the demo"
+    echo ""
+    echo -e "${BOLD}Environment:${NC}"
+    echo "  VMSPAWND_URL    API URL (default: http://127.0.0.1:8080)"
+    echo ""
+}
+
+# ── Main ────────────────────────────────────────────────────────────────
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        deps)       cmd_deps "$@" ;;
+        build)      cmd_build "$@" ;;
+        install)    cmd_install "$@" ;;
+        uninstall)  cmd_uninstall "$@" ;;
+        start)      cmd_start "$@" ;;
+        stop)       cmd_stop "$@" ;;
+        restart)    cmd_restart "$@" ;;
+        status)     cmd_status "$@" ;;
+        logs)       cmd_logs "$@" ;;
+        password)   cmd_password "$@" ;;
+        doctor)     cmd_doctor "$@" ;;
+        demo)       cmd_demo "$@" ;;
+        help|--help|-h) cmd_help ;;
+        *)
+            err "Unknown command: $cmd"
+            cmd_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
