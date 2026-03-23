@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { startVM, stopVM, restartVM, pauseVM, resumeVM, deleteVM } from '../api/vm'
+import { createBackup } from '../api/backup'
 import { useToastContext } from '../contexts/ToastContext'
 
 export function useVMActions(vmName: string, onSuccess?: () => void) {
@@ -19,6 +20,17 @@ export function useVMActions(vmName: string, onSuccess?: () => void) {
     }
   }, [vmName, onSuccess, toast])
 
+  const handleBackup = useCallback(async () => {
+    try {
+      await createBackup({ vm_name: vmName, backup_type: 'full' })
+      toast.success(`Backup started for VM '${vmName}'`)
+      onSuccess?.()
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      toast.error(`Failed to backup VM '${vmName}': ${msg}`)
+    }
+  }, [vmName, onSuccess, toast])
+
   return {
     handleStart: useCallback(() => performAction(startVM, 'started'), [performAction]),
     handleStop: useCallback(() => performAction(stopVM, 'stopped'), [performAction]),
@@ -26,5 +38,6 @@ export function useVMActions(vmName: string, onSuccess?: () => void) {
     handlePause: useCallback(() => performAction(pauseVM, 'paused'), [performAction]),
     handleResume: useCallback(() => performAction(resumeVM, 'resumed'), [performAction]),
     handleDelete: useCallback(() => performAction(deleteVM, 'deleted'), [performAction]),
+    handleBackup,
   }
 }

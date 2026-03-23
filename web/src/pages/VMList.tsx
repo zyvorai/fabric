@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router'
 import { listVMs, startVM, stopVM, deleteVM, VM } from '../api/vm'
-import { Search, X, Tag, Layers, Monitor, LayoutGrid, List, Play, Square, Pause, Terminal, MoreVertical, Cpu, HardDrive, CheckSquare, Trash2 } from 'lucide-react'
+import { createBackup } from '../api/backup'
+import { Search, X, Tag, Layers, Monitor, LayoutGrid, List, Play, Square, Pause, Terminal, MoreVertical, Cpu, HardDrive, CheckSquare, Trash2, Archive } from 'lucide-react'
 import VMCard from '../components/VMCard'
 import { getTagColor } from '../components/TagEditor'
 import { PageHeader, EmptyState, StatusBadge } from '../components/ui'
@@ -13,7 +14,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 type ViewMode = 'grid' | 'table'
 
 function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: () => void; selected: boolean; onSelect: (name: string) => void }) {
-  const { handleStart, handleStop, handlePause, handleResume } = useVMActions(vm.name, onUpdate)
+  const { handleStart, handleStop, handlePause, handleResume, handleBackup } = useVMActions(vm.name, onUpdate)
 
   return (
     <tr className={`border-t border-gray-800 hover:bg-white/[0.02] transition-colors group ${selected ? 'bg-blue-600/5' : ''}`}>
@@ -90,6 +91,9 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
               </button>
             </>
           )}
+          <button onClick={handleBackup} className="p-1.5 rounded-md text-blue-400 hover:bg-blue-400/10 transition-colors" title="Backup">
+            <Archive className="w-3.5 h-3.5" />
+          </button>
           <Link to={`/vms/${vm.name}/console`} className="p-1.5 rounded-md text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 transition-colors" title="Console">
             <Terminal className="w-3.5 h-3.5" />
           </Link>
@@ -213,6 +217,16 @@ export default function VMList() {
     clearSelection()
     setBulkLoading(false)
     loadVMs()
+  }
+
+  const bulkBackup = async () => {
+    setBulkLoading(true)
+    const names = Array.from(selectedVMs)
+    const results = await Promise.allSettled(names.map((n) => createBackup({ vm_name: n, backup_type: 'full' })))
+    const ok = results.filter((r) => r.status === 'fulfilled').length
+    toast.success(`Backup started for ${ok} VM${ok !== 1 ? 's' : ''}`)
+    clearSelection()
+    setBulkLoading(false)
   }
 
   const bulkDelete = async () => {
@@ -441,6 +455,14 @@ export default function VMList() {
                 Stop {selectedRunning}
               </button>
             )}
+            <button
+              onClick={bulkBackup}
+              disabled={bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              Backup {selectedCount}
+            </button>
             <button
               onClick={() => setBulkAction('delete')}
               disabled={bulkLoading}

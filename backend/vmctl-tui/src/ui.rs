@@ -607,7 +607,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     } else {
         match app.current_view {
             View::Dashboard => "[1-7] Views  [Tab] Next  [R] Refresh  [?] Help  [q] Quit".to_string(),
-            View::VMs => "[↑/↓] Navigate  [v] Bulk Mode  [s] Start  [t] Stop  [r] Restart  [d] Delete  [q] Quit".to_string(),
+            View::VMs => "[↑/↓] Navigate  [v] Bulk Mode  [s] Start  [t] Stop  [r] Restart  [b] Backup  [d] Delete  [q] Quit".to_string(),
             View::NetSecurity => "[←/→] Tabs  [↑/↓] Navigate  [S] Sync  [d] Delete  [q] Quit".to_string(),
             View::Help => "[q] Quit".to_string(),
             _ => "[1-7] Views  [Tab] Next  [q] Quit".to_string(),

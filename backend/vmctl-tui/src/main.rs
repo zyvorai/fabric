@@ -200,6 +200,7 @@ async fn run_app<B: ratatui::backend::Backend>(
                                 KeyCode::Char('s') if !app.bulk_mode => app.start_selected().await?,
                                 KeyCode::Char('t') if !app.bulk_mode => app.stop_selected().await?,
                                 KeyCode::Char('r') if !app.bulk_mode => app.restart_selected().await?,
+                                KeyCode::Char('b') if !app.bulk_mode => app.backup_selected().await?,
                                 KeyCode::Char('d') if !app.bulk_mode => app.delete_selected().await?,
                                 KeyCode::Char('m') if !app.bulk_mode => app.switch_to_view(View::Metrics),
 

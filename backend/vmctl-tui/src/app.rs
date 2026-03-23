@@ -752,4 +752,35 @@ impl App {
         }
         Ok(())
     }
+
+    pub async fn backup_selected(&mut self) -> Result<()> {
+        let filtered = self.filtered_vms();
+        if let Some(vm) = filtered.get(self.selected) {
+            let vm_name = vm.name.clone();
+            let body = serde_json::json!({"vm_name": vm_name, "backup_type": "full"});
+            match self.client
+                .post(format!("{}/backups", API_BASE))
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(res) if res.status().is_success() => {
+                    self.add_status(format!("Backup started for VM '{}'", vm_name), StatusLevel::Success);
+                }
+                Ok(res) => {
+                    self.add_status(
+                        format!("Failed to backup '{}': {}", vm_name, res.status()),
+                        StatusLevel::Error,
+                    );
+                }
+                Err(e) => {
+                    self.add_status(
+                        format!("Failed to backup '{}': {}", vm_name, e),
+                        StatusLevel::Error,
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
 }
