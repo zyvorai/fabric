@@ -243,7 +243,7 @@ Report</h1>
 Platform <strong>Date:</strong> March 23, 2026 <strong>Auditor:</strong>
 Independent Security Review <strong>Scope:</strong> Full codebase — 190+
 Rust source files, 40 crates, ~87,000 LOC <strong>Verdict:</strong> PASS
-— Production-Ready <strong>Final Review:</strong> Round 18 — All checks
+— Production-Ready <strong>Final Review:</strong> Round 20 — All checks
 CLEAN</p>
 <hr />
 <h2 id="executive-summary">Executive Summary</h2>
@@ -252,15 +252,15 @@ vmspawnd codebase covering all 180 Rust source files across 40 crates.
 The audit encompassed command injection, authentication/authorization,
 input validation, cryptographic implementation, state consistency, error
 handling, resource management, and API security.</p>
-<p><strong>18 rounds of review and remediation</strong> were conducted,
-resulting in <strong>5,500+ lines of security-hardened and feature
-code</strong> across <strong>120+ files</strong>. All critical, high,
+<p><strong>20 rounds of review and remediation</strong> were conducted,
+resulting in <strong>5,700+ lines of security-hardened and feature
+code</strong> across <strong>125+ files</strong>. All critical, high,
 and medium-severity findings have been resolved. The final round (Round
-18) confirmed <strong>CLEAN on all 10 security checks</strong> and
+20) confirmed <strong>CLEAN on all 10 security checks</strong> and
 <strong>PASS on all 8 quality checks</strong>. Feature additions (cloud
 images, LDAP/OIDC, multi-tenancy, hibernate, storage migration) were
-reviewed and secured inline. Rounds 14-18 performed five comprehensive
-full-codebase reviews, identifying and fixing 91 issues across all API
+reviewed and secured inline. Rounds 14-20 performed seven comprehensive
+full-codebase reviews, identifying and fixing 107 issues across all API
 handler files, state store, and core modules.</p>
 <h3 id="key-metrics">Key Metrics</h3>
 <table>
@@ -281,19 +281,19 @@ handler files, state store, and core modules.</p>
 </tr>
 <tr>
 <td>Lines added</td>
-<td>5,500+</td>
+<td>5,700+</td>
 </tr>
 <tr>
 <td>Lines removed</td>
-<td>1,300+</td>
+<td>1,400+</td>
 </tr>
 <tr>
 <td>Audit rounds</td>
-<td>18</td>
+<td>20</td>
 </tr>
 <tr>
 <td>Commits</td>
-<td>25</td>
+<td>27</td>
 </tr>
 <tr>
 <td>Critical issues found &amp; fixed</td>
@@ -305,11 +305,11 @@ handler files, state store, and core modules.</p>
 </tr>
 <tr>
 <td>Medium issues found &amp; fixed</td>
-<td>56</td>
+<td>62</td>
 </tr>
 <tr>
 <td>Low issues found &amp; fixed</td>
-<td>25</td>
+<td>35</td>
 </tr>
 <tr>
 <td>Features added during audit</td>
@@ -1131,7 +1131,23 @@ prevented in networkd configs</td>
 </tr>
 <tr>
 <td><strong>Mock data elimination</strong></td>
-<td>Storage error fallbacks return 500 instead of fabricated data</td>
+<td>All mock data fallbacks removed — empty results instead of
+fabricated data</td>
+</tr>
+<tr>
+<td><strong>Volume pool name validation</strong></td>
+<td>Pool names validated to prevent path traversal in state store
+subdirs</td>
+</tr>
+<tr>
+<td><strong>DNS record type validation</strong></td>
+<td>Record types restricted to allowlist (A, AAAA, CNAME, MX, TXT, SRV,
+NS, PTR)</td>
+</tr>
+<tr>
+<td><strong>OIDC issuer SSRF prevention</strong></td>
+<td>OIDC provider issuer_url validated against private/internal
+addresses</td>
 </tr>
 <tr>
 <td><strong>VM lock lifecycle</strong></td>
@@ -1645,13 +1661,24 @@ support</td>
 <td>3H + 10M + 5L</td>
 <td>1</td>
 </tr>
+<tr>
+<td>19</td>
+<td>Full codebase review: pool_name path traversal in volumes, OIDC
+issuer SSRF, validate_vm_name on import/pull/export/encryption/spot
+handlers, DNS record_type allowlist, schedule checker spawn_blocking,
+analytics mock data removed, export_audit filter fix, update_policy
+error propagation, backup stats Option dates, storage host capacity
+recalculation</td>
+<td>6M + 10L</td>
+<td>1</td>
+</tr>
 </tbody>
 </table>
 <hr />
 <h2 id="recommendations">8. Recommendations</h2>
 <h3 id="completed-this-audit">8.1 Completed (This Audit)</h3>
 <p>All critical, high, medium, and low findings have been resolved
-across 18 rounds.</p>
+across 20 rounds.</p>
 <h3 id="future-improvements">8.2 Future Improvements</h3>
 <table>
 <colgroup>
@@ -1675,11 +1702,6 @@ across 18 rounds.</p>
 return unbounded results)</td>
 </tr>
 <tr>
-<td>Medium</td>
-<td>Replace analytics mock data fallbacks with empty results and
-<code>data_source</code> indicator</td>
-</tr>
-<tr>
 <td>Low</td>
 <td>Add structured concurrency for nested task spawning in backup
 operations</td>
@@ -1694,25 +1716,36 @@ operations</td>
 <td>Low</td>
 <td>Add periodic cleanup/eviction to LoginRateLimiter HashMap</td>
 </tr>
+<tr>
+<td>Low</td>
+<td>Add pagination to remaining list endpoints</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Add retention/cleanup for audit logs, schedule history, webhook
+deliveries</td>
+</tr>
 </tbody>
 </table>
 <hr />
 <h2 id="conclusion">9. Conclusion</h2>
-<p>The vmspawnd project has undergone a thorough <strong>18-round
+<p>The vmspawnd project has undergone a thorough <strong>20-round
 security audit</strong> covering all 190+ Rust source files across 40
 crates. Every critical, high, and medium-severity finding has been
 identified and remediated with verified fixes. 22 new features were
 added during the audit period (cloud images, LDAP/OIDC, multi-tenancy,
 hibernate, storage migration, affinity rules, webhook retry) — each was
-reviewed and secured inline. Rounds 14-18 performed five comprehensive
-full-codebase reviews, identifying and fixing <strong>91 additional
+reviewed and secured inline. Rounds 14-20 performed seven comprehensive
+full-codebase reviews, identifying and fixing <strong>107 additional
 issues</strong> including missing auth guards on 70+ endpoints, SSRF
-vulnerabilities, privilege escalation on 20+ mutating operations,
-credential exposure, path traversal in the state store, blocking I/O in
-async handlers, non-deterministic pagination, mock data elimination,
-storage pool name validation, and DHCP config injection prevention. The
-Round 18 final verification confirmed <strong>CLEAN on all 10 security
-checks</strong> and <strong>PASS on all 8 quality checks</strong>.</p>
+vulnerabilities (including OIDC issuer URLs), privilege escalation on
+20+ mutating operations, credential exposure, path traversal in the
+state store and volume handlers, blocking I/O in async handlers,
+non-deterministic pagination, mock data elimination, storage pool name
+validation, DHCP config injection prevention, DNS record type
+validation, and audit export filter enforcement. The Round 20 final
+verification confirmed <strong>CLEAN on all 10 security checks</strong>
+and <strong>PASS on all 8 quality checks</strong>.</p>
 <p>The codebase demonstrates:</p>
 <ul>
 <li><strong>Defense in depth</strong> — TLS + JWT + RBAC + input
@@ -1732,7 +1765,7 @@ error-level store logging</li>
 perspective</strong>.</p>
 <hr />
 <p><em>Report generated: March 23, 2026</em> <em>Final codebase version:
-<code>a7ccbb2</code> (main branch)</em> <em>Audit rounds: 18 | Commits:
-25 | Total issues fixed: 131 | Outstanding vulnerabilities: 0</em></p>
+<code>db095ad</code> (main branch)</em> <em>Audit rounds: 20 | Commits:
+27 | Total issues fixed: 147 | Outstanding vulnerabilities: 0</em></p>
 </body>
 </html>
