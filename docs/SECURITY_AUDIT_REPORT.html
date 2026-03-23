@@ -243,7 +243,7 @@ Report</h1>
 Platform <strong>Date:</strong> March 23, 2026 <strong>Auditor:</strong>
 Independent Security Review <strong>Scope:</strong> Full codebase — 190+
 Rust source files, 40 crates, ~87,000 LOC <strong>Verdict:</strong> PASS
-— Production-Ready <strong>Final Review:</strong> Round 22 — All checks
+— Production-Ready <strong>Final Review:</strong> Round 23 — All checks
 CLEAN</p>
 <hr />
 <h2 id="executive-summary">Executive Summary</h2>
@@ -252,15 +252,15 @@ vmspawnd codebase covering all 180 Rust source files across 40 crates.
 The audit encompassed command injection, authentication/authorization,
 input validation, cryptographic implementation, state consistency, error
 handling, resource management, and API security.</p>
-<p><strong>22 rounds of review and remediation</strong> were conducted,
-resulting in <strong>5,900+ lines of security-hardened and feature
-code</strong> across <strong>140+ files</strong>. All critical, high,
+<p><strong>23 rounds of review and remediation</strong> were conducted,
+resulting in <strong>6,000+ lines of security-hardened and feature
+code</strong> across <strong>145+ files</strong>. All critical, high,
 and medium-severity findings have been resolved. The final round (Round
-22) confirmed <strong>CLEAN on all 10 security checks</strong> and
+23) confirmed <strong>CLEAN on all 10 security checks</strong> and
 <strong>PASS on all 8 quality checks</strong>. Feature additions (cloud
 images, LDAP/OIDC, multi-tenancy, hibernate, storage migration) were
-reviewed and secured inline. Rounds 14-22 performed nine comprehensive
-full-codebase reviews, identifying and fixing 129 issues across all API
+reviewed and secured inline. Rounds 14-23 performed ten comprehensive
+full-codebase reviews, identifying and fixing 134 issues across all API
 handler files, state store, and core modules.</p>
 <h3 id="key-metrics">Key Metrics</h3>
 <table>
@@ -281,19 +281,19 @@ handler files, state store, and core modules.</p>
 </tr>
 <tr>
 <td>Lines added</td>
-<td>5,900+</td>
+<td>6,000+</td>
 </tr>
 <tr>
 <td>Lines removed</td>
-<td>1,650+</td>
+<td>1,660+</td>
 </tr>
 <tr>
 <td>Audit rounds</td>
-<td>22</td>
+<td>23</td>
 </tr>
 <tr>
 <td>Commits</td>
-<td>29</td>
+<td>30</td>
 </tr>
 <tr>
 <td>Critical issues found &amp; fixed</td>
@@ -305,11 +305,11 @@ handler files, state store, and core modules.</p>
 </tr>
 <tr>
 <td>Medium issues found &amp; fixed</td>
-<td>75</td>
+<td>76</td>
 </tr>
 <tr>
 <td>Low issues found &amp; fixed</td>
-<td>42</td>
+<td>46</td>
 </tr>
 <tr>
 <td>Features added during audit</td>
@@ -1183,6 +1183,15 @@ success</td>
 <td>DB migrations execute SQL via UserDb instead of tracking only</td>
 </tr>
 <tr>
+<td><strong>Firewall rule validation</strong></td>
+<td>CIDR format and log prefix validated before nft command
+construction</td>
+</tr>
+<tr>
+<td><strong>Entity ID absolute path rejection</strong></td>
+<td>State store rejects entity IDs starting with <code>/</code></td>
+</tr>
+<tr>
 <td><strong>VM lock lifecycle</strong></td>
 <td>Lock entries cleaned up on VM deletion to prevent memory leaks</td>
 </tr>
@@ -1727,13 +1736,23 @@ Option date tracking, filter_map→map in 7 networking files</td>
 <td>5M + 3L</td>
 <td>1</td>
 </tr>
+<tr>
+<td>22</td>
+<td>Full codebase review: firewall rule source_cidr CIDR validation and
+log_prefix sanitization before nft command interpolation, entity ID
+leading ‘/’ rejection in state store, validate_vm_name on 8
+fault_tolerance handlers + analytics get_vm_performance, snapshot log
+message bug fix</td>
+<td>1M + 4L</td>
+<td>1</td>
+</tr>
 </tbody>
 </table>
 <hr />
 <h2 id="recommendations">8. Recommendations</h2>
 <h3 id="completed-this-audit">8.1 Completed (This Audit)</h3>
 <p>All critical, high, medium, and low findings have been resolved
-across 22 rounds.</p>
+across 23 rounds.</p>
 <h3 id="future-improvements">8.2 Future Improvements</h3>
 <table>
 <colgroup>
@@ -1781,14 +1800,14 @@ polling</td>
 </table>
 <hr />
 <h2 id="conclusion">9. Conclusion</h2>
-<p>The vmspawnd project has undergone a thorough <strong>22-round
+<p>The vmspawnd project has undergone a thorough <strong>23-round
 security audit</strong> covering all 190+ Rust source files across 40
 crates. Every critical, high, and medium-severity finding has been
 identified and remediated with verified fixes. 22 new features were
 added during the audit period (cloud images, LDAP/OIDC, multi-tenancy,
 hibernate, storage migration, affinity rules, webhook retry) — each was
-reviewed and secured inline. Rounds 14-22 performed nine comprehensive
-full-codebase reviews, identifying and fixing <strong>129 additional
+reviewed and secured inline. Rounds 14-23 performed ten comprehensive
+full-codebase reviews, identifying and fixing <strong>134 additional
 issues</strong> including missing auth guards on 70+ endpoints, SSRF
 vulnerabilities (including OIDC issuer URLs, host discovery, and content
 library downloads), privilege escalation on 20+ mutating operations,
@@ -1796,12 +1815,12 @@ credential exposure, path traversal in the state store and volume
 handlers, blocking I/O in async handlers, non-deterministic pagination,
 complete mock data elimination across all analytics endpoints, storage
 pool name validation, DHCP config injection prevention, DNS record type
-validation, audit export filter enforcement, error propagation in 43+
-save/delete handlers, rate limiter memory eviction, project owner
-protection, store key collision prevention, SMTP async safety, and
-database migration execution. The Round 22 security review confirmed
-<strong>CLEAN — zero new findings</strong> across all 53 handler
-files.</p>
+validation, firewall rule CIDR/log-prefix validation, audit export
+filter enforcement, error propagation in 43+ save/delete handlers, rate
+limiter memory eviction, project owner protection, store key collision
+prevention, SMTP async safety, and database migration execution. The
+Round 23 security review confirmed <strong>CLEAN — zero new
+findings</strong> across all 53 handler files.</p>
 <p>The codebase demonstrates:</p>
 <ul>
 <li><strong>Defense in depth</strong> — TLS + JWT + RBAC + input
@@ -1821,7 +1840,7 @@ error-level store logging</li>
 perspective</strong>.</p>
 <hr />
 <p><em>Report generated: March 23, 2026</em> <em>Final codebase version:
-<code>86fce46</code> (main branch)</em> <em>Audit rounds: 22 | Commits:
-29 | Total issues fixed: 169 | Outstanding vulnerabilities: 0</em></p>
+<code>b0ee6d1</code> (main branch)</em> <em>Audit rounds: 23 | Commits:
+30 | Total issues fixed: 174 | Outstanding vulnerabilities: 0</em></p>
 </body>
 </html>
