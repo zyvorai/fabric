@@ -331,8 +331,9 @@ Dependencies</h3>
 </tbody>
 </table>
 <h3 id="security-first-architecture">3. Security-First Architecture</h3>
-<p>The entire codebase has undergone a <strong>23-round security
-audit</strong> with 174 issues identified and fixed:</p>
+<p>The entire codebase has undergone a <strong>24-round security
+audit</strong> with 174 issues identified and fixed (2 consecutive clean
+rounds confirming convergence):</p>
 <ul>
 <li><strong>Zero unsafe Rust</strong> — memory-safe by construction</li>
 <li><strong>Zero shell pipelines</strong> — all subprocess calls use
@@ -427,8 +428,8 @@ and quotas</li>
 <li>Audit logging with JSON/CSV export</li>
 <li>Encryption at rest</li>
 <li>Rate limiting on authentication and API keys</li>
-<li><strong>23-round security audit</strong> — 174 issues fixed, zero
-outstanding vulnerabilities</li>
+<li><strong>24-round security audit</strong> — 174 issues fixed, 2
+consecutive clean rounds, zero outstanding</li>
 <li><strong>Storage pool name validation</strong> — LVM, ZFS, Ceph pool
 names validated</li>
 <li><strong>SSRF prevention</strong> on all user-provided URLs</li>
@@ -815,7 +816,7 @@ operator deployed</p>
 </tr>
 <tr>
 <td>Security audit rounds</td>
-<td>23</td>
+<td>24 (2 consecutive clean)</td>
 </tr>
 <tr>
 <td>Security issues fixed</td>
