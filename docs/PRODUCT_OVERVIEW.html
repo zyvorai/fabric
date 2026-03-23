@@ -331,8 +331,8 @@ Dependencies</h3>
 </tbody>
 </table>
 <h3 id="security-first-architecture">3. Security-First Architecture</h3>
-<p>The entire codebase has undergone a <strong>25-round security
-audit</strong> with 174 issues identified and fixed (3 consecutive clean
+<p>The entire codebase has undergone a <strong>26-round security
+audit</strong> with 174 issues identified and fixed (5 consecutive clean
 rounds — audit complete):</p>
 <ul>
 <li><strong>Zero unsafe Rust</strong> — memory-safe by construction</li>
@@ -429,7 +429,7 @@ and quotas</li>
 <li>Audit logging with JSON/CSV export</li>
 <li>Encryption at rest</li>
 <li>Rate limiting on authentication and API keys</li>
-<li><strong>25-round security audit</strong> — 174 issues fixed, 3
+<li><strong>26-round security audit</strong> — 174 issues fixed, 5
 consecutive clean rounds, audit complete</li>
 <li><strong>Storage pool name validation</strong> — LVM, ZFS, Ceph pool
 names validated</li>
@@ -465,10 +465,18 @@ retry + backoff</strong>, Microsoft Teams</li>
 bulk)</li>
 <li><strong>Automated daily backups</strong> via systemd timer
 (configurable schedule, retention, cleanup)</li>
+<li><strong>Automated weekly state store cleanup</strong> via systemd
+timer (events, audit logs, webhook deliveries, history)</li>
 <li><strong>Backup configuration</strong> via <code>[backup]</code>
 section in config file or
 <code>VMSPAWND_BACKUP_DIR</code>/<code>VMSPAWND_BACKUP_RETAIN</code>/<code>VMSPAWND_BACKUP_TYPE</code>
 env vars</li>
+<li><strong>Deep health check</strong> — API, disk space, DB integrity,
+credentials, timers, memory, KVM</li>
+<li><strong>TLS certificate generation</strong> — self-signed certs with
+SAN via <code>vmspawnctl tls</code></li>
+<li><strong>Shell completions</strong> — Bash tab completion for
+<code>vmctl</code> and <code>vmspawnctl</code></li>
 <li>Resource quotas, pools, and datacenter abstractions</li>
 <li><strong>Database schema migrations</strong> with version
 tracking</li>
@@ -829,7 +837,7 @@ operator deployed</p>
 </tr>
 <tr>
 <td>Security audit rounds</td>
-<td>25 (3 consecutive clean — complete)</td>
+<td>26 (5 consecutive clean — complete)</td>
 </tr>
 <tr>
 <td>Security issues fixed</td>

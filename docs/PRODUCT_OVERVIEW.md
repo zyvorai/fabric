@@ -51,7 +51,7 @@ vmspawnd leverages systemd-vmspawn and systemd-machined — the VM management to
 
 ### 3. Security-First Architecture
 
-The entire codebase has undergone a **25-round security audit** with 174 issues identified and fixed (3 consecutive clean rounds — audit complete):
+The entire codebase has undergone a **26-round security audit** with 174 issues identified and fixed (5 consecutive clean rounds — audit complete):
 
 - **Zero unsafe Rust** — memory-safe by construction
 - **Zero shell pipelines** — all subprocess calls use safe argument passing
@@ -115,7 +115,7 @@ The entire codebase has undergone a **25-round security audit** with 174 issues 
 - Audit logging with JSON/CSV export
 - Encryption at rest
 - Rate limiting on authentication and API keys
-- **25-round security audit** — 174 issues fixed, 3 consecutive clean rounds, audit complete
+- **26-round security audit** — 174 issues fixed, 5 consecutive clean rounds, audit complete
 - **Storage pool name validation** — LVM, ZFS, Ceph pool names validated
 - **SSRF prevention** on all user-provided URLs
 - **Entity ID sanitization** in state store
@@ -140,7 +140,11 @@ The entire codebase has undergone a **25-round security audit** with 174 issues 
 - Backup/restore with retention policies and incremental backups
 - **Per-VM backup** from web UI and TUI (single or bulk)
 - **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
+- **Automated weekly state store cleanup** via systemd timer (events, audit logs, webhook deliveries, history)
 - **Backup configuration** via `[backup]` section in config file or `VMSPAWND_BACKUP_DIR`/`VMSPAWND_BACKUP_RETAIN`/`VMSPAWND_BACKUP_TYPE` env vars
+- **Deep health check** — API, disk space, DB integrity, credentials, timers, memory, KVM
+- **TLS certificate generation** — self-signed certs with SAN via `vmspawnctl tls`
+- **Shell completions** — Bash tab completion for `vmctl` and `vmspawnctl`
 - Resource quotas, pools, and datacenter abstractions
 - **Database schema migrations** with version tracking
 
@@ -316,7 +320,7 @@ vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside
 | REST API endpoints | 520+ |
 | WebSocket endpoints | 3 |
 | Web pages | 37+ |
-| Security audit rounds | 25 (3 consecutive clean — complete) |
+| Security audit rounds | 26 (5 consecutive clean — complete) |
 | Security issues fixed | 174 |
 | Test suite | Passing |
 
