@@ -14,9 +14,9 @@
 set -euo pipefail
 
 VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:8080}"
-BACKUP_DIR="${BACKUP_DIR:-/var/lib/vmspawnd/backups}"
-BACKUP_RETAIN="${BACKUP_RETAIN:-7}"
-BACKUP_TYPE="${BACKUP_TYPE:-full}"
+BACKUP_DIR="${VMSPAWND_BACKUP_DIR:-${BACKUP_DIR:-/var/lib/vmspawnd/backups}}"
+BACKUP_RETAIN="${VMSPAWND_BACKUP_RETAIN:-${BACKUP_RETAIN:-7}}"
+BACKUP_TYPE="${VMSPAWND_BACKUP_TYPE:-${BACKUP_TYPE:-full}}"
 PASSWORD_FILE="/var/lib/vmspawnd/.admin_password"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_TAG="vmspawnd-backup"

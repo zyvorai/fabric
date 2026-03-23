@@ -10,6 +10,14 @@ path = "/var/lib/vmspawnd"
 # Path to store VM images
 image_path = "/var/lib/vmspawnd/images"
 
+[backup]
+# Backup storage directory
+backup_dir = "/var/lib/vmspawnd/backups"
+# Days to retain backups before automatic cleanup (default: 7)
+# retention_days = 7
+# Default backup type: "full" or "incremental" (default: "full")
+# backup_type = "full"
+
 [network]
 # Default network bridge
 bridge = "br0"
