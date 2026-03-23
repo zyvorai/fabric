@@ -424,32 +424,8 @@ pub async fn list_backup_policies(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupPolicy>>, StatusCode> {
     tracing::debug!("backups::{}", stringify!(list_backup_policies));
-    // Load from state store, fall back to mock data if empty
     let policies = state.store.list_entities::<BackupPolicy>("backup_policies")
-        .unwrap_or_else(|_| vec![
-        BackupPolicy {
-            id: Uuid::new_v4().to_string(),
-            name: "Production Daily Backup".to_string(),
-            vm_tags: Some(vec!["production".to_string()]),
-            schedule_type: ScheduleType::Daily,
-            backup_type: BackupType::Incremental,
-            retention_days: 7,
-            enabled: true,
-            last_run: Some(Utc::now() - Duration::days(1)),
-            next_run: Some(Utc::now() + Duration::days(1)),
-        },
-        BackupPolicy {
-            id: Uuid::new_v4().to_string(),
-            name: "Weekly Full Backup".to_string(),
-            vm_tags: None,
-            schedule_type: ScheduleType::Weekly,
-            backup_type: BackupType::Full,
-            retention_days: 30,
-            enabled: true,
-            last_run: Some(Utc::now() - Duration::days(7)),
-            next_run: Some(Utc::now()),
-        },
-    ]);
+        .map_err(|e| { tracing::error!("Failed to load backup policies: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     Ok(Json(policies))
 }

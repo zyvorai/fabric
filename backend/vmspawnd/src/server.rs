@@ -1710,18 +1710,15 @@ async fn run_autoscaler(state: Arc<AppState>) {
                 _ => continue,
             };
 
-            // Get latest metrics
+            // Get latest metrics (single fetch)
             let metrics_key = format!("metrics/vm/{}/1h", policy.vm_name);
-            let latest_cpu = state.store
+            let perf_data = state.store
                 .get_entity::<VMPerformance>("performance", &metrics_key)
                 .ok()
-                .flatten()
+                .flatten();
+            let latest_cpu = perf_data.as_ref()
                 .and_then(|p| p.metrics.last().map(|m| m.cpu_usage));
-
-            let latest_memory = state.store
-                .get_entity::<VMPerformance>("performance", &metrics_key)
-                .ok()
-                .flatten()
+            let latest_memory = perf_data.as_ref()
                 .and_then(|p| p.metrics.last().map(|m| m.memory_usage));
 
             // CPU scaling

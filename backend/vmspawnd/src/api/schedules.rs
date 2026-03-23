@@ -242,40 +242,8 @@ pub async fn list_schedules(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Schedule>>, StatusCode> {
     tracing::debug!("schedules::{}", stringify!(list_schedules));
-    // Load from state store, fall back to mock data if empty
     let schedules = state.store.list_entities::<Schedule>("schedules")
-        .unwrap_or_else(|_| vec![
-        Schedule {
-            id: Uuid::new_v4().to_string(),
-            name: "Nightly Shutdown".to_string(),
-            vm_name: "web-server".to_string(),
-            action: VMAction::Stop,
-            schedule_type: ScheduleType::Daily,
-            time: "22:00".to_string(),
-            days_of_week: None,
-            enabled: true,
-            created: Utc::now(),
-            last_run: Some(Utc::now() - Duration::days(1)),
-            next_run: calculate_next_run(&ScheduleType::Daily, "22:00", &None),
-        },
-        Schedule {
-            id: Uuid::new_v4().to_string(),
-            name: "Weekday Startup".to_string(),
-            vm_name: "web-server".to_string(),
-            action: VMAction::Start,
-            schedule_type: ScheduleType::Weekly,
-            time: "08:00".to_string(),
-            days_of_week: Some(vec![1, 2, 3, 4, 5]), // Monday-Friday
-            enabled: true,
-            created: Utc::now(),
-            last_run: Some(Utc::now() - Duration::days(1)),
-            next_run: calculate_next_run(
-                &ScheduleType::Weekly,
-                "08:00",
-                &Some(vec![1, 2, 3, 4, 5]),
-            ),
-        },
-    ]);
+        .map_err(|e| { tracing::error!("Failed to load schedules: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     Ok(Json(schedules))
 }
@@ -487,16 +455,20 @@ pub async fn run_schedule_now(
     tracing::info!("Executing schedule {} immediately: {:?} on VM {}",
                    schedule.name, schedule.action, schedule.vm_name);
 
-    // Execute the VM action
-    let result = match schedule.action {
-        VMAction::Start => vmspawn_driver::start_vm(&schedule.vm_name),
-        VMAction::Stop => vmspawn_driver::stop_vm(&schedule.vm_name),
-        VMAction::Restart => vmspawn_driver::restart_vm(&schedule.vm_name),
-        VMAction::Snapshot => {
-            tracing::warn!("Snapshot action not yet implemented");
-            Ok(())
+    // Execute the VM action via spawn_blocking to avoid blocking async runtime
+    let vm_name_clone = schedule.vm_name.clone();
+    let action = schedule.action.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        match action {
+            VMAction::Start => vmspawn_driver::start_vm(&vm_name_clone),
+            VMAction::Stop => vmspawn_driver::stop_vm(&vm_name_clone),
+            VMAction::Restart => vmspawn_driver::restart_vm(&vm_name_clone),
+            VMAction::Snapshot => {
+                tracing::warn!("Snapshot action not yet implemented");
+                Ok(())
+            }
         }
-    };
+    }).await.unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
 
     // Check if execution was successful
     let (success, error) = match result {

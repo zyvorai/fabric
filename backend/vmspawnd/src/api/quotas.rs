@@ -166,42 +166,8 @@ pub async fn list_quotas(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ResourceQuota>>, StatusCode> {
-    // Load from state store, fall back to mock data if empty
     let quotas = state.store.list_entities::<ResourceQuota>("quotas")
-        .unwrap_or_else(|_| vec![
-        ResourceQuota {
-            id: Uuid::new_v4().to_string(),
-            name: "Development Team".to_string(),
-            max_cpus: 32,
-            max_memory: 65536,
-            max_disk: 500,
-            max_vms: 10,
-            used_cpus: 16,
-            used_memory: 32768,
-            used_disk: 200,
-            used_vms: 5,
-            tags: Some(vec!["dev".to_string()]),
-            enabled: true,
-            created: Utc::now(),
-            updated: Utc::now(),
-        },
-        ResourceQuota {
-            id: Uuid::new_v4().to_string(),
-            name: "Production".to_string(),
-            max_cpus: 128,
-            max_memory: 262144,
-            max_disk: 2000,
-            max_vms: 50,
-            used_cpus: 96,
-            used_memory: 196608,
-            used_disk: 1500,
-            used_vms: 35,
-            tags: Some(vec!["production".to_string()]),
-            enabled: true,
-            created: Utc::now(),
-            updated: Utc::now(),
-        },
-    ]);
+        .map_err(|e| { tracing::error!("Failed to load quotas: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
 
     Ok(Json(quotas))
 }

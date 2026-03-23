@@ -26,7 +26,7 @@ pub async fn list_providers(
 }
 
 pub async fn register_provider(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut provider): Json<KeyProvider>,
 ) -> impl IntoResponse {

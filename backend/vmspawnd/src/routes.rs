@@ -159,6 +159,10 @@ pub async fn delete_vm(
 
     match state.store.delete_vm(&name) {
         Ok(_) => {
+            // Clean up the per-VM lock entry to prevent unbounded growth
+            if let Ok(mut locks) = state.vm_locks.lock() {
+                locks.remove(&name);
+            }
             audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "SUCCESS");
             crate::api::events::record_event(&state, crate::api::events::VMEventType::Deleted, &name, None);
             StatusCode::NO_CONTENT.into_response()
@@ -203,11 +207,14 @@ pub async fn start_vm(
 
     audit(&state, &claims.sub, "START", &format!("vm/{}", name), "ACCEPTED");
 
+    // Drop outer lock before spawning so the background task can acquire it
+    drop(_lock);
+
     // Spawn start in background so API returns immediately
     let vm_name = name.clone();
     let state_clone = state.clone();
     tokio::spawn(async move {
-        // Re-acquire lock in background task
+        // Acquire lock in background task
         let vm_mutex = state_clone.vm_lock(&vm_name);
         let _lock = vm_mutex.lock().await;
 
