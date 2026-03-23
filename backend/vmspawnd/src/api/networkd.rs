@@ -30,7 +30,7 @@ fn networkd_manager(state: &AppState) -> NetworkdManager {
 // Bridge handlers
 // ============================================================================
 
-pub async fn list_bridges(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_bridges(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bridges));
     let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -158,7 +158,7 @@ pub async fn delete_bridge(
 // VLAN handlers
 // ============================================================================
 
-pub async fn list_vlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_vlans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vlans));
     let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -276,7 +276,7 @@ pub async fn delete_vlan(
 // Macvtap handlers
 // ============================================================================
 
-pub async fn list_macvtaps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_macvtaps(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_macvtaps));
     let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -347,7 +347,7 @@ pub async fn delete_macvtap(
 // Tap handlers
 // ============================================================================
 
-pub async fn list_taps(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_taps(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_taps));
     let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -420,7 +420,7 @@ pub async fn delete_tap(
 // Status & control handlers
 // ============================================================================
 
-pub async fn list_links(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_links(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_links));
     let mgr = networkd_manager(&state);
     match mgr.list_links() {
@@ -442,7 +442,7 @@ pub async fn get_device_status(
     }
 }
 
-pub async fn reload_networkd(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn reload_networkd(RequireWrite(_claims): RequireWrite, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(reload_networkd));
     let mgr = networkd_manager(&state);
     match mgr.reload() {
@@ -451,7 +451,7 @@ pub async fn reload_networkd(State(state): State<Arc<AppState>>) -> impl IntoRes
     }
 }
 
-pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_managed_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_managed_files));
     let mgr = networkd_manager(&state);
     match mgr.list_managed_files() {
@@ -464,7 +464,7 @@ pub async fn list_managed_files(State(state): State<Arc<AppState>>) -> impl Into
 // Bond handlers
 // ============================================================================
 
-pub async fn list_bonds(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_bonds(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bonds));
     let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -600,7 +600,7 @@ pub async fn delete_bond(
 // Network file handlers (physical interface config)
 // ============================================================================
 
-pub async fn list_network_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_network_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_network_files));
     let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -676,7 +676,7 @@ pub async fn delete_network_file(
 // Link file handlers
 // ============================================================================
 
-pub async fn list_link_files(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_link_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_link_files));
     let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -740,7 +740,7 @@ pub async fn delete_link_file(
 // Port forwarding handlers (nftables DNAT)
 // ============================================================================
 
-pub async fn list_port_forwards(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_port_forwards(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_port_forwards));
     let items: Vec<PortForwardConfig> = state
         .store
@@ -831,7 +831,7 @@ pub async fn delete_port_forward(
     StatusCode::NO_CONTENT
 }
 
-pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(sync_port_forwards));
     let configs: Vec<PortForwardConfig> = state
         .store
@@ -857,7 +857,7 @@ pub async fn sync_port_forwards(State(state): State<Arc<AppState>>) -> impl Into
 // VXLAN handlers
 // ============================================================================
 
-pub async fn list_vxlans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_vxlans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vxlans));
     let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -933,7 +933,7 @@ pub async fn delete_vxlan(
 // SR-IOV handlers
 // ============================================================================
 
-pub async fn list_sriov(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_sriov(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_sriov));
     let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -997,7 +997,7 @@ pub async fn delete_sriov(
 // Scan existing configs (parser)
 // ============================================================================
 
-pub async fn scan_configs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn scan_configs(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(scan_configs));
     let dir = std::path::Path::new(&state.config.network.networkd_config_dir);
     match networking::parser::scan_networkd_dir(dir) {

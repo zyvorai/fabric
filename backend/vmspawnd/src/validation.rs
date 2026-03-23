@@ -135,7 +135,6 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
     let allowed_prefixes = [
         "/var/lib/machines",
         "/var/lib/vmspawnd",
-        "/tmp",
     ];
 
     // Try to canonicalize to resolve symlinks; fall back to the raw path

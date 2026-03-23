@@ -15,7 +15,7 @@ use resource_pools::{
     ResourcePoolSummary, UpdateResourcePoolRequest,
 };
 
-pub async fn list_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_pools(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("resource_pools::{}", stringify!(list_pools));
     let items: Vec<ResourcePool> = state.store.list_entities("resource_pools").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -187,7 +187,7 @@ pub struct MoveVmRequest {
 }
 
 pub async fn move_vm(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(from_id): Path<String>,
     Json(req): Json<MoveVmRequest>,

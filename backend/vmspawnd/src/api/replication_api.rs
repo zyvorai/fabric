@@ -19,14 +19,14 @@ use replication::{
 // Site handlers
 // ============================================================================
 
-pub async fn list_sites(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_sites(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_sites));
     let items: Vec<ReplicationSite> = state.store.list_entities("replication_sites").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
 }
 
 pub async fn register_site(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut site): Json<ReplicationSite>,
 ) -> impl IntoResponse {
@@ -57,7 +57,7 @@ pub async fn remove_site(
 // Replication configuration handlers
 // ============================================================================
 
-pub async fn list_replications(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_replications(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_replications));
     let items: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -93,7 +93,7 @@ pub async fn get_replication(
 }
 
 pub async fn pause_replication(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -112,7 +112,7 @@ pub async fn pause_replication(
 }
 
 pub async fn resume_replication(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -174,7 +174,7 @@ pub async fn get_replication_metrics(
     }
 }
 
-pub async fn check_rpo_violations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn check_rpo_violations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(check_rpo_violations));
     let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let now = Utc::now();
@@ -188,7 +188,7 @@ pub async fn check_rpo_violations(State(state): State<Arc<AppState>>) -> impl In
     Json(violations)
 }
 
-pub async fn get_replication_health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_replication_health(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(get_replication_health));
     let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let now = Utc::now();
@@ -215,7 +215,7 @@ pub async fn get_replication_health(State(state): State<Arc<AppState>>) -> impl 
     Json(summary)
 }
 
-pub async fn list_recovery_instances(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_recovery_instances(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_recovery_instances));
     let items: Vec<ReplicationInstance> = state.store.list_entities("recovery_instances").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)

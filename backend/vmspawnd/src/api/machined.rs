@@ -46,6 +46,7 @@ pub async fn show_machine(
     Path(name): Path<String>,
 ) -> Result<Json<std::collections::HashMap<String, String>>, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(show_machine));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .get_properties(&name)
@@ -61,6 +62,7 @@ pub async fn poweroff_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(poweroff_machine));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .poweroff(&name)
@@ -76,6 +78,7 @@ pub async fn reboot_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(reboot_machine));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .reboot(&name)
@@ -107,6 +110,7 @@ pub async fn enable_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(enable_machine));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .enable(&name)
@@ -122,6 +126,7 @@ pub async fn disable_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(disable_machine));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .disable(&name)
@@ -165,6 +170,7 @@ pub async fn ssh_info(
     Path(name): Path<String>,
 ) -> Result<Json<SshInfo>, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(ssh_info));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     let address = machinectl::ssh_address(&name)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let key_path = machinectl::ssh_key_path(&name)
@@ -268,6 +274,8 @@ pub async fn clone_machine_image(
     Json(req): Json<CloneImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(clone_machine_image));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.target_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     machinectl::clone_image(&name, &req.target_name)
         .map(|_| StatusCode::CREATED)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -285,6 +293,8 @@ pub async fn rename_machine_image(
     Json(req): Json<RenameImageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(rename_machine_image));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.new_name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     machinectl::rename_image(&name, &req.new_name)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -296,6 +306,7 @@ pub async fn remove_machine_image(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(remove_machine_image));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     machinectl::remove_image(&name)
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -313,6 +324,7 @@ pub async fn set_image_read_only(
     Json(req): Json<SetReadOnlyRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("machined::{}", stringify!(set_image_read_only));
+    validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     machinectl::set_read_only(&name, req.read_only)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

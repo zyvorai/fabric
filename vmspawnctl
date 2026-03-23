@@ -539,9 +539,11 @@ api_login() {
         return 1
     }
 
+    local payload
+    payload=$(jq -n --arg p "$password" '{"username":"admin","password":$p}')
     TOKEN=$(curl -sf "$API_URL/api/auth/login" \
         -H "Content-Type: application/json" \
-        -d "{\"username\":\"admin\",\"password\":\"$password\"}" | jq -r '.token // empty')
+        -d "$payload" | jq -r '.token // empty')
 
     if [[ -z "$TOKEN" ]]; then
         err "Login failed"

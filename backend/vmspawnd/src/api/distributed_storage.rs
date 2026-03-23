@@ -20,7 +20,7 @@ use distributed_storage::{
 // Storage pool handlers
 // ============================================================================
 
-pub async fn list_storage_pools(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_storage_pools(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_pools));
     let items: Vec<DistributedStoragePool> = state.store.list_entities("dist_storage_pools").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -130,7 +130,7 @@ pub struct DiskFailureRequest {
 }
 
 pub async fn report_disk_failure(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(pool_id): Path<String>,
     Json(_req): Json<DiskFailureRequest>,
@@ -226,7 +226,7 @@ pub async fn get_storage_migration(
     }
 }
 
-pub async fn list_storage_migrations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_storage_migrations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_migrations));
     let items: Vec<StorageMigration> = state.store.list_entities("storage_migrations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -301,7 +301,7 @@ pub async fn cancel_migration(
 // Storage policy handlers
 // ============================================================================
 
-pub async fn list_storage_policies(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_storage_policies(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_storage_policies));
     let items: Vec<StoragePolicy> = state.store.list_entities("storage_policies").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -396,7 +396,7 @@ pub async fn check_compliance(
 // Datastore cluster handlers
 // ============================================================================
 
-pub async fn list_datastore_clusters(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_datastore_clusters(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(list_datastore_clusters));
     let items: Vec<DatastoreCluster> = state.store.list_entities("datastore_clusters").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)

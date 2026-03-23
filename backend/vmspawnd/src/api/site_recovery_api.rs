@@ -19,7 +19,7 @@ use site_recovery::{
 // Recovery plan handlers
 // ============================================================================
 
-pub async fn list_plans(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_plans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_plans));
     let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -175,7 +175,7 @@ pub async fn execute_reprotect(
     }
 }
 
-pub async fn list_executions(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_executions(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_executions));
     let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -217,7 +217,7 @@ pub async fn cancel_execution(
 // Dashboard
 // ============================================================================
 
-pub async fn get_dr_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_dr_dashboard(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(get_dr_dashboard));
     let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let total_plans = plans.len() as u32;

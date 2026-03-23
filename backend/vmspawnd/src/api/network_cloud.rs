@@ -308,16 +308,19 @@ fn generate_dhcp_network_file(config: &DhcpServerConfig) -> String {
         config.bridge
     );
 
+    // Sanitize values to prevent INI injection via newlines
+    let sanitize = |s: &str| -> String { s.replace('\n', "").replace('\r', "") };
+
     if let Some(ref gw) = config.gateway {
-        content.push_str(&format!("Address={}/24\n", gw));
+        content.push_str(&format!("Address={}/24\n", sanitize(gw)));
     }
 
     if let Some(ref domain) = config.domain {
-        content.push_str(&format!("Domains={}\n", domain));
+        content.push_str(&format!("Domains={}\n", sanitize(domain)));
     }
 
     for dns in &config.dns_servers {
-        content.push_str(&format!("DNS={}\n", dns));
+        content.push_str(&format!("DNS={}\n", sanitize(dns)));
     }
 
     content.push_str(&format!(
@@ -327,11 +330,11 @@ fn generate_dhcp_network_file(config: &DhcpServerConfig) -> String {
     ));
 
     if !config.dns_servers.is_empty() {
-        content.push_str(&format!("DNS={}\n", config.dns_servers.join(" ")));
+        content.push_str(&format!("DNS={}\n", config.dns_servers.iter().map(|s| sanitize(s)).collect::<Vec<_>>().join(" ")));
     }
 
     if let Some(ref domain) = config.domain {
-        content.push_str(&format!("SendOption=15:string:{}\n", domain));
+        content.push_str(&format!("SendOption=15:string:{}\n", sanitize(domain)));
     }
 
     content

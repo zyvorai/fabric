@@ -124,7 +124,7 @@ async fn test_firmware_capabilities() {
 async fn test_storage_pool_lifecycle() {
     let app = common::create_test_app().await;
 
-    let tmp = std::env::temp_dir().join("vmspawnd-test-pool");
+    let tmp = std::path::PathBuf::from("/var/lib/vmspawnd/images/test-pool");
     let _ = std::fs::create_dir_all(&tmp);
 
     let create_request = Request::builder()

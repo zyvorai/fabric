@@ -301,6 +301,8 @@ pub async fn create_lvm_pool(
     Json(req): Json<CreateLvmPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_lvm_pool));
+    crate::validation::validate_hostname(&req.volume_group)
+        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid volume group name: {}", m)))?;
     let result = {
         let manager = state.storage_manager.read().await;
         manager.create_lvm_pool(req.name, req.volume_group, req.auto_start).await
@@ -322,6 +324,10 @@ pub async fn create_lvm_thin_pool(
     Json(req): Json<CreateLvmThinPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_lvm_thin_pool));
+    crate::validation::validate_hostname(&req.volume_group)
+        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid volume group name: {}", m)))?;
+    crate::validation::validate_hostname(&req.thin_pool)
+        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid thin pool name: {}", m)))?;
     let result = {
         let manager = state.storage_manager.read().await;
         manager.create_lvm_thin_pool(req.name, req.volume_group, req.thin_pool, req.auto_start).await
@@ -343,6 +349,8 @@ pub async fn create_zfs_pool(
     Json(req): Json<CreateZfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_zfs_pool));
+    crate::validation::validate_hostname(&req.zpool)
+        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid zpool name: {}", m)))?;
     let result = {
         let manager = state.storage_manager.read().await;
         manager.create_zfs_pool(req.name, req.zpool, req.dataset, req.auto_start).await
@@ -374,6 +382,10 @@ pub async fn create_ceph_pool(
     Json(req): Json<CreateCephPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_ceph_pool));
+    for monitor in &req.monitors {
+        crate::validation::validate_hostname(monitor)
+            .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid Ceph monitor: {}", m)))?;
+    }
     let result = {
         let manager = state.storage_manager.read().await;
         manager

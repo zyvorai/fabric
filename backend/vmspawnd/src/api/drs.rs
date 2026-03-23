@@ -103,7 +103,7 @@ pub async fn list_recommendations(
 }
 
 pub async fn approve_recommendation(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -121,7 +121,7 @@ pub async fn approve_recommendation(
 }
 
 pub async fn reject_recommendation(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -142,7 +142,7 @@ pub async fn reject_recommendation(
 // Affinity rules
 // ============================================================================
 
-pub async fn list_affinity_rules(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_affinity_rules(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(list_affinity_rules));
     let items: Vec<AffinityRule> = state.store.list_entities("affinity_rules").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)

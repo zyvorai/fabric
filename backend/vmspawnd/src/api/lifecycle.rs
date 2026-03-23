@@ -19,7 +19,7 @@ use lifecycle_manager::{
 // Baseline handlers
 // ============================================================================
 
-pub async fn list_baselines(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_baselines(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_baselines));
     let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -167,7 +167,7 @@ pub async fn get_cluster_compliance(
 // Remediation handlers
 // ============================================================================
 
-pub async fn list_remediations(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_remediations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_remediations));
     let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -215,7 +215,7 @@ pub async fn get_remediation(
 // Rolling update handlers
 // ============================================================================
 
-pub async fn list_rolling_updates(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_rolling_updates(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_rolling_updates));
     let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -259,7 +259,7 @@ pub async fn start_rolling_update(
 }
 
 pub async fn pause_rolling_update(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -277,7 +277,7 @@ pub async fn pause_rolling_update(
 }
 
 pub async fn advance_rolling_update(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {

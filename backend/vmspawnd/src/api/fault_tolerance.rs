@@ -76,7 +76,7 @@ pub async fn get_ft_config(
     }
 }
 
-pub async fn list_ft_vms(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_ft_vms(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(list_ft_vms));
     let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)
@@ -164,7 +164,7 @@ pub async fn test_failover(
 }
 
 pub async fn suspend_replication(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -183,7 +183,7 @@ pub async fn suspend_replication(
 }
 
 pub async fn resume_replication(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> impl IntoResponse {
@@ -214,7 +214,7 @@ pub async fn get_ft_metrics(
     }
 }
 
-pub async fn get_ft_events(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_ft_events(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(get_ft_events));
     let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     Json(items)

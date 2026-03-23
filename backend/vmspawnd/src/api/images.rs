@@ -655,12 +655,15 @@ pub async fn resize_disk(
 
 fn parse_size_to_bytes(size: &str) -> u64 {
     let s = size.trim();
-    if let Some(n) = s.strip_suffix('T') {
+    let s_upper = s.to_uppercase();
+    if let Some(n) = s_upper.strip_suffix('T') {
         n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024 * 1024 * 1024
-    } else if let Some(n) = s.strip_suffix('G') {
+    } else if let Some(n) = s_upper.strip_suffix('G') {
         n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024 * 1024
-    } else if let Some(n) = s.strip_suffix('M') {
+    } else if let Some(n) = s_upper.strip_suffix('M') {
         n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024
+    } else if let Some(n) = s_upper.strip_suffix('K') {
+        n.trim().parse::<u64>().unwrap_or(0) * 1024
     } else {
         s.parse::<u64>().unwrap_or(0)
     }
