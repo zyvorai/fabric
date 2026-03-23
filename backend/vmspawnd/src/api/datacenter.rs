@@ -103,6 +103,7 @@ pub async fn update_datacenter(
     dc.updated_at = Utc::now();
     if let Err(e) = state.store.save_entity("datacenters", &dc.id, &dc) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(dc).into_response()
 }
@@ -115,8 +116,9 @@ pub async fn delete_datacenter(
     tracing::debug!("datacenter::{}", stringify!(delete_datacenter));
     if let Err(e) = state.store.delete_entity("datacenters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn get_datacenter_summary(
@@ -223,6 +225,7 @@ pub async fn update_cluster(
     cluster.updated_at = Utc::now();
     if let Err(e) = state.store.save_entity("clusters", &cluster.id, &cluster) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(cluster).into_response()
 }
@@ -235,8 +238,9 @@ pub async fn delete_cluster(
     tracing::debug!("datacenter::{}", stringify!(delete_cluster));
     if let Err(e) = state.store.delete_entity("clusters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -320,6 +324,7 @@ pub async fn update_host(
     host.updated_at = Utc::now();
     if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(host).into_response()
 }
@@ -355,6 +360,7 @@ pub async fn host_heartbeat(
     host.updated_at = host.last_heartbeat;
     if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -374,6 +380,7 @@ pub async fn host_enter_maintenance(
     host.updated_at = Utc::now();
     if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -393,6 +400,7 @@ pub async fn host_exit_maintenance(
     host.updated_at = Utc::now();
     if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -424,6 +432,11 @@ pub async fn discover_host(
     Json(req): Json<DiscoverHostRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(discover_host));
+    // Validate address against SSRF
+    let check_url = format!("http://{}:{}", req.address, req.port.unwrap_or(8080));
+    if let Err(e) = crate::api::notifications::validate_external_url_public(&check_url) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid address: {}", e)}))).into_response();
+    }
     let port = req.port.unwrap_or(8080);
     let url = format!("http://{}:{}/health", req.address, port);
 
@@ -472,7 +485,7 @@ pub async fn discover_host(
         cpus,
         memory_mb,
         already_registered,
-    })
+    }).into_response()
 }
 
 #[derive(serde::Serialize)]

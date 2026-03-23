@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
 use security::RequireRead;
@@ -122,17 +122,6 @@ fn default_export_format() -> String {
 // Helper Functions
 // ============================================================================
 
-fn parse_time_range(range: &str) -> Duration {
-    match range {
-        "1h" => Duration::hours(1),
-        "6h" => Duration::hours(6),
-        "24h" => Duration::hours(24),
-        "7d" => Duration::days(7),
-        "30d" => Duration::days(30),
-        _ => Duration::hours(24),
-    }
-}
-
 // ============================================================================
 // Analytics Handlers
 // ============================================================================
@@ -175,41 +164,9 @@ pub async fn get_system_performance(
         return Ok(Json(stored_performance));
     }
 
-    // Fall back to mock data for demonstration
-    tracing::debug!("No stored system metrics found, using mock data");
-
-    let duration = parse_time_range(&query.range);
-    let count = match query.range.as_str() {
-        "1h" => 60,
-        "6h" => 72,
-        "24h" => 96,
-        "7d" => 168,
-        "30d" => 720,
-        _ => 96,
-    };
-
-    let interval_minutes = duration.num_minutes() / count as i64;
-    let now = Utc::now();
-
-    let mut performance = Vec::new();
-
-    for i in 0..count {
-        let timestamp = now - Duration::minutes(i as i64 * interval_minutes);
-        let t = (i as f64 * 0.1).sin();
-
-        performance.push(SystemPerformance {
-            timestamp,
-            total_vms: 12,
-            running_vms: 8 + ((t * 2.0) as i32).max(0) as u32,
-            total_cpu_usage: 55.0 + (t * 15.0),
-            total_memory_usage: 70.0 + (t * 10.0),
-            total_network_rx: 1024 * 1024 * (500 + (t * 200.0) as u64),
-            total_network_tx: 1024 * 1024 * (300 + (t * 150.0) as u64),
-        });
-    }
-
-    performance.reverse();
-    Ok(Json(performance))
+    // No metrics available — return empty
+    tracing::debug!("No stored system metrics found");
+    Ok(Json(Vec::new()))
 }
 
 pub async fn get_performance_insights(
@@ -314,49 +271,6 @@ pub async fn get_performance_insights(
         }
     }
 
-    // If no real insights generated, fall back to mock data
-    if insights.is_empty() {
-        tracing::debug!("No real metrics found for insights, using mock data");
-        insights = vec![
-        PerformanceInsight {
-            insight_type: InsightType::HighCpu,
-            vm_name: "web-server-01".to_string(),
-            resource: "CPU".to_string(),
-            value: 92.5,
-            threshold: 80.0,
-            severity: Severity::Critical,
-            recommendation: "Consider adding more vCPUs or scaling horizontally".to_string(),
-        },
-        PerformanceInsight {
-            insight_type: InsightType::HighMemory,
-            vm_name: "database-01".to_string(),
-            resource: "Memory".to_string(),
-            value: 88.3,
-            threshold: 85.0,
-            severity: Severity::Warning,
-            recommendation: "Increase memory allocation or optimize application memory usage".to_string(),
-        },
-        PerformanceInsight {
-            insight_type: InsightType::Underutilized,
-            vm_name: "test-server-03".to_string(),
-            resource: "CPU".to_string(),
-            value: 12.5,
-            threshold: 20.0,
-            severity: Severity::Info,
-            recommendation: "Consider downsizing this VM or consolidating workloads".to_string(),
-        },
-        PerformanceInsight {
-            insight_type: InsightType::HighDiskIo,
-            vm_name: "database-01".to_string(),
-            resource: "Disk I/O".to_string(),
-            value: 450.0,
-            threshold: 400.0,
-            severity: Severity::Warning,
-            recommendation: "Consider using faster storage or optimizing database queries".to_string(),
-        },
-        ];
-    }
-
     Ok(Json(insights))
 }
 
@@ -397,45 +311,6 @@ pub async fn get_top_vms_by_resource(
     // Apply limit
     vm_resources.truncate(query.limit);
 
-    // If no real metrics, fall back to mock data
-    if vm_resources.is_empty() {
-        tracing::debug!("No real metrics found for top VMs, using mock data");
-        let vms = match query.resource.as_str() {
-        "cpu" => vec![
-            TopVMResource { vm_name: "web-server-01".to_string(), value: 92.5 },
-            TopVMResource { vm_name: "database-01".to_string(), value: 78.3 },
-            TopVMResource { vm_name: "app-server-02".to_string(), value: 65.7 },
-            TopVMResource { vm_name: "api-gateway".to_string(), value: 54.2 },
-            TopVMResource { vm_name: "worker-01".to_string(), value: 48.9 },
-        ],
-        "memory" => vec![
-            TopVMResource { vm_name: "database-01".to_string(), value: 88.3 },
-            TopVMResource { vm_name: "cache-server".to_string(), value: 82.1 },
-            TopVMResource { vm_name: "app-server-01".to_string(), value: 71.5 },
-            TopVMResource { vm_name: "web-server-01".to_string(), value: 65.3 },
-            TopVMResource { vm_name: "worker-02".to_string(), value: 58.7 },
-        ],
-        "network" => vec![
-            TopVMResource { vm_name: "api-gateway".to_string(), value: 450.0 },
-            TopVMResource { vm_name: "web-server-01".to_string(), value: 380.0 },
-            TopVMResource { vm_name: "web-server-02".to_string(), value: 320.0 },
-            TopVMResource { vm_name: "app-server-01".to_string(), value: 250.0 },
-            TopVMResource { vm_name: "database-01".to_string(), value: 180.0 },
-        ],
-        "disk" => vec![
-            TopVMResource { vm_name: "database-01".to_string(), value: 450.0 },
-            TopVMResource { vm_name: "database-02".to_string(), value: 380.0 },
-            TopVMResource { vm_name: "file-server".to_string(), value: 320.0 },
-            TopVMResource { vm_name: "backup-server".to_string(), value: 280.0 },
-            TopVMResource { vm_name: "app-server-01".to_string(), value: 150.0 },
-        ],
-        _ => vec![],
-        };
-
-        let limited_vms: Vec<TopVMResource> = vms.into_iter().take(query.limit).collect();
-        return Ok(Json(limited_vms));
-    }
-
     Ok(Json(vm_resources))
 }
 
@@ -473,13 +348,11 @@ pub async fn get_resource_utilization(
             network_utilization: (total_network / count as f64 / 10.0).min(100.0), // Normalize to percentage
         }
     } else {
-        // Fall back to mock data
-        tracing::debug!("No real metrics found for resource utilization, using mock data");
         ResourceUtilization {
-            cpu_utilization: 68.5,
-            memory_utilization: 72.3,
-            disk_utilization: 45.8,
-            network_utilization: 38.2,
+            cpu_utilization: 0.0,
+            memory_utilization: 0.0,
+            disk_utilization: 0.0,
+            network_utilization: 0.0,
         }
     };
 

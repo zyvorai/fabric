@@ -89,6 +89,7 @@ pub async fn update_pool(
     pool.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("resource_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(pool).into_response()
 }
@@ -101,8 +102,9 @@ pub async fn delete_pool(
     tracing::debug!("resource_pools::{}", stringify!(delete_pool));
     if let Err(e) = state.store.delete_entity("resource_pools", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn get_pool_summary(
@@ -157,6 +159,7 @@ pub async fn assign_vm(
     pool.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("resource_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -176,6 +179,7 @@ pub async fn unassign_vm(
     pool.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("resource_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -210,9 +214,11 @@ pub async fn move_vm(
     dst.updated = now;
     if let Err(e) = state.store.save_entity("resource_pools", &src.id, &src) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     if let Err(e) = state.store.save_entity("resource_pools", &dst.id, &dst) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }

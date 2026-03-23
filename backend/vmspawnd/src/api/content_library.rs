@@ -75,8 +75,9 @@ pub async fn delete_library(
     tracing::debug!("content_library::{}", stringify!(delete_library));
     if let Err(e) = state.store.delete_entity("libraries", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn sync_library(
@@ -97,6 +98,7 @@ pub async fn sync_library(
     lib.updated = Utc::now();
     if let Err(e) = state.store.save_entity("libraries", &lib.id, &lib) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -124,6 +126,10 @@ pub async fn download_image(
     Json(req): Json<DownloadImageRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(download_image));
+    // Validate URL against SSRF
+    if let Err(e) = crate::api::notifications::validate_external_url_public(&req.url) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid URL: {}", e)}))).into_response();
+    }
     // Verify library exists
     match state.store.get_entity::<Library>("libraries", &library_id) {
         Ok(Some(_)) => {}
@@ -226,8 +232,9 @@ pub async fn delete_library_item(
     tracing::debug!("content_library::{}", stringify!(delete_library_item));
     if let Err(e) = state.store.delete_entity("library_items", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -294,8 +301,9 @@ pub async fn delete_customization_spec(
     tracing::debug!("content_library::{}", stringify!(delete_customization_spec));
     if let Err(e) = state.store.delete_entity("customization_specs", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -345,8 +353,9 @@ pub async fn delete_host_profile(
     tracing::debug!("content_library::{}", stringify!(delete_host_profile));
     if let Err(e) = state.store.delete_entity("host_profiles", &id) {
         tracing::error!("Failed to delete: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 #[derive(serde::Deserialize)]

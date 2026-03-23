@@ -56,11 +56,13 @@ pub async fn disable_ft(
     tracing::debug!("fault_tolerance::{}", stringify!(disable_ft));
     if let Err(e) = state.store.delete_entity("ft_configs", &vm_name) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     if let Err(e) = state.store.delete_entity("ft_metrics", &vm_name) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn get_ft_config(
@@ -178,6 +180,7 @@ pub async fn suspend_replication(
     config.updated = Utc::now();
     if let Err(e) = state.store.save_entity("ft_configs", &vm_name, &config) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -197,6 +200,7 @@ pub async fn resume_replication(
     config.updated = Utc::now();
     if let Err(e) = state.store.save_entity("ft_configs", &vm_name, &config) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }

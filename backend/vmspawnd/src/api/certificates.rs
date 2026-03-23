@@ -110,6 +110,7 @@ pub async fn revoke_certificate(
     cert.updated = Utc::now();
     if let Err(e) = state.store.save_entity("certificates", &cert.id, &cert) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -133,6 +134,7 @@ pub async fn renew_certificate(
     expired.updated = now;
     if let Err(e) = state.store.save_entity("certificates", &id, &expired) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     let new_cert = Certificate {
         id: Uuid::new_v4().to_string(),
@@ -153,6 +155,7 @@ pub async fn renew_certificate(
     };
     if let Err(e) = state.store.save_entity("certificates", &new_cert.id, &new_cert) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(new_cert).into_response()
 }
@@ -218,6 +221,7 @@ pub async fn approve_cert_request(
     req.status = certificate_manager::CsrStatus::Approved;
     if let Err(e) = state.store.save_entity("cert_requests", &req.id, &req) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(req).into_response()
 }
@@ -236,6 +240,7 @@ pub async fn reject_cert_request(
     req.status = certificate_manager::CsrStatus::Rejected;
     if let Err(e) = state.store.save_entity("cert_requests", &req.id, &req) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -279,6 +284,7 @@ pub async fn schedule_rotation(
     };
     if let Err(e) = state.store.save_entity("cert_rotations", &rotation.id, &rotation) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     (StatusCode::CREATED, Json(rotation)).into_response()
 }
@@ -299,6 +305,7 @@ pub async fn execute_rotation(
     rotation.completed_at = Some(Utc::now());
     if let Err(e) = state.store.save_entity("cert_rotations", &rotation.id, &rotation) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(rotation).into_response()
 }
@@ -345,6 +352,7 @@ pub async fn verify_attestation(
     att.last_attested = Some(Utc::now());
     if let Err(e) = state.store.save_entity("attestations", &att.host_id, &att) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(serde_json::json!({"trusted": trusted})).into_response()
 }

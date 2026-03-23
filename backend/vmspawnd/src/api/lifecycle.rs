@@ -64,8 +64,9 @@ pub async fn update_baseline(
     baseline.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("lm_baselines", &id, &baseline) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    Json(baseline)
+    Json(baseline).into_response()
 }
 
 pub async fn delete_baseline(
@@ -76,8 +77,9 @@ pub async fn delete_baseline(
     tracing::debug!("lifecycle::{}", stringify!(delete_baseline));
     if let Err(e) = state.store.delete_entity("lm_baselines", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -272,6 +274,7 @@ pub async fn pause_rolling_update(
     plan.status = RollingUpdateStatus::Paused;
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -293,6 +296,7 @@ pub async fn advance_rolling_update(
         plan.completed = Some(Utc::now());
         if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
             tracing::error!("Failed to save entity: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
         }
         return Json(serde_json::json!({"completed": true})).into_response();
     }
@@ -300,6 +304,7 @@ pub async fn advance_rolling_update(
     plan.current_host_index += 1;
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(serde_json::json!({"next_host_id": host_id})).into_response()
 }

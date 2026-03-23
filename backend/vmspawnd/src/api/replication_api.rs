@@ -49,8 +49,9 @@ pub async fn remove_site(
     tracing::debug!("replication_api::{}", stringify!(remove_site));
     if let Err(e) = state.store.delete_entity("replication_sites", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -107,6 +108,7 @@ pub async fn pause_replication(
     repl.updated = Utc::now();
     if let Err(e) = state.store.save_entity("replications", &repl.id, &repl) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -126,6 +128,7 @@ pub async fn resume_replication(
     repl.updated = Utc::now();
     if let Err(e) = state.store.save_entity("replications", &repl.id, &repl) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -138,8 +141,9 @@ pub async fn remove_replication(
     tracing::debug!("replication_api::{}", stringify!(remove_replication));
     if let Err(e) = state.store.delete_entity("replications", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 #[derive(serde::Deserialize)]

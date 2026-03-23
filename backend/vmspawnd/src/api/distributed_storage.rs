@@ -77,8 +77,9 @@ pub async fn delete_storage_pool(
     tracing::debug!("distributed_storage::{}", stringify!(delete_storage_pool));
     if let Err(e) = state.store.delete_entity("dist_storage_pools", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn add_storage_host(
@@ -100,6 +101,7 @@ pub async fn add_storage_host(
     pool.updated = Utc::now();
     if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -355,8 +357,9 @@ pub async fn update_storage_policy(
     policy.updated = Utc::now();
     if let Err(e) = state.store.save_entity("storage_policies", &id, &policy) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    Json(policy)
+    Json(policy).into_response()
 }
 
 pub async fn delete_storage_policy(
@@ -367,8 +370,9 @@ pub async fn delete_storage_policy(
     tracing::debug!("distributed_storage::{}", stringify!(delete_storage_policy));
     if let Err(e) = state.store.delete_entity("storage_policies", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -456,8 +460,9 @@ pub async fn delete_datastore_cluster(
     tracing::debug!("distributed_storage::{}", stringify!(delete_datastore_cluster));
     if let Err(e) = state.store.delete_entity("datastore_clusters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 #[derive(serde::Deserialize)]

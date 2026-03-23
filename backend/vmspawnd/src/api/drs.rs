@@ -116,6 +116,7 @@ pub async fn approve_recommendation(
     rec.status = predictive_drs::RecommendationStatus::Approved;
     if let Err(e) = state.store.save_entity("drs_recommendations", &rec.id, &rec) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(rec).into_response()
 }
@@ -134,6 +135,7 @@ pub async fn reject_recommendation(
     rec.status = predictive_drs::RecommendationStatus::Rejected;
     if let Err(e) = state.store.save_entity("drs_recommendations", &rec.id, &rec) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -189,8 +191,9 @@ pub async fn update_affinity_rule(
     rule.updated = Utc::now();
     if let Err(e) = state.store.save_entity("affinity_rules", &id, &rule) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    Json(rule)
+    Json(rule).into_response()
 }
 
 pub async fn delete_affinity_rule(
@@ -201,6 +204,7 @@ pub async fn delete_affinity_rule(
     tracing::debug!("drs::{}", stringify!(delete_affinity_rule));
     if let Err(e) = state.store.delete_entity("affinity_rules", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }

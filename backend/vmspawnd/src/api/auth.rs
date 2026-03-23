@@ -44,6 +44,15 @@ impl LoginRateLimiter {
     pub fn record_failure(&self, key: &str) {
         let mut attempts = self.attempts.lock().unwrap_or_else(|e| e.into_inner());
         let now = std::time::Instant::now();
+
+        // Periodic eviction: remove stale entries when map exceeds threshold
+        if attempts.len() > 10_000 {
+            attempts.retain(|_, times| {
+                times.retain(|t| now.duration_since(*t) < self.window);
+                !times.is_empty()
+            });
+        }
+
         let times = attempts.entry(key.to_string()).or_default();
         times.retain(|t| now.duration_since(*t) < self.window);
         times.push(now);

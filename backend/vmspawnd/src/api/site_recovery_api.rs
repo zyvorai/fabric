@@ -73,6 +73,7 @@ pub async fn update_plan(
     plan.priority_groups.sort_by_key(|g| g.priority);
     if let Err(e) = state.store.save_entity("recovery_plans", &id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(plan).into_response()
 }
@@ -85,8 +86,9 @@ pub async fn delete_plan(
     tracing::debug!("site_recovery_api::{}", stringify!(delete_plan));
     if let Err(e) = state.store.delete_entity("recovery_plans", &id) {
         tracing::error!("Failed to delete entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -209,6 +211,7 @@ pub async fn cancel_execution(
     exec.completed = Some(Utc::now());
     if let Err(e) = state.store.save_entity("recovery_executions", &exec.id, &exec) {
         tracing::error!("Failed to save entity: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     StatusCode::OK.into_response()
 }
