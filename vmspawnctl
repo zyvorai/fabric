@@ -530,6 +530,92 @@ cmd_backup() {
     esac
 }
 
+# ── health: Deep health check ───────────────────────────────────────────
+cmd_health() {
+    if [[ -x /usr/libexec/vmspawnd/health-check ]]; then
+        /usr/libexec/vmspawnd/health-check
+    elif [[ -x "$SCRIPT_DIR/scripts/health-check" ]]; then
+        "$SCRIPT_DIR/scripts/health-check"
+    else
+        err "Health check script not found. Run: ./vmspawnctl install"
+        exit 1
+    fi
+}
+
+# ── upgrade: Pull, rebuild, reinstall ──────────────────────────────────
+cmd_upgrade() {
+    need_root
+    step "Upgrading vmspawnd"
+
+    # Pull latest code
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        info "Pulling latest code as $SUDO_USER..."
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && git pull --ff-only"
+    else
+        cd "$SCRIPT_DIR"
+        git pull --ff-only
+    fi
+    echo ""
+
+    # Reinstall
+    cmd_reinstall
+}
+
+# ── tls: Generate self-signed TLS certificate ─────────────────────────
+cmd_tls() {
+    need_root
+    step "TLS Certificate Setup"
+
+    local cert_dir="/etc/vmspawnd/tls"
+    local cert_file="$cert_dir/server.crt"
+    local key_file="$cert_dir/server.key"
+
+    mkdir -p "$cert_dir"
+
+    if [[ -f "$cert_file" && -f "$key_file" ]]; then
+        local expiry
+        expiry=$(openssl x509 -enddate -noout -in "$cert_file" 2>/dev/null | cut -d= -f2)
+        ok "Certificate already exists"
+        info "Expires: $expiry"
+        info "Cert: $cert_file"
+        info "Key:  $key_file"
+        echo ""
+        read -rp "Regenerate? [y/N] " answer
+        if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+            return
+        fi
+    fi
+
+    local hostname
+    hostname=$(hostname -f 2>/dev/null || hostname)
+
+    info "Generating self-signed certificate for $hostname..."
+
+    openssl req -x509 -newkey rsa:4096 \
+        -keyout "$key_file" \
+        -out "$cert_file" \
+        -sha256 -days 365 -nodes \
+        -subj "/CN=$hostname/O=vmspawnd" \
+        -addext "subjectAltName=DNS:$hostname,DNS:localhost,IP:127.0.0.1" \
+        2>/dev/null
+
+    chmod 600 "$key_file"
+    chmod 644 "$cert_file"
+
+    ok "Certificate generated"
+    info "Cert: $cert_file"
+    info "Key:  $key_file"
+    info "Valid: 365 days"
+    echo ""
+    info "To enable TLS, add to /etc/vmspawnd/vmspawnd.toml:"
+    echo ""
+    echo "  [daemon]"
+    echo "  tls_cert = \"$cert_file\""
+    echo "  tls_key = \"$key_file\""
+    echo ""
+    info "Then restart: ${BOLD}./vmspawnctl restart${NC}"
+}
+
 # ── start/stop/restart/status/logs ──────────────────────────────────────
 cmd_start() {
     need_root
@@ -876,6 +962,7 @@ cmd_help() {
     echo -e "${BOLD}Lifecycle:${NC}"
     echo "  deploy            Full deployment: deps → build → install → start (auto-sudo)"
     echo "  reinstall         Rebuild and reinstall: stop → build → install → start (auto-sudo)"
+    echo "  upgrade           Git pull + reinstall (auto-sudo)"
     echo ""
     echo -e "${BOLD}Service:${NC}"
     echo "  start             Start the vmspawnd service"
@@ -892,7 +979,9 @@ cmd_help() {
     echo "  backup logs       Follow backup logs"
     echo ""
     echo -e "${BOLD}Utilities:${NC}"
-    echo "  doctor            Check system readiness"
+    echo "  health            Deep health check (API, disk, DB, timers, resources)"
+    echo "  doctor            Check system readiness (deps, tools, services)"
+    echo "  tls               Generate self-signed TLS certificate (auto-sudo)"
     echo "  password          Show the admin password"
     echo "  demo              Run interactive API demo"
     echo "  help              Show this help"
@@ -927,7 +1016,10 @@ main() {
         uninstall)  cmd_uninstall "$@" ;;
         deploy)     cmd_deploy "$@" ;;
         reinstall)  cmd_reinstall "$@" ;;
+        upgrade)    cmd_upgrade "$@" ;;
         backup)     cmd_backup "$@" ;;
+        health)     cmd_health "$@" ;;
+        tls)        cmd_tls "$@" ;;
         start)      cmd_start "$@" ;;
         stop)       cmd_stop "$@" ;;
         restart)    cmd_restart "$@" ;;

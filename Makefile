@@ -44,8 +44,10 @@ install-systemd:
 	install -m 0644 systemd/vmspawnd.service         $(DESTDIR)$(UNITDIR)/vmspawnd.service
 	install -m 0644 systemd/vmspawnd.socket          $(DESTDIR)$(UNITDIR)/vmspawnd.socket
 	install -m 0644 systemd/vm@.service              $(DESTDIR)$(UNITDIR)/vm@.service
-	install -m 0644 systemd/vmspawnd-backup.service  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
+	install -m 0644 systemd/vmspawnd-backup.service   $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
 	install -m 0644 systemd/vmspawnd-backup.timer    $(DESTDIR)$(UNITDIR)/vmspawnd-backup.timer
+	install -m 0644 systemd/vmspawnd-cleanup.service $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.service
+	install -m 0644 systemd/vmspawnd-cleanup.timer   $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.timer
 	install -d $(DESTDIR)$(PRESETDIR)
 	install -m 0644 systemd/vmspawnd.preset  $(DESTDIR)$(PRESETDIR)/90-vmspawnd.preset
 	install -d $(DESTDIR)$(SYSUSERSDIR)
@@ -53,7 +55,9 @@ install-systemd:
 	install -d $(DESTDIR)$(TMPFILESDIR)
 	install -m 0644 systemd/vmspawnd.tmpfiles $(DESTDIR)$(TMPFILESDIR)/vmspawnd.conf
 	install -d $(DESTDIR)$(LIBEXECDIR)
-	install -m 0755 scripts/backup-vms $(DESTDIR)$(LIBEXECDIR)/backup-vms
+	install -m 0755 scripts/backup-vms    $(DESTDIR)$(LIBEXECDIR)/backup-vms
+	install -m 0755 scripts/cleanup-store $(DESTDIR)$(LIBEXECDIR)/cleanup-store
+	install -m 0755 scripts/health-check  $(DESTDIR)$(LIBEXECDIR)/health-check
 
 install-web:
 	install -d $(DESTDIR)$(DATADIR)/vmspawnd/web
@@ -62,6 +66,11 @@ install-web:
 install-modules:
 	install -d $(DESTDIR)$(MODULESDIR)
 	install -m 0644 configs/modules-load.d/vmspawnd.conf $(DESTDIR)$(MODULESDIR)/vmspawnd.conf
+	install -d $(DESTDIR)/etc/logrotate.d
+	install -m 0644 configs/logrotate.d/vmspawnd $(DESTDIR)/etc/logrotate.d/vmspawnd
+	install -d $(DESTDIR)/etc/bash_completion.d
+	install -m 0644 completions/vmspawnctl.bash $(DESTDIR)/etc/bash_completion.d/vmspawnctl
+	install -m 0644 completions/vmctl.bash $(DESTDIR)/etc/bash_completion.d/vmctl
 
 uninstall:
 	rm -f  $(DESTDIR)$(BINDIR)/vmspawnd
@@ -72,6 +81,11 @@ uninstall:
 	rm -f  $(DESTDIR)$(UNITDIR)/vm@.service
 	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
 	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.timer
+	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.service
+	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.timer
+	rm -f  $(DESTDIR)/etc/logrotate.d/vmspawnd
+	rm -f  $(DESTDIR)/etc/bash_completion.d/vmspawnctl
+	rm -f  $(DESTDIR)/etc/bash_completion.d/vmctl
 	rm -rf $(DESTDIR)$(LIBEXECDIR)
 	rm -f  $(DESTDIR)$(PRESETDIR)/90-vmspawnd.preset
 	rm -f  $(DESTDIR)$(SYSUSERSDIR)/vmspawnd.conf
