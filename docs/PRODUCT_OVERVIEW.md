@@ -75,7 +75,7 @@ The entire codebase has undergone a **25-round security audit** with 174 issues 
 ## Feature Overview
 
 ### VM Lifecycle
-- Create, start, stop, restart, pause, resume, delete
+- Create, start, stop, restart, pause, resume, delete, **per-VM backup**
 - Full and linked cloning with CoW support
 - **Hibernate (suspend-to-disk)** and resume from snapshot
 - Templates for rapid deployment
@@ -175,11 +175,11 @@ vmctl ceph health my-pool
 
 ### Terminal UI (`vmctl-tui`)
 
-k9s-style dashboard with 8 views, vim keybindings, sparkline graphs, and live API data.
+k9s-style dashboard with 8 views, vim keybindings, sparkline graphs, and live API data. Per-VM actions: `s` start, `t` stop, `r` restart, `b` backup, `d` delete.
 
 ### Web Dashboard
 
-React-based UI with 37+ pages, command palette (Ctrl+K), dark theme, real-time WebSocket updates, and bulk operations.
+React-based UI with 37+ pages, command palette (Ctrl+K), dark theme, real-time WebSocket updates, and bulk operations. Per-VM actions: start, stop, pause, backup, console, details. Bulk actions: start, stop, backup, delete.
 
 ### Kubernetes Operator
 

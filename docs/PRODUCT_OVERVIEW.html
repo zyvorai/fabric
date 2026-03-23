@@ -367,7 +367,8 @@ conditions</li>
 <h2 id="feature-overview">Feature Overview</h2>
 <h3 id="vm-lifecycle">VM Lifecycle</h3>
 <ul>
-<li>Create, start, stop, restart, pause, resume, delete</li>
+<li>Create, start, stop, restart, pause, resume, delete, <strong>per-VM
+backup</strong></li>
 <li>Full and linked cloning with CoW support</li>
 <li><strong>Hibernate (suspend-to-disk)</strong> and resume from
 snapshot</li>
@@ -497,10 +498,14 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> ceph health my-pool</span></code></pre></div>
 <h3 id="terminal-ui-vmctl-tui">Terminal UI (<code>vmctl-tui</code>)</h3>
 <p>k9s-style dashboard with 8 views, vim keybindings, sparkline graphs,
-and live API data.</p>
+and live API data. Per-VM actions: <code>s</code> start, <code>t</code>
+stop, <code>r</code> restart, <code>b</code> backup, <code>d</code>
+delete.</p>
 <h3 id="web-dashboard">Web Dashboard</h3>
 <p>React-based UI with 37+ pages, command palette (Ctrl+K), dark theme,
-real-time WebSocket updates, and bulk operations.</p>
+real-time WebSocket updates, and bulk operations. Per-VM actions: start,
+stop, pause, backup, console, details. Bulk actions: start, stop,
+backup, delete.</p>
 <h3 id="kubernetes-operator">Kubernetes Operator</h3>
 <p>Manage VMs as <code>VirtualMachine</code> CRDs with automatic
 reconciliation:</p>
