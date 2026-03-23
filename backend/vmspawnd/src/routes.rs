@@ -422,7 +422,7 @@ pub async fn clone_vm(
 
     // Ensure target directory exists
     if let Some(parent) = std::path::Path::new(&target_path).parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
+        if let Err(e) = tokio::fs::create_dir_all(parent).await {
             return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e), &claims).into_response();
         }
     }

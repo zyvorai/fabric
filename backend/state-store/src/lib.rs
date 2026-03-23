@@ -16,7 +16,16 @@ pub struct StateStore {
 /// Generic entity storage helper
 impl StateStore {
     /// Save any serializable entity to a subdirectory (atomic write)
+    /// Validate that an entity ID does not contain path traversal characters.
+    fn validate_entity_id(id: &str) -> Result<()> {
+        if id.contains('\\') || id.contains("..") || id.is_empty() {
+            anyhow::bail!("Invalid entity ID: must not contain path traversal sequences or be empty");
+        }
+        Ok(())
+    }
+
     pub fn save_entity<T: Serialize>(&self, subdir: &str, id: &str, entity: &T) -> Result<()> {
+        Self::validate_entity_id(id)?;
         let dir = self.path.join(subdir);
         fs::create_dir_all(&dir)?;
 
@@ -31,6 +40,7 @@ impl StateStore {
 
     /// Load a specific entity by ID
     pub fn get_entity<T: for<'de> Deserialize<'de>>(&self, subdir: &str, id: &str) -> Result<Option<T>> {
+        Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
         if !file_path.exists() {
@@ -120,6 +130,7 @@ impl StateStore {
 
     /// Delete an entity by ID
     pub fn delete_entity(&self, subdir: &str, id: &str) -> Result<()> {
+        Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
         if file_path.exists() {
@@ -195,7 +206,9 @@ impl StateStore {
             .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         let total = vms.len();
-        let items: Vec<VM> = vms.values()
+        let mut sorted: Vec<&VM> = vms.values().collect();
+        sorted.sort_by(|a, b| a.name.cmp(&b.name));
+        let items: Vec<VM> = sorted.into_iter()
             .skip(offset)
             .take(limit)
             .cloned()

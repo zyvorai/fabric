@@ -65,7 +65,7 @@ pub async fn list_certificates(RequireRead(_claims): RequireRead, State(state): 
 }
 
 pub async fn issue_certificate(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CertificateRequest>,
 ) -> impl IntoResponse {
@@ -96,7 +96,7 @@ pub async fn issue_certificate(
 }
 
 pub async fn revoke_certificate(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -190,7 +190,7 @@ pub async fn list_cert_requests(RequireRead(_claims): RequireRead, State(state):
 }
 
 pub async fn submit_cert_request(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(mut req): Json<CertificateRequest>,
 ) -> impl IntoResponse {
@@ -205,7 +205,7 @@ pub async fn submit_cert_request(
 }
 
 pub async fn approve_cert_request(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -223,7 +223,7 @@ pub async fn approve_cert_request(
 }
 
 pub async fn reject_cert_request(
-    RequireRead(_claims): RequireRead,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
@@ -257,7 +257,7 @@ pub struct ScheduleRotationRequest {
 }
 
 pub async fn schedule_rotation(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<ScheduleRotationRequest>,
 ) -> impl IntoResponse {
@@ -314,7 +314,7 @@ pub async fn list_attestations(RequireRead(_claims): RequireRead, State(state): 
 }
 
 pub async fn submit_attestation(
-    RequireRead(_claims): RequireRead,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(att): Json<TrustAttestation>,
 ) -> impl IntoResponse {
@@ -424,7 +424,7 @@ pub async fn check_vm_security_compliance(
 // Dashboard
 // ============================================================================
 
-pub async fn get_cert_health_dashboard(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_cert_health_dashboard(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(get_cert_health_dashboard));
     let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let cas: Vec<CertificateAuthority> = state.store.list_entities("cert_cas").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });

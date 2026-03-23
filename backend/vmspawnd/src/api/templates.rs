@@ -265,6 +265,9 @@ pub async fn deploy_template(
     Json(req): Json<DeployTemplateRequest>,
 ) -> Result<(StatusCode, Json<vm_model::VM>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("templates::{}", stringify!(deploy_template));
+    crate::validation::validate_vm_name(&req.vm_name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
     let template = match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(t)) => t,
         Ok(None) => {

@@ -56,6 +56,9 @@ pub async fn hotplug_cpu(
     Json(req): Json<HotplugCpuRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_cpu));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -121,6 +124,9 @@ pub async fn hotplug_memory(
     Json(req): Json<HotplugMemoryRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_memory));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -181,6 +187,9 @@ pub async fn hotplug_disk(
     Json(req): Json<HotplugDiskRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_disk));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
 
     // Validate disk path to prevent traversal
     if let Err((status, msg)) = crate::validation::validate_host_path(&req.path) {
@@ -248,6 +257,9 @@ pub async fn hotremove_disk(
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotremove_disk));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -276,6 +288,9 @@ pub async fn hotplug_nic(
     Json(req): Json<HotplugNicRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_nic));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -330,6 +345,9 @@ pub async fn hotremove_nic(
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotremove_nic));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();

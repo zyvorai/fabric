@@ -117,6 +117,12 @@ pub async fn update_settings(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    // Validate webhook URL against SSRF if provided
+    if !settings.webhook_url.is_empty() {
+        crate::api::notifications::validate_external_url_public(&settings.webhook_url)
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
+    }
+
     if let Err(e) = state.store.save_entity("config", "settings", &settings) {
         tracing::error!("Failed to save settings: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);

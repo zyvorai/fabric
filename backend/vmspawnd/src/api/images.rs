@@ -605,6 +605,19 @@ pub async fn resize_disk(
     crate::validation::validate_vm_name(&vm_name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
 
+    // Validate size format: must be a positive number followed by optional unit
+    let size_valid = {
+        let s = req.size.trim();
+        if let Some(num_str) = s.strip_suffix(|c: char| "GMTKgmtk".contains(c)) {
+            num_str.trim().parse::<u64>().map(|n| n > 0).unwrap_or(false)
+        } else {
+            s.parse::<u64>().map(|n| n > 0).unwrap_or(false)
+        }
+    };
+    if !size_valid {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Size must be a positive number with optional unit suffix (e.g. '50G', '100M')"}))));
+    }
+
     let image_path = crate::validation::find_vm_image(&vm_name)
         .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("No disk image found for VM '{}'", vm_name)}))))?;
 

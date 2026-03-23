@@ -249,27 +249,26 @@ pub async fn snapshot_tree(
 }
 
 fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {
-    let mut roots = Vec::new();
+    use std::collections::HashMap;
 
+    // Build parent_id -> children index for O(n) tree construction
+    let mut children_map: HashMap<Option<&str>, Vec<&VMSnapshot>> = HashMap::new();
     for snap in snapshots {
-        if snap.parent_id.is_none() {
-            roots.push(build_node(snap, snapshots));
+        children_map.entry(snap.parent_id.as_deref()).or_default().push(snap);
+    }
+
+    fn build_node(snap: &VMSnapshot, children_map: &HashMap<Option<&str>, Vec<&VMSnapshot>>) -> SnapshotTreeNode {
+        let children = children_map.get(&Some(snap.id.as_str()))
+            .map(|kids| kids.iter().map(|s| build_node(s, children_map)).collect())
+            .unwrap_or_default();
+        SnapshotTreeNode {
+            snapshot: snap.clone(),
+            children,
         }
     }
 
-    roots
-}
-
-fn build_node(snap: &VMSnapshot, all: &[VMSnapshot]) -> SnapshotTreeNode {
-    let children: Vec<SnapshotTreeNode> = all
-        .iter()
-        .filter(|s| s.parent_id.as_deref() == Some(&snap.id))
-        .map(|s| build_node(s, all))
-        .collect();
-
-    SnapshotTreeNode {
-        snapshot: snap.clone(),
-        children,
-    }
+    children_map.get(&None)
+        .map(|roots| roots.iter().map(|s| build_node(s, &children_map)).collect())
+        .unwrap_or_default()
 }
 

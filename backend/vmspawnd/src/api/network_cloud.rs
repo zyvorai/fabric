@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
 // Floating IP
@@ -225,6 +225,11 @@ pub async fn create_dhcp_server(
     Json(req): Json<CreateDhcpServerRequest>,
 ) -> Result<(StatusCode, Json<DhcpServerConfig>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(create_dhcp_server));
+    // Validate bridge name to prevent path traversal
+    crate::validation::validate_hostname(&req.bridge).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid bridge name: {}", msg) })))
+    })?;
+
     let config = DhcpServerConfig {
         id: uuid::Uuid::new_v4().to_string(),
         bridge: req.bridge.clone(),
@@ -263,6 +268,7 @@ pub async fn create_dhcp_server(
 
 /// GET /api/dhcp-servers - List DHCP server configs
 pub async fn list_dhcp_servers(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DhcpServerConfig>> {
     tracing::debug!("network_cloud::{}", stringify!(list_dhcp_servers));
@@ -376,6 +382,23 @@ pub async fn create_dns_config(
     Json(req): Json<CreateDnsConfigRequest>,
 ) -> Result<(StatusCode, Json<DnsConfig>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(create_dns_config));
+    // Validate domain name
+    crate::validation::validate_hostname(&req.domain).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid domain: {}", msg) })))
+    })?;
+    // Validate upstream servers
+    for server in &req.upstream_servers {
+        crate::validation::validate_hostname(server).map_err(|msg| {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid upstream server: {}", msg) })))
+        })?;
+    }
+    // Validate search domains
+    for domain in &req.search_domains {
+        crate::validation::validate_hostname(domain).map_err(|msg| {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid search domain: {}", msg) })))
+        })?;
+    }
+
     let config = DnsConfig {
         id: uuid::Uuid::new_v4().to_string(),
         domain: req.domain,
@@ -420,6 +443,7 @@ pub async fn create_dns_config(
 
 /// GET /api/dns - List DNS configurations
 pub async fn list_dns_configs(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DnsConfig>> {
     tracing::debug!("network_cloud::{}", stringify!(list_dns_configs));
@@ -429,6 +453,7 @@ pub async fn list_dns_configs(
 
 /// POST /api/dns/:id/records - Add a DNS record
 pub async fn add_dns_record(
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<AddDnsRecordRequest>,
@@ -439,6 +464,14 @@ pub async fn add_dns_record(
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "DNS config not found" })))),
         Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
     };
+
+    // Validate DNS record fields
+    crate::validation::validate_hostname(&req.name).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record name: {}", msg) })))
+    })?;
+    crate::validation::validate_hostname(&req.value).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record value: {}", msg) })))
+    })?;
 
     config.records.push(DnsRecord {
         name: req.name,
@@ -458,6 +491,7 @@ pub async fn add_dns_record(
 
 /// DELETE /api/dns/:id - Delete DNS configuration
 pub async fn delete_dns_config(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {

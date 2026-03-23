@@ -160,6 +160,15 @@ pub async fn apply_vm_spec(
     Json(spec): Json<VMSpec>,
 ) -> Result<(StatusCode, Json<ApplyResult>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("declarative::{}", stringify!(apply_vm_spec));
+    crate::validation::validate_vm_name(&spec.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
+    // Validate volume host paths
+    for vol in &spec.volumes {
+        crate::validation::validate_host_path(&vol.host)
+            .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid volume host path: {}", m)}))))?;
+    }
+
     let mut warnings = Vec::new();
 
     let memory_mb = parse_memory_mb(&spec.resources.memory);
@@ -251,6 +260,8 @@ pub async fn export_vm_spec(
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<Json<VMSpec>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("declarative::{}", stringify!(export_vm_spec));
+    crate::validation::validate_vm_name(&name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let vm = match state.store.get_vm(&name) {
         Ok(Some(vm)) => vm,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "VM not found" })))),

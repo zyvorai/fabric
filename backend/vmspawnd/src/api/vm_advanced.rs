@@ -41,25 +41,26 @@ pub async fn get_ksm_status(
     RequireAdmin(_claims): RequireAdmin,
 ) -> Result<Json<KsmStatus>, (StatusCode, String)> {
     tracing::debug!("vm_advanced::{}", stringify!(get_ksm_status));
-    let read_ksm = |file: &str| -> u64 {
-        std::fs::read_to_string(format!("/sys/kernel/mm/ksm/{}", file))
+    let read_ksm = |file: &'static str| async move {
+        tokio::fs::read_to_string(format!("/sys/kernel/mm/ksm/{}", file))
+            .await
             .unwrap_or_default()
             .trim()
-            .parse()
+            .parse::<u64>()
             .unwrap_or(0)
     };
 
-    let run = read_ksm("run");
+    let run = read_ksm("run").await;
 
     Ok(Json(KsmStatus {
         enabled: run == 1,
-        pages_shared: read_ksm("pages_shared"),
-        pages_sharing: read_ksm("pages_sharing"),
-        pages_unshared: read_ksm("pages_unshared"),
-        pages_volatile: read_ksm("pages_volatile"),
-        full_scans: read_ksm("full_scans"),
-        sleep_ms: read_ksm("sleep_millisecs"),
-        pages_to_scan: read_ksm("pages_to_scan"),
+        pages_shared: read_ksm("pages_shared").await,
+        pages_sharing: read_ksm("pages_sharing").await,
+        pages_unshared: read_ksm("pages_unshared").await,
+        pages_volatile: read_ksm("pages_volatile").await,
+        full_scans: read_ksm("full_scans").await,
+        sleep_ms: read_ksm("sleep_millisecs").await,
+        pages_to_scan: read_ksm("pages_to_scan").await,
     }))
 }
 
