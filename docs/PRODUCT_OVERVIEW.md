@@ -138,7 +138,9 @@ The entire codebase has undergone a **25-round security audit** with 174 issues 
 - Multi-channel notifications: Email, Slack, **Webhook with retry + backoff**, Microsoft Teams
 - VM scheduling (once, daily, weekly)
 - Backup/restore with retention policies and incremental backups
+- **Per-VM backup** from web UI and TUI (single or bulk)
 - **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
+- **Backup configuration** via `[backup]` section in config file or `VMSPAWND_BACKUP_DIR`/`VMSPAWND_BACKUP_RETAIN`/`VMSPAWND_BACKUP_TYPE` env vars
 - Resource quotas, pools, and datacenter abstractions
 - **Database schema migrations** with version tracking
 

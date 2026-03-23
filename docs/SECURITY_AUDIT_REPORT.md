@@ -345,6 +345,9 @@ On first startup with authentication enabled:
 | Admin password | `auth.default_admin_password` | `VMSPAWND_ADMIN_PASSWORD` |
 | Auth enabled | `auth.enabled` | — |
 | Token expiration | `auth.token_expiration_hours` | — |
+| Backup directory | `backup.backup_dir` | `VMSPAWND_BACKUP_DIR` |
+| Backup retention | `backup.retention_days` | `VMSPAWND_BACKUP_RETAIN` |
+| Backup type | `backup.backup_type` | `VMSPAWND_BACKUP_TYPE` |
 
 ### 4.3 Password Retrieval
 

@@ -461,8 +461,14 @@ cleanup</li>
 retry + backoff</strong>, Microsoft Teams</li>
 <li>VM scheduling (once, daily, weekly)</li>
 <li>Backup/restore with retention policies and incremental backups</li>
+<li><strong>Per-VM backup</strong> from web UI and TUI (single or
+bulk)</li>
 <li><strong>Automated daily backups</strong> via systemd timer
 (configurable schedule, retention, cleanup)</li>
+<li><strong>Backup configuration</strong> via <code>[backup]</code>
+section in config file or
+<code>VMSPAWND_BACKUP_DIR</code>/<code>VMSPAWND_BACKUP_RETAIN</code>/<code>VMSPAWND_BACKUP_TYPE</code>
+env vars</li>
 <li>Resource quotas, pools, and datacenter abstractions</li>
 <li><strong>Database schema migrations</strong> with version
 tracking</li>
