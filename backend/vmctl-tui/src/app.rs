@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::time::Instant;
 use vm_model::VM;
 
-const API_BASE: &str = "http://localhost:8080/api";
+const API_BASE: &str = "http://localhost:9095/api";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum View {

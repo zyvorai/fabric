@@ -433,11 +433,11 @@ pub async fn discover_host(
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(discover_host));
     // Validate address against SSRF
-    let check_url = format!("http://{}:{}", req.address, req.port.unwrap_or(8080));
+    let check_url = format!("http://{}:{}", req.address, req.port.unwrap_or(9095));
     if let Err(e) = crate::api::notifications::validate_external_url_public(&check_url) {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid address: {}", e)}))).into_response();
     }
-    let port = req.port.unwrap_or(8080);
+    let port = req.port.unwrap_or(9095);
     let url = format!("http://{}:{}/health", req.address, port);
 
     // Check if already registered

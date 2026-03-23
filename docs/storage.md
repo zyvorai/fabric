@@ -48,7 +48,7 @@ See [NFS_STORAGE_GUIDE.md](NFS_STORAGE_GUIDE.md) for detailed NFS setup.
 ### Create
 
 ```bash
-curl -X POST http://localhost:8080/api/volumes \
+curl -X POST http://localhost:9095/api/volumes \
   -H "Content-Type: application/json" \
   -d '{"name": "data-volume", "size_gb": 100, "format": "qcow2"}'
 ```
@@ -56,13 +56,13 @@ curl -X POST http://localhost:8080/api/volumes \
 ### List
 
 ```bash
-curl http://localhost:8080/api/volumes
+curl http://localhost:9095/api/volumes
 ```
 
 ### Resize
 
 ```bash
-curl -X POST http://localhost:8080/api/volumes/data-volume/resize \
+curl -X POST http://localhost:9095/api/volumes/data-volume/resize \
   -H "Content-Type: application/json" \
   -d '{"size_gb": 200}'
 ```
@@ -70,7 +70,7 @@ curl -X POST http://localhost:8080/api/volumes/data-volume/resize \
 ### Clone
 
 ```bash
-curl -X POST http://localhost:8080/api/volumes/data-volume/clone \
+curl -X POST http://localhost:9095/api/volumes/data-volume/clone \
   -H "Content-Type: application/json" \
   -d '{"name": "data-volume-copy"}'
 ```
@@ -82,7 +82,7 @@ curl -X POST http://localhost:8080/api/volumes/data-volume/clone \
 ### Create
 
 ```bash
-curl -X POST http://localhost:8080/api/volumes/data-volume/snapshots \
+curl -X POST http://localhost:9095/api/volumes/data-volume/snapshots \
   -H "Content-Type: application/json" \
   -d '{"name": "backup-2026-02-18"}'
 ```
@@ -90,13 +90,13 @@ curl -X POST http://localhost:8080/api/volumes/data-volume/snapshots \
 ### List
 
 ```bash
-curl http://localhost:8080/api/volumes/data-volume/snapshots
+curl http://localhost:9095/api/volumes/data-volume/snapshots
 ```
 
 ### Restore
 
 ```bash
-curl -X POST http://localhost:8080/api/volumes/data-volume/restore \
+curl -X POST http://localhost:9095/api/volumes/data-volume/restore \
   -H "Content-Type: application/json" \
   -d '{"snapshot_id": "abc123"}'
 ```
@@ -132,7 +132,7 @@ vmctl ceph pools -o yaml
 
 ```bash
 # Create pool
-curl -X POST http://localhost:8080/api/storage/pools/ceph \
+curl -X POST http://localhost:9095/api/storage/pools/ceph \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-pool",
@@ -144,12 +144,12 @@ curl -X POST http://localhost:8080/api/storage/pools/ceph \
   }'
 
 # Health, stats, images
-curl http://localhost:8080/api/storage/pools/my-pool/health
-curl http://localhost:8080/api/storage/pools/my-pool/stats
-curl http://localhost:8080/api/storage/pools/my-pool/images
+curl http://localhost:9095/api/storage/pools/my-pool/health
+curl http://localhost:9095/api/storage/pools/my-pool/stats
+curl http://localhost:9095/api/storage/pools/my-pool/images
 
 # Create RBD image
-curl -X POST http://localhost:8080/api/storage/pools/my-pool/images \
+curl -X POST http://localhost:9095/api/storage/pools/my-pool/images \
   -H "Content-Type: application/json" \
   -d '{"name": "vm-disk-01", "size_mb": 10240}'
 ```

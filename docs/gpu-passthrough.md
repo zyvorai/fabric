@@ -48,7 +48,7 @@ find /sys/kernel/iommu_groups/ -type l
 vmctl gpu list
 
 # API
-curl http://localhost:8080/api/gpu/devices
+curl http://localhost:9095/api/gpu/devices
 ```
 
 ```json
@@ -83,7 +83,7 @@ Before passing a GPU to a VM, bind it to the `vfio-pci` driver:
 vmctl gpu bind 0000:02:00.0
 
 # API
-curl -X POST http://localhost:8080/api/gpu/bind \
+curl -X POST http://localhost:9095/api/gpu/bind \
   -H "Content-Type: application/json" \
   -d '{"pci_address": "0000:02:00.0"}'
 
@@ -97,7 +97,7 @@ echo "10de 1c03" > /sys/bus/pci/drivers/vfio-pci/new_id
 ## Create a VM with GPU Passthrough
 
 ```bash
-curl -X POST http://localhost:8080/api/vms \
+curl -X POST http://localhost:9095/api/vms \
   -H "Content-Type: application/json" \
   -d '{
     "name": "gaming-vm",

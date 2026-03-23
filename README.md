@@ -186,7 +186,7 @@ vmctl ceph health my-pool
 vmctl-tui
 
 # Web UI
-# Open http://localhost:8080
+# Open http://localhost:9095
 ```
 
 ---

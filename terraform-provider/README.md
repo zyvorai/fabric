@@ -19,7 +19,7 @@ terraform {
 
 ```hcl
 provider "vmspawnd" {
-  endpoint = "http://localhost:8080"
+  endpoint = "http://localhost:9095"
   # token  = var.vmspawnd_token    # Required when auth is enabled
 }
 ```

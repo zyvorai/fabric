@@ -95,7 +95,7 @@ vmctl-tui
 Once vmspawnd is running, access:
 
 ```
-http://localhost:8080
+http://localhost:9095
 ```
 
 ## Authentication
@@ -107,12 +107,12 @@ When auth is enabled (default), vmspawnd creates an `admin` user on first startu
 sudo cat /var/lib/vmspawnd/.admin_password
 
 # Login to get a JWT token
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:9095/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "<password-from-file>"}' | jq -r .token)
 
 # Use the token for API calls
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/vms
+curl -H "Authorization: Bearer $TOKEN" http://localhost:9095/api/vms
 ```
 
 To set a custom admin password, use the `VMSPAWND_ADMIN_PASSWORD` environment variable before first startup.
@@ -123,13 +123,13 @@ When auth is disabled (`enabled = false` in config), API calls work without a to
 
 ```bash
 # With auth disabled:
-curl http://localhost:8080/api/vms
+curl http://localhost:9095/api/vms
 
 # With auth enabled (see Authentication above):
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/vms
+curl -H "Authorization: Bearer $TOKEN" http://localhost:9095/api/vms
 
 # Create a VM
-curl -X POST http://localhost:8080/api/vms \
+curl -X POST http://localhost:9095/api/vms \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -140,7 +140,7 @@ curl -X POST http://localhost:8080/api/vms \
   }'
 
 # Start a VM
-curl -X POST http://localhost:8080/api/vms/test-vm/start \
+curl -X POST http://localhost:9095/api/vms/test-vm/start \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -193,7 +193,7 @@ cd backend && cargo clean && cargo build
 
 ```bash
 # Check if daemon is running
-curl http://localhost:8080/health
+curl http://localhost:9095/health
 
 # Should return: OK
 ```

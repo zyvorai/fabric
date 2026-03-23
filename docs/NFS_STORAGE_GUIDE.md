@@ -57,7 +57,7 @@ sudo exportfs -ra
 ### Via API
 
 ```bash
-curl -X POST http://localhost:8080/api/storage/pools/nfs \
+curl -X POST http://localhost:9095/api/storage/pools/nfs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "nfs-pool-1",
@@ -159,16 +159,16 @@ rw,hard,sync,rsize=8192,wsize=8192
 
 ```bash
 # Start pool (mount NFS share)
-curl -X POST http://localhost:8080/api/storage/pools/nfs-pool-1/start
+curl -X POST http://localhost:9095/api/storage/pools/nfs-pool-1/start
 
 # Stop pool (unmount NFS share)
-curl -X POST http://localhost:8080/api/storage/pools/nfs-pool-1/stop
+curl -X POST http://localhost:9095/api/storage/pools/nfs-pool-1/stop
 ```
 
 ### Check Health
 
 ```bash
-curl http://localhost:8080/api/storage/pools/nfs-pool-1/health
+curl http://localhost:9095/api/storage/pools/nfs-pool-1/health
 ```
 
 Response:
@@ -190,7 +190,7 @@ Health statuses:
 ### Get Statistics
 
 ```bash
-curl http://localhost:8080/api/storage/pools/nfs-pool-1/stats
+curl http://localhost:9095/api/storage/pools/nfs-pool-1/stats
 ```
 
 Response:
@@ -207,7 +207,7 @@ Response:
 ### Refresh Statistics
 
 ```bash
-curl -X POST http://localhost:8080/api/storage/pools/nfs-pool-1/refresh
+curl -X POST http://localhost:9095/api/storage/pools/nfs-pool-1/refresh
 ```
 
 ---
@@ -350,7 +350,7 @@ auto_start = true
 
 ```bash
 # Create read-only pool for template images
-curl -X POST http://localhost:8080/api/storage/pools/nfs \
+curl -X POST http://localhost:9095/api/storage/pools/nfs \
   -d '{
     "name": "templates-ro",
     "config": {

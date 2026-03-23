@@ -370,7 +370,7 @@ vmctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
 vmctl start myvm
 
 # Open web dashboard
-open http://localhost:8080
+open http://localhost:9095
 ```
 
 ### Management Commands

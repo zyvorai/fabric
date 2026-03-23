@@ -19,7 +19,7 @@ pub async fn run(client: Client) -> Result<()> {
     let vms = Api::<VirtualMachine>::all(client.clone());
 
     let vmspawnd_url = std::env::var("VMSPAWND_URL")
-        .unwrap_or_else(|_| "http://vmspawnd:8080".to_string());
+        .unwrap_or_else(|_| "http://vmspawnd:9095".to_string());
 
     let context = Arc::new(Context {
         client: client.clone(),

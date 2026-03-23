@@ -21,7 +21,7 @@ pub struct DaemonConfig {
 }
 
 fn default_cors_origins() -> Vec<String> {
-    vec!["http://127.0.0.1:8080".to_string()]
+    vec!["http://127.0.0.1:9095".to_string()]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -236,7 +236,7 @@ impl Config {
         // Default config
         Ok(Config {
             daemon: DaemonConfig {
-                listen: "127.0.0.1:8080".to_string(),
+                listen: "127.0.0.1:9095".to_string(),
                 cors_origins: default_cors_origins(),
             },
             storage: StorageConfig {

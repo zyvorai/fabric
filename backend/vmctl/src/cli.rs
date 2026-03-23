@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tabled::{Table, Tabled};
 use vm_model::{CreateVMRequest, VM};
 
-const API_BASE: &str = "http://localhost:8080/api";
+const API_BASE: &str = "http://localhost:9095/api";
 
 // ─── Output format ───────────────────────────────────────────────────────────
 

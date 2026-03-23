@@ -12,14 +12,14 @@
 # Also calls the metrics cleanup API endpoint.
 #
 # Configuration:
-#   VMSPAWND_URL             API endpoint (default: http://127.0.0.1:8080)
+#   VMSPAWND_URL             API endpoint (default: http://127.0.0.1:9095)
 #   VMSPAWND_EVENT_RETAIN    Days to keep events (default: 7)
 #   VMSPAWND_AUDIT_RETAIN    Days to keep audit logs (default: 90)
 #   VMSPAWND_HISTORY_RETAIN  Days to keep history/deliveries (default: 30)
 
 set -euo pipefail
 
-VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:8080}"
+VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:9095}"
 STATE_DIR="/var/lib/vmspawnd"
 EVENT_RETAIN="${VMSPAWND_EVENT_RETAIN:-7}"
 AUDIT_RETAIN="${VMSPAWND_AUDIT_RETAIN:-90}"

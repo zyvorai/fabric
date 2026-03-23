@@ -13,7 +13,7 @@ rbac:
   create: true
 
 vmspawnd:
-  url: "http://vmspawnd:8080"
+  url: "http://vmspawnd:9095"
 
 resources:
   limits:

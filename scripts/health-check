@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:8080}"
+VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:9095}"
 STATE_DIR="/var/lib/vmspawnd"
 
 RED='\033[0;31m'

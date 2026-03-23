@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "vmspawnd" {
-  endpoint = "http://localhost:8080"
+  endpoint = "http://localhost:9095"
 }
 
 resource "vmspawnd_vm" "example" {

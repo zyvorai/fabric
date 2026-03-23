@@ -31,7 +31,7 @@ NC='\033[0m'
 
 # ── Globals ─────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-API_URL="${VMSPAWND_URL:-http://127.0.0.1:8080}"
+API_URL="${VMSPAWND_URL:-http://127.0.0.1:9095}"
 TOKEN=""
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -998,7 +998,7 @@ cmd_help() {
     echo "  ./vmspawnctl deploy          # Does everything in one command"
     echo ""
     echo -e "${BOLD}Environment:${NC}"
-    echo "  VMSPAWND_URL    API URL (default: http://127.0.0.1:8080)"
+    echo "  VMSPAWND_URL    API URL (default: http://127.0.0.1:9095)"
     echo ""
 }
 

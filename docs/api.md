@@ -3,7 +3,7 @@
 ## Base URL
 
 ```
-http://localhost:8080/api
+http://localhost:9095/api
 ```
 
 ## Authentication
@@ -21,7 +21,7 @@ Authorization: Bearer <token>
 PASSWORD=$(sudo cat /var/lib/vmspawnd/.admin_password)
 
 # Login
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:9095/api/auth/login \
   -H "Content-Type: application/json" \
   -d "{\"username\": \"admin\", \"password\": \"$PASSWORD\"}"
 ```
@@ -557,7 +557,7 @@ WebSocket connections require the same authentication token, passed as a query p
 ### Console Example
 
 ```javascript
-const ws = new WebSocket("ws://localhost:8080/ws/console/myvm?token=<token>");
+const ws = new WebSocket("ws://localhost:9095/ws/console/myvm?token=<token>");
 ws.onmessage = (event) => term.write(event.data);
 term.onData((data) => ws.send(data));
 ```

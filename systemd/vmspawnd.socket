@@ -3,7 +3,7 @@ Description=vmspawnd API Socket
 Documentation=https://github.com/ssahani/vmspawn
 
 [Socket]
-ListenStream=8080
+ListenStream=9095
 BindIPv6Only=both
 Accept=no
 NoDelay=yes

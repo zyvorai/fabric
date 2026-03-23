@@ -95,7 +95,7 @@ sudo systemctl restart vmspawnd
 ### Check the Current Leader
 
 ```bash
-curl http://localhost:8080/api/cluster/leader
+curl http://localhost:9095/api/cluster/leader
 ```
 
 ```json
@@ -109,7 +109,7 @@ curl http://localhost:8080/api/cluster/leader
 ### Trigger Manual Failover
 
 ```bash
-curl -X POST http://localhost:8080/api/cluster/resign-leadership
+curl -X POST http://localhost:9095/api/cluster/resign-leadership
 ```
 
 ### Automatic Failover
@@ -129,7 +129,7 @@ When the leader fails:
 VMs are placed on the least-loaded node:
 
 ```bash
-curl -X POST http://localhost:8080/api/vms \
+curl -X POST http://localhost:9095/api/vms \
   -H "Content-Type: application/json" \
   -d '{"name": "myvm", "image": "/path/to/image.qcow2"}'
 ```
@@ -139,7 +139,7 @@ curl -X POST http://localhost:8080/api/vms \
 Specify a target node:
 
 ```bash
-curl -X POST http://localhost:8080/api/vms \
+curl -X POST http://localhost:9095/api/vms \
   -H "Content-Type: application/json" \
   -d '{
     "name": "myvm",
@@ -157,7 +157,7 @@ curl -X POST http://localhost:8080/api/vms \
 Zero-downtime migration of a running VM (requires shared storage or high-bandwidth network):
 
 ```bash
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{"target_node": "node2", "live": true}'
 ```
@@ -167,7 +167,7 @@ curl -X POST http://localhost:8080/api/vms/myvm/migrate \
 Stop, copy, and restart on the target node:
 
 ```bash
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{"target_node": "node2", "live": false}'
 ```
@@ -181,7 +181,7 @@ See [migration.md](migration.md) for advanced options, status tracking, and perf
 ### Node Status
 
 ```bash
-curl http://localhost:8080/api/cluster/nodes
+curl http://localhost:9095/api/cluster/nodes
 ```
 
 ```json
@@ -210,7 +210,7 @@ curl http://localhost:8080/api/cluster/nodes
 ### Prometheus Metrics
 
 ```bash
-curl http://localhost:8080/metrics | grep cluster
+curl http://localhost:9095/metrics | grep cluster
 ```
 
 Key metrics:
@@ -256,13 +256,13 @@ etcdctl snapshot restore /backup/etcd-20260218.db
 ### Backup VM State
 
 ```bash
-curl http://localhost:8080/api/backup/export > vmspawnd-backup.json
+curl http://localhost:9095/api/backup/export > vmspawnd-backup.json
 ```
 
 ### Restore VM State
 
 ```bash
-curl -X POST http://localhost:8080/api/backup/import \
+curl -X POST http://localhost:9095/api/backup/import \
   -H "Content-Type: application/json" \
   -d @vmspawnd-backup.json
 ```

@@ -15,7 +15,7 @@ Group=root
 
 # Environment
 EnvironmentFile=-/etc/vmspawnd/vmspawnd.env
-Environment=VMSPAWND_URL=http://127.0.0.1:8080
+Environment=VMSPAWND_URL=http://127.0.0.1:9095
 
 # Security hardening
 ProtectSystem=strict

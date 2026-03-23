@@ -26,7 +26,7 @@ Migrate a running VM with minimal downtime. Memory is copied iteratively while t
 vmctl migrate myvm --to node2 --live
 
 # API
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{"target_node": "node2", "live": true}'
 ```
@@ -37,7 +37,7 @@ curl -X POST http://localhost:8080/api/vms/myvm/migrate \
 vmctl migrate myvm --to node2 --live --compress --bandwidth 100
 
 # API equivalent
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{
     "target_node": "node2",
@@ -66,7 +66,7 @@ Stop the VM, copy its disk and configuration to the target, then start it there.
 vmctl migrate myvm --to node2 --offline
 
 # API
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{"target_node": "node2", "live": false}'
 ```
@@ -80,7 +80,7 @@ curl -X POST http://localhost:8080/api/vms/myvm/migrate \
 vmctl migrate status myvm
 
 # API
-curl http://localhost:8080/api/vms/myvm/migrate/status
+curl http://localhost:9095/api/vms/myvm/migrate/status
 ```
 
 ```json
@@ -97,7 +97,7 @@ curl http://localhost:8080/api/vms/myvm/migrate/status
 ```bash
 vmctl migrate cancel myvm
 
-curl -X POST http://localhost:8080/api/vms/myvm/migrate/cancel
+curl -X POST http://localhost:9095/api/vms/myvm/migrate/cancel
 ```
 
 ---
@@ -170,7 +170,7 @@ ssh node2 echo "OK"              # SSH access works
 Throttles VM CPU to reduce the memory dirty rate, improving convergence for write-heavy workloads:
 
 ```bash
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{"target_node": "node2", "live": true, "auto_converge": true}'
 ```
@@ -178,7 +178,7 @@ curl -X POST http://localhost:8080/api/vms/myvm/migrate \
 ### Memory Dirty Rate Limit
 
 ```bash
-curl -X POST http://localhost:8080/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate \
   -H "Content-Type: application/json" \
   -d '{"target_node": "node2", "live": true, "max_dirty_rate_mbps": 50}'
 ```
@@ -198,7 +198,7 @@ vmctl migrate myvm --to node2 --live --cpu-model Nehalem
 ### Migration Statistics
 
 ```bash
-curl http://localhost:8080/api/vms/myvm/migrate/stats
+curl http://localhost:9095/api/vms/myvm/migrate/stats
 ```
 
 ```json
@@ -229,7 +229,7 @@ vmspawnd_migration_failure_total
 ### Load-Based Auto-Migration
 
 ```bash
-curl -X POST http://localhost:8080/api/cluster/config \
+curl -X POST http://localhost:9095/api/cluster/config \
   -H "Content-Type: application/json" \
   -d '{
     "auto_migrate": true,
@@ -241,7 +241,7 @@ curl -X POST http://localhost:8080/api/cluster/config \
 ### Scheduled Migration
 
 ```bash
-curl -X POST http://localhost:8080/api/vms/myvm/migrate/schedule \
+curl -X POST http://localhost:9095/api/vms/myvm/migrate/schedule \
   -H "Content-Type: application/json" \
   -d '{
     "target_node": "node2",

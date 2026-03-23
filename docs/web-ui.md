@@ -41,7 +41,7 @@ npm install
 npm run dev
 ```
 
-Access at `http://localhost:3000`. The dev server proxies API requests to `http://localhost:8080/api`.
+Access at `http://localhost:3000`. The dev server proxies API requests to `http://localhost:9095/api`.
 
 ### Production Build
 

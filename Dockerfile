@@ -25,6 +25,6 @@ RUN mkdir -p /var/lib/vmspawnd/images /var/lib/vmspawnd/storage /etc/vmspawnd
 COPY --from=builder /build/target/release/vmspawnd /usr/local/bin/
 COPY configs/vmspawnd-docker.toml /etc/vmspawnd/vmspawnd.toml
 
-EXPOSE 8080
+EXPOSE 9095
 
 CMD ["/usr/local/bin/vmspawnd"]

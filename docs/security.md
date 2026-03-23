@@ -63,7 +63,7 @@ All API endpoints (except `/api/auth/login` and `/health`) require authenticatio
 PASSWORD=$(sudo cat /var/lib/vmspawnd/.admin_password)
 
 # Login
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:9095/api/auth/login \
   -H "Content-Type: application/json" \
   -d "{\"username\": \"admin\", \"password\": \"$PASSWORD\"}"
 ```
@@ -80,7 +80,7 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 ```bash
 curl -H "Authorization: Bearer <token>" \
-  http://localhost:8080/api/vms
+  http://localhost:9095/api/vms
 ```
 
 ### API Keys
@@ -89,7 +89,7 @@ For service-to-service and CI/CD authentication:
 
 ```bash
 # Generate an API key (admin only)
-curl -X POST http://localhost:8080/api/auth/api-keys \
+curl -X POST http://localhost:9095/api/auth/api-keys \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "ci-system", "role": "user"}'
@@ -106,7 +106,7 @@ curl -X POST http://localhost:8080/api/auth/api-keys \
 ```bash
 # Use the API key
 curl -H "X-API-Key: vmspawnd_xxxxxxxxxxxxx" \
-  http://localhost:8080/api/vms
+  http://localhost:9095/api/vms
 ```
 
 ---
@@ -129,17 +129,17 @@ Three built-in roles with progressively restricted permissions:
 
 ```bash
 # Create a new user (admin only)
-curl -X POST http://localhost:8080/api/auth/users \
+curl -X POST http://localhost:9095/api/auth/users \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"username": "operator", "password": "strong-password", "role": "user"}'
 
 # List users
 curl -H "Authorization: Bearer <admin-token>" \
-  http://localhost:8080/api/auth/users
+  http://localhost:9095/api/auth/users
 
 # Delete a user
-curl -X DELETE http://localhost:8080/api/auth/users/<user-id> \
+curl -X DELETE http://localhost:9095/api/auth/users/<user-id> \
   -H "Authorization: Bearer <admin-token>"
 ```
 
@@ -201,7 +201,7 @@ sudo journalctl -u vmspawnd | grep AUDIT
 
 # Via API (with filtering)
 curl -H "Authorization: Bearer <token>" \
-  http://localhost:8080/api/audit/logs
+  http://localhost:9095/api/audit/logs
 ```
 
 Audit logs can be exported as JSON or CSV for compliance and analysis.
@@ -235,10 +235,10 @@ sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 
 ```bash
 # On your workstation
-ssh -L 8080:localhost:8080 user@vmspawnd-server
+ssh -L 8080:localhost:9095 user@vmspawnd-server
 
 # Then access via localhost
-curl http://localhost:8080/api/vms
+curl http://localhost:9095/api/vms
 ```
 
 ---

@@ -20,7 +20,7 @@ pub async fn create_test_app() -> Router {
     let config = Config {
         daemon: DaemonConfig {
             listen: "127.0.0.1:0".to_string(),
-            cors_origins: vec!["http://127.0.0.1:8080".to_string()],
+            cors_origins: vec!["http://127.0.0.1:9095".to_string()],
         },
         storage: StorageConfig {
             path: tmp_dir.to_string_lossy().to_string(),

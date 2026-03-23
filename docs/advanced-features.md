@@ -4,14 +4,14 @@
 
 Real-time interactive terminal access to any running VM via WebSocket.
 
-**Endpoint:** `ws://localhost:8080/ws/console/:vmname`
+**Endpoint:** `ws://localhost:9095/ws/console/:vmname`
 
 The server authenticates the WebSocket upgrade, attaches to the VM's serial console, and relays bidirectional I/O between the client and the VM.
 
 ### Browser (xterm.js)
 
 ```typescript
-const ws = new WebSocket(`ws://localhost:8080/ws/console/myvm?token=${token}`)
+const ws = new WebSocket(`ws://localhost:9095/ws/console/myvm?token=${token}`)
 term.onData(data => ws.send(data))
 ws.onmessage = event => term.write(event.data)
 ```
@@ -28,7 +28,7 @@ ws.onmessage = event => term.write(event.data)
 
 Graphical console access via VNC, proxied over WebSocket for browser-based display.
 
-**Endpoint:** `ws://localhost:8080/ws/vnc/:vmname`
+**Endpoint:** `ws://localhost:9095/ws/vnc/:vmname`
 
 ```
 Browser (noVNC over WebSocket) <-> vnc-proxy <-> VNC Server (TCP 5900+)
@@ -187,7 +187,7 @@ Declarative VM provisioning via HashiCorp Terraform.
 
 ```hcl
 provider "vmspawnd" {
-  url   = "http://localhost:8080"
+  url   = "http://localhost:9095"
   token = var.vmspawnd_token
 }
 
@@ -244,7 +244,7 @@ See [terraform-provider/README.md](../terraform-provider/README.md) for full doc
 scrape_configs:
   - job_name: vmspawnd
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['localhost:9095']
     metrics_path: /metrics
     scrape_interval: 15s
 ```

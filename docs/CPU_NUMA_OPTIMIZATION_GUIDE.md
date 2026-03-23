@@ -27,7 +27,7 @@ Optimize VM performance with CPU pinning strategies, NUMA-aware placement, and h
 
 **Via API:**
 ```bash
-curl http://localhost:8080/api/system/cpu/topology
+curl http://localhost:9095/api/system/cpu/topology
 ```
 
 Response:
@@ -113,7 +113,7 @@ Pin all VM vCPUs to CPUs in a single NUMA node.
 **Example:**
 ```bash
 # Create VM pinned to NUMA node 0
-curl -X POST http://localhost:8080/api/vms \
+curl -X POST http://localhost:9095/api/vms \
   -d '{
     "name": "database-vm",
     "cpus": 8,
@@ -180,7 +180,7 @@ Avoid hyperthreading siblings for latency-sensitive VMs:
 
 **Via API:**
 ```bash
-curl -X POST http://localhost:8080/api/vms/my-vm/cpu/pin \
+curl -X POST http://localhost:9095/api/vms/my-vm/cpu/pin \
   -H "Content-Type: application/json" \
   -d '{
     "pinning": {
@@ -208,7 +208,7 @@ curl -X POST http://localhost:8080/api/vms/my-vm/cpu/pin \
 
 **Via API:**
 ```bash
-curl http://localhost:8080/api/system/numa/topology
+curl http://localhost:9095/api/system/numa/topology
 ```
 
 Response:
@@ -262,7 +262,7 @@ Node 1 → Node 1: Distance 10 (local, fast)
 
 Get placement recommendation:
 ```bash
-curl "http://localhost:8080/api/system/numa/placement?memory_mb=16384&cpus=8"
+curl "http://localhost:9095/api/system/numa/placement?memory_mb=16384&cpus=8"
 ```
 
 Response:
@@ -306,7 +306,7 @@ vmspawnd selects the node with:
 **Via API:**
 ```bash
 # Allocate 512 × 2MB hugepages (1GB total)
-curl -X POST http://localhost:8080/api/system/memory/hugepages \
+curl -X POST http://localhost:9095/api/system/memory/hugepages \
   -H "Content-Type: application/json" \
   -d '{
     "size": "Size2MB",
@@ -314,7 +314,7 @@ curl -X POST http://localhost:8080/api/system/memory/hugepages \
   }'
 
 # Allocate 16 × 1GB hugepages (16GB total)
-curl -X POST http://localhost:8080/api/system/memory/hugepages \
+curl -X POST http://localhost:9095/api/system/memory/hugepages \
   -d '{
     "size": "Size1GB",
     "count": 16
@@ -334,7 +334,7 @@ sudo reboot
 ### Create VM with Hugepages
 
 ```bash
-curl -X POST http://localhost:8080/api/vms \
+curl -X POST http://localhost:9095/api/vms \
   -d '{
     "name": "big-vm",
     "cpus": 16,
@@ -540,7 +540,7 @@ cat /proc/$(pidof qemu-system-x86_64)/numa_maps
 # Or migrate VM to node with more memory
 
 # Get NUMA topology
-curl http://localhost:8080/api/system/numa/topology
+curl http://localhost:9095/api/system/numa/topology
 
 # Choose node with enough resources
 # Pin VM to that node
@@ -553,7 +553,7 @@ curl http://localhost:8080/api/system/numa/topology
 **Solution:**
 ```bash
 # Apply CPU pinning
-curl -X POST http://localhost:8080/api/vms/my-vm/cpu/pin \
+curl -X POST http://localhost:9095/api/vms/my-vm/cpu/pin \
   -d '{"pinning": {"type": "NumaNode", "value": 0}}'
 ```
 
@@ -570,7 +570,7 @@ cat /proc/meminfo | grep Huge
 echo 1024 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
 
 # Or via API
-curl -X POST http://localhost:8080/api/system/memory/hugepages \
+curl -X POST http://localhost:9095/api/system/memory/hugepages \
   -d '{"size": "Size2MB", "count": 1024}'
 ```
 

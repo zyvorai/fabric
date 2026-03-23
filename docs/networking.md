@@ -25,12 +25,12 @@ bridge = "br0"
 
 ```bash
 # Create a bridge
-curl -X POST http://localhost:8080/api/network/bridges \
+curl -X POST http://localhost:9095/api/network/bridges \
   -H "Content-Type: application/json" \
   -d '{"name": "br0"}'
 
 # Delete a bridge
-curl -X DELETE http://localhost:8080/api/network/bridges/br0
+curl -X DELETE http://localhost:9095/api/network/bridges/br0
 
 # Manual creation
 sudo ip link add name br0 type bridge
@@ -45,7 +45,7 @@ sudo ip addr add 192.168.100.1/24 dev br0
 ### Add a NIC to a VM
 
 ```bash
-curl -X POST http://localhost:8080/api/vms/myvm/network \
+curl -X POST http://localhost:9095/api/vms/myvm/network \
   -H "Content-Type: application/json" \
   -d '{"name": "eth0", "bridge": "br0", "mac_address": "52:54:00:12:34:56"}'
 ```
@@ -66,12 +66,12 @@ curl -X POST http://localhost:8080/api/vms/myvm/network \
 
 ```bash
 # Create a VLAN on a bridge
-curl -X POST http://localhost:8080/api/network/vlans \
+curl -X POST http://localhost:9095/api/network/vlans \
   -H "Content-Type: application/json" \
   -d '{"bridge": "br0", "vlan_id": 100}'
 
 # Assign a VM to a VLAN
-curl -X POST http://localhost:8080/api/vms/myvm/network \
+curl -X POST http://localhost:9095/api/vms/myvm/network \
   -H "Content-Type: application/json" \
   -d '{"name": "eth0", "bridge": "br0", "vlan_id": 100}'
 ```
@@ -82,12 +82,12 @@ curl -X POST http://localhost:8080/api/vms/myvm/network \
 
 ```bash
 # Forward host port 8080 to VM port 80
-curl -X POST http://localhost:8080/api/vms/myvm/port-forwards \
+curl -X POST http://localhost:9095/api/vms/myvm/port-forwards \
   -H "Content-Type: application/json" \
   -d '{"protocol": "tcp", "host_port": 8080, "guest_port": 80, "guest_ip": "192.168.100.10"}'
 
 # Remove
-curl -X DELETE http://localhost:8080/api/vms/myvm/port-forwards/8080
+curl -X DELETE http://localhost:9095/api/vms/myvm/port-forwards/8080
 ```
 
 ---
@@ -114,7 +114,7 @@ vmspawnd includes a Cilium-style network security stack. All security resources 
 Label-based ingress/egress rules:
 
 ```bash
-curl -X POST http://localhost:8080/api/network-policies \
+curl -X POST http://localhost:9095/api/network-policies \
   -H "Content-Type: application/json" \
   -d '{
     "name": "allow-web",
@@ -132,7 +132,7 @@ Per-VM firewall profiles and zones via nftables:
 
 ```bash
 # Create a firewall profile
-curl -X POST http://localhost:8080/api/firewall-profiles \
+curl -X POST http://localhost:9095/api/firewall-profiles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "web-profile",
@@ -151,7 +151,7 @@ vmctl firewall assign myvm --profile=web-profile
 Virtual IP load-balanced services:
 
 ```bash
-curl -X POST http://localhost:8080/api/services \
+curl -X POST http://localhost:9095/api/services \
   -H "Content-Type: application/json" \
   -d '{
     "name": "web-service",
@@ -169,7 +169,7 @@ Algorithms: `round_robin`, `least_conn`, `random`, `ip_hash`.
 Bandwidth management with guaranteed and maximum rates:
 
 ```bash
-curl -X POST http://localhost:8080/api/qos-policies \
+curl -X POST http://localhost:9095/api/qos-policies \
   -H "Content-Type: application/json" \
   -d '{
     "name": "standard-qos",
@@ -186,7 +186,7 @@ curl -X POST http://localhost:8080/api/qos-policies \
 Zone management and domain blocking:
 
 ```bash
-curl -X POST http://localhost:8080/api/dns-policies \
+curl -X POST http://localhost:9095/api/dns-policies \
   -H "Content-Type: application/json" \
   -d '{
     "name": "block-ads",
@@ -202,7 +202,7 @@ WireGuard tunnels with three topologies:
 
 ```bash
 # Create a tunnel
-curl -X POST http://localhost:8080/api/vpn-tunnels \
+curl -X POST http://localhost:9095/api/vpn-tunnels \
   -H "Content-Type: application/json" \
   -d '{
     "name": "site-link",
@@ -219,7 +219,7 @@ curl -X POST http://localhost:8080/api/vpn-tunnels \
   }'
 
 # Create an auto-mesh network
-curl -X POST http://localhost:8080/api/vpn-networks \
+curl -X POST http://localhost:9095/api/vpn-networks \
   -H "Content-Type: application/json" \
   -d '{
     "name": "dev-mesh",
@@ -237,7 +237,7 @@ Topologies: `full_mesh`, `hub_spoke`, `point_to_point`.
 Traffic capture for debugging and monitoring:
 
 ```bash
-curl -X POST http://localhost:8080/api/mirror-sessions \
+curl -X POST http://localhost:9095/api/mirror-sessions \
   -H "Content-Type: application/json" \
   -d '{
     "name": "debug-capture",
@@ -257,7 +257,7 @@ Masquerade, SNAT, DNAT, and hairpin NAT via nftables:
 
 ```bash
 # Masquerade
-curl -X POST http://localhost:8080/api/nat-rules \
+curl -X POST http://localhost:9095/api/nat-rules \
   -H "Content-Type: application/json" \
   -d '{
     "name": "vm-internet",
@@ -267,7 +267,7 @@ curl -X POST http://localhost:8080/api/nat-rules \
   }'
 
 # DNAT (port forward)
-curl -X POST http://localhost:8080/api/nat-rules \
+curl -X POST http://localhost:9095/api/nat-rules \
   -H "Content-Type: application/json" \
   -d '{
     "name": "web-forward",
@@ -285,7 +285,7 @@ curl -X POST http://localhost:8080/api/nat-rules \
 Per-VM bandwidth tracking with threshold alerts:
 
 ```bash
-curl -X POST http://localhost:8080/api/monitor-policies \
+curl -X POST http://localhost:9095/api/monitor-policies \
   -H "Content-Type: application/json" \
   -d '{
     "name": "high-bandwidth-alert",
@@ -299,9 +299,9 @@ curl -X POST http://localhost:8080/api/monitor-policies \
   }'
 
 # View metrics and alerts
-curl http://localhost:8080/api/network-metrics
-curl http://localhost:8080/api/network-metrics/myvm
-curl http://localhost:8080/api/bandwidth-alerts
+curl http://localhost:9095/api/network-metrics
+curl http://localhost:9095/api/network-metrics/myvm
+curl http://localhost:9095/api/bandwidth-alerts
 ```
 
 ---
