@@ -43,11 +43,11 @@ export default function MigrationTemplates() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3"><FileText className="w-6 h-6 text-indigo-400" /><div><h1 className="text-xl font-bold text-white">Migration Templates</h1><p className="text-sm text-slate-400">Reusable migration configurations</p></div></div>
-        <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /> New Template</button>
+        <button onClick={() => setShowAdd(!showAdd)} title="Create new template" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /> New Template</button>
       </div>
 
       {showAdd && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-slate-300">New Template</h3>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-xs text-slate-400 mb-1">Name</label><input type="text" value={newTemplate.name || ''} onChange={e => setNewTemplate(p => ({ ...p, name: e.target.value }))} placeholder="My Template" className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500" /></div>

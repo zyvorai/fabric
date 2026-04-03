@@ -59,7 +59,7 @@ export default function JobMonitor() {
       if (!res.ok) return
       const data = await res.json()
       setLogs(Array.isArray(data) ? data : data.lines || data.logs || [])
-    } catch { /* ignore */ }
+    } catch { /* Log fetch failures are non-critical during streaming */ }
   }, [])
 
   useEffect(() => { fetchJobs(); const interval = setInterval(fetchJobs, 3000); return () => clearInterval(interval) }, [fetchJobs])
@@ -77,7 +77,7 @@ export default function JobMonitor() {
         <div><h1 className="text-2xl font-bold text-white">Job Monitor</h1><p className="text-sm text-slate-400 mt-1">Real-time job tracking with live logs</p></div>
         <button onClick={fetchJobs} title="Refresh jobs" className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /> Refresh</button>
       </div>
-      {error && <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-4 text-sm text-red-400">{error}</div>}
+      {error && <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-4 text-sm text-red-400">{error}<button onClick={fetchJobs} className="ml-3 text-xs underline">Retry</button></div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Job list */}
@@ -89,7 +89,7 @@ export default function JobMonitor() {
             const Icon = cfg.icon
             const isSelected = selectedJob === job.id
             return (
-              <div key={job.id} onClick={() => setSelectedJob(job.id)} className={`bg-slate-800/50 rounded-xl border p-4 cursor-pointer transition-all hover:scale-[1.01] ${isSelected ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-700/50'}`}>
+              <div key={job.id} role="button" tabIndex={0} onClick={() => setSelectedJob(job.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedJob(job.id) } }} className={`bg-slate-800/50 rounded-xl border p-4 cursor-pointer transition-all hover:scale-[1.01] ${isSelected ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-700/50'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-white truncate">{job.name || job.vm_name || job.id}</span>
                   <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>

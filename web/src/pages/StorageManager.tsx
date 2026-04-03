@@ -24,7 +24,7 @@ export default function StorageManager() {
   }, [])
 
   const fetchVolumes = useCallback(async (poolName: string) => {
-    try { const res = await apiFetch(`/api/storage/pools/${poolName}/volumes`); if (res.ok) { const data = await res.json(); setVolumes(Array.isArray(data) ? data : data.volumes || []) } } catch { setVolumes([]) }
+    try { const res = await apiFetch(`/api/storage/pools/${poolName}/volumes`); if (res.ok) { const data = await res.json(); setVolumes(Array.isArray(data) ? data : data.volumes || []) } } catch (err: any) { setError(`Failed to load volumes: ${err.message}`); setVolumes([]) }
   }, [])
 
   useEffect(() => { fetchPools() }, [fetchPools])
@@ -38,7 +38,7 @@ export default function StorageManager() {
         <div className="flex items-center gap-3"><Database className="w-6 h-6 text-blue-400" /><div><h1 className="text-xl font-bold text-white">Storage Manager</h1><p className="text-sm text-slate-400">Storage pools and volumes</p></div></div>
         <button onClick={fetchPools} title="Refresh pools" className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /> Refresh</button>
       </div>
-      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400">{error}</div>}
+      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400">{error}<button onClick={fetchPools} className="ml-3 text-xs underline">Retry</button></div>}
 
       {pools.length === 0 ? (
         <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500"><Database className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No storage pools found</p></div>
@@ -48,7 +48,7 @@ export default function StorageManager() {
             const usage = pct(pool.allocation, pool.capacity)
             const isSelected = selectedPool === pool.name
             return (
-              <div key={pool.name} onClick={() => setSelectedPool(pool.name)} className={`bg-slate-800/50 rounded-xl border p-5 cursor-pointer transition-all hover:scale-[1.01] card-glow ${isSelected ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-700/50'}`}>
+              <div key={pool.name} role="button" tabIndex={0} onClick={() => setSelectedPool(pool.name)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPool(pool.name) } }} className={`bg-slate-800/50 rounded-xl border p-5 cursor-pointer transition-all hover:scale-[1.01] card-glow ${isSelected ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-700/50'}`}>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-white">{pool.name}</h3>
                   <div className="flex items-center gap-2">

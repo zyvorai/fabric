@@ -104,13 +104,13 @@ export default function MigrationWizard() {
       </div>
 
       <div className="flex items-center justify-between">
-        <button onClick={() => setStep(steps[currentIdx - 1].key)} disabled={currentIdx === 0} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ArrowLeft className="w-4 h-4" /> Back</button>
+        <button onClick={() => setStep(steps[currentIdx - 1].key)} disabled={currentIdx === 0} title="Go back" className="flex items-center gap-2 px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ArrowLeft className="w-4 h-4" /> Back</button>
         {step === 'review' ? (
-          <button onClick={handleSubmit} disabled={submitting || result?.ok} className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all shadow-lg shadow-green-600/20 disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={submitting || result?.ok} title="Submit migration" className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all shadow-lg shadow-green-600/20 disabled:opacity-50">
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {submitting ? 'Submitting...' : 'Submit Migration'}
           </button>
         ) : (
-          <button onClick={() => setStep(steps[currentIdx + 1].key)} disabled={!canNext} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Next <ArrowRight className="w-4 h-4" /></button>
+          <button onClick={() => setStep(steps[currentIdx + 1].key)} disabled={!canNext} title="Next step" className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Next <ArrowRight className="w-4 h-4" /></button>
         )}
       </div>
     </div>

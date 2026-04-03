@@ -77,7 +77,7 @@ done
 
 # ── Systemd ──
 section "Systemd Services"
-for unit in vmspawnd.service; do
+for unit in vmspawnd.service vmspawnd-backup.service vmspawnd-cleanup.service; do
     if systemctl list-unit-files "$unit" &>/dev/null 2>&1; then
         if systemctl is-active "$unit" &>/dev/null; then
             pass "$unit: running"

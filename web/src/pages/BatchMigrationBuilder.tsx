@@ -26,7 +26,7 @@ export default function BatchMigrationBuilder() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3"><Layers className="w-6 h-6 text-pink-400" /><div><h1 className="text-xl font-bold text-white">Batch Migration Builder</h1><p className="text-sm text-slate-400">Configure multiple VM migrations with JSON export</p></div></div>
-        <button onClick={addEntry} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /> Add VM</button>
+        <button onClick={addEntry} title="Add VM" className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /> Add VM</button>
       </div>
 
       {entries.length === 0 ? (
@@ -35,7 +35,7 @@ export default function BatchMigrationBuilder() {
         <div className="space-y-3">
           {entries.map((entry, idx) => (
             <div key={entry.id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-700/30 transition-colors" onClick={() => toggleExpand(entry.id)}>
+              <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-700/30 transition-colors" role="button" tabIndex={0} onClick={() => toggleExpand(entry.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(entry.id) } }}>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-slate-500 bg-slate-700/50 w-6 h-6 rounded-full flex items-center justify-center">{idx + 1}</span>
                   <span className="text-sm font-medium text-white">{entry.name || `VM ${idx + 1}`}</span>

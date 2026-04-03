@@ -15,12 +15,12 @@ export default function SnapshotManager() {
   const [success, setSuccess] = useState<string | null>(null)
 
   const fetchVMs = useCallback(async () => {
-    try { const res = await apiFetch('/api/vms'); if (res.ok) { const data = await res.json(); setVMs((Array.isArray(data) ? data : data.vms || []).map((v: any) => v.name)) } } catch { /* ignore */ } finally { setLoading(false) }
+    try { const res = await apiFetch('/api/vms'); if (res.ok) { const data = await res.json(); setVMs((Array.isArray(data) ? data : data.vms || []).map((v: any) => v.name)) } } catch (err: any) { setError(err.message || 'Failed to load VMs') } finally { setLoading(false) }
   }, [])
 
   const fetchSnapshots = useCallback(async () => {
     if (!selectedVM) return
-    try { const res = await apiFetch(`/api/vms/${selectedVM}/snapshots`); if (res.ok) { const data = await res.json(); setSnapshots(Array.isArray(data) ? data : data.snapshots || []) } } catch { setSnapshots([]) }
+    try { const res = await apiFetch(`/api/vms/${selectedVM}/snapshots`); if (res.ok) { const data = await res.json(); setSnapshots(Array.isArray(data) ? data : data.snapshots || []) } } catch (err: any) { setError(err.message || 'Failed to load snapshots'); setSnapshots([]) }
   }, [selectedVM])
 
   useEffect(() => { fetchVMs() }, [fetchVMs])
@@ -81,7 +81,7 @@ export default function SnapshotManager() {
           <h3 className="text-sm font-semibold text-white mb-3">Create Snapshot</h3>
           <div className="flex gap-3">
             <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="snapshot-name" aria-label="Snapshot name" className="flex-1 bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500" />
-            <button onClick={handleCreate} disabled={creating || !newName.trim()} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+            <button onClick={handleCreate} disabled={creating || !newName.trim()} title="Create snapshot" className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
             </button>
           </div>
