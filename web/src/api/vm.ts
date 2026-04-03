@@ -29,7 +29,8 @@ export interface VMMetrics {
 const API_BASE = '/api'
 
 export async function listVMs(): Promise<VM[]> {
-  return apiGet<VM[]>(`${API_BASE}/vms`)
+  const data = await apiGet<VM[] | { items: VM[] }>(`${API_BASE}/vms`)
+  return Array.isArray(data) ? data : data.items || []
 }
 
 export async function getVM(name: string): Promise<VM> {
