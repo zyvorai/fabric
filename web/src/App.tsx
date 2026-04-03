@@ -3,9 +3,8 @@ import { Suspense, lazy, ReactNode } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { SidebarProvider, useSidebar } from './contexts/SidebarContext'
 import { PageErrorBoundary } from './components/ErrorBoundary'
-import Sidebar from './components/Sidebar'
+import Navbar from './components/Navbar'
 import KeyboardShortcutsPanel from './components/KeyboardShortcutsPanel'
 import CommandPalette from './components/CommandPalette'
 import Login from './pages/Login'
@@ -46,16 +45,54 @@ const Migrations = lazy(() => import('./pages/Migrations'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Snapshots = lazy(() => import('./pages/Snapshots'))
 const NetworkSecurity = lazy(() => import('./pages/NetworkSecurity'))
+const Processes = lazy(() => import('./pages/Processes'))
+const SecurityDashboard = lazy(() => import('./pages/SecurityDashboard'))
+const Kernel = lazy(() => import('./pages/Kernel'))
+const Alerts = lazy(() => import('./pages/Alerts'))
+const Debug = lazy(() => import('./pages/Debug'))
+const Explain = lazy(() => import('./pages/Explain'))
+const Timeline = lazy(() => import('./pages/Timeline'))
+const Webhooks = lazy(() => import('./pages/Webhooks'))
+const APIPlayground = lazy(() => import('./pages/APIPlayground'))
+const CostEstimator = lazy(() => import('./pages/CostEstimator'))
+const SystemHealth = lazy(() => import('./pages/SystemHealth'))
+const ContainersPage = lazy(() => import('./pages/Containers'))
+const DiskConverter = lazy(() => import('./pages/DiskConverter'))
+const VMComparePage = lazy(() => import('./pages/VMCompare'))
+const VMHealthCheckPage = lazy(() => import('./pages/VMHealthCheck'))
+const NotificationCenterPage = lazy(() => import('./pages/NotificationCenter'))
+const FavoriteVMs = lazy(() => import('./pages/FavoriteVMs'))
+const BulkOperationsPage = lazy(() => import('./pages/BulkOperations'))
+const ISOImages = lazy(() => import('./pages/ISOImages'))
+const DownloadDisk = lazy(() => import('./pages/DownloadDisk'))
+const UploadDiskPage = lazy(() => import('./pages/UploadDisk'))
+const PipelineMonitorPage = lazy(() => import('./pages/PipelineMonitor'))
+const MigrationReadinessPage = lazy(() => import('./pages/MigrationReadiness'))
+const MigrationHistoryPage = lazy(() => import('./pages/MigrationHistory'))
+const MigrationReportPage = lazy(() => import('./pages/MigrationReport'))
+const NetworkTopologyPage = lazy(() => import('./pages/NetworkTopology'))
+const BackupSchedulerPage = lazy(() => import('./pages/BackupScheduler'))
+const BatchImportPage = lazy(() => import('./pages/BatchImport'))
+const ResourceOptimizerPage = lazy(() => import('./pages/ResourceOptimizer'))
+const CapacityPlanningPage = lazy(() => import('./pages/CapacityPlanning'))
+const ComplianceDashboardPage = lazy(() => import('./pages/ComplianceDashboard'))
+const LiveMetricsPage = lazy(() => import('./pages/LiveMetrics'))
+const AccessControlPage = lazy(() => import('./pages/AccessControl'))
+const PluginManagerPage = lazy(() => import('./pages/PluginManager'))
+const ServiceMapPage = lazy(() => import('./pages/ServiceMap'))
+const EventStreamPage = lazy(() => import('./pages/EventStream'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-gray-500 text-sm">Loading...</span>
+          <span className="text-sm font-semibold text-slate-300 tracking-wide">
+            Loading vmspawnd...
+          </span>
         </div>
       </div>
     )
@@ -69,18 +106,13 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 function MainLayout() {
-  const { collapsed } = useSidebar()
-
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <Sidebar />
+    <div className="h-screen flex flex-col bg-slate-950">
+      <Navbar />
       <KeyboardShortcutsPanel />
       <CommandPalette />
-      <main
-        className="min-h-screen transition-all duration-300 ease-in-out"
-        style={{ marginLeft: collapsed ? 68 : 260 }}
-      >
-        <div className="px-6 py-6 lg:px-8 lg:py-8 max-w-[1600px]">
+      <main className="flex-1 overflow-auto px-6 py-6 page-bg">
+        <div className="animate-fade-in max-w-[1600px] mx-auto">
           <PageErrorBoundary>
             <Suspense fallback={
               <div className="flex items-center justify-center h-64">
@@ -123,6 +155,42 @@ function MainLayout() {
               <Route path="/lifecycle" element={<LifecycleManager />} />
               <Route path="/certificates" element={<Certificates />} />
               <Route path="/network-security" element={<NetworkSecurity />} />
+              <Route path="/processes" element={<Processes />} />
+              <Route path="/security-dashboard" element={<SecurityDashboard />} />
+              <Route path="/kernel" element={<Kernel />} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/debug" element={<Debug />} />
+              <Route path="/explain" element={<Explain />} />
+              <Route path="/timeline" element={<Timeline />} />
+              <Route path="/webhooks" element={<Webhooks />} />
+              <Route path="/api-playground" element={<APIPlayground />} />
+              <Route path="/cost-estimator" element={<CostEstimator />} />
+              <Route path="/system-health" element={<SystemHealth />} />
+              <Route path="/containers" element={<ContainersPage />} />
+              <Route path="/disk-converter" element={<DiskConverter />} />
+              <Route path="/vm-compare" element={<VMComparePage />} />
+              <Route path="/vm-healthcheck" element={<VMHealthCheckPage />} />
+              <Route path="/notification-center" element={<NotificationCenterPage />} />
+              <Route path="/favorites" element={<FavoriteVMs />} />
+              <Route path="/bulk-operations" element={<BulkOperationsPage />} />
+              <Route path="/iso-images" element={<ISOImages />} />
+              <Route path="/download-disk" element={<DownloadDisk />} />
+              <Route path="/upload-disk" element={<UploadDiskPage />} />
+              <Route path="/pipeline" element={<PipelineMonitorPage />} />
+              <Route path="/migration-readiness" element={<MigrationReadinessPage />} />
+              <Route path="/migration-history" element={<MigrationHistoryPage />} />
+              <Route path="/migration-report" element={<MigrationReportPage />} />
+              <Route path="/network-topology" element={<NetworkTopologyPage />} />
+              <Route path="/backup-scheduler" element={<BackupSchedulerPage />} />
+              <Route path="/batch-import" element={<BatchImportPage />} />
+              <Route path="/resource-optimizer" element={<ResourceOptimizerPage />} />
+              <Route path="/capacity-planning" element={<CapacityPlanningPage />} />
+              <Route path="/compliance" element={<ComplianceDashboardPage />} />
+              <Route path="/live-metrics" element={<LiveMetricsPage />} />
+              <Route path="/access-control" element={<AccessControlPage />} />
+              <Route path="/plugins" element={<PluginManagerPage />} />
+              <Route path="/service-map" element={<ServiceMapPage />} />
+              <Route path="/event-stream" element={<EventStreamPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
@@ -151,11 +219,9 @@ function App() {
     <AuthProvider>
       <ToastProvider>
         <WebSocketProvider>
-          <SidebarProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </SidebarProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
         </WebSocketProvider>
       </ToastProvider>
     </AuthProvider>
