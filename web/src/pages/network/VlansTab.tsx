@@ -12,36 +12,36 @@ interface VlansTabProps {
 
 function VlansTabContent({ vlans, onDelete, onCreate }: VlansTabProps) {
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">VLANs</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create VLAN
         </button>
       </div>
       {vlans.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">No VLANs configured.</div>
+        <div className="p-12 text-center text-slate-400">No VLANs configured.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-slate-800">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                <th className="text-left p-4 font-medium text-gray-300">VLAN ID</th>
-                <th className="text-left p-4 font-medium text-gray-300">Parent</th>
-                <th className="text-left p-4 font-medium text-gray-300">Addresses</th>
-                <th className="text-left p-4 font-medium text-gray-300">DHCP</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                <th className="text-left p-4 font-medium text-slate-300">VLAN ID</th>
+                <th className="text-left p-4 font-medium text-slate-300">Parent</th>
+                <th className="text-left p-4 font-medium text-slate-300">Addresses</th>
+                <th className="text-left p-4 font-medium text-slate-300">DHCP</th>
+                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {vlans.map(v => (
                 <tr key={v.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{v.name}</td>
                   <td className="p-4 font-mono text-purple-400">{v.vlan_id}</td>
-                  <td className="p-4 text-gray-400">{v.parent_interface}</td>
-                  <td className="p-4 text-gray-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
-                  <td className="p-4 text-gray-400">{v.dhcp}</td>
+                  <td className="p-4 text-slate-400">{v.parent_interface}</td>
+                  <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
+                  <td className="p-4 text-slate-400">{v.dhcp}</td>
                   <td className="p-4">
                     <button onClick={() => onDelete(v.id)} className="p-2 hover:bg-red-600 rounded transition">
                       <Trash2 className="w-4 h-4" />

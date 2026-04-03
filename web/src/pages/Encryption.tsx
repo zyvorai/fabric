@@ -78,7 +78,7 @@ export default function Encryption() {
       encrypting: 'bg-blue-100 text-blue-800',
       decrypting: 'bg-yellow-100 text-yellow-800',
     }
-    return colors[status] || 'bg-gray-100 text-gray-800'
+    return colors[status] || 'bg-slate-500/20 text-slate-400'
   }
 
   if (loading) {
@@ -90,7 +90,7 @@ export default function Encryption() {
       <PageHeader
         title="Encryption"
         actions={
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
         }
@@ -99,25 +99,25 @@ export default function Encryption() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+          <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
             <Key className="w-4 h-4" /> Key Providers
           </div>
           <div className="text-2xl font-bold">{providers.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+          <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
             <Shield className="w-4 h-4" /> Policies
           </div>
           <div className="text-2xl font-bold">{policies.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Encrypted VMs</div>
+          <div className="text-slate-400 text-sm mb-1">Encrypted VMs</div>
           <div className="text-2xl font-bold text-green-400">
             {encryptedVMs.filter(v => v.encrypted).length}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Total Keys</div>
+          <div className="text-slate-400 text-sm mb-1">Total Keys</div>
           <div className="text-2xl font-bold">
             {providers.reduce((s, p) => s + p.key_count, 0)}
           </div>
@@ -125,7 +125,7 @@ export default function Encryption() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
         {(['providers', 'policies', 'vms'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -143,10 +143,10 @@ export default function Encryption() {
               <Plus className="w-4 h-4" /> Add Provider
             </button>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-800">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+            <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase">
+                <tr className="text-left text-xs text-slate-400 uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Type</th>
                   <th className="p-4">Endpoint</th>
@@ -156,14 +156,14 @@ export default function Encryption() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {providers.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-gray-400">No key providers registered.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No key providers registered.</td></tr>
                 ) : providers.map(prov => (
-                  <tr key={prov.id} className="hover:bg-gray-900">
+                  <tr key={prov.id} className="hover:bg-slate-900">
                     <td className="p-4 font-medium">{prov.name}</td>
                     <td className="p-4 text-sm">{prov.provider_type}</td>
-                    <td className="p-4 text-sm font-mono text-gray-400">{prov.endpoint}</td>
+                    <td className="p-4 text-sm font-mono text-slate-400">{prov.endpoint}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(prov.status)}`}>
                         {prov.status}
@@ -193,10 +193,10 @@ export default function Encryption() {
               <Plus className="w-4 h-4" /> Create Policy
             </button>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-800">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+            <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase">
+                <tr className="text-left text-xs text-slate-400 uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Provider</th>
                   <th className="p-4">Algorithm</th>
@@ -206,22 +206,22 @@ export default function Encryption() {
                   <th className="p-4">Enabled</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {policies.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-gray-400">No encryption policies.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No encryption policies.</td></tr>
                 ) : policies.map(pol => (
-                  <tr key={pol.id} className="hover:bg-gray-900">
+                  <tr key={pol.id} className="hover:bg-slate-900">
                     <td className="p-4">
                       <div className="font-medium">{pol.name}</div>
-                      {pol.description && <div className="text-xs text-gray-400">{pol.description}</div>}
+                      {pol.description && <div className="text-xs text-slate-400">{pol.description}</div>}
                     </td>
-                    <td className="p-4 text-sm text-gray-400">{pol.provider_id}</td>
+                    <td className="p-4 text-sm text-slate-400">{pol.provider_id}</td>
                     <td className="p-4 text-sm font-mono">{pol.algorithm}</td>
                     <td className="p-4 text-sm">{pol.key_size} bits</td>
                     <td className="p-4 text-sm">{pol.auto_rotate ? 'Yes' : 'No'}</td>
                     <td className="p-4 text-sm">{pol.rotation_interval_days ? `${pol.rotation_interval_days} days` : '-'}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${pol.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${pol.enabled ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>
                         {pol.enabled ? 'Enabled' : 'Disabled'}
                       </span>
                     </td>
@@ -235,10 +235,10 @@ export default function Encryption() {
 
       {/* Encrypted VMs Tab */}
       {activeTab === 'vms' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-800">
+        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
-              <tr className="text-left text-xs text-gray-400 uppercase">
+              <tr className="text-left text-xs text-slate-400 uppercase">
                 <th className="p-4">VM</th>
                 <th className="p-4">Encrypted</th>
                 <th className="p-4">Policy</th>
@@ -247,20 +247,20 @@ export default function Encryption() {
                 <th className="p-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {encryptedVMs.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-400">No encrypted VMs.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-slate-400">No encrypted VMs.</td></tr>
               ) : encryptedVMs.map(vm => (
-                <tr key={vm.vm_id} className="hover:bg-gray-900">
+                <tr key={vm.vm_id} className="hover:bg-slate-900">
                   <td className="p-4 font-medium">{vm.vm_name}</td>
                   <td className="p-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${vm.encrypted ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${vm.encrypted ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>
                       {vm.encrypted ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td className="p-4 text-sm text-gray-400">{vm.policy_name || '-'}</td>
+                  <td className="p-4 text-sm text-slate-400">{vm.policy_name || '-'}</td>
                   <td className="p-4 text-sm font-mono">{vm.algorithm || '-'}</td>
-                  <td className="p-4 text-sm text-gray-400">
+                  <td className="p-4 text-sm text-slate-400">
                     {vm.last_key_rotation ? new Date(vm.last_key_rotation).toLocaleDateString() : 'Never'}
                   </td>
                   <td className="p-4">
@@ -319,18 +319,18 @@ function CreateProviderModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Register Key Provider</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
             <select value={providerType} onChange={e => setProviderType(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
               <option value="KMIP">KMIP</option>
               <option value="Native">Native</option>
               <option value="Cloud">Cloud</option>
@@ -339,11 +339,11 @@ function CreateProviderModal({ onClose, onCreated }: { onClose: () => void; onCr
           <div>
             <label className="block text-sm font-medium mb-1">Endpoint</label>
             <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2"
               placeholder="https://kms.example.com:5696" required />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Register</button>
           </div>
         </form>
@@ -375,23 +375,23 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Encryption Policy</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Key Provider</label>
             <select value={providerId} onChange={e => setProviderId(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
               {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -399,7 +399,7 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
             <div>
               <label className="block text-sm font-medium mb-1">Algorithm</label>
               <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
                 <option value="AES-256-XTS">AES-256-XTS</option>
                 <option value="AES-128-XTS">AES-128-XTS</option>
                 <option value="AES-256-CBC">AES-256-CBC</option>
@@ -408,7 +408,7 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
             <div>
               <label className="block text-sm font-medium mb-1">Key Size</label>
               <select value={keySize} onChange={e => setKeySize(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
                 <option value={128}>128 bits</option>
                 <option value={256}>256 bits</option>
               </select>
@@ -422,11 +422,11 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
             <div>
               <label className="block text-sm font-medium mb-1">Rotation Interval (days)</label>
               <input type="number" value={rotationDays} onChange={e => setRotationDays(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" min={1} />
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" min={1} />
             </div>
           )}
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>

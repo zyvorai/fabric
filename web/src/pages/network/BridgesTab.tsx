@@ -12,36 +12,36 @@ interface BridgesTabProps {
 
 function BridgesTabContent({ bridges, onDelete, onCreate }: BridgesTabProps) {
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Network Bridges</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Bridge
         </button>
       </div>
       {bridges.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">No bridges configured. Create one to get started.</div>
+        <div className="p-12 text-center text-slate-400">No bridges configured. Create one to get started.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-slate-800">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                <th className="text-left p-4 font-medium text-gray-300">Addresses</th>
-                <th className="text-left p-4 font-medium text-gray-300">STP</th>
-                <th className="text-left p-4 font-medium text-gray-300">DHCP</th>
-                <th className="text-left p-4 font-medium text-gray-300">MTU</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                <th className="text-left p-4 font-medium text-slate-300">Addresses</th>
+                <th className="text-left p-4 font-medium text-slate-300">STP</th>
+                <th className="text-left p-4 font-medium text-slate-300">DHCP</th>
+                <th className="text-left p-4 font-medium text-slate-300">MTU</th>
+                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {bridges.map(b => (
                 <tr key={b.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{b.name}</td>
-                  <td className="p-4 text-gray-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
-                  <td className="p-4">{b.stp ? <span className="text-green-400">on</span> : <span className="text-gray-500">off</span>}</td>
-                  <td className="p-4 text-gray-400">{b.dhcp}</td>
-                  <td className="p-4 text-gray-400">{b.mtu ?? '-'}</td>
+                  <td className="p-4 text-slate-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
+                  <td className="p-4">{b.stp ? <span className="text-green-400">on</span> : <span className="text-slate-500">off</span>}</td>
+                  <td className="p-4 text-slate-400">{b.dhcp}</td>
+                  <td className="p-4 text-slate-400">{b.mtu ?? '-'}</td>
                   <td className="p-4">
                     <button onClick={() => onDelete(b.id)} className="p-2 hover:bg-red-600 rounded transition">
                       <Trash2 className="w-4 h-4" />

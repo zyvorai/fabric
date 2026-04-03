@@ -14,11 +14,11 @@ interface QosTabProps {
 
 function QosTabContent({ policies, onDelete, onCreate, onSync }: QosTabProps) {
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">QoS / Traffic Shaping</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -27,34 +27,34 @@ function QosTabContent({ policies, onDelete, onCreate, onSync }: QosTabProps) {
         </div>
       </div>
       {policies.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">No QoS policies configured. Create one to shape VM network traffic.</div>
+        <div className="p-12 text-center text-slate-400">No QoS policies configured. Create one to shape VM network traffic.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-slate-800">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                <th className="text-left p-4 font-medium text-gray-300">Labels</th>
-                <th className="text-left p-4 font-medium text-gray-300">Guaranteed</th>
-                <th className="text-left p-4 font-medium text-gray-300">Max Rate</th>
-                <th className="text-left p-4 font-medium text-gray-300">Burst</th>
-                <th className="text-left p-4 font-medium text-gray-300">Priority</th>
-                <th className="text-left p-4 font-medium text-gray-300">VMs</th>
-                <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                <th className="text-left p-4 font-medium text-slate-300">Guaranteed</th>
+                <th className="text-left p-4 font-medium text-slate-300">Max Rate</th>
+                <th className="text-left p-4 font-medium text-slate-300">Burst</th>
+                <th className="text-left p-4 font-medium text-slate-300">Priority</th>
+                <th className="text-left p-4 font-medium text-slate-300">VMs</th>
+                <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {policies.map(p => (
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
                     <div className="font-medium">{p.name}</div>
-                    {p.description && <div className="text-xs text-gray-500 mt-1">{p.description}</div>}
+                    {p.description && <div className="text-xs text-slate-500 mt-1">{p.description}</div>}
                   </td>
                   <td className="p-4"><LabelTags labels={p.labels} /></td>
                   <td className="p-4 font-mono text-sm text-green-400">{p.guaranteed_rate ?? '-'}</td>
                   <td className="p-4 font-mono text-sm text-yellow-400">{p.max_rate ?? '-'}</td>
-                  <td className="p-4 font-mono text-sm text-gray-400">{p.burst ?? '-'}</td>
+                  <td className="p-4 font-mono text-sm text-slate-400">{p.burst ?? '-'}</td>
                   <td className="p-4 font-mono text-sm">{p.priority}</td>
                   <td className="p-4 text-blue-400 font-medium">{p.matched_vms}</td>
                   <td className="p-4">

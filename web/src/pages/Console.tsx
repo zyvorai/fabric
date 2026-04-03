@@ -15,14 +15,14 @@ export default function Console() {
     <div>
       <button
         onClick={() => navigate(`/vms/${name}`)}
-        className="flex items-center gap-2 mb-6 text-gray-400 hover:text-white transition"
+        className="flex items-center gap-2 mb-6 text-slate-400 hover:text-white transition"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to VM Details
       </button>
 
-      <div className="bg-gray-900 rounded-lg border border-gray-800">
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <h1 className="text-2xl font-bold">Console: {name}</h1>
           <div className="flex gap-2">
             <button
@@ -30,7 +30,7 @@ export default function Console() {
               className={`flex items-center gap-2 px-4 py-2 rounded transition ${
                 mode === 'terminal'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-600'
               }`}
             >
               <TerminalIcon className="w-4 h-4" />
@@ -41,7 +41,7 @@ export default function Console() {
               className={`flex items-center gap-2 px-4 py-2 rounded transition ${
                 mode === 'vnc'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-600'
               }`}
             >
               <Monitor className="w-4 h-4" />

@@ -97,13 +97,13 @@ function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
         isActive
           ? 'bg-gradient-to-r from-blue-600/15 to-blue-600/5 text-white'
-          : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+          : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
       } ${collapsed ? 'justify-center' : ''}`}
     >
       {isActive && (
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-500 rounded-r-full" />
       )}
-      <span className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'}`}>
+      <span className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
         {item.icon}
       </span>
       {!collapsed && <span className="truncate">{item.label}</span>}
@@ -122,7 +122,7 @@ function NavSection({ group, collapsed, defaultOpen }: { group: NavGroup; collap
 
   if (collapsed) {
     return (
-      <div className="space-y-1 py-2 border-b border-gray-800/50 last:border-b-0">
+      <div className="space-y-1 py-2 border-b border-slate-700/50/50 last:border-b-0">
         {group.items.map((item) => (
           <NavLink key={item.to} item={item} collapsed={collapsed} />
         ))}
@@ -134,7 +134,7 @@ function NavSection({ group, collapsed, defaultOpen }: { group: NavGroup; collap
     <div className="py-1">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
       >
         <span>{group.label}</span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
@@ -158,12 +158,12 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 h-screen bg-gray-900 border-r border-gray-800 flex flex-col z-30 transition-all duration-300 ease-in-out ${
+      className={`fixed top-0 left-0 h-screen bg-slate-900 border-r border-slate-700/50 flex flex-col z-30 transition-all duration-300 ease-in-out ${
         collapsed ? 'w-[68px]' : 'w-[260px]'
       }`}
     >
       {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800 shrink-0">
+      <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700/50 shrink-0">
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
             <Server className="w-4.5 h-4.5 text-white" />
@@ -176,7 +176,7 @@ export default function Sidebar() {
         </Link>
         <button
           onClick={toggle}
-          className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors shrink-0"
+          className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-white/5 transition-colors shrink-0"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
@@ -184,7 +184,7 @@ export default function Sidebar() {
       </div>
 
       {/* Create VM + Search */}
-      <div className="px-3 py-3 space-y-2 border-b border-gray-800 shrink-0">
+      <div className="px-3 py-3 space-y-2 border-b border-slate-700/50 shrink-0">
         <Link
           to="/create"
           className={`flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-lg text-sm font-medium text-white transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30 ${
@@ -200,11 +200,11 @@ export default function Sidebar() {
             onClick={() => {
               window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 rounded-lg text-sm text-gray-400 hover:text-gray-300 transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50/50 rounded-lg text-sm text-slate-400 hover:text-slate-300 transition-colors"
           >
             <Search className="w-4 h-4" />
             <span className="flex-1 text-left">Search...</span>
-            <kbd className="text-[10px] px-1.5 py-0.5 bg-gray-700 border border-gray-600 rounded font-mono">
+            <kbd className="text-[10px] px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded font-mono">
               {navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl'}K
             </kbd>
           </button>
@@ -231,7 +231,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-gray-800 px-3 py-3 shrink-0 space-y-2">
+      <div className="border-t border-slate-700/50 px-3 py-3 shrink-0 space-y-2">
         <ConnectionStatus />
         {user && (
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -241,13 +241,13 @@ export default function Sidebar() {
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-white truncate">{user.username}</div>
-                <div className="text-xs text-gray-500 capitalize">{user.role}</div>
+                <div className="text-xs text-slate-500 capitalize">{user.role}</div>
               </div>
             )}
             {!collapsed && (
               <button
                 onClick={logout}
-                className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />

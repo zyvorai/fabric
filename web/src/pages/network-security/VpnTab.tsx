@@ -17,20 +17,20 @@ interface VpnTabProps {
 function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onCreate, onSync }: VpnTabProps) {
   const [view, setView] = useState<'tunnels' | 'networks'>('tunnels')
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">VPN Mesh</h2>
-          <div className="flex bg-gray-800 rounded-lg p-0.5">
+          <div className="flex bg-slate-800 rounded-lg p-0.5">
             {(['tunnels', 'networks'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
             ))}
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -41,27 +41,27 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
 
       {view === 'tunnels' && (
         tunnels.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No VPN tunnels configured. Create a WireGuard tunnel to connect VMs.</div>
+          <div className="p-12 text-center text-slate-400">No VPN tunnels configured. Create a WireGuard tunnel to connect VMs.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Interface</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Port</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Peers</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Key</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Interface</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Port</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Peers</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Key</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {tunnels.map(t => (
                   <tr key={t.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
                       <div className="font-medium">{t.name}</div>
-                      {t.description && <div className="text-xs text-gray-500 mt-1">{t.description}</div>}
+                      {t.description && <div className="text-xs text-slate-500 mt-1">{t.description}</div>}
                     </td>
                     <td className="p-4 font-mono text-sm text-blue-400">{t.interface_name}</td>
                     <td className="p-4 font-mono text-sm">{t.listen_port}</td>
@@ -87,28 +87,28 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
 
       {view === 'networks' && (
         networks.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No VPN networks configured.</div>
+          <div className="p-12 text-center text-slate-400">No VPN networks configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Topology</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Address Range</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Labels</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Tunnels</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Topology</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Address Range</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Tunnels</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {networks.map(n => (
                   <tr key={n.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{n.name}</td>
                     <td className="p-4">
                       <StatusBadge status={n.topology} color="blue" />
                     </td>
-                    <td className="p-4 font-mono text-sm text-gray-400">{n.address_range}</td>
+                    <td className="p-4 font-mono text-sm text-slate-400">{n.address_range}</td>
                     <td className="p-4"><LabelTags labels={n.labels} /></td>
                     <td className="p-4 font-medium text-cyan-400">{n.tunnel_ids.length}</td>
                     <td className="p-4">
@@ -184,8 +184,8 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
           <InputField label="Listen Port" value={listenPort} onChange={setListenPort} placeholder="51820" type="number" />
         </div>
         <InputField label="Private Key" value={privateKey} onChange={setPrivateKey} placeholder="Base64 private key" />
-        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-gray-300">Add Peer</div>
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Add Peer</div>
           <InputField label="Public Key" value={peerKey} onChange={setPeerKey} placeholder="Base64 public key" />
           <div className="grid grid-cols-2 gap-2">
             <InputField label="Endpoint" value={peerEndpoint} onChange={setPeerEndpoint} placeholder="1.2.3.4:51820" />
@@ -197,9 +197,9 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
           {peers.length > 0 && (
             <div className="space-y-1 mt-2">
               {peers.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
-                  <span className="text-gray-300 truncate">{p.public_key.slice(0, 20)}...</span>
-                  {p.endpoint && <span className="text-gray-400">{p.endpoint}</span>}
+                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                  <span className="text-slate-300 truncate">{p.public_key.slice(0, 20)}...</span>
+                  {p.endpoint && <span className="text-slate-400">{p.endpoint}</span>}
                   <button onClick={() => setPeers(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -253,8 +253,8 @@ export function CreateVpnNetworkModal({ onClose, onCreated }: { onClose: () => v
         <InputField label="Name" value={name} onChange={setName} placeholder="site-network" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Multi-site VPN network" />
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Topology</label>
-          <select value={topology} onChange={e => setTopology(e.target.value as VpnTopology)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <label className="block text-sm font-medium text-slate-300 mb-1">Topology</label>
+          <select value={topology} onChange={e => setTopology(e.target.value as VpnTopology)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
             <option value="full-mesh">Full Mesh</option>
             <option value="hub-spoke">Hub & Spoke</option>
             <option value="point-to-point">Point to Point</option>

@@ -83,7 +83,7 @@ export default function Logs() {
       case 'INFO': return 'text-cyan-400'
       case 'WARN': case 'WARNING': return 'text-yellow-400'
       case 'ERROR': case 'CRITICAL': return 'text-red-400'
-      case 'DEBUG': return 'text-gray-400'
+      case 'DEBUG': return 'text-slate-400'
       default: return 'text-white'
     }
   }
@@ -93,8 +93,8 @@ export default function Logs() {
       case 'INFO': return 'bg-cyan-500/10 border-cyan-500/20'
       case 'WARN': case 'WARNING': return 'bg-yellow-500/10 border-yellow-500/20'
       case 'ERROR': case 'CRITICAL': return 'bg-red-500/10 border-red-500/20'
-      case 'DEBUG': return 'bg-gray-500/10 border-gray-500/20'
-      default: return 'bg-gray-800'
+      case 'DEBUG': return 'bg-slate-500/10 border-slate-500/20'
+      default: return 'bg-slate-800'
     }
   }
 
@@ -108,28 +108,28 @@ export default function Logs() {
         <div className="flex items-center gap-2">
           <button
             onClick={loadLogs}
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm"
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
-          <span className="text-sm text-gray-400">{filteredLogs.length} entries</span>
+          <span className="text-sm text-slate-400">{filteredLogs.length} entries</span>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Filter logs..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function Logs() {
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="ALL">All Levels</option>
               <option value="INFO">INFO</option>
@@ -174,43 +174,43 @@ export default function Logs() {
             id="autoScroll"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
+            className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
           />
-          <label htmlFor="autoScroll" className="text-sm text-gray-400">
+          <label htmlFor="autoScroll" className="text-sm text-slate-400">
             Auto-scroll to new logs
           </label>
         </div>
       </div>
 
       {/* Log Stream */}
-      <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
         <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="flex items-center justify-center h-full text-slate-400">
               Loading logs...
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="flex items-center justify-center h-full text-slate-400">
               No logs to display
             </div>
           ) : (
-            <div className="divide-y divide-gray-800">
+            <div className="divide-y divide-slate-700/50">
               {filteredLogs.map((log, index) => (
                 <div
                   key={log.id || index}
                   className={`p-3 hover:bg-white/[0.03] transition ${getLevelBg(log.level)} border-l-4`}
                 >
                   <div className="flex items-start gap-4">
-                    <span className="text-gray-500 text-xs whitespace-nowrap">
+                    <span className="text-slate-500 text-xs whitespace-nowrap">
                       {log.timestamp.length > 19 ? log.timestamp.slice(0, 19).replace('T', ' ') : log.timestamp}
                     </span>
                     <span className={`font-bold text-xs whitespace-nowrap ${getLevelColor(log.level)}`}>
                       {log.level}
                     </span>
-                    <span className="text-gray-400 text-xs whitespace-nowrap">
+                    <span className="text-slate-400 text-xs whitespace-nowrap">
                       [{log.source}]
                     </span>
-                    <span className="text-gray-200 flex-1">
+                    <span className="text-slate-200 flex-1">
                       {log.message}
                     </span>
                   </div>

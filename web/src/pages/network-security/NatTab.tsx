@@ -19,20 +19,20 @@ interface NatTabProps {
 function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onDeleteGateway, onCreate, onSync }: NatTabProps) {
   const [view, setView] = useState<'rules' | 'pools' | 'gateways'>('rules')
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">NAT Gateway</h2>
-          <div className="flex bg-gray-800 rounded-lg p-0.5">
+          <div className="flex bg-slate-800 rounded-lg p-0.5">
             {(['rules', 'pools', 'gateways'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
             ))}
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -43,27 +43,27 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
 
       {view === 'rules' && (
         rules.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No NAT rules configured.</div>
+          <div className="p-12 text-center text-slate-400">No NAT rules configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Type</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Source</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Destination</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Translate To</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Type</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Source</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Destination</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Translate To</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {rules.map(r => (
                   <tr key={r.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
                       <div className="font-medium">{r.name}</div>
-                      {r.description && <div className="text-xs text-gray-500 mt-1">{r.description}</div>}
+                      {r.description && <div className="text-xs text-slate-500 mt-1">{r.description}</div>}
                     </td>
                     <td className="p-4">
                       <StatusBadge
@@ -71,8 +71,8 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
                         color={r.nat_type === 'masquerade' ? 'blue' : r.nat_type === 'snat' ? 'green' : r.nat_type === 'dnat' ? 'yellow' : 'red'}
                       />
                     </td>
-                    <td className="p-4 font-mono text-sm text-gray-400">{r.source_cidr ?? '*'}</td>
-                    <td className="p-4 font-mono text-sm text-gray-400">{r.dest_cidr ?? '*'}</td>
+                    <td className="p-4 font-mono text-sm text-slate-400">{r.source_cidr ?? '*'}</td>
+                    <td className="p-4 font-mono text-sm text-slate-400">{r.dest_cidr ?? '*'}</td>
                     <td className="p-4 font-mono text-sm text-blue-400">
                       {r.translate_address ?? '-'}{r.translate_port ? `:${r.translate_port}` : ''}
                     </td>
@@ -94,24 +94,24 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
 
       {view === 'pools' && (
         pools.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No NAT pools configured.</div>
+          <div className="p-12 text-center text-slate-400">No NAT pools configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Address Range</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Port Range</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Address Range</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Port Range</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {pools.map(p => (
                   <tr key={p.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{p.name}</td>
                     <td className="p-4 font-mono text-sm text-blue-400">{p.address_range}</td>
-                    <td className="p-4 font-mono text-sm text-gray-400">
+                    <td className="p-4 font-mono text-sm text-slate-400">
                       {p.port_range_start && p.port_range_end ? `${p.port_range_start}-${p.port_range_end}` : '-'}
                     </td>
                     <td className="p-4">
@@ -129,20 +129,20 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
 
       {view === 'gateways' && (
         gateways.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No NAT gateways configured.</div>
+          <div className="p-12 text-center text-slate-400">No NAT gateways configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Labels</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Rules</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Rules</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {gateways.map(g => (
                   <tr key={g.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{g.name}</td>
@@ -211,8 +211,8 @@ export function CreateNatRuleModal({ onClose, onCreated }: { onClose: () => void
         <InputField label="Name" value={name} onChange={setName} placeholder="outbound-masq" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Outbound masquerade" />
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">NAT Type</label>
-          <select value={natType} onChange={e => setNatType(e.target.value as NatType)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <label className="block text-sm font-medium text-slate-300 mb-1">NAT Type</label>
+          <select value={natType} onChange={e => setNatType(e.target.value as NatType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
             <option value="masquerade">Masquerade</option>
             <option value="snat">SNAT</option>
             <option value="dnat">DNAT</option>

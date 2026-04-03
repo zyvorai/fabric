@@ -183,7 +183,7 @@ export default function Dashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Overview of your virtual infrastructure</p>
+        <p className="text-sm text-slate-500 mt-1">Overview of your virtual infrastructure</p>
       </div>
 
       {/* Stats Grid */}
@@ -228,13 +228,13 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* CPU Chart */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 card-hover">
+        <div className="bg-slate-900 rounded-xl p-5 border border-slate-700/50 card-hover">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-blue-500/10">
                 <Cpu className="w-4 h-4 text-blue-400" />
               </div>
-              <h3 className="text-sm font-medium text-gray-300">CPU Usage</h3>
+              <h3 className="text-sm font-medium text-slate-300">CPU Usage</h3>
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-lg font-semibold tabular-nums ${latestCpu > 80 ? 'text-red-400' : latestCpu > 50 ? 'text-yellow-400' : 'text-blue-400'}`}>
@@ -260,13 +260,13 @@ export default function Dashboard() {
         </div>
 
         {/* Memory Chart */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 card-hover">
+        <div className="bg-slate-900 rounded-xl p-5 border border-slate-700/50 card-hover">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-emerald-500/10">
                 <HardDrive className="w-4 h-4 text-emerald-400" />
               </div>
-              <h3 className="text-sm font-medium text-gray-300">Memory Usage</h3>
+              <h3 className="text-sm font-medium text-slate-300">Memory Usage</h3>
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-lg font-semibold tabular-nums ${latestMem > 80 ? 'text-red-400' : latestMem > 50 ? 'text-yellow-400' : 'text-emerald-400'}`}>
@@ -295,9 +295,9 @@ export default function Dashboard() {
       {/* Bottom: VM List + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* VM List - 2/3 width */}
-        <div className="lg:col-span-2 bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-            <h2 className="text-sm font-medium text-gray-300">Virtual Machines</h2>
+        <div className="lg:col-span-2 bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
+            <h2 className="text-sm font-medium text-slate-300">Virtual Machines</h2>
             <Link
               to="/vms"
               className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
@@ -308,8 +308,8 @@ export default function Dashboard() {
           </div>
           {vms.length === 0 ? (
             <div className="p-8 text-center">
-              <Server className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">No virtual machines yet</p>
+              <Server className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+              <p className="text-sm text-slate-500">No virtual machines yet</p>
               <Link to="/create" className="text-sm text-blue-400 hover:text-blue-300 mt-1 inline-block">
                 Create your first VM
               </Link>
@@ -317,7 +317,7 @@ export default function Dashboard() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-b border-gray-800/50">
+                <tr className="text-left text-xs font-medium text-slate-600 uppercase tracking-wider border-b border-slate-700/50/50">
                   <th className="py-2.5 px-5">Name</th>
                   <th className="py-2.5 px-4">Status</th>
                   <th className="py-2.5 px-4">CPU</th>
@@ -326,7 +326,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {vms.slice(0, 6).map((vm) => (
-                  <tr key={vm.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors">
+                  <tr key={vm.name} className="border-t border-slate-700/50/50 hover:bg-white/[0.02] transition-colors">
                     <td className="py-2.5 px-5">
                       <Link
                         to={`/vms/${vm.name}`}
@@ -338,10 +338,10 @@ export default function Dashboard() {
                     <td className="py-2.5 px-4">
                       <StatusBadge status={vm.state} />
                     </td>
-                    <td className="py-2.5 px-4 text-gray-400 tabular-nums">
+                    <td className="py-2.5 px-4 text-slate-400 tabular-nums">
                       {vm.cpus} vCPU{vm.cpus !== 1 ? 's' : ''}
                     </td>
-                    <td className="py-2.5 px-4 text-gray-400 tabular-nums">
+                    <td className="py-2.5 px-4 text-slate-400 tabular-nums">
                       {vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}
                     </td>
                   </tr>
@@ -352,10 +352,10 @@ export default function Dashboard() {
         </div>
 
         {/* Activity Feed - 1/3 width */}
-        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-            <h2 className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 text-gray-500" />
+        <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
               Recent Activity
             </h2>
             <Link
@@ -382,8 +382,8 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="py-8 text-center">
-                <Activity className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No recent activity</p>
+                <Activity className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No recent activity</p>
               </div>
             )}
           </div>
@@ -418,7 +418,7 @@ function StatCard({ icon, title, value, unit, subtitle, color, linkTo, sparkData
   const displayValue = typeof value === 'number' ? animatedValue : value
 
   const content = (
-    <div className={`bg-gray-900 rounded-xl p-5 border border-gray-800 hover:border-gray-700 card-hover gradient-border relative overflow-hidden group hover:glow-${color}`}>
+    <div className={`bg-slate-900 rounded-xl p-5 border border-slate-700/50 hover:border-slate-700/50 card-hover gradient-border relative overflow-hidden group hover:glow-${color}`}>
       {/* Sparkline background */}
       {sparkData && sparkData.length > 2 && (
         <div className="absolute bottom-0 right-0 w-24 h-12 opacity-30 group-hover:opacity-50 transition-opacity">
@@ -435,18 +435,18 @@ function StatCard({ icon, title, value, unit, subtitle, color, linkTo, sparkData
           <span className={c.text}>{icon}</span>
         </div>
         {linkTo && (
-          <ArrowUpRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400 transition-colors" />
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-colors" />
         )}
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-2xl font-bold text-white tabular-nums">{displayValue}</span>
-        {unit && <span className="text-sm text-gray-500 font-medium">{unit}</span>}
+        {unit && <span className="text-sm text-slate-500 font-medium">{unit}</span>}
       </div>
-      <div className="text-xs text-gray-500 mt-1">{title}</div>
+      <div className="text-xs text-slate-500 mt-1">{title}</div>
       {subtitle && (
         <div className="flex items-center gap-1 mt-1.5">
-          <TrendingUp className="w-3 h-3 text-gray-600" />
-          <span className="text-[11px] text-gray-500">{subtitle}</span>
+          <TrendingUp className="w-3 h-3 text-slate-600" />
+          <span className="text-[11px] text-slate-500">{subtitle}</span>
         </div>
       )}
     </div>
@@ -467,23 +467,23 @@ interface ActivityItemProps {
 }
 
 function ActivityItem({ time, type, action, resource, isLast }: ActivityItemProps) {
-  const dotColor = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-gray-500'
+  const dotColor = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-slate-500'
 
   return (
     <div className="flex gap-3 relative">
       {/* Timeline */}
       <div className="flex flex-col items-center pt-1.5">
-        <div className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0 ring-2 ring-gray-900`} />
-        {!isLast && <div className="w-px flex-1 bg-gray-800 mt-1" />}
+        <div className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0 ring-2 ring-slate-900`} />
+        {!isLast && <div className="w-px flex-1 bg-slate-800 mt-1" />}
       </div>
       {/* Content */}
       <div className={`pb-4 min-w-0 ${isLast ? '' : ''}`}>
-        <p className="text-sm text-gray-300 leading-snug">
+        <p className="text-sm text-slate-300 leading-snug">
           <span className="font-medium text-white">{action}</span>
           {' '}on{' '}
-          <span className="text-gray-400">{resource}</span>
+          <span className="text-slate-400">{resource}</span>
         </p>
-        <p className="text-[11px] text-gray-600 mt-0.5">{time}</p>
+        <p className="text-[11px] text-slate-600 mt-0.5">{time}</p>
       </div>
     </div>
   )

@@ -12,38 +12,38 @@ interface LinkfilesTabProps {
 
 function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProps) {
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Link Configuration (.link)</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Link File
         </button>
       </div>
       {linkfiles.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">No link files configured. Use these to rename interfaces, set MTU, MAC, or Wake-on-LAN.</div>
+        <div className="p-12 text-center text-slate-400">No link files configured. Use these to rename interfaces, set MTU, MAC, or Wake-on-LAN.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-slate-800">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Match</th>
-                <th className="text-left p-4 font-medium text-gray-300">Rename To</th>
-                <th className="text-left p-4 font-medium text-gray-300">MTU</th>
-                <th className="text-left p-4 font-medium text-gray-300">MAC Override</th>
-                <th className="text-left p-4 font-medium text-gray-300">WoL</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                <th className="text-left p-4 font-medium text-slate-300">Match</th>
+                <th className="text-left p-4 font-medium text-slate-300">Rename To</th>
+                <th className="text-left p-4 font-medium text-slate-300">MTU</th>
+                <th className="text-left p-4 font-medium text-slate-300">MAC Override</th>
+                <th className="text-left p-4 font-medium text-slate-300">WoL</th>
+                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {linkfiles.map(l => (
                 <tr key={l.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-mono text-sm text-gray-400">
+                  <td className="p-4 font-mono text-sm text-slate-400">
                     {l.match_mac ?? l.match_original_name ?? l.match_driver ?? l.match_path ?? '-'}
                   </td>
                   <td className="p-4 font-medium">{l.name ?? '-'}</td>
-                  <td className="p-4 text-gray-400">{l.mtu ?? '-'}</td>
-                  <td className="p-4 text-gray-400 font-mono text-sm">{l.mac_address ?? '-'}</td>
-                  <td className="p-4 text-gray-400">{l.wake_on_lan ?? '-'}</td>
+                  <td className="p-4 text-slate-400">{l.mtu ?? '-'}</td>
+                  <td className="p-4 text-slate-400 font-mono text-sm">{l.mac_address ?? '-'}</td>
+                  <td className="p-4 text-slate-400">{l.wake_on_lan ?? '-'}</td>
                   <td className="p-4">
                     <button onClick={() => onDelete(l.id)} className="p-2 hover:bg-red-600 rounded transition">
                       <Trash2 className="w-4 h-4" />

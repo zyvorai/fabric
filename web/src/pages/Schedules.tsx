@@ -94,7 +94,7 @@ export default function Schedules() {
       case 'stop': return 'bg-red-600'
       case 'restart': return 'bg-yellow-600'
       case 'snapshot': return 'bg-blue-600'
-      default: return 'bg-gray-600'
+      default: return 'bg-slate-600'
     }
   }
 
@@ -127,7 +127,7 @@ export default function Schedules() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 showHistory
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'
+                  : 'bg-slate-900 border border-slate-700/50 text-slate-400 hover:text-white'
               }`}
             >
               <Clock className="w-4 h-4" />
@@ -148,10 +148,10 @@ export default function Schedules() {
       {!showHistory && (
         <>
           {schedules.length === 0 ? (
-            <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
-              <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-xl text-gray-400 mb-4">No schedules configured</p>
-              <p className="text-gray-500 mb-6">Create schedules to automate VM operations</p>
+            <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+              <Calendar className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <p className="text-xl text-slate-400 mb-4">No schedules configured</p>
+              <p className="text-slate-500 mb-6">Create schedules to automate VM operations</p>
               <button
                 onClick={() => setShowCreateDialog(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
@@ -165,7 +165,7 @@ export default function Schedules() {
               {schedules.map((schedule) => (
                 <div
                   key={schedule.id}
-                  className="bg-gray-900 rounded-lg border border-gray-800 p-6"
+                  className="bg-slate-900 rounded-lg border border-slate-700/50 p-6"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -176,7 +176,7 @@ export default function Schedules() {
                           className={`px-2 py-1 rounded text-xs font-medium ${
                             schedule.enabled
                               ? 'bg-green-600 text-white'
-                              : 'bg-gray-600 text-gray-300'
+                              : 'bg-slate-600 text-slate-300'
                           }`}
                         >
                           {schedule.enabled ? 'Enabled' : 'Disabled'}
@@ -185,10 +185,10 @@ export default function Schedules() {
                           {schedule.action.toUpperCase()}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-400 mb-1">
+                      <p className="text-sm text-slate-400 mb-1">
                         VM: <span className="text-white font-medium">{schedule.vm_name}</span>
                       </p>
-                      <p className="text-sm text-gray-400 mb-1">
+                      <p className="text-sm text-slate-400 mb-1">
                         Schedule: {getScheduleTypeText(schedule)}
                       </p>
                       {schedule.next_run && (
@@ -197,7 +197,7 @@ export default function Schedules() {
                         </p>
                       )}
                       {schedule.last_run && (
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500">
                           Last run: {new Date(schedule.last_run).toLocaleString()}
                         </p>
                       )}
@@ -252,40 +252,40 @@ export default function Schedules() {
 
       {/* History */}
       {showHistory && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800">
-          <div className="p-4 border-b border-gray-800">
+        <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="p-4 border-b border-slate-700/50">
             <h2 className="text-lg font-bold">Execution History</h2>
-            <p className="text-sm text-gray-400">Latest 20 executions</p>
+            <p className="text-sm text-slate-400">Latest 20 executions</p>
           </div>
           <div className="overflow-x-auto">
             {history.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-400">No execution history yet</p>
+                <p className="text-slate-400">No execution history yet</p>
               </div>
             ) : (
               <table className="w-full">
-                <thead className="bg-gray-900">
+                <thead className="bg-slate-900">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
                       Schedule
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
                       VM
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
                       Action
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
                       Executed At
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
+                <tbody className="divide-y divide-slate-700/50">
                   {history.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-gray-900">
+                    <tr key={idx} className="hover:bg-slate-900">
                       <td className="px-4 py-3 text-sm">{item.schedule_name}</td>
                       <td className="px-4 py-3 text-sm font-medium">{item.vm_name}</td>
                       <td className="px-4 py-3">
@@ -293,7 +293,7 @@ export default function Schedules() {
                           {item.action.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-400">
+                      <td className="px-4 py-3 text-sm text-slate-400">
                         {new Date(item.executed_at).toLocaleString()}
                       </td>
                       <td className="px-4 py-3">

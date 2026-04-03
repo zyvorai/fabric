@@ -59,7 +59,7 @@ export default function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="bg-gray-900 rounded-xl shadow-2xl border border-gray-800 w-full max-w-md p-6"
+        className="bg-slate-900 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-4 mb-5">
@@ -70,7 +70,7 @@ export default function ConfirmDialog({
             <h3 id="confirm-title" className="text-base font-semibold text-white">
               {title}
             </h3>
-            <p id="confirm-message" className="text-sm text-gray-400 mt-1 leading-relaxed">
+            <p id="confirm-message" className="text-sm text-slate-400 mt-1 leading-relaxed">
               {message}
             </p>
           </div>
@@ -79,7 +79,7 @@ export default function ConfirmDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors text-sm text-gray-300"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-lg transition-colors text-sm text-slate-300"
           >
             {cancelLabel}
           </button>

@@ -34,7 +34,7 @@ export default function Login() {
             <Server className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">vmspawnd</h1>
-          <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
+          <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-7 space-y-5 border border-white/[0.06] shadow-2xl">
@@ -45,7 +45,7 @@ export default function Login() {
           )}
 
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="username" className="block text-sm font-medium text-slate-400 mb-1.5">
               Username
             </label>
             <input
@@ -53,7 +53,7 @@ export default function Login() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all text-sm"
               placeholder="Enter username"
               required
               autoFocus
@@ -61,7 +61,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-1.5">
               Password
             </label>
             <input
@@ -69,7 +69,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all text-sm"
               placeholder="Enter password"
               required
             />
@@ -78,7 +78,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 text-white font-semibold rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30 disabled:shadow-none"
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 text-white font-semibold rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30 disabled:shadow-none"
           >
             {submitting ? (
               <>
@@ -91,7 +91,7 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center text-[11px] text-gray-600 mt-6">
+        <p className="text-center text-[11px] text-slate-600 mt-6">
           Virtual Machine Manager
         </p>
       </div>

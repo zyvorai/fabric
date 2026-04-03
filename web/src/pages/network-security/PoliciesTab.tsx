@@ -14,11 +14,11 @@ interface PoliciesTabProps {
 
 function PoliciesTabContent({ policies, onDelete, onCreate, onSync }: PoliciesTabProps) {
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Network Policies</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -27,28 +27,28 @@ function PoliciesTabContent({ policies, onDelete, onCreate, onSync }: PoliciesTa
         </div>
       </div>
       {policies.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">No network policies configured. Create one to define ingress/egress rules with label selectors.</div>
+        <div className="p-12 text-center text-slate-400">No network policies configured. Create one to define ingress/egress rules with label selectors.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-slate-800">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                <th className="text-left p-4 font-medium text-gray-300">Labels</th>
-                <th className="text-left p-4 font-medium text-gray-300">Ingress</th>
-                <th className="text-left p-4 font-medium text-gray-300">Egress</th>
-                <th className="text-left p-4 font-medium text-gray-300">Priority</th>
-                <th className="text-left p-4 font-medium text-gray-300">VMs</th>
-                <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                <th className="text-left p-4 font-medium text-slate-300">Ingress</th>
+                <th className="text-left p-4 font-medium text-slate-300">Egress</th>
+                <th className="text-left p-4 font-medium text-slate-300">Priority</th>
+                <th className="text-left p-4 font-medium text-slate-300">VMs</th>
+                <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {policies.map(p => (
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
                     <div className="font-medium">{p.name}</div>
-                    {p.description && <div className="text-xs text-gray-500 mt-1">{p.description}</div>}
+                    {p.description && <div className="text-xs text-slate-500 mt-1">{p.description}</div>}
                   </td>
                   <td className="p-4"><LabelTags labels={p.labels} /></td>
                   <td className="p-4">
@@ -133,19 +133,19 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Allow HTTP/HTTPS ingress" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
         <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
-        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-gray-300">Add Rule</div>
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Add Rule</div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Direction</label>
-              <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <label className="block text-xs text-slate-400 mb-1">Direction</label>
+              <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 <option value="ingress">Ingress</option>
                 <option value="egress">Egress</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Action</label>
-              <select value={ruleAction} onChange={e => setRuleAction(e.target.value as PolicyAction)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <label className="block text-xs text-slate-400 mb-1">Action</label>
+              <select value={ruleAction} onChange={e => setRuleAction(e.target.value as PolicyAction)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 <option value="allow">Allow</option>
                 <option value="deny">Deny</option>
                 <option value="log">Log</option>
@@ -163,12 +163,12 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
           {rules.length > 0 && (
             <div className="space-y-1 mt-2">
               {rules.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
                   <StatusBadge status={r.direction} color={r.direction === 'ingress' ? 'green' : 'yellow'} />
                   <span>{r.action}</span>
-                  {r.protocol && <span className="text-gray-400">{r.protocol}</span>}
-                  {r.port && <span className="text-gray-400">:{r.port}</span>}
-                  {r.cidr && <span className="text-gray-400">{r.cidr}</span>}
+                  {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
+                  {r.port && <span className="text-slate-400">:{r.port}</span>}
+                  {r.cidr && <span className="text-slate-400">{r.cidr}</span>}
                   <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
                     <Trash2 className="w-3 h-3" />
                   </button>

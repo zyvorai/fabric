@@ -85,7 +85,7 @@ export default function Templates() {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-gray-900 rounded-lg border border-gray-800">
+        <div className="bg-slate-900 rounded-lg border border-slate-700/50">
           <EmptyState
             icon={<Layers className="w-16 h-16" />}
             title="No templates yet"
@@ -151,35 +151,35 @@ function TemplateCard({
   onInstantiate: () => void
 }) {
   return (
-    <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-gray-800 transition">
+    <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold mb-2">{template.name}</h3>
-          <p className="text-sm text-gray-400">{template.description || 'No description'}</p>
+          <p className="text-sm text-slate-400">{template.description || 'No description'}</p>
         </div>
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-gray-400">CPUs</span>
+          <span className="text-slate-400">CPUs</span>
           <span className="font-medium">{template.cpus}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-gray-400">Memory</span>
+          <span className="text-slate-400">Memory</span>
           <span className="font-medium">{template.memory} MB</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-gray-400">Disk Size</span>
+          <span className="text-slate-400">Disk Size</span>
           <span className="font-medium">{template.disk} GB</span>
         </div>
         {template.tags.length > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-gray-400">Tags</span>
+            <span className="text-slate-400">Tags</span>
             <span className="font-medium text-xs">{template.tags.join(', ')}</span>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-gray-400">Created</span>
+          <span className="text-slate-400">Created</span>
           <span className="font-medium text-xs">{new Date(template.created).toLocaleDateString()}</span>
         </div>
       </div>
@@ -236,8 +236,8 @@ function CreateVMFromTemplateDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-bold">Create VM from Template</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
             <span className="text-2xl">&times;</span>
@@ -246,23 +246,23 @@ function CreateVMFromTemplateDialog({
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">VM Name</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">VM Name</label>
             <input
               type="text"
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
               placeholder="Enter VM name"
-              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
               autoFocus
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 p-6 border-t border-gray-800">
+        <div className="flex justify-end gap-2 p-6 border-t border-slate-700/50">
           <button
             onClick={onClose}
             disabled={isCreating}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 text-white rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
           >
             Cancel
           </button>

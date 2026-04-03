@@ -19,7 +19,7 @@ const TAG_COLORS: Record<string, string> = {
   database: 'bg-pink-600',
   backend: 'bg-indigo-600',
   frontend: 'bg-cyan-600',
-  default: 'bg-gray-600',
+  default: 'bg-slate-600',
 }
 
 export function getTagColor(tag: string): string {
@@ -71,19 +71,19 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-2xl">
+      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
             <Tag className="w-6 h-6 text-blue-500" />
             <div>
               <h2 className="text-xl font-bold">Manage Tags</h2>
-              <p className="text-sm text-gray-400">VM: {vmName}</p>
+              <p className="text-sm text-slate-400">VM: {vmName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition"
+            className="text-slate-400 hover:text-white transition"
           >
             <X className="w-6 h-6" />
           </button>
@@ -95,8 +95,8 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
           <div>
             <label className="block text-sm font-medium mb-3">Current Tags</label>
             {tags.length === 0 ? (
-              <div className="text-center py-8 bg-gray-900 rounded-lg border border-gray-800">
-                <p className="text-gray-400">No tags assigned</p>
+              <div className="text-center py-8 bg-slate-900 rounded-lg border border-slate-700/50">
+                <p className="text-slate-400">No tags assigned</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -128,7 +128,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="Enter tag name..."
-                className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
               <button
                 onClick={handleAddTag}
@@ -161,10 +161,10 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-800 bg-gray-900">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-700/50 bg-slate-900">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded-lg transition"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition"
           >
             Cancel
           </button>

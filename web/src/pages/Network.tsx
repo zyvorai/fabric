@@ -175,7 +175,7 @@ export default function Network() {
           <NetworkIcon className="w-8 h-8" />
           Network Configuration
         </h1>
-        <button onClick={handleReload} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition">
+        <button onClick={handleReload} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
           <RefreshCw className="w-4 h-4" />
           Reload networkd
         </button>
@@ -190,42 +190,42 @@ export default function Network() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Bridges</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Bridges</div>
           <div className="text-2xl font-bold text-blue-400">{bridges.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Bonds</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Bonds</div>
           <div className="text-2xl font-bold text-cyan-400">{bonds.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">VLANs</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">VLANs</div>
           <div className="text-2xl font-bold text-purple-400">{vlans.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Macvtap</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Macvtap</div>
           <div className="text-2xl font-bold text-green-400">{macvtaps.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Tap</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Tap</div>
           <div className="text-2xl font-bold text-orange-400">{taps.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Interfaces</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Interfaces</div>
           <div className="text-2xl font-bold text-yellow-400">{netfiles.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Link Files</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Link Files</div>
           <div className="text-2xl font-bold text-pink-400">{linkfiles.length}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-          <div className="text-gray-400 text-xs mb-1">Port Forwards</div>
+        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">Port Forwards</div>
           <div className="text-2xl font-bold text-red-400">{portForwards.length}</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-800">
+      <div className="border-b border-slate-700/50">
         <div className="flex gap-1">
           {tabs.map(t => (
             <button
@@ -234,7 +234,7 @@ export default function Network() {
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
                 activeTab === t.key
                   ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               {t.icon}
@@ -245,7 +245,7 @@ export default function Network() {
       </div>
 
       {loading ? (
-        <div className="text-center text-gray-400 py-12">Loading...</div>
+        <div className="text-center text-slate-400 py-12">Loading...</div>
       ) : (
         <>
           {activeTab === 'bridges' && (

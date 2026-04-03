@@ -17,20 +17,20 @@ interface DnsTabProps {
 function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onCreate, onSync }: DnsTabProps) {
   const [view, setView] = useState<'zones' | 'policies'>('zones')
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">DNS Policy</h2>
-          <div className="flex bg-gray-800 rounded-lg p-0.5">
+          <div className="flex bg-slate-800 rounded-lg p-0.5">
             {(['zones', 'policies'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
             ))}
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
           <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -41,20 +41,20 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onCreate
 
       {view === 'zones' && (
         zones.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No DNS zones configured.</div>
+          <div className="p-12 text-center text-slate-400">No DNS zones configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Domain</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Records</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Domain</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Records</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {zones.map(z => (
                   <tr key={z.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{z.name}</td>
@@ -78,26 +78,26 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onCreate
 
       {view === 'policies' && (
         policies.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">No DNS policies configured.</div>
+          <div className="p-12 text-center text-slate-400">No DNS policies configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-slate-800">
                 <tr>
-                  <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Labels</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Upstreams</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Blocked</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Status</th>
-                  <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Upstreams</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Blocked</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {policies.map(p => (
                   <tr key={p.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{p.name}</td>
                     <td className="p-4"><LabelTags labels={p.labels} /></td>
-                    <td className="p-4 font-mono text-sm text-gray-400">{p.upstream_servers.length}</td>
+                    <td className="p-4 font-mono text-sm text-slate-400">{p.upstream_servers.length}</td>
                     <td className="p-4 font-mono text-sm text-red-400">{p.blocked_domains.length}</td>
                     <td className="p-4">
                       <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
@@ -163,13 +163,13 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
         <InputField label="Name" value={name} onChange={setName} placeholder="internal-zone" />
         <InputField label="Domain" value={domain} onChange={setDomain} placeholder="internal.local" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Internal DNS zone" />
-        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-gray-300">Add Record</div>
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Add Record</div>
           <div className="grid grid-cols-2 gap-2">
             <InputField label="Record Name" value={recName} onChange={setRecName} placeholder="web" />
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Type</label>
-              <select value={recType} onChange={e => setRecType(e.target.value as DnsRecordType)} className="w-full bg-gray-800 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <label className="block text-xs text-slate-400 mb-1">Type</label>
+              <select value={recType} onChange={e => setRecType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                 {(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'PTR'] as DnsRecordType[]).map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -186,11 +186,11 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
           {records.length > 0 && (
             <div className="space-y-1 mt-2">
               {records.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
                   <StatusBadge status={r.record_type} color="blue" />
-                  <span className="text-gray-300">{r.name}</span>
-                  <span className="text-gray-400">{r.value}</span>
-                  <span className="text-gray-500">TTL:{r.ttl}</span>
+                  <span className="text-slate-300">{r.name}</span>
+                  <span className="text-slate-400">{r.value}</span>
+                  <span className="text-slate-500">TTL:{r.ttl}</span>
                   <button onClick={() => setRecords(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
                     <Trash2 className="w-3 h-3" />
                   </button>

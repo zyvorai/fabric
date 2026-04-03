@@ -29,21 +29,21 @@ export function LabelSelectorInput({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-300 mb-1">Label Selectors</label>
+      <label className="block text-sm font-medium text-slate-300 mb-1">Label Selectors</label>
       <div className="flex gap-2 mb-2">
         <input
           type="text"
           value={key}
           onChange={e => setKey(e.target.value)}
           placeholder="key"
-          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-sm"
+          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
         />
         <input
           type="text"
           value={value}
           onChange={e => setValue(e.target.value)}
           placeholder="value"
-          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-sm"
+          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
         />
         <button
           type="button"
@@ -79,7 +79,7 @@ export function StatusBadge({ status, color }: { status: string; color?: string 
     red: 'bg-red-500/10 text-red-400 border-red-500/20',
     yellow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
     blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    gray: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+    gray: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
   }
   const c = colorMap[color ?? 'blue'] ?? colorMap.blue
   return (
@@ -92,7 +92,7 @@ export function StatusBadge({ status, color }: { status: string; color?: string 
 /** Render label tags inline */
 export function LabelTags({ labels }: { labels: Record<string, string> }) {
   const entries = Object.entries(labels)
-  if (entries.length === 0) return <span className="text-gray-500 text-sm">none</span>
+  if (entries.length === 0) return <span className="text-slate-500 text-sm">none</span>
   return (
     <div className="flex flex-wrap gap-1">
       {entries.map(([k, v]) => (

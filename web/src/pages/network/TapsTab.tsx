@@ -12,36 +12,36 @@ interface TapsTabProps {
 
 function TapsTabContent({ taps, onDelete, onCreate }: TapsTabProps) {
   return (
-    <div className="bg-gray-900 rounded-lg border border-gray-800">
-      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Tap Devices</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Tap
         </button>
       </div>
       {taps.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">No tap devices configured.</div>
+        <div className="p-12 text-center text-slate-400">No tap devices configured.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-slate-800">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-300">Name</th>
-                <th className="text-left p-4 font-medium text-gray-300">Bridge</th>
-                <th className="text-left p-4 font-medium text-gray-300">User</th>
-                <th className="text-left p-4 font-medium text-gray-300">MultiQueue</th>
-                <th className="text-left p-4 font-medium text-gray-300">VNet Header</th>
-                <th className="text-left p-4 font-medium text-gray-300">Actions</th>
+                <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                <th className="text-left p-4 font-medium text-slate-300">Bridge</th>
+                <th className="text-left p-4 font-medium text-slate-300">User</th>
+                <th className="text-left p-4 font-medium text-slate-300">MultiQueue</th>
+                <th className="text-left p-4 font-medium text-slate-300">VNet Header</th>
+                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {taps.map(t => (
                 <tr key={t.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{t.name}</td>
-                  <td className="p-4 text-gray-400">{t.bridge ?? '-'}</td>
-                  <td className="p-4 text-gray-400">{t.user ?? '-'}</td>
-                  <td className="p-4">{t.multi_queue ? <span className="text-green-400">yes</span> : <span className="text-gray-500">no</span>}</td>
-                  <td className="p-4">{t.vnet_hdr ? <span className="text-green-400">yes</span> : <span className="text-gray-500">no</span>}</td>
+                  <td className="p-4 text-slate-400">{t.bridge ?? '-'}</td>
+                  <td className="p-4 text-slate-400">{t.user ?? '-'}</td>
+                  <td className="p-4">{t.multi_queue ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
+                  <td className="p-4">{t.vnet_hdr ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
                     <button onClick={() => onDelete(t.id)} className="p-2 hover:bg-red-600 rounded transition">
                       <Trash2 className="w-4 h-4" />

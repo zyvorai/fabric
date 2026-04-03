@@ -61,12 +61,12 @@ export default function Snapshots() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold mb-2">VM Snapshots</h1>
-          <p className="text-gray-400">Create and manage VM snapshots</p>
+          <p className="text-slate-400">Create and manage VM snapshots</p>
         </div>
       </div>
 
       {/* VM selector */}
-      <div className="bg-gray-900 rounded-lg p-6 mb-8">
+      <div className="bg-slate-900 rounded-lg p-6 mb-8">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium mb-2">VM Name</label>
@@ -74,21 +74,21 @@ export default function Snapshots() {
               type="text"
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2"
               placeholder="Enter VM name"
             />
           </div>
           <button
             onClick={loadSnapshots}
             disabled={!vmName}
-            className="mt-7 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded transition"
+            className="mt-7 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 rounded transition"
           >
             Load Snapshots
           </button>
           <button
             onClick={() => setShowCreateDialog(true)}
             disabled={!vmName}
-            className="mt-7 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded transition"
+            className="mt-7 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 rounded transition"
           >
             <Plus className="w-4 h-4" />
             Create
@@ -98,10 +98,10 @@ export default function Snapshots() {
 
       {/* Snapshots list */}
       {vmName && (
-        <div className="bg-gray-900 rounded-lg overflow-hidden">
+        <div className="bg-slate-900 rounded-lg overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-gray-400 text-sm">
+              <tr className="text-left text-slate-400 text-sm">
                 <th className="p-4">Name</th>
                 <th className="p-4">Type</th>
                 <th className="p-4">Description</th>
@@ -112,28 +112,28 @@ export default function Snapshots() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-400">
+                  <td colSpan={5} className="p-8 text-center text-slate-400">
                     Loading snapshots...
                   </td>
                 </tr>
               ) : snapshots.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-400">
+                  <td colSpan={5} className="p-8 text-center text-slate-400">
                     No snapshots found for this VM.
                   </td>
                 </tr>
               ) : (
                 snapshots.map((snap) => (
-                  <tr key={snap.id} className="border-t border-gray-800 hover:bg-gray-900">
+                  <tr key={snap.id} className="border-t border-slate-700/50 hover:bg-slate-900">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <Camera className="w-4 h-4 text-blue-400" />
                         <span className="font-medium">{snap.name}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-sm text-gray-400">{snap.snapshot_type}</td>
-                    <td className="p-4 text-sm text-gray-400">{snap.description || '-'}</td>
-                    <td className="p-4 text-sm text-gray-400">
+                    <td className="p-4 text-sm text-slate-400">{snap.snapshot_type}</td>
+                    <td className="p-4 text-sm text-slate-400">{snap.description || '-'}</td>
+                    <td className="p-4 text-sm text-slate-400">
                       {new Date(snap.created).toLocaleString()}
                     </td>
                     <td className="p-4">
@@ -215,7 +215,7 @@ function CreateSnapshotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold mb-6">Create Snapshot</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -224,7 +224,7 @@ function CreateSnapshotDialog({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2"
               placeholder="my-snapshot"
               required
             />
@@ -235,7 +235,7 @@ function CreateSnapshotDialog({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2"
               placeholder="Optional description"
             />
           </div>
@@ -244,7 +244,7 @@ function CreateSnapshotDialog({
             <select
               value={snapshotType}
               onChange={(e) => setSnapshotType(e.target.value as 'Disk' | 'Full')}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-4 py-2"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2"
             >
               <option value="Disk">Disk Only</option>
               <option value="Full">Full (Disk + State)</option>
@@ -254,7 +254,7 @@ function CreateSnapshotDialog({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded transition"
+              className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded transition"
             >
               Cancel
             </button>

@@ -40,9 +40,9 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-800 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
             <Copy className="w-6 h-6 text-blue-400" />
             <h2 className="text-xl font-bold">Clone VM</h2>
@@ -58,19 +58,19 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
         {/* Content */}
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Source VM
             </label>
             <input
               type="text"
               value={vmName}
               disabled
-              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-gray-400"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-slate-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               New VM Name
             </label>
             <input
@@ -78,7 +78,7 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
               value={targetName}
               onChange={(e) => setTargetName(e.target.value)}
               placeholder="Enter name for cloned VM"
-              className="w-full bg-gray-800 border border-gray-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -89,9 +89,9 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
                 id="includeSnapshots"
                 checked={includeSnapshots}
                 onChange={(e) => setIncludeSnapshots(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
               />
-              <label htmlFor="includeSnapshots" className="text-sm text-gray-300">
+              <label htmlFor="includeSnapshots" className="text-sm text-slate-300">
                 Include snapshots
               </label>
             </div>
@@ -102,9 +102,9 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
                 id="linkedClone"
                 checked={linkedClone}
                 onChange={(e) => setLinkedClone(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-800 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
               />
-              <label htmlFor="linkedClone" className="text-sm text-gray-300">
+              <label htmlFor="linkedClone" className="text-sm text-slate-300">
                 Linked clone (faster, uses less space)
               </label>
             </div>
@@ -120,11 +120,11 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 p-6 border-t border-gray-800">
+        <div className="flex justify-end gap-2 p-6 border-t border-slate-700/50">
           <button
             onClick={onClose}
             disabled={isCloning}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-600 text-white rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
           >
             Cancel
           </button>

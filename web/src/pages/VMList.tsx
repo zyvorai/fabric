@@ -17,13 +17,13 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
   const { handleStart, handleStop, handlePause, handleResume, handleBackup } = useVMActions(vm.name, onUpdate)
 
   return (
-    <tr className={`border-t border-gray-800 hover:bg-white/[0.02] transition-colors group ${selected ? 'bg-blue-600/5' : ''}`}>
+    <tr className={`border-t border-slate-700/50 hover:bg-white/[0.02] transition-colors group ${selected ? 'bg-blue-600/5' : ''}`}>
       <td className="py-3 px-4 w-10">
         <input
           type="checkbox"
           checked={selected}
           onChange={() => onSelect(vm.name)}
-          className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500/20 cursor-pointer"
+          className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500/20 cursor-pointer"
         />
       </td>
       <td className="py-3 px-4">
@@ -38,19 +38,19 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
         <StatusBadge status={vm.state} />
       </td>
       <td className="py-3 px-4">
-        <div className="flex items-center gap-1.5 text-sm text-gray-400">
-          <Cpu className="w-3.5 h-3.5 text-gray-500" />
+        <div className="flex items-center gap-1.5 text-sm text-slate-400">
+          <Cpu className="w-3.5 h-3.5 text-slate-500" />
           {vm.cpus}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="flex items-center gap-1.5 text-sm text-gray-400">
-          <HardDrive className="w-3.5 h-3.5 text-gray-500" />
+        <div className="flex items-center gap-1.5 text-sm text-slate-400">
+          <HardDrive className="w-3.5 h-3.5 text-slate-500" />
           {vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}
         </div>
       </td>
       <td className="py-3 px-4">
-        <span className="text-sm text-gray-500 truncate block max-w-[200px]">{vm.image}</span>
+        <span className="text-sm text-slate-500 truncate block max-w-[200px]">{vm.image}</span>
       </td>
       <td className="py-3 px-4">
         {vm.tags && vm.tags.length > 0 ? (
@@ -64,11 +64,11 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
               </span>
             ))}
             {vm.tags.length > 2 && (
-              <span className="text-[11px] text-gray-500">+{vm.tags.length - 2}</span>
+              <span className="text-[11px] text-slate-500">+{vm.tags.length - 2}</span>
             )}
           </div>
         ) : (
-          <span className="text-gray-600 text-sm">--</span>
+          <span className="text-slate-600 text-sm">--</span>
         )}
       </td>
       <td className="py-3 px-4">
@@ -94,10 +94,10 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
           <button onClick={handleBackup} className="p-1.5 rounded-md text-blue-400 hover:bg-blue-400/10 transition-colors" title="Backup">
             <Archive className="w-3.5 h-3.5" />
           </button>
-          <Link to={`/vms/${vm.name}/console`} className="p-1.5 rounded-md text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 transition-colors" title="Console">
+          <Link to={`/vms/${vm.name}/console`} className="p-1.5 rounded-md text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 transition-colors" title="Console">
             <Terminal className="w-3.5 h-3.5" />
           </Link>
-          <Link to={`/vms/${vm.name}`} className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/5 transition-colors" title="Details">
+          <Link to={`/vms/${vm.name}`} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-colors" title="Details">
             <MoreVertical className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -269,17 +269,17 @@ export default function VMList() {
         title="Virtual Machines"
         actions={
           <div className="flex items-center gap-2">
-            <div className="flex bg-gray-900 border border-gray-800 rounded-lg p-0.5">
+            <div className="flex bg-slate-900 border border-slate-700/50 rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                 title="Grid view"
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                 title="Table view"
               >
                 <List className="w-4 h-4" />
@@ -288,7 +288,7 @@ export default function VMList() {
             <button
               onClick={() => setGroupByTags(!groupByTags)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition ${
-                groupByTags ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'
+                groupByTags ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-slate-900 border border-slate-700/50 text-slate-400 hover:text-white'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -301,22 +301,22 @@ export default function VMList() {
       {/* Stats bar */}
       {vms.length > 0 && (
         <div className="flex items-center gap-4 mb-5 text-sm">
-          <span className="text-gray-500">
+          <span className="text-slate-500">
             {filteredVMs.length === vms.length ? `${vms.length} VMs` : `${filteredVMs.length} of ${vms.length} VMs`}
           </span>
-          <div className="h-3 w-px bg-gray-800" />
+          <div className="h-3 w-px bg-slate-800" />
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-gray-400">{statCounts.running} running</span>
+            <span className="text-slate-400">{statCounts.running} running</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-red-500" />
-            <span className="text-gray-400">{statCounts.stopped} stopped</span>
+            <span className="text-slate-400">{statCounts.stopped} stopped</span>
           </span>
           {statCounts.paused > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-yellow-500" />
-              <span className="text-gray-400">{statCounts.paused} paused</span>
+              <span className="text-slate-400">{statCounts.paused} paused</span>
             </span>
           )}
         </div>
@@ -326,16 +326,16 @@ export default function VMList() {
       {vms.length > 0 && (
         <div className="flex items-center gap-3 mb-4">
           <div className="relative max-w-md flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
               placeholder="Search VMs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
+              className="w-full bg-slate-900 border border-slate-700/50 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -346,7 +346,7 @@ export default function VMList() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 selectedVMs.size === filteredVMs.length
                   ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-gray-900 border border-gray-800 text-gray-500 hover:text-gray-300'
+                  : 'bg-slate-900 border border-slate-700/50 text-slate-500 hover:text-slate-300'
               }`}
             >
               <CheckSquare className="w-3.5 h-3.5" />
@@ -360,7 +360,7 @@ export default function VMList() {
       {allTags.length > 0 && (
         <div className="mb-5">
           <div className="flex items-center gap-2 flex-wrap">
-            <Tag className="w-3.5 h-3.5 text-gray-500" />
+            <Tag className="w-3.5 h-3.5 text-slate-500" />
             {allTags.map((tag) => {
               const isSelected = selectedTags.includes(tag)
               const vmCount = vms.filter((vm) => vm.tags?.includes(tag)).length
@@ -371,10 +371,10 @@ export default function VMList() {
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
                     isSelected
                       ? getTagColor(tag) + ' text-white/90'
-                      : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-gray-300 border border-gray-800'
+                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-300 border border-slate-700/50'
                   }`}
                 >
-                  {tag}<span className={isSelected ? 'ml-1 text-white/60' : 'ml-1 text-gray-500'}>{vmCount}</span>
+                  {tag}<span className={isSelected ? 'ml-1 text-white/60' : 'ml-1 text-slate-500'}>{vmCount}</span>
                 </button>
               )
             })}
@@ -387,7 +387,7 @@ export default function VMList() {
 
       {/* Content */}
       {vms.length === 0 ? (
-        <div className="bg-gray-900 rounded-xl border border-gray-800">
+        <div className="bg-slate-900 rounded-xl border border-slate-700/50">
           <EmptyState
             icon={<Monitor className="w-16 h-16" />}
             title="No virtual machines"
@@ -400,7 +400,7 @@ export default function VMList() {
           />
         </div>
       ) : filteredVMs.length === 0 ? (
-        <div className="bg-gray-900 rounded-xl border border-gray-800">
+        <div className="bg-slate-900 rounded-xl border border-slate-700/50">
           <EmptyState icon={<Search className="w-12 h-12" />} title="No matching VMs" description="Try adjusting your search or filters" />
         </div>
       ) : groupByTags ? (
@@ -409,7 +409,7 @@ export default function VMList() {
             <div key={tag}>
               <div className="flex items-center gap-3 mb-3">
                 <span className={`px-3 py-1.5 rounded-md text-sm font-medium ${getTagColor(tag)} text-white/90`}>{tag}</span>
-                <span className="text-sm text-gray-500">{vmsInGroup.length} {vmsInGroup.length === 1 ? 'VM' : 'VMs'}</span>
+                <span className="text-sm text-slate-500">{vmsInGroup.length} {vmsInGroup.length === 1 ? 'VM' : 'VMs'}</span>
               </div>
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -432,9 +432,9 @@ export default function VMList() {
       {/* Bulk Action Bar */}
       {selectedCount > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slide-in">
-          <div className="flex items-center gap-3 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl px-5 py-3">
+          <div className="flex items-center gap-3 bg-slate-900 border border-slate-700/50 rounded-xl shadow-2xl px-5 py-3">
             <span className="text-sm font-medium text-white tabular-nums">{selectedCount} selected</span>
-            <div className="w-px h-5 bg-gray-700" />
+            <div className="w-px h-5 bg-slate-700" />
             {selectedStopped > 0 && (
               <button
                 onClick={bulkStart}
@@ -471,10 +471,10 @@ export default function VMList() {
               <Trash2 className="w-3.5 h-3.5" />
               Delete
             </button>
-            <div className="w-px h-5 bg-gray-700" />
+            <div className="w-px h-5 bg-slate-700" />
             <button
               onClick={clearSelection}
-              className="text-xs text-gray-400 hover:text-white transition-colors"
+              className="text-xs text-slate-400 hover:text-white transition-colors"
             >
               Cancel
             </button>
@@ -498,10 +498,10 @@ export default function VMList() {
 
 function VMTable({ vms, onUpdate, selectedVMs, onSelect }: { vms: VM[]; onUpdate: () => void; selectedVMs: Set<string>; onSelect: (name: string) => void }) {
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
             <th className="py-3 px-4 w-10" />
             <th className="py-3 px-4">Name</th>
             <th className="py-3 px-4">Status</th>

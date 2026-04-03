@@ -96,10 +96,10 @@ export default function DistributedStorage() {
       non_compliant: 'bg-red-100 text-red-800',
       completed: 'bg-green-100 text-green-800',
       in_progress: 'bg-blue-100 text-blue-800',
-      pending: 'bg-gray-100 text-gray-800',
+      pending: 'bg-slate-500/20 text-slate-400',
       failed: 'bg-red-100 text-red-800',
     }
-    return colors[status] || 'bg-gray-100 text-gray-800'
+    return colors[status] || 'bg-slate-500/20 text-slate-400'
   }
 
   if (loading) {
@@ -110,7 +110,7 @@ export default function DistributedStorage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Distributed Storage</h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">
+        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
@@ -118,19 +118,19 @@ export default function DistributedStorage() {
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Storage Pools</div>
+          <div className="text-slate-400 text-sm mb-1">Storage Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Total Capacity</div>
+          <div className="text-slate-400 text-sm mb-1">Total Capacity</div>
           <div className="text-2xl font-bold">{formatGB(pools.reduce((s, p) => s + p.total_capacity_gb, 0))}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Policies</div>
+          <div className="text-slate-400 text-sm mb-1">Policies</div>
           <div className="text-2xl font-bold">{policies.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Active Migrations</div>
+          <div className="text-slate-400 text-sm mb-1">Active Migrations</div>
           <div className="text-2xl font-bold text-blue-400">
             {migrations.filter(m => m.status === 'in_progress').length}
           </div>
@@ -138,7 +138,7 @@ export default function DistributedStorage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
         {(['pools', 'policies', 'migrations', 'clusters'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -158,11 +158,11 @@ export default function DistributedStorage() {
           </div>
           <div className="space-y-4">
             {pools.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 bg-gray-900 rounded-lg">No storage pools configured.</div>
+              <div className="text-center py-12 text-slate-400 bg-slate-900 rounded-lg">No storage pools configured.</div>
             ) : pools.map(pool => {
               const usedPct = pool.total_capacity_gb > 0 ? (pool.used_capacity_gb / pool.total_capacity_gb * 100) : 0
               return (
-                <div key={pool.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <div key={pool.id} className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold text-lg">{pool.name}</span>
@@ -171,22 +171,22 @@ export default function DistributedStorage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-400">{pool.hosts.length} hosts | RF: {pool.replication_factor}</span>
+                      <span className="text-sm text-slate-400">{pool.hosts.length} hosts | RF: {pool.replication_factor}</span>
                       <button onClick={() => handleDeletePool(pool.id)} className="text-red-600 hover:text-red-800 p-1">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                   <div className="mb-2">
-                    <div className="flex justify-between text-sm text-gray-400 mb-1">
+                    <div className="flex justify-between text-sm text-slate-400 mb-1">
                       <span>Used: {formatGB(pool.used_capacity_gb)}</span>
                       <span>Total: {formatGB(pool.total_capacity_gb)}</span>
                     </div>
-                    <div className="w-full bg-gray-800 rounded-full h-3">
+                    <div className="w-full bg-slate-800 rounded-full h-3">
                       <div className={`h-3 rounded-full ${usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-blue-500'}`}
                         style={{ width: `${Math.min(usedPct, 100)}%` }} />
                     </div>
-                    <div className="text-right text-xs text-gray-400 mt-1">
+                    <div className="text-right text-xs text-slate-400 mt-1">
                       {formatGB(pool.available_capacity_gb)} free ({(100 - usedPct).toFixed(1)}%)
                     </div>
                   </div>
@@ -206,10 +206,10 @@ export default function DistributedStorage() {
               <Plus className="w-4 h-4" /> Create Policy
             </button>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-800">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+            <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase">
+                <tr className="text-left text-xs text-slate-400 uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Tier</th>
                   <th className="p-4">RF</th>
@@ -220,19 +220,19 @@ export default function DistributedStorage() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {policies.length === 0 ? (
-                  <tr><td colSpan={8} className="p-8 text-center text-gray-400">No storage policies.</td></tr>
+                  <tr><td colSpan={8} className="p-8 text-center text-slate-400">No storage policies.</td></tr>
                 ) : policies.map(pol => (
-                  <tr key={pol.id} className="hover:bg-gray-900">
+                  <tr key={pol.id} className="hover:bg-slate-900">
                     <td className="p-4">
                       <div className="font-medium">{pol.name}</div>
-                      {pol.description && <div className="text-xs text-gray-400">{pol.description}</div>}
+                      {pol.description && <div className="text-xs text-slate-400">{pol.description}</div>}
                     </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         pol.tier === 'performance' ? 'bg-purple-100 text-purple-800' :
-                        pol.tier === 'archive' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'
+                        pol.tier === 'archive' ? 'bg-slate-500/20 text-slate-400' : 'bg-blue-100 text-blue-800'
                       }`}>{pol.tier}</span>
                     </td>
                     <td className="p-4 text-sm">{pol.replication_factor}</td>
@@ -255,10 +255,10 @@ export default function DistributedStorage() {
 
       {/* Migrations Tab */}
       {activeTab === 'migrations' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-800">
+        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
-              <tr className="text-left text-xs text-gray-400 uppercase">
+              <tr className="text-left text-xs text-slate-400 uppercase">
                 <th className="p-4">VM</th>
                 <th className="p-4">From</th>
                 <th className="p-4">To</th>
@@ -267,20 +267,20 @@ export default function DistributedStorage() {
                 <th className="p-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-slate-700/50">
               {migrations.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-400">No storage migrations.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-slate-400">No storage migrations.</td></tr>
               ) : migrations.map(mig => (
-                <tr key={mig.id} className="hover:bg-gray-900">
+                <tr key={mig.id} className="hover:bg-slate-900">
                   <td className="p-4 font-medium">{mig.vm_name}</td>
-                  <td className="p-4 text-sm text-gray-400">{mig.source_pool_name}</td>
-                  <td className="p-4 text-sm text-gray-400">{mig.target_pool_name}</td>
+                  <td className="p-4 text-sm text-slate-400">{mig.source_pool_name}</td>
+                  <td className="p-4 text-sm text-slate-400">{mig.target_pool_name}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-24 bg-gray-800 rounded-full h-2">
+                      <div className="w-24 bg-slate-800 rounded-full h-2">
                         <div className="h-2 rounded-full bg-blue-500" style={{ width: `${mig.progress_pct}%` }} />
                       </div>
-                      <span className="text-xs text-gray-400">{mig.progress_pct}%</span>
+                      <span className="text-xs text-slate-400">{mig.progress_pct}%</span>
                     </div>
                   </td>
                   <td className="p-4 text-sm">{formatBytes(mig.bytes_migrated)} / {formatBytes(mig.bytes_total)}</td>
@@ -305,10 +305,10 @@ export default function DistributedStorage() {
               <Plus className="w-4 h-4" /> Create Cluster
             </button>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-800">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+            <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase">
+                <tr className="text-left text-xs text-slate-400 uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Datastores</th>
                   <th className="p-4">SDRS</th>
@@ -318,11 +318,11 @@ export default function DistributedStorage() {
                   <th className="p-4">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-slate-700/50">
                 {dsClusters.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-gray-400">No datastore clusters.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No datastore clusters.</td></tr>
                 ) : dsClusters.map(cl => (
-                  <tr key={cl.id} className="hover:bg-gray-900">
+                  <tr key={cl.id} className="hover:bg-slate-900">
                     <td className="p-4 font-medium">{cl.name}</td>
                     <td className="p-4 text-sm">{cl.storage_pool_ids.length}</td>
                     <td className="p-4 text-sm">{cl.sdrs_enabled ? 'Enabled' : 'Disabled'}</td>
@@ -421,7 +421,7 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">{title}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           {fields.map(f => (
@@ -429,18 +429,18 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
               <label className="block text-sm font-medium mb-1">{f.label}</label>
               {f.type === 'select' ? (
                 <select value={values[f.name]} onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2">
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
                   {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               ) : (
                 <input type={f.type} value={values[f.name]}
                   onChange={e => setValues(v => ({ ...v, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required={f.required} />
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required={f.required} />
               )}
             </div>
           ))}
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>

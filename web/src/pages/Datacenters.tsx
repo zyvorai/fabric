@@ -132,7 +132,7 @@ export default function Datacenters() {
       Maintenance: 'bg-yellow-100 text-yellow-800',
       Active: 'bg-green-100 text-green-800',
     }
-    return colors[status] || 'bg-gray-100 text-gray-800'
+    return colors[status] || 'bg-slate-500/20 text-slate-400'
   }
 
   if (loading) {
@@ -157,19 +157,19 @@ export default function Datacenters() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Datacenters</div>
+          <div className="text-slate-400 text-sm mb-1">Datacenters</div>
           <div className="text-2xl font-bold">{datacenters.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Clusters</div>
+          <div className="text-slate-400 text-sm mb-1">Clusters</div>
           <div className="text-2xl font-bold">{clusters.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Hosts</div>
+          <div className="text-slate-400 text-sm mb-1">Hosts</div>
           <div className="text-2xl font-bold">{hosts.length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-gray-400 text-sm mb-1">Total VMs</div>
+          <div className="text-slate-400 text-sm mb-1">Total VMs</div>
           <div className="text-2xl font-bold">
             {hosts.reduce((s, h) => s + h.vm_count, 0)}
           </div>
@@ -177,9 +177,9 @@ export default function Datacenters() {
       </div>
 
       {/* Tree View */}
-      <div className="bg-gray-900 border border-gray-800 rounded-lg">
+      <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
         {datacenters.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-slate-400">
             No datacenters configured. Create one to get started.
           </div>
         ) : (
@@ -189,9 +189,9 @@ export default function Datacenters() {
             const isExpanded = expandedDCs.has(dc.id)
 
             return (
-              <div key={dc.id} className="border-b border-gray-800 last:border-b-0">
+              <div key={dc.id} className="border-b border-slate-700/50 last:border-b-0">
                 <div
-                  className="flex items-center justify-between p-4 hover:bg-gray-900 cursor-pointer"
+                  className="flex items-center justify-between p-4 hover:bg-slate-900 cursor-pointer"
                   onClick={() => toggleDC(dc.id)}
                 >
                   <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ export default function Datacenters() {
                     <Server className="w-5 h-5 text-blue-400" />
                     <span className="font-semibold text-lg">{dc.name}</span>
                     {summary && (
-                      <span className="text-sm text-gray-400 ml-2">
+                      <span className="text-sm text-slate-400 ml-2">
                         {summary.cluster_count} clusters, {summary.host_count} hosts, {summary.vm_count} VMs
                         {summary.total_cpus > 0 && ` | ${summary.total_cpus} CPUs`}
                         {summary.total_memory_mb > 0 && ` | ${(summary.total_memory_mb / 1024).toFixed(1)} GB RAM`}
@@ -229,13 +229,13 @@ export default function Datacenters() {
                   return (
                     <div key={cl.id} className="ml-8">
                       <div
-                        className="flex items-center justify-between p-3 hover:bg-gray-900 cursor-pointer border-t border-gray-800"
+                        className="flex items-center justify-between p-3 hover:bg-slate-900 cursor-pointer border-t border-slate-700/50"
                         onClick={() => toggleCluster(cl.id)}
                       >
                         <div className="flex items-center gap-3">
                           {clExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           <span className="font-medium">{cl.name}</span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-slate-400">
                             {clHosts.length} hosts |
                             HA: {cl.ha_enabled ? 'On' : 'Off'} |
                             DRS: {cl.drs_enabled ? cl.drs_mode : 'Off'}
@@ -258,10 +258,10 @@ export default function Datacenters() {
                       </div>
 
                       {clExpanded && clHosts.length > 0 && (
-                        <div className="ml-8 border-t border-gray-800">
-                          <table className="min-w-full divide-y divide-gray-800">
+                        <div className="ml-8 border-t border-slate-700/50">
+                          <table className="min-w-full divide-y divide-slate-700/50">
                             <thead>
-                              <tr className="text-left text-xs text-gray-400">
+                              <tr className="text-left text-xs text-slate-400">
                                 <th className="p-2">Hostname</th>
                                 <th className="p-2">Address</th>
                                 <th className="p-2">CPUs</th>
@@ -273,33 +273,33 @@ export default function Datacenters() {
                                 <th className="p-2">Actions</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-800">
+                            <tbody className="divide-y divide-slate-700/50">
                               {clHosts.map(host => (
-                                <tr key={host.id} className="hover:bg-gray-900">
+                                <tr key={host.id} className="hover:bg-slate-900">
                                   <td className="p-2 font-medium">{host.hostname}</td>
-                                  <td className="p-2 font-mono text-sm text-gray-400">{host.address}</td>
+                                  <td className="p-2 font-mono text-sm text-slate-400">{host.address}</td>
                                   <td className="p-2 text-sm">{host.cpus}</td>
                                   <td className="p-2 text-sm">{(host.memory_mb / 1024).toFixed(1)} GB</td>
                                   <td className="p-2">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-16 bg-gray-800 rounded-full h-2">
+                                      <div className="w-16 bg-slate-800 rounded-full h-2">
                                         <div
                                           className={`h-2 rounded-full ${host.cpu_usage_pct > 80 ? 'bg-red-500' : host.cpu_usage_pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
                                           style={{ width: `${host.cpu_usage_pct}%` }}
                                         />
                                       </div>
-                                      <span className="text-xs text-gray-400">{host.cpu_usage_pct}%</span>
+                                      <span className="text-xs text-slate-400">{host.cpu_usage_pct}%</span>
                                     </div>
                                   </td>
                                   <td className="p-2">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-16 bg-gray-800 rounded-full h-2">
+                                      <div className="w-16 bg-slate-800 rounded-full h-2">
                                         <div
                                           className={`h-2 rounded-full ${host.memory_usage_pct > 80 ? 'bg-red-500' : host.memory_usage_pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
                                           style={{ width: `${host.memory_usage_pct}%` }}
                                         />
                                       </div>
-                                      <span className="text-xs text-gray-400">{host.memory_usage_pct}%</span>
+                                      <span className="text-xs text-slate-400">{host.memory_usage_pct}%</span>
                                     </div>
                                   </td>
                                   <td className="p-2 text-sm">{host.vm_count}</td>
@@ -315,7 +315,7 @@ export default function Datacenters() {
                                         className="p-1 hover:bg-white/[0.03] rounded"
                                         title={host.status === 'Maintenance' ? 'Exit maintenance' : 'Enter maintenance'}
                                       >
-                                        <Wrench className={`w-4 h-4 ${host.status === 'Maintenance' ? 'text-yellow-500' : 'text-gray-400'}`} />
+                                        <Wrench className={`w-4 h-4 ${host.status === 'Maintenance' ? 'text-yellow-500' : 'text-slate-400'}`} />
                                       </button>
                                       <button
                                         onClick={() => handleRemoveHost(host.id)}
@@ -333,14 +333,14 @@ export default function Datacenters() {
                       )}
 
                       {clExpanded && clHosts.length === 0 && (
-                        <div className="ml-8 p-4 text-gray-500 text-sm">No hosts registered in this cluster.</div>
+                        <div className="ml-8 p-4 text-slate-500 text-sm">No hosts registered in this cluster.</div>
                       )}
                     </div>
                   )
                 })}
 
                 {isExpanded && dcClusters.length === 0 && (
-                  <div className="ml-8 p-4 text-gray-500 text-sm">No clusters in this datacenter.</div>
+                  <div className="ml-8 p-4 text-slate-500 text-sm">No clusters in this datacenter.</div>
                 )}
               </div>
             )
@@ -402,21 +402,21 @@ function CreateDCModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Datacenter</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>
@@ -439,21 +439,21 @@ function CreateClusterModal({ datacenterId, onClose, onCreated }: { datacenterId
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Cluster</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Cluster Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>
@@ -478,33 +478,33 @@ function RegisterHostModal({ clusterId, onClose, onCreated }: { clusterId: strin
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Register Host</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Hostname</label>
             <input type="text" value={hostname} onChange={e => setHostname(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">IP Address</label>
             <input type="text" value={address} onChange={e => setAddress(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" required />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">CPUs</label>
               <input type="number" value={cpus} onChange={e => setCpus(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" min={1} required />
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" min={1} required />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Memory (MB)</label>
               <input type="number" value={memoryMb} onChange={e => setMemoryMb(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-800 rounded px-3 py-2" min={512} required />
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" min={512} required />
             </div>
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-600 rounded">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Register</button>
           </div>
         </form>

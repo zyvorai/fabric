@@ -17,7 +17,7 @@ const statusStyles: Record<string, string> = {
   paused: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
   warning: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
   pending: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-  unknown: 'text-gray-400 bg-gray-400/10 border-gray-400/20',
+  unknown: 'text-slate-400 bg-slate-400/10 border-gray-400/20',
 }
 
 const dotColors: Record<string, string> = {
@@ -34,7 +34,7 @@ const dotColors: Record<string, string> = {
   paused: 'bg-yellow-400',
   warning: 'bg-yellow-400',
   pending: 'bg-yellow-400',
-  unknown: 'bg-gray-400',
+  unknown: 'bg-slate-400',
 }
 
 const isRunning = (s: string) => ['running', 'active', 'enabled', 'healthy'].includes(s.toLowerCase())

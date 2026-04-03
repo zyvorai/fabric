@@ -44,8 +44,8 @@ export default function VNCViewer({ vmName }: VNCViewerProps) {
 
   return (
     <div className="bg-black rounded flex items-center justify-center" style={{ minHeight: '500px' }}>
-      <canvas ref={canvasRef} className="border border-gray-700" />
-      <div className="absolute text-gray-500">
+      <canvas ref={canvasRef} className="border border-slate-700/50" />
+      <div className="absolute text-slate-500">
         VNC Viewer (integrate noVNC for full functionality)
       </div>
     </div>

@@ -63,21 +63,21 @@ export default function VMDetails() {
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-5 w-24 bg-gray-800 rounded" />
+        <div className="h-5 w-24 bg-slate-800 rounded" />
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-8 w-48 bg-gray-800 rounded" />
-            <div className="h-4 w-32 bg-gray-800 rounded" />
+            <div className="h-8 w-48 bg-slate-800 rounded" />
+            <div className="h-4 w-32 bg-slate-800 rounded" />
           </div>
           <div className="flex gap-2">
-            <div className="h-9 w-20 bg-gray-800 rounded-lg" />
-            <div className="h-9 w-20 bg-gray-800 rounded-lg" />
+            <div className="h-9 w-20 bg-slate-800 rounded-lg" />
+            <div className="h-9 w-20 bg-slate-800 rounded-lg" />
           </div>
         </div>
-        <div className="h-10 bg-gray-800 rounded" />
+        <div className="h-10 bg-slate-800 rounded" />
         <div className="grid grid-cols-2 gap-4">
-          <div className="h-48 bg-gray-800 rounded-xl" />
-          <div className="h-48 bg-gray-800 rounded-xl" />
+          <div className="h-48 bg-slate-800 rounded-xl" />
+          <div className="h-48 bg-slate-800 rounded-xl" />
         </div>
       </div>
     )
@@ -86,8 +86,8 @@ export default function VMDetails() {
   if (!vm) {
     return (
       <div className="text-center py-16">
-        <div className="text-gray-600 text-6xl font-bold mb-3">?</div>
-        <p className="text-gray-400 mb-4">VM not found</p>
+        <div className="text-slate-600 text-6xl font-bold mb-3">?</div>
+        <p className="text-slate-400 mb-4">VM not found</p>
         <Link to="/vms" className="text-sm text-blue-400 hover:text-blue-300">
           Back to Virtual Machines
         </Link>
@@ -109,7 +109,7 @@ export default function VMDetails() {
       {/* Back */}
       <button
         onClick={() => navigate('/vms')}
-        className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors text-sm"
+        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-sm"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         Virtual Machines
@@ -122,7 +122,7 @@ export default function VMDetails() {
             <h1 className="text-2xl font-bold text-white">{vm.name}</h1>
             <StatusBadge status={vm.state} />
           </div>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
+          <div className="flex items-center gap-3 text-sm text-slate-500">
             <span className="flex items-center gap-1.5">
               <Cpu className="w-3.5 h-3.5" />
               {vm.cpus} vCPU{vm.cpus !== 1 ? 's' : ''}
@@ -152,18 +152,18 @@ export default function VMDetails() {
               <ActionBtn onClick={handleRestart} color="blue" icon={RotateCw} label="Restart" />
             </>
           )}
-          <div className="w-px h-6 bg-gray-800 mx-1" />
+          <div className="w-px h-6 bg-slate-800 mx-1" />
           <ActionBtn onClick={() => setShowCloneDialog(true)} color="purple" icon={Copy} label="Clone" />
           <Link
             to={`/vms/${vm.name}/console`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-600 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
           >
             <Terminal className="w-3.5 h-3.5" />
             Console
           </Link>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
             title="Delete VM"
           >
             <Trash2 className="w-4 h-4" />
@@ -172,7 +172,7 @@ export default function VMDetails() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-800">
+      <div className="border-b border-slate-700/50">
         <div className="flex gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon
@@ -184,7 +184,7 @@ export default function VMDetails() {
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
                   isActive
                     ? 'text-blue-400'
-                    : 'text-gray-500 hover:text-gray-300'
+                    : 'text-slate-500 hover:text-slate-300'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -256,8 +256,8 @@ function ActionBtn({ onClick, color, icon: Icon, label }: {
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-800/50 last:border-b-0">
-      <dt className="text-sm text-gray-500">{label}</dt>
+    <div className="flex items-center justify-between py-2.5 border-b border-slate-700/50/50 last:border-b-0">
+      <dt className="text-sm text-slate-500">{label}</dt>
       <dd className={`text-sm text-white ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
     </div>
   )
@@ -266,8 +266,8 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
 function OverviewTab({ vm }: { vm: VM }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-        <h3 className="text-sm font-medium text-gray-400 mb-3">Configuration</h3>
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+        <h3 className="text-sm font-medium text-slate-400 mb-3">Configuration</h3>
         <dl>
           <InfoRow label="Name" value={vm.name} />
           <InfoRow label="State" value={vm.state} />
@@ -277,19 +277,19 @@ function OverviewTab({ vm }: { vm: VM }) {
         </dl>
       </div>
 
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-        <h3 className="text-sm font-medium text-gray-400 mb-3">Resources</h3>
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+        <h3 className="text-sm font-medium text-slate-400 mb-3">Resources</h3>
         <dl>
           <InfoRow label="vCPUs" value={`${vm.cpus}`} />
           <InfoRow label="Memory" value={vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`} />
         </dl>
 
         {vm.tags && vm.tags.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-gray-800">
-            <span className="text-sm text-gray-500 block mb-2">Tags</span>
+          <div className="mt-4 pt-3 border-t border-slate-700/50">
+            <span className="text-sm text-slate-500 block mb-2">Tags</span>
             <div className="flex flex-wrap gap-1.5">
               {vm.tags.map((tag) => (
-                <span key={tag} className="px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-400">
+                <span key={tag} className="px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-400">
                   {tag}
                 </span>
               ))}
@@ -331,9 +331,9 @@ function MetricsTab({ vm }: { vm: VM }) {
 
   if (vm.state !== 'running') {
     return (
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center">
-        <Activity className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-        <p className="text-gray-500 text-sm">Metrics are only available for running VMs</p>
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 text-center">
+        <Activity className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+        <p className="text-slate-500 text-sm">Metrics are only available for running VMs</p>
       </div>
     )
   }
@@ -357,8 +357,8 @@ function MetricsTab({ vm }: { vm: VM }) {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">CPU Usage</h3>
+        <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+          <h3 className="text-sm font-medium text-slate-400 mb-3">CPU Usage</h3>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history}>
               <defs>
@@ -374,8 +374,8 @@ function MetricsTab({ vm }: { vm: VM }) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">Memory Usage</h3>
+        <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+          <h3 className="text-sm font-medium text-slate-400 mb-3">Memory Usage</h3>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history}>
               <defs>
@@ -404,8 +404,8 @@ function MetricStat({ label, value, color }: { label: string; value: string; col
     orange: 'bg-orange-500/10 text-orange-400',
   }
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
+    <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-4">
+      <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className={`text-xl font-bold tabular-nums ${bgMap[color]?.split(' ')[1] || 'text-white'}`}>{value}</div>
     </div>
   )
@@ -417,10 +417,10 @@ function DisksTab({ vm }: { vm: VM }) {
   ]
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-800">
+          <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
             <th className="py-3 px-5">Device</th>
             <th className="py-3 px-4">Path</th>
             <th className="py-3 px-4">Size</th>
@@ -430,16 +430,16 @@ function DisksTab({ vm }: { vm: VM }) {
         </thead>
         <tbody>
           {disks.map((disk) => (
-            <tr key={disk.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors">
+            <tr key={disk.name} className="border-t border-slate-700/50/50 hover:bg-white/[0.02] transition-colors">
               <td className="py-3 px-5 font-medium text-white">{disk.name}</td>
-              <td className="py-3 px-4 font-mono text-xs text-gray-400 max-w-[300px] truncate">{disk.path}</td>
-              <td className="py-3 px-4 text-gray-400">{disk.size}</td>
+              <td className="py-3 px-4 font-mono text-xs text-slate-400 max-w-[300px] truncate">{disk.path}</td>
+              <td className="py-3 px-4 text-slate-400">{disk.size}</td>
               <td className="py-3 px-4">
                 <span className="px-2 py-0.5 text-[11px] font-medium rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                   {disk.format.toUpperCase()}
                 </span>
               </td>
-              <td className="py-3 px-4 text-gray-400">{disk.bus}</td>
+              <td className="py-3 px-4 text-slate-400">{disk.bus}</td>
             </tr>
           ))}
         </tbody>
@@ -454,10 +454,10 @@ function NetworkTab({ vm }: { vm: VM }) {
   ]
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-800">
+          <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
             <th className="py-3 px-5">Interface</th>
             <th className="py-3 px-4">MAC Address</th>
             <th className="py-3 px-4">IP Address</th>
@@ -467,11 +467,11 @@ function NetworkTab({ vm }: { vm: VM }) {
         </thead>
         <tbody>
           {interfaces.map((iface) => (
-            <tr key={iface.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors">
+            <tr key={iface.name} className="border-t border-slate-700/50/50 hover:bg-white/[0.02] transition-colors">
               <td className="py-3 px-5 font-medium text-white">{iface.name}</td>
-              <td className="py-3 px-4 font-mono text-xs text-gray-400">{iface.mac}</td>
-              <td className="py-3 px-4 font-mono text-xs text-gray-300">{iface.ip}</td>
-              <td className="py-3 px-4 text-gray-400">{iface.model}</td>
+              <td className="py-3 px-4 font-mono text-xs text-slate-400">{iface.mac}</td>
+              <td className="py-3 px-4 font-mono text-xs text-slate-300">{iface.ip}</td>
+              <td className="py-3 px-4 text-slate-400">{iface.model}</td>
               <td className="py-3 px-4">
                 <StatusBadge status={iface.state === 'up' ? 'running' : 'stopped'} />
               </td>
@@ -498,10 +498,10 @@ function SnapshotsTab(_props: { vm: VM }) {
         </button>
       </div>
 
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-800">
+            <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
               <th className="py-3 px-5">Name</th>
               <th className="py-3 px-4">Type</th>
               <th className="py-3 px-4">Created</th>
@@ -511,15 +511,15 @@ function SnapshotsTab(_props: { vm: VM }) {
           </thead>
           <tbody>
             {snapshots.map((snap) => (
-              <tr key={snap.name} className="border-t border-gray-800/50 hover:bg-white/[0.02] transition-colors group">
+              <tr key={snap.name} className="border-t border-slate-700/50/50 hover:bg-white/[0.02] transition-colors group">
                 <td className="py-3 px-5 font-medium text-white">{snap.name}</td>
                 <td className="py-3 px-4">
                   <span className="px-2 py-0.5 text-[11px] font-medium rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
                     {snap.type}
                   </span>
                 </td>
-                <td className="py-3 px-4 text-gray-400">{snap.created}</td>
-                <td className="py-3 px-4 text-gray-400 tabular-nums">{snap.size}</td>
+                <td className="py-3 px-4 text-slate-400">{snap.created}</td>
+                <td className="py-3 px-4 text-slate-400 tabular-nums">{snap.size}</td>
                 <td className="py-3 px-4">
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button className="px-2.5 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 rounded text-xs font-medium transition-colors">
@@ -552,19 +552,19 @@ function LogsTab(_props: { vm: VM }) {
     INFO: 'text-cyan-400',
     WARN: 'text-yellow-400',
     ERROR: 'text-red-400',
-    DEBUG: 'text-gray-500',
+    DEBUG: 'text-slate-500',
   }
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
       <div className="font-mono text-xs">
         {logs.map((log, index) => (
-          <div key={index} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-gray-800/30 last:border-b-0">
-            <span className="text-gray-600 shrink-0 tabular-nums">{log.time}</span>
-            <span className={`shrink-0 w-12 ${levelStyles[log.level] || 'text-gray-400'}`}>
+          <div key={index} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-slate-700/50/30 last:border-b-0">
+            <span className="text-slate-600 shrink-0 tabular-nums">{log.time}</span>
+            <span className={`shrink-0 w-12 ${levelStyles[log.level] || 'text-slate-400'}`}>
               {log.level}
             </span>
-            <span className="text-gray-300">{log.message}</span>
+            <span className="text-slate-300">{log.message}</span>
           </div>
         ))}
       </div>

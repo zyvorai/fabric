@@ -8,7 +8,7 @@ interface MetricChartProps {
 
 export default function MetricChart({ title, data, color = '#3b82f6' }: MetricChartProps) {
   return (
-    <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
+    <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50">
       <h3 className="text-lg font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data}>

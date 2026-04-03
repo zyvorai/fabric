@@ -36,10 +36,10 @@ export function ToastItem({ toast, onClose }: ToastProps) {
       className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-lg animate-slide-in ${config.bg} ${config.border}`}
     >
       <Icon className={`w-4 h-4 shrink-0 ${config.text}`} />
-      <span className="flex-1 text-sm text-gray-200">{toast.message}</span>
+      <span className="flex-1 text-sm text-slate-200">{toast.message}</span>
       <button
         onClick={() => onClose(toast.id)}
-        className="shrink-0 p-0.5 rounded-md text-gray-500 hover:text-gray-300 transition-colors"
+        className="shrink-0 p-0.5 rounded-md text-slate-500 hover:text-slate-300 transition-colors"
       >
         <X className="w-3.5 h-3.5" />
       </button>
