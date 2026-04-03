@@ -81,6 +81,16 @@ const AccessControlPage = lazy(() => import('./pages/AccessControl'))
 const PluginManagerPage = lazy(() => import('./pages/PluginManager'))
 const ServiceMapPage = lazy(() => import('./pages/ServiceMap'))
 const EventStreamPage = lazy(() => import('./pages/EventStream'))
+const JobMonitorPage = lazy(() => import('./pages/JobMonitor'))
+const ManifestBuilderPage = lazy(() => import('./pages/ManifestBuilder'))
+const DiskImagesPage = lazy(() => import('./pages/DiskImages'))
+const VMBrowserPage = lazy(() => import('./pages/VMBrowser'))
+const MigrationWizardPage = lazy(() => import('./pages/MigrationWizard'))
+const BatchMigrationBuilderPage = lazy(() => import('./pages/BatchMigrationBuilder'))
+const MigrationTemplatesPage = lazy(() => import('./pages/MigrationTemplates'))
+const SnapshotManagerPage = lazy(() => import('./pages/SnapshotManager'))
+const StorageManagerPage = lazy(() => import('./pages/StorageManager'))
+const VMCreateWizardPage = lazy(() => import('./pages/VMCreateWizard'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -191,6 +201,16 @@ function MainLayout() {
               <Route path="/plugins" element={<PluginManagerPage />} />
               <Route path="/service-map" element={<ServiceMapPage />} />
               <Route path="/event-stream" element={<EventStreamPage />} />
+              <Route path="/job-monitor" element={<JobMonitorPage />} />
+              <Route path="/manifest-builder" element={<ManifestBuilderPage />} />
+              <Route path="/disk-images" element={<DiskImagesPage />} />
+              <Route path="/vm-browser" element={<VMBrowserPage />} />
+              <Route path="/migration-wizard" element={<MigrationWizardPage />} />
+              <Route path="/batch-migration" element={<BatchMigrationBuilderPage />} />
+              <Route path="/migration-templates" element={<MigrationTemplatesPage />} />
+              <Route path="/snapshot-manager" element={<SnapshotManagerPage />} />
+              <Route path="/storage-manager" element={<StorageManagerPage />} />
+              <Route path="/vm-wizard" element={<VMCreateWizardPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
