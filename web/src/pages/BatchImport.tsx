@@ -92,7 +92,7 @@ export default function BatchImport() {
             <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="hidden" onChange={handleFileSelect} />
           </div>
           <div><label className="block text-sm font-medium text-slate-400 mb-2">Or paste YAML/JSON directly</label>
-            <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={12} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-sm text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-y" placeholder={exampleYAML} />
+            <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={12} className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-sm text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-y" placeholder={exampleYAML} />
           </div>
           {parseError && <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400"><XCircle className="w-4 h-4 flex-shrink-0" />{parseError}</div>}
           <button onClick={handlePreview} disabled={!inputText.trim()} className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"><Eye className="w-4 h-4" /> Preview</button>
@@ -104,7 +104,7 @@ export default function BatchImport() {
             {submitted > 0 && <span className="text-green-400"><CheckCircle className="w-4 h-4 inline mr-1" />{submitted} submitted</span>}
             {errors > 0 && <span className="text-red-400"><XCircle className="w-4 h-4 inline mr-1" />{errors} failed</span>}
           </div>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
             <table className="w-full text-sm"><thead><tr className="border-b border-slate-700 bg-slate-800/50"><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">VM Name</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">CPUs</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Memory</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Image</th></tr></thead>
             <tbody>{items.map((item, idx) => (
               <tr key={idx} className="border-b border-slate-800 last:border-0 hover:bg-slate-800/30">

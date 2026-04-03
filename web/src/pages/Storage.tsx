@@ -137,26 +137,26 @@ export default function Storage() {
 
       {/* Storage Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-2">Total Capacity</div>
           <div className="text-2xl font-bold text-blue-400">{formatBytes(totalCapacity)}</div>
         </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-2">Used</div>
           <div className="text-2xl font-bold text-orange-400">{formatBytes(totalUsed)}</div>
         </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-2">Volumes</div>
           <div className="text-2xl font-bold text-green-400">{volumes.length}</div>
         </div>
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-2">Pools</div>
           <div className="text-2xl font-bold text-purple-400">{pools.length}</div>
         </div>
       </div>
 
       {/* Storage Pools */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold">Storage Pools</h2>
         </div>
@@ -209,7 +209,7 @@ export default function Storage() {
       </div>
 
       {/* Volumes */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold">Volumes</h2>
         </div>
@@ -271,7 +271,7 @@ export default function Storage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50 hover:border-blue-500 transition cursor-pointer">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-blue-500 transition cursor-pointer">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-3 bg-blue-500/10 rounded-lg">
               <Plus className="w-6 h-6 text-blue-400" />
@@ -281,7 +281,7 @@ export default function Storage() {
           <p className="text-sm text-slate-400">Create a new disk image for VMs</p>
         </div>
 
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50 hover:border-purple-500 transition cursor-pointer">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-purple-500 transition cursor-pointer">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-3 bg-purple-500/10 rounded-lg">
               <RefreshCw className="w-6 h-6 text-purple-400" />
@@ -291,7 +291,7 @@ export default function Storage() {
           <p className="text-sm text-slate-400">Take a snapshot of existing volume</p>
         </div>
 
-        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50 hover:border-green-500 transition cursor-pointer">
+        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-green-500 transition cursor-pointer">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-3 bg-green-500/10 rounded-lg">
               <Copy className="w-6 h-6 text-green-400" />

@@ -266,7 +266,7 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
 function OverviewTab({ vm }: { vm: VM }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
         <h3 className="text-sm font-medium text-slate-400 mb-3">Configuration</h3>
         <dl>
           <InfoRow label="Name" value={vm.name} />
@@ -277,7 +277,7 @@ function OverviewTab({ vm }: { vm: VM }) {
         </dl>
       </div>
 
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
         <h3 className="text-sm font-medium text-slate-400 mb-3">Resources</h3>
         <dl>
           <InfoRow label="vCPUs" value={`${vm.cpus}`} />
@@ -331,7 +331,7 @@ function MetricsTab({ vm }: { vm: VM }) {
 
   if (vm.state !== 'running') {
     return (
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-8 text-center">
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
         <Activity className="w-10 h-10 text-slate-600 mx-auto mb-3" />
         <p className="text-slate-500 text-sm">Metrics are only available for running VMs</p>
       </div>
@@ -357,7 +357,7 @@ function MetricsTab({ vm }: { vm: VM }) {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
           <h3 className="text-sm font-medium text-slate-400 mb-3">CPU Usage</h3>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history}>
@@ -374,7 +374,7 @@ function MetricsTab({ vm }: { vm: VM }) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-5">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
           <h3 className="text-sm font-medium text-slate-400 mb-3">Memory Usage</h3>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history}>
@@ -404,7 +404,7 @@ function MetricStat({ label, value, color }: { label: string; value: string; col
     orange: 'bg-orange-500/10 text-orange-400',
   }
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-4">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
       <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className={`text-xl font-bold tabular-nums ${bgMap[color]?.split(' ')[1] || 'text-white'}`}>{value}</div>
     </div>
@@ -417,7 +417,7 @@ function DisksTab({ vm }: { vm: VM }) {
   ]
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
@@ -454,7 +454,7 @@ function NetworkTab({ vm }: { vm: VM }) {
   ]
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
@@ -498,7 +498,7 @@ function SnapshotsTab(_props: { vm: VM }) {
         </button>
       </div>
 
-      <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
@@ -556,7 +556,7 @@ function LogsTab(_props: { vm: VM }) {
   }
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <div className="font-mono text-xs">
         {logs.map((log, index) => (
           <div key={index} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-slate-700/50/30 last:border-b-0">

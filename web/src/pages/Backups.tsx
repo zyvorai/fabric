@@ -142,7 +142,7 @@ export default function Backups() {
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Total Backups</p>
@@ -151,7 +151,7 @@ export default function Backups() {
               <HardDrive className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Total Size</p>
@@ -160,7 +160,7 @@ export default function Backups() {
               <Save className="w-8 h-8 text-green-500" />
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div>
               <p className="text-sm text-slate-400 mb-2">By Type</p>
               <div className="space-y-1">
@@ -173,7 +173,7 @@ export default function Backups() {
               </div>
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div>
               <p className="text-sm text-slate-400 mb-2">Latest</p>
               <p className="text-xs text-slate-500">
@@ -186,11 +186,11 @@ export default function Backups() {
 
       {/* Active Jobs */}
       {jobs.filter(j => j.status === 'running' || j.status === 'queued').length > 0 && (
-        <div className="mb-6 bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="mb-6 bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <h2 className="text-lg font-bold mb-4">Active Jobs</h2>
           <div className="space-y-3">
             {jobs.filter(j => j.status === 'running' || j.status === 'queued').map((job) => (
-              <div key={job.id} className="flex items-center gap-3 p-3 bg-slate-900 rounded">
+              <div key={job.id} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded">
                 {getJobStatusIcon(job.status)}
                 <div className="flex-1">
                   <p className="font-medium">{job.vm_name}</p>
@@ -212,7 +212,7 @@ export default function Backups() {
       )}
 
       {/* Backups List */}
-      <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
         <div className="p-4 border-b border-slate-700/50">
           <h2 className="text-lg font-bold">Available Backups</h2>
         </div>
@@ -342,7 +342,7 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-bold">Create Backup</h2>
         </div>
@@ -352,7 +352,7 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
             <select
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               {vms.map((vm: VM) => (
                 <option key={vm.name} value={vm.name}>{vm.name}</option>
@@ -364,7 +364,7 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
             <select
               value={backupType}
               onChange={(e) => setBackupType(e.target.value as 'full' | 'incremental')}
-              className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="full">Full Backup</option>
               <option value="incremental">Incremental Backup</option>
@@ -403,12 +403,12 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-bold">Restore from Backup</h2>
         </div>
         <div className="p-6 space-y-4">
-          <div className="p-3 bg-slate-900 rounded border border-slate-700/50">
+          <div className="p-3 bg-slate-800/50 rounded border border-slate-700/50">
             <p className="text-sm text-slate-400">Source VM</p>
             <p className="font-medium">{backup.vm_name}</p>
             <p className="text-xs text-slate-500 mt-1">
@@ -421,7 +421,7 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
               id="create-new"
               checked={createNew}
               onChange={(e) => setCreateNew(e.target.checked)}
-              className="w-4 h-4 bg-slate-900 border-slate-700/50 rounded focus:ring-blue-500"
+              className="w-4 h-4 bg-slate-800/50 border-slate-700/50 rounded focus:ring-blue-500"
             />
             <label htmlFor="create-new" className="text-sm font-medium">
               Restore to new VM
@@ -435,7 +435,7 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
                 value={targetName}
                 onChange={(e) => setTargetName(e.target.value)}
                 placeholder={`${backup.vm_name}-restored`}
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
           )}

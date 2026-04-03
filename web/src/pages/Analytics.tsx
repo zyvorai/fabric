@@ -111,7 +111,7 @@ export default function Analytics() {
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-              className="bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="1h">Last Hour</option>
               <option value="6h">Last 6 Hours</option>
@@ -123,14 +123,14 @@ export default function Analytics() {
               <button
                 onClick={() => document.getElementById('export-analytics')?.classList.toggle('hidden')}
                 disabled={exporting}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-700/50 hover:bg-white/[0.03] rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border border-slate-700/50 hover:bg-white/[0.03] rounded-lg transition disabled:opacity-50"
               >
                 <Download className="w-4 h-4" />
                 Export
               </button>
               <div
                 id="export-analytics"
-                className="hidden absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl z-10"
+                className="hidden absolute right-0 mt-2 w-48 bg-slate-800/50 border border-slate-700/50 rounded-lg shadow-xl z-10"
               >
                 <button
                   onClick={() => { handleExport('pdf'); document.getElementById('export-analytics')?.classList.add('hidden') }}
@@ -153,7 +153,7 @@ export default function Analytics() {
       {/* Resource Utilization Overview */}
       {utilization && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-slate-400">CPU Utilization</span>
               <Activity className="w-5 h-5 text-blue-500" />
@@ -169,7 +169,7 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-slate-400">Memory Utilization</span>
               <Activity className="w-5 h-5 text-purple-500" />
@@ -185,7 +185,7 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-slate-400">Disk Utilization</span>
               <Activity className="w-5 h-5 text-green-500" />
@@ -201,7 +201,7 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-slate-400">Network Utilization</span>
               <Activity className="w-5 h-5 text-cyan-500" />
@@ -230,7 +230,7 @@ export default function Analytics() {
             {insights.slice(0, 5).map((insight, idx) => (
               <div
                 key={idx}
-                className="bg-slate-900 border border-slate-700/50 rounded-lg p-4"
+                className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4"
               >
                 <div className="flex items-start gap-3">
                   <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(insight.severity)}`}>
@@ -251,7 +251,7 @@ export default function Analytics() {
 
       {/* Top VMs by Resource */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-blue-500" />
             Top VMs by CPU
@@ -276,7 +276,7 @@ export default function Analytics() {
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-purple-500" />
             Top VMs by Memory
@@ -301,7 +301,7 @@ export default function Analytics() {
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-cyan-500" />
             Top VMs by Network
@@ -328,7 +328,7 @@ export default function Analytics() {
       </div>
 
       {/* System Performance Chart Placeholder */}
-      <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-6">
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-500" />
@@ -370,7 +370,7 @@ export default function Analytics() {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-64 flex items-center justify-center bg-slate-900 rounded border border-slate-700/50">
+          <div className="h-64 flex items-center justify-center bg-slate-800/50 rounded border border-slate-700/50">
             <div className="text-center">
               <Activity className="w-12 h-12 text-slate-600 mx-auto mb-2" />
               <p className="text-slate-500">No performance data available</p>

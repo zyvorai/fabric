@@ -104,7 +104,7 @@ export default function UploadDisk() {
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1">Destination Directory</label>
             <input type="text" value={destDir} onChange={(e) => setDestDir(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500" />
           </div>
           <div className="flex gap-2">
             <button onClick={handleUpload} className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-500 hover:to-blue-600 shadow-lg shadow-blue-500/20 transition-all">

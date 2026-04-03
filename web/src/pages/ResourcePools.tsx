@@ -175,7 +175,7 @@ export default function ResourcePools() {
       </div>
 
       {/* Tree */}
-      <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
         {rootPools.length === 0 ? (
           <div className="text-center py-12 text-slate-400">No resource pools configured.</div>
         ) : (
@@ -247,7 +247,7 @@ function CreatePoolModal({ pools, onClose, onCreated }: { pools: ResourcePool[];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-lg">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-lg">
         <h2 className="text-xl font-bold mb-4">Create Resource Pool</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -321,7 +321,7 @@ function AdmissionTestModal({ poolId, result, onTest, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Admission Control Test</h2>
         <div className="space-y-4">
           <div>

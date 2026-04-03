@@ -28,7 +28,7 @@ function formatBytes(bytes: number): string {
 function MonitorTabContent({ policies, metrics, alerts, onDelete, onAcknowledge, onCreate, onSync }: MonitorTabProps) {
   const [view, setView] = useState<'policies' | 'metrics' | 'alerts'>('policies')
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">Network Monitor</h2>

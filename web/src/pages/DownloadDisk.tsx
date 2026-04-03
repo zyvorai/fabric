@@ -96,7 +96,7 @@ export default function DownloadDisk() {
         <label className="block text-sm font-medium text-slate-300 mb-2">Custom Path</label>
         <div className="flex gap-2">
           <input type="text" value={customPath} onChange={(e) => setCustomPath(e.target.value)} placeholder="/path/to/disk-image.qcow2 or /path/to/directory/"
-            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            className="flex-1 px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             onKeyDown={(e) => { if (e.key === 'Enter') handleDownload(customPath.trim()) }} />
           <button onClick={() => fetchImages(customPath.trim())} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors text-sm flex items-center gap-1.5">
             <FolderSearch className="w-4 h-4" /> Browse

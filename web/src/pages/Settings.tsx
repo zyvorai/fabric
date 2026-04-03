@@ -138,7 +138,7 @@ export default function Settings() {
       </div>
 
       {/* General Settings */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Globe className="w-5 h-5 text-blue-400" />
@@ -196,7 +196,7 @@ export default function Settings() {
       </div>
 
       {/* Network Settings */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Globe className="w-5 h-5 text-green-400" />
@@ -239,7 +239,7 @@ export default function Settings() {
       </div>
 
       {/* Storage Settings */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Database className="w-5 h-5 text-purple-400" />
@@ -300,7 +300,7 @@ export default function Settings() {
       </div>
 
       {/* Security Settings */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Shield className="w-5 h-5 text-red-400" />
@@ -339,7 +339,7 @@ export default function Settings() {
       </div>
 
       {/* Notification Settings */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Bell className="w-5 h-5 text-yellow-400" />

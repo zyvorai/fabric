@@ -40,7 +40,7 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <div className="flex items-center gap-3">

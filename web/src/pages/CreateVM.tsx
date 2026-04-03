@@ -87,7 +87,7 @@ export default function CreateVM() {
           )}
 
           {/* Basic section */}
-          <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-6 space-y-5">
+          <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 space-y-5">
             <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Basic Configuration</h2>
 
             <div>
@@ -123,7 +123,7 @@ export default function CreateVM() {
           </div>
 
           {/* Resources section */}
-          <div className="bg-slate-900 rounded-xl border border-slate-700/50 p-6 space-y-5">
+          <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 space-y-5">
             <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Resources</h2>
 
             <div>
@@ -201,7 +201,7 @@ export default function CreateVM() {
           </div>
 
           {/* Advanced Options */}
-          <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}

@@ -140,7 +140,7 @@ export default function ContentLibrary() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['libraries', 'items', 'specs', 'profiles'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -160,9 +160,9 @@ export default function ContentLibrary() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {libraries.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-slate-400 bg-slate-900 rounded-lg">No libraries.</div>
+              <div className="col-span-full text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No libraries.</div>
             ) : libraries.map(lib => (
-              <div key={lib.id} className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+              <div key={lib.id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-lg">{lib.name}</span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${lib.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>{lib.status}</span>
@@ -203,7 +203,7 @@ export default function ContentLibrary() {
               <span className="text-sm text-slate-400">{filteredItems.length} items</span>
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -252,7 +252,7 @@ export default function ContentLibrary() {
               <Plus className="w-4 h-4" /> Create Spec
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -300,7 +300,7 @@ export default function ContentLibrary() {
               <Plus className="w-4 h-4" /> Create Profile
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -368,7 +368,7 @@ function CreateLibraryModal({ onClose, onCreated }: { onClose: () => void; onCre
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Library</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
@@ -408,7 +408,7 @@ function CreateSpecModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Customization Spec</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
@@ -445,7 +445,7 @@ function CreateProfileModal({ onClose, onCreated }: { onClose: () => void; onCre
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Host Profile</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>

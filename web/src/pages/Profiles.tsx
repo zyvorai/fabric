@@ -45,7 +45,7 @@ export default function Profiles() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {profiles.map(p => (
-          <div key={p.name} className="bg-slate-900 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
+          <div key={p.name} className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h3 className="text-lg font-bold">{p.name}</h3>
@@ -88,7 +88,7 @@ function CreateProfileDialog({ onClose, onSuccess }: { onClose: () => void; onSu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50"><h2 className="text-xl font-bold">Create Profile</h2><button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded"><span className="text-2xl">&times;</span></button></div>
         <div className="p-6 space-y-4">
           <div><label className="block text-sm font-medium text-slate-300 mb-2">Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="my-profile" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" autoFocus /></div>

@@ -127,7 +127,7 @@ export default function Schedules() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 showHistory
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-900 border border-slate-700/50 text-slate-400 hover:text-white'
+                  : 'bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white'
               }`}
             >
               <Clock className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function Schedules() {
       {!showHistory && (
         <>
           {schedules.length === 0 ? (
-            <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Calendar className="w-16 h-16 text-slate-600 mx-auto mb-4" />
               <p className="text-xl text-slate-400 mb-4">No schedules configured</p>
               <p className="text-slate-500 mb-6">Create schedules to automate VM operations</p>
@@ -165,7 +165,7 @@ export default function Schedules() {
               {schedules.map((schedule) => (
                 <div
                   key={schedule.id}
-                  className="bg-slate-900 rounded-lg border border-slate-700/50 p-6"
+                  className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -252,7 +252,7 @@ export default function Schedules() {
 
       {/* History */}
       {showHistory && (
-        <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
           <div className="p-4 border-b border-slate-700/50">
             <h2 className="text-lg font-bold">Execution History</h2>
             <p className="text-sm text-slate-400">Latest 20 executions</p>

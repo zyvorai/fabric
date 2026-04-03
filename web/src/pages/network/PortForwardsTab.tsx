@@ -13,7 +13,7 @@ interface PortForwardsTabProps {
 
 function PortForwardsTabContent({ portForwards, onDelete, onCreate, onSync }: PortForwardsTabProps) {
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Port Forwards (nftables DNAT)</h2>
         <div className="flex gap-2">

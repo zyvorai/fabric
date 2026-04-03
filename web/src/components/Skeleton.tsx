@@ -13,7 +13,7 @@ export function SkeletonText({ className = '' }: SkeletonProps) {
 
 export function SkeletonCard() {
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <div className="p-5 space-y-3">
         <div className="flex items-start justify-between">
           <div className="space-y-2 flex-1">
@@ -37,7 +37,7 @@ export function SkeletonCard() {
 
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <div className="grid gap-4 p-4 border-b border-slate-700/50" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {Array.from({ length: cols }).map((_, i) => (
           <SkeletonBase key={i} className="h-3" />
@@ -60,7 +60,7 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
 
 export function SkeletonChart() {
   return (
-    <div className="bg-slate-900 rounded-xl p-5 border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
       <div className="flex items-center justify-between mb-4">
         <SkeletonBase className="h-4 w-28" />
         <SkeletonBase className="h-5 w-12" />
@@ -87,7 +87,7 @@ export function SkeletonDashboard() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-slate-900 rounded-xl p-5 border border-slate-700/50">
+          <div key={i} className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
             <SkeletonBase className="h-8 w-8 rounded-lg mb-3" />
             <SkeletonBase className="h-7 w-16 mb-1" />
             <SkeletonBase className="h-3 w-20" />

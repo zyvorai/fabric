@@ -125,7 +125,7 @@ export default function Encryption() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['providers', 'policies', 'vms'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -143,7 +143,7 @@ export default function Encryption() {
               <Plus className="w-4 h-4" /> Add Provider
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -193,7 +193,7 @@ export default function Encryption() {
               <Plus className="w-4 h-4" /> Create Policy
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -235,7 +235,7 @@ export default function Encryption() {
 
       {/* Encrypted VMs Tab */}
       {activeTab === 'vms' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -319,7 +319,7 @@ function CreateProviderModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Register Key Provider</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -375,7 +375,7 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Encryption Policy</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

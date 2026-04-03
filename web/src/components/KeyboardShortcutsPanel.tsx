@@ -78,7 +78,7 @@ export default function KeyboardShortcutsPanel() {
       onClick={() => setIsOpen(false)}
     >
       <div
-        className="bg-slate-900 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-lg overflow-hidden"
+        className="bg-slate-800/50 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">

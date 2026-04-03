@@ -45,7 +45,7 @@ export default function ImageBuilder() {
         <div className="space-y-3">
           <h2 className="text-xl font-semibold">Active Builds</h2>
           {builds.filter(b => b.state === 'pending' || b.state === 'building').map(build => (
-            <div key={build.id} className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+            <div key={build.id} className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-bold">{build.name}</span>
@@ -62,13 +62,13 @@ export default function ImageBuilder() {
       <div>
         <h2 className="text-xl font-semibold mb-3">Available Images</h2>
         {images.length === 0 ? (
-          <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
             <Package className="w-16 h-16 mx-auto mb-4 text-slate-600" />
             <p className="text-xl text-slate-400 mb-4">No images found</p>
             <p className="text-slate-500">Build an image with mkosi to get started</p>
           </div>
         ) : (
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
             <table className="w-full">
               <thead className="bg-slate-800">
                 <tr>
@@ -97,7 +97,7 @@ export default function ImageBuilder() {
       {builds.filter(b => b.state === 'completed' || b.state === 'failed').length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-3">Build History</h2>
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
             <table className="w-full">
               <thead className="bg-slate-800">
                 <tr>
@@ -151,7 +151,7 @@ function BuildImageDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-bold">Build Image (mkosi)</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded"><span className="text-2xl">&times;</span></button>

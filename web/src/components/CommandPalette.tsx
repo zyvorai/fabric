@@ -216,7 +216,7 @@ export default function CommandPalette() {
       onClick={close}
     >
       <div
-        className="bg-slate-900 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-xl max-h-[420px] overflow-hidden"
+        className="bg-slate-800/50 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-xl max-h-[420px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search */}

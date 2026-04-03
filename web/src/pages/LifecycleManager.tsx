@@ -117,7 +117,7 @@ export default function LifecycleManager() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['baselines', 'compliance', 'remediation', 'updates'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -135,7 +135,7 @@ export default function LifecycleManager() {
               <Plus className="w-4 h-4" /> Create Baseline
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -197,7 +197,7 @@ export default function LifecycleManager() {
 
       {/* Compliance Scans Tab */}
       {activeTab === 'compliance' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -233,7 +233,7 @@ export default function LifecycleManager() {
 
       {/* Remediation Tab */}
       {activeTab === 'remediation' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -276,9 +276,9 @@ export default function LifecycleManager() {
       {activeTab === 'updates' && (
         <div className="space-y-4">
           {updates.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 bg-slate-900 rounded-lg">No rolling updates.</div>
+            <div className="text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No rolling updates.</div>
           ) : updates.map(update => (
-            <div key={update.id} className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+            <div key={update.id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold">{update.name}</span>
@@ -340,7 +340,7 @@ function CreateBaselineModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Baseline</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>

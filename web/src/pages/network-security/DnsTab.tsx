@@ -17,7 +17,7 @@ interface DnsTabProps {
 function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onCreate, onSync }: DnsTabProps) {
   const [view, setView] = useState<'zones' | 'policies'>('zones')
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">DNS Policy</h2>

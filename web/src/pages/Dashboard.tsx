@@ -182,7 +182,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gradient-blue">Dashboard</h1>
         <p className="text-sm text-slate-500 mt-1">Overview of your virtual infrastructure</p>
       </div>
 
@@ -228,7 +228,7 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* CPU Chart */}
-        <div className="bg-slate-900 rounded-xl p-5 border border-slate-700/50 card-hover">
+        <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50 card-hover">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-blue-500/10">
@@ -260,7 +260,7 @@ export default function Dashboard() {
         </div>
 
         {/* Memory Chart */}
-        <div className="bg-slate-900 rounded-xl p-5 border border-slate-700/50 card-hover">
+        <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50 card-hover">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-emerald-500/10">
@@ -295,7 +295,7 @@ export default function Dashboard() {
       {/* Bottom: VM List + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* VM List - 2/3 width */}
-        <div className="lg:col-span-2 bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="lg:col-span-2 bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
             <h2 className="text-sm font-medium text-slate-300">Virtual Machines</h2>
             <Link
@@ -352,7 +352,7 @@ export default function Dashboard() {
         </div>
 
         {/* Activity Feed - 1/3 width */}
-        <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
             <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-slate-500" />
@@ -417,8 +417,12 @@ function StatCard({ icon, title, value, unit, subtitle, color, linkTo, sparkData
   const animatedValue = useAnimatedValue(typeof value === 'number' ? numericValue : 0)
   const displayValue = typeof value === 'number' ? animatedValue : value
 
+  const statCardClass: Record<string, string> = {
+    blue: 'stat-card-blue', green: 'stat-card-green', purple: 'stat-card-purple', orange: 'stat-card-orange',
+  }
+
   const content = (
-    <div className={`bg-slate-900 rounded-xl p-5 border border-slate-700/50 hover:border-slate-700/50 card-hover gradient-border relative overflow-hidden group hover:glow-${color}`}>
+    <div className={`${statCardClass[color] || 'bg-slate-800/50'} rounded-xl p-5 border border-slate-700/50 card-glow transition-all hover:scale-[1.02] relative overflow-hidden group`}>
       {/* Sparkline background */}
       {sparkData && sparkData.length > 2 && (
         <div className="absolute bottom-0 right-0 w-24 h-12 opacity-30 group-hover:opacity-50 transition-opacity">
@@ -442,7 +446,7 @@ function StatCard({ icon, title, value, unit, subtitle, color, linkTo, sparkData
         <span className="text-2xl font-bold text-white tabular-nums">{displayValue}</span>
         {unit && <span className="text-sm text-slate-500 font-medium">{unit}</span>}
       </div>
-      <div className="text-xs text-slate-500 mt-1">{title}</div>
+      <div className="text-xs text-slate-400 mt-1">{title}</div>
       {subtitle && (
         <div className="flex items-center gap-1 mt-1.5">
           <TrendingUp className="w-3 h-3 text-slate-600" />

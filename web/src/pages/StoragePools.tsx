@@ -185,23 +185,23 @@ export default function StoragePools() {
 
       {/* Statistics */}
       <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="text-slate-400 text-sm mb-2">Total Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="text-slate-400 text-sm mb-2">Active Pools</div>
           <div className="text-2xl font-bold text-green-500">
             {pools.filter((p) => p.state === 'Active').length}
           </div>
         </div>
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="text-slate-400 text-sm mb-2">Total Capacity</div>
           <div className="text-2xl font-bold">
             {formatBytes(pools.reduce((sum, p) => sum + p.capacity, 0))}
           </div>
         </div>
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="text-slate-400 text-sm mb-2">Available</div>
           <div className="text-2xl font-bold">
             {formatBytes(pools.reduce((sum, p) => sum + p.available, 0))}
@@ -210,7 +210,7 @@ export default function StoragePools() {
       </div>
 
       {/* Pools List */}
-      <div className="bg-slate-900 rounded-lg overflow-hidden">
+      <div className="bg-slate-800/50 rounded-lg overflow-hidden">
         <table className="w-full">
           <thead className="bg-slate-900">
             <tr className="text-left text-slate-400 text-sm">
@@ -432,7 +432,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-2xl">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-2xl">
         <h2 className="text-2xl font-bold mb-6">Create Storage Pool</h2>
 
         <form onSubmit={handleSubmit}>

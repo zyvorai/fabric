@@ -118,7 +118,7 @@ export default function Logs() {
       </div>
 
       {/* Controls */}
-      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
@@ -183,7 +183,7 @@ export default function Logs() {
       </div>
 
       {/* Log Stream */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
         <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
           {loading ? (
             <div className="flex items-center justify-center h-full text-slate-400">

@@ -12,7 +12,7 @@ interface NetfilesTabProps {
 
 function NetfilesTabContent({ netfiles, onDelete, onCreate }: NetfilesTabProps) {
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Interface Configuration (.network)</h2>
         <button onClick={onCreate} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition text-sm">

@@ -102,7 +102,7 @@ export default function AccessControl() {
       </div>
 
       {showAdd && (
-        <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 space-y-4">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-slate-300">New User</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className="block text-xs font-medium text-slate-400 mb-1.5">Username</label><input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="username" className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" /></div>

@@ -85,7 +85,7 @@ export default function Templates() {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
           <EmptyState
             icon={<Layers className="w-16 h-16" />}
             title="No templates yet"
@@ -151,7 +151,7 @@ function TemplateCard({
   onInstantiate: () => void
 }) {
   return (
-    <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
+    <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold mb-2">{template.name}</h3>
@@ -236,7 +236,7 @@ function CreateVMFromTemplateDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-bold">Create VM from Template</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">

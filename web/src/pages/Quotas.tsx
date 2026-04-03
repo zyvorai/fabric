@@ -104,7 +104,7 @@ export default function Quotas() {
       />
 
       {quotas.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+        <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
           <p className="text-xl text-slate-400 mb-4">No quotas configured</p>
           <p className="text-slate-500 mb-6">Create quotas to limit resource usage</p>
           <button
@@ -124,7 +124,7 @@ export default function Quotas() {
             return (
               <div
                 key={quota.id}
-                className={`bg-slate-900 rounded-lg border ${
+                className={`bg-slate-800/50 rounded-lg border ${
                   isExceeded ? 'border-red-500' : 'border-slate-700/50'
                 } p-6`}
               >

@@ -71,7 +71,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
@@ -95,7 +95,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
           <div>
             <label className="block text-sm font-medium mb-3">Current Tags</label>
             {tags.length === 0 ? (
-              <div className="text-center py-8 bg-slate-900 rounded-lg border border-slate-700/50">
+              <div className="text-center py-8 bg-slate-800/50 rounded-lg border border-slate-700/50">
                 <p className="text-slate-400">No tags assigned</p>
               </div>
             ) : (
@@ -128,7 +128,7 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="Enter tag name..."
-                className="flex-1 bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
               <button
                 onClick={handleAddTag}

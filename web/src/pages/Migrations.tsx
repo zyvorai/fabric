@@ -102,7 +102,7 @@ export default function Migrations() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Migration History</h2>
         {completedMigrations.length === 0 && activeMigrations.length === 0 ? (
-          <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
             <ArrowRightLeft className="w-16 h-16 mx-auto mb-4 text-slate-600" />
             <p className="text-xl text-slate-400 mb-4">No migrations yet</p>
             <p className="text-slate-500 mb-6">Migrate VMs between hosts for load balancing or maintenance</p>
@@ -114,7 +114,7 @@ export default function Migrations() {
             </button>
           </div>
         ) : (
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-800">
@@ -187,7 +187,7 @@ function MigrationCard({
   onCancel: () => void
 }) {
   return (
-    <div className="bg-slate-900 rounded-lg p-6 border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold">{migration.vm_name}</h3>
@@ -274,7 +274,7 @@ function StartMigrationDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-bold">Start Migration</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">

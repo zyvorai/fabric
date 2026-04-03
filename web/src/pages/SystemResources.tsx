@@ -85,7 +85,7 @@ export default function SystemResources() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <Cpu className="w-5 h-5 text-blue-400" />
             <div className="text-slate-400 text-sm">Total CPUs</div>
@@ -96,7 +96,7 @@ export default function SystemResources() {
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <Server className="w-5 h-5 text-green-400" />
             <div className="text-slate-400 text-sm">NUMA Nodes</div>
@@ -107,7 +107,7 @@ export default function SystemResources() {
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <MemoryStick className="w-5 h-5 text-purple-400" />
             <div className="text-slate-400 text-sm">Total Memory</div>
@@ -120,7 +120,7 @@ export default function SystemResources() {
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <HardDrive className="w-5 h-5 text-yellow-400" />
             <div className="text-slate-400 text-sm">Hugepages (2MB)</div>
@@ -133,7 +133,7 @@ export default function SystemResources() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-slate-900 rounded-lg overflow-hidden">
+      <div className="bg-slate-800/50 rounded-lg overflow-hidden">
         <div className="border-b border-slate-700/50">
           <div className="flex">
             <button
@@ -248,7 +248,7 @@ function CpuTopologyView({ topology }: { topology: CpuTopology | null }) {
 
       <div className="space-y-6">
         {Array.from(cpusBySocket.entries()).map(([socketId, cpus]) => (
-          <div key={socketId} className="bg-slate-900 rounded-lg p-4">
+          <div key={socketId} className="bg-slate-800/50 rounded-lg p-4">
             <div className="font-medium mb-3">Socket {socketId}</div>
             <div className="grid grid-cols-8 gap-2">
               {cpus.map((cpu) => (
@@ -287,7 +287,7 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
   return (
     <div className="space-y-6">
       {topology.nodes.map((node) => (
-        <div key={node.id} className="bg-slate-900 rounded-lg p-6">
+        <div key={node.id} className="bg-slate-800/50 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xl font-bold mb-1">Node {node.id}</div>
@@ -351,7 +351,7 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
       ))}
 
       {topology.distances.length > 0 && (
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="font-medium mb-3">Inter-Node Distances</div>
           <table className="w-full">
             <thead>
@@ -417,7 +417,7 @@ function MemoryView({
 
   return (
     <div>
-      <div className="bg-slate-900 rounded-lg p-6 mb-6">
+      <div className="bg-slate-800/50 rounded-lg p-6 mb-6">
         <div className="text-lg font-medium mb-4">System Memory</div>
         <div className="grid grid-cols-3 gap-6 mb-4">
           <div>
@@ -469,7 +469,7 @@ function MemoryView({
       </div>
 
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="text-lg font-medium mb-4">2MB Hugepages</div>
           {hugepages2mb ? (
             <div className="space-y-3">
@@ -494,7 +494,7 @@ function MemoryView({
           )}
         </div>
 
-        <div className="bg-slate-900 rounded-lg p-6">
+        <div className="bg-slate-800/50 rounded-lg p-6">
           <div className="text-lg font-medium mb-4">1GB Hugepages</div>
           {hugepages1gb ? (
             <div className="space-y-3">
@@ -554,7 +554,7 @@ function OptimizationView({
         Recommendations based on system topology analysis. Click "Apply" to auto-configure optimal settings.
       </p>
       {recommendations.map((rec) => (
-        <div key={rec.vm_name} className="bg-slate-900 rounded-lg p-6">
+        <div key={rec.vm_name} className="bg-slate-800/50 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold">{rec.vm_name}</h3>
             <button
@@ -567,7 +567,7 @@ function OptimizationView({
           </div>
           <div className="space-y-3">
             {rec.recommendations.map((r, idx) => (
-              <div key={idx} className="bg-slate-900 rounded p-4">
+              <div key={idx} className="bg-slate-800/50 rounded p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-blue-400">{r.resource}</span>
                   <span className="text-xs text-slate-500">
@@ -607,7 +607,7 @@ function AllocateHugepagesDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Allocate Hugepages</h2>
 
         <div className="mb-4">

@@ -123,7 +123,7 @@ export default function DRS() {
 
       {/* DRS Configuration */}
       {config && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4 mb-6">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold mb-4">DRS Configuration</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -159,7 +159,7 @@ export default function DRS() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['balance', 'recommendations', 'rules', 'placement'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -170,7 +170,7 @@ export default function DRS() {
 
       {/* Balance Tab */}
       {activeTab === 'balance' && balance && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Cluster Balance</h2>
             <div className="text-sm text-slate-400">
@@ -181,7 +181,7 @@ export default function DRS() {
           </div>
           <div className="space-y-3">
             {balance.hosts.map(host => (
-              <div key={host.host_id} className="p-3 bg-slate-900 rounded">
+              <div key={host.host_id} className="p-3 bg-slate-800/50 rounded">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium">{host.hostname}</span>
                   <span className="text-sm text-slate-400">{host.vm_count} VMs</span>
@@ -220,7 +220,7 @@ export default function DRS() {
 
       {/* Recommendations Tab */}
       {activeTab === 'recommendations' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -278,7 +278,7 @@ export default function DRS() {
               <Plus className="w-4 h-4" /> Create Rule
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -319,7 +319,7 @@ export default function DRS() {
 
       {/* Placement Tab */}
       {activeTab === 'placement' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <h2 className="text-lg font-semibold mb-4">Placement Calculator</h2>
           <PlacementForm clusterId={clusterId} result={placementResult} onTest={handlePlacementTest} />
         </div>
@@ -368,7 +368,7 @@ function PlacementForm({ result, onTest }: { clusterId: string; result: Placemen
       <button onClick={() => onTest(cpus, memory)}
         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Test Placement</button>
       {result && (
-        <div className="p-4 bg-slate-900 rounded border border-slate-700/50">
+        <div className="p-4 bg-slate-800/50 rounded border border-slate-700/50">
           <div className="font-medium mb-2">Recommended: {result.hostname}</div>
           <div className="text-sm text-slate-400">Score: {result.score.toFixed(2)} | Reason: {result.reason}</div>
           <div className="text-sm text-slate-400">After placement: CPU {result.cpu_after_pct.toFixed(1)}% | Memory {result.memory_after_pct.toFixed(1)}%</div>
@@ -408,7 +408,7 @@ function CreateRuleModal({ clusterId, onClose, onCreated }: { clusterId: string;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Affinity Rule</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

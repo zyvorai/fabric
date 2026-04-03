@@ -107,7 +107,7 @@ export default function AuditLogs() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                 showFilters
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-900 border border-slate-700/50 text-slate-400 hover:text-white'
+                  : 'bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white'
               }`}
             >
               <Filter className="w-4 h-4" />
@@ -117,14 +117,14 @@ export default function AuditLogs() {
               <button
                 onClick={() => document.getElementById('export-menu')?.classList.toggle('hidden')}
                 disabled={exporting}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-700/50 hover:bg-white/[0.03] rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border border-slate-700/50 hover:bg-white/[0.03] rounded-lg transition disabled:opacity-50"
               >
                 <Download className="w-4 h-4" />
                 Export
               </button>
               <div
                 id="export-menu"
-                className="hidden absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl z-10"
+                className="hidden absolute right-0 mt-2 w-48 bg-slate-800/50 border border-slate-700/50 rounded-lg shadow-xl z-10"
               >
                 <button
                   onClick={() => { handleExport('json'); document.getElementById('export-menu')?.classList.add('hidden') }}
@@ -147,7 +147,7 @@ export default function AuditLogs() {
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Total Logs</p>
@@ -156,7 +156,7 @@ export default function AuditLogs() {
               <FileText className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Success Rate</p>
@@ -167,7 +167,7 @@ export default function AuditLogs() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Recent Failures</p>
@@ -176,7 +176,7 @@ export default function AuditLogs() {
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
             <div>
               <p className="text-sm text-slate-400 mb-2">Top Actions</p>
               <div className="space-y-1">
@@ -205,7 +205,7 @@ export default function AuditLogs() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full bg-slate-900 border border-slate-700/50 rounded-lg py-3 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg py-3 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
           {searchQuery && (
             <button
@@ -220,14 +220,14 @@ export default function AuditLogs() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="mb-6 bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+        <div className="mb-6 bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Status</label>
               <select
                 value={filters.status || ''}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value as any || undefined })}
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="">All</option>
                 <option value="success">Success</option>
@@ -239,7 +239,7 @@ export default function AuditLogs() {
               <select
                 value={filters.resource_type || ''}
                 onChange={(e) => setFilters({ ...filters, resource_type: e.target.value || undefined })}
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="">All</option>
                 <option value="vm">VM</option>
@@ -263,7 +263,7 @@ export default function AuditLogs() {
       )}
 
       {/* Logs Table */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           {filteredLogs.length === 0 ? (
             <div className="text-center py-12">

@@ -66,7 +66,7 @@ export default function Snapshots() {
       </div>
 
       {/* VM selector */}
-      <div className="bg-slate-900 rounded-lg p-6 mb-8">
+      <div className="bg-slate-800/50 rounded-lg p-6 mb-8">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium mb-2">VM Name</label>
@@ -98,7 +98,7 @@ export default function Snapshots() {
 
       {/* Snapshots list */}
       {vmName && (
-        <div className="bg-slate-900 rounded-lg overflow-hidden">
+        <div className="bg-slate-800/50 rounded-lg overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="text-left text-slate-400 text-sm">
@@ -215,7 +215,7 @@ function CreateSnapshotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold mb-6">Create Snapshot</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">

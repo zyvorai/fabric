@@ -98,7 +98,7 @@ export default function Certificates() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1 overflow-x-auto">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1 overflow-x-auto">
         {(['dashboard', 'cas', 'certs', 'csrs', 'attestation', 'baselines'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 rounded text-sm font-medium whitespace-nowrap ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -130,25 +130,25 @@ export default function Certificates() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Certificate Authorities</div>
               <div className="text-2xl font-bold">{health.ca_count}</div>
             </div>
-            <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Pending Requests</div>
               <div className="text-2xl font-bold text-blue-400">{health.pending_requests}</div>
             </div>
-            <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Overall Compliance</div>
               <div className="text-2xl font-bold">{health.overall_compliance_pct.toFixed(0)}%</div>
             </div>
           </div>
           {health.expiring_within_30_days.length > 0 && (
-            <div className="bg-slate-900 border border-yellow-600 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-yellow-600 rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3 text-yellow-400">Expiring Within 30 Days</h3>
               <div className="space-y-2">
                 {health.expiring_within_30_days.map(c => (
-                  <div key={c.cert_id} className="flex items-center justify-between p-2 bg-slate-900 rounded">
+                  <div key={c.cert_id} className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
                     <span className="font-mono text-sm">{c.subject}</span>
                     <span className="text-sm text-yellow-400">{c.days_remaining} days left</span>
                   </div>
@@ -168,7 +168,7 @@ export default function Certificates() {
               <Plus className="w-4 h-4" /> Create CA
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -208,7 +208,7 @@ export default function Certificates() {
 
       {/* Certificates Tab */}
       {activeTab === 'certs' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -253,7 +253,7 @@ export default function Certificates() {
 
       {/* CSR Queue Tab */}
       {activeTab === 'csrs' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -295,7 +295,7 @@ export default function Certificates() {
 
       {/* Host Attestation Tab */}
       {activeTab === 'attestation' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -344,7 +344,7 @@ export default function Certificates() {
               <Plus className="w-4 h-4" /> Create Baseline
             </button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
             <table className="min-w-full divide-y divide-slate-700/50">
               <thead>
                 <tr className="text-left text-xs text-slate-400 uppercase">
@@ -397,7 +397,7 @@ export default function Certificates() {
       {/* Modals */}
       {showCreateCA && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Create Certificate Authority</h2>
             <CreateCAForm onClose={() => setShowCreateCA(false)} onCreated={() => { setShowCreateCA(false); loadData() }} />
           </div>
@@ -405,7 +405,7 @@ export default function Certificates() {
       )}
       {showCreateBaseline && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Create Security Baseline</h2>
             <CreateBaselineForm onClose={() => setShowCreateBaseline(false)} onCreated={() => { setShowCreateBaseline(false); loadData() }} />
           </div>

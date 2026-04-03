@@ -21,7 +21,7 @@ export default function Console() {
         Back to VM Details
       </button>
 
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
           <h1 className="text-2xl font-bold">Console: {name}</h1>
           <div className="flex gap-2">

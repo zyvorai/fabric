@@ -59,7 +59,7 @@ export default function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="bg-slate-900 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-md p-6"
+        className="bg-slate-800/50 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-4 mb-5">

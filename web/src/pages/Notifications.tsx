@@ -181,7 +181,7 @@ export default function Notifications() {
           </div>
 
           {channels.length === 0 ? (
-            <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
               <p className="text-xl text-slate-400 mb-4">No notification channels</p>
               <p className="text-slate-500 mb-6">Add a channel to receive notifications</p>
@@ -198,7 +198,7 @@ export default function Notifications() {
               {channels.map((channel) => (
                 <div
                   key={channel.id}
-                  className="bg-slate-900 border border-slate-700/50 rounded-lg p-4"
+                  className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -256,7 +256,7 @@ export default function Notifications() {
           </div>
 
           {rules.length === 0 ? (
-            <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
               <p className="text-xl text-slate-400 mb-4">No notification rules</p>
               <p className="text-slate-500 mb-6">Create rules to trigger notifications</p>
@@ -273,7 +273,7 @@ export default function Notifications() {
               {rules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="bg-slate-900 border border-slate-700/50 rounded-lg p-4"
+                  className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -350,11 +350,11 @@ export default function Notifications() {
         <div>
           <h2 className="text-xl font-bold mb-4">Notification History</h2>
           {history.length === 0 ? (
-            <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-700/50">
+            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <p className="text-slate-400">No notification history yet</p>
             </div>
           ) : (
-            <div className="bg-slate-900 border border-slate-700/50 rounded-lg overflow-hidden">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-slate-900">
@@ -415,7 +415,7 @@ export default function Notifications() {
       {/* Placeholder dialogs */}
       {showCreateChannel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Add Notification Channel</h2>
             <p className="text-slate-400 mb-4">
               Configure email, Slack, webhook, or Teams integration
@@ -434,7 +434,7 @@ export default function Notifications() {
 
       {showCreateRule && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Create Notification Rule</h2>
             <p className="text-slate-400 mb-4">
               Configure when and how to send notifications

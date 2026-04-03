@@ -106,7 +106,7 @@ export default function SiteRecovery() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['dashboard', 'plans', 'executions'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -143,11 +143,11 @@ export default function SiteRecovery() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Sites</h3>
               <div className="space-y-2">
                 {dashboard.sites.map(site => (
-                  <div key={site.site_id} className="flex items-center justify-between p-3 bg-slate-900 rounded">
+                  <div key={site.site_id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded">
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${site.status === 'connected' || site.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
                       <span className="font-medium">{site.site_name}</span>
@@ -158,14 +158,14 @@ export default function SiteRecovery() {
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Recent Executions</h3>
               {dashboard.recent_executions.length === 0 ? (
                 <div className="text-slate-400 text-sm">No recent executions.</div>
               ) : (
                 <div className="space-y-2">
                   {dashboard.recent_executions.slice(0, 5).map(exec => (
-                    <div key={exec.id} className="flex items-center justify-between p-3 bg-slate-900 rounded">
+                    <div key={exec.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded">
                       <div>
                         <span className="font-medium">{exec.plan_name}</span>
                         <span className="ml-2 text-xs px-2 py-0.5 bg-slate-800 rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
@@ -182,7 +182,7 @@ export default function SiteRecovery() {
 
       {/* Plans Tab */}
       {activeTab === 'plans' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -232,7 +232,7 @@ export default function SiteRecovery() {
 
       {/* Executions Tab */}
       {activeTab === 'executions' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           {executions.length === 0 ? (
             <div className="p-8 text-center text-slate-400">No execution history.</div>
           ) : (
@@ -280,7 +280,7 @@ export default function SiteRecovery() {
       {/* Execute Modal */}
       {showExecute && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Execute Recovery Plan</h2>
             <div className="space-y-3">
               <button onClick={() => handleExecute(showExecute, 'test_failover')}
@@ -347,7 +347,7 @@ function CreatePlanModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Recovery Plan</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

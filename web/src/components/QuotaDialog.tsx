@@ -80,7 +80,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-700/50 sticky top-0 bg-slate-900 z-10">
           <div className="flex items-center gap-3">
@@ -114,14 +114,14 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Development Team Quota"
-              className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               required
             />
           </div>
 
           {/* Current Usage Info (edit mode only) */}
           {mode === 'edit' && (
-            <div className="p-4 bg-slate-900 border border-slate-700/50 rounded-lg">
+            <div className="p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg">
               <h4 className="text-sm font-medium mb-3">Current Usage</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
@@ -159,7 +159,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 value={formData.max_cpus}
                 onChange={(e) => setFormData({ ...formData, max_cpus: parseInt(e.target.value) || 0 })}
                 min="1"
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_cpus < quota.used_cpus ? (
@@ -182,7 +182,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 onChange={(e) => setFormData({ ...formData, max_memory: parseInt(e.target.value) || 0 })}
                 min="1"
                 step="1024"
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_memory < quota.used_memory ? (
@@ -207,7 +207,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 onChange={(e) => setFormData({ ...formData, max_disk: parseInt(e.target.value) || 0 })}
                 min="1"
                 step="10"
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_disk < quota.used_disk ? (
@@ -229,7 +229,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 value={formData.max_vms}
                 onChange={(e) => setFormData({ ...formData, max_vms: parseInt(e.target.value) || 0 })}
                 min="1"
-                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_vms < quota.used_vms ? (
@@ -280,7 +280,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 placeholder="Enter tag name..."
-                className="flex-1 bg-slate-900 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
               <button
                 type="button"
@@ -301,7 +301,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 id="enabled"
                 checked={formData.enabled}
                 onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="w-4 h-4 bg-slate-900 border-slate-700/50 rounded focus:ring-blue-500"
+                className="w-4 h-4 bg-slate-800/50 border-slate-700/50 rounded focus:ring-blue-500"
               />
               <label htmlFor="enabled" className="text-sm font-medium">
                 Enable quota immediately

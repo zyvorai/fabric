@@ -269,7 +269,7 @@ export default function VMList() {
         title="Virtual Machines"
         actions={
           <div className="flex items-center gap-2">
-            <div className="flex bg-slate-900 border border-slate-700/50 rounded-lg p-0.5">
+            <div className="flex bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
@@ -288,7 +288,7 @@ export default function VMList() {
             <button
               onClick={() => setGroupByTags(!groupByTags)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition ${
-                groupByTags ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-slate-900 border border-slate-700/50 text-slate-400 hover:text-white'
+                groupByTags ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -332,7 +332,7 @@ export default function VMList() {
               placeholder="Search VMs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/50 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
+              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
@@ -346,7 +346,7 @@ export default function VMList() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 selectedVMs.size === filteredVMs.length
                   ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-slate-900 border border-slate-700/50 text-slate-500 hover:text-slate-300'
+                  : 'bg-slate-800/50 border border-slate-700/50 text-slate-500 hover:text-slate-300'
               }`}
             >
               <CheckSquare className="w-3.5 h-3.5" />
@@ -387,7 +387,7 @@ export default function VMList() {
 
       {/* Content */}
       {vms.length === 0 ? (
-        <div className="bg-slate-900 rounded-xl border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50">
           <EmptyState
             icon={<Monitor className="w-16 h-16" />}
             title="No virtual machines"
@@ -400,7 +400,7 @@ export default function VMList() {
           />
         </div>
       ) : filteredVMs.length === 0 ? (
-        <div className="bg-slate-900 rounded-xl border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50">
           <EmptyState icon={<Search className="w-12 h-12" />} title="No matching VMs" description="Try adjusting your search or filters" />
         </div>
       ) : groupByTags ? (
@@ -432,7 +432,7 @@ export default function VMList() {
       {/* Bulk Action Bar */}
       {selectedCount > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slide-in">
-          <div className="flex items-center gap-3 bg-slate-900 border border-slate-700/50 rounded-xl shadow-2xl px-5 py-3">
+          <div className="flex items-center gap-3 bg-slate-800/50 border border-slate-700/50 rounded-xl shadow-2xl px-5 py-3">
             <span className="text-sm font-medium text-white tabular-nums">{selectedCount} selected</span>
             <div className="w-px h-5 bg-slate-700" />
             {selectedStopped > 0 && (
@@ -498,7 +498,7 @@ export default function VMList() {
 
 function VMTable({ vms, onUpdate, selectedVMs, onSelect }: { vms: VM[]; onUpdate: () => void; selectedVMs: Set<string>; onSelect: (name: string) => void }) {
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider">

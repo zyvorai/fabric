@@ -147,7 +147,7 @@ export default function FaultTolerance() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-900 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['vms', 'compatibility', 'events', 'metrics'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
@@ -158,7 +158,7 @@ export default function FaultTolerance() {
 
       {/* Protected VMs Tab */}
       {activeTab === 'vms' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -204,7 +204,7 @@ export default function FaultTolerance() {
 
       {/* Compatibility Check Tab */}
       {activeTab === 'compatibility' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-6">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">FT Compatibility Checker</h2>
           <div className="flex gap-4 mb-4">
             <input type="text" value={compatVmId} onChange={e => setCompatVmId(e.target.value)}
@@ -245,7 +245,7 @@ export default function FaultTolerance() {
 
       {/* Events Tab */}
       {activeTab === 'events' && (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <div className="p-4 border-b border-slate-700/50">
             <h2 className="text-lg font-semibold">FT Events Timeline</h2>
           </div>
@@ -280,12 +280,12 @@ export default function FaultTolerance() {
       {activeTab === 'metrics' && (
         <div className="space-y-4">
           {ftVMs.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 bg-slate-900 rounded-lg">No FT-protected VMs to show metrics for.</div>
+            <div className="text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No FT-protected VMs to show metrics for.</div>
           ) : ftVMs.map(vm => {
             const m = metrics.get(vm.vm_id)
             if (!m) return null
             return (
-              <div key={vm.vm_id} className="bg-slate-900 border border-slate-700/50 rounded-lg p-4">
+              <div key={vm.vm_id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
                 <h3 className="font-semibold mb-3">{vm.vm_name}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
@@ -352,7 +352,7 @@ function EnableFTModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Enable Fault Tolerance</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

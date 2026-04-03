@@ -177,7 +177,7 @@ export default function Datacenters() {
       </div>
 
       {/* Tree View */}
-      <div className="bg-slate-900 border border-slate-700/50 rounded-lg">
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
         {datacenters.length === 0 ? (
           <div className="text-center py-12 text-slate-400">
             No datacenters configured. Create one to get started.
@@ -402,7 +402,7 @@ function CreateDCModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Datacenter</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -439,7 +439,7 @@ function CreateClusterModal({ datacenterId, onClose, onCreated }: { datacenterId
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Cluster</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -478,7 +478,7 @@ function RegisterHostModal({ clusterId, onClose, onCreated }: { clusterId: strin
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Register Host</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

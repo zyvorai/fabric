@@ -19,7 +19,7 @@ interface NatTabProps {
 function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onDeleteGateway, onCreate, onSync }: NatTabProps) {
   const [view, setView] = useState<'rules' | 'pools' | 'gateways'>('rules')
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700/50">
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">NAT Gateway</h2>
