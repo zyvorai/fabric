@@ -173,7 +173,7 @@ function MainLayout() {
               <Route path="/explain" element={<Explain />} />
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/webhooks" element={<Webhooks />} />
-              <Route path="/api-playground" element={<APIPlayground />} />
+              <Route path="/playground" element={<APIPlayground />} />
               <Route path="/cost-estimator" element={<CostEstimator />} />
               <Route path="/system-health" element={<SystemHealth />} />
               <Route path="/containers" element={<ContainersPage />} />

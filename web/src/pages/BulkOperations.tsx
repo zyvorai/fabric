@@ -57,7 +57,7 @@ export default function BulkOperations() {
         if (action === 'start') { url = `/api/vms/${vmName}/start` }
         else if (action === 'stop') { url = `/api/vms/${vmName}/stop` }
         else if (action === 'restart') { url = `/api/vms/${vmName}/restart` }
-        else if (action === 'snapshot') { url = `/api/snapshots`; body = JSON.stringify({ vm_name: vmName, name: `bulk-snap-${Date.now()}` }) }
+        else if (action === 'snapshot') { url = `/api/vms/${vmName}/snapshots`; body = JSON.stringify({ name: `bulk-snap-${Date.now()}` }) }
 
         const res = await apiFetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body })
         if (res.ok) { setTasks((prev) => prev.map((t) => t.vmName === vmName ? { ...t, status: 'done', message: 'Success' } : t)) }

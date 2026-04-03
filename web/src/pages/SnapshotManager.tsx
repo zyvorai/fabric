@@ -30,7 +30,7 @@ export default function SnapshotManager() {
     if (!selectedVM || !newName.trim()) return
     setCreating(true); setError(null); setSuccess(null)
     try {
-      const res = await apiFetch('/api/snapshots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vm_name: selectedVM, name: newName.trim() }) })
+      const res = await apiFetch(`/api/vms/${selectedVM}/snapshots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName.trim() }) })
       if (!res.ok) { const body = await res.json().catch(() => null); throw new Error(body?.error || `HTTP ${res.status}`) }
       setSuccess(`Snapshot "${newName}" created`); setNewName(''); fetchSnapshots()
       setTimeout(() => setSuccess(null), 3000)

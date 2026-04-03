@@ -134,7 +134,7 @@ const navGroups: NavGroup[] = [
     label: 'Tools',
     items: [
       { to: '/webhooks', icon: <Globe className="w-4 h-4 text-orange-400" />, label: 'Webhooks' },
-      { to: '/api-playground', icon: <Terminal className="w-4 h-4 text-green-400" />, label: 'API Playground' },
+      { to: '/playground', icon: <Terminal className="w-4 h-4 text-green-400" />, label: 'API Playground' },
       { to: '/cost-estimator', icon: <DollarSign className="w-4 h-4 text-green-400" />, label: 'Cost Estimator' },
       { to: '/disk-converter', icon: <HardDrive className="w-4 h-4 text-teal-400" />, label: 'Disk Converter' },
       { to: '/vm-compare', icon: <ArrowRightLeft className="w-4 h-4 text-violet-400" />, label: 'VM Compare' },
