@@ -12,6 +12,10 @@ tracing.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 rand.workspace = true
+tokio.workspace = true
+rtnetlink = "0.15"
+netlink-packet-route = "0.21"
+futures.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

@@ -1,4 +1,5 @@
 pub mod db;
+pub mod pam_auth;
 
 use anyhow::Result;
 use axum::{

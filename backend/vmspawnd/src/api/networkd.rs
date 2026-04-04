@@ -1005,3 +1005,30 @@ pub async fn scan_configs(RequireRead(_claims): RequireRead, State(state): State
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
+
+/// List all network interfaces via netlink (real-time kernel state).
+pub async fn list_netlink_interfaces(RequireRead(_claims): RequireRead) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_netlink_interfaces));
+    match networking::netlink::list_interfaces().await {
+        Ok(ifaces) => Json(ifaces).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+/// List only physical network interfaces (for bond slave / bridge member selection).
+pub async fn list_physical_interfaces(RequireRead(_claims): RequireRead) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_physical_interfaces));
+    match networking::netlink::list_physical_interfaces().await {
+        Ok(ifaces) => Json(ifaces).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+/// List interfaces available as bond slaves or bridge members (not already enslaved).
+pub async fn list_available_interfaces(RequireRead(_claims): RequireRead) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(list_available_interfaces));
+    match networking::netlink::list_available_interfaces().await {
+        Ok(ifaces) => Json(ifaces).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}

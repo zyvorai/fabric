@@ -1,4 +1,5 @@
 pub mod models;
+pub mod netlink;
 pub mod nftables;
 pub mod parser;
 pub mod serializer;

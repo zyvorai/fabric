@@ -18,3 +18,4 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["auth"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid.workspace = true
+pam = "0.8"

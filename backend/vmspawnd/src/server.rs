@@ -7,7 +7,7 @@ use state_store::StateStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 use vmspawnd_storage::StorageManager;
 
 use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
@@ -557,6 +557,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/networkd/sriov", get(api::networkd::list_sriov).post(api::networkd::create_sriov))
             .route("/networkd/sriov/{id}", get(api::networkd::get_sriov).delete(api::networkd::delete_sriov))
             .route("/networkd/scan", get(api::networkd::scan_configs))
+            .route("/networkd/netlink/interfaces", get(api::networkd::list_netlink_interfaces))
+            .route("/networkd/netlink/physical", get(api::networkd::list_physical_interfaces))
+            .route("/networkd/netlink/available", get(api::networkd::list_available_interfaces))
             // Network policy routes
             .route("/network-policies", get(api::network_policy::list_policies).post(api::network_policy::create_policy))
             .route("/network-policies/sync", post(api::network_policy::sync_policies))
@@ -764,8 +767,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
             .route("/metrics", get(prometheus_exporter::metrics_handler))
-            .fallback_service(ServeDir::new(
-                if std::path::Path::new("/usr/share/vmspawnd/web").exists() {
+            .fallback_service({
+                let web_dir: &str = if std::path::Path::new("/usr/share/vmspawnd/web").exists() {
                     "/usr/share/vmspawnd/web"
                 } else if std::path::Path::new("/var/lib/vmspawnd/web").exists() {
                     "/var/lib/vmspawnd/web"
@@ -778,8 +781,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                             .unwrap_or_else(|_| "/usr/share/vmspawnd/web".to_string())
                     });
                     &DEV_WEB
-                },
-            ))
+                };
+                let index_path = format!("{}/index.html", web_dir);
+                ServeDir::new(web_dir).fallback(ServeFile::new(index_path))
+            })
             .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
             .layer(cors)
 }

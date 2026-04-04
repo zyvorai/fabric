@@ -102,45 +102,62 @@ pub async fn login(
         return Err(StatusCode::TOO_MANY_REQUESTS);
     }
 
-    let user_db = state.user_db.as_ref().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
     let jwt_config = state.jwt_config.as_ref().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let user = user_db
-        .get_by_username(&req.username)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or_else(|| {
-            LOGIN_LIMITER.record_failure(&req.username);
-            StatusCode::UNAUTHORIZED
-        })?;
+    // Authenticate via PAM (system users)
+    let pam_result = tokio::task::spawn_blocking({
+        let username = req.username.clone();
+        let password = req.password.clone();
+        move || security::pam_auth::authenticate(&username, &password)
+    })
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let valid = user
-        .verify_password(&req.password)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    if !valid {
+    if let Err(e) = pam_result {
+        tracing::warn!("PAM authentication failed for '{}': {}", req.username, e);
         LOGIN_LIMITER.record_failure(&req.username);
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    // Successful login — clear rate limit
+    // Successful PAM login — clear rate limit
     LOGIN_LIMITER.clear(&req.username);
 
+    // Determine role: root and wheel/sudo group members get admin, others get user
+    let role = if req.username == "root" || is_admin_user(&req.username) {
+        security::Role::Admin
+    } else {
+        security::Role::User
+    };
+
+    let user_id = req.username.clone();
     let token = jwt_config
-        .generate_token(&user.id, user.role.clone())
+        .generate_token(&user_id, role.clone())
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let role_str = serde_json::to_value(&user.role)
+    let role_str = serde_json::to_value(&role)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .as_str()
-        .unwrap_or("viewer")
+        .unwrap_or("user")
         .to_string();
 
     Ok(Json(LoginResponse {
         token,
-        user_id: user.id,
+        user_id: user_id.clone(),
         role: role_str,
-        username: user.username,
+        username: user_id,
     }))
+}
+
+/// Check if a user belongs to an admin group (wheel, sudo, or adm).
+fn is_admin_user(username: &str) -> bool {
+    use std::process::Command;
+    if let Ok(output) = Command::new("id").arg("-Gn").arg(username).output() {
+        if let Ok(groups) = String::from_utf8(output.stdout) {
+            return groups.split_whitespace()
+                .any(|g| g == "wheel" || g == "sudo" || g == "adm");
+        }
+    }
+    false
 }
 
 pub async fn me(
