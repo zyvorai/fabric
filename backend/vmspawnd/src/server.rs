@@ -43,7 +43,10 @@ pub struct AppState {
 impl AppState {
     /// Acquire a per-VM lock. Creates one if it doesn't exist yet.
     pub fn vm_lock(&self, name: &str) -> Arc<tokio::sync::Mutex<()>> {
-        let mut locks = self.vm_locks.lock().unwrap_or_else(|e| e.into_inner());
+        let mut locks = self.vm_locks.lock().unwrap_or_else(|e| {
+            tracing::warn!("VM locks mutex was poisoned, recovering");
+            e.into_inner()
+        });
         locks.entry(name.to_string())
             .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
             .clone()

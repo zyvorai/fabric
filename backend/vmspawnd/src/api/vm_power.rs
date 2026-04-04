@@ -114,6 +114,12 @@ pub async fn resume_hibernate(
     // Start VM and restore snapshot
     let image_path = crate::validation::find_vm_image_or_default(&vm_name);
 
+    // Validate the stored snapshot name before passing to command
+    if let Err((_, msg)) = crate::validation::validate_snapshot_name(&info.snapshot_name) {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Corrupted hibernate data: {}", msg)}))));
+    }
+
     // Use qemu-img snapshot -a to restore, then start
     let output = tokio::process::Command::new("qemu-img")
         .args(["snapshot", "-a", &info.snapshot_name, &image_path])
@@ -190,10 +196,9 @@ pub async fn migrate_storage(
     // Validate target format against allowlist
     validate_image_format(target_format)?;
 
-    // Validate pool name to prevent path traversal
-    if req.target_pool.contains('/') || req.target_pool.contains('\\') || req.target_pool.contains("..") || req.target_pool.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid pool name"}))));
-    }
+    // Validate pool name using standard validator
+    crate::validation::validate_vm_name(&req.target_pool)
+        .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid pool name: {}", m)}))))?;
 
     // Determine target path based on pool
     let target_dir = format!("/var/lib/vmspawnd/pools/{}", req.target_pool);

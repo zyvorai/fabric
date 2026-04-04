@@ -18,8 +18,8 @@ impl StateStore {
     /// Save any serializable entity to a subdirectory (atomic write)
     /// Validate that an entity ID does not contain path traversal characters.
     fn validate_entity_id(id: &str) -> Result<()> {
-        if id.contains('\\') || id.contains("..") || id.is_empty() || id.starts_with('/') {
-            anyhow::bail!("Invalid entity ID: must not contain path traversal sequences, start with '/', or be empty");
+        if id.is_empty() || id.contains('\\') || id.contains('/') || id.contains("..") || id.contains('\0') {
+            anyhow::bail!("Invalid entity ID: must not contain path separators, traversal sequences, null bytes, or be empty");
         }
         Ok(())
     }
@@ -43,13 +43,15 @@ impl StateStore {
         Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
-        if !file_path.exists() {
-            return Ok(None);
+        // Read directly and handle NotFound instead of exists() check (avoids TOCTOU)
+        match fs::read_to_string(&file_path) {
+            Ok(content) => {
+                let entity = serde_json::from_str(&content)?;
+                Ok(Some(entity))
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let content = fs::read_to_string(file_path)?;
-        let entity = serde_json::from_str(&content)?;
-        Ok(Some(entity))
     }
 
     /// List all entities in a subdirectory
@@ -133,11 +135,11 @@ impl StateStore {
         Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
-        if file_path.exists() {
-            fs::remove_file(file_path)?;
+        match fs::remove_file(&file_path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e.into()),
         }
-
-        Ok(())
     }
 }
 
@@ -228,8 +230,10 @@ impl StateStore {
     pub fn delete_vm(&self, name: &str) -> Result<()> {
         // Delete file FIRST — if this fails, in-memory state stays consistent
         let vm_file = self.path.join(format!("{}.json", name));
-        if vm_file.exists() {
-            fs::remove_file(vm_file)?;
+        match fs::remove_file(&vm_file) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
         }
 
         // Only update in-memory state after file deletion succeeds

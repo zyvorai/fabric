@@ -260,6 +260,12 @@ pub async fn hotremove_disk(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return (s, Json(serde_json::json!({"error": m}))).into_response();
     }
+    // Validate device_id format (alphanumeric, hyphens, underscores, dots)
+    if device_id.is_empty() || device_id.len() > 128
+        || !device_id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid device ID"}))).into_response();
+    }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
         return not_available_response().into_response();
@@ -298,6 +304,11 @@ pub async fn hotplug_nic(
 
     let netdev_id = format!("net-hotplug-{}", uuid::Uuid::new_v4().simple());
     let device_id = format!("nic-hotplug-{}", uuid::Uuid::new_v4().simple());
+
+    // Validate bridge name
+    if let Err(msg) = crate::validation::validate_hostname(&req.bridge) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid bridge name: {}", msg)}))).into_response();
+    }
 
     // Add netdev (tap backend attached to bridge)
     let netdev_args = serde_json::json!({

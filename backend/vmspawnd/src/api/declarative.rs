@@ -125,27 +125,31 @@ pub struct ApplyResult {
     pub warnings: Vec<String>,
 }
 
-/// Parse memory string like "2G", "512M", "4096" to MB
-fn parse_memory_mb(s: &str) -> u64 {
+/// Parse memory string like "2G", "512M", "4096" to MB.
+/// Returns an error on invalid input instead of silently defaulting.
+fn parse_memory_mb(s: &str) -> Result<u64, String> {
     let s = s.trim();
     if let Some(gb) = s.strip_suffix('G').or_else(|| s.strip_suffix("GB")).or_else(|| s.strip_suffix("g")) {
-        gb.trim().parse::<u64>().unwrap_or(1) * 1024
+        let val = gb.trim().parse::<u64>().map_err(|_| format!("Invalid memory value: '{}'", s))?;
+        Ok(val * 1024)
     } else if let Some(mb) = s.strip_suffix('M').or_else(|| s.strip_suffix("MB")).or_else(|| s.strip_suffix("m")) {
-        mb.trim().parse::<u64>().unwrap_or(1024)
+        mb.trim().parse::<u64>().map_err(|_| format!("Invalid memory value: '{}'", s))
     } else {
-        s.parse::<u64>().unwrap_or(1024)
+        s.parse::<u64>().map_err(|_| format!("Invalid memory value: '{}'. Use format like '2G', '512M', or raw MB", s))
     }
 }
 
-/// Parse disk string like "20G", "100G" to GB
-fn parse_disk_gb(s: &str) -> u64 {
+/// Parse disk string like "20G", "100G" to GB.
+/// Returns an error on invalid input instead of silently defaulting.
+fn parse_disk_gb(s: &str) -> Result<u64, String> {
     let s = s.trim();
     if let Some(gb) = s.strip_suffix('G').or_else(|| s.strip_suffix("GB")).or_else(|| s.strip_suffix("g")) {
-        gb.trim().parse::<u64>().unwrap_or(20)
+        gb.trim().parse::<u64>().map_err(|_| format!("Invalid disk size: '{}'", s))
     } else if let Some(tb) = s.strip_suffix('T').or_else(|| s.strip_suffix("TB")).or_else(|| s.strip_suffix("t")) {
-        tb.trim().parse::<u64>().unwrap_or(1) * 1024
+        let val = tb.trim().parse::<u64>().map_err(|_| format!("Invalid disk size: '{}'", s))?;
+        Ok(val * 1024)
     } else {
-        s.parse::<u64>().unwrap_or(20)
+        s.parse::<u64>().map_err(|_| format!("Invalid disk size: '{}'. Use format like '20G', '1T', or raw GB", s))
     }
 }
 
@@ -171,8 +175,10 @@ pub async fn apply_vm_spec(
 
     let mut warnings = Vec::new();
 
-    let memory_mb = parse_memory_mb(&spec.resources.memory);
-    let disk_gb = parse_disk_gb(&spec.resources.disk);
+    let memory_mb = parse_memory_mb(&spec.resources.memory)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
+    let disk_gb = parse_disk_gb(&spec.resources.disk)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
 
     // Check if VM already exists
     let vm_exists = matches!(state.store.get_vm(&spec.name), Ok(Some(_)));

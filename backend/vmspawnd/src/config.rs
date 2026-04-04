@@ -191,7 +191,9 @@ fn default_admin_password() -> String {
             {
                 use std::os::unix::fs::PermissionsExt;
                 if let Err(e) = std::fs::set_permissions(pw_path, std::fs::Permissions::from_mode(0o600)) {
-                    tracing::warn!("Failed to set permissions on admin password file: {}", e);
+                    tracing::error!("SECURITY: Failed to set permissions on admin password file: {}. File may be world-readable!", e);
+                    // Remove the file if we can't secure it
+                    let _ = std::fs::remove_file(pw_path);
                 }
             }
         }

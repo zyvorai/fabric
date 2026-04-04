@@ -230,6 +230,20 @@ pub async fn create_dhcp_server(
         (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid bridge name: {}", msg) })))
     })?;
 
+    // Validate DNS servers
+    for dns in &req.dns_servers {
+        crate::validation::validate_ip_address(dns).map_err(|msg| {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid DNS server: {}", msg) })))
+        })?;
+    }
+
+    // Validate gateway if provided
+    if let Some(ref gw) = req.gateway {
+        crate::validation::validate_ip_address(gw).map_err(|msg| {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid gateway: {}", msg) })))
+        })?;
+    }
+
     let config = DhcpServerConfig {
         id: uuid::Uuid::new_v4().to_string(),
         bridge: req.bridge.clone(),

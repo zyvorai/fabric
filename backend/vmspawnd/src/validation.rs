@@ -56,8 +56,15 @@ pub fn default_retention() -> u32 {
 
 // === VM image path helpers ===
 
+/// Allowed base directories for VM images.
+const IMAGE_ALLOWED_PREFIXES: &[&str] = &[
+    "/var/lib/machines",
+    "/var/lib/vmspawnd/images",
+];
+
 /// Find the disk image path for a VM by checking common locations.
 /// Returns the path if found, or None if not.
+/// The returned path is validated to be under allowed directories.
 pub fn find_vm_image(name: &str) -> Option<String> {
     let candidates = [
         format!("/var/lib/machines/{}.qcow2", name),
@@ -68,8 +75,18 @@ pub fn find_vm_image(name: &str) -> Option<String> {
     ];
 
     for path in &candidates {
-        if std::path::Path::new(path).exists() {
-            return Some(path.clone());
+        let p = std::path::Path::new(path);
+        if p.exists() {
+            // Canonicalize to resolve symlinks and verify the real path
+            // is under an allowed prefix
+            let resolved = match std::fs::canonicalize(p) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            let resolved_str = resolved.to_string_lossy();
+            if IMAGE_ALLOWED_PREFIXES.iter().any(|prefix| resolved_str.starts_with(prefix)) {
+                return Some(resolved_str.to_string());
+            }
         }
     }
 
@@ -153,6 +170,26 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
         ));
     }
 
+    Ok(())
+}
+
+/// Validate a path inside a machine/container.
+/// Must be absolute and must not contain path traversal sequences.
+pub fn validate_machine_path(path: &str) -> Result<(), (StatusCode, String)> {
+    if path.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Machine path must not be empty".to_string()));
+    }
+    if !path.starts_with('/') {
+        return Err((StatusCode::BAD_REQUEST, "Machine path must be absolute".to_string()));
+    }
+    for component in std::path::Path::new(path).components() {
+        if let std::path::Component::ParentDir = component {
+            return Err((StatusCode::BAD_REQUEST, "Machine path must not contain '..' components".to_string()));
+        }
+    }
+    if path.contains('\0') {
+        return Err((StatusCode::BAD_REQUEST, "Machine path must not contain null bytes".to_string()));
+    }
     Ok(())
 }
 
@@ -248,31 +285,29 @@ pub fn validate_image_format(format: &str) -> Result<(), (StatusCode, serde_json
 /// Replaces absolute paths like /var/lib/vmspawnd/images/foo.qcow2 with <path>.
 /// Use for error messages returned to non-admin users.
 pub fn sanitize_error(msg: &str) -> String {
-    let mut result = String::with_capacity(msg.len());
-    let mut chars = msg.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == '/' && result.is_empty() || (c == '/' && result.ends_with(|ch: char| ch.is_whitespace() || ch == '\'' || ch == '"' || ch == ':')) {
-            // Start of a path — consume path characters
-            let mut path_len = 1;
-            while let Some(&next) = chars.peek() {
-                if next.is_ascii_alphanumeric() || matches!(next, '/' | '.' | '-' | '_') {
-                    chars.next();
-                    path_len += 1;
-                } else {
-                    break;
-                }
+    // Match absolute paths: / followed by path characters with at least one more /
+    let mut result = msg.to_string();
+    let mut i = 0;
+    while i < result.len() {
+        if result.as_bytes()[i] == b'/' {
+            // Check if this looks like a path (has at least one more segment)
+            let start = i;
+            let mut j = i + 1;
+            let bytes = result.as_bytes();
+            while j < bytes.len() && (bytes[j].is_ascii_alphanumeric()
+                || matches!(bytes[j], b'/' | b'.' | b'-' | b'_'))
+            {
+                j += 1;
             }
-            if path_len > 1 {
-                result.push_str("<path>");
-            } else {
-                result.push(c);
+            // Only redact if it looks like a real path (has at least one /)
+            if j - start > 2 && result[start..j].contains('/') && result[start + 1..j].contains('/') {
+                result.replace_range(start..j, "<path>");
+                i = start + 6; // length of "<path>"
+                continue;
             }
-        } else {
-            result.push(c);
         }
+        i += 1;
     }
-
     result
 }
 

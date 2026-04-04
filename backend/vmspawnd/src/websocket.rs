@@ -83,6 +83,9 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
         None => {
             tracing::error!("Failed to capture stdin for machinectl shell");
             let _ = child.kill().await;
+            let (mut sender, _) = socket.split();
+            let _ = sender.send(Message::Text("\r\n[Error: failed to open console]\r\n".into())).await;
+            let _ = sender.send(Message::Close(None)).await;
             return;
         }
     };
@@ -91,6 +94,9 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
         None => {
             tracing::error!("Failed to capture stdout for machinectl shell");
             let _ = child.kill().await;
+            let (mut sender, _) = socket.split();
+            let _ = sender.send(Message::Text("\r\n[Error: failed to open console]\r\n".into())).await;
+            let _ = sender.send(Message::Close(None)).await;
             return;
         }
     };

@@ -29,7 +29,10 @@ impl LoginRateLimiter {
 
     /// Check if the given key is rate-limited. Returns true if blocked.
     pub fn is_limited(&self, key: &str) -> bool {
-        let mut attempts = self.attempts.lock().unwrap_or_else(|e| e.into_inner());
+        let mut attempts = self.attempts.lock().unwrap_or_else(|e| {
+            tracing::warn!("Rate limiter mutex was poisoned, recovering");
+            e.into_inner()
+        });
         let now = std::time::Instant::now();
 
         if let Some(times) = attempts.get_mut(key) {
@@ -42,7 +45,10 @@ impl LoginRateLimiter {
 
     /// Record a failed attempt for the given key.
     pub fn record_failure(&self, key: &str) {
-        let mut attempts = self.attempts.lock().unwrap_or_else(|e| e.into_inner());
+        let mut attempts = self.attempts.lock().unwrap_or_else(|e| {
+            tracing::warn!("Rate limiter mutex was poisoned, recovering");
+            e.into_inner()
+        });
         let now = std::time::Instant::now();
 
         // Periodic eviction: remove stale entries when map exceeds threshold
@@ -60,7 +66,10 @@ impl LoginRateLimiter {
 
     /// Clear attempts for a key (on successful login).
     pub fn clear(&self, key: &str) {
-        let mut attempts = self.attempts.lock().unwrap_or_else(|e| e.into_inner());
+        let mut attempts = self.attempts.lock().unwrap_or_else(|e| {
+            tracing::warn!("Rate limiter mutex was poisoned, recovering");
+            e.into_inner()
+        });
         attempts.remove(key);
     }
 }
@@ -113,8 +122,8 @@ pub async fn login(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    if let Err(e) = pam_result {
-        tracing::warn!("PAM authentication failed for '{}': {}", req.username, e);
+    if let Err(_e) = pam_result {
+        tracing::warn!("PAM authentication failed for '{}'", req.username);
         LOGIN_LIMITER.record_failure(&req.username);
         return Err(StatusCode::UNAUTHORIZED);
     }
@@ -134,11 +143,11 @@ pub async fn login(
         .generate_token(&user_id, role.clone())
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let role_str = serde_json::to_value(&role)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .as_str()
-        .unwrap_or("user")
-        .to_string();
+    let role_str = match role {
+        security::Role::Admin => "admin",
+        security::Role::User => "user",
+        security::Role::Viewer => "viewer",
+    }.to_string();
 
     Ok(Json(LoginResponse {
         token,
@@ -178,11 +187,11 @@ pub async fn me(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let role_str = serde_json::to_value(&user.role)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .as_str()
-        .unwrap_or("viewer")
-        .to_string();
+    let role_str = match user.role {
+        security::Role::Admin => "admin",
+        security::Role::User => "user",
+        security::Role::Viewer => "viewer",
+    }.to_string();
 
     Ok(Json(MeResponse {
         id: user.id,

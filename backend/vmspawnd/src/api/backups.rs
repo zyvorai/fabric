@@ -284,8 +284,15 @@ pub async fn delete_backup(
         }
     };
 
-    // Remove actual backup files from storage
+    // Validate that the backup file is under the expected backup directory
+    let backup_dir = std::env::var("BACKUP_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/backups".to_string());
     let storage_path = std::path::Path::new(&backup.storage_location);
+    let resolved = storage_path.canonicalize().unwrap_or_else(|_| storage_path.to_path_buf());
+    if !resolved.to_string_lossy().starts_with(&backup_dir) {
+        tracing::error!("Refusing to delete backup outside allowed directory: {}", backup.storage_location);
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     if storage_path.exists() {
         if let Err(e) = tokio::fs::remove_file(storage_path).await {
             tracing::error!("Failed to delete backup file {}: {}", backup.storage_location, e);
@@ -599,6 +606,10 @@ async fn process_backup_job(
         .map_err(|e| format!("Failed to update job: {}", e))?;
 
     tracing::info!("Processing backup job {} for VM {}", job_id, vm_name);
+
+    // Validate VM name to prevent any path traversal in backup filename
+    crate::validation::validate_vm_name(&vm_name)
+        .map_err(|(_, msg)| format!("Invalid VM name: {}", msg))?;
 
     // Validate VM exists
     let vm = state.store.get_vm(&vm_name)

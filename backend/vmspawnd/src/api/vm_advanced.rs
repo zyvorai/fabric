@@ -258,6 +258,11 @@ pub async fn restore_checkpoint(
         Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
     };
 
+    // Validate stored checkpoint name before passing to command
+    if let Err((status, msg)) = crate::validation::validate_snapshot_name(&checkpoint.name) {
+        return Err((status, Json(json!({ "error": format!("Corrupted checkpoint data: {}", msg) }))));
+    }
+
     let image_path = crate::validation::find_vm_image_or_default(&vm_name);
 
     // Apply snapshot via qemu-img
@@ -285,13 +290,18 @@ pub async fn delete_checkpoint(
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
-        let image_path = crate::validation::find_vm_image_or_default(&vm_name);
-        if let Err(e) = Command::new("qemu-img")
-            .args(["snapshot", "-d", &checkpoint.name, &image_path])
-            .output()
-            .await
-        {
-            tracing::warn!("Command failed: {}", e);
+        // Validate stored name before using in command
+        if crate::validation::validate_snapshot_name(&checkpoint.name).is_err() {
+            tracing::error!("Corrupted checkpoint name '{}', skipping qemu-img delete", checkpoint.name);
+        } else {
+            let image_path = crate::validation::find_vm_image_or_default(&vm_name);
+            if let Err(e) = Command::new("qemu-img")
+                .args(["snapshot", "-d", &checkpoint.name, &image_path])
+                .output()
+                .await
+            {
+                tracing::warn!("Command failed: {}", e);
+            }
         }
     }
 

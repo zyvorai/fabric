@@ -20,6 +20,11 @@ fn validate_image_format(format: &str) -> Result<(), (StatusCode, Json<serde_jso
 // Data Structures
 // ============================================================================
 
+/// Allowed distributions for mkosi image builds.
+const ALLOWED_DISTRIBUTIONS: &[&str] = &[
+    "fedora", "ubuntu", "debian", "centos", "arch", "opensuse", "alma", "rocky",
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageBuildRequest {
     pub name: String,
@@ -62,6 +67,18 @@ pub async fn build_image(
     Json(req): Json<ImageBuildRequest>,
 ) -> Result<(StatusCode, Json<ImageBuildStatus>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(build_image));
+
+    // Validate distribution name against allowlist
+    if !ALLOWED_DISTRIBUTIONS.contains(&req.distribution.to_lowercase().as_str()) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({
+            "error": format!("Invalid distribution '{}'. Allowed: {}", req.distribution, ALLOWED_DISTRIBUTIONS.join(", "))
+        }))));
+    }
+
+    // Validate image name
+    crate::validation::validate_vm_name(&req.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
     let build_id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now();
 

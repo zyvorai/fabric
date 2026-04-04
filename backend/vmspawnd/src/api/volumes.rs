@@ -96,7 +96,7 @@ pub async fn list_volumes(
         return (s, Json(serde_json::json!({"error": format!("Invalid pool name: {}", m)}))).into_response();
     }
     let store_key = format!("volumes_{}", pool_name);
-    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading &store_key: {}", e); Vec::new() });
+    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading {}: {}", store_key, e); Vec::new() });
     Json(items).into_response()
 }
 

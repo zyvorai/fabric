@@ -208,10 +208,11 @@ pub async fn cancel_migration(
     if crate::validation::validate_vm_name(&status.vm_name).is_err() {
         tracing::error!("Migration cancel: invalid VM name '{}', skipping pkill", status.vm_name);
     } else {
-        // VM name is validated to only contain [a-zA-Z0-9._-], which are all
-        // regex-safe characters, so no escaping is needed after validation.
+        // VM name is validated to only contain [a-zA-Z0-9._-].
+        // Escape dots for regex safety since '.' matches any character.
+        let escaped_name = status.vm_name.replace('.', "\\.");
         if let Err(e) = tokio::process::Command::new("pkill")
-            .args(["-f", &format!("rsync.*{}", status.vm_name)])
+            .args(["-f", &format!("rsync.*{}", escaped_name)])
             .output()
             .await
         {

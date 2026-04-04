@@ -184,8 +184,7 @@ pub async fn start_vm(
     }
 
     // Acquire per-VM lock to serialize state transitions
-    let vm_mutex = state.vm_lock(&name);
-    let _lock = vm_mutex.lock().await;
+    let _lock = state.vm_lock(&name).lock_owned().await;
 
     // Check current state before transitioning
     if let Ok(Some(vm)) = state.store.get_vm(&name) {
@@ -207,16 +206,14 @@ pub async fn start_vm(
 
     audit(&state, &claims.sub, "START", &format!("vm/{}", name), "ACCEPTED");
 
-    // Drop outer lock before spawning so the background task can acquire it
-    drop(_lock);
-
-    // Spawn start in background so API returns immediately
+    // Spawn start in background so API returns immediately.
+    // Transfer the lock into the spawned task to avoid a race window
+    // where another request could modify VM state.
     let vm_name = name.clone();
     let state_clone = state.clone();
     tokio::spawn(async move {
-        // Acquire lock in background task
-        let vm_mutex = state_clone.vm_lock(&vm_name);
-        let _lock = vm_mutex.lock().await;
+        // _lock is moved into this task and held until it completes
+        let _lock = _lock;
 
         match state_clone.driver.start(&vm_name).await {
             Ok(_) => {

@@ -332,7 +332,15 @@ pub async fn create_channel(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    Ok((StatusCode::CREATED, Json(channel)))
+    // Redact secrets before returning
+    let mut response = channel;
+    for key in REDACTED_CONFIG_KEYS {
+        if response.config.contains_key(*key) {
+            response.config.insert(key.to_string(), serde_json::json!("**REDACTED**"));
+        }
+    }
+
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 pub async fn update_channel(
@@ -367,6 +375,13 @@ pub async fn update_channel(
     if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
         tracing::error!("Failed to update channel: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // Redact secrets before returning
+    for key in REDACTED_CONFIG_KEYS {
+        if channel.config.contains_key(*key) {
+            channel.config.insert(key.to_string(), serde_json::json!("**REDACTED**"));
+        }
     }
 
     Ok(Json(channel))

@@ -55,8 +55,14 @@ impl JwtConfig {
     }
 
     pub fn generate_token(&self, user_id: &str, role: Role) -> Result<String> {
+        let hours = if self.expiration_hours < 1 {
+            tracing::warn!("Token expiration_hours ({}) is too low, using minimum of 1 hour", self.expiration_hours);
+            1
+        } else {
+            self.expiration_hours
+        };
         let expiration = chrono::Utc::now()
-            .checked_add_signed(chrono::Duration::hours(self.expiration_hours))
+            .checked_add_signed(chrono::Duration::hours(hours))
             .ok_or_else(|| anyhow::anyhow!("Token expiration time overflow"))?
             .timestamp() as usize;
 

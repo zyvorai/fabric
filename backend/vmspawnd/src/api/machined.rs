@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::server::AppState;
-use crate::validation::validate_vm_name;
+use crate::validation::{validate_vm_name, validate_machine_path};
 use security::{RequireRead, RequireWrite, RequireAdmin};
 use vmspawn_driver::machinectl;
 use vmspawnd_driver_core::{MachineInfo, VMDriver};
@@ -207,6 +207,7 @@ pub async fn copy_to_machine(
     tracing::debug!("machined::{}", stringify!(copy_to_machine));
     validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.host_path)?;
+    validate_machine_path(&req.machine_path)?;
     machinectl::copy_to(&name, &req.host_path, &req.machine_path)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -221,6 +222,7 @@ pub async fn copy_from_machine(
     tracing::debug!("machined::{}", stringify!(copy_from_machine));
     validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.host_path)?;
+    validate_machine_path(&req.machine_path)?;
     machinectl::copy_from(&name, &req.machine_path, &req.host_path)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -243,6 +245,7 @@ pub async fn bind_machine(
     tracing::debug!("machined::{}", stringify!(bind_machine));
     validate_vm_name(&name).map_err(|(_s, msg)| (StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.host_path)?;
+    validate_machine_path(&req.machine_path)?;
     machinectl::bind(&name, &req.host_path, &req.machine_path, req.read_only)
         .map(|_| StatusCode::OK)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

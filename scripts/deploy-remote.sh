@@ -69,22 +69,22 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # ── SSH/rsync wrappers (SSHPASS env var — no password in ps) ──
 _ssh() {
     if [ -n "$PASS" ]; then
-        SSHPASS="$PASS" sshpass -e ssh -o StrictHostKeyChecking=no "${USER}@${HOST}" "$@"
+        SSHPASS="$PASS" sshpass -e ssh -o StrictHostKeyChecking=accept-new "${USER}@${HOST}" "$@"
     else
-        ssh -o StrictHostKeyChecking=no "${USER}@${HOST}" "$@"
+        ssh -o StrictHostKeyChecking=accept-new "${USER}@${HOST}" "$@"
     fi
 }
 
 _scp() {
     if [ -n "$PASS" ]; then
-        SSHPASS="$PASS" sshpass -e scp -o StrictHostKeyChecking=no "$@"
+        SSHPASS="$PASS" sshpass -e scp -o StrictHostKeyChecking=accept-new "$@"
     else
-        scp -o StrictHostKeyChecking=no "$@"
+        scp -o StrictHostKeyChecking=accept-new "$@"
     fi
 }
 
 _rsync() {
-    local ssh_cmd="ssh -o StrictHostKeyChecking=no"
+    local ssh_cmd="ssh -o StrictHostKeyChecking=accept-new"
     if [ -n "$PASS" ]; then
         ssh_cmd="sshpass -e $ssh_cmd"
     fi
