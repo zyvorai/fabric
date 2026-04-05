@@ -27,6 +27,9 @@ pub async fn create_service(
     Json(req): Json<CreateServiceRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("service_mesh::{}", stringify!(create_service));
+    if let Err(e) = crate::validation::validate_ip_address(&req.virtual_ip) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid virtual_ip: {}", e)}))).into_response();
+    }
     let now = Utc::now();
     let service = Service {
         id: Uuid::new_v4(),

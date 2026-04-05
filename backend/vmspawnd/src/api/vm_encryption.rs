@@ -48,9 +48,10 @@ pub async fn remove_provider(
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(remove_provider));
     if let Err(e) = state.store.delete_entity("key_providers", &id) {
-        tracing::error!("Failed to delete entity: {}", e);
+        tracing::error!("Failed to delete provider: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn test_provider(
@@ -137,9 +138,10 @@ pub async fn delete_policy(
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(delete_policy));
     if let Err(e) = state.store.delete_entity("encryption_policies", &id) {
-        tracing::error!("Failed to delete: {}", e);
+        tracing::error!("Failed to delete encryption policy: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -176,7 +178,8 @@ pub async fn encrypt_vm(
         last_key_rotation: None,
     };
     if let Err(e) = state.store.save_entity("vm_encryption", &req.vm_name, &status) {
-        tracing::error!("Failed to save: {}", e);
+        tracing::error!("Failed to save encryption status: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     (StatusCode::OK, Json(status)).into_response()
 }
@@ -257,6 +260,7 @@ pub async fn rotate_vm_key(
     status.last_key_rotation = Some(Utc::now());
     if let Err(e) = state.store.save_entity("vm_encryption", &vm_name, &status) {
         tracing::error!("Failed to save: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
     Json(status).into_response()
 }

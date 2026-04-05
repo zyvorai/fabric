@@ -3961,7 +3961,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-test",
  "tracing",
@@ -3974,7 +3974,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tracing",
  "vmspawnd-cgroup",
 ]
@@ -3986,7 +3986,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "uuid",

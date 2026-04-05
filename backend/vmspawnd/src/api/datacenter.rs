@@ -336,9 +336,10 @@ pub async fn remove_host(
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(remove_host));
     if let Err(e) = state.store.delete_entity("hosts", &id) {
-        tracing::error!("Failed to delete entity: {}", e);
+        tracing::error!("Failed to delete host: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn host_heartbeat(

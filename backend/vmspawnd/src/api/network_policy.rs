@@ -27,6 +27,26 @@ pub async fn create_policy(
     Json(req): Json<CreateNetworkPolicyRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("network_policy::{}", stringify!(create_policy));
+    // Validate CIDRs in ingress rules
+    for rule in &req.ingress {
+        for peer in &rule.from {
+            if let network_policy::models::PeerSelector::Cidr(ref cidr) = peer {
+                if let Err(e) = crate::validation::validate_cidr(cidr) {
+                    return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid ingress CIDR: {}", e)}))).into_response();
+                }
+            }
+        }
+    }
+    // Validate CIDRs in egress rules
+    for rule in &req.egress {
+        for peer in &rule.to {
+            if let network_policy::models::PeerSelector::Cidr(ref cidr) = peer {
+                if let Err(e) = crate::validation::validate_cidr(cidr) {
+                    return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid egress CIDR: {}", e)}))).into_response();
+                }
+            }
+        }
+    }
     let now = Utc::now();
     let policy = NetworkPolicy {
         id: Uuid::new_v4(),

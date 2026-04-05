@@ -1742,9 +1742,12 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             "cpu", &vm.cpus.to_string(), &new_cpus.to_string(),
                             &format!("CPU usage {:.1}% > threshold {:.1}%", cpu_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            let old_cpus = vm.cpus;
                             vm.cpus = new_cpus;
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
+                            } else if matches!(vm.state, vm_model::VMState::Running) {
+                                autoscaler_hotplug_cpu(&vm.name, old_cpus, new_cpus);
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -1762,9 +1765,12 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             "cpu", &vm.cpus.to_string(), &new_cpus.to_string(),
                             &format!("CPU usage {:.1}% < threshold {:.1}%", cpu_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            let old_cpus = vm.cpus;
                             vm.cpus = new_cpus;
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
+                            } else if matches!(vm.state, vm_model::VMState::Running) {
+                                autoscaler_hotplug_cpu(&vm.name, old_cpus, new_cpus);
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -1786,9 +1792,12 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             "memory", &format!("{}MB", vm.memory), &format!("{}MB", new_mem),
                             &format!("Memory usage {:.1}% > threshold {:.1}%", mem_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            let old_mem = vm.memory;
                             vm.memory = new_mem;
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
+                            } else if matches!(vm.state, vm_model::VMState::Running) {
+                                autoscaler_hotplug_memory(&vm.name, old_mem, new_mem);
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -1805,9 +1814,12 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             "memory", &format!("{}MB", vm.memory), &format!("{}MB", new_mem),
                             &format!("Memory usage {:.1}% < threshold {:.1}%", mem_usage, threshold));
                         if let Ok(Some(mut vm)) = state.store.get_vm(&policy.vm_name) {
+                            let old_mem = vm.memory;
                             vm.memory = new_mem;
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
+                            } else if matches!(vm.state, vm_model::VMState::Running) {
+                                autoscaler_hotplug_memory(&vm.name, old_mem, new_mem);
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -1818,6 +1830,113 @@ async fn run_autoscaler(state: Arc<AppState>) {
                 }
             }
         }
+    }
+}
+
+/// Apply CPU changes to a running VM via QMP hotplug.
+/// Best-effort: logs warnings on failure but does not propagate errors.
+fn autoscaler_hotplug_cpu(vm_name: &str, old_cpus: u32, new_cpus: u32) {
+    if new_cpus == old_cpus {
+        return;
+    }
+    let qmp = crate::qmp::QmpClient::new(vm_name);
+    if !qmp.is_available() {
+        tracing::warn!("Autoscaler: QMP not available for '{}', CPU hotplug skipped (will apply on next restart)", vm_name);
+        return;
+    }
+    if new_cpus > old_cpus {
+        // Scale up: query hotpluggable CPU slots and add unrealized ones
+        match qmp.execute("query-hotpluggable-cpus", serde_json::Value::Null) {
+            Ok(cpus) => {
+                let mut added = 0u32;
+                let needed = new_cpus - old_cpus;
+                if let Some(cpu_list) = cpus.as_array() {
+                    for cpu in cpu_list {
+                        if added >= needed {
+                            break;
+                        }
+                        if cpu.get("qom-path").is_some() {
+                            continue;
+                        }
+                        if let Some(props) = cpu.get("props") {
+                            let cpu_id = format!("cpu-auto-{}", old_cpus + added);
+                            let args = serde_json::json!({
+                                "driver": "host-x86_64-cpu",
+                                "id": cpu_id,
+                                "socket-id": props.get("socket-id").and_then(|v| v.as_u64()).unwrap_or(0),
+                                "core-id": props.get("core-id").and_then(|v| v.as_u64()).unwrap_or(0),
+                                "thread-id": props.get("thread-id").and_then(|v| v.as_u64()).unwrap_or(0),
+                            });
+                            match qmp.execute("device_add", args) {
+                                Ok(_) => added += 1,
+                                Err(e) => {
+                                    tracing::warn!("Autoscaler: failed to hotplug CPU for '{}': {}", vm_name, e);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                tracing::info!("Autoscaler: hotplugged {}/{} CPUs for '{}'", added, needed, vm_name);
+            }
+            Err(e) => {
+                tracing::warn!("Autoscaler: failed to query hotpluggable CPUs for '{}': {}", vm_name, e);
+            }
+        }
+    } else {
+        // Scale down: CPU hot-remove is not universally supported, log and skip
+        tracing::info!("Autoscaler: CPU scale-down hotplug not supported for '{}', will apply on next restart", vm_name);
+    }
+}
+
+/// Apply memory changes to a running VM via QMP hotplug.
+/// Best-effort: logs warnings on failure but does not propagate errors.
+fn autoscaler_hotplug_memory(vm_name: &str, old_memory: u64, new_memory: u64) {
+    if new_memory == old_memory {
+        return;
+    }
+    let qmp = crate::qmp::QmpClient::new(vm_name);
+    if !qmp.is_available() {
+        tracing::warn!("Autoscaler: QMP not available for '{}', memory hotplug skipped (will apply on next restart)", vm_name);
+        return;
+    }
+    if new_memory > old_memory {
+        // Scale up: add a new memory DIMM for the delta
+        let delta_mb = new_memory - old_memory;
+        let size_bytes = delta_mb * 1024 * 1024;
+        let backend_id = format!("mem-auto-{}", uuid::Uuid::new_v4().simple());
+        let dimm_id = format!("dimm-auto-{}", uuid::Uuid::new_v4().simple());
+
+        let backend_args = serde_json::json!({
+            "qom-type": "memory-backend-ram",
+            "id": backend_id,
+            "size": size_bytes,
+        });
+        if let Err(e) = qmp.execute("object-add", backend_args) {
+            tracing::warn!("Autoscaler: failed to add memory backend for '{}': {}", vm_name, e);
+            return;
+        }
+
+        let dimm_args = serde_json::json!({
+            "driver": "pc-dimm",
+            "id": dimm_id,
+            "memdev": backend_id,
+        });
+        match qmp.execute("device_add", dimm_args) {
+            Ok(_) => {
+                tracing::info!("Autoscaler: hotplugged {}MB memory for '{}'", delta_mb, vm_name);
+            }
+            Err(e) => {
+                tracing::warn!("Autoscaler: failed to hotplug DIMM for '{}': {}", vm_name, e);
+                // Rollback: remove the memory backend
+                if let Err(rollback_err) = qmp.execute("object-del", serde_json::json!({"id": backend_id})) {
+                    tracing::warn!("Autoscaler: failed to rollback memory backend '{}': {}", backend_id, rollback_err);
+                }
+            }
+        }
+    } else {
+        // Scale down: memory hot-remove is not universally supported, log and skip
+        tracing::info!("Autoscaler: memory scale-down hotplug not supported for '{}', will apply on next restart", vm_name);
     }
 }
 

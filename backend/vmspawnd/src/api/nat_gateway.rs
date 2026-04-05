@@ -30,6 +30,26 @@ pub async fn create_nat_rule(
     Json(req): Json<CreateNatRuleRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(create_nat_rule));
+    if let Some(ref cidr) = req.source_cidr {
+        if let Err(e) = crate::validation::validate_cidr(cidr) {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();
+        }
+    }
+    if let Some(ref cidr) = req.dest_cidr {
+        if let Err(e) = crate::validation::validate_cidr(cidr) {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid dest_cidr: {}", e)}))).into_response();
+        }
+    }
+    if let Some(ref ip) = req.translate_to {
+        if let Err(e) = crate::validation::validate_ip_address(ip) {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid translate_to: {}", e)}))).into_response();
+        }
+    }
+    if let Some(ref iface) = req.outbound_interface {
+        if let Err(msg) = crate::validation::validate_hostname(iface) {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid outbound_interface: {}", msg)}))).into_response();
+        }
+    }
     let now = Utc::now();
     let rule = NatRule {
         id: Uuid::new_v4(),
@@ -194,6 +214,11 @@ pub async fn create_nat_pool(
     Json(req): Json<CreateNatPoolRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(create_nat_pool));
+    for ip_range in &req.ip_ranges {
+        if let Err(e) = crate::validation::validate_ip_address(ip_range) {
+            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid ip_range: {}", e)}))).into_response();
+        }
+    }
     let now = Utc::now();
     let pool = NatPool {
         id: Uuid::new_v4(),
@@ -279,6 +304,12 @@ pub async fn create_nat_gateway(
     Json(req): Json<CreateNatGatewayRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(create_nat_gateway));
+    if let Err(msg) = crate::validation::validate_hostname(&req.outbound_interface) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid outbound_interface: {}", msg)}))).into_response();
+    }
+    if let Err(e) = crate::validation::validate_cidr(&req.subnet) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid subnet: {}", e)}))).into_response();
+    }
     let now = Utc::now();
     let gw = NatGatewayConfig {
         id: Uuid::new_v4(),

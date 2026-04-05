@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
+    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -365,7 +366,7 @@ pub async fn export_performance_report(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
-) -> Result<(StatusCode, String), StatusCode> {
+) -> Result<axum::response::Response, StatusCode> {
     // Generate real report from metrics
     let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let total_vms = vms.len();
@@ -401,7 +402,75 @@ pub async fn export_performance_report(
     let avg_network = if count > 0 { total_network / count as f64 } else { 0.0 };
 
     let now = Utc::now();
-    let report = format!(
+
+    match query.format.as_str() {
+        "csv" => {
+            use crate::validation::escape_csv_field;
+
+            let mut csv_content = String::from("VM Name,CPU Usage (%),Memory Usage (%),Network Traffic (MB/s)\n");
+
+            for vm in &vms {
+                let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+                if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+                    if let Some(latest_metric) = performance.metrics.last() {
+                        let net = (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                        csv_content.push_str(&format!(
+                            "{},{},{},{}\n",
+                            escape_csv_field(&vm.name),
+                            escape_csv_field(&format!("{:.1}", latest_metric.cpu_usage)),
+                            escape_csv_field(&format!("{:.1}", latest_metric.memory_usage)),
+                            escape_csv_field(&format!("{:.1}", net)),
+                        ));
+                    }
+                }
+            }
+
+            Ok(axum::response::Response::builder()
+                .header(header::CONTENT_TYPE, "text/csv")
+                .header(header::CONTENT_DISPOSITION, "attachment; filename=\"performance-report.csv\"")
+                .body(axum::body::Body::from(csv_content))
+                .unwrap()
+                .into_response())
+        }
+        "json" => {
+            #[derive(Serialize)]
+            struct JsonReport {
+                generated: String,
+                time_range: String,
+                total_vms: usize,
+                running_vms: usize,
+                avg_cpu_usage: f64,
+                avg_memory_usage: f64,
+                avg_network_traffic: f64,
+                top_cpu_vms: Vec<TopVMResource>,
+            }
+
+            let report = JsonReport {
+                generated: now.to_rfc3339(),
+                time_range: query.range,
+                total_vms,
+                running_vms,
+                avg_cpu_usage: avg_cpu,
+                avg_memory_usage: avg_memory,
+                avg_network_traffic: avg_network,
+                top_cpu_vms: top_cpu_vms.into_iter().map(|(name, value)| TopVMResource {
+                    vm_name: name,
+                    value,
+                }).collect(),
+            };
+
+            let json_body = serde_json::to_string(&report)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+            Ok(axum::response::Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(json_body))
+                .unwrap()
+                .into_response())
+        }
+        _ => {
+            // Default: plain text report (covers "pdf" and any other value)
+            let report = format!(
 r#"Performance Analytics Report
 ============================
 
@@ -419,23 +488,29 @@ Time Range: {}
 ## Top VMs by CPU Usage
 
 {}"#,
-        now.to_rfc3339(),
-        query.range,
-        total_vms,
-        running_vms,
-        avg_cpu,
-        avg_memory,
-        avg_network,
-        if !top_cpu_vms.is_empty() {
-            top_cpu_vms.iter()
-                .enumerate()
-                .map(|(i, (name, cpu))| format!("{}. {}: {:.1}%", i + 1, name, cpu))
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            "No metrics available".to_string()
-        }
-    );
+                now.to_rfc3339(),
+                query.range,
+                total_vms,
+                running_vms,
+                avg_cpu,
+                avg_memory,
+                avg_network,
+                if !top_cpu_vms.is_empty() {
+                    top_cpu_vms.iter()
+                        .enumerate()
+                        .map(|(i, (name, cpu))| format!("{}. {}: {:.1}%", i + 1, name, cpu))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                } else {
+                    "No metrics available".to_string()
+                }
+            );
 
-    Ok((StatusCode::OK, report))
+            Ok(axum::response::Response::builder()
+                .header(header::CONTENT_TYPE, "text/plain")
+                .body(axum::body::Body::from(report))
+                .unwrap()
+                .into_response())
+        }
+    }
 }

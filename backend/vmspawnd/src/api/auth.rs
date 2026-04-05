@@ -105,6 +105,13 @@ pub async fn login(
 ) -> Result<impl IntoResponse, StatusCode> {
     tracing::debug!("auth::{}", stringify!(login));
 
+    // Validate username format
+    if req.username.is_empty() || req.username.len() > 64
+        || !req.username.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     // Rate limit check
     if LOGIN_LIMITER.is_limited(&req.username) {
         tracing::warn!("Login rate limited for user '{}'", req.username);

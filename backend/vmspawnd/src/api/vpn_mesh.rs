@@ -29,6 +29,29 @@ pub async fn create_vpn_tunnel(
     Json(req): Json<CreateVpnTunnelRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(create_vpn_tunnel));
+    if let Err(msg) = crate::validation::validate_hostname(&req.interface_name) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid interface_name: {}", msg)}))).into_response();
+    }
+    if let Err(e) = crate::validation::validate_cidr(&req.address) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid address: {}", e)}))).into_response();
+    }
+    for peer in &req.peers {
+        for allowed_ip in &peer.allowed_ips {
+            if let Err(e) = crate::validation::validate_cidr(allowed_ip) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid peer allowed_ip: {}", e)}))).into_response();
+            }
+        }
+        if let Some(ref endpoint) = peer.endpoint {
+            // Endpoint format is host:port, validate the host part
+            if let Some(host) = endpoint.rsplit_once(':').map(|(h, _)| h) {
+                if let Err(msg) = crate::validation::validate_hostname(host) {
+                    if crate::validation::validate_ip_address(host).is_err() {
+                        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid peer endpoint: {}", msg)}))).into_response();
+                    }
+                }
+            }
+        }
+    }
     let now = Utc::now();
     let tunnel = VpnTunnel {
         id: Uuid::new_v4(),
@@ -68,7 +91,13 @@ pub async fn list_vpn_tunnels(
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(list_vpn_tunnels));
     match state.store.list_entities::<VpnTunnel>(TUNNEL_STORE_KEY) {
-        Ok(tunnels) => (StatusCode::OK, Json(tunnels)).into_response(),
+        Ok(mut tunnels) => {
+            // Redact sensitive private key references
+            for tunnel in &mut tunnels {
+                tunnel.private_key_ref = "**REDACTED**".to_string();
+            }
+            (StatusCode::OK, Json(tunnels)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -84,7 +113,11 @@ pub async fn get_vpn_tunnel(
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_tunnel));
     match state.store.get_entity::<VpnTunnel>(TUNNEL_STORE_KEY, &id) {
-        Ok(Some(tunnel)) => (StatusCode::OK, Json(tunnel)).into_response(),
+        Ok(Some(mut tunnel)) => {
+            // Redact sensitive private key reference
+            tunnel.private_key_ref = "**REDACTED**".to_string();
+            (StatusCode::OK, Json(tunnel)).into_response()
+        }
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "error": "VPN tunnel not found" })),
@@ -181,6 +214,9 @@ pub async fn create_vpn_network(
     Json(req): Json<CreateVpnNetworkRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(create_vpn_network));
+    if let Err(e) = crate::validation::validate_cidr(&req.subnet) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid subnet: {}", e)}))).into_response();
+    }
     let now = Utc::now();
     let network = VpnNetwork {
         id: Uuid::new_v4(),

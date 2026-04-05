@@ -407,7 +407,8 @@ impl ZfsPool {
             .stderr(Stdio::piped())
             .spawn()?;
 
-        let send_stdout = send_child.stdout.expect("piped stdout");
+        let send_stdout = send_child.stdout
+            .ok_or_else(|| ZfsError::CommandFailed("Failed to capture stdout for zfs send".to_string()))?;
 
         let ssh_args = Self::ssh_args(target);
         let output = Command::new(&ssh_args[0])

@@ -79,6 +79,18 @@ pub async fn build_image(
     crate::validation::validate_vm_name(&req.name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
 
+    // Validate package names
+    if req.packages.len() > 100 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Maximum 100 packages allowed"}))));
+    }
+    for pkg in &req.packages {
+        if pkg.is_empty() || pkg.len() > 128 || !pkg.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+')) {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({
+                "error": format!("Invalid package name '{}'. Only alphanumeric, hyphens, underscores, dots, and plus signs allowed.", pkg)
+            }))));
+        }
+    }
+
     let build_id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -163,8 +175,9 @@ pub async fn list_builds(
 }
 
 /// GET /api/images/list - List available VM images
-pub async fn list_images(RequireRead(_claims): RequireRead) -> Json<Vec<ImageInfo>> {
+pub async fn list_images(RequireRead(claims): RequireRead) -> Json<Vec<ImageInfo>> {
     tracing::debug!("images::{}", stringify!(list_images));
+    let show_path = claims.role.can_manage();
     let mut images = Vec::new();
 
     // Scan /var/lib/machines and /var/lib/vmspawnd/images using async read_dir
@@ -182,7 +195,7 @@ pub async fn list_images(RequireRead(_claims): RequireRead) -> Json<Vec<ImageInf
                     let size = entry.metadata().await.map(|m| m.len()).unwrap_or(0);
                     images.push(ImageInfo {
                         name: name.trim_end_matches(&format!(".{}", ext)).to_string(),
-                        path: path.display().to_string(),
+                        path: if show_path { path.display().to_string() } else { String::new() },
                         format: ext.to_string(),
                         size_bytes: size,
                     });
@@ -288,6 +301,9 @@ pub struct DownloadStatus {
     pub completed: Option<DateTime<Utc>>,
 }
 
+/// Maximum download size (100 GB).
+const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024 * 1024;
+
 /// Helper to stream an HTTP response body to a file on disk.
 async fn stream_response_to_file(
     response: reqwest::Response,
@@ -307,6 +323,11 @@ async fn stream_response_to_file(
         file.write_all(&chunk).await
             .map_err(|e| format!("Failed to write chunk: {}", e))?;
         written += chunk.len() as u64;
+        if written > MAX_DOWNLOAD_BYTES {
+            drop(file);
+            let _ = tokio::fs::remove_file(dest_path).await;
+            return Err(format!("Download exceeds maximum size of {} bytes", MAX_DOWNLOAD_BYTES));
+        }
     }
 
     file.flush().await.map_err(|e| format!("Failed to flush file: {}", e))?;
@@ -337,6 +358,9 @@ pub async fn download_cloud_image(
     Json(req): Json<DownloadCloudImageRequest>,
 ) -> Result<(StatusCode, Json<DownloadStatus>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(download_cloud_image));
+
+    crate::validation::validate_vm_name(&req.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
 
     let catalog = cloud_image_catalog();
     let url = if let Some(ref custom_url) = req.url {
@@ -381,8 +405,11 @@ pub async fn download_cloud_image(
         let dest_dir = "/var/lib/vmspawnd/images";
         if let Err(e) = tokio::fs::create_dir_all(dest_dir).await { tracing::error!("Failed to create dir: {}", e); return; }
 
-        // Determine extension from URL
-        let ext = url.rsplit('.').next().unwrap_or("qcow2");
+        // Determine extension from URL (strip query params, validate against allowlist)
+        let raw_ext = url.rsplit('.').next()
+            .and_then(|e| e.split('?').next())
+            .unwrap_or("qcow2");
+        let ext = if crate::validation::ALLOWED_IMAGE_FORMATS.contains(&raw_ext) { raw_ext } else { "qcow2" };
         let dest_path = format!("{}/{}.{}", dest_dir, image_name, ext);
 
         // Download using streaming to avoid loading entire image into memory
@@ -515,9 +542,8 @@ pub async fn download_iso(
     tracing::debug!("images::{}", stringify!(download_iso));
 
     // Validate name
-    if req.name.contains('/') || req.name.contains('\\') || req.name.contains("..") {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid ISO name"}))));
-    }
+    crate::validation::validate_vm_name(&req.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
 
     // Validate URL against SSRF
     crate::api::notifications::validate_external_url_public(&req.url)
@@ -586,9 +612,8 @@ pub async fn delete_iso(
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(delete_iso));
-    if name.contains('/') || name.contains('\\') || name.contains("..") {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid ISO name"}))));
-    }
+    crate::validation::validate_vm_name(&name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let path = format!("/var/lib/vmspawnd/iso/{}.iso", name);
     if let Err(e) = tokio::fs::remove_file(&path).await {
         if e.kind() != std::io::ErrorKind::NotFound {
@@ -673,17 +698,19 @@ pub async fn resize_disk(
 fn parse_size_to_bytes(size: &str) -> u64 {
     let s = size.trim();
     let s_upper = s.to_uppercase();
-    if let Some(n) = s_upper.strip_suffix('T') {
-        n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024 * 1024 * 1024
+    let result = if let Some(n) = s_upper.strip_suffix('T') {
+        n.trim().parse::<u64>().unwrap_or(1) * 1024 * 1024 * 1024 * 1024
     } else if let Some(n) = s_upper.strip_suffix('G') {
-        n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024 * 1024
+        n.trim().parse::<u64>().unwrap_or(1) * 1024 * 1024 * 1024
     } else if let Some(n) = s_upper.strip_suffix('M') {
-        n.trim().parse::<u64>().unwrap_or(0) * 1024 * 1024
+        n.trim().parse::<u64>().unwrap_or(1) * 1024 * 1024
     } else if let Some(n) = s_upper.strip_suffix('K') {
-        n.trim().parse::<u64>().unwrap_or(0) * 1024
+        n.trim().parse::<u64>().unwrap_or(1) * 1024
     } else {
-        s.parse::<u64>().unwrap_or(0)
-    }
+        s.parse::<u64>().unwrap_or(1)
+    };
+    // Ensure minimum of 1 byte to prevent destructive zero-resize
+    result.max(1)
 }
 
 // ============================================================================

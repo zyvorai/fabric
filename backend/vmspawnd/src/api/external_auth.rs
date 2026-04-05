@@ -125,6 +125,12 @@ pub async fn create_provider(
             .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid issuer URL: {}", e)}))))?;
     }
 
+    // Validate LDAP server URL against SSRF
+    if let AuthProviderConfig::Ldap(ref ldap) = req.config {
+        crate::api::notifications::validate_external_url_public(&ldap.server_url)
+            .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid LDAP server URL: {}", e)}))))?;
+    }
+
     let now = Utc::now();
     let provider = AuthProvider {
         id: uuid::Uuid::new_v4().to_string(),

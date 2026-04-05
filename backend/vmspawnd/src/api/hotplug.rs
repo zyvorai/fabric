@@ -326,8 +326,14 @@ pub async fn hotplug_nic(
             .into_response();
     }
 
-    // Add NIC device
+    // Validate NIC model against allowlist
+    const ALLOWED_NIC_MODELS: &[&str] = &["virtio-net-pci", "e1000", "e1000e", "rtl8139"];
     let model = req.model.as_deref().unwrap_or("virtio-net-pci");
+    if !ALLOWED_NIC_MODELS.contains(&model) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid NIC model '{}'. Allowed: {}", model, ALLOWED_NIC_MODELS.join(", "))}))).into_response();
+    }
+
+    // Add NIC device
     let device_args = serde_json::json!({
         "driver": model,
         "id": device_id,
@@ -358,6 +364,12 @@ pub async fn hotremove_nic(
     tracing::debug!("hotplug::{}", stringify!(hotremove_nic));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
+    // Validate device_id format (alphanumeric, hyphens, underscores, dots)
+    if device_id.is_empty() || device_id.len() > 128
+        || !device_id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid device ID"}))).into_response();
     }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {

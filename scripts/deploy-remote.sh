@@ -3,13 +3,12 @@
 # deploy-remote.sh — Full vmspawnd deployment to a remote server
 # ============================================================================
 # One command to fully set up a remote server with vmspawnd:
-#   1. Build Rust binaries locally (cross-compile for linux/x86_64)
-#   2. Build web dashboard
-#   3. Rsync binaries + configs to remote
-#   4. Install system deps (systemd-vmspawn, systemd-machined, qemu)
-#   5. Install binaries + systemd services
-#   6. Deploy web dashboard
-#   7. Verify everything works
+#   1. Rsync repo to remote
+#   2. Remove old installation
+#   3. Install system deps (systemd-vmspawn, systemd-machined, qemu)
+#   4. Build Rust binaries on remote
+#   5. Install binaries + systemd services + web dashboard
+#   6. Verify everything works
 #
 # Usage:
 #   ./scripts/deploy-remote.sh <host> [user] [password]
@@ -43,11 +42,11 @@ for arg in "$@"; do
         --help|-h)
             echo "Usage: $0 <host> [user] [password] [--quick|--uninstall]"
             echo ""
-            echo "  --quick      Skip system deps (only build + deploy binaries)"
+            echo "  --quick      Skip system deps (only rsync + build + deploy)"
             echo "  --uninstall  Remove vmspawnd from remote server"
             echo ""
             echo "Full mode installs everything: systemd-vmspawn, systemd-machined,"
-            echo "qemu, vmspawnd binaries, systemd services, web dashboard."
+            echo "qemu, Rust, vmspawnd binaries, systemd services, web dashboard."
             exit 0
             ;;
         *)  POSITIONAL+=("$arg") ;;
@@ -92,7 +91,9 @@ _rsync() {
         --exclude='*.qcow2' --exclude='*.raw' --exclude='*.vmdk' \
         --exclude='*.iso' --exclude='*.img' --exclude='*.ova' \
         --exclude='.git' --exclude='target/' --exclude='node_modules/' \
+        --exclude='.web/node_modules/' --exclude='.web/dist/' \
         --exclude='web/dist/' --exclude='web/node_modules/' \
+        --exclude='*.tpmstate' --exclude='*.tpmstate/' \
         -e "$ssh_cmd" \
         "$@"
 }
@@ -154,8 +155,8 @@ if $UNINSTALL_MODE; then
     exit 0
 fi
 
-TOTAL_STEPS=7
-$QUICK_MODE && TOTAL_STEPS=5
+TOTAL_STEPS=6
+$QUICK_MODE && TOTAL_STEPS=4
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════╗"
@@ -166,59 +167,37 @@ echo "  Host:     ${USER}@${HOST}"
 echo "  Auth:     $([ -n "$PASS" ] && echo "🔑 password" || echo "🔐 SSH key")"
 echo "  Local:    $REPO_DIR"
 echo "  Remote:   $REMOTE_DIR"
-echo "  Mode:     $($QUICK_MODE && echo "⚡ quick (build + deploy only)" || echo "📦 full (system deps + vmspawnd)")"
+echo "  Mode:     $($QUICK_MODE && echo "⚡ quick (rsync + build only)" || echo "📦 full (system deps + vmspawnd)")"
 echo ""
 
-# ── Step 1: Build Rust binaries locally ──
-step "Step 1/${TOTAL_STEPS}: 🔨 Building Rust binaries (release)"
+# ── Step 1: Rsync repo ──
+step "Step 1/${TOTAL_STEPS}: 📤 Syncing repository to ${HOST}"
 
-cd "$REPO_DIR/backend"
-cargo build --release 2>&1 | tail -5
-info "Binaries built in backend/target/release/"
-
-# ── Step 2: Build web dashboard ──
-step "Step 2/${TOTAL_STEPS}: 🌐 Building web dashboard"
-
-cd "$REPO_DIR/web"
-if [ -f "package.json" ]; then
-    npm install --silent 2>&1 | tail -1
-    npm run build 2>&1 | tail -3
-    info "Dashboard built to web/dist/"
-else
-    warn "package.json not found — skipping dashboard build"
-fi
-cd "$REPO_DIR"
-
-# ── Step 3: Rsync to remote ──
-CURRENT_STEP=3
-step "Step ${CURRENT_STEP}/${TOTAL_STEPS}: 📤 Syncing to ${HOST}"
-
-_ssh "mkdir -p $REMOTE_DIR/build $REMOTE_DIR/systemd $REMOTE_DIR/configs $REMOTE_DIR/web-dist"
-
-# Sync binaries
-for bin in vmspawnd vmctl vmctl-tui; do
-    if [ -f "backend/target/release/$bin" ]; then
-        _scp "backend/target/release/$bin" "${USER}@${HOST}:${REMOTE_DIR}/build/$bin"
-        info "Synced $bin"
+# rsync exit code 23 = partial transfer (permission-denied files) — acceptable
+_rsync "$REPO_DIR/" "${USER}@${HOST}:${REMOTE_DIR}/" 2>&1 | tail -3 || {
+    rc=$?
+    if [ "$rc" -eq 23 ]; then
+        warn "Some files skipped (permission denied) — continuing"
+    else
+        error "rsync failed with exit code $rc"
     fi
-done
-
-# Sync config + systemd
-_rsync "$REPO_DIR/configs/" "${USER}@${HOST}:${REMOTE_DIR}/configs/" 2>&1 | tail -1
-_rsync "$REPO_DIR/systemd/" "${USER}@${HOST}:${REMOTE_DIR}/systemd/" 2>&1 | tail -1
-
-# Sync web dashboard
-if [ -d "$REPO_DIR/web/dist" ]; then
-    _ssh "rm -rf $REMOTE_DIR/web-dist"
-    _rsync "$REPO_DIR/web/dist/" "${USER}@${HOST}:${REMOTE_DIR}/web-dist/" 2>&1 | tail -1
-fi
-
+}
 info "Synced to ${HOST}:${REMOTE_DIR}"
 
 if ! $QUICK_MODE; then
-    # ── Step 4: Install system deps ──
-    CURRENT_STEP=4
-    step "Step ${CURRENT_STEP}/${TOTAL_STEPS}: 📦 Installing system dependencies"
+    # ── Step 2: Remove old installation ──
+    step "Step 2/${TOTAL_STEPS}: 🗑️  Removing old vmspawnd"
+
+    _ssh "
+        systemctl stop vmspawnd.service 2>/dev/null || true
+        for bin in vmspawnd vmctl vmctl-tui; do
+            rm -f /usr/bin/\$bin 2>/dev/null || true
+        done
+    " 2>&1 | grep -v "^WARNING" || true
+    info "Old version removed"
+
+    # ── Step 3: Install system deps ──
+    step "Step 3/${TOTAL_STEPS}: 📦 Installing system dependencies"
 
     _ssh "
         # Detect package manager
@@ -232,36 +211,71 @@ if ! $QUICK_MODE; then
             exit 1
         fi
 
-        # Core virtualization (systemd-vmspawn + machined)
+        # Core: Rust toolchain
+        if ! command -v cargo &>/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>&1 | tail -1
+            source \"\$HOME/.cargo/env\"
+        fi
+
+        # Core: systemd-vmspawn + machined + qemu
         \$PKG systemd-container qemu-img 2>&1 | tail -3
 
-        # Optional tools
+        # Build deps
+        \$PKG gcc openssl-devel pam-devel dbus-devel systemd-devel 2>&1 | tail -1 || true
+        \$PKG gcc libssl-dev libpam0g-dev libdbus-1-dev libsystemd-dev 2>&1 | tail -1 || true
+
+        # Optional: full QEMU + UEFI
         \$PKG qemu-system-x86 edk2-ovmf 2>&1 | tail -1 || true
 
         # Enable machined
         systemctl enable --now systemd-machined 2>/dev/null || true
 
         echo 'System deps installed'
-    " 2>&1 | grep -E 'installed|enabled|System deps' | head -10
+    " 2>&1 | grep -E 'installed|enabled|System deps|Rust is installed' | head -10
     info "System dependencies installed"
 
-    CURRENT_STEP=5
+    # ── Step 4: Build + install ──
+    step "Step 4/${TOTAL_STEPS}: 🔨 Building and installing vmspawnd"
 else
-    CURRENT_STEP=4
+    # Quick mode: uninstall old + build
+    step "Step 2/${TOTAL_STEPS}: 🗑️  Removing old vmspawnd"
+
+    _ssh "
+        systemctl stop vmspawnd.service 2>/dev/null || true
+        for bin in vmspawnd vmctl vmctl-tui; do
+            rm -f /usr/bin/\$bin 2>/dev/null || true
+        done
+    " 2>&1 | grep -v "^WARNING" || true
+    info "Old version removed"
+
+    step "Step 3/${TOTAL_STEPS}: 🔨 Building and installing vmspawnd"
 fi
 
-# ── Install binaries ──
-step "Step ${CURRENT_STEP}/${TOTAL_STEPS}: 📦 Installing vmspawnd binaries"
+# ── Build Rust binaries on remote ──
+_ssh "
+    source \"\$HOME/.cargo/env\" 2>/dev/null || true
+    cd $REMOTE_DIR/backend
+    cargo build --release 2>&1 | tail -5
+" 2>&1 | tail -5
+info "Rust binaries built"
 
+# ── Install binaries ──
 _ssh "
     cd $REMOTE_DIR
 
     # Install binaries
-    for bin in build/*; do
-        name=\$(basename \$bin)
-        install -m 755 \$bin /usr/bin/\$name
-        echo \"  ✅ \$name -> /usr/bin/\$name\"
+    for bin in vmspawnd vmctl vmctl-tui; do
+        if [ -f backend/target/release/\$bin ]; then
+            install -m 755 backend/target/release/\$bin /usr/bin/\$bin
+            echo \"  ✅ \$bin -> /usr/bin/\$bin\"
+        fi
     done
+
+    # Install vmspawnctl helper
+    if [ -f vmspawnctl ]; then
+        install -m 755 vmspawnctl /usr/bin/vmspawnctl
+        echo '  ✅ vmspawnctl -> /usr/bin/vmspawnctl'
+    fi
 
     # Create directories
     install -d /etc/vmspawnd
@@ -273,21 +287,16 @@ _ssh "
     # Install config if not exists
     if [ ! -f /etc/vmspawnd/vmspawnd.toml ] && [ -f configs/vmspawnd.toml ]; then
         install -m 0644 configs/vmspawnd.toml /etc/vmspawnd/vmspawnd.toml
-        echo '  ✅ Created /etc/vmspawnd/vmspawnd.toml'
+        # Bind to all interfaces for remote access
+        sed -i 's/listen = \"127.0.0.1:/listen = \"0.0.0.0:/' /etc/vmspawnd/vmspawnd.toml
+        echo '  ✅ Created /etc/vmspawnd/vmspawnd.toml (listening on 0.0.0.0)'
     else
         echo '  ℹ️  /etc/vmspawnd/vmspawnd.toml already exists'
-    fi
-
-    if [ ! -f /etc/vmspawnd/vmspawnd.env ] && [ -f configs/vmspawnd.env ]; then
-        install -m 0640 configs/vmspawnd.env /etc/vmspawnd/vmspawnd.env
     fi
 " 2>&1
 info "Binaries installed"
 
-# ── Install systemd service ──
-CURRENT_STEP=$((CURRENT_STEP + 1))
-step "Step ${CURRENT_STEP}/${TOTAL_STEPS}: ⚙️  Installing systemd services"
-
+# ── Install systemd services ──
 _ssh "
     cd $REMOTE_DIR
 
@@ -295,21 +304,13 @@ _ssh "
     for unit in vmspawnd.service vm@.service vmspawnd-backup.service vmspawnd-cleanup.service; do
         if [ -f systemd/\$unit ]; then
             install -m 644 systemd/\$unit /usr/lib/systemd/system/\$unit
-            echo \"  ✅ Installed \$unit\"
         fi
     done
 
-    # Install socket if available
-    if [ -f systemd/vmspawnd.socket ]; then
-        install -m 644 systemd/vmspawnd.socket /usr/lib/systemd/system/vmspawnd.socket
-        echo '  ✅ Installed vmspawnd.socket'
-    fi
-
-    # Install timers
-    for timer in vmspawnd-backup.timer vmspawnd-cleanup.timer; do
-        if [ -f systemd/\$timer ]; then
-            install -m 644 systemd/\$timer /usr/lib/systemd/system/\$timer
-            echo \"  ✅ Installed \$timer\"
+    # Install socket + timers
+    for extra in vmspawnd.socket vmspawnd-backup.timer vmspawnd-cleanup.timer; do
+        if [ -f systemd/\$extra ]; then
+            install -m 644 systemd/\$extra /usr/lib/systemd/system/\$extra
         fi
     done
 
@@ -321,33 +322,60 @@ _ssh "
     if systemctl is-active vmspawnd &>/dev/null; then
         echo '  ✅ vmspawnd: running'
     else
-        echo '  ⚠️  vmspawnd: not running (check: journalctl -u vmspawnd -n 10)'
+        echo '  ❌ vmspawnd: not running (check: journalctl -u vmspawnd -n 10)'
     fi
 " 2>&1
 info "Systemd services installed"
 
 # ── Deploy web dashboard ──
-CURRENT_STEP=$((CURRENT_STEP + 1))
-step "Step ${CURRENT_STEP}/${TOTAL_STEPS}: 🌐 Deploying web dashboard"
+if $QUICK_MODE; then
+    DEPLOY_STEP=4
+else
+    DEPLOY_STEP=5
+fi
+step "Step ${DEPLOY_STEP}/${TOTAL_STEPS}: 🌐 Deploying web dashboard"
 
 _ssh "
-    WEB_DIST='$REMOTE_DIR/web-dist'
+    cd $REMOTE_DIR
 
-    if [ -d \"\$WEB_DIST\" ] && [ -f \"\$WEB_DIST/index.html\" ]; then
-        rm -rf /usr/share/vmspawnd/web
-        install -d /usr/share/vmspawnd/web
-        cp -r \$WEB_DIST/* /usr/share/vmspawnd/web/
-        echo '  ✅ Dashboard deployed to /usr/share/vmspawnd/web/'
-        echo \"  📁 Files: \$(find /usr/share/vmspawnd/web -type f | wc -l)\"
+    # Build web dashboard if npm is available
+    WEB_DIR=''
+    for dir in .web web; do
+        if [ -f \$dir/package.json ]; then
+            WEB_DIR=\$dir
+            break
+        fi
+    done
+
+    if [ -n \"\$WEB_DIR\" ] && command -v npm &>/dev/null; then
+        cd \$WEB_DIR
+        npm install --silent 2>&1 | tail -1
+        npm run build 2>&1 | tail -3
+        cd $REMOTE_DIR
+
+        # Deploy built files
+        if [ -d \$WEB_DIR/dist ]; then
+            rm -rf /usr/share/vmspawnd/web
+            install -d /usr/share/vmspawnd/web
+            cp -r \$WEB_DIR/dist/* /usr/share/vmspawnd/web/
+            echo \"  ✅ Dashboard deployed: \$(find /usr/share/vmspawnd/web -type f | wc -l) files\"
+        fi
+    elif [ -d /usr/share/vmspawnd/web/index.html ]; then
+        echo '  ℹ️  Dashboard already deployed'
     else
-        echo '  ⚠️  Dashboard files not found — skipping'
+        echo '  ⚠️  npm not found — skipping dashboard build'
+        echo '  ℹ️  Install Node.js: dnf install nodejs npm'
     fi
 " 2>&1
 info "Web dashboard deployed"
 
 # ── Verify ──
-CURRENT_STEP=$((CURRENT_STEP + 1))
-step "Step ${CURRENT_STEP}/${TOTAL_STEPS}: ✅ Verifying installation"
+if $QUICK_MODE; then
+    VERIFY_STEP=$TOTAL_STEPS
+else
+    VERIFY_STEP=$TOTAL_STEPS
+fi
+step "Step ${VERIFY_STEP}/${TOTAL_STEPS}: ✅ Verifying installation"
 
 _ssh "
     echo ''
@@ -361,7 +389,7 @@ _ssh "
 
     echo ''
     echo '  ── System tools ──'
-    for tool in systemd-vmspawn machinectl qemu-img; do
+    for tool in systemd-vmspawn machinectl qemu-img cargo; do
         if command -v \$tool &>/dev/null; then
             echo \"  📍 \$tool: \$(command -v \$tool)\"
         else
@@ -373,9 +401,9 @@ _ssh "
     echo '  ── Services ──'
     for svc in vmspawnd systemd-machined; do
         if systemctl is-active \$svc &>/dev/null; then
-            echo \"  📍 \$svc: running\"
+            echo \"  ✅ \$svc: running\"
         else
-            echo \"  ⚠️  \$svc: not running\"
+            echo \"  ❌ \$svc: not running\"
         fi
     done
 
@@ -384,10 +412,19 @@ _ssh "
     echo \"  📍 /var/lib/vmspawnd: \$(du -sh /var/lib/vmspawnd 2>/dev/null | cut -f1 || echo 'N/A')\"
     echo \"  📍 /etc/vmspawnd:     \$(ls /etc/vmspawnd/*.toml 2>/dev/null | wc -l) config file(s)\"
 
+    # Check API
+    echo ''
+    echo '  ── API ──'
+    if curl -sf http://localhost:9095/api/health &>/dev/null; then
+        echo '  ✅ API: http://localhost:9095 responding'
+    else
+        echo '  ⚠️  API: http://localhost:9095 not responding'
+    fi
+
     echo ''
     echo '  ── Dashboard ──'
-    if [ -d /usr/share/vmspawnd/web ]; then
-        echo \"  📍 Dashboard files: \$(find /usr/share/vmspawnd/web -type f | wc -l) files\"
+    if [ -d /usr/share/vmspawnd/web ] && [ -f /usr/share/vmspawnd/web/index.html ]; then
+        echo \"  ✅ Dashboard: \$(find /usr/share/vmspawnd/web -type f | wc -l) files\"
     else
         echo '  ⚠️  Dashboard not deployed'
     fi
@@ -405,11 +442,11 @@ echo "  🌐 Web Dashboard:"
 echo "    http://${HOST}:9095/"
 echo ""
 echo "  🚀 Manage VMs:"
-echo "    vmctl list"
-echo "    vmctl create --name my-vm --image /var/lib/vmspawnd/images/my.qcow2"
+echo "    vmspawnctl status"
+echo "    vmspawnctl list"
+echo "    vmspawnctl create --name my-vm --image /var/lib/vmspawnd/images/my.qcow2"
 echo ""
 echo "  🩺 System check:"
-echo "    vmctl status"
 echo "    systemctl status vmspawnd"
 echo "    journalctl -u vmspawnd -f"
 echo ""

@@ -78,7 +78,7 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
         cmd.arg(format!("--set-credential={}:{}", cred.id, cred.value));
     }
 
-    tracing::info!("Starting VM '{}': {:?}", vm.name, cmd);
+    tracing::info!("Starting VM '{}'", vm.name);
 
     let output = cmd.spawn();
 

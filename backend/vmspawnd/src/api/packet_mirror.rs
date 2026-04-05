@@ -25,6 +25,32 @@ pub async fn create_mirror_session(
     Json(req): Json<CreateMirrorSessionRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("packet_mirror::{}", stringify!(create_mirror_session));
+    // Validate collector_target based on collector type
+    match req.collector_type {
+        packet_mirror::models::CollectorType::RemoteIp => {
+            if let Err(e) = crate::validation::validate_ip_address(&req.collector_target) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid collector_target IP: {}", e)}))).into_response();
+            }
+        }
+        packet_mirror::models::CollectorType::Interface => {
+            if let Err(msg) = crate::validation::validate_hostname(&req.collector_target) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid collector_target interface: {}", msg)}))).into_response();
+            }
+        }
+    }
+    // Validate filter CIDRs if present
+    if let Some(ref filter) = req.filter {
+        if let Some(ref cidr) = filter.src_cidr {
+            if let Err(e) = crate::validation::validate_cidr(cidr) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid filter src_cidr: {}", e)}))).into_response();
+            }
+        }
+        if let Some(ref cidr) = filter.dst_cidr {
+            if let Err(e) = crate::validation::validate_cidr(cidr) {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid filter dst_cidr: {}", e)}))).into_response();
+            }
+        }
+    }
     let now = Utc::now();
     let session = MirrorSession {
         id: Uuid::new_v4(),

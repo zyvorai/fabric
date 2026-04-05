@@ -49,9 +49,10 @@ pub async fn delete_ca(
 ) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(delete_ca));
     if let Err(e) = state.store.delete_entity("cert_cas", &id) {
-        tracing::error!("Failed to delete entity: {}", e);
+        tracing::error!("Failed to delete CA: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -242,7 +243,7 @@ pub async fn reject_cert_request(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    Json(req).into_response()
 }
 
 // ============================================================================

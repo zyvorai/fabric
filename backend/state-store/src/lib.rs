@@ -168,6 +168,7 @@ impl StateStore {
     }
 
     pub fn save_vm(&self, vm: &VM) -> Result<()> {
+        Self::validate_entity_id(&vm.name)?;
         // Serialize and write file FIRST — if this fails, in-memory state stays consistent
         let content = serde_json::to_string_pretty(vm)?;
         let vm_file = self.path.join(format!("{}.json", vm.name));
@@ -228,6 +229,7 @@ impl StateStore {
     }
 
     pub fn delete_vm(&self, name: &str) -> Result<()> {
+        Self::validate_entity_id(name)?;
         // Delete file FIRST — if this fails, in-memory state stays consistent
         let vm_file = self.path.join(format!("{}.json", name));
         match fs::remove_file(&vm_file) {

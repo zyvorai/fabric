@@ -286,9 +286,10 @@ pub async fn delete_backup(
 
     // Validate that the backup file is under the expected backup directory
     let backup_dir = std::env::var("BACKUP_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/backups".to_string());
+    let backup_dir_prefix = format!("{}/", backup_dir.trim_end_matches('/'));
     let storage_path = std::path::Path::new(&backup.storage_location);
     let resolved = storage_path.canonicalize().unwrap_or_else(|_| storage_path.to_path_buf());
-    if !resolved.to_string_lossy().starts_with(&backup_dir) {
+    if !resolved.to_string_lossy().starts_with(&backup_dir_prefix) {
         tracing::error!("Refusing to delete backup outside allowed directory: {}", backup.storage_location);
         return Err(StatusCode::FORBIDDEN);
     }

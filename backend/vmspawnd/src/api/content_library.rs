@@ -31,6 +31,9 @@ pub async fn create_library(
     Json(req): Json<CreateLibraryRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(create_library));
+    if let Err((s, m)) = crate::validation::validate_host_path(&req.storage_path) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     let now = Utc::now();
     let library = Library {
         id: Uuid::new_v4().to_string(),

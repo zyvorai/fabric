@@ -171,6 +171,23 @@ pub async fn create_nfs_pool(
     crate::validation::validate_host_path(&req.config.mount_path)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
+    // Validate export path (must be absolute, no traversal)
+    crate::validation::validate_machine_path(&req.config.export_path)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
+    // Validate mount options against allowlist
+    const ALLOWED_NFS_OPTIONS: &[&str] = &[
+        "ro", "rw", "sync", "async", "noatime", "nodiratime", "soft", "hard",
+        "intr", "nointr", "tcp", "udp", "nolock", "lock",
+        "vers=3", "vers=4", "vers=4.1", "nfsvers=3", "nfsvers=4", "nfsvers=4.1",
+        "actimeo=0",
+    ];
+    for opt in &req.config.mount_options {
+        if !ALLOWED_NFS_OPTIONS.contains(&opt.as_str()) {
+            return Err((StatusCode::BAD_REQUEST, format!("Invalid NFS mount option: '{}'", opt)));
+        }
+    }
+
     let nfs_config = NfsConfig {
         server: req.config.server,
         export_path: req.config.export_path,

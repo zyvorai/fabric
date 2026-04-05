@@ -28,6 +28,9 @@ pub async fn create_zone(
     Json(req): Json<CreateDnsZoneRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("dns_policy::{}", stringify!(create_zone));
+    if let Err(msg) = crate::validation::validate_hostname(&req.name) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid zone name: {}", msg)}))).into_response();
+    }
     let now = Utc::now();
     let zone = DnsZone {
         id: Uuid::new_v4(),

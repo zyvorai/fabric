@@ -160,8 +160,14 @@ fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, 
             }
             // Validate webhook URL format
             if let Some(url) = config.get("webhook_url").and_then(|v| v.as_str()) {
-                if !url.starts_with("https://hooks.slack.com/") {
-                    return Err("Invalid Slack webhook URL format".to_string());
+                let parsed_host = url.trim_start_matches("https://").trim_start_matches("http://")
+                    .split('/').next().unwrap_or("")
+                    .split(':').next().unwrap_or("");
+                if parsed_host != "hooks.slack.com" {
+                    return Err("Slack webhook URL must have host hooks.slack.com".to_string());
+                }
+                if !url.starts_with("https://") {
+                    return Err("Slack webhook URL must use HTTPS".to_string());
                 }
             }
         }
@@ -185,8 +191,14 @@ fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, 
             }
             // Validate webhook URL format
             if let Some(url) = config.get("webhook_url").and_then(|v| v.as_str()) {
-                if !url.contains("office.com") && !url.contains("microsoft.com") {
-                    return Err("Invalid Teams webhook URL format".to_string());
+                let parsed_host = url.trim_start_matches("https://").trim_start_matches("http://")
+                    .split('/').next().unwrap_or("")
+                    .split(':').next().unwrap_or("");
+                if !(parsed_host.ends_with(".office.com") || parsed_host.ends_with(".microsoft.com")) {
+                    return Err("Teams webhook URL must be from office.com or microsoft.com domain".to_string());
+                }
+                if !url.starts_with("https://") {
+                    return Err("Teams webhook URL must use HTTPS".to_string());
                 }
             }
         }
@@ -263,6 +275,8 @@ fn validate_external_url(url: &str) -> Result<(), String> {
             std::net::IpAddr::V6(v6) => {
                 v6.is_loopback()                              // ::1
                     || v6.is_unspecified()                     // ::
+                    || (v6.segments()[0] & 0xffc0) == 0xfe80   // fe80::/10 link-local
+                    || (v6.segments()[0] & 0xfe00) == 0xfc00   // fc00::/7 ULA
             }
         };
 

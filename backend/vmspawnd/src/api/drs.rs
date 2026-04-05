@@ -23,7 +23,7 @@ pub async fn configure_drs(
     tracing::debug!("drs::{}", stringify!(configure_drs));
     match state.store.save_entity("drs_configs", &config.cluster_id, &config) {
         Ok(_) => (StatusCode::OK, Json(config)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
 
@@ -62,6 +62,7 @@ pub struct BalanceRequest {
 pub async fn analyze_balance(
     RequireRead(_claims): RequireRead,
     State(_state): State<Arc<AppState>>,
+    Path(_cluster_id): Path<String>,
     Json(req): Json<BalanceRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(analyze_balance));
@@ -96,6 +97,7 @@ pub async fn generate_recommendations(
 pub async fn list_recommendations(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
+    Path(_cluster_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("drs::{}", stringify!(list_recommendations));
     let items: Vec<MigrationRecommendation> = state.store.list_entities("drs_recommendations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });

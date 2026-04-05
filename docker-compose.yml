@@ -6,8 +6,16 @@ services:
       - "9080:8080"
     volumes:
       - vmspawnd-data:/var/lib/vmspawnd
-    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - MKNOD
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9095/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   vmspawnd-data:

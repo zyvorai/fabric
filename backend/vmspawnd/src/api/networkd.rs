@@ -42,6 +42,9 @@ pub async fn create_bridge(
     Json(req): Json<CreateBridgeRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_bridge));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = BridgeConfig {
         id: Uuid::new_v4().to_string(),
@@ -95,6 +98,9 @@ pub async fn update_bridge(
     Json(req): Json<CreateBridgeRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(update_bridge));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let existing = match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => b,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -170,6 +176,12 @@ pub async fn create_vlan(
     Json(req): Json<CreateVlanRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_vlan));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    if let Err(msg) = crate::validation::validate_hostname(&req.parent_interface) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = VlanConfig {
         id: Uuid::new_v4().to_string(),
@@ -219,6 +231,12 @@ pub async fn update_vlan(
     Json(req): Json<CreateVlanRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(update_vlan));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    if let Err(msg) = crate::validation::validate_hostname(&req.parent_interface) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+    }
     let existing = match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => v,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -288,6 +306,12 @@ pub async fn create_macvtap(
     Json(req): Json<CreateMacvtapRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_macvtap));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    if let Err(msg) = crate::validation::validate_hostname(&req.parent_interface) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let mac = req.mac_address.unwrap_or_else(|| NetworkdManager::generate_mac_address());
     let cfg = MacvtapConfig {
@@ -359,6 +383,9 @@ pub async fn create_tap(
     Json(req): Json<CreateTapRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_tap));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = TapConfig {
         id: Uuid::new_v4().to_string(),
@@ -476,6 +503,14 @@ pub async fn create_bond(
     Json(req): Json<CreateBondRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_bond));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    for iface in &req.slave_interfaces {
+        if let Err(msg) = crate::validation::validate_hostname(iface) {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid slave interface '{}': {}", iface, msg)}))).into_response();
+        }
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = BondConfig {
         id: Uuid::new_v4().to_string(),
@@ -534,6 +569,14 @@ pub async fn update_bond(
     Json(req): Json<CreateBondRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(update_bond));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    for iface in &req.slave_interfaces {
+        if let Err(msg) = crate::validation::validate_hostname(iface) {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid slave interface '{}': {}", iface, msg)}))).into_response();
+        }
+    }
     let existing = match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => b,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -612,6 +655,9 @@ pub async fn create_network_file(
     Json(req): Json<CreateNetworkFileRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_network_file));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.match_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = NetworkFileConfig {
         id: Uuid::new_v4().to_string(),
@@ -688,6 +734,11 @@ pub async fn create_link_file(
     Json(req): Json<CreateLinkFileRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_link_file));
+    if let Some(ref name) = req.name {
+        if let Err((status, msg)) = crate::validation::validate_vm_name(name) {
+            return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        }
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = LinkFileConfig {
         id: Uuid::new_v4().to_string(),
@@ -755,6 +806,9 @@ pub async fn create_port_forward(
     Json(req): Json<CreatePortForwardRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_port_forward));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = PortForwardConfig {
         id: Uuid::new_v4().to_string(),
@@ -869,6 +923,14 @@ pub async fn create_vxlan(
     Json(req): Json<CreateVxlanRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_vxlan));
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    if let Some(ref iface) = req.parent_interface {
+        if let Err(msg) = crate::validation::validate_hostname(iface) {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+        }
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = VxlanConfig {
         id: Uuid::new_v4().to_string(),
@@ -945,6 +1007,9 @@ pub async fn create_sriov(
     Json(req): Json<CreateSriovRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_sriov));
+    if let Err(msg) = crate::validation::validate_hostname(&req.pf_name) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid PF name: {}", msg)}))).into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = SriovConfig {
         id: Uuid::new_v4().to_string(),

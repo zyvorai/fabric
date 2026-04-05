@@ -3,11 +3,9 @@ Description=vmspawnd - Virtual Machine Management Daemon
 Documentation=https://github.com/ssahani/vmspawn
 After=network-online.target systemd-machined.service systemd-networkd.service
 Wants=network-online.target
-Requires=vmspawnd.socket
 
 [Service]
-Type=notify
-NotifyAccess=main
+Type=simple
 ExecStart=/usr/bin/vmspawnd
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
@@ -27,7 +25,7 @@ ReadWritePaths=/var/lib/vmspawnd
 ReadWritePaths=/etc/vmspawnd
 ReadWritePaths=/etc/systemd/network
 ReadWritePaths=/run/systemd/machines
-ReadWritePaths=/run/systemd/nspawn
+ReadWritePaths=-/run/systemd/nspawn
 ReadWritePaths=/tmp
 StateDirectory=vmspawnd
 ConfigurationDirectory=vmspawnd
