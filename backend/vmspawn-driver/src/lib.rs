@@ -200,20 +200,38 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
 
     match cmd.spawn() {
         Ok(mut child) => {
-            // Spawn a reaper thread to avoid zombie processes and log exit errors
-            let vm_name = vm.name.clone();
-            std::thread::spawn(move || {
-                match child.wait() {
-                    Ok(status) if !status.success() => {
-                        tracing::error!("VM '{}': systemd-vmspawn exited with {}", vm_name, status);
-                    }
-                    Err(e) => {
-                        tracing::error!("VM '{}': failed to wait on systemd-vmspawn: {}", vm_name, e);
-                    }
-                    _ => {}
+            // Wait briefly to catch immediate failures (bad config, missing image, etc.)
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            match child.try_wait() {
+                Ok(Some(status)) if !status.success() => {
+                    return Err(anyhow!(
+                        "systemd-vmspawn exited immediately with {}", status
+                    ));
                 }
-            });
-            Ok(())
+                Ok(Some(_)) => {
+                    // Exited with success immediately (unusual but valid)
+                    return Ok(());
+                }
+                Ok(None) => {
+                    // Still running — spawn reaper to avoid zombies and log later exits
+                    let vm_name = vm.name.clone();
+                    std::thread::spawn(move || {
+                        match child.wait() {
+                            Ok(status) if !status.success() => {
+                                tracing::error!("VM '{}': systemd-vmspawn exited with {}", vm_name, status);
+                            }
+                            Err(e) => {
+                                tracing::error!("VM '{}': failed to wait on systemd-vmspawn: {}", vm_name, e);
+                            }
+                            _ => {}
+                        }
+                    });
+                    Ok(())
+                }
+                Err(e) => {
+                    Err(anyhow!("Failed to check vmspawn process status: {}", e))
+                }
+            }
         }
         Err(e) => {
             // Fallback: try machinectl if systemd-vmspawn is not available

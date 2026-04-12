@@ -287,12 +287,30 @@ pub async fn apply_vm_spec(
         state.store.save_entity("vm_start_options", &spec.name, &spec.start_options).map_err(|e| {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
         })?;
+    } else {
+        // Clear stale options when re-applying with all defaults
+        let _ = state.store.delete_entity("vm_start_options", &spec.name);
     }
 
     // Start VM if requested
     let mut started = false;
     if spec.auto_start {
-        let start_opts: vm_model::VMStartOptions = spec.start_options.clone().into();
+        let mut start_opts: vm_model::VMStartOptions = spec.start_options.clone().into();
+
+        // Merge top-level VMSpec.credentials into start options
+        for cred in &spec.credentials {
+            if let Some(file_path) = cred.value.strip_prefix('@') {
+                start_opts.load_credentials.push(vm_model::LoadCredential {
+                    id: cred.id.clone(),
+                    path: file_path.to_string(),
+                });
+            } else {
+                start_opts.credentials.push(vm_model::VMCredential {
+                    id: cred.id.clone(),
+                    value: cred.value.clone(),
+                });
+            }
+        }
 
         // Validate start options before attempting start
         if let Err(validation_errors) = start_opts.validate() {

@@ -190,7 +190,7 @@ pub async fn start_vm(
     // Check current state before transitioning
     if let Ok(Some(vm)) = state.store.get_vm(&name) {
         match vm.state {
-            vm_model::VMState::Running | vm_model::VMState::Starting => {
+            vm_model::VMState::Running | vm_model::VMState::Starting | vm_model::VMState::Stopping => {
                 return json_error(StatusCode::CONFLICT, format!("VM is already {:?}", vm.state)).into_response();
             }
             _ => {}

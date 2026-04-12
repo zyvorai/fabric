@@ -481,6 +481,9 @@ impl VMStartOptions {
                     "SMBIOS11 entries must not start with 'io.systemd.credential' (use credentials field instead)".to_string()
                 );
             }
+            if s.chars().any(|c| c.is_control()) {
+                errors.push("SMBIOS11 entries must not contain control characters".to_string());
+            }
         }
 
         // Validate bind_users don't include root or system accounts
@@ -499,6 +502,13 @@ impl VMStartOptions {
                 if uid < 1000 {
                     errors.push(format!("Cannot bind system UID {} (< 1000) into VM", uid));
                 }
+            }
+            // Validate username character set
+            if user.is_empty() || !user.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+                errors.push(format!(
+                    "Invalid bind_user '{}': must be alphanumeric with hyphens/underscores/dots only",
+                    user
+                ));
             }
         }
 
@@ -1438,6 +1448,67 @@ mod tests {
         assert!(opts.validate().is_err());
 
         opts.properties = vec!["Delegate=yes".into()];
+        assert!(opts.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_extra_args_control_chars() {
+        let mut opts = VMStartOptions::default();
+        opts.extra_args = vec!["enforcing=0".into()];
+        assert!(opts.validate().is_ok());
+
+        opts.extra_args = vec!["bad\x00value".into()];
+        assert!(opts.validate().is_err());
+
+        opts.extra_args = vec!["bad\nvalue".into()];
+        assert!(opts.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_load_credential_invalid_id() {
+        let mut opts = VMStartOptions::default();
+        opts.load_credentials = vec![LoadCredential {
+            id: "valid.id".into(),
+            path: "/some/path".into(),
+        }];
+        assert!(opts.validate().is_ok());
+
+        opts.load_credentials = vec![LoadCredential {
+            id: "invalid:id".into(),
+            path: "/some/path".into(),
+        }];
+        assert!(opts.validate().is_err());
+
+        opts.load_credentials = vec![LoadCredential {
+            id: "invalid/id".into(),
+            path: "/some/path".into(),
+        }];
+        assert!(opts.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_smbios11_control_chars() {
+        let mut opts = VMStartOptions::default();
+        opts.smbios11 = vec!["valid.string=hello".into()];
+        assert!(opts.validate().is_ok());
+
+        opts.smbios11 = vec!["bad\x00string".into()];
+        assert!(opts.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_bind_users_charset() {
+        let mut opts = VMStartOptions::default();
+        opts.bind_users = vec!["valid-user".into()];
+        assert!(opts.validate().is_ok());
+
+        opts.bind_users = vec!["bad user".into()];
+        assert!(opts.validate().is_err());
+
+        opts.bind_users = vec!["bad;user".into()];
+        assert!(opts.validate().is_err());
+
+        opts.bind_users = vec!["".into()];
         assert!(opts.validate().is_err());
     }
 
