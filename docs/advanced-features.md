@@ -104,7 +104,8 @@ sudo apt install swtpm swtpm-tools    # Debian/Ubuntu
 
 ### Capabilities
 
-- TPM 1.2 and 2.0 support
+- TPM 1.2 and 2.0 support (`--tpm=yes`)
+- Configurable TPM state persistence (`--tpm-state=auto|off|/path`)
 - Automatic lifecycle tied to VM lifecycle
 - EK (Endorsement Key) and platform certificates
 - Per-VM isolated TPM instances with persistent state

@@ -92,7 +92,54 @@ pub struct StartOptionsSpec {
     #[serde(default)]
     pub vsock: Option<bool>,
     #[serde(default)]
-    pub gui: bool,
+    pub tpm: Option<bool>,
+    /// Console mode: "interactive", "read-only", "native", "gui"
+    #[serde(default)]
+    pub console: Option<vm_model::ConsoleMode>,
+    /// Create a TAP device for networking
+    #[serde(default)]
+    pub network_tap: bool,
+    /// Use user mode networking
+    #[serde(default)]
+    pub network_user_mode: bool,
+    /// Manager scope: "system" or "user"
+    #[serde(default)]
+    pub scope: Option<vm_model::ManagerScope>,
+    /// Use directory instead of image
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub directory: Option<String>,
+    /// Bind mounts from host into VM
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bind_mounts: Vec<vm_model::BindMount>,
+    /// Credentials to pass (ID -> value)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub set_credentials: Vec<vm_model::VMCredential>,
+    /// Forward VM journal to host
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forward_journal: Option<String>,
+    /// Generate and pass SSH key to VM
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pass_ssh_key: Option<bool>,
+}
+
+impl From<StartOptionsSpec> for vm_model::VMStartOptions {
+    fn from(spec: StartOptionsSpec) -> Self {
+        let mut opts = vm_model::VMStartOptions::default();
+        opts.kvm = spec.kvm;
+        opts.secure_boot = spec.secure_boot;
+        opts.vsock = spec.vsock;
+        opts.tpm = spec.tpm;
+        opts.console = spec.console;
+        opts.network_tap = spec.network_tap;
+        opts.network_user_mode = spec.network_user_mode;
+        opts.scope = spec.scope;
+        opts.directory = spec.directory;
+        opts.bind_mounts = spec.bind_mounts;
+        opts.credentials = spec.set_credentials;
+        opts.forward_journal = spec.forward_journal;
+        opts.pass_ssh_key = spec.pass_ssh_key;
+        opts
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,10 +269,46 @@ pub async fn apply_vm_spec(
         false
     };
 
+    // Persist start options for export
+    let has_non_default_opts = spec.start_options.kvm.is_some()
+        || spec.start_options.secure_boot.is_some()
+        || spec.start_options.vsock.is_some()
+        || spec.start_options.tpm.is_some()
+        || spec.start_options.console.is_some()
+        || spec.start_options.network_tap
+        || spec.start_options.network_user_mode
+        || spec.start_options.scope.is_some()
+        || spec.start_options.directory.is_some()
+        || !spec.start_options.bind_mounts.is_empty()
+        || !spec.start_options.set_credentials.is_empty()
+        || spec.start_options.forward_journal.is_some()
+        || spec.start_options.pass_ssh_key.is_some();
+    if has_non_default_opts {
+        state.store.save_entity("vm_start_options", &spec.name, &spec.start_options).map_err(|e| {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        })?;
+    }
+
     // Start VM if requested
     let mut started = false;
     if spec.auto_start {
-        match vmspawn_driver::start_vm(&spec.name) {
+        let start_opts: vm_model::VMStartOptions = spec.start_options.clone().into();
+
+        // Validate start options before attempting start
+        if let Err(validation_errors) = start_opts.validate() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid start options: {}", validation_errors.join("; "))})),
+            ));
+        }
+
+        let vm = match state.store.get_vm(&spec.name) {
+            Ok(Some(vm)) => vm,
+            Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({"error": "VM not found after creation"})))),
+            Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))),
+        };
+
+        match vmspawn_driver::start_vm_with_options(&vm, &start_opts) {
             Ok(_) => {
                 started = true;
                 if let Ok(Some(mut vm)) = state.store.get_vm(&spec.name) {
@@ -291,6 +374,12 @@ pub async fn export_vm_spec(
         format!("{}M", vm.memory)
     };
 
+    let start_options: StartOptionsSpec = state.store
+        .get_entity("vm_start_options", &name)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+
     let spec = VMSpec {
         name: vm.name,
         image: vm.image,
@@ -302,7 +391,7 @@ pub async fn export_vm_spec(
         network: Vec::new(),
         volumes,
         credentials: Vec::new(),
-        start_options: StartOptionsSpec::default(),
+        start_options,
         autoscale,
         hostname: vm.hostname,
         tags: vm.tags.unwrap_or_default(),

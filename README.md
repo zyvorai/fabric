@@ -54,6 +54,10 @@ Manage VMs through a CLI, terminal UI, web dashboard, Kubernetes operator, or Te
 
 ### VM Lifecycle
 - Create, start, stop, restart, pause, resume, delete
+- Full systemd-vmspawn(1) v260 support: all CLI options exposed via API
+- KVM, VSock, TPM, Secure Boot, direct kernel boot, user namespacing
+- TAP/user-mode networking, bind mounts, user binding, journal forwarding
+- Console modes, SSH key management, SMBIOS strings, credentials
 - Full and linked cloning with snapshot support
 - Templates for rapid deployment
 - Multiple disk formats: qcow2, raw, vmdk, vdi

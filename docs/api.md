@@ -94,6 +94,109 @@ Content-Type: application/json
 }
 ```
 
+### Start a VM with Options
+
+The `POST /vms/:name/start` endpoint accepts an optional JSON body with `VMStartOptions` to control how `systemd-vmspawn` launches the VM. All fields are optional and default sensibly when omitted.
+
+```
+POST /api/vms/myvm/start
+Content-Type: application/json
+
+{
+  "scope": "system",
+  "directory": "/path/to/rootfs",
+  "kvm": true,
+  "secure_boot": false,
+  "vsock": true,
+  "vsock_cid": 42,
+  "tpm": true,
+  "tpm_state": "auto",
+  "linux": "/boot/vmlinuz",
+  "initrd": ["/boot/initrd.img"],
+  "network_tap": true,
+  "network_user_mode": false,
+  "firmware": "/usr/share/ovmf/OVMF.fd",
+  "discard_disk": true,
+  "grow_image": "50G",
+  "smbios11": ["custom.vendor-string=hello"],
+  "notify_ready": true,
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "slice": "vm.slice",
+  "properties": ["MemoryMax=4G", "CPUQuota=200%"],
+  "register": true,
+  "private_users": "1000:65536",
+  "bind_mounts": [
+    { "source": "/host/data", "destination": "/vm/data", "read_only": false }
+  ],
+  "extra_drives": ["/extra/disk.raw"],
+  "bind_users": ["myuser"],
+  "bind_user_shell": "/bin/bash",
+  "bind_user_groups": ["wheel"],
+  "forward_journal": "/var/log/vm.journal",
+  "pass_ssh_key": true,
+  "ssh_key_type": "ed25519",
+  "console": "interactive",
+  "background": "44",
+  "quiet": false,
+  "credentials": [
+    { "id": "passwd.hashed-password.root", "value": "$y$..." }
+  ],
+  "load_credentials": [
+    { "id": "ssh.authorized_keys.root", "path": "/root/.ssh/authorized_keys" }
+  ],
+  "extra_args": ["enforcing=0"]
+}
+```
+
+#### VMStartOptions Field Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `scope` | `"system"` \| `"user"` | Manager scope (omitted = auto: system when root, user otherwise) |
+| `directory` | string | Root filesystem directory (alternative to image) |
+| `kvm` | bool? | KVM acceleration (`null` = omitted, uses vmspawn default) |
+| `secure_boot` | bool? | Secure Boot firmware (`null` = omitted, uses vmspawn default) |
+| `vsock` | bool? | VSock networking (`null` = omitted, uses vmspawn default) |
+| `vsock_cid` | u32? | VSock CID (`null` = omitted, uses vmspawn default) |
+| `tpm` | bool? | TPM support (`null` = omitted, uses vmspawn default) |
+| `tpm_state` | string | TPM state path, `"auto"`, or `"off"` |
+| `linux` | string | Kernel image path for direct kernel boot |
+| `initrd` | string[] | Initrd paths (multiple are merged) |
+| `network_tap` | bool | Create a TAP device, requires root (default: `false`) |
+| `network_user_mode` | bool | Use user mode networking (default: `false`) |
+| `firmware` | string | Firmware definition file path |
+| `discard_disk` | bool? | Process discard/trim requests (`null` = omitted, vmspawn default: yes) |
+| `grow_image` | string | Grow image to size, e.g. `"50G"`. Validated format: digits + optional size suffix |
+| `smbios11` | string[] | SMBIOS Type #11 vendor strings (must not start with `io.systemd.credential`) |
+| `notify_ready` | bool? | Wait for READY=1 from VM init (`null` = omitted, vmspawn default: yes) |
+| `uuid` | string | Machine UUID (must be valid UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) |
+| `slice` | string | Systemd slice for scope unit (must end with `.slice`) |
+| `properties` | string[] | Resource-control properties only (e.g. `"MemoryMax=4G"`, `"CPUQuota=200%"`) |
+| `register` | bool? | Register with systemd-machined |
+| `private_users` | string | User namespace mapping (e.g. `"1000:65536"`) |
+| `bind_mounts` | BindMount[] | Host-to-VM bind mounts (paths must not contain `..`) |
+| `extra_drives` | string[] | Additional disk images or block devices |
+| `bind_users` | string[] | Host users to bind into the VM (system users and UIDs < 1000 are blocked) |
+| `bind_user_shell` | string | Shell for bound users: `"yes"`, `"no"`, or an absolute path |
+| `bind_user_groups` | string[] | Auxiliary groups for bound users |
+| `forward_journal` | string | Forward VM journal to host (file or dir) |
+| `pass_ssh_key` | bool? | Generate and pass SSH key (`null` = omitted, vmspawn default: yes) |
+| `ssh_key_type` | enum | SSH key type: `"ed25519"`, `"ecdsa"`, `"rsa"` |
+| `console` | enum | Console mode: `"interactive"`, `"read-only"`, `"native"`, `"gui"` |
+| `background` | string | Terminal background color (ANSI SGR) |
+| `quiet` | bool | Suppress vmspawn status output (default: `false`) |
+| `credentials` | Credential[] | Credentials via `--set-credential` |
+| `load_credentials` | LoadCredential[] | Credentials loaded from file via `--load-credential` |
+| `extra_args` | string[] | Extra kernel command line arguments (must not start with `-`) |
+
+**BindMount object:** `{ "source": string, "destination": string?, "read_only": bool }`
+
+**Credential object:** `{ "id": string, "value": string }` — `id` must be alphanumeric/dot/hyphen/underscore (no colons)
+
+**LoadCredential object:** `{ "id": string, "path": string }` — `path` is the file to load the credential from (`"value"` is accepted as an alias for backward compatibility)
+
+All fields map directly to `systemd-vmspawn(1)` options (systemd v260).
+
 ## Snapshots
 
 Point-in-time VM state capture and restoration.

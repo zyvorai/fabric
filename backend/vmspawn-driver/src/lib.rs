@@ -4,7 +4,7 @@ pub mod qemu;
 use anyhow::{anyhow, Result};
 use std::fs;
 use std::process::Command;
-use vm_model::{CreateVMRequest, VM, VMMetrics, VMStartOptions, VMState};
+use vm_model::{CreateVMRequest, ManagerScope, VM, VMMetrics, VMStartOptions, VMState};
 
 pub fn create_vm(req: &CreateVMRequest) -> Result<VM> {
     let vm = VM::from_request(req);
@@ -13,80 +13,211 @@ pub fn create_vm(req: &CreateVMRequest) -> Result<VM> {
 
 /// Start a VM using systemd-vmspawn with proper flags.
 ///
-/// Uses the systemd-vmspawn(1) interface:
-///   --image=      Root filesystem image
-///   --directory=  Root filesystem directory
-///   --machine=    Machine name
-///   --qemu-smp=   Number of CPUs
-///   --qemu-mem=   Memory size
-///   --qemu-kvm=   KVM acceleration
-///   --qemu-vsock= VSock networking
-///   --secure-boot= Secure Boot firmware
-///   --qemu-gui    Graphical mode
-///   --set-credential= Pass credentials
+/// Supports the full systemd-vmspawn(1) interface as documented in
+/// systemd v260. See the man page for details on each option.
+///
+/// This is a blocking function. When calling from async context, wrap
+/// the call in `tokio::task::spawn_blocking`.
 pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
+    // Validate all options before building the command
+    opts.validate().map_err(|errors| {
+        anyhow!("Invalid start options: {}", errors.join("; "))
+    })?;
+
     let mut cmd = Command::new("systemd-vmspawn");
 
-    // Machine name
-    cmd.arg(format!("--machine={}", vm.name));
+    // -- Manager Scope --
+    match opts.scope {
+        Some(ManagerScope::System) => { cmd.arg("--system"); }
+        Some(ManagerScope::User) => { cmd.arg("--user"); }
+        None => {}
+    }
 
-    // Image or directory
+    // -- Input/Output Options --
+    if opts.quiet {
+        cmd.arg("--quiet");
+    }
+
+    // -- Image Options --
     if let Some(ref dir) = opts.directory {
         cmd.arg(format!("--directory={}", dir));
     } else {
-        // Resolve image path
         let image_path = resolve_image_path(&vm.image, &vm.name);
         cmd.arg(format!("--image={}", image_path));
     }
 
-    // CPU count
-    cmd.arg(format!("--qemu-smp={}", vm.cpus));
+    // -- Host Configuration --
+    cmd.arg(format!("--cpus={}", vm.cpus));
 
-    // Memory (systemd-vmspawn expects e.g. "2G" or "512M")
     let mem_str = if vm.memory >= 1024 && vm.memory % 1024 == 0 {
         format!("{}G", vm.memory / 1024)
     } else {
         format!("{}M", vm.memory)
     };
-    cmd.arg(format!("--qemu-mem={}", mem_str));
+    cmd.arg(format!("--ram={}", mem_str));
 
-    // KVM acceleration
     if let Some(kvm) = opts.kvm {
-        cmd.arg(format!("--qemu-kvm={}", if kvm { "yes" } else { "no" }));
+        cmd.arg(format!("--kvm={}", if kvm { "yes" } else { "no" }));
     }
 
-    // Secure Boot
-    if let Some(sb) = opts.secure_boot {
-        cmd.arg(format!("--secure-boot={}", if sb { "yes" } else { "no" }));
-    }
-
-    // VSock
     if let Some(vsock) = opts.vsock {
-        cmd.arg(format!("--qemu-vsock={}", if vsock { "yes" } else { "no" }));
+        cmd.arg(format!("--vsock={}", if vsock { "yes" } else { "no" }));
     }
     if let Some(cid) = opts.vsock_cid {
         cmd.arg(format!("--vsock-cid={}", cid));
     }
 
-    // GUI mode
-    if opts.gui {
-        cmd.arg("--qemu-gui");
+    if let Some(tpm) = opts.tpm {
+        cmd.arg(format!("--tpm={}", if tpm { "yes" } else { "no" }));
+    }
+    if let Some(ref tpm_state) = opts.tpm_state {
+        cmd.arg(format!("--tpm-state={}", tpm_state));
     }
 
-    // Credentials
+    if let Some(ref linux) = opts.linux {
+        cmd.arg(format!("--linux={}", linux));
+    }
+    for initrd in &opts.initrd {
+        cmd.arg(format!("--initrd={}", initrd));
+    }
+
+    if opts.network_tap {
+        cmd.arg("--network-tap");
+    }
+    if opts.network_user_mode {
+        cmd.arg("--network-user-mode");
+    }
+
+    if let Some(ref firmware) = opts.firmware {
+        cmd.arg(format!("--firmware={}", firmware));
+    }
+
+    if let Some(sb) = opts.secure_boot {
+        cmd.arg(format!("--secure-boot={}", if sb { "yes" } else { "no" }));
+    }
+
+    if let Some(discard) = opts.discard_disk {
+        cmd.arg(format!("--discard-disk={}", if discard { "yes" } else { "no" }));
+    }
+
+    if let Some(ref grow) = opts.grow_image {
+        cmd.arg(format!("--grow-image={}", grow));
+    }
+
+    for s in &opts.smbios11 {
+        cmd.arg(format!("--smbios11={}", s));
+    }
+
+    if let Some(ready) = opts.notify_ready {
+        cmd.arg(format!("--notify-ready={}", if ready { "yes" } else { "no" }));
+    }
+
+    // -- System Identity Options --
+    cmd.arg(format!("--machine={}", vm.name));
+
+    if let Some(ref uuid) = opts.uuid {
+        cmd.arg(format!("--uuid={}", uuid));
+    }
+
+    // -- Property Options --
+    if let Some(ref slice) = opts.slice {
+        cmd.arg(format!("--slice={}", slice));
+    }
+    for prop in &opts.properties {
+        cmd.arg(format!("--property={}", prop));
+    }
+    if let Some(register) = opts.register {
+        cmd.arg(format!("--register={}", if register { "yes" } else { "no" }));
+    }
+
+    // -- User Namespacing Options --
+    if let Some(ref pu) = opts.private_users {
+        cmd.arg(format!("--private-users={}", pu));
+    }
+
+    // -- Mount Options --
+    for bm in &opts.bind_mounts {
+        let flag = if bm.read_only { "--bind-ro" } else { "--bind" };
+        let arg = if let Some(ref dest) = bm.destination {
+            format!("{}={}:{}", flag, bm.source, dest)
+        } else {
+            format!("{}={}", flag, bm.source)
+        };
+        cmd.arg(arg);
+    }
+
+    for drive in &opts.extra_drives {
+        cmd.arg(format!("--extra-drive={}", drive));
+    }
+
+    for user in &opts.bind_users {
+        cmd.arg(format!("--bind-user={}", user));
+    }
+    if let Some(ref shell) = opts.bind_user_shell {
+        cmd.arg(format!("--bind-user-shell={}", shell));
+    }
+    for group in &opts.bind_user_groups {
+        cmd.arg(format!("--bind-user-group={}", group));
+    }
+
+    // -- Integration Options --
+    if let Some(ref fj) = opts.forward_journal {
+        cmd.arg(format!("--forward-journal={}", fj));
+    }
+    if let Some(pass_key) = opts.pass_ssh_key {
+        cmd.arg(format!("--pass-ssh-key={}", if pass_key { "yes" } else { "no" }));
+    }
+    if let Some(ref key_type) = opts.ssh_key_type {
+        cmd.arg(format!("--ssh-key-type={}", key_type));
+    }
+
+    // -- Console / Background --
+    if let Some(ref mode) = opts.console {
+        cmd.arg(format!("--console={}", mode));
+    }
+    if let Some(ref bg) = opts.background {
+        cmd.arg(format!("--background={}", bg));
+    }
+
+    // -- Credentials --
     for cred in &opts.credentials {
         cmd.arg(format!("--set-credential={}:{}", cred.id, cred.value));
+    }
+    for cred in &opts.load_credentials {
+        cmd.arg(format!("--load-credential={}:{}", cred.id, cred.path));
+    }
+
+    // -- Extra kernel command line arguments (passed via SMBIOS) --
+    // Use -- to separate vmspawn flags from kernel cmdline arguments
+    if !opts.extra_args.is_empty() {
+        cmd.arg("--");
+        for arg in &opts.extra_args {
+            cmd.arg(arg);
+        }
     }
 
     tracing::info!("Starting VM '{}'", vm.name);
 
-    let output = cmd.spawn();
-
-    match output {
-        Ok(_) => Ok(()),
+    match cmd.spawn() {
+        Ok(mut child) => {
+            // Spawn a reaper thread to avoid zombie processes and log exit errors
+            let vm_name = vm.name.clone();
+            std::thread::spawn(move || {
+                match child.wait() {
+                    Ok(status) if !status.success() => {
+                        tracing::error!("VM '{}': systemd-vmspawn exited with {}", vm_name, status);
+                    }
+                    Err(e) => {
+                        tracing::error!("VM '{}': failed to wait on systemd-vmspawn: {}", vm_name, e);
+                    }
+                    _ => {}
+                }
+            });
+            Ok(())
+        }
         Err(e) => {
             // Fallback: try machinectl if systemd-vmspawn is not available
-            tracing::warn!("systemd-vmspawn failed, falling back to machinectl: {}", e);
+            tracing::warn!("systemd-vmspawn not available, falling back to machinectl: {}", e);
             let fallback = Command::new("machinectl")
                 .arg("start")
                 .arg(&vm.name)
@@ -131,7 +262,9 @@ pub fn start_vm(name: &str) -> Result<()> {
 /// If the image exists elsewhere, create a symlink.
 fn ensure_image_in_machines(name: &str) -> Result<()> {
     let machines_dir = "/var/lib/machines";
-    let _ = std::fs::create_dir_all(machines_dir);
+    if let Err(e) = std::fs::create_dir_all(machines_dir) {
+        tracing::warn!("Failed to create {}: {}", machines_dir, e);
+    }
 
     // Check if already exists in /var/lib/machines/
     let candidates_in_machines = [
@@ -172,10 +305,19 @@ fn ensure_image_in_machines(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Resolve an image path, checking common locations
+/// Resolve an image path, checking common locations.
+/// Only allows paths under /var/lib/machines and /var/lib/vmspawnd.
 fn resolve_image_path(image: &str, name: &str) -> String {
+    // Reject path traversal in image name
+    if std::path::Path::new(image)
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        tracing::warn!("Image path contains '..' traversal, using default path");
+        return format!("/var/lib/machines/{}.raw", name);
+    }
+
     let candidates = [
-        image.to_string(),
         format!("/var/lib/machines/{}", image),
         format!("/var/lib/machines/{}.raw", name),
         format!("/var/lib/machines/{}.qcow2", name),
@@ -190,8 +332,8 @@ fn resolve_image_path(image: &str, name: &str) -> String {
         }
     }
 
-    // Return the original image path if nothing found
-    image.to_string()
+    // Return a safe default path
+    format!("/var/lib/machines/{}", image)
 }
 
 pub fn stop_vm(name: &str) -> Result<()> {
@@ -207,6 +349,10 @@ pub fn stop_vm(name: &str) -> Result<()> {
     }
 }
 
+/// Restart a VM by stopping and starting it.
+///
+/// This is a blocking function that sleeps between stop and start.
+/// When calling from async context, wrap in `tokio::task::spawn_blocking`.
 pub fn restart_vm(name: &str) -> Result<()> {
     stop_vm(name)?;
     // Brief pause to allow the VM to fully stop before restarting
@@ -376,8 +522,7 @@ fn read_network_stats(vm_name: &str) -> Result<(u64, u64)> {
     if let Ok(entries) = fs::read_dir(net_dir) {
         for entry in entries.flatten() {
             let iface_name = entry.file_name().to_string_lossy().to_string();
-            if iface_name.contains(vm_name)
-                || iface_name.starts_with(&format!("ve-{}", vm_name))
+            if iface_name.starts_with(&format!("ve-{}", vm_name))
                 || iface_name.starts_with(&format!("veth-{}", vm_name))
                 || iface_name.starts_with(&format!("tap-{}", vm_name))
                 || iface_name.starts_with(&format!("vb-{}", vm_name))

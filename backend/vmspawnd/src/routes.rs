@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
-use vm_model::CreateVMRequest;
+use vm_model::{CreateVMRequest, VMStartOptions};
 use cloud_init::{CloudInitConfig, CloudInitGenerator};
 use security::{RequireRead, RequireWrite, RequireAdmin};
 
@@ -178,6 +178,7 @@ pub async fn start_vm(
     RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
+    body: Option<Json<VMStartOptions>>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
         return json_error(status, msg).into_response();
@@ -193,6 +194,17 @@ pub async fn start_vm(
                 return json_error(StatusCode::CONFLICT, format!("VM is already {:?}", vm.state)).into_response();
             }
             _ => {}
+        }
+    }
+
+    // If start options provided, validate them eagerly before accepting
+    let start_opts = body.map(|j| j.0);
+    if let Some(ref opts) = start_opts {
+        if let Err(errors) = opts.validate() {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                format!("Invalid start options: {}", errors.join("; ")),
+            ).into_response();
         }
     }
 
@@ -215,7 +227,29 @@ pub async fn start_vm(
         // _lock is moved into this task and held until it completes
         let _lock = _lock;
 
-        match state_clone.driver.start(&vm_name).await {
+        let result = if let Some(opts) = start_opts {
+            // Use systemd-vmspawn directly with full options
+            let vm = match state_clone.store.get_vm(&vm_name) {
+                Ok(Some(vm)) => vm,
+                Ok(None) => {
+                    tracing::error!("VM '{}' not found in store", vm_name);
+                    return;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to load VM '{}': {}", vm_name, e);
+                    return;
+                }
+            };
+            // start_vm_with_options is blocking, run on blocking thread pool
+            tokio::task::spawn_blocking(move || {
+                vmspawn_driver::start_vm_with_options(&vm, &opts)
+            }).await.unwrap_or_else(|e| Err(anyhow::anyhow!("Task join error: {}", e)))
+        } else {
+            // Default: use machined driver (D-Bus)
+            state_clone.driver.start(&vm_name).await
+        };
+
+        match result {
             Ok(_) => {
                 tracing::info!("VM '{}' started successfully", vm_name);
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {

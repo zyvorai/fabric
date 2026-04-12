@@ -139,9 +139,23 @@ curl -X POST http://localhost:9095/api/vms \
     "memory": 2048
   }'
 
-# Start a VM
+# Start a VM (basic)
 curl -X POST http://localhost:9095/api/vms/test-vm/start \
   -H "Authorization: Bearer $TOKEN"
+
+# Start a VM with options (all fields optional)
+curl -X POST http://localhost:9095/api/vms/test-vm/start \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kvm": true,
+    "tpm": true,
+    "network_tap": true,
+    "console": "interactive",
+    "credentials": [
+      { "id": "passwd.hashed-password.root", "value": "$y$..." }
+    ]
+  }'
 ```
 
 ## Directory Structure

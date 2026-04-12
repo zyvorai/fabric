@@ -19,8 +19,25 @@
 - Create, start, stop, restart, delete, clone VMs
 - VM templates
 - VM state persistence
-- systemd-vmspawn and systemd-machined integration
-- CPU and memory configuration
+- Full systemd-vmspawn(1) v260 integration (all CLI options supported)
+- systemd-machined integration via machinectl
+- CPU and memory configuration (`--cpus`, `--ram`)
+- KVM acceleration and Secure Boot (`--kvm`, `--secure-boot`)
+- VSock networking with CID assignment (`--vsock`, `--vsock-cid`)
+- TPM 1.2/2.0 with persistent state (`--tpm`, `--tpm-state`)
+- Direct kernel boot (`--linux`, `--initrd`)
+- TAP and user mode networking (`--network-tap`, `--network-user-mode`)
+- Firmware selection (`--firmware`)
+- Disk management: discard, grow, extra drives (`--discard-disk`, `--grow-image`, `--extra-drive`)
+- SMBIOS Type #11 vendor strings (`--smbios11`)
+- Bind mounts: paths, users, shells, groups (`--bind`, `--bind-ro`, `--bind-user`)
+- User namespacing (`--private-users`)
+- Machine identity: UUID, slice, properties, machined registration
+- Journal forwarding and SSH key management (`--forward-journal`, `--pass-ssh-key`)
+- Console modes: interactive, read-only, native, GUI (`--console`)
+- System/user manager scope (`--system`, `--user`)
+- Credentials: set and load (`--set-credential`, `--load-credential`)
+- Extra kernel command line arguments via SMBIOS
 - Multiple disk formats (qcow2, raw, vmdk, vdi)
 - VM tagging and grouping
 - VM scheduling (once, daily, weekly)
