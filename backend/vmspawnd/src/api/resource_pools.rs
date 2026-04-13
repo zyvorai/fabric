@@ -27,6 +27,9 @@ pub async fn create_pool(
     Json(req): Json<CreateResourcePoolRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("resource_pools::{}", stringify!(create_pool));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now();
     let pool = ResourcePool {
         id: Uuid::new_v4().to_string(),
@@ -60,8 +63,8 @@ pub async fn get_pool(
     tracing::debug!("resource_pools::{}", stringify!(get_pool));
     match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Resource pool not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load resource pool"}))).into_response(),
     }
 }
 
@@ -74,8 +77,8 @@ pub async fn update_pool(
     tracing::debug!("resource_pools::{}", stringify!(update_pool));
     let mut pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load resource pool"}))).into_response(),
     };
     if let Some(name) = req.name { pool.name = name; }
     if let Some(shares) = req.cpu_shares { pool.cpu_shares = shares; }
@@ -115,8 +118,8 @@ pub async fn get_pool_summary(
     tracing::debug!("resource_pools::{}", stringify!(get_pool_summary));
     let pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load resource pool"}))).into_response(),
     };
     let summary = ResourcePoolSummary {
         id: pool.id.clone(),
@@ -149,8 +152,8 @@ pub async fn assign_vm(
     tracing::debug!("resource_pools::{}", stringify!(assign_vm));
     let mut pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load resource pool"}))).into_response(),
     };
     if pool.vms.contains(&req.vm_name) {
         return (StatusCode::CONFLICT, Json(serde_json::json!({"error": "VM already assigned"}))).into_response();
@@ -172,8 +175,8 @@ pub async fn unassign_vm(
     tracing::debug!("resource_pools::{}", stringify!(unassign_vm));
     let mut pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load resource pool"}))).into_response(),
     };
     pool.vms.retain(|v| v != &vm_name);
     pool.updated = Some(Utc::now());
@@ -199,13 +202,13 @@ pub async fn move_vm(
     tracing::debug!("resource_pools::{}", stringify!(move_vm));
     let mut src = match state.store.get_entity::<ResourcePool>("resource_pools", &from_id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Source resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load source resource pool"}))).into_response(),
     };
     let mut dst = match state.store.get_entity::<ResourcePool>("resource_pools", &req.target_pool_id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Target resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load target resource pool"}))).into_response(),
     };
     src.vms.retain(|v| v != &req.vm_name);
     dst.vms.push(req.vm_name);
@@ -238,8 +241,8 @@ pub async fn check_admission(
     tracing::debug!("resource_pools::{}", stringify!(check_admission));
     let pool = match state.store.get_entity::<ResourcePool>("resource_pools", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Resource pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load resource pool"}))).into_response(),
     };
     let avail_cpu = pool.cpu_limit_mhz.unwrap_or(pool.cpu_reservation_mhz);
     let avail_mem = pool.memory_limit_mb.unwrap_or(pool.memory_reservation_mb);

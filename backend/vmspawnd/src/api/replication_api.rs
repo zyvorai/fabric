@@ -31,6 +31,9 @@ pub async fn register_site(
     Json(mut site): Json<ReplicationSite>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(register_site));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&site.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     if site.id.is_empty() { site.id = Uuid::new_v4().to_string(); }
     let now = Utc::now();
     site.created = now;
@@ -51,7 +54,7 @@ pub async fn remove_site(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 // ============================================================================
@@ -88,8 +91,8 @@ pub async fn get_replication(
     tracing::debug!("replication_api::{}", stringify!(get_replication));
     match state.store.get_entity::<ReplicationConfig>("replications", &id) {
         Ok(Some(r)) => Json(r).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -101,8 +104,8 @@ pub async fn pause_replication(
     tracing::debug!("replication_api::{}", stringify!(pause_replication));
     let mut repl = match state.store.get_entity::<ReplicationConfig>("replications", &id) {
         Ok(Some(r)) => r,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     repl.status = ReplicationStatus::Paused;
     repl.updated = Utc::now();
@@ -110,7 +113,7 @@ pub async fn pause_replication(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "replication paused"}))).into_response()
 }
 
 pub async fn resume_replication(
@@ -121,8 +124,8 @@ pub async fn resume_replication(
     tracing::debug!("replication_api::{}", stringify!(resume_replication));
     let mut repl = match state.store.get_entity::<ReplicationConfig>("replications", &id) {
         Ok(Some(r)) => r,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     repl.status = ReplicationStatus::Active;
     repl.updated = Utc::now();
@@ -130,7 +133,7 @@ pub async fn resume_replication(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "replication resumed"}))).into_response()
 }
 
 pub async fn remove_replication(
@@ -143,7 +146,7 @@ pub async fn remove_replication(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -159,9 +162,102 @@ pub async fn start_sync(
     tracing::debug!("replication_api::{}", stringify!(start_sync));
     let repl = match state.store.get_entity::<ReplicationConfig>("replications", &req.replication_id) {
         Ok(Some(r)) => r,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
+    if repl.status != ReplicationStatus::Active {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "error": format!("Cannot sync replication in {:?} state", repl.status)
+        }))).into_response();
+    }
+
+    // Resolve the target site address for rsync
+    let target_address = state.store
+        .get_entity::<ReplicationSite>("replication_sites", &repl.target_site_id)
+        .ok()
+        .flatten()
+        .map(|s| s.address.clone())
+        .unwrap_or_else(|| repl.target_site_id.clone());
+
+    // Perform the actual sync in a background task
+    let repl_id = repl.id.clone();
+    let vm_name = repl.vm_name.clone();
+    let compression = repl.compression_enabled;
+    let bandwidth_limit = repl.bandwidth_limit_mbps;
+    let store = state.store.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let source_path = format!("/var/lib/vmspawnd/images/{}", vm_name);
+        let mut bytes_synced: u64 = 0;
+
+        if std::path::Path::new(&source_path).exists() {
+            // Compute source data size
+            bytes_synced = std::fs::read_dir(&source_path)
+                .map(|entries| {
+                    entries
+                        .filter_map(|e| e.ok())
+                        .filter_map(|e| e.metadata().ok())
+                        .map(|m| m.len())
+                        .sum()
+                })
+                .unwrap_or(0);
+
+            let mut rsync_args = vec!["-a".to_string(), "--partial".to_string()];
+            if compression {
+                rsync_args.push("-z".to_string());
+            }
+            if let Some(bw) = bandwidth_limit {
+                rsync_args.push(format!("--bwlimit={}", bw * 1024));
+            }
+            let source_with_slash = if source_path.ends_with('/') {
+                source_path.clone()
+            } else {
+                format!("{}/", source_path)
+            };
+            rsync_args.push(source_with_slash);
+            rsync_args.push(format!("{}:/var/lib/vmspawnd/images/{}/", target_address, vm_name));
+
+            match std::process::Command::new("rsync").args(&rsync_args).output() {
+                Ok(out) if out.status.success() => {
+                    tracing::info!("rsync completed for replication {} (VM '{}')", repl_id, vm_name);
+                }
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    tracing::warn!("rsync non-zero for replication {}: {}", repl_id, stderr);
+                }
+                Err(e) => {
+                    tracing::warn!("rsync not available for replication {}: {}", repl_id, e);
+                }
+            }
+        } else {
+            tracing::debug!(
+                "Source path '{}' not found for VM '{}', metadata-only sync",
+                source_path, vm_name
+            );
+        }
+
+        // Update the replication last_sync timestamp and record metrics
+        if let Ok(Some(mut r)) = store.get_entity::<ReplicationConfig>("replications", &repl_id) {
+            r.last_sync = Some(Utc::now());
+            r.next_sync = Some(Utc::now() + chrono::Duration::minutes(r.rpo_minutes as i64));
+            r.updated = Utc::now();
+            let _ = store.save_entity("replications", &repl_id, &r);
+        }
+
+        // Save metrics
+        let metrics = replication::ReplicationMetrics {
+            replication_id: repl_id.clone(),
+            vm_name: vm_name.clone(),
+            rpo_actual_minutes: 0,
+            rpo_violation: false,
+            bytes_transferred_last_sync: bytes_synced,
+            sync_duration_secs: 0,
+            total_bytes_transferred: bytes_synced,
+            sync_count: 1,
+        };
+        let _ = store.save_entity("replication_metrics", &repl_id, &metrics);
+    });
+
     Json(serde_json::json!({"status": "sync_started", "replication_id": repl.id})).into_response()
 }
 
@@ -173,8 +269,8 @@ pub async fn get_replication_metrics(
     tracing::debug!("replication_api::{}", stringify!(get_replication_metrics));
     match state.store.get_entity::<ReplicationMetrics>("replication_metrics", &id) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication metrics not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 

@@ -61,8 +61,16 @@ pub async fn create_snapshot(
     if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
+
+    let _lock = state.vm_lock(&vm_name).lock_owned().await;
+
     // Find the VM's disk image path
-    let image_path = crate::validation::find_vm_image(&vm_name);
+    let image_path = match crate::validation::find_vm_image(&vm_name) {
+        Some(p) => p,
+        None => {
+            return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": format!("No disk image found for VM '{}'", vm_name)}))).into_response();
+        }
+    };
 
     // Validate snapshot name
     if let Err((status, msg)) = crate::validation::validate_snapshot_name(&req.name) {
@@ -70,30 +78,28 @@ pub async fn create_snapshot(
     }
 
     // Attempt qemu-img snapshot
-    if let Some(ref path) = image_path {
-        let output = Command::new("qemu-img")
-            .args(["snapshot", "-c", &req.name, path])
-            .output()
-            .await;
+    let output = Command::new("qemu-img")
+        .args(["snapshot", "-c", &req.name, &image_path])
+        .output()
+        .await;
 
-        match output {
-            Ok(o) if !o.status.success() => {
-                let stderr = String::from_utf8_lossy(&o.stderr);
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("qemu-img snapshot failed: {}", stderr)})),
-                )
-                    .into_response();
-            }
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("Failed to run qemu-img: {}", e)})),
-                )
-                    .into_response();
-            }
-            _ => {}
+    match output {
+        Ok(o) if !o.status.success() => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("qemu-img snapshot failed: {}", stderr)})),
+            )
+                .into_response();
         }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to run qemu-img: {}", e)})),
+            )
+                .into_response();
+        }
+        _ => {}
     }
 
     let snapshot = VMSnapshot {
@@ -109,7 +115,10 @@ pub async fn create_snapshot(
 
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.save_entity(&store_key, &snapshot.id, &snapshot) {
-        Ok(_) => (StatusCode::CREATED, Json(snapshot)).into_response(),
+        Ok(_) => {
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::SnapshotCreated, &vm_name, Some(format!("Snapshot: {}", snapshot.name)));
+            (StatusCode::CREATED, Json(snapshot)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -146,8 +155,8 @@ pub async fn get_snapshot(
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Snapshot not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load snapshot"}))).into_response(),
     }
 }
 
@@ -161,11 +170,16 @@ pub async fn delete_snapshot(
     if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
+
+    let _lock = state.vm_lock(&vm_name).lock_owned().await;
+
     let store_key = format!("snapshots_{}", vm_name);
 
     // Get snapshot info to delete from qemu-img
     if let Ok(Some(snapshot)) = state.store.get_entity::<VMSnapshot>(&store_key, &id) {
-        if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
+        if crate::validation::validate_snapshot_name(&snapshot.name).is_err() {
+            tracing::error!("Corrupted snapshot name in store, skipping qemu-img delete");
+        } else if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
             if let Err(e) = Command::new("qemu-img")
                 .args(["snapshot", "-d", &snapshot.name, path])
                 .output()
@@ -176,10 +190,10 @@ pub async fn delete_snapshot(
         }
     }
 
-    if let Err(e) = state.store.delete_entity(&store_key, &id) {
-        tracing::error!("Failed to delete: {}", e);
+    match state.store.delete_entity(&store_key, &id) {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("Failed to delete snapshot: {}", e)}))).into_response(),
     }
-    StatusCode::NO_CONTENT.into_response()
 }
 
 /// POST /api/vms/:name/snapshots/:id/revert - Revert to a snapshot
@@ -192,13 +206,23 @@ pub async fn revert_snapshot(
     if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
+
+    let _lock = state.vm_lock(&vm_name).lock_owned().await;
+
     let store_key = format!("snapshots_{}", vm_name);
 
     let snapshot = match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         Ok(Some(s)) => s,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Snapshot not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load snapshot"}))).into_response(),
     };
+
+    // Check that the VM is stopped before reverting
+    if let Ok(Some(vm)) = state.store.get_vm(&vm_name) {
+        if vm.state == vm_model::VMState::Running || vm.state == vm_model::VMState::Starting {
+            return (StatusCode::CONFLICT, Json(serde_json::json!({"error": "VM must be stopped before reverting a snapshot"}))).into_response();
+        }
+    }
 
     // VM should be stopped before reverting
     if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
@@ -227,6 +251,7 @@ pub async fn revert_snapshot(
         }
     }
 
+    crate::api::events::record_event(&state, crate::api::events::VMEventType::SnapshotReverted, &vm_name, Some(format!("Reverted to: {}", snapshot.name)));
     Json(serde_json::json!({"status": "reverted", "snapshot": snapshot.name})).into_response()
 }
 

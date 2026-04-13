@@ -25,6 +25,9 @@ pub async fn create_qos_policy(
     Json(req): Json<CreateQoSPolicyRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("traffic_shaping::{}", stringify!(create_qos_policy));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     if let Err(msg) = crate::validation::validate_hostname(&req.interface) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid interface: {}", msg)}))).into_response();
     }

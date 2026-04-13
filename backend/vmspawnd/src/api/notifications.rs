@@ -287,6 +287,32 @@ fn validate_external_url(url: &str) -> Result<(), String> {
         }
     }
 
+    // Also resolve hostnames to check resolved IPs against private ranges
+    if host.parse::<std::net::IpAddr>().is_err() {
+        // It's a hostname, not an IP — resolve it
+        if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&(host, 80u16)) {
+            for addr in addrs {
+                let ip = addr.ip();
+                let is_resolved_private = match ip {
+                    std::net::IpAddr::V4(v4) => {
+                        v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
+                            || v4.is_broadcast()
+                            || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64)
+                            || (v4.octets()[0] == 169 && v4.octets()[1] == 254)
+                    }
+                    std::net::IpAddr::V6(v6) => {
+                        v6.is_loopback() || v6.is_unspecified()
+                            || (v6.segments()[0] & 0xffc0) == 0xfe80
+                            || (v6.segments()[0] & 0xfe00) == 0xfc00
+                    }
+                };
+                if is_resolved_private {
+                    return Err(format!("URL host '{}' resolves to private/internal IP '{}'", host, ip));
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -300,11 +326,11 @@ const REDACTED_CONFIG_KEYS: &[&str] = &["password", "client_secret", "api_key", 
 pub async fn list_channels(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<NotificationChannel>>, StatusCode> {
+) -> Result<Json<Vec<NotificationChannel>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(list_channels));
     // Load from state store
     let mut channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
-        .map_err(|e| { tracing::error!("Failed to load channels: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+        .map_err(|e| { tracing::error!("Failed to load channels: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification channels"}))) })?;
 
     // Redact sensitive config fields
     for channel in &mut channels {
@@ -322,12 +348,12 @@ pub async fn create_channel(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateChannelRequest>,
-) -> Result<(StatusCode, Json<NotificationChannel>), StatusCode> {
+) -> Result<(StatusCode, Json<NotificationChannel>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(create_channel));
     // Validate config based on channel type
     if let Err(err) = validate_channel_config(&req.channel_type, &req.config) {
         tracing::warn!("Invalid channel config: {}", err);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
     }
 
     let channel = NotificationChannel {
@@ -343,7 +369,7 @@ pub async fn create_channel(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
         tracing::error!("Failed to save notification channel: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save notification channel"}))));
     }
 
     // Redact secrets before returning
@@ -362,12 +388,12 @@ pub async fn update_channel(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateChannelRequest>,
-) -> Result<Json<NotificationChannel>, StatusCode> {
+) -> Result<Json<NotificationChannel>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(update_channel));
     // Load existing channel from state store
     let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load channel"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Channel not found"}))))?;
 
     // Update fields if provided
     if let Some(name) = req.name {
@@ -377,7 +403,7 @@ pub async fn update_channel(
         // Validate new config
         if let Err(err) = validate_channel_config(&channel.channel_type, &config) {
             tracing::warn!("Invalid channel config: {}", err);
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
         }
         channel.config = config;
     }
@@ -388,7 +414,7 @@ pub async fn update_channel(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
         tracing::error!("Failed to update channel: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update channel"}))));
     }
 
     // Redact secrets before returning
@@ -405,23 +431,23 @@ pub async fn delete_channel(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(delete_channel));
     // Check if channel is used by any rules
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification rules"}))) })?;
 
     for rule in rules {
         if rule.channels.contains(&id) {
             tracing::warn!("Cannot delete channel {} - used by rule {}", id, rule.name);
-            return Err(StatusCode::CONFLICT);
+            return Err((StatusCode::CONFLICT, Json(serde_json::json!({"error": format!("Channel is in use by rule '{}'", rule.name)}))));
         }
     }
 
     // Remove from state store
     if let Err(e) = state.store.delete_entity("notifications/channels", &id) {
         tracing::error!("Failed to delete channel: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete channel"}))));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -431,12 +457,12 @@ pub async fn test_channel(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(test_channel));
     // Load channel from state store
     let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load channel"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Channel not found"}))))?;
 
     // Send test notification based on channel type
     let test_message = format!("Test notification from vmspawnd - Channel: {}", channel.name);
@@ -448,7 +474,7 @@ pub async fn test_channel(
         Err(e) => {
             tracing::error!("Failed to send test notification to channel {}: {}",
                 channel.name, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("Test notification failed: {}", e)}))));
         }
     }
 
@@ -458,7 +484,7 @@ pub async fn test_channel(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
         tracing::error!("Failed to update channel last_test: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update channel"}))));
     }
 
     Ok(StatusCode::OK)
@@ -471,11 +497,11 @@ pub async fn test_channel(
 pub async fn list_rules(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<NotificationRule>>, StatusCode> {
+) -> Result<Json<Vec<NotificationRule>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(list_rules));
     // Load from state store
     let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification rules"}))) })?;
 
     Ok(Json(rules))
 }
@@ -484,12 +510,12 @@ pub async fn create_rule(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateRuleRequest>,
-) -> Result<(StatusCode, Json<NotificationRule>), StatusCode> {
+) -> Result<(StatusCode, Json<NotificationRule>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(create_rule));
     // Validate rule
     if let Err(err) = validate_notification_rule(&req) {
         tracing::warn!("Invalid notification rule: {}", err);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
     }
 
     // Validate channels exist
@@ -497,7 +523,7 @@ pub async fn create_rule(
         if state.store.get_entity::<NotificationChannel>("notifications/channels", channel_id)
             .ok().flatten().is_none() {
             tracing::warn!("Channel not found: {}", channel_id);
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Channel not found: {}", channel_id)}))));
         }
     }
 
@@ -518,7 +544,7 @@ pub async fn create_rule(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
         tracing::error!("Failed to save notification rule: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save notification rule"}))));
     }
 
     Ok((StatusCode::CREATED, Json(rule)))
@@ -529,12 +555,12 @@ pub async fn update_rule(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateRuleRequest>,
-) -> Result<Json<NotificationRule>, StatusCode> {
+) -> Result<Json<NotificationRule>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(update_rule));
     // Load existing rule from state store
     let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load rule"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rule not found"}))))?;
 
     // Update fields if provided
     if let Some(name) = req.name {
@@ -555,7 +581,7 @@ pub async fn update_rule(
             if state.store.get_entity::<NotificationChannel>("notifications/channels", channel_id)
                 .ok().flatten().is_none() {
                 tracing::warn!("Channel not found: {}", channel_id);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Channel not found: {}", channel_id)}))));
             }
         }
         rule.channels = channels;
@@ -570,7 +596,7 @@ pub async fn update_rule(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
         tracing::error!("Failed to update rule: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update rule"}))));
     }
 
     Ok(Json(rule))
@@ -580,12 +606,12 @@ pub async fn delete_rule(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(delete_rule));
     // Remove from state store
     if let Err(e) = state.store.delete_entity("notifications/rules", &id) {
         tracing::error!("Failed to delete rule: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete rule"}))));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -595,12 +621,12 @@ pub async fn enable_rule(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(enable_rule));
     // Load rule from state store
     let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load rule"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rule not found"}))))?;
 
     // Set enabled = true
     rule.enabled = true;
@@ -608,7 +634,7 @@ pub async fn enable_rule(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
         tracing::error!("Failed to enable rule: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to enable rule"}))));
     }
 
     Ok(StatusCode::OK)
@@ -618,12 +644,12 @@ pub async fn disable_rule(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(disable_rule));
     // Load rule from state store
     let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load rule"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rule not found"}))))?;
 
     // Set enabled = false
     rule.enabled = false;
@@ -631,7 +657,7 @@ pub async fn disable_rule(
     // Save to state store
     if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
         tracing::error!("Failed to disable rule: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to disable rule"}))));
     }
 
     Ok(StatusCode::OK)
@@ -645,17 +671,28 @@ pub async fn get_history(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<HistoryQuery>,
-) -> Result<Json<Vec<NotificationHistory>>, StatusCode> {
+) -> Result<Json<Vec<NotificationHistory>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(get_history));
     // Load from state store
     let mut history = state.store.list_entities::<NotificationHistory>("notification_history")
-        .map_err(|e| { tracing::error!("Failed to load history: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+        .map_err(|e| { tracing::error!("Failed to load history: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification history"}))) })?;
 
     // Sort by sent_at (most recent first)
     history.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
 
+    // Prune old history entries beyond retention limit (keep 500 most recent)
+    const HISTORY_RETENTION_LIMIT: usize = 500;
+    if history.len() > HISTORY_RETENTION_LIMIT {
+        let to_delete: Vec<String> = history.drain(HISTORY_RETENTION_LIMIT..).map(|h| h.id).collect();
+        let deleted_count = to_delete.len();
+        for id in to_delete {
+            let _ = state.store.delete_entity("notification_history", &id);
+        }
+        tracing::debug!("Pruned {} old notification history entries", deleted_count);
+    }
+
     // Apply limit (cap at 500)
-    history.truncate(query.limit.min(500));
+    history.truncate(query.limit.min(HISTORY_RETENTION_LIMIT));
 
     Ok(Json(history))
 }
@@ -857,6 +894,9 @@ async fn send_webhook_notification(
     let webhook_url = channel.config.get("url")
         .and_then(|v| v.as_str())
         .ok_or("Missing url in channel config")?;
+
+    // Re-validate URL at send time to catch DNS rebinding attacks
+    validate_external_url(webhook_url)?;
 
     tracing::info!("Sending webhook notification to: {} (Subject: {})", webhook_url, subject);
 

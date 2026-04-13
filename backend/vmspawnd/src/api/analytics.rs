@@ -5,6 +5,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
@@ -132,9 +133,9 @@ pub async fn get_vm_performance(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Query(query): Query<TimeRangeQuery>,
-) -> Result<Json<VMPerformance>, StatusCode> {
+) -> Result<Json<VMPerformance>, (StatusCode, Json<serde_json::Value>)> {
     crate::validation::validate_vm_name(&vm_name)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     // Try to load real metrics from state store
     let metrics_key = format!("metrics/vm/{}/{}", vm_name, query.range);
     let metrics = if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
@@ -159,7 +160,7 @@ pub async fn get_system_performance(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<TimeRangeQuery>,
-) -> Result<Json<Vec<SystemPerformance>>, StatusCode> {
+) -> Result<Json<Vec<SystemPerformance>>, (StatusCode, Json<serde_json::Value>)> {
     // Try to load real system metrics from state store
     let metrics_key = format!("metrics/system/{}", query.range);
     if let Ok(Some(stored_performance)) = state.store.get_entity::<Vec<SystemPerformance>>("performance", &metrics_key) {
@@ -175,12 +176,12 @@ pub async fn get_system_performance(
 pub async fn get_performance_insights(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<PerformanceInsight>>, StatusCode> {
+) -> Result<Json<Vec<PerformanceInsight>>, (StatusCode, Json<serde_json::Value>)> {
     // Generate real insights from metrics analysis
     let mut insights = Vec::new();
 
     // Try to load all VMs to analyze their metrics
-    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
 
     for vm in vms {
         // Try to load recent metrics for this VM
@@ -281,12 +282,12 @@ pub async fn get_top_vms_by_resource(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<TopResourceQuery>,
-) -> Result<Json<Vec<TopVMResource>>, StatusCode> {
+) -> Result<Json<Vec<TopVMResource>>, (StatusCode, Json<serde_json::Value>)> {
     // Calculate from real metrics
     let mut vm_resources = Vec::new();
 
     // Load all VMs and their latest metrics
-    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
 
     for vm in vms {
         let metrics_key = format!("metrics/vm/{}/1h", vm.name);
@@ -320,9 +321,9 @@ pub async fn get_top_vms_by_resource(
 pub async fn get_resource_utilization(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<ResourceUtilization>, StatusCode> {
+) -> Result<Json<ResourceUtilization>, (StatusCode, Json<serde_json::Value>)> {
     // Calculate from real metrics
-    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
 
     let mut total_cpu = 0.0;
     let mut total_memory = 0.0;
@@ -366,9 +367,9 @@ pub async fn export_performance_report(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
-) -> Result<axum::response::Response, StatusCode> {
+) -> Result<axum::response::Response, (StatusCode, Json<serde_json::Value>)> {
     // Generate real report from metrics
-    let vms = state.store.list_vms().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
     let total_vms = vms.len();
     let running_vms = vms.iter().filter(|vm| matches!(vm.state, vm_model::VMState::Running)).count();
 
@@ -425,12 +426,12 @@ pub async fn export_performance_report(
                 }
             }
 
-            Ok(axum::response::Response::builder()
+            axum::response::Response::builder()
                 .header(header::CONTENT_TYPE, "text/csv")
                 .header(header::CONTENT_DISPOSITION, "attachment; filename=\"performance-report.csv\"")
                 .body(axum::body::Body::from(csv_content))
-                .unwrap()
-                .into_response())
+                .map(|r| Ok(r.into_response()))
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to build CSV response"}))))?
         }
         "json" => {
             #[derive(Serialize)]
@@ -460,13 +461,13 @@ pub async fn export_performance_report(
             };
 
             let json_body = serde_json::to_string(&report)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to serialize report"}))))?;
 
-            Ok(axum::response::Response::builder()
+            axum::response::Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(axum::body::Body::from(json_body))
-                .unwrap()
-                .into_response())
+                .map(|r| Ok(r.into_response()))
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to build JSON response"}))))?
         }
         _ => {
             // Default: plain text report (covers "pdf" and any other value)
@@ -506,11 +507,11 @@ Time Range: {}
                 }
             );
 
-            Ok(axum::response::Response::builder()
+            axum::response::Response::builder()
                 .header(header::CONTENT_TYPE, "text/plain")
                 .body(axum::body::Body::from(report))
-                .unwrap()
-                .into_response())
+                .map(|r| Ok(r.into_response()))
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to build report response"}))))?
         }
     }
 }

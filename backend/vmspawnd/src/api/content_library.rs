@@ -31,6 +31,9 @@ pub async fn create_library(
     Json(req): Json<CreateLibraryRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(create_library));
+    if let Err((s, m)) = crate::validation::validate_entity_name(&req.name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
     if let Err((s, m)) = crate::validation::validate_host_path(&req.storage_path) {
         return (s, Json(serde_json::json!({"error": m}))).into_response();
     }
@@ -65,8 +68,8 @@ pub async fn get_library(
     tracing::debug!("content_library::{}", stringify!(get_library));
     match state.store.get_entity::<Library>("libraries", &id) {
         Ok(Some(l)) => Json(l).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Library not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -80,7 +83,7 @@ pub async fn delete_library(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 pub async fn sync_library(
@@ -91,8 +94,8 @@ pub async fn sync_library(
     tracing::debug!("content_library::{}", stringify!(sync_library));
     let mut lib = match state.store.get_entity::<Library>("libraries", &id) {
         Ok(Some(l)) => l,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Library not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     if lib.library_type != LibraryType::Subscribed {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Not a subscribed library"}))).into_response();
@@ -103,7 +106,7 @@ pub async fn sync_library(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "sync completed"}))).into_response()
 }
 
 // ============================================================================
@@ -136,8 +139,8 @@ pub async fn download_image(
     // Verify library exists
     match state.store.get_entity::<Library>("libraries", &library_id) {
         Ok(Some(_)) => {}
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Library not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 
     let mgr = content_library::ContentLibraryManager::new();
@@ -145,7 +148,7 @@ pub async fn download_image(
     // We need a library in the manager. Create a temporary one with the storage path.
     let lib = match state.store.get_entity::<Library>("libraries", &library_id) {
         Ok(Some(l)) => l,
-        _ => return StatusCode::NOT_FOUND.into_response(),
+        _ => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Library not found"}))).into_response(),
     };
 
     // Create library in the in-memory manager so download_image can find it
@@ -166,7 +169,7 @@ pub async fn download_image(
     let manager_libs = mgr.list_libraries();
     let manager_lib_id = match manager_libs.first() {
         Some(l) => l.id.clone(),
-        None => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        None => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to initialize library manager"}))).into_response(),
     };
 
     match mgr.download_image(&manager_lib_id, &req.url, &req.name, req.item_type).await {
@@ -222,8 +225,8 @@ pub async fn get_library_item(
     tracing::debug!("content_library::{}", stringify!(get_library_item));
     match state.store.get_entity::<LibraryItem>("library_items", &id) {
         Ok(Some(i)) => Json(i).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Library item not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -237,7 +240,7 @@ pub async fn delete_library_item(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -251,10 +254,13 @@ pub async fn search_items(
     Query(query): Query<SearchQuery>,
 ) -> impl IntoResponse {
     tracing::debug!("content_library::{}", stringify!(search_items));
+    if query.q.len() > 256 {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Search query must not exceed 256 characters"}))).into_response();
+    }
     let items: Vec<LibraryItem> = state.store.list_entities("library_items").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let q = query.q.to_lowercase();
     let matched: Vec<_> = items.into_iter().filter(|i| i.name.to_lowercase().contains(&q)).collect();
-    Json(matched)
+    Json(matched).into_response()
 }
 
 // ============================================================================
@@ -291,8 +297,8 @@ pub async fn get_customization_spec(
     tracing::debug!("content_library::{}", stringify!(get_customization_spec));
     match state.store.get_entity::<GuestCustomizationSpec>("customization_specs", &id) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Customization spec not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -306,7 +312,7 @@ pub async fn delete_customization_spec(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 // ============================================================================
@@ -343,8 +349,8 @@ pub async fn get_host_profile(
     tracing::debug!("content_library::{}", stringify!(get_host_profile));
     match state.store.get_entity::<HostProfile>("host_profiles", &id) {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Host profile not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -358,7 +364,7 @@ pub async fn delete_host_profile(
         tracing::error!("Failed to delete: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 #[derive(serde::Deserialize)]

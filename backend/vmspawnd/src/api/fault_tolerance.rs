@@ -82,8 +82,8 @@ pub async fn get_ft_config(
     }
     match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => Json(c).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
     }
 }
 
@@ -122,8 +122,8 @@ pub async fn trigger_failover(
     }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
     };
     let old_primary = config.primary_host_id.clone();
     let new_primary = config.secondary_host_id.clone();
@@ -162,8 +162,8 @@ pub async fn test_failover(
     }
     let config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
     };
     let result = FailoverResult {
         vm_name,
@@ -191,8 +191,8 @@ pub async fn suspend_replication(
     }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
     };
     config.replication_state = ReplicationState::Suspended;
     config.updated = Utc::now();
@@ -214,8 +214,8 @@ pub async fn resume_replication(
     }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
     };
     config.replication_state = ReplicationState::Syncing;
     config.updated = Utc::now();
@@ -237,8 +237,8 @@ pub async fn get_ft_metrics(
     }
     match state.store.get_entity::<FtMetrics>("ft_metrics", &vm_name) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance metrics not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance metrics"}))).into_response(),
     }
 }
 

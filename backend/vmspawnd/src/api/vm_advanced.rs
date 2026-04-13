@@ -39,7 +39,7 @@ pub struct KsmConfigRequest {
 /// GET /api/system/ksm - Get KSM status
 pub async fn get_ksm_status(
     RequireAdmin(_claims): RequireAdmin,
-) -> Result<Json<KsmStatus>, (StatusCode, String)> {
+) -> Result<Json<KsmStatus>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("vm_advanced::{}", stringify!(get_ksm_status));
     let read_ksm = |file: &'static str| async move {
         tokio::fs::read_to_string(format!("/sys/kernel/mm/ksm/{}", file))
@@ -68,11 +68,21 @@ pub async fn get_ksm_status(
 pub async fn configure_ksm(
     RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<KsmConfigRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("vm_advanced::{}", stringify!(configure_ksm));
+    if let Some(sleep_ms) = req.sleep_ms {
+        if sleep_ms == 0 || sleep_ms > 60000 {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "sleep_ms must be between 1 and 60000"}))));
+        }
+    }
+    if let Some(pages) = req.pages_to_scan {
+        if pages == 0 || pages > 10_000_000 {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "pages_to_scan must be between 1 and 10000000"}))));
+        }
+    }
     let run_value = if req.enabled { "1" } else { "0" };
     tokio::fs::write("/sys/kernel/mm/ksm/run", run_value).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to set KSM: {}", e)))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to set KSM: {}", e)}))))?;
 
     if let Some(sleep_ms) = req.sleep_ms {
         if let Err(e) = tokio::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string()).await {
@@ -86,7 +96,7 @@ pub async fn configure_ksm(
         }
     }
 
-    Ok(StatusCode::OK)
+    Ok(Json(json!({"status": "KSM configured"})))
 }
 
 // ============================================================================
@@ -141,21 +151,21 @@ pub struct SetNestedVirtRequest {
 pub async fn set_nested_virt(
     RequireAdmin(_claims): RequireAdmin,
     Json(req): Json<SetNestedVirtRequest>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("vm_advanced::{}", stringify!(set_nested_virt));
     let path = if std::path::Path::new("/sys/module/kvm_intel").exists() {
         "/sys/module/kvm_intel/parameters/nested"
     } else if std::path::Path::new("/sys/module/kvm_amd").exists() {
         "/sys/module/kvm_amd/parameters/nested"
     } else {
-        return Err((StatusCode::NOT_FOUND, "KVM module not loaded".to_string()));
+        return Err((StatusCode::NOT_FOUND, Json(json!({"error": "KVM module not loaded"}))));
     };
 
     let value = if req.enabled { "1" } else { "0" };
     tokio::fs::write(path, value).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to set nested virt: {}", e)))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to set nested virt: {}", e)}))))?;
 
-    Ok(StatusCode::OK)
+    Ok(Json(json!({"status": "nested virtualization configured"})))
 }
 
 // ============================================================================
@@ -219,7 +229,8 @@ pub async fn create_checkpoint(
         created: Utc::now(),
     };
 
-    state.store.save_entity("checkpoints", &checkpoint.id, &checkpoint).map_err(|e| {
+    let store_key = format!("checkpoints_{}", vm_name);
+    state.store.save_entity(&store_key, &checkpoint.id, &checkpoint).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;
 
@@ -235,12 +246,11 @@ pub async fn list_checkpoints(
     tracing::debug!("vm_advanced::{}", stringify!(list_checkpoints));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
-    let all: Vec<VMCheckpoint> = state.store.list_entities("checkpoints").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    let filtered: Vec<VMCheckpoint> = all.into_iter()
-        .filter(|c| c.vm_name == vm_name)
-        .collect();
+    let store_key = format!("checkpoints_{}", vm_name);
+    let checkpoints: Vec<VMCheckpoint> = state.store.list_entities(&store_key)
+        .unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
 
-    Ok(Json(filtered))
+    Ok(Json(checkpoints))
 }
 
 /// POST /api/vms/:name/checkpoints/:id/restore - Restore a checkpoint
@@ -248,11 +258,12 @@ pub async fn restore_checkpoint(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
-) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("vm_advanced::{}", stringify!(restore_checkpoint));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
-    let checkpoint = match state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
+    let store_key = format!("checkpoints_{}", vm_name);
+    let checkpoint = match state.store.get_entity::<VMCheckpoint>(&store_key, &id) {
         Ok(Some(c)) => c,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Checkpoint not found" })))),
         Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
@@ -277,7 +288,7 @@ pub async fn restore_checkpoint(
         return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Restore failed: {}", stderr) }))));
     }
 
-    Ok(StatusCode::OK)
+    Ok(Json(json!({"status": "checkpoint restored"})))
 }
 
 /// DELETE /api/vms/:name/checkpoints/:id - Delete a checkpoint
@@ -285,11 +296,12 @@ pub async fn delete_checkpoint(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path((vm_name, id)): Path<(String, String)>,
-) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("vm_advanced::{}", stringify!(delete_checkpoint));
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
-    if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>("checkpoints", &id) {
+    let store_key = format!("checkpoints_{}", vm_name);
+    if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>(&store_key, &id) {
         // Validate stored name before using in command
         if crate::validation::validate_snapshot_name(&checkpoint.name).is_err() {
             tracing::error!("Corrupted checkpoint name '{}', skipping qemu-img delete", checkpoint.name);
@@ -305,11 +317,11 @@ pub async fn delete_checkpoint(
         }
     }
 
-    state.store.delete_entity("checkpoints", &id).map_err(|e| {
+    state.store.delete_entity(&store_key, &id).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     })?;
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(json!({"status": "deleted"})))
 }
 
 // ============================================================================
@@ -331,6 +343,17 @@ pub async fn fork_vm(
     tracing::debug!("vm_advanced::{}", stringify!(fork_vm));
     validate_vm_name(&source_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
     validate_vm_name(&req.new_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
+
+    // Lock both VMs in canonical (lexicographic) order to prevent deadlock
+    let (_first_lock, _second_lock) = if source_name < req.new_name {
+        let first = state.vm_lock(&source_name).lock_owned().await;
+        let second = state.vm_lock(&req.new_name).lock_owned().await;
+        (first, second)
+    } else {
+        let first = state.vm_lock(&req.new_name).lock_owned().await;
+        let second = state.vm_lock(&source_name).lock_owned().await;
+        (first, second)
+    };
 
     let source_vm = match state.store.get_vm(&source_name) {
         Ok(Some(vm)) => vm,

@@ -42,6 +42,40 @@ pub fn validate_vm_name(name: &str) -> Result<(), (StatusCode, String)> {
     Ok(())
 }
 
+/// Validate an entity name (datacenter, cluster, resource pool, etc.).
+/// Allows alphanumeric characters, hyphens, underscores, dots, and spaces.
+/// Must start with an alphanumeric character. 1-128 characters.
+pub fn validate_entity_name(name: &str) -> Result<(), (StatusCode, String)> {
+    if name.is_empty() || name.len() > 128 {
+        return Err((StatusCode::BAD_REQUEST, "Entity name must be between 1 and 128 characters".to_string()));
+    }
+    if let Some(c) = name.chars().next() {
+        if !c.is_ascii_alphanumeric() {
+            return Err((StatusCode::BAD_REQUEST, "Entity name must start with an alphanumeric character".to_string()));
+        }
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ' ')) {
+        return Err((StatusCode::BAD_REQUEST, "Entity name may only contain alphanumeric characters, hyphens, underscores, dots, and spaces".to_string()));
+    }
+    Ok(())
+}
+
+/// Validate a network device name (Linux IFNAMSIZ max 15 chars, no dots).
+pub fn validate_device_name(name: &str) -> Result<(), (StatusCode, String)> {
+    if name.is_empty() || name.len() > 15 {
+        return Err((StatusCode::BAD_REQUEST, "Device name must be between 1 and 15 characters".to_string()));
+    }
+    if let Some(c) = name.chars().next() {
+        if !c.is_ascii_alphanumeric() {
+            return Err((StatusCode::BAD_REQUEST, "Device name must start with an alphanumeric character".to_string()));
+        }
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')) {
+        return Err((StatusCode::BAD_REQUEST, "Device name may only contain alphanumeric characters, hyphens, and underscores".to_string()));
+    }
+    Ok(())
+}
+
 // === Serde default helpers ===
 
 /// Serde default for boolean true. Used across multiple API modules.
@@ -154,10 +188,21 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
         "/var/lib/vmspawnd",
     ];
 
-    // Try to canonicalize to resolve symlinks; fall back to the raw path
-    // if the target doesn't exist yet (e.g. creating a new file).
-    let resolved = std::fs::canonicalize(raw)
-        .unwrap_or_else(|_| raw.to_path_buf());
+    // Try to canonicalize to resolve symlinks. If the file doesn't exist yet,
+    // canonicalize the parent directory to prevent symlink-based traversal.
+    let resolved = match std::fs::canonicalize(raw) {
+        Ok(r) => r,
+        Err(_) => {
+            // File doesn't exist yet -- canonicalize parent directory
+            if let Some(parent) = raw.parent() {
+                let resolved_parent = std::fs::canonicalize(parent)
+                    .map_err(|_| (StatusCode::BAD_REQUEST, "Parent directory does not exist".to_string()))?;
+                resolved_parent.join(raw.file_name().unwrap_or_default())
+            } else {
+                raw.to_path_buf()
+            }
+        }
+    };
     let resolved_str = resolved.to_string_lossy();
 
     if !allowed_prefixes.iter().any(|prefix| resolved_str.starts_with(prefix)) {

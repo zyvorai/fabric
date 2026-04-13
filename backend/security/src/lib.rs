@@ -1,5 +1,6 @@
 pub mod db;
 pub mod pam_auth;
+pub mod totp;
 
 use anyhow::Result;
 use axum::{
@@ -17,6 +18,8 @@ pub struct Claims {
     pub sub: String, // subject (user id)
     pub role: Role,
     pub exp: usize, // expiration time
+    #[serde(default)]
+    pub jti: String, // JWT ID for revocation
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -44,6 +47,7 @@ impl Role {
 pub struct JwtConfig {
     pub secret: String,
     pub expiration_hours: i64,
+    revoked_tokens: std::sync::Mutex<std::collections::HashSet<String>>,
 }
 
 impl JwtConfig {
@@ -51,6 +55,7 @@ impl JwtConfig {
         Self {
             secret,
             expiration_hours: 24,
+            revoked_tokens: std::sync::Mutex::new(std::collections::HashSet::new()),
         }
     }
 
@@ -70,6 +75,7 @@ impl JwtConfig {
             sub: user_id.to_string(),
             role,
             exp: expiration,
+            jti: uuid::Uuid::new_v4().to_string(),
         };
 
         let token = encode(
@@ -88,7 +94,23 @@ impl JwtConfig {
             &Validation::default(),
         )?;
 
-        Ok(token_data.claims)
+        let claims = token_data.claims;
+        if let Ok(revoked) = self.revoked_tokens.lock() {
+            if !claims.jti.is_empty() && revoked.contains(&claims.jti) {
+                return Err(anyhow::anyhow!("Token has been revoked"));
+            }
+        }
+        Ok(claims)
+    }
+
+    pub fn revoke_token(&self, jti: &str) {
+        if let Ok(mut revoked) = self.revoked_tokens.lock() {
+            revoked.insert(jti.to_string());
+            // Limit revocation set size to prevent memory issues
+            if revoked.len() > 100_000 {
+                revoked.clear(); // In production, clear only expired entries
+            }
+        }
     }
 }
 
@@ -122,12 +144,15 @@ pub async fn auth_middleware(
 // ============================================================================
 
 /// When auth middleware is not active (auth disabled), extractors use this
-/// default Claims to allow all operations.
+/// default Claims. Defaults to Viewer role so that unauthenticated requests
+/// only get read access, not full admin privileges. Endpoints that require
+/// write or admin access will reject these claims via their role checks.
 fn unauthenticated_claims() -> Claims {
     Claims {
         sub: "anonymous".to_string(),
-        role: Role::Admin,
+        role: Role::Viewer,
         exp: usize::MAX,
+        jti: String::new(),
     }
 }
 

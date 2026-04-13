@@ -1,7 +1,54 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use tracing;
 
 use crate::models::{CompiledNatRule, NatChain, NatProtocol};
+
+/// Known safe nftables NAT actions.
+const ALLOWED_NAT_ACTIONS: &[&str] = &["masquerade", "accept", "drop", "reject"];
+
+/// Validate that a NAT action string is safe for use in an nft command.
+///
+/// Accepts exact matches from the allowlist (`masquerade`, `accept`, `drop`, `reject`)
+/// or `snat to`/`dnat to` followed by a valid IP address (optionally with `:port`).
+fn validate_nat_action(action: &str) -> Result<()> {
+    if action.is_empty() {
+        return Err(anyhow!("NAT action must not be empty"));
+    }
+
+    // Check exact matches first
+    if ALLOWED_NAT_ACTIONS.contains(&action) {
+        return Ok(());
+    }
+
+    // Check "snat to <ip>[:<port>]" or "dnat to <ip>[:<port>]"
+    for prefix in &["snat to ", "dnat to "] {
+        if let Some(target) = action.strip_prefix(prefix) {
+            // Target may be "ip:port" or just "ip"
+            let ip_part = if let Some((ip, port)) = target.rsplit_once(':') {
+                // Validate port
+                port.parse::<u16>().map_err(|_| {
+                    anyhow!("Invalid port in NAT action: '{}'", port)
+                })?;
+                ip
+            } else {
+                target
+            };
+
+            // Validate IP address
+            ip_part.parse::<std::net::IpAddr>().map_err(|_| {
+                anyhow!("Invalid IP address in NAT action: '{}'", ip_part)
+            })?;
+
+            return Ok(());
+        }
+    }
+
+    Err(anyhow!(
+        "Invalid NAT action: '{}'. Must be one of {:?}, or 'snat to <ip>[:<port>]' / 'dnat to <ip>[:<port>]'",
+        action,
+        ALLOWED_NAT_ACTIONS
+    ))
+}
 
 /// nftables table name for NAT.
 const TABLE_NAME: &str = "vmspawnd_nat";
@@ -56,7 +103,7 @@ impl NatEnforcer {
         ));
 
         for rule in rules {
-            let rule_str = self.build_nat_rule_string(rule);
+            let rule_str = self.build_nat_rule_string(rule)?;
             let chain = match rule.chain {
                 NatChain::Prerouting => "nat_prerouting",
                 NatChain::Postrouting => "nat_postrouting",
@@ -87,7 +134,13 @@ impl NatEnforcer {
     }
 
     /// Build a single nftables rule string from a compiled rule.
-    pub fn build_nat_rule_string(&self, rule: &CompiledNatRule) -> String {
+    ///
+    /// Validates that the action is from a known allowlist to prevent
+    /// nft command injection.
+    pub fn build_nat_rule_string(&self, rule: &CompiledNatRule) -> Result<String> {
+        // Validate action before interpolating into the nft command
+        validate_nat_action(&rule.action)?;
+
         let mut parts: Vec<String> = Vec::new();
 
         // Output interface match
@@ -129,7 +182,7 @@ impl NatEnforcer {
         // Action
         parts.push(rule.action.clone());
 
-        parts.join(" ")
+        Ok(parts.join(" "))
     }
 }
 
@@ -202,7 +255,7 @@ mod tests {
             Some("eth0"),
         );
 
-        let result = enforcer.build_nat_rule_string(&rule);
+        let result = enforcer.build_nat_rule_string(&rule).unwrap();
         assert!(result.contains("oifname \"eth0\""));
         assert!(result.contains("ip saddr 10.0.0.0/24"));
         assert!(result.contains("masquerade"));
@@ -223,7 +276,7 @@ mod tests {
             Some("eth0"),
         );
 
-        let result = enforcer.build_nat_rule_string(&rule);
+        let result = enforcer.build_nat_rule_string(&rule).unwrap();
         assert!(result.contains("snat to 203.0.113.10"));
         assert!(result.contains("ip saddr 10.0.0.0/24"));
     }
@@ -243,7 +296,7 @@ mod tests {
             None,
         );
 
-        let result = enforcer.build_nat_rule_string(&rule);
+        let result = enforcer.build_nat_rule_string(&rule).unwrap();
         assert!(result.contains("ip daddr 203.0.113.1"));
         assert!(result.contains("tcp dport 80"));
         assert!(result.contains("dnat to 10.0.0.5:8080"));
@@ -264,7 +317,7 @@ mod tests {
             None,
         );
 
-        let result = enforcer.build_nat_rule_string(&rule);
+        let result = enforcer.build_nat_rule_string(&rule).unwrap();
         assert!(result.contains("ip saddr 10.0.0.0/24"));
         assert!(result.contains("ip daddr 203.0.113.1"));
         assert!(result.contains("dnat to 10.0.0.5:80"));
@@ -285,7 +338,7 @@ mod tests {
             None,
         );
 
-        let result = enforcer.build_nat_rule_string(&rule);
+        let result = enforcer.build_nat_rule_string(&rule).unwrap();
         assert!(result.contains("tcp dport 8000-9000"));
     }
 
@@ -304,9 +357,26 @@ mod tests {
             None,
         );
 
-        let result = enforcer.build_nat_rule_string(&rule);
+        let result = enforcer.build_nat_rule_string(&rule).unwrap();
         assert!(result.contains("ip protocol udp"));
         assert!(result.contains("udp dport 53"));
+    }
+
+    #[test]
+    fn test_invalid_nat_action() {
+        let enforcer = make_enforcer();
+        let rule = make_rule(
+            NatRuleType::Masquerade,
+            NatChain::Postrouting,
+            None,
+            None,
+            NatProtocol::Any,
+            None,
+            None,
+            "; drop table",
+            None,
+        );
+        assert!(enforcer.build_nat_rule_string(&rule).is_err());
     }
 
     #[test]

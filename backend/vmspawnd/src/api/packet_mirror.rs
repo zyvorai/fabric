@@ -25,6 +25,9 @@ pub async fn create_mirror_session(
     Json(req): Json<CreateMirrorSessionRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("packet_mirror::{}", stringify!(create_mirror_session));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     // Validate collector_target based on collector type
     match req.collector_type {
         packet_mirror::models::CollectorType::RemoteIp => {

@@ -4,6 +4,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -165,9 +166,9 @@ impl QuotaUsage {
 pub async fn list_quotas(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<ResourceQuota>>, StatusCode> {
+) -> Result<Json<Vec<ResourceQuota>>, (StatusCode, Json<serde_json::Value>)> {
     let quotas = state.store.list_entities::<ResourceQuota>("quotas")
-        .map_err(|e| { tracing::error!("Failed to load quotas: {}", e); StatusCode::INTERNAL_SERVER_ERROR })?;
+        .map_err(|e| { tracing::error!("Failed to load quotas: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load quotas"}))) })?;
 
     Ok(Json(quotas))
 }
@@ -176,11 +177,11 @@ pub async fn get_quota(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<ResourceQuota>, StatusCode> {
+) -> Result<Json<ResourceQuota>, (StatusCode, Json<serde_json::Value>)> {
     // Load from state store
     let quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load quota"}))))?
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Quota not found"}))))?;
 
     Ok(Json(quota))
 }
@@ -189,11 +190,11 @@ pub async fn create_quota(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateQuotaRequest>,
-) -> Result<(StatusCode, Json<ResourceQuota>), StatusCode> {
+) -> Result<(StatusCode, Json<ResourceQuota>), (StatusCode, Json<serde_json::Value>)> {
     // Validate quota
     if let Err(err) = validate_quota(&req) {
         tracing::warn!("Invalid quota: {}", err);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": err}))));
     }
 
     let now = Utc::now();
@@ -217,7 +218,7 @@ pub async fn create_quota(
     // Save to state store
     if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
         tracing::error!("Failed to save quota: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to save quota"}))));
     }
 
     Ok((StatusCode::CREATED, Json(quota)))
@@ -228,40 +229,40 @@ pub async fn update_quota(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateQuotaRequest>,
-) -> Result<Json<ResourceQuota>, StatusCode> {
+) -> Result<Json<ResourceQuota>, (StatusCode, Json<serde_json::Value>)> {
     // Load existing quota from state store
     let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load quota"}))))?
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Quota not found"}))))?;
 
     // Update fields if provided
     if let Some(name) = req.name {
         if name.trim().is_empty() {
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Quota name cannot be empty"}))));
         }
         quota.name = name;
     }
     if let Some(max_cpus) = req.max_cpus {
         if max_cpus == 0 {
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "max_cpus must be greater than 0"}))));
         }
         quota.max_cpus = max_cpus;
     }
     if let Some(max_memory) = req.max_memory {
         if max_memory == 0 {
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "max_memory must be greater than 0"}))));
         }
         quota.max_memory = max_memory;
     }
     if let Some(max_disk) = req.max_disk {
         if max_disk == 0 {
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "max_disk must be greater than 0"}))));
         }
         quota.max_disk = max_disk;
     }
     if let Some(max_vms) = req.max_vms {
         if max_vms == 0 {
-            return Err(StatusCode::BAD_REQUEST);
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "max_vms must be greater than 0"}))));
         }
         quota.max_vms = max_vms;
     }
@@ -277,7 +278,7 @@ pub async fn update_quota(
     // Save to state store
     if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
         tracing::error!("Failed to update quota: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to update quota"}))));
     }
 
     Ok(Json(quota))
@@ -287,19 +288,19 @@ pub async fn delete_quota(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     // Check if quota is in use (has any usage)
     if let Ok(Some(quota)) = state.store.get_entity::<ResourceQuota>("quotas", &id) {
         if quota.used_vms > 0 {
             tracing::warn!("Cannot delete quota {} - currently in use by {} VMs", id, quota.used_vms);
-            return Err(StatusCode::CONFLICT);
+            return Err((StatusCode::CONFLICT, Json(json!({"error": format!("Quota is in use by {} VMs", quota.used_vms)}))));
         }
     }
 
     // Remove from state store
     if let Err(e) = state.store.delete_entity("quotas", &id) {
         tracing::error!("Failed to delete quota: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to delete quota"}))));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -309,11 +310,11 @@ pub async fn enable_quota(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     // Load quota from state store
     let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load quota"}))))?
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Quota not found"}))))?;
 
     // Set enabled = true
     quota.enabled = true;
@@ -322,7 +323,7 @@ pub async fn enable_quota(
     // Save to state store
     if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
         tracing::error!("Failed to enable quota: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to enable quota"}))));
     }
 
     Ok(StatusCode::OK)
@@ -332,11 +333,11 @@ pub async fn disable_quota(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     // Load quota from state store
     let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load quota"}))))?
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Quota not found"}))))?;
 
     // Set enabled = false
     quota.enabled = false;
@@ -345,7 +346,7 @@ pub async fn disable_quota(
     // Save to state store
     if let Err(e) = state.store.save_entity("quotas", &quota.id, &quota) {
         tracing::error!("Failed to disable quota: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to disable quota"}))));
     }
 
     Ok(StatusCode::OK)
@@ -359,14 +360,16 @@ pub async fn get_quota_usage(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<QuotaUsage>, StatusCode> {
+) -> Result<Json<QuotaUsage>, (StatusCode, Json<serde_json::Value>)> {
     // Load quota from state store
     let mut quota = state.store.get_entity::<ResourceQuota>("quotas", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load quota"}))))?
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Quota not found"}))))?;
 
-    // Calculate real usage from VMs
-    calculate_quota_usage(&state, &mut quota).await;
+    // Load VMs once and calculate usage
+    let vms = state.store.list_vms()
+        .map_err(|e| { tracing::error!("Failed to load VMs: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load VMs"}))) })?;
+    calculate_quota_usage(&vms, &mut quota);
 
     let usage = QuotaUsage::from_quota(&quota);
     Ok(Json(usage))
@@ -375,7 +378,7 @@ pub async fn get_quota_usage(
 pub async fn get_all_quota_usage(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<QuotaUsage>>, StatusCode> {
+) -> Result<Json<Vec<QuotaUsage>>, (StatusCode, Json<serde_json::Value>)> {
     // Check cache first
     {
         let cache = state.quota_cache.read().await;
@@ -389,8 +392,10 @@ pub async fn get_all_quota_usage(
     let mut quotas = state.store.list_entities::<ResourceQuota>("quotas")
         .unwrap_or_default();
 
+    // Load VMs once for all quota calculations
+    let vms = state.store.list_vms().unwrap_or_default();
     for quota in &mut quotas {
-        calculate_quota_usage(&state, quota).await;
+        calculate_quota_usage(&vms, quota);
     }
 
     let usage: Vec<QuotaUsage> = quotas.iter()
@@ -414,17 +419,8 @@ pub async fn get_all_quota_usage(
 // Usage Calculation Helper
 // ============================================================================
 
-/// Calculate real quota usage from actual VMs
-async fn calculate_quota_usage(state: &AppState, quota: &mut ResourceQuota) {
-    // Load all VMs
-    let vms = match state.store.list_vms() {
-        Ok(vms) => vms,
-        Err(e) => {
-            tracing::error!("Failed to load VMs for quota calculation: {}", e);
-            return;
-        }
-    };
-
+/// Calculate real quota usage from a pre-loaded list of VMs
+fn calculate_quota_usage(vms: &[vm_model::VM], quota: &mut ResourceQuota) {
     // Reset usage counters
     quota.used_cpus = 0;
     quota.used_memory = 0;

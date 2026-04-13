@@ -31,7 +31,7 @@ pub async fn create_baseline(
     Json(mut baseline): Json<Baseline>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(create_baseline));
-    if baseline.id.is_empty() { baseline.id = Uuid::new_v4().to_string(); }
+    baseline.id = Uuid::new_v4().to_string();
     baseline.created = Utc::now();
     baseline.updated = None;
     match state.store.save_entity("lm_baselines", &baseline.id, &baseline) {
@@ -48,8 +48,8 @@ pub async fn get_baseline(
     tracing::debug!("lifecycle::{}", stringify!(get_baseline));
     match state.store.get_entity::<Baseline>("lm_baselines", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Baseline not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -60,6 +60,9 @@ pub async fn update_baseline(
     Json(mut baseline): Json<Baseline>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(update_baseline));
+    if state.store.get_entity::<Baseline>("lm_baselines", &id).ok().flatten().is_none() {
+        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Not found"}))).into_response();
+    }
     baseline.id = id.clone();
     baseline.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("lm_baselines", &id, &baseline) {
@@ -79,7 +82,7 @@ pub async fn delete_baseline(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 // ============================================================================
@@ -208,8 +211,8 @@ pub async fn get_remediation(
     tracing::debug!("lifecycle::{}", stringify!(get_remediation));
     match state.store.get_entity::<RemediationTask>("remediations", &id) {
         Ok(Some(t)) => Json(t).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Remediation not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -229,7 +232,7 @@ pub async fn create_rolling_update(
     Json(mut plan): Json<RollingUpdatePlan>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(create_rolling_update));
-    if plan.id.is_empty() { plan.id = Uuid::new_v4().to_string(); }
+    plan.id = Uuid::new_v4().to_string();
     plan.status = RollingUpdateStatus::Planned;
     plan.current_host_index = 0;
     plan.started = None;
@@ -249,15 +252,15 @@ pub async fn start_rolling_update(
     tracing::debug!("lifecycle::{}", stringify!(start_rolling_update));
     let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rolling update not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     plan.status = RollingUpdateStatus::InProgress;
     plan.started = Some(Utc::now());
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "rolling update started"}))).into_response()
 }
 
 pub async fn pause_rolling_update(
@@ -268,15 +271,15 @@ pub async fn pause_rolling_update(
     tracing::debug!("lifecycle::{}", stringify!(pause_rolling_update));
     let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rolling update not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     plan.status = RollingUpdateStatus::Paused;
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "rolling update paused"}))).into_response()
 }
 
 pub async fn advance_rolling_update(
@@ -287,8 +290,8 @@ pub async fn advance_rolling_update(
     tracing::debug!("lifecycle::{}", stringify!(advance_rolling_update));
     let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rolling update not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     let index = plan.current_host_index as usize;
     if index >= plan.host_order.len() {

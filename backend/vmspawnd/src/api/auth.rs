@@ -52,7 +52,7 @@ impl LoginRateLimiter {
         let now = std::time::Instant::now();
 
         // Periodic eviction: remove stale entries when map exceeds threshold
-        if attempts.len() > 10_000 {
+        if attempts.len() > 1_000 {
             attempts.retain(|_, times| {
                 times.retain(|t| now.duration_since(*t) < self.window);
                 !times.is_empty()
@@ -74,14 +74,19 @@ impl LoginRateLimiter {
     }
 }
 
-/// Global login rate limiter: 5 failed attempts per username per 5 minutes.
+/// Per-username login rate limiter: 5 failed attempts per username per 5 minutes.
 static LOGIN_LIMITER: std::sync::LazyLock<LoginRateLimiter> =
     std::sync::LazyLock::new(|| LoginRateLimiter::new(5, 300));
+
+/// Global login rate limiter: 50 failed attempts across all users per 5 minutes.
+static GLOBAL_LOGIN_LIMITER: std::sync::LazyLock<LoginRateLimiter> =
+    std::sync::LazyLock::new(|| LoginRateLimiter::new(50, 300));
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
+    pub totp_code: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -102,23 +107,29 @@ pub struct MeResponse {
 pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(req): Json<LoginRequest>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("auth::{}", stringify!(login));
 
     // Validate username format
     if req.username.is_empty() || req.username.len() > 64
         || !req.username.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
     {
-        return Err(StatusCode::BAD_REQUEST);
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid username format"}))));
     }
 
-    // Rate limit check
+    // Rate limit check (per-user)
     if LOGIN_LIMITER.is_limited(&req.username) {
         tracing::warn!("Login rate limited for user '{}'", req.username);
-        return Err(StatusCode::TOO_MANY_REQUESTS);
+        return Err((StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({"error": "Too many login attempts, try again later"}))));
     }
 
-    let jwt_config = state.jwt_config.as_ref().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    // Global rate limit check (across all users)
+    if GLOBAL_LOGIN_LIMITER.is_limited("__global__") {
+        tracing::warn!("Global login rate limit exceeded");
+        return Err((StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({"error": "Too many login attempts, try again later"}))));
+    }
+
+    let jwt_config = state.jwt_config.as_ref().ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
 
     // Authenticate via PAM (system users)
     let pam_result = tokio::task::spawn_blocking({
@@ -127,19 +138,55 @@ pub async fn login(
         move || security::pam_auth::authenticate(&username, &password)
     })
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
 
     if let Err(_e) = pam_result {
         tracing::warn!("PAM authentication failed for '{}'", req.username);
         LOGIN_LIMITER.record_failure(&req.username);
-        return Err(StatusCode::UNAUTHORIZED);
+        GLOBAL_LOGIN_LIMITER.record_failure("__global__");
+        return Err((StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Invalid credentials"}))));
     }
 
     // Successful PAM login — clear rate limit
     LOGIN_LIMITER.clear(&req.username);
 
+    // Check if TOTP 2FA is enabled for this user
+    if let Some(ref user_db) = state.user_db {
+        let totp_enabled = user_db
+            .is_totp_enabled(&req.username)
+            .unwrap_or(false);
+        if totp_enabled {
+            match &req.totp_code {
+                None => {
+                    return Err((
+                        StatusCode::FORBIDDEN,
+                        Json(serde_json::json!({
+                            "error": "2FA code required",
+                            "requires_2fa": true
+                        })),
+                    ));
+                }
+                Some(code) => {
+                    let secret = user_db
+                        .get_totp_secret(&req.username)
+                        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
+                    if let Some(secret) = secret {
+                        let valid = security::totp::verify_code(&secret, code)
+                            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
+                        if !valid {
+                            return Err((
+                                StatusCode::UNAUTHORIZED,
+                                Json(serde_json::json!({"error": "Invalid 2FA code"})),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Determine role: root and wheel/sudo group members get admin, others get user
-    let role = if req.username == "root" || is_admin_user(&req.username) {
+    let role = if req.username == "root" || is_admin_user(&req.username).await {
         security::Role::Admin
     } else {
         security::Role::User
@@ -148,7 +195,7 @@ pub async fn login(
     let user_id = req.username.clone();
     let token = jwt_config
         .generate_token(&user_id, role.clone())
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
 
     let role_str = match role {
         security::Role::Admin => "admin",
@@ -165,9 +212,13 @@ pub async fn login(
 }
 
 /// Check if a user belongs to an admin group (wheel, sudo, or adm).
-fn is_admin_user(username: &str) -> bool {
-    use std::process::Command;
-    if let Ok(output) = Command::new("id").arg("-Gn").arg(username).output() {
+async fn is_admin_user(username: &str) -> bool {
+    if let Ok(output) = tokio::process::Command::new("id")
+        .arg("-Gn")
+        .arg(username)
+        .output()
+        .await
+    {
         if let Ok(groups) = String::from_utf8(output.stdout) {
             return groups.split_whitespace()
                 .any(|g| g == "wheel" || g == "sudo" || g == "adm");
@@ -179,20 +230,20 @@ fn is_admin_user(username: &str) -> bool {
 pub async fn me(
     State(state): State<Arc<AppState>>,
     req: axum::extract::Request,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("auth::{}", stringify!(me));
     let claims = req
         .extensions()
         .get::<security::Claims>()
-        .ok_or(StatusCode::UNAUTHORIZED)?
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Authentication required"}))))?
         .clone();
 
-    let user_db = state.user_db.as_ref().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let user_db = state.user_db.as_ref().ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
 
     let user = user_db
         .get_by_id(&claims.sub)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "User not found"}))))?;
 
     let role_str = match user.role {
         security::Role::Admin => "admin",
@@ -205,4 +256,115 @@ pub async fn me(
         username: user.username,
         role: role_str,
     }))
+}
+
+// ============================================================================
+// 2FA / TOTP endpoints
+// ============================================================================
+
+#[derive(Debug, Serialize)]
+pub struct TotpSetupResponse {
+    pub secret: String,
+    pub otpauth_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TotpVerifyRequest {
+    pub code: String,
+}
+
+/// POST /api/auth/2fa/setup - Generate a TOTP secret for the authenticated user.
+pub async fn setup_2fa(
+    State(state): State<Arc<AppState>>,
+    req: axum::extract::Request,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let claims = req
+        .extensions()
+        .get::<security::Claims>()
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Authentication required"}))))?
+        .clone();
+
+    let user_db = state.user_db.as_ref().ok_or_else(|| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Auth not configured"})))
+    })?;
+
+    // Check if already enabled
+    let already_enabled = user_db
+        .is_totp_enabled(&claims.sub)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
+    if already_enabled {
+        return Err((StatusCode::CONFLICT, Json(serde_json::json!({"error": "2FA is already enabled"}))));
+    }
+
+    let (secret, otpauth_url) = security::totp::generate_secret(&claims.sub, "vmspawnd")
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to generate TOTP secret"}))))?;
+
+    // Store the secret (but don't enable yet until verified)
+    user_db
+        .enable_totp(&claims.sub, &secret)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save TOTP secret"}))))?;
+
+    Ok(Json(TotpSetupResponse {
+        secret,
+        otpauth_url,
+    }))
+}
+
+/// POST /api/auth/2fa/verify - Verify a TOTP code (used during setup confirmation).
+pub async fn verify_2fa(
+    State(state): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    // We need to extract the body manually since we already consumed extensions
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let claims = req
+        .extensions()
+        .get::<security::Claims>()
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Authentication required"}))))?
+        .clone();
+
+    let body = axum::body::to_bytes(req.into_body(), 1024)
+        .await
+        .map_err(|_| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid request body"}))))?;
+    let verify_req: TotpVerifyRequest = serde_json::from_slice(&body)
+        .map_err(|_| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid JSON"}))))?;
+
+    let user_db = state.user_db.as_ref().ok_or_else(|| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Auth not configured"})))
+    })?;
+
+    let secret = user_db
+        .get_totp_secret(&claims.sub)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "2FA not set up"}))))?;
+
+    let valid = security::totp::verify_code(&secret, &verify_req.code)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Verification failed"}))))?;
+
+    if valid {
+        Ok(Json(serde_json::json!({"verified": true, "message": "2FA is now active"})))
+    } else {
+        Err((StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Invalid TOTP code"}))))
+    }
+}
+
+/// POST /api/auth/2fa/disable - Disable 2FA for the authenticated user.
+pub async fn disable_2fa(
+    State(state): State<Arc<AppState>>,
+    req: axum::extract::Request,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let claims = req
+        .extensions()
+        .get::<security::Claims>()
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Authentication required"}))))?
+        .clone();
+
+    let user_db = state.user_db.as_ref().ok_or_else(|| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Auth not configured"})))
+    })?;
+
+    user_db
+        .disable_totp(&claims.sub)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to disable 2FA"}))))?;
+
+    Ok(Json(serde_json::json!({"message": "2FA disabled successfully"})))
 }

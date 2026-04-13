@@ -424,6 +424,14 @@ impl DistributedStorageManager {
     // -- Storage vMotion (migrations) ----------------------------------------
 
     /// Start a storage migration (storage vMotion) for a VM between pools.
+    ///
+    /// In addition to tracking migration metadata, this method attempts the
+    /// actual data movement using `qemu-img convert` if the source disk image
+    /// exists on the filesystem. The migration copies the VM's qcow2 image
+    /// from the source pool directory to the target pool directory. If
+    /// `qemu-img` is not available or the source path does not exist, the
+    /// migration is still recorded (metadata-only) so it can be completed or
+    /// failed through the normal lifecycle methods.
     pub fn start_storage_migration(
         &self,
         vm_name: &str,
@@ -463,18 +471,120 @@ impl DistributedStorageManager {
             error: None,
         };
 
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
-        tracing::info!(
-            id = %migration.id,
-            vm = %vm_name,
-            source = %source_pool,
-            target = %target_pool,
-            size_gb = disk_size_gb,
-            "started storage migration"
+        {
+            let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            tracing::info!(
+                id = %migration.id,
+                vm = %vm_name,
+                source = %source_pool,
+                target = %target_pool,
+                size_gb = disk_size_gb,
+                "started storage migration"
+            );
+            store
+                .migrations
+                .insert(migration.id.clone(), migration.clone());
+        }
+
+        // Attempt the actual data movement using qemu-img convert.
+        let source_path = format!(
+            "/var/lib/vmspawnd/storage/{}/{}.qcow2",
+            source_pool, vm_name
         );
-        store
-            .migrations
-            .insert(migration.id.clone(), migration.clone());
+        let dest_dir = format!("/var/lib/vmspawnd/storage/{}", target_pool);
+        let dest_path = format!("{}/{}.qcow2", dest_dir, vm_name);
+
+        if std::path::Path::new(&source_path).exists() {
+            // Ensure the destination directory exists
+            if let Err(e) = std::fs::create_dir_all(&dest_dir) {
+                tracing::error!(
+                    id = %migration.id,
+                    "Failed to create destination directory '{}': {}",
+                    dest_dir, e
+                );
+                // Update migration status to failed
+                if let Ok(mut store) = self.store.write() {
+                    if let Some(m) = store.migrations.get_mut(&migration.id) {
+                        m.status = MigrationStatus::Failed;
+                        m.error = Some(format!("Failed to create destination: {}", e));
+                        m.completed = Some(Utc::now());
+                    }
+                }
+                return Ok(migration);
+            }
+
+            // Use qemu-img convert to copy and optionally optimize the image.
+            // --reflink=auto would be ideal for btrfs/xfs, but qemu-img convert
+            // handles format conversion and deduplication of zero blocks.
+            let output = std::process::Command::new("qemu-img")
+                .args([
+                    "convert",
+                    "-f", "qcow2",
+                    "-O", "qcow2",
+                    "-p",
+                    &source_path,
+                    &dest_path,
+                ])
+                .output();
+
+            match output {
+                Ok(out) if out.status.success() => {
+                    // Get the actual size of the transferred file
+                    let bytes_transferred = std::fs::metadata(&dest_path)
+                        .map(|m| m.len())
+                        .unwrap_or(disk_size_gb * 1024 * 1024 * 1024);
+
+                    if let Ok(mut store) = self.store.write() {
+                        if let Some(m) = store.migrations.get_mut(&migration.id) {
+                            m.bytes_transferred = bytes_transferred;
+                            m.progress_pct = 100.0;
+                            m.status = MigrationStatus::Completed;
+                            m.completed = Some(Utc::now());
+                        }
+                    }
+                    tracing::info!(
+                        id = %migration.id,
+                        vm = %vm_name,
+                        bytes = bytes_transferred,
+                        "storage migration completed via qemu-img convert"
+                    );
+                }
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    tracing::error!(
+                        id = %migration.id,
+                        "qemu-img convert failed for VM '{}': {}",
+                        vm_name, stderr
+                    );
+                    // Clean up partial destination file
+                    let _ = std::fs::remove_file(&dest_path);
+                    if let Ok(mut store) = self.store.write() {
+                        if let Some(m) = store.migrations.get_mut(&migration.id) {
+                            m.status = MigrationStatus::Failed;
+                            m.error = Some(format!("qemu-img convert failed: {}", stderr));
+                            m.completed = Some(Utc::now());
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        id = %migration.id,
+                        "Failed to execute qemu-img for VM '{}': {} \
+                         (qemu-img may not be installed; migration recorded as in-progress)",
+                        vm_name, e
+                    );
+                    // Leave status as InProgress for the caller to manage manually
+                }
+            }
+        } else {
+            tracing::debug!(
+                id = %migration.id,
+                "Source path '{}' does not exist for VM '{}', \
+                 migration recorded as in-progress (metadata only)",
+                source_path, vm_name
+            );
+        }
+
         Ok(migration)
     }
 

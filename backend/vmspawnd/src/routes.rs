@@ -67,7 +67,7 @@ pub async fn list_vms(
             StatusCode::OK,
             Json(json!({ "items": vms, "total": total, "offset": offset, "limit": limit })),
         ).into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims).into_response(),
     }
 }
 
@@ -82,7 +82,7 @@ pub async fn get_vm(
     match state.store.get_vm(&name) {
         Ok(Some(vm)) => (StatusCode::OK, Json(vm)).into_response(),
         Ok(None) => json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims).into_response(),
     }
 }
 
@@ -94,6 +94,19 @@ pub async fn create_vm(
     if let Err((status, msg)) = validate_vm_name(&req.name) {
         return json_error(status, msg).into_response();
     }
+
+    if let Err(errors) = req.validate() {
+        return json_error(StatusCode::BAD_REQUEST, format!("Invalid VM parameters: {}", errors.join("; "))).into_response();
+    }
+
+    // Acquire per-VM lock before duplicate check to prevent TOCTOU races
+    let _lock = state.vm_lock(&req.name).lock_owned().await;
+
+    // Check for duplicate VM name
+    if let Ok(Some(_)) = state.store.get_vm(&req.name) {
+        return json_error(StatusCode::CONFLICT, "VM with this name already exists").into_response();
+    }
+
     match vmspawn_driver::create_vm(&req) {
         Ok(vm) => {
             if let Err(e) = state.store.save_vm(&vm) {
@@ -226,6 +239,20 @@ pub async fn start_vm(
     tokio::spawn(async move {
         // _lock is moved into this task and held until it completes
         let _lock = _lock;
+        let shutdown = state_clone.shutdown.clone();
+
+        // Check if shutdown was requested before starting the blocking work
+        if shutdown.is_cancelled() {
+            tracing::info!("Start task for VM '{}' cancelled due to shutdown", vm_name);
+            // Revert state from Starting back to Stopped
+            if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
+                vm.state = vm_model::VMState::Stopped;
+                if let Err(e) = state_clone.store.save_vm(&vm) {
+                    tracing::error!("Failed to save VM state: {}", e);
+                }
+            }
+            return;
+        }
 
         let result = if let Some(opts) = start_opts {
             // Use systemd-vmspawn directly with full options
@@ -259,9 +286,11 @@ pub async fn start_vm(
                         tracing::error!("Failed to save VM state: {}", e);
                     }
                 }
+                crate::api::events::record_event(&state_clone, crate::api::events::VMEventType::Started, &vm_name, None);
             }
             Err(e) => {
                 tracing::error!("Failed to start VM '{}': {}", vm_name, e);
+                crate::api::events::record_event(&state_clone, crate::api::events::VMEventType::Error, &vm_name, Some(format!("Failed to start: {}", e)));
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
                     vm.state = vm_model::VMState::Failed;
                     vm.last_error = Some(e.to_string());
@@ -291,6 +320,7 @@ pub async fn stop_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Stopped;
+                vm.updated = Some(chrono::Utc::now());
                 if let Err(e) = state.store.save_vm(&vm) {
                     tracing::error!("Failed to save VM state: {}", e);
                 }
@@ -301,7 +331,7 @@ pub async fn stop_vm(
         }
         Err(e) => {
             audit(&state, &claims.sub, "STOP", &format!("vm/{}", name), "FAILED");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response()
         }
     }
 }
@@ -321,6 +351,7 @@ pub async fn restart_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Running;
+                vm.updated = Some(chrono::Utc::now());
                 if let Err(e) = state.store.save_vm(&vm) {
                     tracing::error!("Failed to save VM state: {}", e);
                 }
@@ -350,6 +381,7 @@ pub async fn pause_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Paused;
+                vm.updated = Some(chrono::Utc::now());
                 if let Err(e) = state.store.save_vm(&vm) {
                     tracing::error!("Failed to save VM state: {}", e);
                 }
@@ -377,6 +409,7 @@ pub async fn resume_vm(
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Running;
+                vm.updated = Some(chrono::Utc::now());
                 if let Err(e) = state.store.save_vm(&vm) {
                     tracing::error!("Failed to save VM state: {}", e);
                 }
@@ -435,6 +468,11 @@ pub async fn clone_vm(
             return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     };
+
+    // Prevent linked clone while source VM is running
+    if req.linked_clone && source_vm.state == vm_model::VMState::Running {
+        return json_error(StatusCode::CONFLICT, "Cannot create a linked clone while the source VM is running").into_response();
+    }
 
     // Check target name not taken
     if let Ok(Some(_)) = state.store.get_vm(&req.target_name) {

@@ -31,6 +31,9 @@ pub async fn create_plan(
     Json(mut plan): Json<RecoveryPlan>,
 ) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(create_plan));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&plan.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     plan.id = Uuid::new_v4().to_string();
     plan.created = Utc::now();
     plan.updated = None;
@@ -50,8 +53,8 @@ pub async fn get_plan(
     tracing::debug!("site_recovery_api::{}", stringify!(get_plan));
     match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery plan not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -64,8 +67,8 @@ pub async fn update_plan(
     tracing::debug!("site_recovery_api::{}", stringify!(update_plan));
     let existing = match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery plan not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     plan.id = existing.id;
     plan.created = existing.created;
@@ -88,7 +91,7 @@ pub async fn delete_plan(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 // ============================================================================
@@ -99,12 +102,12 @@ fn start_execution(
     state: &Arc<AppState>,
     plan_id: &str,
     exec_type: ExecutionType,
-) -> Result<RecoveryExecution, StatusCode> {
+) -> Result<RecoveryExecution, (StatusCode, Json<serde_json::Value>)> {
     let plan = state
         .store
         .get_entity::<RecoveryPlan>("recovery_plans", plan_id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery plan not found"}))))?;
 
     let steps = SiteRecoveryManager::generate_recovery_steps(&plan, exec_type.clone());
     let execution = RecoveryExecution {
@@ -125,7 +128,7 @@ fn start_execution(
     state
         .store
         .save_entity("recovery_executions", &execution.id, &execution)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
     Ok(execution)
 }
 
@@ -137,7 +140,7 @@ pub async fn execute_planned_migration(
     tracing::debug!("site_recovery_api::{}", stringify!(execute_planned_migration));
     match start_execution(&state, &plan_id, ExecutionType::PlannedMigration) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
-        Err(sc) => sc.into_response(),
+        Err((sc, body)) => (sc, body).into_response(),
     }
 }
 
@@ -149,7 +152,7 @@ pub async fn execute_disaster_recovery(
     tracing::debug!("site_recovery_api::{}", stringify!(execute_disaster_recovery));
     match start_execution(&state, &plan_id, ExecutionType::DisasterRecovery) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
-        Err(sc) => sc.into_response(),
+        Err((sc, body)) => (sc, body).into_response(),
     }
 }
 
@@ -161,7 +164,7 @@ pub async fn execute_test_failover(
     tracing::debug!("site_recovery_api::{}", stringify!(execute_test_failover));
     match start_execution(&state, &plan_id, ExecutionType::TestFailover) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
-        Err(sc) => sc.into_response(),
+        Err((sc, body)) => (sc, body).into_response(),
     }
 }
 
@@ -173,7 +176,7 @@ pub async fn execute_reprotect(
     tracing::debug!("site_recovery_api::{}", stringify!(execute_reprotect));
     match start_execution(&state, &plan_id, ExecutionType::Reprotect) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
-        Err(sc) => sc.into_response(),
+        Err((sc, body)) => (sc, body).into_response(),
     }
 }
 
@@ -191,8 +194,8 @@ pub async fn get_execution(
     tracing::debug!("site_recovery_api::{}", stringify!(get_execution));
     match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
         Ok(Some(e)) => Json(e).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery execution not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -204,8 +207,8 @@ pub async fn cancel_execution(
     tracing::debug!("site_recovery_api::{}", stringify!(cancel_execution));
     let mut exec = match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
         Ok(Some(e)) => e,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery execution not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     exec.status = ExecutionStatus::Cancelled;
     exec.completed = Some(Utc::now());
@@ -213,7 +216,7 @@ pub async fn cancel_execution(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "execution cancelled"}))).into_response()
 }
 
 // ============================================================================

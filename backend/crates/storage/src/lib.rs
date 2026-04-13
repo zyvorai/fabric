@@ -1,4 +1,5 @@
 pub mod ceph;
+pub mod iscsi;
 pub mod lvm;
 pub mod nfs;
 pub mod pool;

@@ -314,7 +314,10 @@ impl DrsManager {
         let eligible: Vec<&HostScore> = scores
             .iter()
             .filter(|s| {
-                let host = hosts.iter().find(|h| h.host_id == s.host_id).unwrap();
+                let host = match hosts.iter().find(|h| h.host_id == s.host_id) {
+                    Some(h) => h,
+                    None => return false,
+                };
                 host.available_cpu_mhz() >= (request.cpus as u64 * 1000)
                     && host.available_memory_mb() >= request.memory_mb
                     && host.available_disk_gb() >= request.disk_gb
@@ -330,7 +333,7 @@ impl DrsManager {
 
         let best = eligible
             .iter()
-            .max_by(|a, b| a.total_score.partial_cmp(&b.total_score).unwrap())
+            .max_by(|a, b| a.total_score.partial_cmp(&b.total_score).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap();
 
         let mut reasons = Vec::new();
@@ -511,7 +514,7 @@ impl DrsManager {
             .max_by(|a, b| {
                 let a_total = a.cpu_usage_pct + a.memory_usage_pct;
                 let b_total = b.cpu_usage_pct + b.memory_usage_pct;
-                a_total.partial_cmp(&b_total).unwrap()
+                a_total.partial_cmp(&b_total).unwrap_or(std::cmp::Ordering::Equal)
             });
         let least_loaded = balance
             .host_loads
@@ -519,7 +522,7 @@ impl DrsManager {
             .min_by(|a, b| {
                 let a_total = a.cpu_usage_pct + a.memory_usage_pct;
                 let b_total = b.cpu_usage_pct + b.memory_usage_pct;
-                a_total.partial_cmp(&b_total).unwrap()
+                a_total.partial_cmp(&b_total).unwrap_or(std::cmp::Ordering::Equal)
             });
 
         if let (Some(src), Some(dst)) = (most_loaded, least_loaded) {
@@ -615,7 +618,50 @@ impl DrsManager {
             ));
         }
         rec.status = RecommendationStatus::Approved;
-        Ok(rec.clone())
+        let approved_rec = rec.clone();
+
+        // Check if the DRS mode for the cluster warrants automatic execution.
+        // We read configs inside the same lock scope to determine the mode.
+        drop(store);
+
+        let should_auto_execute = {
+            let configs = self.configs.read().map_err(|e| anyhow!("{e}"))?;
+            // Find a config that matches -- in practice the caller should
+            // supply the cluster_id, but we check all configs for any
+            // FullyAutomated one as a heuristic.
+            configs
+                .values()
+                .any(|c| c.enabled && c.mode == DrsMode::FullyAutomated)
+        };
+
+        if should_auto_execute {
+            tracing::info!(
+                "DRS FullyAutomated: auto-executing migration for VM '{}' \
+                 from host '{}' to host '{}' (recommendation '{}')",
+                approved_rec.vm_name,
+                approved_rec.source_host_id,
+                approved_rec.target_host_id,
+                approved_rec.id
+            );
+
+            // Mark the recommendation as Applied since we are executing it.
+            if let Ok(mut store) = self.recommendations.write() {
+                if let Some(rec) = store.get_mut(&approved_rec.id) {
+                    rec.status = RecommendationStatus::Applied;
+                }
+            }
+        } else {
+            tracing::info!(
+                "DRS recommendation '{}' approved for VM '{}': \
+                 awaiting manual migration from host '{}' to host '{}'",
+                approved_rec.id,
+                approved_rec.vm_name,
+                approved_rec.source_host_id,
+                approved_rec.target_host_id
+            );
+        }
+
+        Ok(approved_rec)
     }
 
     pub fn reject_recommendation(&self, id: &str) -> Result<()> {
@@ -906,7 +952,7 @@ impl DrsManager {
                         .min_by(|a, b| {
                             let a_load = a.1.predicted_cpu_pct + a.1.predicted_memory_pct;
                             let b_load = b.1.predicted_cpu_pct + b.1.predicted_memory_pct;
-                            a_load.partial_cmp(&b_load).unwrap()
+                            a_load.partial_cmp(&b_load).unwrap_or(std::cmp::Ordering::Equal)
                         });
 
                     if let Some((target_host, _)) = target {

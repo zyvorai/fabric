@@ -92,11 +92,11 @@ impl Default for ControllerConfig {
 pub struct AuthConfig {
     #[serde(default = "default_auth_enabled")]
     pub enabled: bool,
-    #[serde(default = "default_jwt_secret")]
+    #[serde(default = "default_jwt_secret", skip_serializing)]
     pub jwt_secret: String,
     #[serde(default = "default_auth_db_path")]
     pub db_path: String,
-    #[serde(default = "default_admin_password")]
+    #[serde(default = "default_admin_password", skip_serializing)]
     pub default_admin_password: String,
     #[serde(default = "default_token_expiration_hours")]
     pub token_expiration_hours: i64,
@@ -163,6 +163,15 @@ fn default_auth_db_path() -> String {
 fn default_admin_password() -> String {
     // Use env var or generate a secure random password (never default to "admin")
     std::env::var("VMSPAWND_ADMIN_PASSWORD").unwrap_or_else(|_| {
+        // Check if a password was already persisted from a previous run
+        let pw_path = "/var/lib/vmspawnd/.admin_password";
+        if let Ok(existing) = std::fs::read_to_string(pw_path) {
+            let trimmed = existing.trim().to_string();
+            if !trimmed.is_empty() {
+                return trimmed;
+            }
+        }
+
         let password = generate_random_secret();
         tracing::warn!(
             "================================================================"
@@ -231,9 +240,18 @@ impl Config {
         for path in paths {
             if let Ok(content) = fs::read_to_string(path) {
                 let config: Config = toml::from_str(&content)?;
+                tracing::info!("Loaded config from {}", path);
+                // Validate CORS origins at load time
+                for origin in &config.daemon.cors_origins {
+                    if origin.parse::<axum::http::HeaderValue>().is_err() {
+                        tracing::warn!("Invalid CORS origin '{}' in config — will be ignored", origin);
+                    }
+                }
                 return Ok(config);
             }
         }
+
+        tracing::warn!("No config file found, using defaults");
 
         // Default config
         Ok(Config {

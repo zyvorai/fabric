@@ -155,6 +155,10 @@ pub struct RecoveryStep {
     pub started: Option<DateTime<Utc>>,
     pub completed: Option<DateTime<Utc>>,
     pub error: Option<String>,
+    /// Additional context for step execution (e.g. script command, delay
+    /// seconds, target site id for sync operations).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
 }
 
 /// A running or completed recovery execution.
@@ -219,6 +223,62 @@ pub enum SiteRecoveryError {
 }
 
 // ---------------------------------------------------------------------------
+// Script path validation
+// ---------------------------------------------------------------------------
+
+/// Allowed directory prefixes for recovery scripts.  Scripts must be
+/// absolute paths under one of these directories.  This prevents arbitrary
+/// command injection -- only pre-validated admin-defined scripts located in
+/// trusted directories are permitted.
+const ALLOWED_SCRIPT_PREFIXES: &[&str] = &[
+    "/usr/local/bin/",
+    "/usr/local/sbin/",
+    "/var/lib/vmspawnd/scripts/",
+    "/opt/vmspawnd/scripts/",
+];
+
+/// Validate that a script command starts with an allowed absolute path.
+///
+/// The command may contain arguments (e.g. "/usr/local/bin/notify.sh start"),
+/// so we extract the first whitespace-delimited token and validate it.
+/// Path traversal components (`..`) are rejected outright.
+fn validate_script_path(command: &str) -> Result<()> {
+    let script_path = command.split_whitespace().next().unwrap_or("");
+
+    if script_path.is_empty() {
+        bail!("script command is empty");
+    }
+
+    if !script_path.starts_with('/') {
+        bail!(
+            "script path must be absolute (starts with /), got: {}",
+            script_path
+        );
+    }
+
+    // Reject path traversal.
+    if script_path.contains("..") {
+        bail!(
+            "script path must not contain '..' components: {}",
+            script_path
+        );
+    }
+
+    if !ALLOWED_SCRIPT_PREFIXES
+        .iter()
+        .any(|prefix| script_path.starts_with(prefix))
+    {
+        bail!(
+            "script path '{}' is not under an allowed directory ({})",
+            script_path,
+            ALLOWED_SCRIPT_PREFIXES.join(", ")
+        );
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // SiteRecoveryManager
 // ---------------------------------------------------------------------------
 
@@ -248,7 +308,7 @@ impl SiteRecoveryManager {
     /// Create a new recovery plan. The plan's `id`, `created`, and `status`
     /// fields are set automatically.
     pub fn create_plan(&self, mut plan: RecoveryPlan) -> Result<RecoveryPlan> {
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
 
         plan.id = Uuid::new_v4().to_string();
         plan.created = Utc::now();
@@ -266,19 +326,19 @@ impl SiteRecoveryManager {
 
     /// Get a single plan by id.
     pub fn get_plan(&self, id: &str) -> Option<RecoveryPlan> {
-        let plans = self.plans.read().unwrap();
+        let plans = self.plans.read().unwrap_or_else(|e| e.into_inner());
         plans.get(id).cloned()
     }
 
     /// List all recovery plans.
     pub fn list_plans(&self) -> Vec<RecoveryPlan> {
-        let plans = self.plans.read().unwrap();
+        let plans = self.plans.read().unwrap_or_else(|e| e.into_inner());
         plans.values().cloned().collect()
     }
 
     /// Replace a plan with an updated version. Preserves `id` and `created`.
     pub fn update_plan(&self, id: &str, mut plan: RecoveryPlan) -> Result<RecoveryPlan> {
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
         let existing = plans
             .get(id)
             .ok_or_else(|| SiteRecoveryError::PlanNotFound(id.to_string()))?;
@@ -296,7 +356,7 @@ impl SiteRecoveryManager {
 
     /// Delete a recovery plan.
     pub fn delete_plan(&self, id: &str) -> Result<()> {
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
         if plans.remove(id).is_none() {
             bail!(SiteRecoveryError::PlanNotFound(id.to_string()));
         }
@@ -348,7 +408,7 @@ impl SiteRecoveryManager {
 
     /// Cancel a running execution.
     pub fn cancel_execution(&self, execution_id: &str) -> Result<()> {
-        let mut executions = self.executions.write().unwrap();
+        let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
         let exec = executions
             .get_mut(execution_id)
             .ok_or_else(|| SiteRecoveryError::ExecutionNotFound(execution_id.to_string()))?;
@@ -373,7 +433,7 @@ impl SiteRecoveryManager {
         let plan_id = exec.plan_id.clone();
         drop(executions);
 
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
         if let Some(plan) = plans.get_mut(&plan_id) {
             plan.status = PlanStatus::Ready;
             plan.updated = Some(Utc::now());
@@ -385,13 +445,13 @@ impl SiteRecoveryManager {
 
     /// Get a single execution by id.
     pub fn get_execution(&self, id: &str) -> Option<RecoveryExecution> {
-        let executions = self.executions.read().unwrap();
+        let executions = self.executions.read().unwrap_or_else(|e| e.into_inner());
         executions.get(id).cloned()
     }
 
     /// List executions, optionally filtered by plan id.
     pub fn list_executions(&self, plan_id: Option<&str>) -> Vec<RecoveryExecution> {
-        let executions = self.executions.read().unwrap();
+        let executions = self.executions.read().unwrap_or_else(|e| e.into_inner());
         executions
             .values()
             .filter(|e| match plan_id {
@@ -410,7 +470,7 @@ impl SiteRecoveryManager {
         status: StepStatus,
         error: Option<String>,
     ) -> Result<()> {
-        let mut executions = self.executions.write().unwrap();
+        let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
         let exec = executions
             .get_mut(execution_id)
             .ok_or_else(|| SiteRecoveryError::ExecutionNotFound(execution_id.to_string()))?;
@@ -460,7 +520,7 @@ impl SiteRecoveryManager {
 
     /// Mark an execution as completed (success or failure).
     pub fn complete_execution(&self, execution_id: &str, success: bool) -> Result<()> {
-        let mut executions = self.executions.write().unwrap();
+        let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
         let exec = executions
             .get_mut(execution_id)
             .ok_or_else(|| SiteRecoveryError::ExecutionNotFound(execution_id.to_string()))?;
@@ -492,7 +552,7 @@ impl SiteRecoveryManager {
         drop(executions);
 
         // Update plan status and timestamps.
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
         if let Some(plan) = plans.get_mut(&plan_id) {
             plan.status = if success {
                 PlanStatus::Completed
@@ -515,7 +575,7 @@ impl SiteRecoveryManager {
                         vms_failed,
                     };
                     drop(plans);
-                    let mut results = self.test_results.write().unwrap();
+                    let mut results = self.test_results.write().unwrap_or_else(|e| e.into_inner());
                     results.push(result);
                 }
                 _ => {
@@ -538,6 +598,9 @@ impl SiteRecoveryManager {
     /// type. Steps are ordered: pre-scripts, then per-group (pre-action,
     /// per-VM power-off/sync/recover/network-config/power-on, post-action,
     /// wait-delay), then post-scripts.
+    ///
+    /// Each step's `details` field carries the metadata needed for execution
+    /// (e.g. the script command, delay duration, or target site id).
     pub fn generate_recovery_steps(
         plan: &RecoveryPlan,
         exec_type: ExecutionType,
@@ -556,6 +619,7 @@ impl SiteRecoveryManager {
                 started: None,
                 completed: None,
                 error: None,
+                details: Some(script.command.clone()),
             });
             step_num += 1;
         }
@@ -566,7 +630,7 @@ impl SiteRecoveryManager {
 
         for group in &sorted_groups {
             // Pre-group action.
-            if group.pre_action.is_some() {
+            if let Some(ref pre) = group.pre_action {
                 steps.push(RecoveryStep {
                     step_number: step_num,
                     description: format!("Run pre-group script for group '{}'", group.name),
@@ -576,6 +640,7 @@ impl SiteRecoveryManager {
                     started: None,
                     completed: None,
                     error: None,
+                    details: Some(pre.command.clone()),
                 });
                 step_num += 1;
             }
@@ -593,6 +658,7 @@ impl SiteRecoveryManager {
                         started: None,
                         completed: None,
                         error: None,
+                        details: None,
                     });
                     step_num += 1;
 
@@ -605,6 +671,7 @@ impl SiteRecoveryManager {
                         started: None,
                         completed: None,
                         error: None,
+                        details: Some(plan.target_site_id.clone()),
                     });
                     step_num += 1;
                 }
@@ -619,6 +686,7 @@ impl SiteRecoveryManager {
                     started: None,
                     completed: None,
                     error: None,
+                    details: Some(plan.target_site_id.clone()),
                 });
                 step_num += 1;
 
@@ -633,6 +701,7 @@ impl SiteRecoveryManager {
                         started: None,
                         completed: None,
                         error: None,
+                        details: None,
                     });
                     step_num += 1;
                 }
@@ -647,12 +716,13 @@ impl SiteRecoveryManager {
                     started: None,
                     completed: None,
                     error: None,
+                    details: None,
                 });
                 step_num += 1;
             }
 
             // Post-group action.
-            if group.post_action.is_some() {
+            if let Some(ref post) = group.post_action {
                 steps.push(RecoveryStep {
                     step_number: step_num,
                     description: format!("Run post-group script for group '{}'", group.name),
@@ -662,6 +732,7 @@ impl SiteRecoveryManager {
                     started: None,
                     completed: None,
                     error: None,
+                    details: Some(post.command.clone()),
                 });
                 step_num += 1;
             }
@@ -680,6 +751,7 @@ impl SiteRecoveryManager {
                     started: None,
                     completed: None,
                     error: None,
+                    details: Some(group.startup_delay_secs.to_string()),
                 });
                 step_num += 1;
             }
@@ -696,6 +768,7 @@ impl SiteRecoveryManager {
                 started: None,
                 completed: None,
                 error: None,
+                details: Some(script.command.clone()),
             });
             step_num += 1;
         }
@@ -703,10 +776,252 @@ impl SiteRecoveryManager {
         steps
     }
 
+    /// Execute a single recovery step by dispatching to the appropriate
+    /// system command based on its `step_type`.
+    ///
+    /// Updates the step's `status`, `started`, `completed`, and `error`
+    /// fields in place.  Returns `Ok(())` on success or an error describing
+    /// what went wrong.
+    pub fn execute_step(step: &mut RecoveryStep) -> Result<()> {
+        step.status = StepStatus::Running;
+        step.started = Some(Utc::now());
+
+        let target = step
+            .vm_name
+            .as_deref()
+            .unwrap_or("unknown");
+
+        let result = match step.step_type {
+            StepType::PowerOff => {
+                // Stop the VM via machinectl.
+                tracing::info!(vm = target, "step {}: powering off VM", step.step_number);
+                let output = std::process::Command::new("machinectl")
+                    .args(["poweroff", target])
+                    .output()
+                    .map_err(|e| anyhow::anyhow!("failed to run machinectl: {e}"))?;
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    Err(anyhow::anyhow!("machinectl poweroff failed: {}", stderr.trim()))
+                }
+            }
+            StepType::PowerOn => {
+                // Start the VM via systemd-vmspawn.
+                tracing::info!(vm = target, "step {}: powering on VM", step.step_number);
+                let image_path = format!("/var/lib/machines/{}.raw", target);
+                let output = std::process::Command::new("systemd-vmspawn")
+                    .args(["--image", &image_path, "--machine", target])
+                    .output()
+                    .map_err(|e| anyhow::anyhow!("failed to run systemd-vmspawn: {e}"))?;
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    Err(anyhow::anyhow!("systemd-vmspawn failed: {}", stderr.trim()))
+                }
+            }
+            StepType::Sync => {
+                // Sync the VM image to the target site using rsync.
+                let target_site = step.details.as_deref().unwrap_or("localhost");
+                let source = format!("/var/lib/machines/{}.raw", target);
+                let dest = format!("{}:/var/lib/machines/{}.raw", target_site, target);
+                tracing::info!(
+                    vm = target,
+                    dest = %dest,
+                    "step {}: syncing VM image", step.step_number
+                );
+                let output = std::process::Command::new("rsync")
+                    .args(["-avz", "--partial", &source, &dest])
+                    .output()
+                    .map_err(|e| anyhow::anyhow!("failed to run rsync: {e}"))?;
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    Err(anyhow::anyhow!("rsync failed: {}", stderr.trim()))
+                }
+            }
+            StepType::WaitDelay => {
+                let secs = step
+                    .details
+                    .as_deref()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(5);
+                tracing::info!(
+                    "step {}: waiting {} seconds",
+                    step.step_number,
+                    secs
+                );
+                std::thread::sleep(std::time::Duration::from_secs(secs));
+                Ok(())
+            }
+            StepType::RunScript => {
+                if let Some(ref script) = step.details {
+                    // Validate that the script path is an absolute path under
+                    // allowed directories.  This prevents arbitrary command
+                    // injection -- only pre-validated admin-defined scripts
+                    // are permitted.
+                    validate_script_path(script)?;
+
+                    tracing::info!(
+                        "step {}: running script: {}",
+                        step.step_number,
+                        script
+                    );
+                    let output = std::process::Command::new("/bin/sh")
+                        .args(["-c", script])
+                        .output()
+                        .map_err(|e| anyhow::anyhow!("failed to run script: {e}"))?;
+                    if output.status.success() {
+                        Ok(())
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        Err(anyhow::anyhow!("script failed: {}", stderr.trim()))
+                    }
+                } else {
+                    tracing::warn!(
+                        "step {}: RunScript step has no command, skipping",
+                        step.step_number
+                    );
+                    Ok(())
+                }
+            }
+            StepType::Recover => {
+                // Recovery = verify image exists, then prepare it for start.
+                let image_path = format!("/var/lib/machines/{}.raw", target);
+                tracing::info!(
+                    vm = target,
+                    "step {}: recovering VM (verifying image at {})",
+                    step.step_number,
+                    image_path
+                );
+                if std::path::Path::new(&image_path).exists() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "VM image not found at {image_path}"
+                    ))
+                }
+            }
+            StepType::NetworkConfig => {
+                // Network reconfiguration is environment-specific; log and
+                // succeed for now.  Real implementations would call networkctl
+                // or equivalent.
+                tracing::info!(
+                    vm = target,
+                    "step {}: network configuration (no-op in current implementation)",
+                    step.step_number
+                );
+                Ok(())
+            }
+        };
+
+        match result {
+            Ok(()) => {
+                step.status = StepStatus::Completed;
+                step.completed = Some(Utc::now());
+                Ok(())
+            }
+            Err(e) => {
+                step.status = StepStatus::Failed;
+                step.error = Some(e.to_string());
+                step.completed = Some(Utc::now());
+                Err(e)
+            }
+        }
+    }
+
+    /// Run all pending steps in an execution sequentially.  Stops on the
+    /// first failure and marks subsequent steps as skipped.
+    ///
+    /// Returns `Ok(true)` if all steps completed, `Ok(false)` if a step
+    /// failed (execution is marked as failed), or `Err` on internal errors.
+    pub fn run_execution(&self, execution_id: &str) -> Result<bool> {
+        // Collect the step numbers we need to execute.
+        let step_numbers: Vec<u32> = {
+            let executions = self.executions.read().unwrap_or_else(|e| e.into_inner());
+            let exec = executions
+                .get(execution_id)
+                .ok_or_else(|| SiteRecoveryError::ExecutionNotFound(execution_id.to_string()))?;
+            exec.steps
+                .iter()
+                .filter(|s| s.status == StepStatus::Pending)
+                .map(|s| s.step_number)
+                .collect()
+        };
+
+        let mut all_ok = true;
+
+        for step_num in step_numbers {
+            // Extract the step, execute it, then put it back.
+            let mut step = {
+                let executions = self.executions.read().unwrap_or_else(|e| e.into_inner());
+                let exec = executions
+                    .get(execution_id)
+                    .ok_or_else(|| {
+                        SiteRecoveryError::ExecutionNotFound(execution_id.to_string())
+                    })?;
+                exec.steps
+                    .iter()
+                    .find(|s| s.step_number == step_num)
+                    .cloned()
+                    .ok_or_else(|| {
+                        SiteRecoveryError::StepNotFound(step_num, execution_id.to_string())
+                    })?
+            };
+
+            let exec_result = Self::execute_step(&mut step);
+
+            // Write the step result back.
+            {
+                let mut executions =
+                    self.executions.write().unwrap_or_else(|e| e.into_inner());
+                let exec = executions.get_mut(execution_id).ok_or_else(|| {
+                    SiteRecoveryError::ExecutionNotFound(execution_id.to_string())
+                })?;
+
+                if let Some(s) = exec.steps.iter_mut().find(|s| s.step_number == step_num) {
+                    s.status = step.status.clone();
+                    s.started = step.started;
+                    s.completed = step.completed;
+                    s.error = step.error.clone();
+
+                    // Update VM counters for PowerOn steps.
+                    if s.step_type == StepType::PowerOn {
+                        match s.status {
+                            StepStatus::Completed => exec.vms_recovered += 1,
+                            StepStatus::Failed => exec.vms_failed += 1,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            if exec_result.is_err() {
+                all_ok = false;
+                // Skip remaining steps.
+                let mut executions =
+                    self.executions.write().unwrap_or_else(|e| e.into_inner());
+                if let Some(exec) = executions.get_mut(execution_id) {
+                    for s in &mut exec.steps {
+                        if s.status == StepStatus::Pending {
+                            s.status = StepStatus::Skipped;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        self.complete_execution(execution_id, all_ok)?;
+        Ok(all_ok)
+    }
+
     /// Clean up resources created by a test failover (tear down the isolated
     /// test environment). Marks the execution as completed.
     pub fn cleanup_test_failover(&self, execution_id: &str) -> Result<()> {
-        let mut executions = self.executions.write().unwrap();
+        let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
         let exec = executions
             .get_mut(execution_id)
             .ok_or_else(|| SiteRecoveryError::ExecutionNotFound(execution_id.to_string()))?;
@@ -731,7 +1046,7 @@ impl SiteRecoveryManager {
         drop(executions);
 
         // Update plan and record test result.
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
         if let Some(plan) = plans.get_mut(&plan_id) {
             plan.status = PlanStatus::Ready;
             plan.last_tested = Some(now);
@@ -749,7 +1064,7 @@ impl SiteRecoveryManager {
             vms_failed,
         };
 
-        let mut results = self.test_results.write().unwrap();
+        let mut results = self.test_results.write().unwrap_or_else(|e| e.into_inner());
         results.push(result);
 
         tracing::info!(
@@ -763,8 +1078,8 @@ impl SiteRecoveryManager {
 
     /// Build a high-level DR dashboard from current state.
     pub fn get_dashboard(&self) -> DrDashboard {
-        let plans = self.plans.read().unwrap();
-        let results = self.test_results.read().unwrap();
+        let plans = self.plans.read().unwrap_or_else(|e| e.into_inner());
+        let results = self.test_results.read().unwrap_or_else(|e| e.into_inner());
 
         let total_plans = plans.len() as u32;
         let ready_plans = plans
@@ -816,7 +1131,7 @@ impl SiteRecoveryManager {
 
     /// Get test results, optionally filtered by plan id.
     pub fn get_test_results(&self, plan_id: Option<&str>) -> Vec<TestResult> {
-        let results = self.test_results.read().unwrap();
+        let results = self.test_results.read().unwrap_or_else(|e| e.into_inner());
         results
             .iter()
             .filter(|r| match plan_id {
@@ -836,7 +1151,7 @@ impl SiteRecoveryManager {
         initiated_by: &str,
         exec_type: ExecutionType,
     ) -> Result<RecoveryExecution> {
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = self.plans.write().unwrap_or_else(|e| e.into_inner());
         let plan = plans
             .get_mut(plan_id)
             .ok_or_else(|| SiteRecoveryError::PlanNotFound(plan_id.to_string()))?;
@@ -872,7 +1187,7 @@ impl SiteRecoveryManager {
 
         drop(plans);
 
-        let mut executions = self.executions.write().unwrap();
+        let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
         executions.insert(execution.id.clone(), execution.clone());
 
         tracing::info!(

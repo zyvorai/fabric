@@ -196,11 +196,13 @@ use axum::{
     extract::State,
     Json,
 };
+use security::RequireRead;
 
 use crate::server::AppState;
 
 /// GET /api/plugins - List all registered plugins
 pub async fn list_plugins(
+    RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<PluginInfo>> {
     let registry = state.plugin_registry.read().await;

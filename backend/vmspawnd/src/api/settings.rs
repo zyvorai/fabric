@@ -93,10 +93,10 @@ impl Default for AppSettings {
 pub async fn get_settings(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<AppSettings>, StatusCode> {
+) -> Result<Json<AppSettings>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("settings::{}", stringify!(get_settings));
     let settings = state.store.get_entity::<AppSettings>("config", "settings")
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load settings"}))))?
         .unwrap_or_default();
 
     Ok(Json(settings))
@@ -107,25 +107,25 @@ pub async fn update_settings(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(settings): Json<AppSettings>,
-) -> Result<Json<AppSettings>, StatusCode> {
+) -> Result<Json<AppSettings>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("settings::{}", stringify!(update_settings));
     // Validate
     if settings.refresh_interval == 0 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Refresh interval must be greater than 0"}))));
     }
     if settings.session_timeout == 0 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Session timeout must be greater than 0"}))));
     }
 
     // Validate webhook URL against SSRF if provided
     if !settings.webhook_url.is_empty() {
         crate::api::notifications::validate_external_url_public(&settings.webhook_url)
-            .map_err(|_| StatusCode::BAD_REQUEST)?;
+            .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid webhook URL: {}", e)}))))?;
     }
 
     if let Err(e) = state.store.save_entity("config", "settings", &settings) {
         tracing::error!("Failed to save settings: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save settings"}))));
     }
 
     tracing::info!("Settings updated successfully");

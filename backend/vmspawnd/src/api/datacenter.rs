@@ -35,6 +35,9 @@ pub async fn create_datacenter(
     Json(req): Json<CreateDatacenterRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(create_datacenter));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now();
     let dc = Datacenter {
         id: Uuid::new_v4().to_string(),
@@ -63,7 +66,7 @@ pub async fn get_datacenter(
     tracing::debug!("datacenter::{}", stringify!(get_datacenter));
     match state.store.get_entity::<Datacenter>("datacenters", &id) {
         Ok(Some(dc)) => Json(dc).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Datacenter not found"}))).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -79,9 +82,14 @@ pub async fn update_datacenter(
     Json(req): Json<UpdateDatacenterRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(update_datacenter));
+    if let Some(ref name) = req.name {
+        if let Err((status, msg)) = crate::validation::validate_entity_name(name) {
+            return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        }
+    }
     let dc = match state.store.get_entity::<Datacenter>("datacenters", &id) {
         Ok(Some(dc)) => dc,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Datacenter not found"}))).into_response(),
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -114,6 +122,10 @@ pub async fn delete_datacenter(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(delete_datacenter));
+    let clusters: Vec<Cluster> = state.store.list_entities("clusters").unwrap_or_default();
+    if clusters.iter().any(|c| c.datacenter_id == id) {
+        return (StatusCode::CONFLICT, Json(serde_json::json!({"error": "Cannot delete datacenter with active clusters"}))).into_response();
+    }
     if let Err(e) = state.store.delete_entity("datacenters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
@@ -129,8 +141,8 @@ pub async fn get_datacenter_summary(
     tracing::debug!("datacenter::{}", stringify!(get_datacenter_summary));
     let dc = match state.store.get_entity::<Datacenter>("datacenters", &id) {
         Ok(Some(dc)) => dc,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Datacenter not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load datacenter"}))).into_response(),
     };
     let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
     let dc_hosts: Vec<&HostInfo> = hosts.iter().filter(|h| h.datacenter_id == id).collect();
@@ -165,6 +177,9 @@ pub async fn create_cluster(
     Json(req): Json<CreateClusterRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(create_cluster));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now();
     let cluster = Cluster {
         id: Uuid::new_v4().to_string(),
@@ -198,8 +213,8 @@ pub async fn get_cluster(
     tracing::debug!("datacenter::{}", stringify!(get_cluster));
     match state.store.get_entity::<Cluster>("clusters", &id) {
         Ok(Some(c)) => Json(c).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Cluster not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load cluster"}))).into_response(),
     }
 }
 
@@ -210,10 +225,15 @@ pub async fn update_cluster(
     Json(req): Json<UpdateClusterRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(update_cluster));
+    if let Some(ref name) = req.name {
+        if let Err((status, msg)) = crate::validation::validate_entity_name(name) {
+            return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        }
+    }
     let mut cluster = match state.store.get_entity::<Cluster>("clusters", &id) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Cluster not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load cluster"}))).into_response(),
     };
     if let Some(name) = req.name { cluster.name = name; }
     if let Some(desc) = req.description { cluster.description = desc; }
@@ -236,6 +256,10 @@ pub async fn delete_cluster(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(delete_cluster));
+    let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+    if hosts.iter().any(|h| h.cluster_id == id) {
+        return (StatusCode::CONFLICT, Json(serde_json::json!({"error": "Cannot delete cluster with active hosts"}))).into_response();
+    }
     if let Err(e) = state.store.delete_entity("clusters", &id) {
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
@@ -262,6 +286,12 @@ pub async fn register_host(
     Json(req): Json<RegisterHostRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(register_host));
+    if let Err(msg) = crate::validation::validate_hostname(&req.hostname) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    if let Err(msg) = crate::validation::validate_hostname(&req.address) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid address: {}", msg)}))).into_response();
+    }
     let now = Utc::now();
     let host = HostInfo {
         id: Uuid::new_v4().to_string(),
@@ -298,8 +328,8 @@ pub async fn get_host(
     tracing::debug!("datacenter::{}", stringify!(get_host));
     match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => Json(h).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Host not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load host"}))).into_response(),
     }
 }
 
@@ -310,10 +340,20 @@ pub async fn update_host(
     Json(req): Json<UpdateHostRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(update_host));
+    if let Some(ref hostname) = req.hostname {
+        if let Err(msg) = crate::validation::validate_hostname(hostname) {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response();
+        }
+    }
+    if let Some(ref address) = req.address {
+        if let Err(msg) = crate::validation::validate_hostname(address) {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid address: {}", msg)}))).into_response();
+        }
+    }
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Host not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load host"}))).into_response(),
     };
     if let Some(hostname) = req.hostname { host.hostname = hostname; }
     if let Some(address) = req.address { host.address = address; }
@@ -349,10 +389,16 @@ pub async fn host_heartbeat(
     Json(hb): Json<HostHeartbeat>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(host_heartbeat));
+    if !hb.cpu_usage_pct.is_finite() || hb.cpu_usage_pct < 0.0 || hb.cpu_usage_pct > 100.0 {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "cpu_usage_pct must be between 0.0 and 100.0"}))).into_response();
+    }
+    if !hb.memory_usage_pct.is_finite() || hb.memory_usage_pct < 0.0 || hb.memory_usage_pct > 100.0 {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "memory_usage_pct must be between 0.0 and 100.0"}))).into_response();
+    }
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Host not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load host"}))).into_response(),
     };
     host.cpu_usage_pct = hb.cpu_usage_pct;
     host.memory_usage_pct = hb.memory_usage_pct;
@@ -374,8 +420,8 @@ pub async fn host_enter_maintenance(
     tracing::debug!("datacenter::{}", stringify!(host_enter_maintenance));
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Host not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load host"}))).into_response(),
     };
     host.status = HostStatus::Maintenance;
     host.updated_at = Utc::now();
@@ -394,8 +440,8 @@ pub async fn host_exit_maintenance(
     tracing::debug!("datacenter::{}", stringify!(host_exit_maintenance));
     let mut host = match state.store.get_entity::<HostInfo>("hosts", &id) {
         Ok(Some(h)) => h,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Host not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load host"}))).into_response(),
     };
     host.status = HostStatus::Connected;
     host.updated_at = Utc::now();
@@ -512,8 +558,8 @@ pub async fn get_cluster_health(
     // Verify cluster exists
     match state.store.get_entity::<Cluster>("clusters", &cluster_id) {
         Ok(Some(_)) => {}
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Cluster not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load cluster"}))).into_response(),
     }
 
     let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });

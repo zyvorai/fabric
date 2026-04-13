@@ -26,6 +26,20 @@ impl QmpClient {
 
     /// Execute a QMP command and return the response
     pub fn execute(&self, command: &str, args: Value) -> Result<Value> {
+        const ALLOWED_QMP_COMMANDS: &[&str] = &[
+            "query-status", "query-block", "query-blockstats", "query-cpus-fast",
+            "query-memory-size-summary", "query-vnc", "query-spice",
+            "system_powerdown", "system_reset", "stop", "cont",
+            "balloon", "block_resize", "blockdev-snapshot-sync",
+            "device_add", "device_del", "netdev_add", "netdev_del",
+            "object-add", "object-del", "chardev-add", "chardev-remove",
+            "human-monitor-command", "savevm", "loadvm", "delvm",
+            "cpu-add", "drive-backup",
+        ];
+        if !ALLOWED_QMP_COMMANDS.contains(&command) {
+            return Err(anyhow::anyhow!("QMP command '{}' is not in the allowed list", command));
+        }
+
         let mut stream = UnixStream::connect(&self.socket_path)
             .with_context(|| format!("Failed to connect to QMP socket: {}", self.socket_path))?;
 

@@ -27,6 +27,9 @@ pub async fn create_service(
     Json(req): Json<CreateServiceRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("service_mesh::{}", stringify!(create_service));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     if let Err(e) = crate::validation::validate_ip_address(&req.virtual_ip) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid virtual_ip: {}", e)}))).into_response();
     }

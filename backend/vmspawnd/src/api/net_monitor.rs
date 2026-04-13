@@ -25,6 +25,9 @@ pub async fn create_monitor_policy(
     Json(req): Json<CreateMonitorPolicyRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("net_monitor::{}", stringify!(create_monitor_policy));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     if let Some(ref url) = req.webhook_url {
         if let Err(e) = crate::api::notifications::validate_external_url_public(url) {
             return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid webhook_url: {}", e)}))).into_response();

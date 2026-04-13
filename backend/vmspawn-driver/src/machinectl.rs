@@ -6,6 +6,28 @@
 use anyhow::{anyhow, Result};
 use std::process::Command;
 
+/// Characters that are dangerous in shell commands and must be rejected.
+const SHELL_METACHARACTERS: &[char] = &[
+    ';', '|', '&', '$', '`', '>', '<', '(', ')', '{', '}', '\n', '\r', '\0', '!',
+];
+
+/// Validate that a shell command does not contain dangerous metacharacters.
+/// Returns an error if any shell injection characters are found.
+fn validate_shell_command(command: &str) -> Result<()> {
+    if command.is_empty() {
+        return Err(anyhow!("Shell command must not be empty"));
+    }
+    for ch in SHELL_METACHARACTERS {
+        if command.contains(*ch) {
+            return Err(anyhow!(
+                "Shell command contains forbidden character '{}'",
+                ch.escape_default()
+            ));
+        }
+    }
+    Ok(())
+}
+
 // ============================================================================
 // Machine lifecycle
 // ============================================================================
@@ -102,7 +124,12 @@ pub fn disable(name: &str) -> Result<()> {
 
 /// Run a command inside a machine via machinectl shell.
 /// Returns (stdout, stderr, exit_code).
+///
+/// The command is validated to reject shell metacharacters that could allow
+/// command injection (e.g., `;`, `|`, `&`, `$`, backticks, etc.).
 pub fn shell(name: &str, command: &str) -> Result<ShellOutput> {
+    validate_shell_command(command)?;
+
     let output = Command::new("machinectl")
         .args(["shell", name, "/bin/sh", "-c", command])
         .output()?;

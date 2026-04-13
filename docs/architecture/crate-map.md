@@ -1,0 +1,199 @@
+# vmspawn Crate Map
+
+This document catalogs all 46 crates in the vmspawn workspace, organized by domain.
+Each entry includes the crate name, workspace path, and a brief description of its
+purpose.
+
+---
+
+## Table of Contents
+
+1. [Core](#core)
+2. [Drivers](#drivers)
+3. [Networking](#networking)
+4. [Storage](#storage)
+5. [System Internals](#system-internals)
+6. [Management](#management)
+7. [Infrastructure](#infrastructure)
+8. [Utilities](#utilities)
+9. [CLI and UI](#cli-and-ui)
+10. [Dependency Summary](#dependency-summary)
+
+---
+
+## Core
+
+These crates form the foundation of the vmspawn platform.
+
+| Crate          | Path                    | Description                                              |
+|----------------|-------------------------|----------------------------------------------------------|
+| `vmspawnd`     | `backend/vmspawnd`      | Main daemon binary. Axum HTTP server, 480+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
+| `vm-model`     | `backend/vm-model`      | Core data structures: `VM`, `VMState`, `CreateVMRequest`, `VMStartOptions`, `VMMetrics`. Shared across all crates. |
+| `state-store`  | `backend/state-store`   | File-based persistent storage. Atomic JSON writes, in-memory VM cache, paginated queries, path traversal protection. |
+| `security`     | `backend/security`      | Authentication and authorization. JWT token management, PAM integration, RBAC (Admin/User/Viewer), user database (SQLite), audit logging, Axum extractors. |
+
+## Drivers
+
+These crates abstract the interface between vmspawnd and the underlying hypervisor tooling.
+
+| Crate                        | Path                              | Description                                              |
+|------------------------------|-----------------------------------|----------------------------------------------------------|
+| `vmspawnd-driver-core`       | `backend/crates/driver-core`      | Trait definitions: `VMDriver` (lifecycle operations), `ResourceStatsDriver` (metrics). Defines `MachineInfo`, `LogEntry`, `LogStream`. |
+| `vmspawn-driver`             | `backend/vmspawn-driver`          | Process-based driver. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
+| `vmspawnd-machinectl-driver` | `backend/crates/machinectl-driver`| D-Bus driver implementing `VMDriver` trait. Communicates with `systemd-machined` via `zbus` for machine lifecycle, properties, and log streaming. |
+| `vmspawnd-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. |
+
+## Networking
+
+Ten crates provide a full-featured software-defined networking stack.
+
+| Crate            | Path                         | Description                                              |
+|------------------|------------------------------|----------------------------------------------------------|
+| `networking`     | `backend/networking`         | Base networking utilities. Bridge and TAP device setup, interface enumeration, networkd configuration file generation. |
+| `network-policy` | `backend/network-policy`     | L3/L4 network access control. Policy engine for identity-based traffic rules. Integrates with nftables for enforcement. |
+| `service-mesh`   | `backend/service-mesh`       | Service discovery and load balancing. Service registration, backend health checking, traffic routing. |
+| `traffic-shaping`| `backend/traffic-shaping`    | Quality of Service (QoS) management. Bandwidth limits, priority queuing via Linux `tc` (traffic control). |
+| `dns-policy`     | `backend/dns-policy`         | DNS zone and record management. Per-VM DNS policies, zone delegation, integration with systemd-resolved. |
+| `vm-firewall`    | `backend/vm-firewall`        | Per-VM firewall management. Firewall profiles and zones. Rules enforcement via nftables. |
+| `vpn-mesh`       | `backend/vpn-mesh`           | VPN mesh networking. WireGuard tunnel creation and management, overlay network topology. |
+| `packet-mirror`  | `backend/packet-mirror`      | Traffic mirroring. Mirror session management for network debugging and analysis. |
+| `nat-gateway`    | `backend/nat-gateway`        | NAT gateway management. SNAT/DNAT rules, NAT pools, gateway lifecycle. |
+| `net-monitor`    | `backend/net-monitor`        | Network monitoring. Per-VM bandwidth metrics collection, alerting policies, threshold-based notifications. |
+
+## Storage
+
+| Crate                | Path                         | Description                                              |
+|----------------------|------------------------------|----------------------------------------------------------|
+| `vmspawnd-storage`   | `backend/crates/storage`     | Storage pool and volume management. Supports Local, NFS, LVM, LVM-Thin, ZFS, and Ceph backends. Volume attach/detach, online resize. |
+| `distributed-storage`| `backend/distributed-storage`| Distributed storage orchestration. Datastore clusters, storage migration, storage policies, SDRS recommendations, compliance checking. |
+
+## System Internals
+
+| Crate                 | Path                          | Description                                              |
+|-----------------------|-------------------------------|----------------------------------------------------------|
+| `vmspawnd-system`     | `backend/crates/system`       | System resource management. CPU topology, NUMA placement, memory balloon, hugepages, KSM deduplication, nested virtualization. |
+| `vmspawnd-vm`         | `backend/crates/vm`           | VM-level utilities. Checkpoint/restore, VM forking, hotplug (CPU, memory, disk, NIC), firmware management (UEFI, Secure Boot, TPM). |
+| `vmspawnd-lock-manager`| `backend/crates/lock-manager`| Distributed lock management. Per-resource advisory locks with configurable TTL and automatic renewal. |
+| `vmspawnd-cgroup`     | `backend/crates/cgroup`       | Cgroup v2 integration. Resource accounting, CPU/memory/IO limits for VMs via the cgroup hierarchy. |
+
+## Management
+
+Enterprise management features for large-scale VM deployments.
+
+| Crate                | Path                          | Description                                              |
+|----------------------|-------------------------------|----------------------------------------------------------|
+| `lifecycle-manager`  | `backend/lifecycle-manager`   | Host lifecycle management. Baseline definitions, compliance scanning, remediation tasks, rolling updates with pause/advance. |
+| `certificate-manager`| `backend/certificate-manager` | PKI and certificate management. CA creation, certificate issuance/renewal/revocation, automated rotation, security baselines, hardware attestation. |
+| `resource-pools`     | `backend/resource-pools`      | Resource pool management. CPU/memory/storage reservation, admission control, VM assignment, pool-level quotas. |
+| `encryption`         | `backend/encryption`          | VM disk encryption. Key management provider integration, encryption policies, per-VM encrypt/decrypt, key rotation. |
+| `site-recovery`      | `backend/site-recovery`       | Disaster recovery orchestration. Recovery plans, planned migration, disaster failover, test failover, reprotection workflows. |
+| `replication`        | `backend/replication`         | VM replication. Multi-site replication configuration, sync scheduling, RPO monitoring, recovery instance management. |
+| `migration`          | `backend/migration`           | VM migration. Live migration between hosts, progress tracking, migration cancellation. |
+| `predictive-drs`     | `backend/predictive-drs`      | Predictive Distributed Resource Scheduler. Resource demand forecasting, proactive placement, trend analysis. |
+
+## Infrastructure
+
+| Crate             | Path                       | Description                                              |
+|-------------------|----------------------------|----------------------------------------------------------|
+| `datacenter`      | `backend/datacenter`       | Datacenter hierarchy management. Datacenters, clusters, hosts. Host registration, heartbeat, maintenance mode, health monitoring, auto-discovery. |
+| `host-agent`      | `backend/host-agent`       | Agent for remote host management. Runs on cluster member hosts, reports resource availability, executes controller commands. |
+| `fault-tolerance`  | `backend/fault-tolerance`  | High availability. Continuous VM replication, automatic failover detection, test failover, replication suspend/resume, FT metrics. |
+| `content-library` | `backend/content-library`  | Centralized content management. Image and template libraries, cross-site synchronization, customization specs, host profiles, compliance. |
+| `tpm-support`     | `backend/tpm-support`      | TPM 2.0 integration. Virtual TPM device management for Secure Boot and measured boot chains. |
+
+## Utilities
+
+| Crate                 | Path                           | Description                                              |
+|-----------------------|--------------------------------|----------------------------------------------------------|
+| `cloud-init`          | `backend/cloud-init`           | Cloud-init configuration generation. User-data, meta-data, network-config for NoCloud datasource. SSH key injection, package installation. |
+| `prometheus-exporter` | `backend/prometheus-exporter`  | Prometheus metrics. Exposes `vmspawnd_vms_total`, `vmspawnd_vms_running`, `vmspawnd_vm_starts_total`, etc. via `/metrics` endpoint. |
+| `vnc-proxy`           | `backend/vnc-proxy`            | WebSocket-to-VNC proxy. Bridges browser-based noVNC client to QEMU VNC server for graphical VM console. |
+
+## CLI and UI
+
+| Crate       | Path                  | Description                                              |
+|-------------|-----------------------|----------------------------------------------------------|
+| `vmctl`     | `backend/vmctl`       | Command-line client. Talks to vmspawnd REST API. VM lifecycle commands, image management, status queries. |
+| `vmctl-tui` | `backend/vmctl-tui`   | Terminal UI client. Full-screen ratatui-based interface for VM management with real-time status display. |
+
+### Web UI (not a Rust crate)
+
+| Component       | Path         | Description                                              |
+|-----------------|--------------|----------------------------------------------------------|
+| `vmspawnd-web`  | `.web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
+
+---
+
+## Dependency Summary
+
+### External Crate Dependencies
+
+| Dependency             | Version | Used By           | Purpose                          |
+|------------------------|---------|-------------------|----------------------------------|
+| `tokio`                | 1.44    | All async crates  | Async runtime                    |
+| `axum`                 | 0.8     | vmspawnd          | HTTP framework                   |
+| `serde` / `serde_json` | 1.0     | All crates        | Serialization                    |
+| `anyhow` / `thiserror` | 1.0/2.0 | All crates        | Error handling                   |
+| `tracing`              | 0.1     | All crates        | Structured logging               |
+| `zbus`                 | 4       | machined-dbus     | D-Bus client (async)             |
+| `tower-http`           | 0.6     | vmspawnd          | CORS, file serving, tracing      |
+| `reqwest`              | 0.12    | vmspawnd          | HTTP client for webhooks         |
+| `lettre`               | 0.11    | vmspawnd          | SMTP email notifications         |
+| `rusqlite`             | -       | security          | SQLite user database             |
+| `jsonwebtoken`         | -       | security          | JWT encode/decode                |
+| `pam`                  | -       | security          | PAM authentication               |
+| `prometheus`           | -       | prometheus-exporter | Metrics registry               |
+| `uuid`                 | 1.16    | All crates        | UUID v4/v5 generation            |
+| `chrono`               | 0.4     | All crates        | Date/time handling               |
+| `clap`                 | 4.5     | vmctl, vmctl-tui  | CLI argument parsing             |
+| `ratatui`              | 0.29    | vmctl-tui         | Terminal UI framework            |
+| `crossterm`            | 0.28    | vmctl-tui         | Terminal control                 |
+| `futures`              | 0.3     | Async crates      | Stream/sink utilities            |
+| `rand`                 | 0.9     | security, core    | Random number generation         |
+| `tar` / `flate2`       | 0.4/1.1 | content-library   | Archive handling                 |
+| `regex`                | 1.11    | validation        | Input validation patterns        |
+| `toml`                 | 0.8     | vmspawnd          | Configuration file parsing       |
+| `tokio-util`           | 0.7     | vmspawnd          | CancellationToken for shutdown   |
+
+### Internal Dependency Flow
+
+```
+vmspawnd (main binary)
+  |-- vm-model
+  |-- state-store --> vm-model
+  |-- security
+  |-- vmspawn-driver --> vm-model
+  |-- vmspawnd-driver-core --> vm-model
+  |-- vmspawnd-machinectl-driver --> vmspawnd-driver-core, vmspawnd-machined-dbus
+  |-- vmspawnd-storage
+  |-- vmspawnd-system
+  |-- vmspawnd-vm
+  |-- vmspawnd-lock-manager
+  |-- vmspawnd-cgroup
+  |-- networking
+  |-- network-policy
+  |-- service-mesh
+  |-- traffic-shaping
+  |-- dns-policy
+  |-- vm-firewall
+  |-- vpn-mesh
+  |-- packet-mirror
+  |-- nat-gateway
+  |-- net-monitor
+  |-- cloud-init
+  |-- prometheus-exporter
+  |-- vnc-proxy
+  |-- tpm-support
+  |-- datacenter
+  |-- resource-pools
+  |-- encryption
+  |-- predictive-drs
+  |-- distributed-storage
+  |-- fault-tolerance
+  |-- replication
+  |-- migration
+  |-- site-recovery
+  |-- content-library
+  |-- lifecycle-manager
+  |-- certificate-manager
+```

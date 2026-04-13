@@ -30,6 +30,9 @@ pub async fn create_nat_rule(
     Json(req): Json<CreateNatRuleRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(create_nat_rule));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     if let Some(ref cidr) = req.source_cidr {
         if let Err(e) = crate::validation::validate_cidr(cidr) {
             return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();

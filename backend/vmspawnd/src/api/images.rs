@@ -114,7 +114,8 @@ pub async fn build_image(
     let build_id_clone = build_id.clone();
     let req_clone = req.clone();
 
-    tokio::spawn(async move {
+    let build_id_log = build_id.clone();
+    let handle = tokio::spawn(async move {
         // Update state to building
         if let Ok(Some(mut s)) = state_clone.store.get_entity::<ImageBuildStatus>("image_builds", &build_id_clone) {
             s.state = BuildState::Building;
@@ -155,6 +156,11 @@ pub async fn build_image(
             if let Err(e) = state_clone.store.save_entity("image_builds", &build_id_clone, &s) {
                 tracing::error!("Failed to save image build: {}", e);
             }
+        }
+    });
+    tokio::spawn(async move {
+        if let Err(e) = handle.await {
+            tracing::error!("Background image build task '{}' panicked: {}", build_id_log, e);
         }
     });
 
@@ -395,7 +401,8 @@ pub async fn download_cloud_image(
     let dl_id = download_id.clone();
     let image_name = req.name.clone();
 
-    tokio::spawn(async move {
+    let dl_id_log = download_id.clone();
+    let handle = tokio::spawn(async move {
         // Update state
         if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
             s.state = BuildState::Building;
@@ -445,6 +452,11 @@ pub async fn download_cloud_image(
             }
         }
     });
+    tokio::spawn(async move {
+        if let Err(e) = handle.await {
+            tracing::error!("Background cloud image download task '{}' panicked: {}", dl_id_log, e);
+        }
+    });
 
     Ok((StatusCode::ACCEPTED, Json(status)))
 }
@@ -475,18 +487,10 @@ pub struct IsoImage {
 }
 
 /// Derive a deterministic UUID from a file path so IDs are stable across calls.
+/// Uses UUID v5 (SHA-1 based) which is deterministic and stable across Rust versions,
+/// unlike DefaultHasher which may change between releases.
 fn stable_id_from_path(path: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    path.hash(&mut hasher);
-    let hash = hasher.finish();
-    // Format as a UUID-like string from the hash
-    format!("{:016x}-{:04x}-{:04x}",
-        hash,
-        (hash >> 48) as u16,
-        (hash >> 32) as u16,
-    )
+    uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, path.as_bytes()).to_string()
 }
 
 /// GET /api/images/iso - List available ISO images
@@ -569,7 +573,8 @@ pub async fn download_iso(
     let iso_name = req.name.clone();
     let url = req.url.clone();
 
-    tokio::spawn(async move {
+    let dl_id_log = download_id.clone();
+    let handle = tokio::spawn(async move {
         let iso_dir = "/var/lib/vmspawnd/iso";
         if let Err(e) = tokio::fs::create_dir_all(iso_dir).await { tracing::error!("Failed to create ISO dir: {}", e); return; }
         let dest_path = format!("{}/{}.iso", iso_dir, iso_name);
@@ -600,6 +605,11 @@ pub async fn download_iso(
             Err(e) => {
                 mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, e.to_string()).await;
             }
+        }
+    });
+    tokio::spawn(async move {
+        if let Err(e) = handle.await {
+            tracing::error!("Background ISO download task '{}' panicked: {}", dl_id_log, e);
         }
     });
 
@@ -682,7 +692,13 @@ pub async fn resize_disk(
                 let qmp = crate::qmp::QmpClient::new(&vm_name);
                 if qmp.is_available() {
                     // Parse size to bytes for QMP
-                    let size_bytes = parse_size_to_bytes(&req.size);
+                    let size_bytes = match parse_size_to_bytes(&req.size) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            tracing::warn!("Failed to parse size for QMP resize: {}", e);
+                            return Ok(Json(json!({"status": "resized", "vm": vm_name, "new_size": req.size, "warning": "Offline resize succeeded but online resize skipped due to size parse error"})));
+                        }
+                    };
                     if let Err(e) = qmp.execute("block_resize", json!({"device": "virtio0", "size": size_bytes})) {
                         tracing::warn!("Online resize via QMP failed (offline resize succeeded): {}", e);
                     }
@@ -695,22 +711,24 @@ pub async fn resize_disk(
     Ok(Json(json!({"status": "resized", "vm": vm_name, "new_size": req.size})))
 }
 
-fn parse_size_to_bytes(size: &str) -> u64 {
+fn parse_size_to_bytes(size: &str) -> Result<u64, String> {
     let s = size.trim();
     let s_upper = s.to_uppercase();
     let result = if let Some(n) = s_upper.strip_suffix('T') {
-        n.trim().parse::<u64>().unwrap_or(1) * 1024 * 1024 * 1024 * 1024
+        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024 * 1024 * 1024 * 1024
     } else if let Some(n) = s_upper.strip_suffix('G') {
-        n.trim().parse::<u64>().unwrap_or(1) * 1024 * 1024 * 1024
+        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024 * 1024 * 1024
     } else if let Some(n) = s_upper.strip_suffix('M') {
-        n.trim().parse::<u64>().unwrap_or(1) * 1024 * 1024
+        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024 * 1024
     } else if let Some(n) = s_upper.strip_suffix('K') {
-        n.trim().parse::<u64>().unwrap_or(1) * 1024
+        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024
     } else {
-        s.parse::<u64>().unwrap_or(1)
+        s.parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))?
     };
-    // Ensure minimum of 1 byte to prevent destructive zero-resize
-    result.max(1)
+    if result == 0 {
+        return Err("Size must be greater than zero".to_string());
+    }
+    Ok(result)
 }
 
 // ============================================================================
@@ -762,6 +780,14 @@ pub async fn import_vm_image(
 
     // Validate target format
     validate_image_format(&req.target_format)?;
+
+    // Acquire per-VM lock before duplicate check to prevent TOCTOU races
+    let _lock = state.vm_lock(&req.name).lock_owned().await;
+
+    // Check for duplicate VM name
+    if let Ok(Some(_)) = state.store.get_vm(&req.name) {
+        return Err((StatusCode::CONFLICT, Json(json!({"error": "VM with this name already exists"}))));
+    }
 
     // Detect source format from extension
     let source_format = std::path::Path::new(&req.source_path)

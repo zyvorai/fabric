@@ -5,6 +5,8 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
+pub mod crypto;
+
 // ---------------------------------------------------------------------------
 // Data models – enums
 // ---------------------------------------------------------------------------
@@ -101,6 +103,12 @@ pub struct Certificate {
     pub component: String,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
+    /// PEM-encoded X.509 certificate (generated via rcgen).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cert_pem: Option<String>,
+    /// PEM-encoded private key (PKCS#8, generated via rcgen).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_pem: Option<String>,
 }
 
 /// A certificate authority (internal or external).
@@ -116,6 +124,15 @@ pub struct CertificateAuthority {
     pub certificates_issued: u32,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
+    /// PEM-encoded CA certificate (generated via rcgen for internal CAs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ca_cert_pem: Option<String>,
+    /// PEM-encoded CA private key (PKCS#8, generated via rcgen for internal CAs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ca_key_pem: Option<String>,
+    /// SHA-256 fingerprint of the CA certificate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint_sha256: Option<String>,
 }
 
 /// A certificate signing request submitted to a CA.
@@ -257,11 +274,24 @@ impl CertificateManager {
     // -- Certificate Authorities --------------------------------------------
 
     /// Register a new certificate authority.
-    pub fn create_ca(&self, ca: CertificateAuthority) -> Result<CertificateAuthority> {
-        let mut inner = self.inner.write().unwrap();
+    ///
+    /// For internal CAs (`CaType::Internal`), a real self-signed X.509 CA
+    /// certificate is generated using `rcgen` and stored in the returned
+    /// [`CertificateAuthority`].
+    pub fn create_ca(&self, mut ca: CertificateAuthority) -> Result<CertificateAuthority> {
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if inner.cas.contains_key(&ca.id) {
             bail!("Certificate authority '{}' already exists", ca.id);
         }
+
+        // Generate a real CA certificate for internal CAs.
+        if ca.ca_type == CaType::Internal && ca.ca_cert_pem.is_none() {
+            let ca_output = crypto::generate_ca(&ca.name, 3650)?;
+            ca.ca_cert_pem = Some(ca_output.cert_pem);
+            ca.ca_key_pem = Some(ca_output.key_pem);
+            ca.fingerprint_sha256 = Some(ca_output.fingerprint);
+        }
+
         tracing::info!(
             "Creating certificate authority '{}' (type: {:?})",
             ca.name,
@@ -273,20 +303,20 @@ impl CertificateManager {
 
     /// Look up a certificate authority by ID.
     pub fn get_ca(&self, id: &str) -> Option<CertificateAuthority> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.cas.get(id).cloned()
     }
 
     /// List all registered certificate authorities.
     pub fn list_cas(&self) -> Vec<CertificateAuthority> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.cas.values().cloned().collect()
     }
 
     /// Delete a certificate authority. Fails if certificates have been issued
     /// by it and are still active.
     pub fn delete_ca(&self, id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if !inner.cas.contains_key(id) {
             bail!("Certificate authority '{}' not found", id);
         }
@@ -310,8 +340,13 @@ impl CertificateManager {
     // -- Certificates -------------------------------------------------------
 
     /// Issue a new certificate from a certificate request.
+    ///
+    /// When the CA has PEM material (internal CAs), a real X.509 certificate
+    /// is generated using `rcgen`.  Otherwise a SHA-256 fingerprint is still
+    /// computed from the certificate metadata so the value is always a real
+    /// hash rather than a random UUID.
     pub fn issue_certificate(&self, req: CertificateRequest) -> Result<Certificate> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         let ca = inner
             .cas
@@ -321,15 +356,40 @@ impl CertificateManager {
         let now = Utc::now();
         let not_after = now + Duration::days(req.validity_days as i64);
 
+        // Try to issue a real X.509 certificate if CA PEM material is available.
+        let (fingerprint, serial, cert_pem, key_pem) =
+            if let (Some(ca_cert), Some(ca_key)) = (ca.ca_cert_pem.clone(), ca.ca_key_pem.clone())
+            {
+                let output = crypto::issue_certificate(
+                    &req.common_name,
+                    &req.subject_alt_names,
+                    req.validity_days,
+                    &ca_cert,
+                    &ca_key,
+                )?;
+                (output.fingerprint, output.serial, Some(output.cert_pem), Some(output.key_pem))
+            } else {
+                // Fallback: compute a real SHA-256 hash from certificate metadata.
+                let data = format!(
+                    "{}:{}:{}",
+                    req.common_name,
+                    uuid::Uuid::new_v4(),
+                    now.to_rfc3339()
+                );
+                let fingerprint = crypto::compute_fingerprint(data.as_bytes());
+                let serial = uuid::Uuid::new_v4().to_string();
+                (fingerprint, serial, None, None)
+            };
+
         let cert = Certificate {
             id: uuid::Uuid::new_v4().to_string(),
             common_name: req.common_name.clone(),
             subject_alt_names: req.subject_alt_names.clone(),
             issuer: req.ca_id.clone(),
-            serial_number: uuid::Uuid::new_v4().to_string(),
+            serial_number: serial,
             not_before: now,
             not_after,
-            fingerprint_sha256: format!("sha256:{}", uuid::Uuid::new_v4()),
+            fingerprint_sha256: fingerprint,
             key_algorithm: req.key_algorithm.clone(),
             usage: req.usage.clone(),
             status: CertStatus::Active,
@@ -337,6 +397,8 @@ impl CertificateManager {
             component: req.component.clone(),
             created: now,
             updated: now,
+            cert_pem,
+            key_pem,
         };
 
         ca.certificates_issued += 1;
@@ -353,13 +415,13 @@ impl CertificateManager {
 
     /// Look up a certificate by ID.
     pub fn get_certificate(&self, id: &str) -> Option<Certificate> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.certificates.get(id).cloned()
     }
 
     /// List certificates, optionally filtered by component name.
     pub fn list_certificates(&self, component: Option<&str>) -> Vec<Certificate> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner
             .certificates
             .values()
@@ -373,7 +435,7 @@ impl CertificateManager {
 
     /// Revoke an active certificate.
     pub fn revoke_certificate(&self, id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         let cert = inner
             .certificates
             .get_mut(id)
@@ -391,8 +453,11 @@ impl CertificateManager {
 
     /// Renew an existing certificate. Creates a new certificate with the same
     /// parameters and marks the old one as expired.
+    ///
+    /// If the issuing CA has PEM material, a new real X.509 certificate is
+    /// generated.  Otherwise a SHA-256 fingerprint is computed from metadata.
     pub fn renew_certificate(&self, id: &str) -> Result<Certificate> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         let old_cert = inner
             .certificates
@@ -406,16 +471,50 @@ impl CertificateManager {
 
         let now = Utc::now();
         let validity = old_cert.not_after - old_cert.not_before;
+        let validity_days = validity.num_days().max(1) as u32;
+
+        // Try to issue a real X.509 certificate if CA PEM material is available.
+        let ca_pem = inner
+            .cas
+            .get(&old_cert.issuer)
+            .and_then(|ca| {
+                ca.ca_cert_pem
+                    .as_ref()
+                    .zip(ca.ca_key_pem.as_ref())
+                    .map(|(c, k)| (c.clone(), k.clone()))
+            });
+
+        let (fingerprint, serial, cert_pem, key_pem) = if let Some((ca_cert, ca_key)) = ca_pem {
+            let output = crypto::issue_certificate(
+                &old_cert.common_name,
+                &old_cert.subject_alt_names,
+                validity_days,
+                &ca_cert,
+                &ca_key,
+            )?;
+            (output.fingerprint, output.serial, Some(output.cert_pem), Some(output.key_pem))
+        } else {
+            // Fallback: compute a real SHA-256 hash from certificate metadata.
+            let data = format!(
+                "{}:{}:{}",
+                old_cert.common_name,
+                uuid::Uuid::new_v4(),
+                now.to_rfc3339()
+            );
+            let fingerprint = crypto::compute_fingerprint(data.as_bytes());
+            let serial = uuid::Uuid::new_v4().to_string();
+            (fingerprint, serial, None, None)
+        };
 
         let new_cert = Certificate {
             id: uuid::Uuid::new_v4().to_string(),
             common_name: old_cert.common_name.clone(),
             subject_alt_names: old_cert.subject_alt_names.clone(),
             issuer: old_cert.issuer.clone(),
-            serial_number: uuid::Uuid::new_v4().to_string(),
+            serial_number: serial,
             not_before: now,
             not_after: now + validity,
-            fingerprint_sha256: format!("sha256:{}", uuid::Uuid::new_v4()),
+            fingerprint_sha256: fingerprint,
             key_algorithm: old_cert.key_algorithm.clone(),
             usage: old_cert.usage.clone(),
             status: CertStatus::Active,
@@ -423,6 +522,8 @@ impl CertificateManager {
             component: old_cert.component.clone(),
             created: now,
             updated: now,
+            cert_pem,
+            key_pem,
         };
 
         // Mark old certificate as expired.
@@ -448,7 +549,7 @@ impl CertificateManager {
 
     /// Return all certificates expiring within the given number of days.
     pub fn check_expiring_certificates(&self, days: u32) -> Vec<Certificate> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         let threshold = Utc::now() + Duration::days(days as i64);
         inner
             .certificates
@@ -462,7 +563,7 @@ impl CertificateManager {
 
     /// Submit a new certificate signing request.
     pub fn submit_request(&self, mut req: CertificateRequest) -> Result<CertificateRequest> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         if !inner.cas.contains_key(&req.ca_id) {
             bail!("CA '{}' not found", req.ca_id);
@@ -486,7 +587,7 @@ impl CertificateManager {
     /// Approve a pending certificate request and issue the certificate.
     pub fn approve_request(&self, id: &str) -> Result<Certificate> {
         let req = {
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
             let req = inner
                 .requests
                 .get_mut(id)
@@ -508,7 +609,7 @@ impl CertificateManager {
         let cert = self.issue_certificate(req.clone())?;
 
         // Mark the request as issued.
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(r) = inner.requests.get_mut(id) {
             r.status = CsrStatus::Issued;
         }
@@ -523,7 +624,7 @@ impl CertificateManager {
 
     /// Reject a pending certificate request.
     pub fn reject_request(&self, id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         let req = inner
             .requests
             .get_mut(id)
@@ -544,7 +645,7 @@ impl CertificateManager {
 
     /// List certificate requests, optionally filtered by status.
     pub fn list_requests(&self, status: Option<CsrStatus>) -> Vec<CertificateRequest> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner
             .requests
             .values()
@@ -564,7 +665,7 @@ impl CertificateManager {
         cert_id: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<CertificateRotation> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         let cert = inner
             .certificates
@@ -597,7 +698,7 @@ impl CertificateManager {
     /// record the result.
     pub fn execute_rotation(&self, rotation_id: &str) -> Result<Certificate> {
         let cert_id = {
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
             let rotation = inner
                 .rotations
                 .get_mut(rotation_id)
@@ -621,7 +722,7 @@ impl CertificateManager {
         let new_cert = match self.renew_certificate(&cert_id) {
             Ok(cert) => cert,
             Err(e) => {
-                let mut inner = self.inner.write().unwrap();
+                let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
                 if let Some(rot) = inner.rotations.get_mut(rotation_id) {
                     rot.status = RotationStatus::Failed;
                     rot.error = Some(e.to_string());
@@ -632,7 +733,7 @@ impl CertificateManager {
         };
 
         // Mark rotation as completed.
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(rot) = inner.rotations.get_mut(rotation_id) {
             rot.status = RotationStatus::Completed;
             rot.new_cert_fingerprint = Some(new_cert.fingerprint_sha256.clone());
@@ -649,7 +750,7 @@ impl CertificateManager {
 
     /// List all rotation records.
     pub fn list_rotations(&self) -> Vec<CertificateRotation> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.rotations.values().cloned().collect()
     }
 
@@ -657,7 +758,7 @@ impl CertificateManager {
 
     /// Register or update a host trust chain.
     pub fn register_host_trust(&self, trust: TrustChain) -> Result<()> {
-        let inner_read = self.inner.read().unwrap();
+        let inner_read = self.inner.read().unwrap_or_else(|e| e.into_inner());
         for ca_id in &trust.trusted_ca_ids {
             if !inner_read.cas.contains_key(ca_id) {
                 drop(inner_read);
@@ -666,7 +767,7 @@ impl CertificateManager {
         }
         drop(inner_read);
 
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         tracing::info!(
             "Registered trust chain for host '{}' ({})",
             trust.host_id,
@@ -681,7 +782,7 @@ impl CertificateManager {
     /// Verify a host's trust chain. Checks that all referenced CAs exist and
     /// the client certificate (if any) is active.
     pub fn verify_host_trust(&self, host_id: &str) -> Result<bool> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         let trust = inner
             .trust_chains
@@ -721,7 +822,7 @@ impl CertificateManager {
 
     /// List all registered trust chains.
     pub fn list_trust_chains(&self) -> Vec<TrustChain> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.trust_chains.values().cloned().collect()
     }
 
@@ -732,7 +833,7 @@ impl CertificateManager {
         &self,
         attestation: TrustAttestation,
     ) -> Result<TrustAttestation> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         tracing::info!(
             "Submitted attestation for host '{}' ({})",
             attestation.host_id,
@@ -746,20 +847,20 @@ impl CertificateManager {
 
     /// Look up a host attestation by host ID.
     pub fn get_attestation(&self, host_id: &str) -> Option<TrustAttestation> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.attestations.get(host_id).cloned()
     }
 
     /// List all attestations.
     pub fn list_attestations(&self) -> Vec<TrustAttestation> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.attestations.values().cloned().collect()
     }
 
     /// Verify a host attestation. The host is considered trusted when TPM is
     /// present, secure boot is enabled, and measured boot is valid.
     pub fn verify_attestation(&self, host_id: &str) -> Result<bool> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         let att = inner
             .attestations
             .get_mut(host_id)
@@ -790,7 +891,7 @@ impl CertificateManager {
         &self,
         baseline: VmSecurityBaseline,
     ) -> Result<VmSecurityBaseline> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if inner.baselines.contains_key(&baseline.id) {
             bail!("Security baseline '{}' already exists", baseline.id);
         }
@@ -803,19 +904,19 @@ impl CertificateManager {
 
     /// Look up a security baseline by ID.
     pub fn get_security_baseline(&self, id: &str) -> Option<VmSecurityBaseline> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.baselines.get(id).cloned()
     }
 
     /// List all security baselines.
     pub fn list_security_baselines(&self) -> Vec<VmSecurityBaseline> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.baselines.values().cloned().collect()
     }
 
     /// Delete a security baseline.
     pub fn delete_security_baseline(&self, id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if !inner.baselines.contains_key(id) {
             bail!("Security baseline '{}' not found", id);
         }
@@ -834,7 +935,7 @@ impl CertificateManager {
         vm_secure_boot: bool,
         host_trusted: bool,
     ) -> VmSecurityCompliance {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
 
         let baseline = match inner.baselines.get(baseline_id) {
             Some(b) => b.clone(),
@@ -882,7 +983,7 @@ impl CertificateManager {
 
     /// Build an aggregate health dashboard for the certificate infrastructure.
     pub fn get_health_dashboard(&self) -> CertHealthDashboard {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         let now = Utc::now();
         let expiry_threshold = now + Duration::days(30);
 
@@ -949,6 +1050,9 @@ mod tests {
             certificates_issued: 0,
             created: now,
             updated: now,
+            ca_cert_pem: None,
+            ca_key_pem: None,
+            fingerprint_sha256: None,
         }
     }
 
@@ -1294,11 +1398,16 @@ mod tests {
             component: "vmspawnd".to_string(),
             created: now,
             updated: now,
+            cert_pem: None,
+            key_pem: None,
         };
         let json = serde_json::to_string(&cert).unwrap();
         let de: Certificate = serde_json::from_str(&json).unwrap();
         assert_eq!(de.common_name, "test.local");
         assert_eq!(de.key_algorithm, KeyAlgorithm::Ed25519);
         assert_eq!(de.subject_alt_names.len(), 2);
+        // Verify that None PEM fields are omitted from JSON.
+        assert!(!json.contains("cert_pem"));
+        assert!(!json.contains("key_pem"));
     }
 }

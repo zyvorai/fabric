@@ -207,6 +207,11 @@ impl MigrationManager {
 
     /// Cancel ongoing migration
     pub async fn cancel_migration(&self, vm_name: &str) -> Result<()> {
+        // Validate vm_name to prevent regex injection in pgrep/pkill patterns
+        if vm_name.is_empty() || !vm_name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) {
+            return Err(anyhow::anyhow!("Invalid VM name for migration"));
+        }
+
         tracing::info!("Cancelling migration for VM {}", vm_name);
 
         // Kill rsync processes for this VM
@@ -223,6 +228,11 @@ impl MigrationManager {
 
     /// Get migration status
     pub async fn get_migration_status(&self, vm_name: &str) -> Result<MigrationStatus> {
+        // Validate vm_name to prevent regex injection in pgrep/pkill patterns
+        if vm_name.is_empty() || !vm_name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) {
+            return Err(anyhow::anyhow!("Invalid VM name for migration"));
+        }
+
         // Check if migration is in progress
         let output = Command::new("pgrep")
             .args(["-f", &format!("rsync.*{}", vm_name)])

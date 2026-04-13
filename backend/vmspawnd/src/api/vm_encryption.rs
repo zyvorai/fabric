@@ -31,7 +31,7 @@ pub async fn register_provider(
     Json(mut provider): Json<KeyProvider>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(register_provider));
-    if provider.id.is_empty() { provider.id = Uuid::new_v4().to_string(); }
+    provider.id = Uuid::new_v4().to_string();
     let now = Utc::now();
     provider.created = now;
     provider.updated = now;
@@ -51,7 +51,7 @@ pub async fn remove_provider(
         tracing::error!("Failed to delete provider: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 pub async fn test_provider(
@@ -68,8 +68,8 @@ pub async fn test_provider(
             };
             Json(serde_json::json!({"connected": ok})).into_response()
         }
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Key provider not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -110,8 +110,8 @@ pub async fn get_policy(
     tracing::debug!("vm_encryption::{}", stringify!(get_policy));
     match state.store.get_entity::<EncryptionPolicy>("encryption_policies", &id) {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Encryption policy not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -122,6 +122,9 @@ pub async fn update_policy(
     Json(mut policy): Json<EncryptionPolicy>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_encryption::{}", stringify!(update_policy));
+    if state.store.get_entity::<EncryptionPolicy>("encryption_policies", &id).ok().flatten().is_none() {
+        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Not found"}))).into_response();
+    }
     policy.id = id.clone();
     policy.updated = Utc::now();
     if let Err(e) = state.store.save_entity("encryption_policies", &id, &policy) {
@@ -141,7 +144,7 @@ pub async fn delete_policy(
         tracing::error!("Failed to delete encryption policy: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 // ============================================================================
@@ -166,13 +169,14 @@ pub async fn encrypt_vm(
     let policy = match state.store.get_entity::<EncryptionPolicy>("encryption_policies", &req.policy_id) {
         Ok(Some(p)) => p,
         Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Policy not found"}))).into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
+    let key_id = Uuid::new_v4().to_string();
     let status = VmEncryptionStatus {
         vm_name: req.vm_name.clone(),
         encrypted: true,
         policy_id: Some(req.policy_id),
-        key_id: Some(Uuid::new_v4().to_string()),
+        key_id: Some(key_id.clone()),
         algorithm: Some(policy.algorithm),
         vmotion_encrypted: policy.encrypt_vmotion,
         last_key_rotation: None,
@@ -181,6 +185,48 @@ pub async fn encrypt_vm(
         tracing::error!("Failed to save encryption status: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
+
+    // Attempt actual disk encryption using qemu-img LUKS.
+    let vm_name = req.vm_name.clone();
+    let key_for_encrypt = key_id;
+    tokio::task::spawn_blocking(move || {
+        let image_path = format!("/var/lib/vmspawnd/images/{}.qcow2", vm_name);
+        if !std::path::Path::new(&image_path).exists() {
+            tracing::debug!("No disk image at '{}', skipping disk encryption", image_path);
+            return;
+        }
+        let encrypted_path = format!("{}.encrypted", image_path);
+        let secret_file = format!("/tmp/vmspawnd-encrypt-{}", Uuid::new_v4().simple());
+        if let Err(e) = std::fs::write(&secret_file, &key_for_encrypt) {
+            tracing::error!("Failed to write secret file: {}", e);
+            return;
+        }
+        let output = std::process::Command::new("qemu-img")
+            .args([
+                "convert", "-f", "qcow2", "-O", "qcow2",
+                "--object", &format!("secret,id=sec0,file={}", secret_file),
+                "-o", "encrypt.format=luks,encrypt.key-secret=sec0",
+                &image_path, &encrypted_path,
+            ])
+            .output();
+        let _ = std::fs::remove_file(&secret_file);
+        match output {
+            Ok(out) if out.status.success() => {
+                if let Err(e) = std::fs::rename(&encrypted_path, &image_path) {
+                    tracing::error!("Failed to replace with encrypted disk: {}", e);
+                } else {
+                    tracing::info!("Encrypted disk image for VM '{}'", vm_name);
+                }
+            }
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                tracing::error!("qemu-img encryption failed for VM '{}': {}", vm_name, stderr);
+                let _ = std::fs::remove_file(&encrypted_path);
+            }
+            Err(e) => tracing::error!("Failed to run qemu-img: {}", e),
+        }
+    });
+
     (StatusCode::OK, Json(status)).into_response()
 }
 
@@ -210,7 +256,7 @@ pub async fn decrypt_vm(
     if let Err(e) = state.store.save_entity("vm_encryption", &req.vm_name, &status) {
         tracing::error!("Failed to save: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "VM decrypted"}))).into_response()
 }
 
 pub async fn get_vm_encryption_status(
@@ -224,8 +270,8 @@ pub async fn get_vm_encryption_status(
     }
     match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VM encryption status not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -250,8 +296,8 @@ pub async fn rotate_vm_key(
     }
     let mut status = match state.store.get_entity::<VmEncryptionStatus>("vm_encryption", &vm_name) {
         Ok(Some(s)) => s,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VM encryption status not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     if !status.encrypted {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "VM is not encrypted"}))).into_response();

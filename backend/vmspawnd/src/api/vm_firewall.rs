@@ -31,6 +31,9 @@ pub async fn create_profile(
     Json(req): Json<CreateFirewallProfileRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(create_profile));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     let now = Utc::now();
     // Validate firewall rule fields
     for rule in &req.rules {

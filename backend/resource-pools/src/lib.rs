@@ -205,7 +205,7 @@ impl ResourcePoolManager {
 
     /// Create a new resource pool and return it.
     pub fn create_pool(&self, req: CreateResourcePoolRequest) -> Result<ResourcePool> {
-        let mut pools = self.pools.write().unwrap();
+        let mut pools = self.pools.write().unwrap_or_else(|e| e.into_inner());
 
         // If a parent is specified, validate it exists and belongs to the same
         // cluster, then register the new pool as a child.
@@ -261,13 +261,13 @@ impl ResourcePoolManager {
 
     /// Get a single pool by id.
     pub fn get_pool(&self, id: &str) -> Option<ResourcePool> {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
         pools.get(id).cloned()
     }
 
     /// List pools, optionally filtered by cluster id.
     pub fn list_pools(&self, cluster_id: Option<&str>) -> Vec<ResourcePool> {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
         pools
             .values()
             .filter(|p| match cluster_id {
@@ -280,7 +280,7 @@ impl ResourcePoolManager {
 
     /// Apply a partial update to an existing pool.
     pub fn update_pool(&self, id: &str, req: UpdateResourcePoolRequest) -> Result<ResourcePool> {
-        let mut pools = self.pools.write().unwrap();
+        let mut pools = self.pools.write().unwrap_or_else(|e| e.into_inner());
         let pool = pools
             .get_mut(id)
             .ok_or_else(|| ResourcePoolError::NotFound(id.to_string()))?;
@@ -321,7 +321,7 @@ impl ResourcePoolManager {
 
     /// Delete a pool.  Fails if the pool has children or assigned VMs.
     pub fn delete_pool(&self, id: &str) -> Result<()> {
-        let mut pools = self.pools.write().unwrap();
+        let mut pools = self.pools.write().unwrap_or_else(|e| e.into_inner());
 
         // Validate the pool exists and has no dependents.
         {
@@ -356,7 +356,7 @@ impl ResourcePoolManager {
 
     /// Build a summary for the given pool, including derived usage figures.
     pub fn get_pool_summary(&self, id: &str) -> Result<ResourcePoolSummary> {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
         let pool = pools
             .get(id)
             .ok_or_else(|| ResourcePoolError::NotFound(id.to_string()))?;
@@ -383,7 +383,7 @@ impl ResourcePoolManager {
 
     /// Assign a VM to a pool.
     pub fn assign_vm(&self, pool_id: &str, vm_name: &str) -> Result<()> {
-        let mut pools = self.pools.write().unwrap();
+        let mut pools = self.pools.write().unwrap_or_else(|e| e.into_inner());
         let pool = pools
             .get_mut(pool_id)
             .ok_or_else(|| ResourcePoolError::NotFound(pool_id.to_string()))?;
@@ -404,7 +404,7 @@ impl ResourcePoolManager {
 
     /// Remove a VM from a pool.
     pub fn unassign_vm(&self, pool_id: &str, vm_name: &str) -> Result<()> {
-        let mut pools = self.pools.write().unwrap();
+        let mut pools = self.pools.write().unwrap_or_else(|e| e.into_inner());
         let pool = pools
             .get_mut(pool_id)
             .ok_or_else(|| ResourcePoolError::NotFound(pool_id.to_string()))?;
@@ -425,7 +425,7 @@ impl ResourcePoolManager {
 
     /// Move a VM from one pool to another.
     pub fn move_vm(&self, from_pool: &str, to_pool: &str, vm_name: &str) -> Result<()> {
-        let mut pools = self.pools.write().unwrap();
+        let mut pools = self.pools.write().unwrap_or_else(|e| e.into_inner());
 
         // Validate source pool and remove VM.
         {
@@ -477,7 +477,7 @@ impl ResourcePoolManager {
         cpu_mhz: u64,
         memory_mb: u64,
     ) -> AdmissionControlResult {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
 
         let pool = match pools.get(pool_id) {
             Some(p) => p,
@@ -572,7 +572,7 @@ impl ResourcePoolManager {
     /// Return the pool identified by `root_id` together with all of its
     /// descendants (breadth-first).
     pub fn get_pool_tree(&self, root_id: &str) -> Vec<ResourcePool> {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
         let mut result = Vec::new();
 
         let root = match pools.get(root_id) {
@@ -603,7 +603,7 @@ impl ResourcePoolManager {
     /// effective reservation includes the parent's unreserved capacity
     /// (recursively).
     pub fn get_effective_reservation(&self, pool_id: &str) -> (u64, u64) {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
         Self::effective_reservation_inner(&pools, pool_id)
     }
 
@@ -642,7 +642,7 @@ impl ResourcePoolManager {
     /// Return the remaining (available) CPU and memory in a pool after
     /// accounting for child reservations and VM reservations.
     pub fn get_available_resources(&self, pool_id: &str) -> (u64, u64) {
-        let pools = self.pools.read().unwrap();
+        let pools = self.pools.read().unwrap_or_else(|e| e.into_inner());
         match pools.get(pool_id) {
             Some(pool) => Self::compute_available(&pools, pool),
             None => (0, 0),

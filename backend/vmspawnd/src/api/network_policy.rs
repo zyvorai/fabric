@@ -27,6 +27,9 @@ pub async fn create_policy(
     Json(req): Json<CreateNetworkPolicyRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("network_policy::{}", stringify!(create_policy));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     // Validate CIDRs in ingress rules
     for rule in &req.ingress {
         for peer in &rule.from {

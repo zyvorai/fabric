@@ -139,6 +139,10 @@ pub async fn create_local_pool(
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_local_pool));
 
+    // Validate pool name
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
+
     // Validate path is within allowed directories
     crate::validation::validate_host_path(&req.path)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
@@ -162,6 +166,10 @@ pub async fn create_nfs_pool(
     Json(req): Json<CreateNfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_nfs_pool));
+
+    // Validate pool name
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
     // Validate NFS server hostname
     crate::validation::validate_hostname(&req.config.server)
@@ -318,6 +326,8 @@ pub async fn create_lvm_pool(
     Json(req): Json<CreateLvmPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_lvm_pool));
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
     crate::validation::validate_hostname(&req.volume_group)
         .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid volume group name: {}", m)))?;
     let result = {
@@ -341,6 +351,8 @@ pub async fn create_lvm_thin_pool(
     Json(req): Json<CreateLvmThinPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_lvm_thin_pool));
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
     crate::validation::validate_hostname(&req.volume_group)
         .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid volume group name: {}", m)))?;
     crate::validation::validate_hostname(&req.thin_pool)
@@ -366,6 +378,8 @@ pub async fn create_zfs_pool(
     Json(req): Json<CreateZfsPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_zfs_pool));
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
     crate::validation::validate_hostname(&req.zpool)
         .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid zpool name: {}", m)))?;
     let result = {
@@ -399,6 +413,8 @@ pub async fn create_ceph_pool(
     Json(req): Json<CreateCephPoolRequest>,
 ) -> Result<Json<StoragePool>, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(create_ceph_pool));
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
     for monitor in &req.monitors {
         crate::validation::validate_hostname(monitor)
             .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid Ceph monitor: {}", m)))?;
@@ -416,6 +432,97 @@ pub async fn create_ceph_pool(
             format!("Failed to create Ceph pool: {}", e),
         )),
     }
+}
+
+// ============================================================================
+// iSCSI endpoints
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct IscsiDiscoverRequest {
+    pub portal: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IscsiLoginRequest {
+    pub portal: String,
+    pub target_iqn: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IscsiLogoutRequest {
+    pub portal: String,
+    pub target_iqn: String,
+}
+
+/// POST /api/storage/iscsi/discover - Discover iSCSI targets on a portal
+pub async fn discover_iscsi_targets(
+    RequireAdmin(_claims): RequireAdmin,
+    Json(req): Json<IscsiDiscoverRequest>,
+) -> Result<Json<Vec<String>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("storage::{}", stringify!(discover_iscsi_targets));
+    crate::validation::validate_hostname(&req.portal)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))))?;
+    vmspawnd_storage::iscsi::discover_targets(&req.portal)
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Discovery failed: {}", e)})),
+            )
+        })
+}
+
+/// POST /api/storage/iscsi/login - Login to an iSCSI target
+pub async fn login_iscsi_target(
+    RequireAdmin(_claims): RequireAdmin,
+    Json(req): Json<IscsiLoginRequest>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("storage::{}", stringify!(login_iscsi_target));
+    crate::validation::validate_hostname(&req.portal)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))))?;
+    vmspawnd_storage::iscsi::login_target(&req.portal, &req.target_iqn)
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        })
+}
+
+/// POST /api/storage/iscsi/logout - Logout from an iSCSI target
+pub async fn logout_iscsi_target(
+    RequireAdmin(_claims): RequireAdmin,
+    Json(req): Json<IscsiLogoutRequest>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("storage::{}", stringify!(logout_iscsi_target));
+    crate::validation::validate_hostname(&req.portal)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))))?;
+    vmspawnd_storage::iscsi::logout_target(&req.portal, &req.target_iqn)
+        .map(|_| StatusCode::OK)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        })
+}
+
+/// GET /api/storage/iscsi/sessions - List active iSCSI sessions
+pub async fn list_iscsi_sessions(
+    RequireRead(_claims): RequireRead,
+) -> Result<Json<Vec<vmspawnd_storage::iscsi::IscsiTarget>>, (StatusCode, Json<serde_json::Value>)>
+{
+    tracing::debug!("storage::{}", stringify!(list_iscsi_sessions));
+    vmspawnd_storage::iscsi::list_sessions()
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        })
 }
 
 #[cfg(test)]

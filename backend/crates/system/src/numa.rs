@@ -60,7 +60,8 @@ impl NumaTopology {
         for entry in fs::read_dir(&node_path)? {
             let entry = entry?;
             let name = entry.file_name();
-            let name_str = name.to_str().unwrap();
+            let name_lossy = name.to_string_lossy();
+            let name_str = name_lossy.as_ref();
 
             if name_str.starts_with("node") && name_str[4..].chars().all(|c| c.is_numeric()) {
                 if let Ok(node_id) = name_str[4..].parse::<u32>() {

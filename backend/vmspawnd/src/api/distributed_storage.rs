@@ -32,6 +32,15 @@ pub async fn create_storage_pool(
     Json(req): Json<CreatePoolRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(create_storage_pool));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    if req.replication_factor == 0 || req.replication_factor > 10 {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "replication_factor must be between 1 and 10"}))).into_response();
+    }
+    if req.hosts.len() > 100 {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "hosts count must not exceed 100"}))).into_response();
+    }
     let total_capacity_gb: u64 = req.hosts.iter().flat_map(|h| h.disks.iter()).map(|d| d.capacity_gb).sum();
     let now = Utc::now();
     let pool = DistributedStoragePool {
@@ -64,8 +73,8 @@ pub async fn get_storage_pool(
     tracing::debug!("distributed_storage::{}", stringify!(get_storage_pool));
     match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &id) {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage pool not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -79,7 +88,7 @@ pub async fn delete_storage_pool(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 pub async fn add_storage_host(
@@ -91,8 +100,8 @@ pub async fn add_storage_host(
     tracing::debug!("distributed_storage::{}", stringify!(add_storage_host));
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     let added_capacity: u64 = host.disks.iter().map(|d| d.capacity_gb).sum();
     pool.hosts.push(host);
@@ -103,7 +112,7 @@ pub async fn add_storage_host(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "host added"}))).into_response()
 }
 
 pub async fn remove_storage_host(
@@ -114,8 +123,8 @@ pub async fn remove_storage_host(
     tracing::debug!("distributed_storage::{}", stringify!(remove_storage_host));
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     // Calculate capacity being removed
     let removed_capacity: u64 = pool.hosts.iter()
@@ -130,7 +139,7 @@ pub async fn remove_storage_host(
     if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "host removed"}))).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -148,8 +157,8 @@ pub async fn report_disk_failure(
     tracing::debug!("distributed_storage::{}", stringify!(report_disk_failure));
     let mut pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     pool.status = PoolStatus::Degraded;
     pool.health = PoolHealth::Warning;
@@ -157,7 +166,7 @@ pub async fn report_disk_failure(
     if let Err(e) = state.store.save_entity("dist_storage_pools", &pool.id, &pool) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "disk failure reported"}))).into_response()
 }
 
 pub async fn get_pool_health(
@@ -168,8 +177,8 @@ pub async fn get_pool_health(
     tracing::debug!("distributed_storage::{}", stringify!(get_pool_health));
     let pool = match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &pool_id) {
         Ok(Some(p)) => p,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     let capacity_used_pct = if pool.total_capacity_gb > 0 {
         (pool.used_capacity_gb as f64 / pool.total_capacity_gb as f64) * 100.0
@@ -203,12 +212,18 @@ pub async fn start_storage_migration(
     Json(req): Json<StartMigrationRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(start_storage_migration));
+    if let Err((s, m)) = crate::validation::validate_vm_name(&req.vm_name) {
+        return (s, Json(serde_json::json!({"error": m}))).into_response();
+    }
+    if req.disk_size_gb == 0 {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "disk_size_gb must be at least 1"}))).into_response();
+    }
     let now = Utc::now();
     let migration = StorageMigration {
         id: Uuid::new_v4().to_string(),
-        vm_name: req.vm_name,
-        source_pool_id: req.source_pool_id,
-        target_pool_id: req.target_pool_id,
+        vm_name: req.vm_name.clone(),
+        source_pool_id: req.source_pool_id.clone(),
+        target_pool_id: req.target_pool_id.clone(),
         disk_size_gb: req.disk_size_gb,
         bytes_transferred: 0,
         progress_pct: 0.0,
@@ -217,10 +232,90 @@ pub async fn start_storage_migration(
         completed: None,
         error: None,
     };
-    match state.store.save_entity("storage_migrations", &migration.id, &migration) {
-        Ok(_) => (StatusCode::CREATED, Json(migration)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    if let Err(e) = state.store.save_entity("storage_migrations", &migration.id, &migration) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
+
+    // Perform actual data movement in a background task using qemu-img convert
+    let migration_id = migration.id.clone();
+    let vm_name = req.vm_name.clone();
+    let source_pool_id = req.source_pool_id.clone();
+    let target_pool_id = req.target_pool_id.clone();
+    let disk_size_gb = req.disk_size_gb;
+    let store = state.store.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let source_path = format!(
+            "/var/lib/vmspawnd/storage/{}/{}.qcow2",
+            source_pool_id, vm_name
+        );
+        let dest_dir = format!("/var/lib/vmspawnd/storage/{}", target_pool_id);
+        let dest_path = format!("{}/{}.qcow2", dest_dir, vm_name);
+
+        if !std::path::Path::new(&source_path).exists() {
+            tracing::debug!(
+                "Source '{}' not found for migration {}, metadata-only",
+                source_path, migration_id
+            );
+            return;
+        }
+
+        if let Err(e) = std::fs::create_dir_all(&dest_dir) {
+            tracing::error!("Failed to create dest dir '{}': {}", dest_dir, e);
+            let m = StorageMigration {
+                id: migration_id.clone(),
+                vm_name: vm_name.clone(),
+                source_pool_id,
+                target_pool_id,
+                disk_size_gb,
+                bytes_transferred: 0,
+                progress_pct: 0.0,
+                status: MigrationStatus::Failed,
+                started: Some(Utc::now()),
+                completed: Some(Utc::now()),
+                error: Some(format!("Failed to create destination: {}", e)),
+            };
+            let _ = store.save_entity("storage_migrations", &m.id, &m);
+            return;
+        }
+
+        let output = std::process::Command::new("qemu-img")
+            .args(["convert", "-f", "qcow2", "-O", "qcow2", "-p", &source_path, &dest_path])
+            .output();
+
+        match output {
+            Ok(out) if out.status.success() => {
+                let bytes = std::fs::metadata(&dest_path).map(|m| m.len()).unwrap_or(0);
+                if let Ok(Some(mut m)) = store.get_entity::<StorageMigration>("storage_migrations", &migration_id) {
+                    m.bytes_transferred = bytes;
+                    m.progress_pct = 100.0;
+                    m.status = MigrationStatus::Completed;
+                    m.completed = Some(Utc::now());
+                    let _ = store.save_entity("storage_migrations", &m.id, &m);
+                }
+                tracing::info!("Storage migration {} completed ({} bytes)", migration_id, bytes);
+            }
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                tracing::error!("qemu-img failed for migration {}: {}", migration_id, stderr);
+                let _ = std::fs::remove_file(&dest_path);
+                if let Ok(Some(mut m)) = store.get_entity::<StorageMigration>("storage_migrations", &migration_id) {
+                    m.status = MigrationStatus::Failed;
+                    m.error = Some(format!("qemu-img convert failed: {}", stderr));
+                    m.completed = Some(Utc::now());
+                    let _ = store.save_entity("storage_migrations", &m.id, &m);
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "qemu-img not available for migration {}: {} (left as in-progress)",
+                    migration_id, e
+                );
+            }
+        }
+    });
+
+    (StatusCode::CREATED, Json(migration)).into_response()
 }
 
 pub async fn get_storage_migration(
@@ -231,8 +326,8 @@ pub async fn get_storage_migration(
     tracing::debug!("distributed_storage::{}", stringify!(get_storage_migration));
     match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage migration not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -256,8 +351,8 @@ pub async fn update_migration_progress(
     tracing::debug!("distributed_storage::{}", stringify!(update_migration_progress));
     let mut m = match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => m,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage migration not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     m.bytes_transferred = req.bytes_transferred;
     let total_bytes = m.disk_size_gb * 1024 * 1024 * 1024;
@@ -265,7 +360,7 @@ pub async fn update_migration_progress(
     if let Err(e) = state.store.save_entity("storage_migrations", &m.id, &m) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "progress updated"}))).into_response()
 }
 
 pub async fn complete_migration(
@@ -276,8 +371,8 @@ pub async fn complete_migration(
     tracing::debug!("distributed_storage::{}", stringify!(complete_migration));
     let mut m = match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => m,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage migration not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     m.status = MigrationStatus::Completed;
     m.progress_pct = 100.0;
@@ -285,7 +380,7 @@ pub async fn complete_migration(
     if let Err(e) = state.store.save_entity("storage_migrations", &m.id, &m) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "migration completed"}))).into_response()
 }
 
 pub async fn cancel_migration(
@@ -296,15 +391,15 @@ pub async fn cancel_migration(
     tracing::debug!("distributed_storage::{}", stringify!(cancel_migration));
     let mut m = match state.store.get_entity::<StorageMigration>("storage_migrations", &id) {
         Ok(Some(m)) => m,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage migration not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     m.status = MigrationStatus::Cancelled;
     m.completed = Some(Utc::now());
     if let Err(e) = state.store.save_entity("storage_migrations", &m.id, &m) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    StatusCode::OK.into_response()
+    (StatusCode::OK, Json(serde_json::json!({"status": "migration cancelled"}))).into_response()
 }
 
 // ============================================================================
@@ -341,8 +436,8 @@ pub async fn get_storage_policy(
     tracing::debug!("distributed_storage::{}", stringify!(get_storage_policy));
     match state.store.get_entity::<StoragePolicy>("storage_policies", &id) {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage policy not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -353,6 +448,9 @@ pub async fn update_storage_policy(
     Json(mut policy): Json<StoragePolicy>,
 ) -> impl IntoResponse {
     tracing::debug!("distributed_storage::{}", stringify!(update_storage_policy));
+    if state.store.get_entity::<StoragePolicy>("storage_policies", &id).ok().flatten().is_none() {
+        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Not found"}))).into_response();
+    }
     policy.id = id.clone();
     policy.updated = Utc::now();
     if let Err(e) = state.store.save_entity("storage_policies", &id, &policy) {
@@ -372,7 +470,7 @@ pub async fn delete_storage_policy(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -390,8 +488,8 @@ pub async fn check_compliance(
     tracing::debug!("distributed_storage::{}", stringify!(check_compliance));
     match state.store.get_entity::<DistributedStoragePool>("dist_storage_pools", &req.pool_id) {
         Ok(Some(_)) => {}
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Storage pool not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     let report = ComplianceReport {
         vm_name: req.vm_name,
@@ -447,8 +545,8 @@ pub async fn get_datastore_cluster(
     tracing::debug!("distributed_storage::{}", stringify!(get_datastore_cluster));
     match state.store.get_entity::<DatastoreCluster>("datastore_clusters", &id) {
         Ok(Some(c)) => Json(c).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Datastore cluster not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     }
 }
 
@@ -462,7 +560,7 @@ pub async fn delete_datastore_cluster(
         tracing::error!("Failed to delete entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::NO_CONTENT.into_response()
+    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -479,8 +577,8 @@ pub async fn recommend_datastore(
     tracing::debug!("distributed_storage::{}", stringify!(recommend_datastore));
     let dsc = match state.store.get_entity::<DatastoreCluster>("datastore_clusters", &ds_cluster_id) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Datastore cluster not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
     };
     // Find the pool with the most free space
     let mut best: Option<DistributedStoragePool> = None;

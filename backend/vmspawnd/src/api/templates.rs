@@ -74,6 +74,8 @@ pub async fn create_template(
     Json(req): Json<CreateTemplateRequest>,
 ) -> Result<(StatusCode, Json<VMTemplate>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("templates::{}", stringify!(create_template));
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let now = Utc::now();
 
     let (cpus, memory, disk, image, tags) = if let Some(ref vm_name) = req.from_vm {
@@ -171,6 +173,10 @@ pub async fn update_template(
     Json(req): Json<UpdateTemplateRequest>,
 ) -> Result<Json<VMTemplate>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("templates::{}", stringify!(update_template));
+    if let Some(ref name) = req.name {
+        crate::validation::validate_entity_name(name)
+            .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    }
     let mut template = match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(t)) => t,
         Ok(None) => {
@@ -267,6 +273,9 @@ pub async fn deploy_template(
     tracing::debug!("templates::{}", stringify!(deploy_template));
     crate::validation::validate_vm_name(&req.vm_name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+
+    // Acquire per-VM lock before duplicate check to prevent TOCTOU races
+    let _lock = state.vm_lock(&req.vm_name).lock_owned().await;
 
     let template = match state.store.get_entity::<VMTemplate>("templates", &id) {
         Ok(Some(t)) => t,

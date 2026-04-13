@@ -1,4 +1,4 @@
-use axum::Router;
+use axum::{middleware, Router};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -6,6 +6,22 @@ use vmspawnd::config::{
     AuthConfig, Config, ControllerConfig, DaemonConfig, NetworkConfig, StorageConfig,
 };
 use vmspawnd::server::{AppState, QuotaCache};
+
+/// Test middleware that injects admin Claims into every request.
+/// This is needed because unauthenticated_claims() now defaults to Viewer,
+/// but integration tests need full access.
+async fn inject_admin_claims(
+    mut req: axum::extract::Request,
+    next: middleware::Next,
+) -> axum::response::Response {
+    req.extensions_mut().insert(security::Claims {
+        sub: "test-admin".to_string(),
+        role: security::Role::Admin,
+        exp: usize::MAX,
+        jti: String::new(),
+    });
+    next.run(req).await
+}
 
 pub async fn create_test_app() -> Router {
     let tmp_dir = std::env::temp_dir().join(format!("vmspawnd-test-{}", std::process::id()));
@@ -73,9 +89,15 @@ pub async fn create_test_app() -> Router {
         packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
         nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
         net_monitor: Arc::new(net_monitor::NetMonitor::new()),
+        secrets_manager: Arc::new(secrets_manager::SecretsManager::new()),
+        event_tx: {
+            let (tx, _) = tokio::sync::broadcast::channel(256);
+            tx
+        },
         vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         shutdown: tokio_util::sync::CancellationToken::new(),
     });
 
     vmspawnd::server::build_router(state)
+        .layer(middleware::from_fn(inject_admin_claims))
 }

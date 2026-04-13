@@ -84,6 +84,8 @@ pub async fn assign_floating_ip(
     Json(req): Json<AssignFloatingIpRequest>,
 ) -> Result<Json<FloatingIp>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(assign_floating_ip));
+    crate::validation::validate_vm_name(&req.vm_name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let mut fip = match state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         Ok(Some(f)) => f,
         Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Floating IP not found" })))),
@@ -495,6 +497,11 @@ pub async fn add_dns_record(
         return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record type '{}'. Allowed: {}", req.record_type, allowed_types.join(", ")) }))));
     }
 
+    // Limit total records to prevent unbounded growth
+    if config.records.len() >= 10000 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "DNS configuration has reached the maximum number of records (10000)" }))));
+    }
+
     config.records.push(DnsRecord {
         name: req.name,
         record_type: req.record_type,
@@ -531,12 +538,14 @@ async fn update_hosts_file(config: &DnsConfig) {
     let mut content = String::from("# Managed by vmspawnd - do not edit\n");
     for record in &config.records {
         if record.record_type == "A" {
+            let value = record.value.replace(['\n', '\r'], "");
             let fqdn = if record.name.ends_with('.') {
                 record.name.trim_end_matches('.').to_string()
             } else {
                 format!("{}.{}", record.name, config.domain)
             };
-            content.push_str(&format!("{} {}\n", record.value, fqdn));
+            let fqdn = fqdn.replace(['\n', '\r'], "");
+            content.push_str(&format!("{} {}\n", value, fqdn));
         }
     }
 

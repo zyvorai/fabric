@@ -9,9 +9,13 @@ use axum::{
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
+
+static ACTIVE_WS_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
+const MAX_WS_CONNECTIONS: usize = 50;
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
@@ -33,23 +37,45 @@ pub async fn console_handler(
     Query(query): Query<ConsoleQuery>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    // Check concurrent WebSocket connection limit
+    let current = ACTIVE_WS_CONNECTIONS.load(Ordering::Relaxed);
+    if current >= MAX_WS_CONNECTIONS {
+        tracing::warn!("WebSocket connection limit reached ({}/{})", current, MAX_WS_CONNECTIONS);
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
+
     // Validate VM name to prevent command injection
     validate_vm_name(&vm_name).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Validate authentication if auth is enabled
-    if let Some(jwt_config) = state.jwt_config.as_ref() {
-        let token = query.token.as_deref().ok_or_else(|| {
-            tracing::warn!(
-                "WebSocket console connection rejected: no auth token for VM '{}'",
-                vm_name
-            );
-            StatusCode::UNAUTHORIZED
-        })?;
+    // Validate authentication - reject if auth is not configured
+    let jwt_config = match state.jwt_config.as_ref() {
+        Some(c) => c,
+        None => {
+            tracing::warn!("WebSocket console rejected: authentication not configured");
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+    };
 
-        let _claims = jwt_config.validate_token(token).map_err(|e| {
-            tracing::warn!("WebSocket auth failed for VM '{}': {}", vm_name, e);
-            StatusCode::UNAUTHORIZED
-        })?;
+    let token = query.token.as_deref().ok_or_else(|| {
+        tracing::warn!(
+            "WebSocket console connection rejected: no auth token for VM '{}'",
+            vm_name
+        );
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    let _claims = jwt_config.validate_token(token).map_err(|e| {
+        tracing::warn!("WebSocket auth failed for VM '{}': {}", vm_name, e);
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    // Require at least write permission for console access
+    if !_claims.role.can_write() {
+        tracing::warn!(
+            "WebSocket console rejected: user '{}' has insufficient permissions",
+            _claims.sub
+        );
+        return Err(StatusCode::FORBIDDEN);
     }
 
     Ok(ws
@@ -58,9 +84,11 @@ pub async fn console_handler(
 }
 
 async fn handle_console(socket: WebSocket, vm_name: String) {
+    ACTIVE_WS_CONNECTIONS.fetch_add(1, Ordering::Relaxed);
     tracing::info!(
-        "WebSocket console connection established for VM: {}",
-        vm_name
+        "WebSocket console connection established for VM: {} (active: {})",
+        vm_name,
+        ACTIVE_WS_CONNECTIONS.load(Ordering::Relaxed),
     );
 
     let mut child = match Command::new("machinectl")
@@ -74,6 +102,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
         Ok(child) => child,
         Err(e) => {
             tracing::error!("Failed to spawn machinectl shell: {}", e);
+            ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     };
@@ -86,6 +115,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
             let (mut sender, _) = socket.split();
             let _ = sender.send(Message::Text("\r\n[Error: failed to open console]\r\n".into())).await;
             let _ = sender.send(Message::Close(None)).await;
+            ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     };
@@ -97,6 +127,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
             let (mut sender, _) = socket.split();
             let _ = sender.send(Message::Text("\r\n[Error: failed to open console]\r\n".into())).await;
             let _ = sender.send(Message::Close(None)).await;
+            ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     };
@@ -111,8 +142,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
             match timeout(IDLE_TIMEOUT, stdout.read(&mut buf)).await {
                 Ok(Ok(0)) => break,
                 Ok(Ok(n)) => {
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    if ws_sender.send(Message::Text(data.into())).await.is_err() {
+                    if ws_sender.send(Message::Binary(buf[..n].to_vec().into())).await.is_err() {
                         break;
                     }
                 }
@@ -179,5 +209,10 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
     // Kill the child process
     let _ = child.kill().await;
 
-    tracing::info!("WebSocket console closed for VM: {}", vm_name);
+    ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
+    tracing::info!(
+        "WebSocket console closed for VM: {} (active: {})",
+        vm_name,
+        ACTIVE_WS_CONNECTIONS.load(Ordering::Relaxed),
+    );
 }

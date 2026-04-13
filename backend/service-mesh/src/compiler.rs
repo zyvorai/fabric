@@ -51,7 +51,7 @@ impl ServiceCompiler {
             .iter()
             .map(|vm| Backend {
                 vm_name: vm.name.clone(),
-                ip: vm.ip.clone().unwrap(),
+                ip: vm.ip.clone().unwrap_or_default(),
                 health: BackendHealth::Unknown,
                 consecutive_successes: 0,
                 consecutive_failures: 0,

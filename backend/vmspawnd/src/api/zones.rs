@@ -54,6 +54,12 @@ pub async fn create_zone(
     Json(req): Json<CreateZoneRequest>,
 ) -> Result<(StatusCode, Json<AvailabilityZone>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("zones::{}", stringify!(create_zone));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return Err((status, Json(json!({"error": msg}))));
+    }
+    if req.hosts.len() > 1000 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "hosts count must not exceed 1000"}))));
+    }
     let zone = AvailabilityZone {
         id: uuid::Uuid::new_v4().to_string(),
         name: req.name,
@@ -173,6 +179,9 @@ pub async fn create_spot_instance(
     tracing::debug!("zones::{}", stringify!(create_spot_instance));
     crate::validation::validate_vm_name(&req.vm_name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    if !req.max_price_per_hour.is_finite() || req.max_price_per_hour <= 0.0 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "max_price_per_hour must be a positive finite number"}))));
+    }
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {},

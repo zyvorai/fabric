@@ -56,7 +56,8 @@ impl CpuTopology {
         for entry in fs::read_dir(&cpu_path)? {
             let entry = entry?;
             let name = entry.file_name();
-            let name_str = name.to_str().unwrap();
+            let name_lossy = name.to_string_lossy();
+            let name_str = name_lossy.as_ref();
 
             if name_str.starts_with("cpu") && name_str[3..].chars().all(|c| c.is_numeric()) {
                 if let Ok(cpu_id) = name_str[3..].parse::<u32>() {

@@ -1,3 +1,5 @@
+pub mod quorum;
+
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -290,8 +292,8 @@ impl FaultToleranceManager {
         }
     }
 
-    /// Trigger a real failover: promote the secondary host to primary and
-    /// mark the old primary as lost.
+    /// Trigger a real failover: fence the old primary, promote the secondary
+    /// host to primary, and start the VM on the new primary.
     pub fn trigger_failover(&self, vm_name: &str) -> Result<FailoverResult> {
         let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
@@ -303,11 +305,44 @@ impl FaultToleranceManager {
             return Err(FtError::NotEnabled(vm_name.to_string()).into());
         }
 
+        let start_time = std::time::Instant::now();
+
         let old_primary = config.primary_host_id.clone();
         let new_primary = config.secondary_host_id.clone();
 
-        // Swap roles: the secondary becomes the primary and we need a new
-        // secondary, so transition the status accordingly.
+        // Step 1: Fence the old primary (stop the VM via machinectl).
+        tracing::info!(
+            vm = vm_name,
+            host = %old_primary,
+            "FT failover: fencing VM on old primary"
+        );
+        let fence_method = match std::process::Command::new("machinectl")
+            .args(["poweroff", vm_name])
+            .output()
+        {
+            Ok(out) if out.status.success() => {
+                tracing::info!(vm = vm_name, "FT failover: VM powered off on old primary");
+                "poweroff".to_string()
+            }
+            _ => {
+                // Force terminate if graceful poweroff fails.
+                tracing::warn!(
+                    vm = vm_name,
+                    "FT failover: graceful poweroff failed, force terminating"
+                );
+                let _ = std::process::Command::new("machinectl")
+                    .args(["terminate", vm_name])
+                    .output();
+                "terminate".to_string()
+            }
+        };
+
+        // Step 2: Promote the secondary by swapping roles.
+        tracing::info!(
+            vm = vm_name,
+            new_primary = %new_primary,
+            "FT failover: promoting secondary host as primary"
+        );
         config.primary_host_id = new_primary.clone();
         config.secondary_host_id = String::new();
         config.status = FtStatus::NeedSecondary;
@@ -315,23 +350,66 @@ impl FaultToleranceManager {
         config.failover_count += 1;
         config.updated = Utc::now();
 
+        // Step 3: Start the VM on the new primary via systemd-vmspawn.
+        let image_path = format!("/var/lib/machines/{}.raw", vm_name);
+        let (success, error) = match std::process::Command::new("systemd-vmspawn")
+            .args(["--image", &image_path, "--machine", vm_name])
+            .spawn()
+        {
+            Ok(mut child) => match child.wait() {
+                Ok(status) if status.success() => {
+                    tracing::info!(vm = vm_name, "FT failover: VM started on new primary");
+                    (true, None)
+                }
+                Ok(status) => {
+                    let msg = format!(
+                        "systemd-vmspawn exited with status {}",
+                        status.code().unwrap_or(-1)
+                    );
+                    tracing::error!(vm = vm_name, %msg, "FT failover: VM start failed");
+                    (false, Some(msg))
+                }
+                Err(e) => {
+                    let msg = format!("failed waiting for systemd-vmspawn: {e}");
+                    tracing::error!(vm = vm_name, %msg, "FT failover: VM start failed");
+                    (false, Some(msg))
+                }
+            },
+            Err(e) => {
+                let msg = format!("failed to spawn systemd-vmspawn: {e}");
+                tracing::error!(vm = vm_name, %msg, "FT failover: VM start failed");
+                (false, Some(msg))
+            }
+        };
+
+        let downtime_ms = start_time.elapsed().as_millis() as u64;
+
+        // Check replication lag from cached metrics if available.
+        let replication_lag_secs = self
+            .metrics
+            .read()
+            .ok()
+            .and_then(|m| m.get(vm_name).map(|met| met.replication_lag_ms / 1000));
+
         let result = FailoverResult {
             vm_name: vm_name.to_string(),
             old_primary: old_primary.clone(),
             new_primary: new_primary.clone(),
-            downtime_ms: 0, // synchronous replication targets zero downtime
-            data_loss: false,
-            success: true,
-            error: None,
-            fence_method: None,
-            storage_promoted: false,
-            replication_lag_secs: None,
+            downtime_ms,
+            data_loss: replication_lag_secs.unwrap_or(0) > 0,
+            success,
+            error,
+            fence_method: Some(fence_method),
+            storage_promoted: success,
+            replication_lag_secs,
         };
 
         tracing::info!(
             vm = vm_name,
             old_primary = %old_primary,
             new_primary = %new_primary,
+            downtime_ms = downtime_ms,
+            success = success,
             "Failover completed"
         );
 
@@ -354,7 +432,11 @@ impl FaultToleranceManager {
             event_type: FtEventType::FailoverCompleted,
             source_host_id: new_primary,
             target_host_id: None,
-            details: Some("Failover succeeded with zero downtime".to_string()),
+            details: Some(format!(
+                "Failover {}: downtime={}ms",
+                if result.success { "succeeded" } else { "failed" },
+                downtime_ms
+            )),
             timestamp: now,
         })?;
 
@@ -475,8 +557,9 @@ impl FaultToleranceManager {
         Ok(())
     }
 
-    /// Perform a non-disruptive test failover.  This simulates the failover
-    /// sequence without actually swapping the primary and secondary hosts.
+    /// Perform a non-disruptive test failover.  Verifies that the disk image
+    /// exists on the secondary host so the VM *could* be started there.
+    /// Does not actually swap the primary and secondary hosts.
     pub fn test_failover(&self, vm_name: &str) -> Result<FailoverResult> {
         let configs = self.configs.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
@@ -488,20 +571,49 @@ impl FaultToleranceManager {
             return Err(FtError::NotEnabled(vm_name.to_string()).into());
         }
 
+        let start_time = std::time::Instant::now();
+
+        // Verify the VM disk image is available on the secondary by checking
+        // common image paths.  This is a non-disruptive readiness check.
+        let image_path = format!("/var/lib/machines/{}.raw", vm_name);
+        let image_exists = std::path::Path::new(&image_path).exists();
+
+        let (success, error) = if image_exists {
+            tracing::info!(
+                vm = vm_name,
+                image = %image_path,
+                "Test failover: disk image found, VM is recoverable"
+            );
+            (true, None)
+        } else {
+            let msg = format!(
+                "disk image not found at {} on secondary '{}'",
+                image_path, config.secondary_host_id
+            );
+            tracing::warn!(vm = vm_name, %msg, "Test failover: readiness check failed");
+            (false, Some(msg))
+        };
+
+        let downtime_ms = start_time.elapsed().as_millis() as u64;
+
         let result = FailoverResult {
             vm_name: vm_name.to_string(),
             old_primary: config.primary_host_id.clone(),
             new_primary: config.secondary_host_id.clone(),
-            downtime_ms: 0,
+            downtime_ms,
             data_loss: false,
-            success: true,
-            error: None,
+            success,
+            error,
             fence_method: None,
             storage_promoted: false,
             replication_lag_secs: None,
         };
 
-        tracing::info!(vm = vm_name, "Test failover completed (non-disruptive)");
+        tracing::info!(
+            vm = vm_name,
+            success = success,
+            "Test failover completed (non-disruptive)"
+        );
         Ok(result)
     }
 
@@ -632,13 +744,15 @@ mod tests {
         mgr.enable_ft("vm-1", "host-a", "host-b").unwrap();
 
         let result = mgr.trigger_failover("vm-1").unwrap();
-        assert!(result.success);
+        // Real failover invokes machinectl/systemd-vmspawn which are unlikely
+        // to succeed in a unit-test environment, so we only assert structural
+        // correctness, not success.
         assert_eq!(result.old_primary, "host-a");
         assert_eq!(result.new_primary, "host-b");
-        assert!(!result.data_loss);
-        assert_eq!(result.downtime_ms, 0);
+        assert!(result.fence_method.is_some());
 
-        // After failover the VM should need a new secondary.
+        // After failover the VM should need a new secondary regardless of
+        // whether the VM actually started.
         let cfg = mgr.get_ft_config("vm-1").unwrap();
         assert_eq!(cfg.primary_host_id, "host-b");
         assert_eq!(cfg.status, FtStatus::NeedSecondary);
@@ -651,7 +765,8 @@ mod tests {
         mgr.enable_ft("vm-1", "host-a", "host-b").unwrap();
 
         let result = mgr.test_failover("vm-1").unwrap();
-        assert!(result.success);
+        // In test environment the disk image likely does not exist, so
+        // success may be false.  We verify the structural result.
         assert_eq!(result.old_primary, "host-a");
         assert_eq!(result.new_primary, "host-b");
 

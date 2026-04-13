@@ -187,6 +187,27 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
         cmd.arg(format!("--load-credential={}:{}", cred.id, cred.path));
     }
 
+    // -- Display Options (SPICE/VNC via QEMU extra args) --
+    if let Some(ref display) = opts.display {
+        match display.display_type {
+            vm_model::DisplayType::Spice => {
+                let port = display.port.unwrap_or(5930);
+                // Pass SPICE config as QEMU extra args via smbios11 string
+                cmd.arg(format!(
+                    "--smbios11=io.systemd.stub.qemu-extra-args=-spice port={},disable-ticketing=on",
+                    port
+                ));
+            }
+            vm_model::DisplayType::Vnc => {
+                // VNC is handled natively by vmspawn via console=gui
+                if opts.console.is_none() {
+                    cmd.arg("--console=gui");
+                }
+            }
+            vm_model::DisplayType::None => {}
+        }
+    }
+
     // -- Extra kernel command line arguments (passed via SMBIOS) --
     // Use -- to separate vmspawn flags from kernel cmdline arguments
     if !opts.extra_args.is_empty() {

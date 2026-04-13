@@ -286,7 +286,7 @@ impl LifecycleManager {
 
     /// Create a new baseline and store it.
     pub fn create_baseline(&self, mut baseline: Baseline) -> Result<Baseline> {
-        let mut store = self.baselines.write().unwrap();
+        let mut store = self.baselines.write().unwrap_or_else(|e| e.into_inner());
 
         if baseline.id.is_empty() {
             baseline.id = Uuid::new_v4().to_string();
@@ -301,19 +301,19 @@ impl LifecycleManager {
 
     /// Retrieve a baseline by ID.
     pub fn get_baseline(&self, id: &str) -> Option<Baseline> {
-        let store = self.baselines.read().unwrap();
+        let store = self.baselines.read().unwrap_or_else(|e| e.into_inner());
         store.get(id).cloned()
     }
 
     /// List all baselines.
     pub fn list_baselines(&self) -> Vec<Baseline> {
-        let store = self.baselines.read().unwrap();
+        let store = self.baselines.read().unwrap_or_else(|e| e.into_inner());
         store.values().cloned().collect()
     }
 
     /// Replace an existing baseline with a new version.
     pub fn update_baseline(&self, id: &str, mut baseline: Baseline) -> Result<Baseline> {
-        let mut store = self.baselines.write().unwrap();
+        let mut store = self.baselines.write().unwrap_or_else(|e| e.into_inner());
 
         if !store.contains_key(id) {
             bail!(LifecycleError::BaselineNotFound(id.to_string()));
@@ -329,7 +329,7 @@ impl LifecycleManager {
 
     /// Delete a baseline by ID.
     pub fn delete_baseline(&self, id: &str) -> Result<()> {
-        let mut store = self.baselines.write().unwrap();
+        let mut store = self.baselines.write().unwrap_or_else(|e| e.into_inner());
 
         if store.remove(id).is_none() {
             bail!(LifecycleError::BaselineNotFound(id.to_string()));
@@ -341,7 +341,7 @@ impl LifecycleManager {
 
     /// Create a new baseline group.
     pub fn create_baseline_group(&self, mut group: BaselineGroup) -> Result<BaselineGroup> {
-        let mut store = self.baseline_groups.write().unwrap();
+        let mut store = self.baseline_groups.write().unwrap_or_else(|e| e.into_inner());
 
         if group.id.is_empty() {
             group.id = Uuid::new_v4().to_string();
@@ -356,7 +356,7 @@ impl LifecycleManager {
 
     /// List all baseline groups.
     pub fn list_baseline_groups(&self) -> Vec<BaselineGroup> {
-        let store = self.baseline_groups.read().unwrap();
+        let store = self.baseline_groups.read().unwrap_or_else(|e| e.into_inner());
         store.values().cloned().collect()
     }
 
@@ -376,7 +376,7 @@ impl LifecycleManager {
         baseline_id: &str,
         installed: &[InstalledPatch],
     ) -> Result<HostComplianceStatus> {
-        let baselines = self.baselines.read().unwrap();
+        let baselines = self.baselines.read().unwrap_or_else(|e| e.into_inner());
         let baseline = baselines
             .get(baseline_id)
             .ok_or_else(|| LifecycleError::BaselineNotFound(baseline_id.to_string()))?
@@ -452,7 +452,7 @@ impl LifecycleManager {
         };
 
         // Store the result.
-        let mut compliance = self.compliance.write().unwrap();
+        let mut compliance = self.compliance.write().unwrap_or_else(|e| e.into_inner());
         compliance
             .entry(host_id.to_string())
             .or_default()
@@ -487,7 +487,7 @@ impl LifecycleManager {
 
     /// Retrieve all stored compliance statuses for a host.
     pub fn get_compliance_status(&self, host_id: &str) -> Vec<HostComplianceStatus> {
-        let compliance = self.compliance.read().unwrap();
+        let compliance = self.compliance.read().unwrap_or_else(|e| e.into_inner());
         compliance.get(host_id).cloned().unwrap_or_default()
     }
 
@@ -498,7 +498,7 @@ impl LifecycleManager {
     /// mapping would come from a separate registry; here we summarise all
     /// known records.
     pub fn get_cluster_compliance_summary(&self, _cluster_id: &str) -> ComplianceSummary {
-        let compliance = self.compliance.read().unwrap();
+        let compliance = self.compliance.read().unwrap_or_else(|e| e.into_inner());
 
         let mut total_hosts: u32 = 0;
         let mut compliant_hosts: u32 = 0;
@@ -590,7 +590,7 @@ impl LifecycleManager {
             error: None,
         };
 
-        let mut store = self.remediations.write().unwrap();
+        let mut store = self.remediations.write().unwrap_or_else(|e| e.into_inner());
         tracing::info!(
             task_id = %id,
             host_id = %host_id,
@@ -603,13 +603,13 @@ impl LifecycleManager {
 
     /// Retrieve a remediation task by ID.
     pub fn get_remediation(&self, id: &str) -> Option<RemediationTask> {
-        let store = self.remediations.read().unwrap();
+        let store = self.remediations.read().unwrap_or_else(|e| e.into_inner());
         store.get(id).cloned()
     }
 
     /// List remediation tasks, optionally filtered by host ID.
     pub fn list_remediations(&self, host_id: Option<&str>) -> Vec<RemediationTask> {
-        let store = self.remediations.read().unwrap();
+        let store = self.remediations.read().unwrap_or_else(|e| e.into_inner());
         store
             .values()
             .filter(|t| match host_id {
@@ -628,7 +628,7 @@ impl LifecycleManager {
         status: StepStatus,
         details: Option<String>,
     ) -> Result<()> {
-        let mut store = self.remediations.write().unwrap();
+        let mut store = self.remediations.write().unwrap_or_else(|e| e.into_inner());
         let task = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RemediationNotFound(id.to_string()))?;
@@ -668,7 +668,7 @@ impl LifecycleManager {
         success: bool,
         error: Option<String>,
     ) -> Result<()> {
-        let mut store = self.remediations.write().unwrap();
+        let mut store = self.remediations.write().unwrap_or_else(|e| e.into_inner());
         let task = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RemediationNotFound(id.to_string()))?;
@@ -692,7 +692,7 @@ impl LifecycleManager {
 
     /// Create a new rolling update plan.
     pub fn create_rolling_update(&self, mut plan: RollingUpdatePlan) -> Result<RollingUpdatePlan> {
-        let mut store = self.rolling_updates.write().unwrap();
+        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
 
         if plan.id.is_empty() {
             plan.id = Uuid::new_v4().to_string();
@@ -713,13 +713,13 @@ impl LifecycleManager {
 
     /// Retrieve a rolling update plan by ID.
     pub fn get_rolling_update(&self, id: &str) -> Option<RollingUpdatePlan> {
-        let store = self.rolling_updates.read().unwrap();
+        let store = self.rolling_updates.read().unwrap_or_else(|e| e.into_inner());
         store.get(id).cloned()
     }
 
     /// List rolling update plans, optionally filtered by cluster ID.
     pub fn list_rolling_updates(&self, cluster_id: Option<&str>) -> Vec<RollingUpdatePlan> {
-        let store = self.rolling_updates.read().unwrap();
+        let store = self.rolling_updates.read().unwrap_or_else(|e| e.into_inner());
         store
             .values()
             .filter(|p| match cluster_id {
@@ -732,7 +732,7 @@ impl LifecycleManager {
 
     /// Start a planned rolling update.
     pub fn start_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap();
+        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -753,7 +753,7 @@ impl LifecycleManager {
 
     /// Pause a running rolling update.
     pub fn pause_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap();
+        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -773,7 +773,7 @@ impl LifecycleManager {
 
     /// Resume a paused rolling update.
     pub fn resume_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap();
+        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -796,7 +796,7 @@ impl LifecycleManager {
     /// Returns the host ID of the next host to update, or `None` if all
     /// hosts have been processed.
     pub fn advance_rolling_update(&self, id: &str) -> Result<Option<String>> {
-        let mut store = self.rolling_updates.write().unwrap();
+        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -831,7 +831,7 @@ impl LifecycleManager {
 
     /// Mark a rolling update as completed.
     pub fn complete_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap();
+        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -849,7 +849,7 @@ impl LifecycleManager {
 
     /// Store or update the inventory snapshot for a host.
     pub fn update_host_inventory(&self, inventory: UpdateInventory) -> Result<()> {
-        let mut store = self.inventories.write().unwrap();
+        let mut store = self.inventories.write().unwrap_or_else(|e| e.into_inner());
 
         tracing::info!(
             host_id = %inventory.host_id,
@@ -863,7 +863,7 @@ impl LifecycleManager {
 
     /// Retrieve the inventory snapshot for a host.
     pub fn get_host_inventory(&self, host_id: &str) -> Option<UpdateInventory> {
-        let store = self.inventories.read().unwrap();
+        let store = self.inventories.read().unwrap_or_else(|e| e.into_inner());
         store.get(host_id).cloned()
     }
 }

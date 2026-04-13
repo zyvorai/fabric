@@ -332,9 +332,17 @@ impl ReplicationManager {
     // -----------------------------------------------------------------------
 
     /// Begin a synchronization cycle for a replication.
+    ///
+    /// This validates the replication is active, records the sync-started event,
+    /// and then attempts to perform the actual data synchronization using rsync.
+    /// If the VM image directory exists locally, rsync is invoked to transfer
+    /// changed blocks to the target site. If rsync is unavailable or the source
+    /// path does not exist, the sync event is still recorded (metadata-only sync)
+    /// so that callers can later complete or fail the sync via the normal lifecycle.
     pub fn start_sync(&self, replication_id: &str) -> Result<SyncEvent> {
-        // Validate that the replication exists and is active
-        {
+        // Validate that the replication exists and is active, and extract info
+        // we need for the actual sync operation.
+        let (vm_name, target_address, compression, bandwidth_limit) = {
             let replications = self
                 .replications
                 .read()
@@ -348,7 +356,22 @@ impl ReplicationManager {
                     repl.status
                 ));
             }
-        }
+            (
+                repl.vm_name.clone(),
+                repl.target_site_id.clone(),
+                repl.compression_enabled,
+                repl.bandwidth_limit_mbps,
+            )
+        };
+
+        // Look up the target site address for rsync destination.
+        let target_host = {
+            let sites = self.sites.read().map_err(|e| anyhow!("lock poisoned: {}", e))?;
+            sites
+                .get(&target_address)
+                .map(|s| s.address.clone())
+                .unwrap_or_else(|| target_address.clone())
+        };
 
         let event = SyncEvent {
             id: uuid::Uuid::new_v4().to_string(),
@@ -358,9 +381,88 @@ impl ReplicationManager {
             timestamp: Utc::now(),
         };
 
-        let mut events = self.events.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
-        events.push(event.clone());
+        {
+            let mut events = self.events.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
+            events.push(event.clone());
+        }
+
         tracing::info!("Sync started for replication {}", replication_id);
+
+        // Attempt real data synchronization using rsync.
+        let source_path = format!("/var/lib/vmspawnd/images/{}", vm_name);
+        if std::path::Path::new(&source_path).exists() {
+            let mut rsync_args = vec!["-a".to_string(), "--partial".to_string()];
+
+            if compression {
+                rsync_args.push("-z".to_string());
+            }
+            if let Some(bw) = bandwidth_limit {
+                // rsync --bwlimit is in KBps, we have MBps
+                rsync_args.push(format!("--bwlimit={}", bw * 1024));
+            }
+
+            // Ensure trailing slash so rsync syncs directory contents
+            let source_with_slash = if source_path.ends_with('/') {
+                source_path.clone()
+            } else {
+                format!("{}/", source_path)
+            };
+            rsync_args.push(source_with_slash);
+            rsync_args.push(format!(
+                "{}:/var/lib/vmspawnd/images/{}/",
+                target_host, vm_name
+            ));
+
+            let output = std::process::Command::new("rsync")
+                .args(&rsync_args)
+                .output();
+
+            match output {
+                Ok(out) if out.status.success() => {
+                    tracing::info!(
+                        "rsync completed successfully for replication {} (VM '{}')",
+                        replication_id, vm_name
+                    );
+                }
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    tracing::warn!(
+                        "rsync returned non-zero for replication {} (VM '{}'): {}",
+                        replication_id, vm_name, stderr
+                    );
+                    // Record the data transfer size even on partial failure
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to execute rsync for replication {} (VM '{}'): {} \
+                         (rsync may not be installed; metadata sync recorded)",
+                        replication_id, vm_name, e
+                    );
+                }
+            }
+
+            // Record the source data size for metrics regardless of rsync outcome.
+            let source_size: u64 = std::fs::read_dir(&source_path)
+                .map(|entries| {
+                    entries
+                        .filter_map(|e| e.ok())
+                        .filter_map(|e| e.metadata().ok())
+                        .map(|m| m.len())
+                        .sum()
+                })
+                .unwrap_or(0);
+
+            tracing::info!(
+                "Replication {} source data size: {} bytes",
+                replication_id, source_size
+            );
+        } else {
+            tracing::debug!(
+                "Source path '{}' does not exist for VM '{}', recording metadata-only sync",
+                source_path, vm_name
+            );
+        }
+
         Ok(event)
     }
 
@@ -394,7 +496,8 @@ impl ReplicationManager {
                 .replications
                 .read()
                 .map_err(|e| anyhow!("lock poisoned: {}", e))?;
-            let repl = replications.get(replication_id).unwrap();
+            let repl = replications.get(replication_id)
+                .ok_or_else(|| anyhow!("Replication '{}' not found", replication_id))?;
             if repl.quiesce_guest {
                 ConsistencyType::AppConsistent
             } else {

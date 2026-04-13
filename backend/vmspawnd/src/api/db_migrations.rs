@@ -65,7 +65,7 @@ pub async fn apply_migrations(
         // Execute migration SQL against the database
         tracing::info!("Applying migration v{}: {}", version, name);
 
-        _user_db.execute_raw(sql)
+        _user_db.run_migration(sql)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Migration v{} failed: {}", version, e)}))))?;
 
         // Record migration as applied

@@ -7,6 +7,7 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 
+use crate::api::events;
 use crate::qmp::QmpClient;
 use crate::server::AppState;
 use security::RequireWrite;
@@ -51,7 +52,7 @@ fn not_available_response() -> impl IntoResponse {
 /// POST /api/vms/:name/hotplug/cpu - Hot-add vCPUs
 pub async fn hotplug_cpu(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugCpuRequest>,
 ) -> impl IntoResponse {
@@ -102,6 +103,7 @@ pub async fn hotplug_cpu(
                 }
             }
 
+            events::record_event(&state, events::VMEventType::CpuHotplug, &vm_name, Some(format!("Added {} vCPUs", added)));
             Json(serde_json::json!({
                 "status": "ok",
                 "cpus_added": added,
@@ -119,7 +121,7 @@ pub async fn hotplug_cpu(
 /// POST /api/vms/:name/hotplug/memory - Hot-add memory
 pub async fn hotplug_memory(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugMemoryRequest>,
 ) -> impl IntoResponse {
@@ -159,12 +161,15 @@ pub async fn hotplug_memory(
     });
 
     match qmp.execute("device_add", dimm_args) {
-        Ok(_) => Json(serde_json::json!({
-            "status": "ok",
-            "memory_added_mb": req.size_mb,
-            "dimm_id": dimm_id,
-        }))
-        .into_response(),
+        Ok(_) => {
+            events::record_event(&state, events::VMEventType::MemoryHotplug, &vm_name, Some(format!("Added {} MB", req.size_mb)));
+            Json(serde_json::json!({
+                "status": "ok",
+                "memory_added_mb": req.size_mb,
+                "dimm_id": dimm_id,
+            }))
+            .into_response()
+        }
         Err(e) => {
             // Rollback: remove the memory backend object since device_add failed
             if let Err(rollback_err) = qmp.execute("object-del", serde_json::json!({"id": backend_id})) {
@@ -182,7 +187,7 @@ pub async fn hotplug_memory(
 /// POST /api/vms/:name/hotplug/disk - Hot-add a disk
 pub async fn hotplug_disk(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugDiskRequest>,
 ) -> impl IntoResponse {
@@ -236,12 +241,15 @@ pub async fn hotplug_disk(
     });
 
     match qmp.execute("device_add", device_args) {
-        Ok(_) => Json(serde_json::json!({
-            "status": "ok",
-            "device_id": device_id,
-            "node_name": node_name,
-        }))
-        .into_response(),
+        Ok(_) => {
+            events::record_event(&state, events::VMEventType::DiskAttached, &vm_name, Some(format!("Disk: {}", req.path)));
+            Json(serde_json::json!({
+                "status": "ok",
+                "device_id": device_id,
+                "node_name": node_name,
+            }))
+            .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("device_add failed: {}", e)})),
@@ -347,11 +355,17 @@ pub async fn hotplug_nic(
             "netdev_id": netdev_id,
         }))
         .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("NIC device_add failed: {}", e)})),
-        )
-            .into_response(),
+        Err(e) => {
+            // Rollback: remove the orphaned netdev since device_add failed
+            if let Err(rollback_err) = qmp.execute("netdev_del", serde_json::json!({"id": netdev_id})) {
+                tracing::warn!("Failed to rollback netdev '{}': {}", netdev_id, rollback_err);
+            }
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("NIC device_add failed: {}", e)})),
+            )
+                .into_response()
+        }
     }
 }
 

@@ -65,6 +65,45 @@ fn default_disk_size() -> u64 {
     20 // 20GB default disk size
 }
 
+impl CreateVMRequest {
+    /// Validate all fields for correctness.
+    /// Returns a list of validation errors, or Ok(()) if all fields are valid.
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.image.is_empty() {
+            errors.push("Image must not be empty".to_string());
+        }
+
+        if self.cpus < 1 || self.cpus > 256 {
+            errors.push(format!(
+                "CPUs must be between 1 and 256, got {}",
+                self.cpus
+            ));
+        }
+
+        if self.memory < 128 || self.memory > 1_048_576 {
+            errors.push(format!(
+                "Memory must be between 128 MB and 1048576 MB (1 TB), got {} MB",
+                self.memory
+            ));
+        }
+
+        if self.disk < 1 || self.disk > 65_536 {
+            errors.push(format!(
+                "Disk must be between 1 GB and 65536 GB (64 TB), got {} GB",
+                self.disk
+            ));
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 /// Console mode for the VM
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -148,6 +187,26 @@ pub struct LoadCredential {
     /// File path to load the credential value from
     #[serde(alias = "value")]
     pub path: String,
+}
+
+/// Display configuration for VM remote access.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DisplayConfig {
+    #[serde(default = "default_display_type")]
+    pub display_type: DisplayType,
+    pub port: Option<u16>,
+}
+
+fn default_display_type() -> DisplayType {
+    DisplayType::None
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum DisplayType {
+    Vnc,
+    Spice,
+    None,
 }
 
 /// Options for starting a VM via systemd-vmspawn
@@ -279,6 +338,11 @@ pub struct VMStartOptions {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub load_credentials: Vec<LoadCredential>,
 
+    // -- Display Options --
+    /// Display configuration (VNC, SPICE, or None)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<DisplayConfig>,
+
     // -- Extra kernel command line arguments --
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_args: Vec<String>,
@@ -328,6 +392,7 @@ impl Default for VMStartOptions {
             quiet: false,
             credentials: Vec::new(),
             load_credentials: Vec::new(),
+            display: None,
             extra_args: Vec::new(),
         }
     }
@@ -932,6 +997,7 @@ mod tests {
                 id: "ssh.authorized_keys.root".into(),
                 path: "/root/.ssh/authorized_keys".into(),
             }],
+            display: None,
             extra_args: vec!["enforcing=0".into()],
         };
 

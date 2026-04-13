@@ -28,6 +28,13 @@ impl UserDb {
         )
         .context("Failed to create users table")?;
 
+        // Migration: add TOTP columns if they don't exist
+        // We use a try approach — ignore errors if columns already exist.
+        let _ = conn.execute_batch(
+            "ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT NULL;
+             ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0;",
+        );
+
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -158,10 +165,86 @@ impl UserDb {
         Ok(count as usize)
     }
 
-    /// Execute a raw SQL statement (for schema migrations).
-    pub fn execute_raw(&self, sql: &str) -> Result<()> {
+    /// Execute a raw SQL statement. Restricted to crate-internal use.
+    pub(crate) fn execute_raw(&self, sql: &str) -> Result<()> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
         conn.execute_batch(sql).context("Failed to execute SQL")?;
+        Ok(())
+    }
+
+    /// Execute a schema migration SQL statement.
+    ///
+    /// This is the public interface for running DDL statements (CREATE TABLE,
+    /// ALTER TABLE, etc.) from outside the crate. Only DDL statements are
+    /// accepted; DML statements that could modify data directly are rejected.
+    pub fn run_migration(&self, sql: &str) -> Result<()> {
+        let trimmed = sql.trim().to_uppercase();
+        let allowed_prefixes = ["CREATE ", "ALTER ", "DROP "];
+        if !allowed_prefixes.iter().any(|p| trimmed.starts_with(p)) {
+            return Err(anyhow::anyhow!(
+                "Migration SQL must start with CREATE, ALTER, or DROP"
+            ));
+        }
+        self.execute_raw(sql)
+    }
+
+    /// Enable TOTP 2FA for a user by storing their secret.
+    pub fn enable_totp(&self, user_id: &str, secret: &str) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+        let rows = conn.execute(
+            "UPDATE users SET totp_secret = ?1, totp_enabled = 1 WHERE id = ?2",
+            params![secret, user_id],
+        )?;
+        if rows == 0 {
+            anyhow::bail!("User not found: {}", user_id);
+        }
+        Ok(())
+    }
+
+    /// Get the TOTP secret for a user, if set.
+    pub fn get_totp_secret(&self, user_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+        let mut stmt = conn.prepare(
+            "SELECT totp_secret FROM users WHERE id = ?1",
+        )?;
+        let result = stmt.query_row(params![user_id], |row| {
+            let secret: Option<String> = row.get(0)?;
+            Ok(secret)
+        });
+        match result {
+            Ok(secret) => Ok(secret),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Check whether TOTP 2FA is enabled for a user.
+    pub fn is_totp_enabled(&self, user_id: &str) -> Result<bool> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+        let mut stmt = conn.prepare(
+            "SELECT totp_enabled FROM users WHERE id = ?1",
+        )?;
+        let result = stmt.query_row(params![user_id], |row| {
+            let enabled: i32 = row.get(0)?;
+            Ok(enabled)
+        });
+        match result {
+            Ok(enabled) => Ok(enabled != 0),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Disable TOTP 2FA for a user.
+    pub fn disable_totp(&self, user_id: &str) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+        let rows = conn.execute(
+            "UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?1",
+            params![user_id],
+        )?;
+        if rows == 0 {
+            anyhow::bail!("User not found: {}", user_id);
+        }
         Ok(())
     }
 

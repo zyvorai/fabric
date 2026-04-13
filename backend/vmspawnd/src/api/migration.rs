@@ -126,8 +126,26 @@ pub async fn start_migration(
     let migration_id_clone = migration_id.clone();
     let req_clone = req.clone();
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         run_migration(state_clone, migration_id_clone, req_clone).await;
+    });
+
+    // Monitor the spawned task for panics
+    let migration_id_monitor = migration_id.clone();
+    let state_monitor = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = handle.await {
+            tracing::error!("Migration task '{}' panicked: {}", migration_id_monitor, e);
+            // Update migration status to Failed on panic
+            if let Ok(Some(mut status)) = state_monitor.store.get_entity::<MigrationStatus>("migrations", &migration_id_monitor) {
+                status.state = MigrationState::Failed;
+                status.error = Some("Internal error: migration task panicked".to_string());
+                status.completed = Some(Utc::now());
+                if let Err(save_err) = state_monitor.store.save_entity("migrations", &migration_id_monitor, &status) {
+                    tracing::error!("Failed to save migration panic status: {}", save_err);
+                }
+            }
+        }
     });
 
     Ok((StatusCode::ACCEPTED, Json(status)))
@@ -301,12 +319,18 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
                 migration::MigrationState::Failed => MigrationState::Failed,
                 _ => MigrationState::Completed,
             };
-            update_status(&state, &migration_id, final_state, 100, 0, result.error);
+            update_status(&state, &migration_id, final_state.clone(), 100, 0, result.error);
+            if matches!(final_state, MigrationState::Completed) {
+                crate::api::events::record_event(&state, crate::api::events::VMEventType::Migrated, &req.vm_name, Some(format!("Migrated to {}", req.target_host)));
+            } else {
+                crate::api::events::record_event(&state, crate::api::events::VMEventType::Error, &req.vm_name, Some("Migration completed with failed status".to_string()));
+            }
             tracing::info!("Migration {} completed for VM '{}'", migration_id, req.vm_name);
         }
         Err(e) => {
             update_status(&state, &migration_id, MigrationState::Failed, 0, 0,
                 Some(e.to_string()));
+            crate::api::events::record_event(&state, crate::api::events::VMEventType::Error, &req.vm_name, Some(format!("Migration failed: {}", e)));
             tracing::error!("Migration {} failed for VM '{}': {}", migration_id, req.vm_name, e);
         }
     }

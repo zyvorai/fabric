@@ -86,8 +86,8 @@ pub async fn get_bridge(
     tracing::debug!("networkd::{}", stringify!(get_bridge));
     match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bridge not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bridge"}))).into_response(),
     }
 }
 
@@ -103,8 +103,8 @@ pub async fn update_bridge(
     }
     let existing = match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => b,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bridge not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bridge"}))).into_response(),
     };
 
     let mgr = networkd_manager(&state);
@@ -219,8 +219,8 @@ pub async fn get_vlan(
     tracing::debug!("networkd::{}", stringify!(get_vlan));
     match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VLAN not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load VLAN"}))).into_response(),
     }
 }
 
@@ -239,8 +239,8 @@ pub async fn update_vlan(
     }
     let existing = match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => v,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VLAN not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load VLAN"}))).into_response(),
     };
 
     let mgr = networkd_manager(&state);
@@ -347,8 +347,8 @@ pub async fn get_macvtap(
     tracing::debug!("networkd::{}", stringify!(get_macvtap));
     match state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Macvtap not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load macvtap"}))).into_response(),
     }
 }
 
@@ -423,8 +423,8 @@ pub async fn get_tap(
     tracing::debug!("networkd::{}", stringify!(get_tap));
     match state.store.get_entity::<TapConfig>("networkd_taps", &id) {
         Ok(Some(t)) => Json(t).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "TAP device not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load TAP device"}))).into_response(),
     }
 }
 
@@ -557,8 +557,8 @@ pub async fn get_bond(
     tracing::debug!("networkd::{}", stringify!(get_bond));
     match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bond not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bond"}))).into_response(),
     }
 }
 
@@ -579,8 +579,8 @@ pub async fn update_bond(
     }
     let existing = match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => b,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bond not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bond"}))).into_response(),
     };
 
     let mgr = networkd_manager(&state);
@@ -698,8 +698,8 @@ pub async fn get_network_file(
     tracing::debug!("networkd::{}", stringify!(get_network_file));
     match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
         Ok(Some(n)) => Json(n).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Network file not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load network file"}))).into_response(),
     }
 }
 
@@ -863,8 +863,8 @@ pub async fn get_port_forward(
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
     {
         Ok(Some(pf)) => Json(pf).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Port forward not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load port forward"}))).into_response(),
     }
 }
 
@@ -971,8 +971,8 @@ pub async fn get_vxlan(
     tracing::debug!("networkd::{}", stringify!(get_vxlan));
     match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VXLAN not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load VXLAN"}))).into_response(),
     }
 }
 
@@ -1039,8 +1039,8 @@ pub async fn get_sriov(
     tracing::debug!("networkd::{}", stringify!(get_sriov));
     match state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "SR-IOV config not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load SR-IOV config"}))).into_response(),
     }
 }
 
@@ -1068,6 +1068,80 @@ pub async fn scan_configs(RequireRead(_claims): RequireRead, State(state): State
     match networking::parser::scan_networkd_dir(dir) {
         Ok(configs) => Json(configs).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+// ============================================================================
+// DHCP Server configuration handler
+// ============================================================================
+
+#[derive(Debug, serde::Deserialize)]
+pub struct DhcpServerConfig {
+    pub bridge_name: String,
+    pub pool_start: String,
+    pub pool_end: String,
+    pub dns_servers: Option<Vec<String>>,
+    pub lease_time_sec: Option<u32>,
+}
+
+/// POST /api/networkd/dhcp - Configure DHCP server on a bridge via systemd-networkd
+pub async fn configure_dhcp_server(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<DhcpServerConfig>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(configure_dhcp_server));
+
+    if let Err((status, msg)) = crate::validation::validate_device_name(&req.bridge_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+
+    if let Err(e) = crate::validation::validate_ip_address(&req.pool_start) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response();
+    }
+    if let Err(e) = crate::validation::validate_ip_address(&req.pool_end) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response();
+    }
+
+    let lease_time = req.lease_time_sec.unwrap_or(3600);
+    let dns = req
+        .dns_servers
+        .as_ref()
+        .map(|d| d.join(" "))
+        .unwrap_or_else(|| "1.1.1.1 8.8.8.8".to_string());
+
+    // Generate networkd config with DHCPServer section
+    let config = format!(
+        "[DHCPServer]\nPoolOffset={}\nPoolSize=100\nDNS={}\nDefaultLeaseTimeSec={}\nMaxLeaseTimeSec={}\n",
+        req.pool_start, dns, lease_time, lease_time * 2
+    );
+
+    let config_path = format!(
+        "{}/{}dhcp-{}.network",
+        state.config.network.networkd_config_dir,
+        state.config.network.networkd_file_prefix,
+        req.bridge_name
+    );
+
+    match tokio::fs::write(&config_path, &config).await {
+        Ok(_) => {
+            // Reload networkd
+            let _ = tokio::process::Command::new("networkctl")
+                .args(["reload"])
+                .output()
+                .await;
+            Json(serde_json::json!({
+                "status": "configured",
+                "bridge": req.bridge_name,
+                "config_path": config_path
+            }))
+            .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to write config: {}", e)})),
+        )
+            .into_response(),
     }
 }
 

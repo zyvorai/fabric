@@ -88,7 +88,7 @@ impl FirewallEnforcer {
         ))?;
 
         for chain in chains {
-            let jump_rule = self.build_jump_rule(&chain.vm_ip, &chain.chain_name);
+            let jump_rule = self.build_jump_rule(&chain.vm_ip, &chain.chain_name)?;
             run_nft(&format!(
                 "add rule ip {} fw_forward {}",
                 TABLE_NAME, jump_rule
@@ -176,8 +176,28 @@ impl FirewallEnforcer {
     }
 
     /// Build a jump rule for the forward chain.
-    pub fn build_jump_rule(&self, vm_ip: &str, chain_name: &str) -> String {
-        format!("ip daddr {} jump {}", vm_ip, chain_name)
+    ///
+    /// Validates that `vm_ip` is a valid IP address and `chain_name` contains
+    /// only alphanumeric characters and underscores, to prevent nft command injection.
+    pub fn build_jump_rule(&self, vm_ip: &str, chain_name: &str) -> Result<String> {
+        // Validate vm_ip is a valid IP address
+        vm_ip.parse::<std::net::IpAddr>().map_err(|_| {
+            anyhow::anyhow!("Invalid VM IP address for jump rule: '{}'", vm_ip)
+        })?;
+
+        // Validate chain_name is alphanumeric + underscores only
+        if chain_name.is_empty()
+            || !chain_name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err(anyhow::anyhow!(
+                "Invalid chain name for jump rule: '{}'. Must be alphanumeric and underscores only.",
+                chain_name
+            ));
+        }
+
+        Ok(format!("ip daddr {} jump {}", vm_ip, chain_name))
     }
 }
 
@@ -295,7 +315,20 @@ mod tests {
     #[test]
     fn test_jump_rule() {
         let enforcer = make_enforcer();
-        let result = enforcer.build_jump_rule("10.0.0.5", "vm_web1_in");
+        let result = enforcer.build_jump_rule("10.0.0.5", "vm_web1_in").unwrap();
         assert_eq!(result, "ip daddr 10.0.0.5 jump vm_web1_in");
+    }
+
+    #[test]
+    fn test_jump_rule_invalid_ip() {
+        let enforcer = make_enforcer();
+        assert!(enforcer.build_jump_rule("not-an-ip", "vm_web1_in").is_err());
+    }
+
+    #[test]
+    fn test_jump_rule_invalid_chain_name() {
+        let enforcer = make_enforcer();
+        assert!(enforcer.build_jump_rule("10.0.0.5", "chain;drop").is_err());
+        assert!(enforcer.build_jump_rule("10.0.0.5", "").is_err());
     }
 }

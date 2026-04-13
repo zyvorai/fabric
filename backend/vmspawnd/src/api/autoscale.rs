@@ -95,6 +95,30 @@ pub async fn create_scaling_policy(
     tracing::debug!("autoscale::{}", stringify!(create_scaling_policy));
     validate_vm_name(&req.vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
+    // Validate threshold values
+    let thresholds = [
+        ("cpu_scale_up_threshold", req.cpu_scale_up_threshold),
+        ("cpu_scale_down_threshold", req.cpu_scale_down_threshold),
+        ("memory_scale_up_threshold", req.memory_scale_up_threshold),
+        ("memory_scale_down_threshold", req.memory_scale_down_threshold),
+    ];
+    for (name, val) in &thresholds {
+        if let Some(v) = val {
+            if !v.is_finite() || *v < 0.0 || *v > 100.0 {
+                return Err((StatusCode::BAD_REQUEST, Json(json!({"error": format!("{} must be between 0.0 and 100.0", name)}))));
+            }
+        }
+    }
+    if req.min_cpus > req.max_cpus {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "min_cpus must not exceed max_cpus"}))));
+    }
+    if req.min_memory_mb > req.max_memory_mb {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "min_memory_mb must not exceed max_memory_mb"}))));
+    }
+    if req.cooldown_secs > 86400 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "cooldown_secs must not exceed 86400"}))));
+    }
+
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {}

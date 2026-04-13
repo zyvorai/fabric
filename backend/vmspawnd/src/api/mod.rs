@@ -55,8 +55,18 @@ pub mod net_monitor;
 
 // Phase 5 API modules for platform features
 pub mod tenant;
+
+// Phase 6 API modules: 2FA, export, secrets, logs
+pub mod export;
+pub mod logs;
+pub mod secrets;
 pub mod external_auth;
 pub mod db_migrations;
 pub mod resource_policy;
 pub mod webhook_retry;
 pub mod vm_power;
+pub mod billing;
+
+// Phase 3 infrastructure modules
+pub mod compliance;
+pub mod usb;

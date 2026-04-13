@@ -13,7 +13,7 @@ use security::{RequireRead, RequireWrite, RequireAdmin};
 use certificate_manager::{
     CertHealthDashboard, CertStatus, Certificate, CertificateAuthority, CertificateRequest,
     CertificateRotation, RotationStatus, TrustAttestation, VmSecurityBaseline,
-    VmSecurityCompliance,
+    VmSecurityCompliance, crypto,
 };
 
 // ============================================================================
@@ -32,10 +32,28 @@ pub async fn create_ca(
     Json(mut ca): Json<CertificateAuthority>,
 ) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(create_ca));
-    if ca.id.is_empty() { ca.id = Uuid::new_v4().to_string(); }
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&ca.name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    ca.id = Uuid::new_v4().to_string();
     let now = Utc::now();
     ca.created = now;
     ca.updated = now;
+
+    // Generate a real CA certificate for internal CAs.
+    if ca.ca_type == certificate_manager::CaType::Internal && ca.ca_cert_pem.is_none() {
+        match crypto::generate_ca(&ca.name, 3650) {
+            Ok(ca_output) => {
+                ca.ca_cert_pem = Some(ca_output.cert_pem);
+                ca.ca_key_pem = Some(ca_output.key_pem);
+                ca.fingerprint_sha256 = Some(ca_output.fingerprint);
+            }
+            Err(e) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("Failed to generate CA certificate: {}", e)}))).into_response();
+            }
+        }
+    }
+
     match state.store.save_entity("cert_cas", &ca.id, &ca) {
         Ok(_) => (StatusCode::CREATED, Json(ca)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
@@ -48,6 +66,10 @@ pub async fn delete_ca(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(delete_ca));
+    let certs: Vec<Certificate> = state.store.list_entities("certificates").unwrap_or_default();
+    if certs.iter().any(|c| c.issuer == id) {
+        return (StatusCode::CONFLICT, Json(serde_json::json!({"error": "Cannot delete CA with active certificates"}))).into_response();
+    }
     if let Err(e) = state.store.delete_entity("cert_cas", &id) {
         tracing::error!("Failed to delete CA: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
@@ -71,17 +93,55 @@ pub async fn issue_certificate(
     Json(req): Json<CertificateRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(issue_certificate));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.common_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
     let now = Utc::now();
     let not_after = now + chrono::Duration::days(req.validity_days as i64);
+
+    // Try to issue a real X.509 certificate if the CA has PEM material.
+    let ca_pem = state
+        .store
+        .get_entity::<CertificateAuthority>("cert_cas", &req.ca_id)
+        .ok()
+        .flatten()
+        .and_then(|ca| {
+            ca.ca_cert_pem
+                .as_ref()
+                .zip(ca.ca_key_pem.as_ref())
+                .map(|(c, k)| (c.clone(), k.clone()))
+        });
+
+    let (fingerprint, serial, cert_pem, key_pem) = if let Some((ca_cert, ca_key)) = ca_pem {
+        match crypto::issue_certificate(
+            &req.common_name,
+            &req.subject_alt_names,
+            req.validity_days,
+            &ca_cert,
+            &ca_key,
+        ) {
+            Ok(output) => (output.fingerprint, output.serial, Some(output.cert_pem), Some(output.key_pem)),
+            Err(e) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("Failed to generate certificate: {}", e)}))).into_response();
+            }
+        }
+    } else {
+        // Fallback: compute a real SHA-256 hash from certificate metadata.
+        let data = format!("{}:{}:{}", req.common_name, Uuid::new_v4(), now.to_rfc3339());
+        let fingerprint = crypto::compute_fingerprint(data.as_bytes());
+        let serial = Uuid::new_v4().to_string();
+        (fingerprint, serial, None, None)
+    };
+
     let cert = Certificate {
         id: Uuid::new_v4().to_string(),
         common_name: req.common_name,
         subject_alt_names: req.subject_alt_names,
         issuer: req.ca_id,
-        serial_number: Uuid::new_v4().to_string(),
+        serial_number: serial,
         not_before: now,
         not_after,
-        fingerprint_sha256: format!("sha256:{}", Uuid::new_v4()),
+        fingerprint_sha256: fingerprint,
         key_algorithm: req.key_algorithm,
         usage: req.usage,
         status: CertStatus::Active,
@@ -89,6 +149,8 @@ pub async fn issue_certificate(
         component: req.component,
         created: now,
         updated: now,
+        cert_pem,
+        key_pem,
     };
     match state.store.save_entity("certificates", &cert.id, &cert) {
         Ok(_) => (StatusCode::CREATED, Json(cert)).into_response(),
@@ -104,8 +166,8 @@ pub async fn revoke_certificate(
     tracing::debug!("certificates::{}", stringify!(revoke_certificate));
     let mut cert = match state.store.get_entity::<Certificate>("certificates", &id) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Certificate not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load certificate"}))).into_response(),
     };
     cert.status = CertStatus::Revoked;
     cert.updated = Utc::now();
@@ -113,7 +175,7 @@ pub async fn revoke_certificate(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
-    StatusCode::OK.into_response()
+    Json(cert).into_response()
 }
 
 pub async fn renew_certificate(
@@ -124,8 +186,8 @@ pub async fn renew_certificate(
     tracing::debug!("certificates::{}", stringify!(renew_certificate));
     let old_cert = match state.store.get_entity::<Certificate>("certificates", &id) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Certificate not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load certificate"}))).into_response(),
     };
     let now = Utc::now();
     let validity = old_cert.not_after - old_cert.not_before;
@@ -137,15 +199,50 @@ pub async fn renew_certificate(
         tracing::error!("Failed to save entity: {}", e);
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
+    let validity_days = validity.num_days().max(1) as u32;
+
+    // Try to issue a real X.509 certificate if the CA has PEM material.
+    let ca_pem = state
+        .store
+        .get_entity::<CertificateAuthority>("cert_cas", &old_cert.issuer)
+        .ok()
+        .flatten()
+        .and_then(|ca| {
+            ca.ca_cert_pem
+                .as_ref()
+                .zip(ca.ca_key_pem.as_ref())
+                .map(|(c, k)| (c.clone(), k.clone()))
+        });
+
+    let (fingerprint, serial, cert_pem, key_pem) = if let Some((ca_cert, ca_key)) = ca_pem {
+        match crypto::issue_certificate(
+            &old_cert.common_name,
+            &old_cert.subject_alt_names,
+            validity_days,
+            &ca_cert,
+            &ca_key,
+        ) {
+            Ok(output) => (output.fingerprint, output.serial, Some(output.cert_pem), Some(output.key_pem)),
+            Err(e) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("Failed to generate certificate: {}", e)}))).into_response();
+            }
+        }
+    } else {
+        let data = format!("{}:{}:{}", old_cert.common_name, Uuid::new_v4(), now.to_rfc3339());
+        let fingerprint = crypto::compute_fingerprint(data.as_bytes());
+        let serial = Uuid::new_v4().to_string();
+        (fingerprint, serial, None, None)
+    };
+
     let new_cert = Certificate {
         id: Uuid::new_v4().to_string(),
         common_name: old_cert.common_name,
         subject_alt_names: old_cert.subject_alt_names,
         issuer: old_cert.issuer,
-        serial_number: Uuid::new_v4().to_string(),
+        serial_number: serial,
         not_before: now,
         not_after: now + validity,
-        fingerprint_sha256: format!("sha256:{}", Uuid::new_v4()),
+        fingerprint_sha256: fingerprint,
         key_algorithm: old_cert.key_algorithm,
         usage: old_cert.usage,
         status: CertStatus::Active,
@@ -153,6 +250,8 @@ pub async fn renew_certificate(
         component: old_cert.component,
         created: now,
         updated: now,
+        cert_pem,
+        key_pem,
     };
     if let Err(e) = state.store.save_entity("certificates", &new_cert.id, &new_cert) {
         tracing::error!("Failed to save entity: {}", e);
@@ -199,7 +298,10 @@ pub async fn submit_cert_request(
     Json(mut req): Json<CertificateRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("certificates::{}", stringify!(submit_cert_request));
-    if req.id.is_empty() { req.id = Uuid::new_v4().to_string(); }
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.common_name) {
+        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+    }
+    req.id = Uuid::new_v4().to_string();
     req.status = certificate_manager::CsrStatus::Pending;
     req.created = Utc::now();
     match state.store.save_entity("cert_requests", &req.id, &req) {
@@ -216,8 +318,8 @@ pub async fn approve_cert_request(
     tracing::debug!("certificates::{}", stringify!(approve_cert_request));
     let mut req = match state.store.get_entity::<CertificateRequest>("cert_requests", &id) {
         Ok(Some(r)) => r,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Certificate request not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load certificate request"}))).into_response(),
     };
     req.status = certificate_manager::CsrStatus::Approved;
     if let Err(e) = state.store.save_entity("cert_requests", &req.id, &req) {
@@ -235,8 +337,8 @@ pub async fn reject_cert_request(
     tracing::debug!("certificates::{}", stringify!(reject_cert_request));
     let mut req = match state.store.get_entity::<CertificateRequest>("cert_requests", &id) {
         Ok(Some(r)) => r,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Certificate request not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load certificate request"}))).into_response(),
     };
     req.status = certificate_manager::CsrStatus::Rejected;
     if let Err(e) = state.store.save_entity("cert_requests", &req.id, &req) {
@@ -270,8 +372,8 @@ pub async fn schedule_rotation(
     tracing::debug!("certificates::{}", stringify!(schedule_rotation));
     let cert = match state.store.get_entity::<Certificate>("certificates", &req.certificate_id) {
         Ok(Some(c)) => c,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Certificate not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load certificate"}))).into_response(),
     };
     let rotation = CertificateRotation {
         id: Uuid::new_v4().to_string(),
@@ -298,11 +400,12 @@ pub async fn execute_rotation(
     tracing::debug!("certificates::{}", stringify!(execute_rotation));
     let mut rotation = match state.store.get_entity::<CertificateRotation>("cert_rotations", &id) {
         Ok(Some(r)) => r,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Certificate rotation not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load certificate rotation"}))).into_response(),
     };
     rotation.status = RotationStatus::Completed;
-    rotation.new_cert_fingerprint = Some(format!("sha256:{}", Uuid::new_v4()));
+    let rotation_data = format!("rotation:{}:{}", rotation.id, Utc::now().to_rfc3339());
+    rotation.new_cert_fingerprint = Some(crypto::compute_fingerprint(rotation_data.as_bytes()));
     rotation.completed_at = Some(Utc::now());
     if let Err(e) = state.store.save_entity("cert_rotations", &rotation.id, &rotation) {
         tracing::error!("Failed to save entity: {}", e);
@@ -341,8 +444,8 @@ pub async fn verify_attestation(
     tracing::debug!("certificates::{}", stringify!(verify_attestation));
     let mut att = match state.store.get_entity::<TrustAttestation>("attestations", &host_id) {
         Ok(Some(a)) => a,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Attestation not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load attestation"}))).into_response(),
     };
     let trusted = att.tpm_present && att.secure_boot_enabled && att.measured_boot_valid;
     att.attestation_status = if trusted {
@@ -402,8 +505,8 @@ pub async fn check_vm_security_compliance(
     tracing::debug!("certificates::{}", stringify!(check_vm_security_compliance));
     let baseline = match state.store.get_entity::<VmSecurityBaseline>("security_baselines", &baseline_id) {
         Ok(Some(b)) => b,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Security baseline not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load security baseline"}))).into_response(),
     };
     let mut violations = Vec::new();
     if baseline.require_encryption && !req.vm_encrypted {

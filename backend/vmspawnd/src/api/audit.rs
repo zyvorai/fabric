@@ -4,6 +4,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use chrono::{DateTime, Utc, Duration};
@@ -88,7 +89,7 @@ pub async fn list_audit_logs(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(filters): Query<AuditLogFilters>,
-) -> Result<Json<Vec<AuditLog>>, StatusCode> {
+) -> Result<Json<Vec<AuditLog>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("audit::{}", stringify!(list_audit_logs));
 
     // Clone filter values for the closure
@@ -145,7 +146,7 @@ pub async fn list_audit_logs(
             true
         },
         limit,
-    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    ).map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit logs"}))))?;
 
     Ok(Json(logs))
 }
@@ -154,12 +155,12 @@ pub async fn get_audit_log(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<AuditLog>, StatusCode> {
+) -> Result<Json<AuditLog>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("audit::{}", stringify!(get_audit_log));
     // Load from state store
     let log = state.store.get_entity::<AuditLog>("audit_logs", &id)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit log"}))))?
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Audit log not found"}))))?;
 
     Ok(Json(log))
 }
@@ -168,7 +169,7 @@ pub async fn export_audit_logs(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Query(query): Query<ExportQuery>,
-) -> Result<(StatusCode, String), StatusCode> {
+) -> Result<(StatusCode, String), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("audit::{}", stringify!(export_audit_logs));
     // Apply the same filters as list_audit_logs
     let action = query.filters.action.clone();
@@ -179,7 +180,7 @@ pub async fn export_audit_logs(
     let search = query.filters.search.as_ref().map(|s| s.to_lowercase());
 
     let logs: Vec<AuditLog> = state.store.list_entities("audit_logs")
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit logs"}))))?
         .into_iter()
         .filter(|log: &AuditLog| {
             if let Some(ref a) = action { if log.action != *a { return false; } }
@@ -200,9 +201,9 @@ pub async fn export_audit_logs(
 
     match query.format.as_str() {
         "json" => {
-            let json = serde_json::to_string_pretty(&logs)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            Ok((StatusCode::OK, json))
+            let json_str = serde_json::to_string_pretty(&logs)
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to serialize audit logs"}))))?;
+            Ok((StatusCode::OK, json_str))
         }
         "csv" => {
             let mut csv = String::from("ID,Timestamp,User,Action,Resource Type,Resource Name,Status,IP Address,Details,Error\n");
@@ -228,18 +229,18 @@ pub async fn export_audit_logs(
 
             Ok((StatusCode::OK, csv))
         }
-        _ => Err(StatusCode::BAD_REQUEST),
+        _ => Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Unsupported export format. Use 'json' or 'csv'"})))),
     }
 }
 
 pub async fn get_audit_stats(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<AuditStats>, StatusCode> {
+) -> Result<Json<AuditStats>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("audit::{}", stringify!(get_audit_stats));
     // Calculate from state store
     let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit logs"}))))?;
 
     let total_logs = logs.len() as u64;
 

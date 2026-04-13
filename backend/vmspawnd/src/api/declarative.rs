@@ -214,10 +214,30 @@ pub async fn apply_vm_spec(
     crate::validation::validate_vm_name(&spec.name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
 
-    // Validate volume host paths
+    if spec.credentials.len() > 100 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "credentials count must not exceed 100"}))));
+    }
+    if spec.tags.len() > 100 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "tags count must not exceed 100"}))));
+    }
+    if spec.resources.cpus < 1 || spec.resources.cpus > 1024 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "cpus must be between 1 and 1024"}))));
+    }
+
+    // Validate volume host and guest paths
     for vol in &spec.volumes {
         crate::validation::validate_host_path(&vol.host)
             .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid volume host path: {}", m)}))))?;
+        crate::validation::validate_machine_path(&vol.guest)
+            .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid volume guest path: {}", m)}))))?;
+    }
+
+    // Validate credential file paths
+    for cred in &spec.credentials {
+        if let Some(file_path) = cred.value.strip_prefix('@') {
+            crate::validation::validate_host_path(file_path)
+                .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid credential file path: {}", m)}))))?;
+        }
     }
 
     let mut warnings = Vec::new();

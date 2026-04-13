@@ -29,6 +29,9 @@ pub async fn create_vpn_tunnel(
     Json(req): Json<CreateVpnTunnelRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(create_vpn_tunnel));
+    if let Err((status, msg)) = crate::validation::validate_entity_name(&req.name) {
+        return (status, Json(json!({"error": msg}))).into_response();
+    }
     if let Err(msg) = crate::validation::validate_hostname(&req.interface_name) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid interface_name: {}", msg)}))).into_response();
     }

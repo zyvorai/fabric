@@ -1,0 +1,424 @@
+# vmspawnd Documentation Index
+
+Complete documentation index for the vmspawnd VM management platform.
+
+---
+
+## Getting Started
+
+Guides for new users to install, configure, and begin using vmspawnd.
+
+| Document | Description |
+|----------|-------------|
+| [Getting Started Overview](getting-started/README.md) | Section overview and reading order |
+| [Installation Guide](getting-started/01-Installation.md) | System requirements, packages, building from source |
+| [Quick Start](getting-started/02-Quick-Start.md) | Create your first VM in 5 minutes |
+| [Configuration Reference](getting-started/03-Configuration.md) | Config file, environment variables, all sections |
+| [Web UI Guide](getting-started/04-Web-UI.md) | Dashboard access, login, VM management through browser |
+
+---
+
+## Tutorials
+
+Step-by-step walkthroughs for common workflows.
+
+| Document | Description |
+|----------|-------------|
+| First VM | Create, configure, start, and connect to a virtual machine |
+| Cloud Image Deployment | Download and deploy Ubuntu, Fedora, or Debian cloud images |
+| Network Setup | Configure bridges, VLANs, and network policies |
+| Storage Pool Configuration | Set up local, NFS, LVM, ZFS, or Ceph storage |
+| Template-Based Deployment | Create templates and deploy VMs from them |
+| Backup and Restore | Configure automated backups and perform restores |
+| Multi-VM Application Stack | Deploy a multi-tier application with networking |
+| CI/CD Integration | Automate VM provisioning from CI pipelines |
+
+---
+
+## Guides
+
+### CLI Guides
+
+| Document | Description |
+|----------|-------------|
+| vmctl Reference | Full CLI command reference with examples |
+| vmspawnctl Operations | Deployment, management, and maintenance commands |
+| Declarative Configuration | Define VM infrastructure as YAML with `vmctl apply` |
+| Shell Completions | Enable tab completion for bash |
+
+### Operations Guides
+
+| Document | Description |
+|----------|-------------|
+| Production Deployment | Hardening, TLS, monitoring, and logging for production |
+| Capacity Planning | Resource estimation and scaling guidelines |
+| Backup Strategy | Backup types, retention policies, and disaster recovery |
+| Monitoring Setup | Prometheus integration, alerting, and dashboards |
+| Troubleshooting | Common issues, log analysis, and diagnostic steps |
+| Upgrade Procedures | Rolling upgrades and version migration |
+| Security Hardening | Firewall rules, RBAC policies, and credential rotation |
+
+### Decision Support
+
+| Document | Description |
+|----------|-------------|
+| vmspawnd vs. Proxmox | Feature and architecture comparison |
+| vmspawnd vs. OpenStack | Scope, complexity, and deployment comparison |
+| vmspawnd vs. libvirt | Integration model and management layer comparison |
+| Storage Backend Selection | Choosing between Local, NFS, LVM, ZFS, and Ceph |
+| Networking Architecture | Overlay vs. flat networking decisions |
+
+---
+
+## Features
+
+Detailed documentation for each major feature area.
+
+### VM Lifecycle
+
+| Document | Description |
+|----------|-------------|
+| VM Creation | `CreateVMRequest` fields, validation rules, defaults |
+| VM Start Options | `VMStartOptions` reference -- KVM, TPM, Secure Boot, networking |
+| VM States | State machine: Stopped, Starting, Running, Paused, Stopping, Failed |
+| VM Cloning | Full and linked clones with CoW support |
+| VM Templates | Create, manage, and deploy from templates |
+| VM Profiles | Instance types and resource presets |
+| VM Import | Import from VMDK, VDI, VHD formats |
+| Declarative Specs | YAML-based VM definitions with `vmctl apply` |
+| VM Checkpoints | Create and restore in-memory checkpoints |
+| VM Forking | Fork a running VM for testing |
+
+### Storage
+
+| Document | Description |
+|----------|-------------|
+| [Storage Overview](storage.md) | Storage architecture and backend selection |
+| Local Storage | File-based qcow2/raw storage pools |
+| NFS Storage | [NFS Storage Guide](NFS_STORAGE_GUIDE.md) |
+| LVM Storage | Logical Volume Manager pools and thin provisioning |
+| ZFS Storage | ZFS pools, datasets, and replication |
+| Ceph/RBD Storage | Ceph cluster integration and RBD image management |
+| Volume Management | CRUD, attach/detach, resize, and clone volumes |
+| Snapshots | Create, revert, delete, and tree-view snapshots |
+| Distributed Storage | Cross-node storage pools, migrations, and policies |
+| Datastore Clusters | Storage DRS and placement recommendations |
+| Cloud Images | Built-in catalog download (Ubuntu, Fedora, Debian, Alma) |
+| ISO Management | Download, list, and manage ISO images |
+| Online Disk Resize | Grow VM disks without downtime |
+
+### Networking
+
+| Document | Description |
+|----------|-------------|
+| [Networking Overview](networking.md) | Network architecture and configuration |
+| systemd-networkd Integration | Bridges, VLANs, bonds, taps, macvtaps, VXLANs, SR-IOV |
+| Network Policies | Cilium-style label-based ingress/egress rules |
+| VM Firewall | Per-VM firewall profiles and zones via nftables |
+| Service Mesh | Virtual IP load balancing (round-robin, least-conn, IP-hash) |
+| Traffic Shaping | QoS: guaranteed rate, max rate, burst, priority-based bandwidth |
+| DNS Policies | Zone management, upstream servers, domain blocking |
+| VPN Mesh | WireGuard tunnels: point-to-point, hub-spoke, full-mesh |
+| NAT Gateway | Masquerade, SNAT, DNAT, hairpin NAT |
+| Packet Mirror | Traffic capture and debugging |
+| Network Monitor | Per-VM bandwidth tracking with threshold alerts |
+| Floating IPs | Virtual IP allocation and VM assignment |
+| DHCP Servers | systemd-networkd DHCP server management |
+| Port Forwarding | NAT-based port forwarding rules |
+
+### Security and Identity
+
+| Document | Description |
+|----------|-------------|
+| [Security Overview](security.md) | Security architecture and audit history |
+| Authentication | PAM + JWT authentication flow |
+| RBAC | Admin, User, Viewer roles and endpoint permissions |
+| API Keys | Service-to-service authentication tokens |
+| External Auth | LDAP and OIDC/OAuth2 integration |
+| Audit Logging | Structured audit logs with JSON/CSV export |
+| Encryption | VM disk encryption with key management providers |
+| TLS/HTTPS | Certificate management and self-signed TLS generation |
+| Multi-Tenancy | Project isolation with member roles and quotas |
+| Credential Management | systemd credentials, SSH keys, and cloud-init secrets |
+
+### High Availability
+
+| Document | Description |
+|----------|-------------|
+| [HA Overview](high-availability.md) | Clustering architecture and failover |
+| Clustering | etcd-based cluster formation and leader election |
+| DRS | Distributed Resource Scheduling and placement |
+| Affinity Rules | VM-to-VM and VM-to-host affinity/anti-affinity |
+| Fault Tolerance | Automatic failover, fencing, and recovery |
+| Live Migration | Iterative rsync pre-copy migration with cutover |
+| Site Recovery | Failover/reprotect workflows for disaster recovery |
+| Resource Overcommit | CPU/memory/storage overcommit policies |
+| Auto-Scaling | Metric-based scaling policies and events |
+
+### Monitoring and Automation
+
+| Document | Description |
+|----------|-------------|
+| Prometheus Metrics | `/metrics` endpoint and metric catalog |
+| Analytics Dashboard | Historical performance data and insights |
+| Notifications | Email, Slack, Webhook, Microsoft Teams channels |
+| Schedules | Once, daily, weekly VM operations scheduling |
+| Backup Automation | Retention policies, incremental backups, systemd timers |
+| Resource Quotas | Per-user and per-project resource limits |
+| Optimization | Resource optimization recommendations |
+| Health Checks | Deep health check: API, disk, DB, credentials, KVM |
+
+### Console Access
+
+| Document | Description |
+|----------|-------------|
+| WebSocket Console | Browser-based terminal via xterm.js |
+| VNC Console | Graphical console via noVNC proxy |
+| Console Modes | Interactive, read-only, native, GUI |
+
+### Advanced Virtualization
+
+| Document | Description |
+|----------|-------------|
+| [GPU Passthrough](gpu-passthrough.md) | NVIDIA, AMD, Intel GVT-g configuration |
+| [CPU/NUMA Optimization](CPU_NUMA_OPTIMIZATION_GUIDE.md) | CPU pinning, NUMA topology, hugepages |
+| KSM Memory Dedup | Kernel Same-page Merging configuration |
+| Nested Virtualization | Running VMs inside VMs |
+| Hotplug | CPU, memory, disk, and NIC hot-add/remove |
+| Firmware | UEFI, Secure Boot, NVRAM management |
+| TPM | vTPM support via swtpm |
+| Direct Kernel Boot | Boot from kernel + initrd without bootloader |
+| Bind Mounts | Host-to-VM filesystem sharing |
+| User Namespaces | Private user mapping for isolation |
+
+---
+
+## Architecture
+
+| Document | Description |
+|----------|-------------|
+| [Architecture Overview](architecture.md) | System architecture and component diagram |
+| Crate Structure | 40 backend crates and their responsibilities |
+| Data Model | VM, VMStartOptions, VMMetrics, VMPressure |
+| Driver Model | VMDriver and ResourceStatsDriver traits |
+| State Store | SQLite-based persistent state management |
+| Event System | Broadcast channels and SSE event streaming |
+| Background Tasks | Reconciliation loops and schedulers |
+| Plugin System | Plugin registry and extension points |
+
+---
+
+## Reference
+
+### API Reference
+
+| Document | Description |
+|----------|-------------|
+| [API Overview](api.md) | Authentication, pagination, error format |
+| VM Endpoints | CRUD, lifecycle, metrics, cloud-init |
+| Storage Endpoints | Pool and volume management |
+| Network Endpoints | systemd-networkd, policies, firewall, mesh |
+| Security Endpoints | Auth, audit, encryption, tenants |
+| System Endpoints | CPU topology, NUMA, memory, firmware |
+| Enterprise Endpoints | Datacenters, clusters, hosts, DRS |
+| Machine Endpoints | systemd-machined integration |
+| Monitoring Endpoints | Analytics, events, notifications, schedules |
+| Backup Endpoints | Backup CRUD, policies, restore |
+| WebSocket Endpoints | Console, VNC, event streaming |
+
+### CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `vmctl list` | List VMs with table, JSON, or YAML output |
+| `vmctl create` | Create a new VM |
+| `vmctl start` | Start a stopped VM |
+| `vmctl stop` | Stop a running VM |
+| `vmctl restart` | Restart a VM |
+| `vmctl delete` | Delete a VM |
+| `vmctl apply` | Apply declarative YAML specification |
+| `vmctl policy` | Manage network policies |
+| `vmctl ceph` | Ceph storage management |
+| `vmctl console` | Attach to VM console |
+
+### vmspawnctl Reference
+
+| Command | Description |
+|---------|-------------|
+| `vmspawnctl deploy` | Full deployment (deps + build + install + start) |
+| `vmspawnctl deps` | Install system dependencies |
+| `vmspawnctl build` | Build from source |
+| `vmspawnctl install` | Install binaries and systemd units |
+| `vmspawnctl start` | Start the vmspawnd service |
+| `vmspawnctl stop` | Stop the vmspawnd service |
+| `vmspawnctl restart` | Restart the service |
+| `vmspawnctl status` | Show service status |
+| `vmspawnctl logs` | Follow service logs |
+| `vmspawnctl verify` | Post-install smoke test |
+| `vmspawnctl health` | Deep health check |
+| `vmspawnctl password` | Read the admin password |
+| `vmspawnctl doctor` | System readiness check |
+| `vmspawnctl tls` | Generate self-signed TLS certificate |
+| `vmspawnctl upgrade` | Git pull + reinstall |
+| `vmspawnctl uninstall` | Remove everything |
+| `vmspawnctl backup now` | Trigger immediate backup |
+| `vmspawnctl backup enable` | Enable daily backup timer |
+| `vmspawnctl backup status` | Show backup timer and storage info |
+
+---
+
+## Deployment
+
+| Document | Description |
+|----------|-------------|
+| Single Server | One-node deployment for development and small teams |
+| Multi-Node Cluster | HA deployment with shared storage and etcd |
+| Kubernetes-Managed | VMs as CRDs with the vmspawnd operator |
+| Terraform Provider | Declarative provisioning with plan/apply |
+| Edge Deployment | Lightweight single-node deployment for edge locations |
+| Air-Gapped Install | Offline installation without internet access |
+
+---
+
+## Development
+
+| Document | Description |
+|----------|-------------|
+| Development Setup | Rust toolchain, IDE, and local development |
+| Build and Test | `cargo check`, `cargo test`, CI pipeline |
+| Crate Map | 40 crates and their dependencies |
+| Adding an API Endpoint | Step-by-step guide for new endpoints |
+| Adding a Storage Backend | Driver trait implementation guide |
+| Adding a Network Feature | Integration with systemd-networkd |
+| Code Style | Formatting, naming, error handling conventions |
+| Security Guidelines | Input validation, path traversal prevention, audit |
+
+---
+
+## Quick Reference
+
+### API Endpoint Categories
+
+The REST API is organized into the following endpoint groups:
+
+| Category | Prefix | Endpoints | Description |
+|----------|--------|-----------|-------------|
+| Authentication | `/api/auth/` | 2 | Login and session management |
+| VM Lifecycle | `/api/vms/` | 12 | CRUD, start, stop, restart, pause, resume, clone |
+| VM Advanced | `/api/vms/{name}/` | 20+ | Hotplug, checkpoints, fork, disk resize, firmware |
+| Snapshots | `/api/vms/{name}/snapshots/` | 5 | Create, list, get, delete, revert |
+| Cloud-Init | `/api/vms/{name}/cloud-init` | 1 | Configure cloud-init for a VM |
+| Storage Pools | `/api/storage/pools/` | 14 | Pool CRUD, health, stats, refresh |
+| Volumes | `/api/storage/pools/{name}/volumes/` | 6 | Volume CRUD, resize, attach, detach |
+| Distributed Storage | `/api/distributed-storage/` | 18 | Cross-node pools, migrations, policies |
+| systemd-networkd | `/api/networkd/` | 35+ | Bridges, VLANs, bonds, taps, VXLANs, SR-IOV |
+| Network Policies | `/api/network-policies/` | 5 | Cilium-style ingress/egress rules |
+| VM Firewall | `/api/vm-firewall/` | 8+ | Per-VM firewall profiles and zones |
+| Service Mesh | `/api/service-mesh/` | 10+ | Virtual IP and load balancing |
+| Traffic Shaping | `/api/traffic-shaping/` | 8+ | QoS and bandwidth management |
+| DNS Policies | `/api/dns-policies/` | 6+ | Zone management and blocking |
+| VPN Mesh | `/api/vpn-mesh/` | 6+ | WireGuard tunnel management |
+| NAT Gateway | `/api/nat-gateway/` | 6+ | Masquerade, SNAT, DNAT |
+| Packet Mirror | `/api/packet-mirror/` | 4+ | Traffic capture |
+| Net Monitor | `/api/net-monitor/` | 4+ | Bandwidth tracking and alerts |
+| Floating IPs | `/api/floating-ips/` | 4 | Virtual IP allocation |
+| DHCP | `/api/dhcp-servers/` | 2 | systemd-networkd DHCP servers |
+| DNS | `/api/dns/` | 4 | DNS configuration |
+| Encryption | `/api/encryption/` | 11 | Key providers, policies, VM encryption |
+| Backups | `/api/backups/` | 11 | Backup CRUD, policies, restore, stats |
+| Schedules | `/api/schedules/` | 9 | Timed VM operations |
+| Quotas | `/api/quotas/` | 8 | Resource quotas and usage |
+| Notifications | `/api/notifications/` | 11 | Multi-channel alerting |
+| Audit | `/api/audit/` | 4 | Audit logs and export |
+| Analytics | `/api/analytics/` | 6 | Performance data and insights |
+| Templates | `/api/templates/` | 5 | VM templates and deployment |
+| Profiles | `/api/profiles/` | 3 | Instance type presets |
+| Images | `/api/images/` | 10 | Image build, cloud download, ISO, import |
+| Migrations | `/api/migrations/` | 3 | Live VM migration |
+| Events | `/api/events/` | 2 | Event list and SSE stream |
+| System | `/api/system/` | 12 | CPU, NUMA, memory, hugepages, optimization |
+| Firmware | `/api/vms/{name}/firmware/` | 5 | UEFI, Secure Boot, NVRAM |
+| Datacenters | `/api/datacenters/` | 5 | Datacenter management |
+| Clusters | `/api/clusters/` | 5 | Cluster management and health |
+| Hosts | `/api/hosts/` | 8 | Host registration and maintenance |
+| DRS | `/api/drs/` | 9 | Scheduling, placement, affinity rules |
+| Resource Pools | `/api/resource-pools/` | 7 | Resource pool management |
+| Zones | `/api/zones/` | 3 | Availability zones |
+| Spot Instances | `/api/spot-instances/` | 3 | Spot VM management |
+| Machines | `/api/machines/` | 20 | systemd-machined integration |
+| Tenants | `/api/tenants/` | varies | Multi-tenancy and projects |
+| Settings | `/api/settings` | 2 | Global settings |
+| Plugins | `/api/plugins` | 1 | Plugin registry |
+| Declarative | `/api/vms/apply` | 2 | YAML spec apply and export |
+| Auto-Scale | `/api/autoscale/` | 4 | Scaling policies and events |
+| WebSocket | `/api/ws/` | 3 | Console, VNC, events |
+
+### Default Ports and Paths
+
+| Item | Default |
+|------|---------|
+| API listen address | `127.0.0.1:9095` |
+| Config file | `/etc/vmspawnd/vmspawnd.toml` |
+| State directory | `/var/lib/vmspawnd/` |
+| Image directory | `/var/lib/vmspawnd/images/` |
+| Auth database | `/var/lib/vmspawnd/auth.db` |
+| Cloud-init directory | `/var/lib/vmspawnd/cloud-init/` |
+| Storage pools | `/var/lib/vmspawnd/storage/` |
+| JWT secret file | `/var/lib/vmspawnd/.jwt_secret` |
+| Admin password file | `/var/lib/vmspawnd/.admin_password` |
+| networkd config dir | `/etc/systemd/network/` |
+| networkd file prefix | `50-vmspawnd-` |
+| Network bridge | `br0` |
+
+### VM Resource Limits
+
+| Resource | Minimum | Maximum | Default |
+|----------|---------|---------|---------|
+| CPUs | 1 | 256 | -- |
+| Memory | 128 MB | 1,048,576 MB (1 TB) | -- |
+| Disk | 1 GB | 65,536 GB (64 TB) | 20 GB |
+
+### VM States
+
+| State | Description |
+|-------|-------------|
+| `stopped` | VM is not running |
+| `starting` | VM is in the process of booting |
+| `running` | VM is running and accessible |
+| `paused` | VM is suspended in memory |
+| `stopping` | VM is in the process of shutting down |
+| `failed` | VM failed to start or encountered an error |
+| `unknown` | VM state could not be determined |
+
+### RBAC Roles
+
+| Role | Read | Write | Admin |
+|------|------|-------|-------|
+| Viewer | Yes | No | No |
+| User | Yes | Yes | No |
+| Admin | Yes | Yes | Yes |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `VMSPAWND_JWT_SECRET` | Override JWT signing secret |
+| `VMSPAWND_ADMIN_PASSWORD` | Override default admin password |
+| `VMSPAWND_BACKUP_DIR` | Override backup directory |
+| `VMSPAWND_BACKUP_RETAIN` | Override backup retention count |
+| `VMSPAWND_BACKUP_TYPE` | Override backup type |
+
+---
+
+## Client Presentations
+
+| Document | Description |
+|----------|-------------|
+| [Product Overview](PRODUCT_OVERVIEW.md) | Comprehensive product overview with feature matrix |
+| [Product Overview (PDF)](PRODUCT_OVERVIEW.pdf) | Printable product overview |
+| [Security Audit Report](SECURITY_AUDIT_REPORT.md) | Full security audit report |
+| [Security Audit Report (PDF)](SECURITY_AUDIT_REPORT.pdf) | Printable security audit report |
+
+---
+
+*This index is maintained alongside the codebase. For the latest information, refer to the source code and inline documentation.*

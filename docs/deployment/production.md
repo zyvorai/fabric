@@ -1,0 +1,591 @@
+# Production Deployment Guide
+
+This document provides a comprehensive guide for deploying vmspawn in a production
+environment. It covers system requirements, installation, configuration, security
+hardening, backup strategy, and monitoring setup.
+
+---
+
+## Table of Contents
+
+1. [System Requirements](#system-requirements)
+2. [Pre-Installation Checklist](#pre-installation-checklist)
+3. [Installation](#installation)
+4. [Configuration](#configuration)
+5. [Authentication Setup](#authentication-setup)
+6. [TLS Configuration](#tls-configuration)
+7. [Systemd Service Setup](#systemd-service-setup)
+8. [Log Management](#log-management)
+9. [Security Hardening](#security-hardening)
+10. [Backup Strategy](#backup-strategy)
+11. [Monitoring Setup](#monitoring-setup)
+12. [Maintenance Procedures](#maintenance-procedures)
+
+---
+
+## System Requirements
+
+### Hardware
+
+| Component | Minimum            | Recommended              |
+|-----------|--------------------|--------------------------|
+| CPU       | 2 cores (x86_64)   | 8+ cores with VT-x/VT-d |
+| RAM       | 4 GB               | 32+ GB                   |
+| Disk      | 50 GB              | 500+ GB SSD/NVMe         |
+| Network   | 1 Gbps NIC         | 10+ Gbps NIC             |
+
+### Software
+
+| Component           | Minimum Version | Notes                                   |
+|---------------------|-----------------|-----------------------------------------|
+| Linux Kernel        | 5.15+           | 6.x recommended for best KVM support    |
+| systemd             | 254+            | 260+ for full vmspawn feature support    |
+| systemd-vmspawn     | 254+            | Included with systemd                    |
+| QEMU                | 7.0+            | 8.x+ recommended                        |
+| KVM                 | Kernel built-in | Verify with `lsmod | grep kvm`          |
+| Rust                | 1.75+           | For building from source                 |
+| PAM                 | System default  | Required for PAM authentication          |
+| SQLite              | 3.35+           | Bundled via rusqlite                     |
+
+### Kernel Modules
+
+Verify the following kernel modules are loaded:
+
+```bash
+lsmod | grep -E "kvm|tun|bridge|vhost"
+```
+
+Required modules:
+- `kvm` and `kvm_intel` or `kvm_amd` -- Hardware virtualization
+- `tun` -- TAP networking
+- `bridge` -- Network bridging
+- `vhost_net` -- Kernel-level virtio networking (optional, improves performance)
+
+---
+
+## Pre-Installation Checklist
+
+```bash
+# 1. Verify CPU virtualization support
+grep -cE '(vmx|svm)' /proc/cpuinfo
+
+# 2. Verify KVM is available
+ls -la /dev/kvm
+
+# 3. Verify systemd-vmspawn is installed
+which systemd-vmspawn
+
+# 4. Verify systemd-machined is running
+systemctl status systemd-machined
+
+# 5. Create the vmspawnd system user (optional, for non-root operation)
+sudo useradd --system --home-dir /var/lib/vmspawnd --shell /usr/sbin/nologin vmspawnd
+
+# 6. Ensure the user has access to KVM
+sudo usermod -aG kvm vmspawnd
+```
+
+---
+
+## Installation
+
+### Building from Source
+
+```bash
+# Install build dependencies (Fedora/RHEL)
+sudo dnf install -y gcc make openssl-devel pam-devel systemd-devel sqlite-devel
+
+# Install build dependencies (Debian/Ubuntu)
+sudo apt install -y build-essential libssl-dev libpam0g-dev libsystemd-dev libsqlite3-dev
+
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Clone and build
+git clone https://github.com/example/vmspawn.git
+cd vmspawn/backend
+cargo build --release
+
+# Install binaries
+sudo install -m 755 target/release/vmspawnd /usr/local/bin/
+sudo install -m 755 target/release/vmctl /usr/local/bin/
+```
+
+### Directory Setup
+
+```bash
+# Create required directories
+sudo mkdir -p /var/lib/vmspawnd/{images,storage,vms,snapshots,backups,cloud-init,certificates}
+sudo mkdir -p /etc/vmspawnd
+sudo mkdir -p /var/log/vmspawnd
+
+# Set ownership (if running as vmspawnd user)
+sudo chown -R vmspawnd:vmspawnd /var/lib/vmspawnd
+sudo chown -R vmspawnd:vmspawnd /var/log/vmspawnd
+```
+
+---
+
+## Configuration
+
+Create the main configuration file at `/etc/vmspawnd/vmspawnd.toml`:
+
+```toml
+# =============================================================================
+# vmspawnd Production Configuration
+# =============================================================================
+
+[daemon]
+# Bind address. Use 0.0.0.0 only behind a reverse proxy with TLS.
+listen = "127.0.0.1:9095"
+
+# CORS origins allowed for the web UI.
+# In production, restrict to the actual domain(s) serving the UI.
+cors_origins = ["https://vmspawn.example.com"]
+
+[storage]
+# Root directory for all persistent state.
+path = "/var/lib/vmspawnd"
+
+# Directory for VM disk images.
+image_path = "/var/lib/vmspawnd/images"
+
+[network]
+# Default bridge for VM networking.
+bridge = "br0"
+
+# Directory for generated systemd-networkd configuration files.
+networkd_config_dir = "/etc/systemd/network"
+
+# Prefix for generated network config file names.
+networkd_file_prefix = "50-vmspawnd-"
+
+[auth]
+# Enable authentication (strongly recommended for production).
+enabled = true
+
+# JWT signing secret. Set this explicitly or use the environment variable
+# VMSPAWND_JWT_SECRET. If not set, a random secret is generated and
+# persisted to /var/lib/vmspawnd/.jwt_secret.
+# jwt_secret = "your-secure-random-secret-here"
+
+# Path to the SQLite user database.
+db_path = "/var/lib/vmspawnd/auth.db"
+
+# JWT token expiration in hours.
+token_expiration_hours = 8
+
+[controller]
+# Enable controller mode for multi-host management.
+enabled = false
+mode = "standalone"
+# cluster_name = "production"
+# datacenter_name = "dc-east-1"
+```
+
+### Environment Variables
+
+| Variable                  | Description                             | Default              |
+|---------------------------|-----------------------------------------|----------------------|
+| `VMSPAWND_JWT_SECRET`     | JWT signing secret                      | Auto-generated       |
+| `VMSPAWND_ADMIN_PASSWORD` | Initial admin user password             | Auto-generated       |
+| `VSPAWN_LOG_LEVEL`        | Log level (trace/debug/info/warn/error) | `info`               |
+| `RUST_LOG`                | Standard Rust log filter (fallback)     | `vmspawnd=info`      |
+
+---
+
+## Authentication Setup
+
+### Initial Admin Access
+
+On first startup with authentication enabled, vmspawnd creates an `admin` user:
+
+1. If `VMSPAWND_ADMIN_PASSWORD` is set, that password is used
+2. Otherwise, a random password is generated and written to
+   `/var/lib/vmspawnd/.admin_password` (mode 0600)
+
+```bash
+# Read the generated admin password
+sudo cat /var/lib/vmspawnd/.admin_password
+
+# Log in and obtain a JWT token
+curl -s http://127.0.0.1:9095/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "THE_PASSWORD"}'
+```
+
+### Creating Additional Users
+
+```bash
+TOKEN="your-admin-jwt-token"
+
+# Create a regular user
+curl -s http://127.0.0.1:9095/api/v1/auth/users \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "operator", "password": "secure-password", "role": "user"}'
+
+# Create a read-only viewer
+curl -s http://127.0.0.1:9095/api/v1/auth/users \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "auditor", "password": "secure-password", "role": "viewer"}'
+```
+
+### PAM Authentication
+
+vmspawnd can authenticate against the system PAM stack. Create a PAM service file:
+
+```bash
+sudo tee /etc/pam.d/vmspawnd << 'EOF'
+auth    required    pam_unix.so
+account required    pam_unix.so
+EOF
+```
+
+When this file exists, vmspawnd will use the `vmspawnd` PAM service for
+authentication. Otherwise, it falls back to the `login` PAM service.
+
+---
+
+## TLS Configuration
+
+vmspawnd does not terminate TLS directly. Use a reverse proxy for TLS termination.
+
+### nginx Configuration
+
+```nginx
+upstream vmspawnd {
+    server 127.0.0.1:9095;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name vmspawn.example.com;
+
+    ssl_certificate     /etc/ssl/certs/vmspawn.crt;
+    ssl_certificate_key /etc/ssl/private/vmspawn.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    # REST API and static web UI
+    location / {
+        proxy_pass http://vmspawnd;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # WebSocket console
+    location /api/v1/ws/ {
+        proxy_pass http://vmspawnd;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # SSE event stream
+    location /api/v1/events/stream {
+        proxy_pass http://vmspawnd;
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+    }
+}
+```
+
+---
+
+## Systemd Service Setup
+
+See [systemd-service.md](systemd-service.md) for the complete unit file. Quick setup:
+
+```bash
+sudo install -m 644 docs/deployment/vmspawnd.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now vmspawnd
+```
+
+---
+
+## Log Management
+
+### Journald Integration
+
+vmspawnd logs to stdout/stderr, which systemd captures into the journal:
+
+```bash
+# View live logs
+journalctl -u vmspawnd -f
+
+# View logs since last boot
+journalctl -u vmspawnd -b
+
+# View only errors
+journalctl -u vmspawnd -p err
+
+# Export logs for analysis
+journalctl -u vmspawnd --since "1 hour ago" -o json > vmspawnd-logs.json
+```
+
+### Log Levels
+
+Set the log level via the `VSPAWN_LOG_LEVEL` environment variable in the
+systemd unit file or on the command line:
+
+| Level   | Description                                      |
+|---------|--------------------------------------------------|
+| `error` | Critical errors only                             |
+| `warn`  | Warnings and errors                              |
+| `info`  | Normal operational messages (default)            |
+| `debug` | Detailed debugging information                   |
+| `trace` | Very verbose trace-level logging                 |
+
+### Audit Logs
+
+vmspawnd writes structured audit log entries for all state-changing operations.
+Query audit logs via the API:
+
+```bash
+curl -s http://127.0.0.1:9095/api/v1/audit/logs \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Export audit logs
+curl -s http://127.0.0.1:9095/api/v1/audit/logs/export \
+  -H "Authorization: Bearer $TOKEN" > audit-export.json
+```
+
+---
+
+## Security Hardening
+
+### Checklist
+
+- [ ] Enable authentication (`auth.enabled = true`)
+- [ ] Set an explicit JWT secret via `VMSPAWND_JWT_SECRET` environment variable
+- [ ] Reduce token expiration (`token_expiration_hours = 8` or less)
+- [ ] Bind to localhost only (`listen = "127.0.0.1:9095"`)
+- [ ] Use a reverse proxy with TLS for external access
+- [ ] Restrict CORS origins to your actual domain(s)
+- [ ] Create a dedicated system user for vmspawnd
+- [ ] Apply the systemd sandboxing options from [systemd-service.md](systemd-service.md)
+- [ ] Set restrictive file permissions on `/var/lib/vmspawnd/` (mode 0700)
+- [ ] Rotate the JWT secret periodically
+- [ ] Monitor audit logs for unauthorized access attempts
+- [ ] Enable resource quotas to prevent resource exhaustion
+- [ ] Configure firewall rules to restrict management port access
+
+### File Permissions
+
+```bash
+# Lock down the data directory
+sudo chmod 700 /var/lib/vmspawnd
+sudo chmod 600 /var/lib/vmspawnd/.jwt_secret
+sudo chmod 600 /var/lib/vmspawnd/.admin_password
+sudo chmod 600 /var/lib/vmspawnd/auth.db
+
+# Lock down the config directory
+sudo chmod 750 /etc/vmspawnd
+sudo chmod 640 /etc/vmspawnd/vmspawnd.toml
+```
+
+### Network Security
+
+```bash
+# Allow management access only from trusted networks
+sudo firewall-cmd --zone=internal --add-rich-rule='
+  rule family="ipv4" source address="10.0.0.0/8"
+  port protocol="tcp" port="9095" accept'
+
+# Or with nftables directly
+sudo nft add rule inet filter input ip saddr 10.0.0.0/8 tcp dport 9095 accept
+sudo nft add rule inet filter input tcp dport 9095 drop
+```
+
+---
+
+## Backup Strategy
+
+### What to Back Up
+
+| Path                           | Priority | Contents                          |
+|--------------------------------|----------|-----------------------------------|
+| `/etc/vmspawnd/vmspawnd.toml`  | Critical | Daemon configuration              |
+| `/var/lib/vmspawnd/auth.db`    | Critical | User accounts and passwords       |
+| `/var/lib/vmspawnd/.jwt_secret`| Critical | JWT signing key                   |
+| `/var/lib/vmspawnd/vms/`       | High     | VM state metadata                 |
+| `/var/lib/vmspawnd/images/`    | High     | VM disk images (large)            |
+| `/var/lib/vmspawnd/snapshots/` | Medium   | Snapshot metadata                 |
+| `/var/lib/vmspawnd/certificates/` | Medium | TLS certificates and CAs       |
+| `/etc/systemd/network/50-vmspawnd-*` | Low | Generated network configs (recreatable) |
+
+### Backup Script Example
+
+```bash
+#!/bin/bash
+# vmspawnd-backup.sh - Daily backup script
+set -euo pipefail
+
+BACKUP_DIR="/backup/vmspawnd/$(date +%Y-%m-%d)"
+mkdir -p "$BACKUP_DIR"
+
+# Stop the daemon briefly for consistent backup (optional)
+# sudo systemctl stop vmspawnd
+
+# Back up configuration and state
+sudo tar czf "$BACKUP_DIR/config.tar.gz" /etc/vmspawnd/
+sudo tar czf "$BACKUP_DIR/state.tar.gz" \
+  /var/lib/vmspawnd/auth.db \
+  /var/lib/vmspawnd/.jwt_secret \
+  /var/lib/vmspawnd/vms/ \
+  /var/lib/vmspawnd/snapshots/ \
+  /var/lib/vmspawnd/certificates/
+
+# Back up VM images (incremental with rsync)
+sudo rsync -a --delete /var/lib/vmspawnd/images/ "$BACKUP_DIR/images/"
+
+# Restart if stopped
+# sudo systemctl start vmspawnd
+
+# Retain 30 days of backups
+find /backup/vmspawnd/ -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
+
+echo "Backup completed: $BACKUP_DIR"
+```
+
+### Automated Backup via API
+
+vmspawnd provides a built-in backup API:
+
+```bash
+# Create a backup
+curl -s -X POST http://127.0.0.1:9095/api/v1/backups \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"vm_name": "production-db", "description": "Pre-upgrade backup"}'
+
+# Create a backup policy (daily at 2 AM)
+curl -s -X POST http://127.0.0.1:9095/api/v1/backups/policies \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"vm_name": "production-db", "schedule": "0 2 * * *", "retention_days": 30}'
+```
+
+---
+
+## Monitoring Setup
+
+### Prometheus Integration
+
+vmspawnd exposes a Prometheus-compatible metrics endpoint:
+
+```bash
+curl http://127.0.0.1:9095/metrics
+```
+
+Available metrics:
+
+| Metric                        | Type    | Description                    |
+|-------------------------------|---------|--------------------------------|
+| `vmspawnd_vms_total`          | Gauge   | Total number of VMs            |
+| `vmspawnd_vms_running`        | Gauge   | Number of running VMs          |
+| `vmspawnd_vms_stopped`        | Gauge   | Number of stopped VMs          |
+| `vmspawnd_vm_starts_total`    | Counter | Total VM start operations      |
+| `vmspawnd_vm_stops_total`     | Counter | Total VM stop operations       |
+| `vmspawnd_vm_creates_total`   | Counter | Total VM create operations     |
+| `vmspawnd_vm_deletes_total`   | Counter | Total VM delete operations     |
+
+### Prometheus Configuration
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'vmspawnd'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['127.0.0.1:9095']
+    metrics_path: '/metrics'
+```
+
+### Health Check
+
+Use the VM list endpoint as a basic health check:
+
+```bash
+# Simple health check
+curl -sf http://127.0.0.1:9095/api/v1/vms > /dev/null && echo "OK" || echo "FAIL"
+```
+
+### Alerting Rules (Prometheus)
+
+```yaml
+# vmspawnd-alerts.yml
+groups:
+  - name: vmspawnd
+    rules:
+      - alert: VMSpawndDown
+        expr: up{job="vmspawnd"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vmspawnd is unreachable"
+
+      - alert: HighVMCount
+        expr: vmspawnd_vms_running > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of running VMs ({{ $value }})"
+```
+
+---
+
+## Maintenance Procedures
+
+### Rolling Restart
+
+```bash
+# Graceful restart (in-flight requests complete, background tasks shut down)
+sudo systemctl restart vmspawnd
+```
+
+### Upgrading
+
+```bash
+# 1. Build new version
+cd vmspawn/backend && cargo build --release
+
+# 2. Stop the daemon
+sudo systemctl stop vmspawnd
+
+# 3. Back up state
+sudo tar czf /tmp/vmspawnd-pre-upgrade.tar.gz /var/lib/vmspawnd/
+
+# 4. Install new binary
+sudo install -m 755 target/release/vmspawnd /usr/local/bin/
+
+# 5. Start the daemon
+sudo systemctl start vmspawnd
+
+# 6. Verify
+journalctl -u vmspawnd -n 20
+curl -sf http://127.0.0.1:9095/api/v1/vms | jq .total
+```
+
+### Database Maintenance
+
+The SQLite user database requires minimal maintenance. To compact it:
+
+```bash
+sudo systemctl stop vmspawnd
+sudo sqlite3 /var/lib/vmspawnd/auth.db "VACUUM;"
+sudo systemctl start vmspawnd
+```

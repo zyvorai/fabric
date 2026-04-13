@@ -43,6 +43,11 @@ members = [
     "packet-mirror",
     "nat-gateway",
     "net-monitor",
+    "ova-tools",
+    "secrets-manager",
+    "vmspawn-sdk",
+    "billing",
+    "compliance",
 ]
 
 [workspace.package]
@@ -66,7 +71,7 @@ crossterm = "0.28"
 tui-input = "0.11"
 toml = "0.8"
 futures = "0.3"
-uuid = { version = "1.16", features = ["v4", "serde"] }
+uuid = { version = "1.16", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.11"
 tar = "0.4"
@@ -75,3 +80,10 @@ hostname = "0.4"
 rand = "0.9"
 zbus = { version = "4", default-features = false, features = ["tokio"] }
 async-stream = "0.3"
+rcgen = { version = "0.13", features = ["pem", "x509-parser"] }
+sha2 = "0.10"
+hex = "0.4"
+time = "0.3"
+totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
+base32 = "0.5"
+quick-xml = "0.36"

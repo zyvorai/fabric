@@ -163,7 +163,7 @@ impl EncryptionManager {
 
     /// Register a new key provider.
     pub fn register_provider(&self, provider: KeyProvider) -> Result<KeyProvider> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if inner.providers.contains_key(&provider.id) {
             bail!("Key provider '{}' already exists", provider.id);
         }
@@ -178,19 +178,19 @@ impl EncryptionManager {
 
     /// Look up a key provider by ID.
     pub fn get_provider(&self, id: &str) -> Option<KeyProvider> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.providers.get(id).cloned()
     }
 
     /// List all registered key providers.
     pub fn list_providers(&self) -> Vec<KeyProvider> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.providers.values().cloned().collect()
     }
 
     /// Remove a key provider. Fails if any active keys still reference it.
     pub fn remove_provider(&self, id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if !inner.providers.contains_key(id) {
             bail!("Key provider '{}' not found", id);
         }
@@ -215,7 +215,7 @@ impl EncryptionManager {
     /// succeeds; for remote providers we just check that the endpoint is
     /// configured and the provider is not in `Error` status.
     pub fn test_provider(&self, id: &str) -> Result<bool> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         let provider = inner
             .providers
             .get(id)
@@ -236,7 +236,7 @@ impl EncryptionManager {
 
     /// Create a new encryption policy.
     pub fn create_policy(&self, policy: EncryptionPolicy) -> Result<EncryptionPolicy> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if inner.policies.contains_key(&policy.id) {
             bail!("Encryption policy '{}' already exists", policy.id);
         }
@@ -253,13 +253,13 @@ impl EncryptionManager {
 
     /// Retrieve a policy by ID.
     pub fn get_policy(&self, id: &str) -> Option<EncryptionPolicy> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.policies.get(id).cloned()
     }
 
     /// List all encryption policies.
     pub fn list_policies(&self) -> Vec<EncryptionPolicy> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.policies.values().cloned().collect()
     }
 
@@ -269,7 +269,7 @@ impl EncryptionManager {
         id: &str,
         mut policy: EncryptionPolicy,
     ) -> Result<EncryptionPolicy> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if !inner.policies.contains_key(id) {
             bail!("Encryption policy '{}' not found", id);
         }
@@ -282,7 +282,7 @@ impl EncryptionManager {
 
     /// Delete a policy.  Fails if any VM is still using it.
     pub fn delete_policy(&self, id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if !inner.policies.contains_key(id) {
             bail!("Encryption policy '{}' not found", id);
         }
@@ -306,7 +306,7 @@ impl EncryptionManager {
         provider_id: &str,
         algorithm: EncryptionAlgorithm,
     ) -> Result<EncryptionKey> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if !inner.providers.contains_key(provider_id) {
             bail!("Key provider '{}' not found", provider_id);
         }
@@ -335,14 +335,14 @@ impl EncryptionManager {
 
     /// Look up a key by ID.
     pub fn get_key(&self, id: &str) -> Option<EncryptionKey> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.keys.get(id).cloned()
     }
 
     /// Rotate a key: mark the existing one as `Rotated`, generate a fresh key
     /// from the same provider, and record a `KeyRotationEvent`.
     pub fn rotate_key(&self, key_id: &str) -> Result<KeyRotationEvent> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         let old_key = inner
             .keys
             .get(key_id)
@@ -405,7 +405,7 @@ impl EncryptionManager {
     /// Revoke an active key.  If the key is assigned to a VM the caller should
     /// decrypt or re-key the VM first; this method simply marks the key.
     pub fn revoke_key(&self, key_id: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         let key = inner
             .keys
             .get_mut(key_id)
@@ -420,7 +420,7 @@ impl EncryptionManager {
 
     /// List keys, optionally filtered by provider.
     pub fn list_keys(&self, provider_id: Option<&str>) -> Vec<EncryptionKey> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner
             .keys
             .values()
@@ -437,7 +437,7 @@ impl EncryptionManager {
     /// Encrypt a VM using the given policy. Generates a new key and records
     /// the encryption status.
     pub fn encrypt_vm(&self, vm_name: &str, policy_id: &str) -> Result<VmEncryptionStatus> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         if let Some(status) = inner.vm_statuses.get(vm_name) {
             if status.encrypted {
@@ -477,6 +477,7 @@ impl EncryptionManager {
             last_key_rotation: None,
         };
 
+        let key_id_for_disk = key.id.clone();
         inner.keys.insert(key.id.clone(), key);
         inner.vm_statuses.insert(vm_name.to_string(), status.clone());
 
@@ -486,12 +487,87 @@ impl EncryptionManager {
             policy.name,
             policy.algorithm
         );
+
+        // Actually encrypt the disk image using qemu-img LUKS encryption.
+        // We must drop the lock before running the blocking I/O operation.
+        drop(inner);
+
+        let image_path = format!("/var/lib/vmspawnd/images/{}.qcow2", vm_name);
+        if std::path::Path::new(&image_path).exists() {
+            let encrypted_path = format!("{}.encrypted", image_path);
+
+            // Write the encryption key to a temporary file for qemu-img --object
+            let secret_file = format!(
+                "/tmp/vmspawnd-encrypt-{}",
+                uuid::Uuid::new_v4().simple()
+            );
+            if let Err(e) = std::fs::write(&secret_file, &key_id_for_disk) {
+                tracing::error!(
+                    "Failed to write encryption secret file for VM '{}': {}",
+                    vm_name, e
+                );
+            } else {
+                let output = std::process::Command::new("qemu-img")
+                    .args([
+                        "convert",
+                        "-f", "qcow2",
+                        "-O", "qcow2",
+                        "--object",
+                        &format!("secret,id=sec0,file={}", secret_file),
+                        "-o", "encrypt.format=luks,encrypt.key-secret=sec0",
+                        &image_path,
+                        &encrypted_path,
+                    ])
+                    .output();
+
+                // Always clean up the secret file
+                let _ = std::fs::remove_file(&secret_file);
+
+                match output {
+                    Ok(out) if out.status.success() => {
+                        // Replace the original with the encrypted version
+                        if let Err(e) = std::fs::rename(&encrypted_path, &image_path) {
+                            tracing::error!(
+                                "Failed to replace disk with encrypted version for VM '{}': {}",
+                                vm_name, e
+                            );
+                        } else {
+                            tracing::info!(
+                                "Successfully encrypted disk image for VM '{}'",
+                                vm_name
+                            );
+                        }
+                    }
+                    Ok(out) => {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        tracing::error!(
+                            "qemu-img encryption failed for VM '{}': {}",
+                            vm_name, stderr
+                        );
+                        // Clean up partial output file
+                        let _ = std::fs::remove_file(&encrypted_path);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to execute qemu-img for VM '{}': {}",
+                            vm_name, e
+                        );
+                    }
+                }
+            }
+        } else {
+            tracing::debug!(
+                "No disk image found at '{}' for VM '{}', skipping disk encryption",
+                image_path, vm_name
+            );
+        }
+
         Ok(status)
     }
 
     /// Decrypt a VM (remove encryption). The associated key is revoked.
     pub fn decrypt_vm(&self, vm_name: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
 
         let status = inner
             .vm_statuses
@@ -510,6 +586,9 @@ impl EncryptionManager {
             }
         }
 
+        // Save the key_id before we modify things, so we can use it for decryption
+        let key_for_decrypt = status.key_id.clone();
+
         inner.vm_statuses.insert(
             vm_name.to_string(),
             VmEncryptionStatus {
@@ -524,18 +603,94 @@ impl EncryptionManager {
         );
 
         tracing::info!("Decrypted VM '{}'", vm_name);
+
+        // Actually decrypt the disk image using qemu-img.
+        // Drop the lock before blocking I/O.
+        drop(inner);
+
+        let image_path = format!("/var/lib/vmspawnd/images/{}.qcow2", vm_name);
+        if std::path::Path::new(&image_path).exists() {
+            if let Some(ref key_id) = key_for_decrypt {
+                let decrypted_path = format!("{}.decrypted", image_path);
+                let secret_file = format!(
+                    "/tmp/vmspawnd-decrypt-{}",
+                    uuid::Uuid::new_v4().simple()
+                );
+
+                if let Err(e) = std::fs::write(&secret_file, key_id) {
+                    tracing::error!(
+                        "Failed to write decryption secret file for VM '{}': {}",
+                        vm_name, e
+                    );
+                } else {
+                    let output = std::process::Command::new("qemu-img")
+                        .args([
+                            "convert",
+                            "-f", "qcow2",
+                            "-O", "qcow2",
+                            "--object",
+                            &format!("secret,id=sec0,file={}", secret_file),
+                            "--image-opts",
+                            &format!(
+                                "driver=qcow2,file.driver=file,file.filename={},encrypt.key-secret=sec0",
+                                image_path
+                            ),
+                            &decrypted_path,
+                        ])
+                        .output();
+
+                    let _ = std::fs::remove_file(&secret_file);
+
+                    match output {
+                        Ok(out) if out.status.success() => {
+                            if let Err(e) = std::fs::rename(&decrypted_path, &image_path) {
+                                tracing::error!(
+                                    "Failed to replace encrypted disk with decrypted version for VM '{}': {}",
+                                    vm_name, e
+                                );
+                            } else {
+                                tracing::info!(
+                                    "Successfully decrypted disk image for VM '{}'",
+                                    vm_name
+                                );
+                            }
+                        }
+                        Ok(out) => {
+                            let stderr = String::from_utf8_lossy(&out.stderr);
+                            tracing::error!(
+                                "qemu-img decryption failed for VM '{}': {}",
+                                vm_name, stderr
+                            );
+                            let _ = std::fs::remove_file(&decrypted_path);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to execute qemu-img for VM '{}': {}",
+                                vm_name, e
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            tracing::debug!(
+                "No disk image found at '{}' for VM '{}', skipping disk decryption",
+                image_path, vm_name
+            );
+        }
+
         Ok(())
     }
 
     /// Get the encryption status of a VM.
     pub fn get_vm_encryption_status(&self, vm_name: &str) -> Option<VmEncryptionStatus> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner.vm_statuses.get(vm_name).cloned()
     }
 
     /// List all VMs that are currently encrypted.
     pub fn list_encrypted_vms(&self) -> Vec<VmEncryptionStatus> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         inner
             .vm_statuses
             .values()
@@ -547,7 +702,7 @@ impl EncryptionManager {
     /// Rotate the encryption key for a specific VM.
     pub fn rotate_vm_key(&self, vm_name: &str) -> Result<KeyRotationEvent> {
         let key_id = {
-            let inner = self.inner.read().unwrap();
+            let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
             let status = inner
                 .vm_statuses
                 .get(vm_name)
@@ -567,7 +722,7 @@ impl EncryptionManager {
     /// Return all active keys that are past their expiry date and therefore
     /// due for rotation.
     pub fn check_keys_due_rotation(&self) -> Vec<EncryptionKey> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
         let now = Utc::now();
         inner
             .keys

@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::trace::TraceLayer;
 use vmspawnd_storage::StorageManager;
 
 use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
@@ -34,8 +35,11 @@ pub struct AppState {
     pub packet_mirror: Arc<packet_mirror::PacketMirror>,
     pub nat_gateway: Arc<nat_gateway::NatGateway>,
     pub net_monitor: Arc<net_monitor::NetMonitor>,
+    pub secrets_manager: Arc<secrets_manager::SecretsManager>,
     /// Per-VM mutex to serialize state-changing operations on the same VM.
     pub vm_locks: Arc<std::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+    /// Broadcast channel for real-time SSE event delivery.
+    pub event_tx: tokio::sync::broadcast::Sender<crate::api::events::VMEvent>,
     /// Cancellation token for graceful background task shutdown.
     pub shutdown: tokio_util::sync::CancellationToken,
 }
@@ -47,6 +51,9 @@ impl AppState {
             tracing::warn!("VM locks mutex was poisoned, recovering");
             e.into_inner()
         });
+        if locks.len() > 10_000 {
+            locks.retain(|_, v| Arc::strong_count(v) > 1);
+        }
         locks.entry(name.to_string())
             .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
             .clone()
@@ -131,7 +138,12 @@ impl Server {
             packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
             nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
             net_monitor: Arc::new(net_monitor::NetMonitor::new()),
+            secrets_manager: Arc::new(secrets_manager::SecretsManager::new()),
             vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            event_tx: {
+                let (tx, _) = tokio::sync::broadcast::channel(256);
+                tx
+            },
             shutdown: tokio_util::sync::CancellationToken::new(),
         });
 
@@ -738,6 +750,35 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/system/rate-limits", get(api::vm_power::get_rate_limits).put(api::vm_power::update_rate_limits))
             // Webhook delivery tracking
             .route("/webhooks/deliveries", get(api::webhook_retry::list_deliveries))
+            // VM export (OVA)
+            .route("/vms/{name}/export", post(api::export::export_vm))
+            // Secrets management
+            .route("/secrets", get(api::secrets::list_secrets).post(api::secrets::create_secret))
+            .route("/secrets/{id}", get(api::secrets::get_secret).delete(api::secrets::delete_secret))
+            // Log aggregation
+            .route("/vms/{name}/logs", get(api::logs::get_vm_logs))
+            .route("/logs", get(api::logs::get_system_logs))
+            // 2FA/TOTP routes
+            .route("/auth/2fa/setup", post(api::auth::setup_2fa))
+            .route("/auth/2fa/verify", post(api::auth::verify_2fa))
+            .route("/auth/2fa/disable", post(api::auth::disable_2fa))
+            // Billing / chargeback routes
+            .route("/billing/pricing", get(api::billing::get_pricing).put(api::billing::update_pricing))
+            .route("/billing/usage", get(api::billing::get_usage))
+            .route("/billing/invoice/{tenant_id}", post(api::billing::generate_invoice))
+            // iSCSI storage routes
+            .route("/storage/iscsi/discover", post(api::storage::discover_iscsi_targets))
+            .route("/storage/iscsi/login", post(api::storage::login_iscsi_target))
+            .route("/storage/iscsi/logout", post(api::storage::logout_iscsi_target))
+            .route("/storage/iscsi/sessions", get(api::storage::list_iscsi_sessions))
+            // USB passthrough routes
+            .route("/system/usb", get(api::usb::list_usb_devices))
+            // DHCP server config
+            .route("/networkd/dhcp", post(api::networkd::configure_dhcp_server))
+            // Compliance scanning routes
+            .route("/compliance/profiles", get(api::compliance::list_compliance_profiles))
+            .route("/compliance/scan/{vm_name}", post(api::compliance::scan_vm_compliance))
+            .route("/compliance/results", get(api::compliance::list_compliance_results))
             .with_state(state.clone());
 
         // Apply auth middleware if enabled
@@ -761,12 +802,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             ));
         }
 
-        // Clone routes for /api/v1/ prefix (versioned API)
-        let versioned_routes = public_auth_routes.clone().merge(api_routes.clone());
+        // Serve API under /api/v1 (canonical) and /api (backward compat alias)
+        let all_api_routes = public_auth_routes.merge(api_routes);
 
         Router::new()
-            .nest("/api", public_auth_routes.merge(api_routes))
-            .nest("/api/v1", versioned_routes)
+            .nest("/api/v1", all_api_routes.clone())
+            .nest("/api", all_api_routes)
             .nest("/ws", ws_routes)
             .route("/health", get(|| async { "OK" }))
             .route("/metrics", get(prometheus_exporter::metrics_handler))
@@ -789,7 +830,20 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                 ServeDir::new(web_dir).fallback(ServeFile::new(index_path))
             })
             .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
+            .layer(axum::middleware::from_fn(security_headers))
+            .layer(tower_http::timeout::TimeoutLayer::with_status_code(axum::http::StatusCode::REQUEST_TIMEOUT, std::time::Duration::from_secs(60)))
+            .layer(TraceLayer::new_for_http())
             .layer(cors)
+}
+
+async fn security_headers(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
+    let mut response = next.run(req).await;
+    let headers = response.headers_mut();
+    headers.insert("x-content-type-options", "nosniff".parse().unwrap());
+    headers.insert("x-frame-options", "DENY".parse().unwrap());
+    headers.insert("x-xss-protection", "1; mode=block".parse().unwrap());
+    headers.insert("referrer-policy", "strict-origin-when-cross-origin".parse().unwrap());
+    response
 }
 
 async fn shutdown_signal() {

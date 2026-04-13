@@ -85,6 +85,8 @@ pub async fn create_project(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>), (StatusCode, Json<serde_json::Value>)> {
+    crate::validation::validate_entity_name(&req.name)
+        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let now = Utc::now();
     let project = Project {
         id: uuid::Uuid::new_v4().to_string(),
@@ -140,6 +142,11 @@ pub async fn add_member(
     let mut project = state.store.get_entity::<Project>("projects", &id)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Project not found"}))))?;
+
+    // Limit total members to prevent unbounded growth
+    if project.members.len() >= 1000 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Project has reached the maximum number of members (1000)"}))));
+    }
 
     // Check if user already a member
     if project.members.iter().any(|m| m.user_id == req.user_id) {
