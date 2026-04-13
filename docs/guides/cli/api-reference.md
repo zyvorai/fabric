@@ -19,6 +19,15 @@ Complete reference for the vmspawn REST API, organized by functional category. A
 - [Cloud-init](#cloud-init)
 - [Notifications](#notifications)
 - [WebSocket Console](#websocket-console)
+- [2FA Authentication](#2fa-authentication)
+- [Secrets Management](#secrets-management)
+- [Log Aggregation](#log-aggregation)
+- [VM Export](#vm-export)
+- [Compliance Scanning](#compliance-scanning)
+- [Billing](#billing)
+- [iSCSI Storage](#iscsi-storage)
+- [USB Devices](#usb-devices)
+- [DHCP Server](#dhcp-server)
 
 ---
 
@@ -2246,3 +2255,836 @@ terminal.onData((data) => {
 ```
 
 See the [WebSocket Reference](../../reference/api/websocket.md) for full protocol details.
+
+---
+
+## 2FA Authentication
+
+Two-factor authentication using TOTP (Time-based One-Time Password). Once enabled, users must provide a TOTP code along with their credentials at login.
+
+### POST /api/auth/2fa/setup
+
+Set up TOTP 2FA for the current user. Returns a TOTP secret and provisioning URI for use with authenticator apps (Google Authenticator, Authy, etc.).
+
+**Auth level:** Admin only
+
+**Response (200):**
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "provisioning_uri": "otpauth://totp/vmspawn:admin?secret=JBSWY3DPEHPK3PXP&issuer=vmspawn",
+  "qr_code": "data:image/png;base64,..."
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/2fa/setup \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### POST /api/auth/2fa/verify
+
+Verify a TOTP code to finalize 2FA setup. This must be called after `/2fa/setup` to confirm the user has correctly configured their authenticator app.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "code": "123456"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "2fa_enabled",
+  "recovery_codes": ["a1b2c3d4", "e5f6g7h8", "i9j0k1l2"]
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/2fa/verify \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "123456"}' | jq
+```
+
+---
+
+### POST /api/auth/2fa/disable
+
+Disable 2FA for the current user. Requires a valid TOTP code to confirm the action.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "code": "654321"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "2fa_disabled"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/2fa/disable \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "654321"}' | jq
+```
+
+---
+
+## Secrets Management
+
+Securely store and manage sensitive values (API keys, database credentials, certificates) for use by VMs and system integrations. Secret values are never returned in API responses -- only metadata is exposed.
+
+### GET /api/secrets
+
+List all secrets with metadata. Values are redacted.
+
+**Auth level:** Admin only
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "db-password",
+    "description": "Production database password",
+    "created": "2026-04-10T14:30:00Z",
+    "updated": "2026-04-12T09:15:00Z"
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/secrets \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### POST /api/secrets
+
+Create a new secret.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "name": "db-password",
+  "value": "s3cret-p@ssword",
+  "description": "Production database password"
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "db-password",
+  "description": "Production database password",
+  "created": "2026-04-12T10:00:00Z"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/secrets \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "db-password",
+    "value": "s3cret-p@ssword",
+    "description": "Production database password"
+  }' | jq
+```
+
+---
+
+### GET /api/secrets/:id
+
+Get secret metadata. The value is redacted.
+
+**Auth level:** Admin only
+
+**Response (200):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "db-password",
+  "description": "Production database password",
+  "created": "2026-04-10T14:30:00Z",
+  "updated": "2026-04-12T09:15:00Z"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/secrets/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### DELETE /api/secrets/:id
+
+Delete a secret permanently.
+
+**Auth level:** Admin only
+
+**Response (204):** No content
+
+**curl example:**
+
+```bash
+curl -s -X DELETE http://localhost:3000/api/secrets/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Log Aggregation
+
+Query journal logs from individual VMs or from the host system. Logs are retrieved via `journalctl` on the backend.
+
+### GET /api/vms/:name/logs
+
+Get journal logs for a specific VM.
+
+**Auth level:** Viewer+
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lines`   | int  | 100     | Number of log lines to return (max 10000) |
+| `priority`| int  | null    | Syslog priority filter (0=emerg, 3=err, 4=warn, 6=info, 7=debug) |
+| `grep`    | string | null  | Pattern to filter log messages |
+
+**Response (200):**
+
+```json
+{
+  "vm_name": "web-server",
+  "lines": [
+    {
+      "timestamp": "2026-04-12T10:00:00Z",
+      "priority": 6,
+      "unit": "nginx.service",
+      "message": "Started The nginx HTTP and reverse proxy server."
+    }
+  ],
+  "total": 1
+}
+```
+
+**curl example:**
+
+```bash
+# Get last 50 log lines
+curl -s "http://localhost:3000/api/vms/web-server/logs?lines=50" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Filter by priority (errors and above) and pattern
+curl -s "http://localhost:3000/api/vms/web-server/logs?lines=100&priority=3&grep=error" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### GET /api/logs
+
+Get system-wide journal logs from the host.
+
+**Auth level:** Viewer+
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lines`   | int  | 100     | Number of log lines to return (max 10000) |
+| `priority`| int  | null    | Syslog priority filter |
+| `grep`    | string | null  | Pattern to filter log messages |
+
+**Response (200):**
+
+```json
+{
+  "lines": [
+    {
+      "timestamp": "2026-04-12T10:00:00Z",
+      "priority": 6,
+      "unit": "vmspawnd.service",
+      "message": "Listening on 0.0.0.0:3000"
+    }
+  ],
+  "total": 1
+}
+```
+
+**curl example:**
+
+```bash
+# Get system logs
+curl -s "http://localhost:3000/api/logs?lines=200" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Filter for kernel messages with priority warning or higher
+curl -s "http://localhost:3000/api/logs?priority=4&grep=kernel" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+## VM Export
+
+Export a VM to OVA (Open Virtual Appliance) format for distribution or migration to other hypervisors.
+
+### POST /api/vms/:name/export
+
+Export a VM to OVA format. The VM should be stopped before exporting for consistency.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "disk_path": "/var/lib/vmspawnd/images/my-vm.qcow2",
+  "output_dir": "/var/lib/vmspawnd/exports"
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `disk_path` | string | null | Path to the disk image (auto-detected if omitted) |
+| `output_dir` | string | `/var/lib/vmspawnd/exports` | Directory for the exported OVA file |
+
+**Response (200):**
+
+```json
+{
+  "status": "exported",
+  "ova_path": "/var/lib/vmspawnd/exports/my-vm.ova",
+  "size_bytes": 2147483648
+}
+```
+
+**curl example:**
+
+```bash
+# Export with defaults (auto-detect disk, default output directory)
+curl -s -X POST http://localhost:3000/api/vms/my-vm/export \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' | jq
+
+# Export with explicit paths
+curl -s -X POST http://localhost:3000/api/vms/my-vm/export \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "disk_path": "/var/lib/vmspawnd/images/my-vm.qcow2",
+    "output_dir": "/tmp/exports"
+  }' | jq
+```
+
+---
+
+## Compliance Scanning
+
+Scan VMs against security compliance profiles (e.g., CIS benchmarks) and retrieve scan results.
+
+### GET /api/compliance/profiles
+
+List available compliance profiles.
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "cis-level1",
+    "name": "CIS Level 1 Baseline",
+    "description": "Center for Internet Security Level 1 benchmark",
+    "check_count": 85
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/compliance/profiles \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### POST /api/compliance/scan/:vm_name
+
+Run a compliance scan against a VM using a specified profile.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "profile_id": "cis-level1"
+}
+```
+
+**Response (202):**
+
+```json
+{
+  "scan_id": "550e8400-e29b-41d4-a716-446655440000",
+  "vm_name": "web-server",
+  "profile_id": "cis-level1",
+  "status": "running",
+  "started": "2026-04-12T10:00:00Z"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/compliance/scan/web-server \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"profile_id": "cis-level1"}' | jq
+```
+
+---
+
+### GET /api/compliance/results
+
+List compliance scan results.
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+[
+  {
+    "scan_id": "550e8400-e29b-41d4-a716-446655440000",
+    "vm_name": "web-server",
+    "profile_id": "cis-level1",
+    "status": "completed",
+    "passed": 72,
+    "failed": 8,
+    "skipped": 5,
+    "score": 90.0,
+    "started": "2026-04-12T10:00:00Z",
+    "completed": "2026-04-12T10:05:00Z"
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/compliance/results \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+## Billing
+
+Track VM resource usage, configure pricing rules, and generate invoices for tenants.
+
+### GET /api/billing/pricing
+
+Get the current pricing rules.
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+{
+  "cpu_per_hour": 0.01,
+  "memory_gb_per_hour": 0.005,
+  "disk_gb_per_hour": 0.001,
+  "network_egress_per_gb": 0.02,
+  "currency": "USD"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/billing/pricing \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### PUT /api/billing/pricing
+
+Update the pricing rules.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "cpu_per_hour": 0.02,
+  "memory_gb_per_hour": 0.008,
+  "disk_gb_per_hour": 0.002,
+  "network_egress_per_gb": 0.03,
+  "currency": "USD"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "updated"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X PUT http://localhost:3000/api/billing/pricing \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cpu_per_hour": 0.02,
+    "memory_gb_per_hour": 0.008,
+    "disk_gb_per_hour": 0.002,
+    "network_egress_per_gb": 0.03,
+    "currency": "USD"
+  }' | jq
+```
+
+---
+
+### GET /api/billing/usage
+
+Get usage records for billing. Records are aggregated per VM per billing period.
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+[
+  {
+    "vm_name": "web-server",
+    "tenant_id": "tenant-alpha",
+    "period_start": "2026-04-01T00:00:00Z",
+    "period_end": "2026-04-12T00:00:00Z",
+    "cpu_hours": 264.5,
+    "memory_gb_hours": 529.0,
+    "disk_gb_hours": 10580.0,
+    "network_egress_gb": 12.3,
+    "total_cost": 15.42
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/billing/usage \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### POST /api/billing/invoice/:tenant_id
+
+Generate an invoice for a specific tenant covering the current billing period.
+
+**Auth level:** Admin only
+
+**Response (200):**
+
+```json
+{
+  "invoice_id": "INV-2026-04-001",
+  "tenant_id": "tenant-alpha",
+  "period_start": "2026-04-01T00:00:00Z",
+  "period_end": "2026-04-12T00:00:00Z",
+  "line_items": [
+    {"description": "web-server CPU (264.5 hours)", "amount": 5.29},
+    {"description": "web-server Memory (529.0 GB-hours)", "amount": 4.23}
+  ],
+  "total": 15.42,
+  "currency": "USD"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/billing/invoice/tenant-alpha \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+## iSCSI Storage
+
+Discover, connect, and manage iSCSI storage targets for VM disk backing.
+
+### POST /api/storage/iscsi/discover
+
+Discover iSCSI targets on a portal.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "portal": "10.0.0.50:3260"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "targets": [
+    {
+      "target_name": "iqn.2026-04.com.example:storage",
+      "portal": "10.0.0.50:3260"
+    }
+  ]
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/storage/iscsi/discover \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"portal": "10.0.0.50:3260"}' | jq
+```
+
+---
+
+### POST /api/storage/iscsi/login
+
+Log in to an iSCSI target to establish a session and make the LUN accessible as a block device.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "target_name": "iqn.2026-04.com.example:storage",
+  "portal": "10.0.0.50:3260",
+  "username": "iscsi-user",
+  "password": "iscsi-pass"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "logged_in",
+  "session_id": "1",
+  "device_path": "/dev/sda"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/storage/iscsi/login \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_name": "iqn.2026-04.com.example:storage",
+    "portal": "10.0.0.50:3260",
+    "username": "iscsi-user",
+    "password": "iscsi-pass"
+  }' | jq
+```
+
+---
+
+### POST /api/storage/iscsi/logout
+
+Log out from an active iSCSI session.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "target_name": "iqn.2026-04.com.example:storage",
+  "portal": "10.0.0.50:3260"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "logged_out"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/storage/iscsi/logout \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_name": "iqn.2026-04.com.example:storage",
+    "portal": "10.0.0.50:3260"
+  }' | jq
+```
+
+---
+
+### GET /api/storage/iscsi/sessions
+
+List all active iSCSI sessions.
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+[
+  {
+    "session_id": "1",
+    "target_name": "iqn.2026-04.com.example:storage",
+    "portal": "10.0.0.50:3260",
+    "state": "LOGGED_IN",
+    "device_path": "/dev/sda"
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/storage/iscsi/sessions \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+## USB Devices
+
+### GET /api/system/usb
+
+List USB devices attached to the host. Useful for identifying devices available for passthrough to VMs.
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+[
+  {
+    "bus": 1,
+    "device": 3,
+    "vendor_id": "0x1234",
+    "product_id": "0x5678",
+    "manufacturer": "Example Corp",
+    "product": "USB Widget",
+    "serial": "ABC123"
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/system/usb \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+## DHCP Server
+
+### POST /api/networkd/dhcp
+
+Configure a DHCP server on a bridge interface. This enables automatic IP address assignment for VMs connected to the bridge.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "bridge_name": "br0",
+  "pool_start": "192.168.1.100",
+  "pool_end": "192.168.1.200"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "configured",
+  "bridge_name": "br0",
+  "pool_start": "192.168.1.100",
+  "pool_end": "192.168.1.200"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/networkd/dhcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bridge_name": "br0",
+    "pool_start": "192.168.1.100",
+    "pool_end": "192.168.1.200"
+  }' | jq
+```

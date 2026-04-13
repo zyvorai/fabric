@@ -253,6 +253,166 @@ process:
 Progress can be tracked via `GET /api/v1/migrations/{id}` and cancelled via
 `POST /api/v1/migrations/{id}/cancel`.
 
+### How do I enable 2FA?
+
+Enable TOTP-based two-factor authentication in the configuration file:
+
+```toml
+[auth.totp]
+enabled = true
+```
+
+Then each user sets up 2FA by calling `POST /api/v1/auth/2fa/setup`, which
+returns a TOTP secret and provisioning URI for an authenticator app. After
+scanning the QR code, the user confirms with `POST /api/v1/auth/2fa/verify`.
+Subsequent logins require a `totp_code` field in addition to the username
+and password. Backup codes are provided during setup for account recovery.
+
+### How do I export a VM to OVA format?
+
+Export a VM to an OVA archive for portability:
+
+```bash
+# Start the export
+curl -s -X POST http://127.0.0.1:9095/api/v1/vms/my-vm/export/ova \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Download the OVA file
+curl -s http://127.0.0.1:9095/api/v1/vms/my-vm/export/ova/download \
+  -H "Authorization: Bearer $TOKEN" -o my-vm.ova
+```
+
+The OVA archive includes the VM disk image, an OVF descriptor with hardware
+configuration, and a manifest file. The exported OVA can be imported into
+vmspawn, VMware, or VirtualBox.
+
+### How do I manage secrets?
+
+vmspawn includes a built-in secrets manager for storing credentials, API keys,
+and certificates. Secrets are encrypted at rest and accessible only to
+authorized users.
+
+```bash
+# Create a secret
+curl -s -X POST http://127.0.0.1:9095/api/v1/secrets \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "db-pass", "value": "s3cret", "description": "DB password"}' | jq .
+
+# List secrets (values are never exposed)
+curl -s http://127.0.0.1:9095/api/v1/secrets \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Secrets can be injected into VMs via cloud-init or systemd credentials using
+`POST /api/v1/vms/{name}/secrets`.
+
+### How do I scan for compliance?
+
+vmspawn supports compliance scanning against security baselines such as CIS
+Benchmarks, DISA STIG, and PCI-DSS:
+
+```bash
+# List available profiles
+curl -s http://127.0.0.1:9095/api/v1/compliance/profiles \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Scan a VM
+curl -s -X POST http://127.0.0.1:9095/api/v1/compliance/scan \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"vm_name": "my-vm", "profile_id": "cis-level1"}' | jq .
+```
+
+Scans produce findings with severity levels (critical, high, medium, low) and
+remediation guidance. Enable automatic scanning with `compliance.auto_scan = true`
+in the configuration file.
+
+### How do I set up billing?
+
+Enable billing and configure pricing in the configuration file:
+
+```toml
+[billing]
+enabled = true
+currency = "USD"
+billing_cycle = "monthly"
+cpu_rate = 0.01        # per vCPU per hour
+memory_rate = 0.005    # per GB per hour
+storage_rate = 0.0001  # per GB per hour
+```
+
+Once enabled, vmspawn meters resource usage per VM. View usage with
+`GET /api/v1/billing/usage`, list invoices with `GET /api/v1/billing/invoices`,
+and configure custom pricing tiers with `POST /api/v1/billing/pricing`.
+
+### How do I view VM logs?
+
+vmspawn provides centralized log aggregation for all VMs:
+
+```bash
+# Get logs for a specific VM
+curl -s http://127.0.0.1:9095/api/v1/logs/my-vm \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Search across all VM logs
+curl -s "http://127.0.0.1:9095/api/v1/logs?query=error&limit=50" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Logs can also be streamed in real-time via SSE at
+`GET /api/v1/logs/{vm_name}/stream`. Logs are sourced from the systemd journal
+for each VM's machine scope.
+
+### How do I connect iSCSI storage?
+
+Enable and configure iSCSI in the configuration file:
+
+```toml
+[storage.iscsi]
+enabled = true
+initiator_name = "iqn.2026-01.com.example:vmspawnd"
+```
+
+Then discover and connect to iSCSI targets:
+
+```bash
+# Discover targets on a portal
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/discover \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"portal": "192.168.1.100:3260"}' | jq .
+
+# Log in to a target
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/login \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"portal": "192.168.1.100:3260", "target": "iqn.2026-01.com.example:storage"}' | jq .
+```
+
+Connected iSCSI LUNs can be used as storage pool backends for VM disks.
+
+### What is split-brain protection?
+
+Split-brain occurs when cluster nodes lose communication and each partition
+believes it is the sole authority, leading to conflicting state changes.
+vmspawn prevents split-brain using quorum-based fencing:
+
+- A cluster requires a majority of nodes (quorum) to accept write operations
+- Nodes that lose quorum are automatically fenced and stop serving requests
+- VMs on fenced nodes are restarted on healthy nodes after a configurable timeout
+- The etcd-based leader election ensures only one controller is active at a time
+
+Configure split-brain protection in the controller section:
+
+```toml
+[controller]
+enabled = true
+mode = "controller"
+quorum_required = true
+fencing_timeout_seconds = 30
+```
+
 ---
 
 ## Configuration

@@ -682,6 +682,148 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 
 ---
 
+## Step 13: SPICE Display Configuration
+
+SPICE (Simple Protocol for Independent Computing Environments) provides
+high-performance remote access to VM graphical consoles. Use it for Windows VMs,
+desktop Linux, or any workload that requires a GUI.
+
+### Start a VM with SPICE
+
+Set `console` to `"gui"` in VMStartOptions to enable SPICE:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kvm": true,
+    "console": "gui"
+  }' | jq .
+```
+
+### Connect to the SPICE Console
+
+Use `remote-viewer` or `virt-viewer` to connect:
+
+```bash
+# Connect with remote-viewer
+remote-viewer spice://your-host:5900
+
+# Or use virt-viewer
+virt-viewer --connect spice://your-host:5900
+```
+
+### Console Mode Reference
+
+| Mode          | Description                                         |
+|--------------|-----------------------------------------------------|
+| `interactive` | Serial console attached to the terminal (default)   |
+| `read-only`   | Read-only serial console output                     |
+| `native`      | QEMU native console                                 |
+| `gui`         | Graphical display via SPICE                          |
+
+---
+
+## Step 14: USB Passthrough
+
+Pass host USB devices directly into a VM. This is useful for hardware security
+keys, USB storage, serial adapters, and specialized peripherals.
+
+### List Available USB Devices
+
+```bash
+curl -s "$VMSPAWN_HOST/api/system/usb" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Expected response:
+
+```json
+[
+  {
+    "bus": 1,
+    "device": 4,
+    "vendor_id": "1050",
+    "product_id": "0407",
+    "description": "Yubico YubiKey OTP+FIDO+CCID"
+  },
+  {
+    "bus": 2,
+    "device": 2,
+    "vendor_id": "0781",
+    "product_id": "5583",
+    "description": "SanDisk Ultra Fit"
+  }
+]
+```
+
+### Pass a USB Device to a VM
+
+Use the vendor ID and product ID to pass the device at start time:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kvm": true,
+    "extra_args": [
+      "usb_host=1050:0407"
+    ]
+  }' | jq .
+```
+
+Inside the guest, the device appears as a native USB peripheral:
+
+```bash
+# Verify the device is visible in the guest
+lsusb
+```
+
+> **Note:** The USB device is exclusively attached to the VM. It will not be
+> available on the host while the VM is running.
+
+---
+
+## Step 15: OVA / OVF Export
+
+Export a stopped VM to OVA (Open Virtual Appliance) format for portability.
+OVA files can be imported into VMware, VirtualBox, and other platforms.
+
+### Export a VM
+
+```bash
+# Stop the VM first
+curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/stop" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Export to OVA
+curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/export" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o advanced-demo.ova
+```
+
+The exported OVA file contains:
+
+- The VM disk image (converted to VMDK for compatibility)
+- An OVF descriptor with hardware configuration
+- A manifest file with checksums
+
+### Use Cases
+
+| Scenario                     | Description                                      |
+|-----------------------------|--------------------------------------------------|
+| VMware migration            | Export from vmspawn, import into vSphere          |
+| Disaster recovery           | Archive VM images to offline storage              |
+| Template distribution       | Share VM templates across air-gapped sites        |
+| Cross-platform testing      | Run the same VM on different hypervisors          |
+
+> **Note:** The VM must be stopped before exporting. Running VMs cannot be
+> exported to ensure disk consistency.
+
+---
+
 ## Cleanup
 
 ```bash
@@ -698,3 +840,4 @@ curl -s -X DELETE "$VMSPAWN_HOST/api/vms/advanced-demo" \
 
 - [Tutorial 05: Multi-Node Clustering](05-clustering.md) -- Distribute VMs across multiple hosts
 - [Tutorial 06: Security Hardening](06-security-hardening.md) -- Secure your VMs with encryption and firewalls
+- [Tutorial 07: Logging and Compliance](07-logging-compliance.md) -- Query logs, scan for compliance, manage secrets

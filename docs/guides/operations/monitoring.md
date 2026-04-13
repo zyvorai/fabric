@@ -10,6 +10,7 @@ How to monitor vmspawn health, collect metrics, subscribe to real-time events, a
 - [Notification Channels](#notification-channels)
 - [Alert Configuration](#alert-configuration)
 - [Webhook Retry Policies](#webhook-retry-policies)
+- [Log Aggregation](#log-aggregation)
 
 ---
 
@@ -392,3 +393,87 @@ curl -s http://localhost:3000/api/notifications/webhooks/deliveries \
 2. Check the `response_code` field for HTTP status from the remote endpoint
 3. Verify the channel URL is correct and the remote endpoint is accessible from the vmspawn host
 4. Test the channel manually: `POST /api/notifications/channels/:id/test`
+
+---
+
+## Log Aggregation
+
+vmspawn provides centralized access to journal logs from individual VMs and from the host system. Logs are retrieved on-demand via the `journalctl` backend, with support for filtering by priority level and text patterns.
+
+### Querying VM Logs
+
+Retrieve journal logs for a specific VM using the `/api/vms/:name/logs` endpoint. This is useful for debugging application issues, reviewing service startup, and auditing activity inside the VM.
+
+```bash
+# Get the last 100 log lines from a VM (default)
+curl -s "http://localhost:3000/api/vms/web-server/logs" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Get the last 500 lines
+curl -s "http://localhost:3000/api/vms/web-server/logs?lines=500" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### Filtering by Priority
+
+Use the `priority` query parameter to filter logs by syslog priority level. Only messages at the specified level or more severe are returned.
+
+| Priority | Level | Description |
+|----------|-------|-------------|
+| 0 | emerg | System is unusable |
+| 1 | alert | Action must be taken immediately |
+| 2 | crit | Critical conditions |
+| 3 | err | Error conditions |
+| 4 | warning | Warning conditions |
+| 5 | notice | Normal but significant |
+| 6 | info | Informational |
+| 7 | debug | Debug-level messages |
+
+```bash
+# Errors and above (priority 3)
+curl -s "http://localhost:3000/api/vms/web-server/logs?priority=3" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Warnings and above (priority 4)
+curl -s "http://localhost:3000/api/vms/web-server/logs?priority=4&lines=200" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### Filtering by Pattern
+
+Use the `grep` query parameter to filter log messages by a text pattern. This is combined with priority filtering when both are specified.
+
+```bash
+# Search for "timeout" in VM logs
+curl -s "http://localhost:3000/api/vms/web-server/logs?grep=timeout" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Search for OOM events at error priority
+curl -s "http://localhost:3000/api/vms/db-server/logs?priority=3&grep=oom" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### System-Wide Log Access
+
+The `/api/logs` endpoint provides access to the host system journal. This is useful for monitoring vmspawnd itself, kernel messages, and other system services.
+
+```bash
+# Get recent system logs
+curl -s "http://localhost:3000/api/logs?lines=200" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Filter for vmspawnd service messages
+curl -s "http://localhost:3000/api/logs?grep=vmspawnd" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Get kernel errors
+curl -s "http://localhost:3000/api/logs?priority=3&grep=kernel" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### Log Monitoring Best Practices
+
+- **Periodic polling:** Set up a cron job to poll VM logs for errors every few minutes and feed them into your centralized logging system.
+- **Priority thresholds:** Focus on priority 3 (error) and below for alerting. Use priority 6 (info) for routine auditing.
+- **Pattern matching:** Use the `grep` parameter for targeted searches rather than retrieving all logs and filtering client-side.
+- **Line limits:** Keep `lines` at a reasonable value (100-1000). The maximum is 10,000 lines per request.

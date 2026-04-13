@@ -11,6 +11,7 @@ Detailed specification of the vmspawn authentication system, covering the login 
 - [Role-Based Access Control](#role-based-access-control)
 - [PAM Integration](#pam-integration)
 - [Rate Limiting](#rate-limiting)
+- [Two-Factor Authentication (TOTP)](#two-factor-authentication-totp)
 
 ---
 
@@ -247,3 +248,124 @@ Content-Type: application/json
   "error": "Too many login attempts, try again later"
 }
 ```
+
+---
+
+## Two-Factor Authentication (TOTP)
+
+vmspawn supports optional TOTP-based two-factor authentication. When 2FA is enabled for a user, the login flow requires an additional `totp_code` field.
+
+### 2FA Setup Flow
+
+Setting up 2FA is a two-step process:
+
+1. **Generate secret** -- Call `POST /api/auth/2fa/setup` to generate a TOTP secret and provisioning URI.
+2. **Verify and enable** -- Scan the QR code or enter the secret into an authenticator app, then call `POST /api/auth/2fa/verify` with a valid TOTP code to confirm the setup.
+
+```
+User                            vmspawnd
+  |                                |
+  |  POST /api/auth/2fa/setup      |
+  |------------------------------->|
+  |                                |  generate TOTP secret
+  |  200 {secret, provisioning_uri}|
+  |<-------------------------------|
+  |                                |
+  |  (configure authenticator app) |
+  |                                |
+  |  POST /api/auth/2fa/verify     |
+  |  {"code": "123456"}            |
+  |------------------------------->|
+  |                                |  validate code against secret
+  |  200 {status, recovery_codes}  |
+  |<-------------------------------|
+```
+
+**Step 1: Generate the TOTP secret**
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/2fa/setup \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+**Response:**
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "provisioning_uri": "otpauth://totp/vmspawn:admin?secret=JBSWY3DPEHPK3PXP&issuer=vmspawn",
+  "qr_code": "data:image/png;base64,..."
+}
+```
+
+Use the `provisioning_uri` or `qr_code` to configure your authenticator app (Google Authenticator, Authy, FreeOTP, etc.).
+
+**Step 2: Verify and enable**
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/2fa/verify \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "123456"}' | jq
+```
+
+**Response:**
+
+```json
+{
+  "status": "2fa_enabled",
+  "recovery_codes": ["a1b2c3d4", "e5f6g7h8", "i9j0k1l2"]
+}
+```
+
+Store the recovery codes in a safe location. They can be used as a fallback if you lose access to your authenticator app.
+
+### Login with TOTP Code
+
+Once 2FA is enabled, the login request must include a `totp_code` field:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "secret",
+  "totp_code": "123456"
+}
+```
+
+**curl example:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "secret",
+    "totp_code": "123456"
+  }' | jq
+```
+
+If a user has 2FA enabled and the `totp_code` field is missing or contains an invalid code, the login request returns `401 Unauthorized`.
+
+### Disabling 2FA
+
+To disable 2FA, call `POST /api/auth/2fa/disable` with a valid TOTP code to confirm the action:
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/2fa/disable \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "654321"}' | jq
+```
+
+**Response:**
+
+```json
+{
+  "status": "2fa_disabled"
+}
+```
+
+After disabling 2FA, the `totp_code` field is no longer required in login requests.

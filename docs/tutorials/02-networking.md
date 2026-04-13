@@ -557,7 +557,87 @@ curl -s "$VMSPAWN_HOST/api/dns/zones" \
 
 ---
 
-## Step 7: Advanced Network Types
+## Step 7: DHCP Server Configuration
+
+vmspawn can configure a DHCP server on a bridge interface using systemd-networkd.
+VMs attached to the bridge will receive IP addresses automatically.
+
+### Configure DHCP on a Bridge
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bridge": "vm-bridge",
+    "pool_offset": 100,
+    "dns": "192.168.100.1",
+    "default_lease_time_sec": 3600,
+    "max_lease_time_sec": 86400
+  }' | jq .
+```
+
+Expected response:
+
+```json
+{
+  "status": "configured",
+  "bridge": "vm-bridge",
+  "pool_offset": 100,
+  "pool_size": 100,
+  "dns": "192.168.100.1",
+  "default_lease_time_sec": 3600,
+  "max_lease_time_sec": 86400
+}
+```
+
+### DHCP Server Parameters
+
+| Parameter              | Type    | Description                                      |
+|-----------------------|---------|--------------------------------------------------|
+| `bridge`              | string  | Bridge interface to serve DHCP on                |
+| `pool_offset`         | integer | Start offset for the DHCP pool (e.g., 100)       |
+| `dns`                 | string  | DNS server address to advertise to clients        |
+| `default_lease_time_sec` | integer | Default lease duration in seconds             |
+| `max_lease_time_sec`  | integer | Maximum lease duration in seconds                |
+
+### How It Works
+
+1. vmspawn generates a systemd-networkd `.network` file with a `[DHCPServer]` section
+2. The configuration is written to `/etc/systemd/network/`
+3. `networkctl reload` is called to apply the changes
+4. VMs on the bridge receive IPs from the configured pool
+
+### Setting the Pool Range
+
+The pool range is determined by the bridge address and the `pool_offset` value.
+For example, if the bridge has address `192.168.100.1/24` and `pool_offset` is
+100, DHCP will serve addresses starting at `192.168.100.100` with a default pool
+size of 100 addresses.
+
+### DNS Server Configuration
+
+The `dns` parameter sets the DNS server address that DHCP clients will use. This
+is typically the bridge IP itself (if running a DNS forwarder) or an upstream
+resolver.
+
+```bash
+# Use the bridge as DNS + upstream resolvers
+curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bridge": "vm-bridge",
+    "pool_offset": 50,
+    "dns": "192.168.100.1",
+    "default_lease_time_sec": 7200,
+    "max_lease_time_sec": 43200
+  }' | jq .
+```
+
+---
+
+## Step 8: Advanced Network Types
 
 ### TAP Interfaces
 

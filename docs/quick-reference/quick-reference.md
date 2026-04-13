@@ -17,6 +17,25 @@ curl -s http://127.0.0.1:9095/api/v1/auth/me \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
+## 2FA Setup and Login
+
+```bash
+# Set up 2FA (get TOTP secret)
+curl -s -X POST http://127.0.0.1:9095/api/v1/auth/2fa/setup \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Verify and activate 2FA
+curl -s -X POST http://127.0.0.1:9095/api/v1/auth/2fa/verify \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"totp_code": "123456"}' | jq .
+
+# Log in with 2FA
+TOKEN=$(curl -s http://127.0.0.1:9095/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "YOUR_PASSWORD", "totp_code": "654321"}' | jq -r '.token')
+```
+
 ---
 
 ## VM Lifecycle
@@ -104,6 +123,18 @@ curl -s -X POST http://127.0.0.1:9095/api/v1/vms/my-vm/clone \
 ```bash
 curl -s -X DELETE http://127.0.0.1:9095/api/v1/vms/my-vm \
   -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### OVA Export
+
+```bash
+# Export a VM to OVA format
+curl -s -X POST http://127.0.0.1:9095/api/v1/vms/my-vm/export/ova \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Download the exported OVA file
+curl -s http://127.0.0.1:9095/api/v1/vms/my-vm/export/ova/download \
+  -H "Authorization: Bearer $TOKEN" -o my-vm.ova
 ```
 
 ---
@@ -250,6 +281,160 @@ curl -s http://127.0.0.1:9095/api/v1/system/memory \
 
 # Firmware capabilities
 curl -s http://127.0.0.1:9095/api/v1/system/firmware/capabilities \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+## Secrets Management
+
+```bash
+# Create a secret
+curl -s -X POST http://127.0.0.1:9095/api/v1/secrets \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "db-pass", "value": "s3cret", "description": "DB password"}' | jq .
+
+# List secrets
+curl -s http://127.0.0.1:9095/api/v1/secrets \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Get secret metadata
+curl -s http://127.0.0.1:9095/api/v1/secrets/db-pass \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Update a secret
+curl -s -X PUT http://127.0.0.1:9095/api/v1/secrets/db-pass \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "new-s3cret"}' | jq .
+
+# Delete a secret
+curl -s -X DELETE http://127.0.0.1:9095/api/v1/secrets/db-pass \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+## Compliance Scanning
+
+```bash
+# List compliance profiles
+curl -s http://127.0.0.1:9095/api/v1/compliance/profiles \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Scan a VM
+curl -s -X POST http://127.0.0.1:9095/api/v1/compliance/scan \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"vm_name": "my-vm", "profile_id": "cis-level1"}' | jq .
+
+# View scan findings
+curl -s http://127.0.0.1:9095/api/v1/compliance/scans/SCAN_ID/findings \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Scan history for a VM
+curl -s "http://127.0.0.1:9095/api/v1/compliance/scans?vm_name=my-vm" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+## Billing and Usage
+
+```bash
+# Get current usage summary
+curl -s http://127.0.0.1:9095/api/v1/billing/usage \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Get usage for a specific VM
+curl -s http://127.0.0.1:9095/api/v1/billing/usage/my-vm \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# List invoices
+curl -s http://127.0.0.1:9095/api/v1/billing/invoices \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Get a specific invoice
+curl -s http://127.0.0.1:9095/api/v1/billing/invoices/INVOICE_ID \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Get pricing tiers
+curl -s http://127.0.0.1:9095/api/v1/billing/pricing \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+## Log Aggregation
+
+```bash
+# Get logs for a VM
+curl -s http://127.0.0.1:9095/api/v1/logs/my-vm \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Search logs with a query
+curl -s "http://127.0.0.1:9095/api/v1/logs?query=error&vm_name=my-vm&limit=50" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Stream logs (SSE)
+curl -s -N http://127.0.0.1:9095/api/v1/logs/my-vm/stream \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get log statistics
+curl -s http://127.0.0.1:9095/api/v1/logs/stats \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+## iSCSI Storage
+
+```bash
+# Discover iSCSI targets
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/discover \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"portal": "192.168.1.100:3260"}' | jq .
+
+# Log in to an iSCSI target
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/login \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"portal": "192.168.1.100:3260", "target": "iqn.2026-01.com.example:storage"}' | jq .
+
+# List active iSCSI sessions
+curl -s http://127.0.0.1:9095/api/v1/iscsi/sessions \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Log out of an iSCSI target
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/logout \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "SESSION_ID"}' | jq .
+```
+
+---
+
+## USB Passthrough
+
+```bash
+# List available USB devices on the host
+curl -s http://127.0.0.1:9095/api/v1/usb/devices \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Attach a USB device to a VM
+curl -s -X POST http://127.0.0.1:9095/api/v1/vms/my-vm/usb/attach \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"vendor_id": "0x1234", "product_id": "0x5678"}' | jq .
+
+# List USB devices attached to a VM
+curl -s http://127.0.0.1:9095/api/v1/vms/my-vm/usb \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# Detach a USB device from a VM
+curl -s -X DELETE http://127.0.0.1:9095/api/v1/vms/my-vm/usb/DEVICE_ID \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 

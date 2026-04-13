@@ -304,6 +304,133 @@ These files should only be readable by the user running the vmspawnd process (ty
 
 ---
 
+### [auth.totp]
+
+Controls two-factor authentication (2FA) via TOTP (Time-based One-Time Password).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | Bool | `false` | Enable 2FA/TOTP support |
+| `issuer` | String | `"vmspawnd"` | Issuer name shown in authenticator apps |
+| `digits` | Integer | `6` | Number of digits in the TOTP code |
+| `period` | Integer | `30` | TOTP code validity period in seconds |
+
+```toml
+[auth.totp]
+enabled = true
+issuer = "vmspawnd"
+digits = 6
+period = 30
+```
+
+When enabled, users can set up 2FA via `POST /api/v1/auth/2fa/setup`, which returns a TOTP secret and a provisioning URI for authenticator apps (Google Authenticator, Authy, etc.). Once verified, subsequent logins require a `totp_code` field in addition to the username and password.
+
+---
+
+### [storage.iscsi]
+
+Controls iSCSI storage backend integration.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | Bool | `false` | Enable iSCSI storage backend |
+| `initiator_name` | String | Auto-detected | iSCSI initiator IQN |
+| `default_port` | Integer | `3260` | Default iSCSI target port |
+| `chap_username` | String | None | CHAP authentication username |
+| `chap_secret` | String | None | CHAP authentication secret |
+| `discovery_timeout` | Integer | `10` | Target discovery timeout in seconds |
+
+```toml
+[storage.iscsi]
+enabled = true
+initiator_name = "iqn.2026-01.com.example:vmspawnd"
+default_port = 3260
+chap_username = "vmspawnd"
+chap_secret = "your-chap-secret"
+discovery_timeout = 10
+```
+
+> **Security note:** Store the `chap_secret` via environment variables or the secrets manager rather than in the config file.
+
+---
+
+### [network.dhcp]
+
+Controls the built-in DHCP server on bridge interfaces.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | Bool | `false` | Enable DHCP server on managed bridges |
+| `lease_time` | String | `"1h"` | Default DHCP lease duration |
+| `dns_servers` | Array of Strings | `[]` | DNS servers advertised to clients |
+| `domain` | String | None | DNS search domain for DHCP clients |
+
+```toml
+[network.dhcp]
+enabled = true
+lease_time = "1h"
+dns_servers = ["8.8.8.8", "8.8.4.4"]
+domain = "vm.internal"
+```
+
+The DHCP server integrates with systemd-networkd and assigns addresses from the pool range configured on each bridge via the API.
+
+---
+
+### [compliance]
+
+Controls default compliance scanning behavior.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | Bool | `false` | Enable compliance scanning |
+| `default_profile` | String | `"cis-level1"` | Default compliance profile for new VMs |
+| `auto_scan` | Bool | `false` | Automatically scan VMs on creation |
+| `scan_interval_hours` | Integer | `24` | Interval between automatic scans |
+| `fail_on_critical` | Bool | `true` | Prevent VM start if critical findings exist |
+
+```toml
+[compliance]
+enabled = true
+default_profile = "cis-level1"
+auto_scan = true
+scan_interval_hours = 24
+fail_on_critical = true
+```
+
+Available built-in profiles: `cis-level1`, `cis-level2`, `stig`, `pci-dss`, `hipaa`. Custom profiles can be created via the API.
+
+---
+
+### [billing]
+
+Controls billing and chargeback defaults.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | Bool | `false` | Enable billing and usage tracking |
+| `currency` | String | `"USD"` | Default currency for pricing |
+| `billing_cycle` | String | `"monthly"` | Billing cycle: `hourly`, `daily`, `monthly` |
+| `cpu_rate` | Float | `0.01` | Price per vCPU per hour |
+| `memory_rate` | Float | `0.005` | Price per GB of memory per hour |
+| `storage_rate` | Float | `0.0001` | Price per GB of storage per hour |
+| `network_rate` | Float | `0.001` | Price per GB of network transfer |
+
+```toml
+[billing]
+enabled = true
+currency = "USD"
+billing_cycle = "monthly"
+cpu_rate = 0.01
+memory_rate = 0.005
+storage_rate = 0.0001
+network_rate = 0.001
+```
+
+When enabled, vmspawnd meters resource usage per VM and generates invoices on the configured billing cycle. Usage data is accessible via `GET /api/v1/billing/usage` and invoices via `GET /api/v1/billing/invoices`.
+
+---
+
 ## Next Steps
 
 - [Web UI Guide](04-Web-UI.md) -- access the web dashboard

@@ -44,7 +44,7 @@
   <h1>Security and Compliance</h1>
   <p class="subtitle">Defense in Depth for VM Infrastructure</p>
   <p style="font-size: 1.2em; color: #64748b; margin-top: 20px;">
-    31-round security audit. 194 issues identified and fixed. Production-ready.
+    33-round security audit. 225 issues identified and fixed. Production-ready.
   </p>
   <div style="margin-top: 40px;">
     <span class="badge">Zero Unsafe Rust</span>
@@ -134,7 +134,95 @@
   </div>
 </div>
 
-<!-- Slide 4: RBAC -->
+<!-- Slide 4: 2FA / TOTP Authentication -->
+<div class="slide">
+  <h1>2FA / TOTP Authentication</h1>
+  <p class="subtitle">Time-based one-time passwords for every user account</p>
+  <div class="two-col">
+    <div>
+      <h3>How It Works</h3>
+      <ol>
+        <li>User calls <code>POST /api/auth/2fa/setup</code> to generate a TOTP secret</li>
+        <li>Server returns the secret and an <code>otpauth://</code> URL</li>
+        <li>User scans the QR code with an authenticator app</li>
+        <li>User confirms by verifying a code via <code>POST /api/auth/2fa/verify</code></li>
+        <li>Subsequent logins require the <code>totp_code</code> field</li>
+      </ol>
+      <h3 style="margin-top: 20px;">Security Properties</h3>
+      <ul>
+        <li>TOTP secrets encrypted at rest in the user database</li>
+        <li>Constant-time code verification (no timing side channel)</li>
+        <li>Per-user enable/disable -- not a global setting</li>
+        <li>Missing code returns <code>401</code> with <code>requires_2fa: true</code></li>
+        <li>Invalid code returns <code>401</code> and is rate-limited</li>
+      </ul>
+    </div>
+    <div>
+      <h3>API Endpoints</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Description</th></tr>
+        <tr><td><code>POST /api/auth/2fa/setup</code></td><td>Generate TOTP secret</td></tr>
+        <tr><td><code>POST /api/auth/2fa/verify</code></td><td>Confirm setup with code</td></tr>
+        <tr><td><code>POST /api/auth/login</code></td><td>Login with optional totp_code</td></tr>
+      </table>
+      <h3 style="margin-top: 20px;">Compatible Apps</h3>
+      <ul>
+        <li>Google Authenticator</li>
+        <li>Authy</li>
+        <li>Microsoft Authenticator</li>
+        <li>FreeOTP</li>
+        <li>Any RFC 6238 TOTP-compatible app</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 5: JWT Token Revocation -->
+<div class="slide">
+  <h1>JWT Token Revocation</h1>
+  <p class="subtitle">Invalidate compromised tokens instantly</p>
+  <div class="two-col">
+    <div>
+      <h3>Token Lifecycle</h3>
+      <ul>
+        <li>JWT tokens issued on successful login (PAM + optional 2FA)</li>
+        <li>Configurable expiration time</li>
+        <li>Token blacklist checked on every authenticated request</li>
+        <li>Revoked tokens rejected immediately at the middleware layer</li>
+        <li>Blacklist entries cleaned up after token expiry</li>
+      </ul>
+      <h3 style="margin-top: 20px;">When to Revoke</h3>
+      <ul>
+        <li>User account compromised</li>
+        <li>Employee offboarding</li>
+        <li>Suspicious activity detected in audit logs</li>
+        <li>Password or role change</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Security Architecture</h3>
+      <pre style="font-size: 1.05em;"><code>  Request with JWT
+       |
+       v
+  [Decode Token] ---- Verify signature + expiry
+       |
+       v
+  [Check Blacklist] -- Is this token revoked?
+       |
+       v
+  [Extract Claims] --- Username, role, expiry
+       |
+       v
+  [RBAC Enforcement] - Does the role permit this action?
+       |
+       v
+  [Handler] ---------- Process the request</code></pre>
+      <p style="margin-top: 16px;">Every API request passes through this pipeline. Revoked tokens are rejected at the blacklist check -- before any business logic executes.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 6: RBAC -->
 <div class="slide">
   <h1>Role-Based Access Control</h1>
   <p class="subtitle">Three-tier RBAC enforced on every API endpoint</p>
@@ -482,21 +570,114 @@ if !canonical.starts_with(&allowed_base) {
   </div>
 </div>
 
-<!-- Slide 11: Security Audit Results -->
+<!-- Slide 13: Compliance Scanning Framework -->
+<div class="slide">
+  <h1>Compliance Scanning Framework</h1>
+  <p class="subtitle">Automated security posture assessment with 7 built-in checks</p>
+  <div class="two-col">
+    <div>
+      <h3>Check Types</h3>
+      <table>
+        <tr><th>Check</th><th>Category</th><th>Severity</th></tr>
+        <tr><td>DiskEncrypted</td><td>Security</td><td>Critical</td></tr>
+        <tr><td>TpmEnabled</td><td>Security</td><td>High</td></tr>
+        <tr><td>SecureBootEnabled</td><td>Security</td><td>High</td></tr>
+        <tr><td>FirewallAssigned</td><td>Network</td><td>High</td></tr>
+        <tr><td>NetworkPolicyAssigned</td><td>Network</td><td>Medium</td></tr>
+        <tr><td>MinCpus</td><td>Compute</td><td>Low</td></tr>
+        <tr><td>MinMemoryMb</td><td>Compute</td><td>Low</td></tr>
+      </table>
+      <h3 style="margin-top: 20px;">Profiles</h3>
+      <ul>
+        <li>Default <code>cis-baseline-v1</code> profile always available</li>
+        <li>Custom profiles with selected rules and thresholds</li>
+        <li>Results stored and queryable via API</li>
+      </ul>
+    </div>
+    <div>
+      <h3>API Endpoints</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Description</th></tr>
+        <tr><td><code>GET /api/compliance/profiles</code></td><td>List profiles</td></tr>
+        <tr><td><code>POST /api/compliance/scan/:vm</code></td><td>Scan a VM</td></tr>
+        <tr><td><code>GET /api/compliance/results</code></td><td>List all results</td></tr>
+      </table>
+      <h3 style="margin-top: 20px;">Scan Result</h3>
+      <pre><code>{
+  "id": "scan-abc123",
+  "profile_id": "cis-baseline-v1",
+  "vm_name": "web-01",
+  "scan_time": "2026-04-12T10:00:00Z",
+  "checks": [
+    {"rule": "DiskEncrypted", "pass": false},
+    {"rule": "TpmEnabled", "pass": true},
+    {"rule": "SecureBootEnabled", "pass": true}
+  ]
+}</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 14: Secrets Management -->
+<div class="slide">
+  <h1>Secrets Management</h1>
+  <p class="subtitle">Encrypted secret storage with RBAC-enforced access</p>
+  <div class="two-col">
+    <div>
+      <h3>Security Properties</h3>
+      <ul>
+        <li>Values encrypted at rest -- never returned in list/get responses</li>
+        <li>Admin-only access enforced by RBAC middleware</li>
+        <li>Every create, read, and delete operation is audit logged</li>
+        <li>Secret names validated (alphanumeric + hyphens/underscores)</li>
+        <li>Metadata key/value pairs for tagging and organization</li>
+      </ul>
+      <h3 style="margin-top: 20px;">VM Integration</h3>
+      <ul>
+        <li>Secrets injected as systemd credentials at VM boot</li>
+        <li>Delivered via SMBIOS or VSOCK -- not command line</li>
+        <li>Guest reads with <code>systemd-creds cat &lt;id&gt;</code></li>
+        <li>Credential IDs validated before injection</li>
+      </ul>
+    </div>
+    <div>
+      <h3>API Endpoints</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Description</th></tr>
+        <tr><td><code>GET /api/secrets</code></td><td>List secrets (values redacted)</td></tr>
+        <tr><td><code>GET /api/secrets/:id</code></td><td>Get secret metadata</td></tr>
+        <tr><td><code>POST /api/secrets</code></td><td>Create a secret</td></tr>
+        <tr><td><code>DELETE /api/secrets/:id</code></td><td>Delete a secret</td></tr>
+      </table>
+      <h3 style="margin-top: 20px;">Example</h3>
+      <pre><code># Create a secret
+curl -X POST "$HOST/api/secrets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "db-password",
+    "value": "s3cretP@ss!",
+    "metadata": {"env": "prod"}
+  }'</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 15: Security Audit Results -->
 <div class="slide">
   <h1>Security Audit Results</h1>
-  <p class="subtitle">31 rounds of systematic security review</p>
+  <p class="subtitle">33 rounds of systematic security review</p>
   <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
     <div class="metric">
-      <div class="number">31</div>
+      <div class="number">33</div>
       <div class="label">Audit Rounds</div>
     </div>
     <div class="metric">
-      <div class="number">194</div>
+      <div class="number">225</div>
       <div class="label">Issues Found</div>
     </div>
     <div class="metric">
-      <div class="number">194</div>
+      <div class="number">225</div>
       <div class="label">Issues Fixed</div>
     </div>
     <div class="metric">
@@ -523,7 +704,7 @@ if !canonical.starts_with(&allowed_base) {
     <div>
       <h3>Audit Methodology</h3>
       <ul>
-        <li>Systematic review of all 40+ crates</li>
+        <li>Systematic review of all 40+ crates (33 rounds)</li>
         <li>Every API handler audited for auth + validation</li>
         <li>All subprocess calls verified for injection safety</li>
         <li>File operations checked for path traversal</li>
@@ -557,7 +738,7 @@ if !canonical.starts_with(&allowed_base) {
     </div>
     <div class="card" style="text-align: center;">
       <h3>Fully Audited</h3>
-      <p>31 rounds, 194 issues found and fixed. Zero outstanding security issues.</p>
+      <p>33 rounds, 225 issues found and fixed. Zero outstanding security issues.</p>
     </div>
   </div>
 </div>

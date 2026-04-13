@@ -680,7 +680,489 @@ key = "/etc/vmspawnd/tls/key.pem"</code></pre>
   </div>
 </div>
 
-<!-- Slide 15: Summary -->
+<!-- Slide 15: 2FA/MFA Authentication -->
+<div class="slide">
+  <h1>2FA / MFA Authentication</h1>
+  <p class="subtitle">TOTP-based two-factor authentication for every user account</p>
+  <div class="two-col">
+    <div>
+      <h3>How It Works</h3>
+      <ol>
+        <li>User calls <code>POST /api/auth/2fa/setup</code> to generate a TOTP secret</li>
+        <li>Server returns the secret and an <code>otpauth://</code> URL for QR scanning</li>
+        <li>User scans the QR code with Google Authenticator, Authy, or any TOTP app</li>
+        <li>User confirms setup by verifying a code via <code>POST /api/auth/2fa/verify</code></li>
+        <li>All subsequent logins require a 6-digit TOTP code in the <code>totp_code</code> field</li>
+      </ol>
+      <h3 style="margin-top: 20px;">Security Benefits</h3>
+      <ul>
+        <li>Protects against stolen passwords</li>
+        <li>Per-user enable/disable -- no global toggle</li>
+        <li>TOTP secrets stored encrypted in the user database</li>
+        <li>Constant-time code verification prevents timing attacks</li>
+      </ul>
+    </div>
+    <div>
+      <h3>API Flow</h3>
+      <pre><code># Step 1: Set up 2FA
+POST /api/auth/2fa/setup
+Authorization: Bearer &lt;token&gt;
+
+# Response:
+{
+  "secret": "BASE32SECRET...",
+  "otpauth_url": "otpauth://totp/vmspawnd:admin?..."
+}
+
+# Step 2: Verify setup
+POST /api/auth/2fa/verify
+{"code": "123456"}
+
+# Step 3: Login with 2FA
+POST /api/auth/login
+{
+  "username": "admin",
+  "password": "...",
+  "totp_code": "654321"
+}</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 16: OVA/OVF Export and Import -->
+<div class="slide">
+  <h1>OVA / OVF Export and Import</h1>
+  <p class="subtitle">Industry-standard VM packaging for portability</p>
+  <div class="two-col">
+    <div>
+      <h3>OVA Export</h3>
+      <ul>
+        <li>Export any VM to OVA format via <code>POST /api/vms/:name/export</code></li>
+        <li>Packages disk image, hardware manifest, and metadata into a single archive</li>
+        <li>Compatible with VMware, VirtualBox, and other OVA-capable platforms</li>
+        <li>VM must be stopped before export</li>
+        <li>Download the OVA file directly from the API response</li>
+      </ul>
+      <h3 style="margin-top: 20px;">Import Support</h3>
+      <ul>
+        <li>Import from VMDK, VDI, and VHD formats</li>
+        <li>Automatic conversion to qcow2</li>
+        <li>Preserves VM configuration metadata</li>
+        <li>Enables seamless VMware-to-vmspawn migration</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Export Example</h3>
+      <pre><code># Export a stopped VM
+curl -X POST "$HOST/api/vms/web-01/export" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o web-01.ova
+
+# Import a VMDK disk
+curl -X POST "$HOST/api/vms" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "migrated-vm",
+    "import_path": "/uploads/server.vmdk",
+    "cpus": 4,
+    "memory": 4096
+  }'</code></pre>
+      <h3 style="margin-top: 20px;">Use Cases</h3>
+      <ul>
+        <li>VMware migration post-Broadcom</li>
+        <li>VM archival and disaster recovery</li>
+        <li>Cross-platform VM portability</li>
+        <li>Template distribution to air-gapped sites</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 17: Secrets Management -->
+<div class="slide">
+  <h1>Secrets Management</h1>
+  <p class="subtitle">Centralized secret storage with encryption at rest</p>
+  <div class="two-col">
+    <div>
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Create, retrieve, and delete secrets via REST API</li>
+        <li>Values encrypted at rest -- never returned in list responses</li>
+        <li>Attach metadata (key/value pairs) to each secret</li>
+        <li>Admin-only access enforced by RBAC</li>
+        <li>Audit logged on every create, read, and delete</li>
+      </ul>
+      <h3 style="margin-top: 20px;">Injection into VMs</h3>
+      <ul>
+        <li>Secrets can be injected at boot via systemd credentials</li>
+        <li>Delivered through SMBIOS or VSOCK -- never on command line</li>
+        <li>Guest reads credentials with <code>systemd-creds cat</code></li>
+        <li>Credential IDs validated (alphanumeric + dots/hyphens only)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>API Examples</h3>
+      <pre><code># Create a secret
+curl -X POST "$HOST/api/secrets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "db-password",
+    "value": "s3cretP@ss!",
+    "metadata": {"env": "production"}
+  }'
+
+# List secrets (values redacted)
+curl "$HOST/api/secrets" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete a secret
+curl -X DELETE "$HOST/api/secrets/$SECRET_ID" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 18: Compliance Scanning -->
+<div class="slide">
+  <h1>Compliance Scanning</h1>
+  <p class="subtitle">Automated security posture assessment for every VM</p>
+  <div class="two-col">
+    <div>
+      <h3>Built-in Check Types</h3>
+      <table>
+        <tr><th>Check</th><th>Category</th><th>What It Verifies</th></tr>
+        <tr><td>DiskEncrypted</td><td>Security</td><td>VM disk encryption enabled</td></tr>
+        <tr><td>TpmEnabled</td><td>Security</td><td>TPM 2.0 present</td></tr>
+        <tr><td>SecureBootEnabled</td><td>Security</td><td>UEFI Secure Boot active</td></tr>
+        <tr><td>FirewallAssigned</td><td>Network</td><td>Firewall profile attached</td></tr>
+        <tr><td>NetworkPolicyAssigned</td><td>Network</td><td>Network policy in effect</td></tr>
+        <tr><td>MinCpus</td><td>Compute</td><td>Meets minimum CPU requirement</td></tr>
+        <tr><td>MinMemoryMb</td><td>Compute</td><td>Meets minimum memory requirement</td></tr>
+      </table>
+      <h3 style="margin-top: 20px;">Severity Levels</h3>
+      <p><span class="badge">Critical</span> <span class="badge">High</span> <span class="badge">Medium</span> <span class="badge">Low</span> <span class="badge">Info</span></p>
+    </div>
+    <div>
+      <h3>Scan a VM</h3>
+      <pre><code># List compliance profiles
+curl "$HOST/api/compliance/profiles" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Scan a VM
+curl -X POST \
+  "$HOST/api/compliance/scan/web-01" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"profile_id": "cis-baseline-v1"}'
+
+# View all scan results
+curl "$HOST/api/compliance/results" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+      <h3 style="margin-top: 20px;">Default Profile</h3>
+      <p>The <code>cis-baseline-v1</code> profile is always available and includes all 7 checks. Custom profiles can be created and stored.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 19: Billing and Chargeback -->
+<div class="slide">
+  <h1>Billing and Chargeback</h1>
+  <p class="subtitle">Track resource consumption and generate per-tenant invoices</p>
+  <div class="two-col">
+    <div>
+      <h3>Pricing Model</h3>
+      <ul>
+        <li>Configurable pricing rules for CPU, memory, storage, and network</li>
+        <li>Per-tenant usage tracking with label-based filtering</li>
+        <li>Hourly, daily, or monthly billing periods</li>
+        <li>Automated invoice generation</li>
+      </ul>
+      <h3 style="margin-top: 20px;">API Endpoints</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Description</th></tr>
+        <tr><td><code>GET /api/billing/pricing</code></td><td>Get current pricing rules</td></tr>
+        <tr><td><code>PUT /api/billing/pricing</code></td><td>Update pricing rules</td></tr>
+        <tr><td><code>GET /api/billing/usage</code></td><td>Get usage records</td></tr>
+        <tr><td><code>POST /api/billing/invoice/:tenant</code></td><td>Generate invoice</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Example Workflow</h3>
+      <pre><code># Set pricing rules
+curl -X PUT "$HOST/api/billing/pricing" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cpu_per_hour": 0.02,
+    "memory_gb_per_hour": 0.01,
+    "storage_gb_per_month": 0.10
+  }'
+
+# Generate invoice for a tenant
+curl -X POST \
+  "$HOST/api/billing/invoice/tenant-alpha" \
+  -H "Authorization: Bearer $TOKEN"
+
+# View usage records
+curl "$HOST/api/billing/usage" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 20: iSCSI Storage -->
+<div class="slide">
+  <h1>iSCSI Storage</h1>
+  <p class="subtitle">Connect to SAN storage with built-in iSCSI initiator support</p>
+  <div class="two-col">
+    <div>
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Discover iSCSI targets on a portal</li>
+        <li>Login and logout of iSCSI sessions</li>
+        <li>List active iSCSI sessions</li>
+        <li>Use iSCSI LUNs as VM disk backends</li>
+        <li>Supports CHAP authentication</li>
+      </ul>
+      <h3 style="margin-top: 20px;">API Endpoints</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Description</th></tr>
+        <tr><td><code>POST /api/storage/iscsi/discover</code></td><td>Discover targets</td></tr>
+        <tr><td><code>POST /api/storage/iscsi/login</code></td><td>Login to a target</td></tr>
+        <tr><td><code>POST /api/storage/iscsi/logout</code></td><td>Logout from a target</td></tr>
+        <tr><td><code>GET /api/storage/iscsi/sessions</code></td><td>List active sessions</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Workflow Example</h3>
+      <pre><code># Discover targets on a SAN
+curl -X POST "$HOST/api/storage/iscsi/discover" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"portal": "10.0.0.50:3260"}'
+
+# Login to a target
+curl -X POST "$HOST/api/storage/iscsi/login" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "portal": "10.0.0.50:3260",
+    "target_iqn": "iqn.2026-04.com.storage:lun0"
+  }'
+
+# List active sessions
+curl "$HOST/api/storage/iscsi/sessions" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 21: USB Passthrough -->
+<div class="slide">
+  <h1>USB Passthrough</h1>
+  <p class="subtitle">Attach host USB devices directly to VMs</p>
+  <div class="two-col">
+    <div>
+      <h3>Use Cases</h3>
+      <ul>
+        <li>Hardware security keys (YubiKey, FIDO2)</li>
+        <li>USB storage devices</li>
+        <li>Serial adapters and specialized hardware</li>
+        <li>Printers and scanners</li>
+        <li>USB dongles for licensed software</li>
+      </ul>
+      <h3 style="margin-top: 20px;">How It Works</h3>
+      <ol>
+        <li>List available USB devices on the host via <code>GET /api/system/usb</code></li>
+        <li>Identify the target device by vendor ID and product ID</li>
+        <li>Pass the device to the VM at start time via QEMU USB passthrough</li>
+        <li>Guest OS detects the device as a native USB peripheral</li>
+      </ol>
+    </div>
+    <div>
+      <h3>List Available Devices</h3>
+      <pre><code># List host USB devices
+curl "$HOST/api/system/usb" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+[
+  {
+    "bus": 1,
+    "device": 4,
+    "vendor_id": "1050",
+    "product_id": "0407",
+    "description": "Yubico YubiKey"
+  }
+]</code></pre>
+      <h3 style="margin-top: 20px;">Pass to VM at Start</h3>
+      <pre><code>curl -X POST "$HOST/api/vms/my-vm/start" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kvm": true,
+    "extra_args": [
+      "usb_host=1050:0407"
+    ]
+  }'</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 22: SPICE Remote Display -->
+<div class="slide">
+  <h1>SPICE Remote Display</h1>
+  <p class="subtitle">High-performance remote access to VM graphical consoles</p>
+  <div class="two-col">
+    <div>
+      <h3>What SPICE Provides</h3>
+      <ul>
+        <li>Full graphical desktop access to VMs</li>
+        <li>Adaptive image compression for low-bandwidth links</li>
+        <li>Audio and video streaming</li>
+        <li>USB redirection from client to VM</li>
+        <li>Clipboard sharing between client and guest</li>
+        <li>Multi-monitor support</li>
+      </ul>
+      <h3 style="margin-top: 20px;">Client Compatibility</h3>
+      <ul>
+        <li><code>virt-viewer</code> (Linux, Windows)</li>
+        <li><code>remote-viewer</code> (cross-platform)</li>
+        <li>Web-based SPICE HTML5 client</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Enabling SPICE</h3>
+      <pre><code># Start a VM with GUI console (SPICE)
+curl -X POST "$HOST/api/vms/desktop-vm/start" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kvm": true,
+    "console": "gui"
+  }'</code></pre>
+      <h3 style="margin-top: 20px;">Connection</h3>
+      <pre><code># Connect with remote-viewer
+remote-viewer spice://host:5900
+
+# Or generate a .vv connection file
+# and open it with virt-viewer</code></pre>
+      <h3 style="margin-top: 20px;">When to Use</h3>
+      <ul>
+        <li>Windows VMs without SSH</li>
+        <li>Desktop Linux VMs (development, testing)</li>
+        <li>BIOS/UEFI troubleshooting</li>
+        <li>GUI-based application testing</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 23: Log Aggregation -->
+<div class="slide">
+  <h1>Log Aggregation</h1>
+  <p class="subtitle">Centralized journal querying for VMs and the host</p>
+  <div class="two-col">
+    <div>
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Query per-VM journal logs via <code>GET /api/vms/:name/logs</code></li>
+        <li>Query system-level logs via <code>GET /api/logs</code></li>
+        <li>Filter by priority (0=emergency through 7=debug)</li>
+        <li>Limit the number of returned entries</li>
+        <li>JSON-structured log entries with timestamps</li>
+        <li>Forward VM journals to the host with <code>forward_journal</code></li>
+      </ul>
+      <h3 style="margin-top: 20px;">Priority Levels</h3>
+      <table>
+        <tr><th>Level</th><th>Name</th><th>Use</th></tr>
+        <tr><td>0</td><td>Emergency</td><td>System unusable</td></tr>
+        <tr><td>3</td><td>Error</td><td>Error conditions</td></tr>
+        <tr><td>4</td><td>Warning</td><td>Warning conditions</td></tr>
+        <tr><td>6</td><td>Info</td><td>Informational</td></tr>
+        <tr><td>7</td><td>Debug</td><td>Debug messages</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>API Examples</h3>
+      <pre><code># Get VM logs (last 100 entries)
+curl "$HOST/api/vms/web-01/logs?lines=100" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filter by priority (errors only)
+curl "$HOST/api/vms/web-01/logs?priority=3" \
+  -H "Authorization: Bearer $TOKEN"
+
+# System-level logs
+curl "$HOST/api/logs?lines=50&priority=4" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+      <h3 style="margin-top: 20px;">Journal Forwarding</h3>
+      <pre><code># Forward VM journal to host at start
+curl -X POST "$HOST/api/vms/web-01/start" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kvm": true,
+    "forward_journal": "/var/log/journal/vm-web-01"
+  }'</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 24: Rust SDK -->
+<div class="slide">
+  <h1>Rust SDK</h1>
+  <p class="subtitle">Type-safe client library for programmatic API access</p>
+  <div class="two-col">
+    <div>
+      <h3>Features</h3>
+      <ul>
+        <li>Published as the <code>vmspawn-sdk</code> crate</li>
+        <li>Async/await with Tokio runtime</li>
+        <li>Automatic authentication and token management</li>
+        <li>Type-safe request and response structs</li>
+        <li>Covers the full 520+ endpoint API surface</li>
+        <li>Built-in retry and error handling</li>
+      </ul>
+      <h3 style="margin-top: 20px;">When to Use</h3>
+      <ul>
+        <li>Custom automation tools</li>
+        <li>CI/CD pipeline integration</li>
+        <li>Building higher-level orchestration layers</li>
+        <li>Testing and validation scripts</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Quick Start</h3>
+      <pre><code># Cargo.toml
+[dependencies]
+vmspawn-sdk = "0.1"
+tokio = { version = "1", features = ["full"] }</code></pre>
+      <pre><code>use vmspawn_sdk::{Client, ClientConfig};
+
+#[tokio::main]
+async fn main() -> anyhow::Result&lt;()&gt; {
+    let client = Client::new(ClientConfig {
+        base_url: "https://host:3000".into(),
+        token: Some("your-jwt-token".into()),
+        ..Default::default()
+    })?;
+
+    // List VMs
+    let vms = client.list_vms().await?;
+    for vm in vms {
+        println!("{}: {}", vm.name, vm.status);
+    }
+
+    Ok(())
+}</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 25: Summary -->
 <div class="slide title-slide">
   <h1>Complete Platform, Zero Compromise</h1>
   <p class="subtitle">Every enterprise feature. One binary. Five minutes to production.</p>
@@ -690,7 +1172,7 @@ key = "/etc/vmspawnd/tls/key.pem"</code></pre>
       <div class="label">API Endpoints</div>
     </div>
     <div class="metric">
-      <div class="number">6</div>
+      <div class="number">7</div>
       <div class="label">Storage Backends</div>
     </div>
     <div class="metric">

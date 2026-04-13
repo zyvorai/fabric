@@ -19,6 +19,11 @@ management, and audit logging.
 5. Encrypt VM disks
 6. Manage TLS certificates and certificate authorities
 7. Query and export audit logs
+8. Set up 2FA/TOTP authentication
+9. Revoke JWT tokens
+10. Manage secrets
+11. Scan VMs for compliance
+12. Configure QMP command allowlists
 
 ---
 
@@ -667,6 +672,387 @@ curl -s "$VMSPAWN_HOST/api/audit/export?start_time=2026-04-01T00:00:00Z&end_time
 
 ---
 
+## Step 8: 2FA/TOTP Setup
+
+Two-factor authentication adds a second verification step using time-based
+one-time passwords (TOTP). Users scan a QR code with an authenticator app
+(Google Authenticator, Authy, FreeOTP) and enter a 6-digit code at login.
+
+### Enable 2FA in Configuration
+
+```toml
+[auth.totp]
+enabled = true
+issuer = "vmspawnd"
+```
+
+### Set Up 2FA for a User
+
+Request a TOTP secret and provisioning URI:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/2fa/setup" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Expected response:
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "provisioning_uri": "otpauth://totp/vmspawnd:admin?secret=JBSWY3DPEHPK3PXP&issuer=vmspawnd",
+  "qr_code_url": "data:image/png;base64,..."
+}
+```
+
+Add the secret to your authenticator app using the provisioning URI or QR code.
+
+### Verify and Activate 2FA
+
+Confirm setup by providing a valid TOTP code from your authenticator:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/2fa/verify" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "totp_code": "123456"
+  }' | jq .
+```
+
+Expected response:
+
+```json
+{
+  "message": "2FA enabled successfully",
+  "backup_codes": ["a1b2c3d4", "e5f6g7h8", "i9j0k1l2"]
+}
+```
+
+> **Important:** Save the backup codes securely. They can be used if you lose access to your authenticator app.
+
+### Log In with 2FA
+
+Once 2FA is enabled, include the `totp_code` field in login requests:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "your-password",
+    "totp_code": "654321"
+  }' | jq .
+```
+
+### Disable 2FA
+
+```bash
+curl -s -X DELETE "$VMSPAWN_HOST/api/v1/auth/2fa" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "totp_code": "123456"
+  }' | jq .
+```
+
+---
+
+## Step 9: JWT Token Revocation
+
+Individual JWT tokens can be revoked before they expire using the token's
+JTI (JWT ID) claim. Revoked tokens are added to a blocklist and rejected
+on subsequent API requests.
+
+### Revoke the Current Token
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/token/revoke" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Expected response:
+
+```json
+{
+  "message": "Token revoked successfully"
+}
+```
+
+### Revoke a Specific Token by JTI
+
+Admins can revoke any token by its JTI:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/token/revoke" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jti": "550e8400-e29b-41d4-a716-446655440000"
+  }' | jq .
+```
+
+### List Revoked Tokens
+
+```bash
+curl -s "$VMSPAWN_HOST/api/v1/auth/token/revoked" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### Best Practices
+
+- Revoke tokens when a user logs out
+- Revoke tokens when a user's role changes
+- Revoke all tokens for a user when their account is compromised
+- Expired tokens are automatically cleaned from the blocklist
+
+---
+
+## Step 10: Secrets Management
+
+vmspawn provides a built-in secrets manager for storing sensitive credentials
+such as database passwords, API keys, and certificates used by VMs.
+
+### Create a Secret
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/secrets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "db-password",
+    "value": "s3cur3-p@ssw0rd",
+    "description": "Production database password",
+    "labels": {"env": "production", "service": "postgres"}
+  }' | jq .
+```
+
+Expected response:
+
+```json
+{
+  "id": "sec-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "db-password",
+  "description": "Production database password",
+  "labels": {"env": "production", "service": "postgres"},
+  "created": "2026-04-12T16:00:00Z",
+  "updated": "2026-04-12T16:00:00Z"
+}
+```
+
+> **Note:** The secret value is never returned in API responses after creation.
+
+### List Secrets
+
+```bash
+curl -s "$VMSPAWN_HOST/api/v1/secrets" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### Get Secret Metadata
+
+```bash
+curl -s "$VMSPAWN_HOST/api/v1/secrets/db-password" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### Update a Secret
+
+```bash
+curl -s -X PUT "$VMSPAWN_HOST/api/v1/secrets/db-password" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "value": "new-s3cur3-p@ssw0rd"
+  }' | jq .
+```
+
+### Delete a Secret
+
+```bash
+curl -s -X DELETE "$VMSPAWN_HOST/api/v1/secrets/db-password" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### Inject a Secret into a VM
+
+Secrets can be injected into VMs via cloud-init or systemd credentials:
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/vms/my-vm/secrets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "secret_name": "db-password",
+    "mount_path": "/run/secrets/db-password"
+  }' | jq .
+```
+
+---
+
+## Step 11: Compliance Scanning
+
+Compliance scanning evaluates VMs against security baselines such as
+CIS Benchmarks, DISA STIG, and PCI-DSS. Findings are categorized by severity
+and include remediation guidance.
+
+### List Available Compliance Profiles
+
+```bash
+curl -s "$VMSPAWN_HOST/api/v1/compliance/profiles" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Expected response:
+
+```json
+[
+  {
+    "id": "cis-level1",
+    "name": "CIS Level 1",
+    "description": "CIS Benchmark Level 1 - essential security controls",
+    "check_count": 42
+  },
+  {
+    "id": "cis-level2",
+    "name": "CIS Level 2",
+    "description": "CIS Benchmark Level 2 - defense-in-depth controls",
+    "check_count": 78
+  },
+  {
+    "id": "stig",
+    "name": "DISA STIG",
+    "description": "Defense Information Systems Agency Security Technical Implementation Guide",
+    "check_count": 95
+  },
+  {
+    "id": "pci-dss",
+    "name": "PCI-DSS",
+    "description": "Payment Card Industry Data Security Standard",
+    "check_count": 60
+  }
+]
+```
+
+### Scan a VM
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/compliance/scan" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vm_name": "web-server-01",
+    "profile_id": "cis-level1"
+  }' | jq .
+```
+
+Expected response:
+
+```json
+{
+  "scan_id": "cs-b2c3d4e5-f6a7-8901-bcde-f23456789012",
+  "vm_name": "web-server-01",
+  "profile": "cis-level1",
+  "status": "completed",
+  "summary": {
+    "total": 42,
+    "passed": 38,
+    "failed": 3,
+    "warning": 1
+  },
+  "score": 90.5,
+  "scanned_at": "2026-04-12T16:10:00Z"
+}
+```
+
+### Review Scan Results
+
+```bash
+curl -s "$VMSPAWN_HOST/api/v1/compliance/scans/cs-b2c3d4e5-f6a7-8901-bcde-f23456789012/findings" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+Expected response:
+
+```json
+[
+  {
+    "check_id": "cis-1.4.1",
+    "title": "Ensure disk encryption is enabled",
+    "severity": "high",
+    "status": "failed",
+    "remediation": "Enable disk encryption via POST /api/v1/encryption/vms/{name}/encrypt"
+  },
+  {
+    "check_id": "cis-5.2.1",
+    "title": "Ensure firewall profile is assigned",
+    "severity": "medium",
+    "status": "failed",
+    "remediation": "Assign a firewall profile via POST /api/v1/firewall/assign"
+  }
+]
+```
+
+### Scan History
+
+```bash
+curl -s "$VMSPAWN_HOST/api/v1/compliance/scans?vm_name=web-server-01" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+## Step 12: QMP Command Allowlist
+
+QEMU Machine Protocol (QMP) commands can be sent to running VMs for advanced
+control. vmspawn restricts which QMP commands are allowed to prevent dangerous
+operations.
+
+### Default Allowlist
+
+The following QMP commands are allowed by default:
+
+| Command | Purpose |
+|---------|---------|
+| `query-status` | Query VM running status |
+| `query-cpus-fast` | Query vCPU information |
+| `query-balloon` | Query memory balloon |
+| `query-block` | Query block devices |
+| `query-blockstats` | Query block device statistics |
+| `query-chardev` | Query character devices |
+| `query-pci` | Query PCI devices |
+| `query-mice` | Query mouse devices |
+| `query-vnc` | Query VNC server status |
+| `system_powerdown` | Graceful ACPI shutdown |
+| `stop` | Pause VM |
+| `cont` | Resume VM |
+
+### Send an Allowed QMP Command
+
+```bash
+curl -s -X POST "$VMSPAWN_HOST/api/v1/vms/my-vm/qmp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "query-status"
+  }' | jq .
+```
+
+### Blocked Commands
+
+Commands not on the allowlist are rejected with `403 Forbidden`:
+
+```json
+{
+  "error": "QMP command 'quit' is not in the allowlist"
+}
+```
+
+Dangerous commands such as `quit`, `system_reset`, `migrate`, and
+`drive_del` are blocked by default to prevent accidental data loss.
+
+---
+
 ## Security Checklist
 
 Use this checklist to verify your vmspawn deployment is properly hardened:
@@ -687,6 +1073,11 @@ Use this checklist to verify your vmspawn deployment is properly hardened:
 - [ ] **Network policies** -- Inter-VM traffic restricted by policy
 - [ ] **Backup encryption** -- Backup files are encrypted at rest
 - [ ] **Host access restricted** -- SSH access limited to authorized operators
+- [ ] **2FA enabled** -- All admin accounts have TOTP 2FA enabled
+- [ ] **JWT revocation active** -- Tokens revoked on logout and role changes
+- [ ] **Secrets stored securely** -- No plaintext credentials in config files
+- [ ] **Compliance scanning** -- VMs scanned against CIS/STIG baselines regularly
+- [ ] **QMP allowlist** -- Only approved QMP commands are permitted
 
 ---
 

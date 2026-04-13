@@ -1,6 +1,6 @@
 # vmspawn Crate Map
 
-This document catalogs all 46 crates in the vmspawn workspace, organized by domain.
+This document catalogs all 51 crates in the vmspawn workspace, organized by domain.
 Each entry includes the crate name, workspace path, and a brief description of its
 purpose.
 
@@ -90,6 +90,9 @@ Enterprise management features for large-scale VM deployments.
 | `replication`        | `backend/replication`         | VM replication. Multi-site replication configuration, sync scheduling, RPO monitoring, recovery instance management. |
 | `migration`          | `backend/migration`           | VM migration. Live migration between hosts, progress tracking, migration cancellation. |
 | `predictive-drs`     | `backend/predictive-drs`      | Predictive Distributed Resource Scheduler. Resource demand forecasting, proactive placement, trend analysis. |
+| `secrets-manager`    | `backend/secrets-manager`     | Secrets and credential storage. Encrypted at-rest secret store with CRUD API, access policies, and automatic rotation. |
+| `compliance`         | `backend/compliance`          | Compliance profile scanning. Built-in profiles (CIS, STIG, PCI-DSS), per-VM scanning, finding severity, remediation guidance. |
+| `billing`            | `backend/billing`             | Usage tracking, pricing, and invoicing. Per-VM metering, configurable pricing tiers, invoice generation, chargeback reports. |
 
 ## Infrastructure
 
@@ -108,6 +111,7 @@ Enterprise management features for large-scale VM deployments.
 | `cloud-init`          | `backend/cloud-init`           | Cloud-init configuration generation. User-data, meta-data, network-config for NoCloud datasource. SSH key injection, package installation. |
 | `prometheus-exporter` | `backend/prometheus-exporter`  | Prometheus metrics. Exposes `vmspawnd_vms_total`, `vmspawnd_vms_running`, `vmspawnd_vm_starts_total`, etc. via `/metrics` endpoint. |
 | `vnc-proxy`           | `backend/vnc-proxy`            | WebSocket-to-VNC proxy. Bridges browser-based noVNC client to QEMU VNC server for graphical VM console. |
+| `ova-tools`           | `backend/ova-tools`            | OVA/OVF export and import. Builds OVA archives from VM disk images and metadata, parses OVF descriptors for import. |
 
 ## CLI and UI
 
@@ -115,6 +119,7 @@ Enterprise management features for large-scale VM deployments.
 |-------------|-----------------------|----------------------------------------------------------|
 | `vmctl`     | `backend/vmctl`       | Command-line client. Talks to vmspawnd REST API. VM lifecycle commands, image management, status queries. |
 | `vmctl-tui` | `backend/vmctl-tui`   | Terminal UI client. Full-screen ratatui-based interface for VM management with real-time status display. |
+| `vmspawn-sdk`| `backend/vmspawn-sdk` | Typed Rust SDK for the vmspawnd API. Async client with builder pattern, authentication helpers, VM lifecycle, storage, networking, and streaming support. |
 
 ### Web UI (not a Rust crate)
 
@@ -196,4 +201,8 @@ vmspawnd (main binary)
   |-- content-library
   |-- lifecycle-manager
   |-- certificate-manager
+  |-- ova-tools --> vm-model
+  |-- secrets-manager
+  |-- compliance --> vm-model, state-store
+  |-- billing --> vm-model, state-store
 ```

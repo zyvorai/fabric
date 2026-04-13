@@ -85,6 +85,7 @@ Detailed documentation for each major feature area.
 | VM Templates | Create, manage, and deploy from templates |
 | VM Profiles | Instance types and resource presets |
 | VM Import | Import from VMDK, VDI, VHD formats |
+| OVA/OVF Export | Export VMs to OVA/OVF format for portability |
 | Declarative Specs | YAML-based VM definitions with `vmctl apply` |
 | VM Checkpoints | Create and restore in-memory checkpoints |
 | VM Forking | Fork a running VM for testing |
@@ -103,6 +104,7 @@ Detailed documentation for each major feature area.
 | Snapshots | Create, revert, delete, and tree-view snapshots |
 | Distributed Storage | Cross-node storage pools, migrations, and policies |
 | Datastore Clusters | Storage DRS and placement recommendations |
+| iSCSI Storage | iSCSI target discovery, login, and LUN management |
 | Cloud Images | Built-in catalog download (Ubuntu, Fedora, Debian, Alma) |
 | ISO Management | Download, list, and manage ISO images |
 | Online Disk Resize | Grow VM disks without downtime |
@@ -124,6 +126,7 @@ Detailed documentation for each major feature area.
 | Network Monitor | Per-VM bandwidth tracking with threshold alerts |
 | Floating IPs | Virtual IP allocation and VM assignment |
 | DHCP Servers | systemd-networkd DHCP server management |
+| DHCP Server | Built-in DHCP server on bridge interfaces |
 | Port Forwarding | NAT-based port forwarding rules |
 
 ### Security and Identity
@@ -139,6 +142,10 @@ Detailed documentation for each major feature area.
 | Encryption | VM disk encryption with key management providers |
 | TLS/HTTPS | Certificate management and self-signed TLS generation |
 | Multi-Tenancy | Project isolation with member roles and quotas |
+| 2FA/MFA Authentication | TOTP-based two-factor authentication for user accounts |
+| Secrets Management | Secure storage and retrieval of credentials and sensitive data |
+| Compliance Scanning | Automated compliance profile scanning and reporting |
+| JWT Revocation | Per-token revocation via JTI blocklist |
 | Credential Management | systemd credentials, SSH keys, and cloud-init secrets |
 
 ### High Availability
@@ -153,6 +160,7 @@ Detailed documentation for each major feature area.
 | Live Migration | Iterative rsync pre-copy migration with cutover |
 | Site Recovery | Failover/reprotect workflows for disaster recovery |
 | Resource Overcommit | CPU/memory/storage overcommit policies |
+| Split-Brain Protection | Quorum-based fencing to prevent split-brain in clusters |
 | Auto-Scaling | Metric-based scaling policies and events |
 
 ### Monitoring and Automation
@@ -166,6 +174,7 @@ Detailed documentation for each major feature area.
 | Backup Automation | Retention policies, incremental backups, systemd timers |
 | Resource Quotas | Per-user and per-project resource limits |
 | Optimization | Resource optimization recommendations |
+| Log Aggregation | Centralized VM log collection, search, and streaming |
 | Health Checks | Deep health check: API, disk, DB, credentials, KVM |
 
 ### Console Access
@@ -174,6 +183,7 @@ Detailed documentation for each major feature area.
 |----------|-------------|
 | WebSocket Console | Browser-based terminal via xterm.js |
 | VNC Console | Graphical console via noVNC proxy |
+| SPICE Display | SPICE protocol support for high-performance remote display |
 | Console Modes | Interactive, read-only, native, GUI |
 
 ### Advanced Virtualization
@@ -189,6 +199,7 @@ Detailed documentation for each major feature area.
 | TPM | vTPM support via swtpm |
 | Direct Kernel Boot | Boot from kernel + initrd without bootloader |
 | Bind Mounts | Host-to-VM filesystem sharing |
+| USB Passthrough | Host USB device passthrough to VMs |
 | User Namespaces | Private user mapping for isolation |
 
 ---
@@ -224,6 +235,7 @@ Detailed documentation for each major feature area.
 | Machine Endpoints | systemd-machined integration |
 | Monitoring Endpoints | Analytics, events, notifications, schedules |
 | Backup Endpoints | Backup CRUD, policies, restore |
+| Billing Endpoints | Usage tracking, pricing, and invoicing |
 | WebSocket Endpoints | Console, VNC, event streaming |
 
 ### CLI Reference
@@ -261,9 +273,20 @@ Detailed documentation for each major feature area.
 | `vmspawnctl tls` | Generate self-signed TLS certificate |
 | `vmspawnctl upgrade` | Git pull + reinstall |
 | `vmspawnctl uninstall` | Remove everything |
+| `vmspawnctl billing` | View billing and usage reports |
 | `vmspawnctl backup now` | Trigger immediate backup |
 | `vmspawnctl backup enable` | Enable daily backup timer |
 | `vmspawnctl backup status` | Show backup timer and storage info |
+
+### Rust SDK
+
+| Item | Description |
+|------|-------------|
+| `vmspawn-sdk` | Typed Rust SDK for the vmspawnd API with async client |
+| Authentication | Login, token refresh, and 2FA helpers |
+| VM Operations | Create, start, stop, delete, clone, and snapshot VMs |
+| Storage / Networking | Pool, volume, bridge, VLAN, and firewall management |
+| Streaming | WebSocket console attach and SSE event subscriptions |
 
 ---
 
@@ -303,7 +326,7 @@ The REST API is organized into the following endpoint groups:
 
 | Category | Prefix | Endpoints | Description |
 |----------|--------|-----------|-------------|
-| Authentication | `/api/auth/` | 2 | Login and session management |
+| Authentication | `/api/auth/` | 6 | Login, 2FA/TOTP setup, and session management |
 | VM Lifecycle | `/api/vms/` | 12 | CRUD, start, stop, restart, pause, resume, clone |
 | VM Advanced | `/api/vms/{name}/` | 20+ | Hotplug, checkpoints, fork, disk resize, firmware |
 | Snapshots | `/api/vms/{name}/snapshots/` | 5 | Create, list, get, delete, revert |
@@ -349,6 +372,14 @@ The REST API is organized into the following endpoint groups:
 | Tenants | `/api/tenants/` | varies | Multi-tenancy and projects |
 | Settings | `/api/settings` | 2 | Global settings |
 | Plugins | `/api/plugins` | 1 | Plugin registry |
+| OVA Export | `/api/vms/{name}/export/` | 2 | OVA/OVF export |
+| Secrets | `/api/secrets/` | 5 | Secrets and credential management |
+| Compliance | `/api/compliance/` | 6 | Compliance profile scanning and results |
+| Billing | `/api/billing/` | 6 | Usage tracking, pricing, and invoicing |
+| Logs | `/api/logs/` | 4 | Centralized log aggregation and search |
+| iSCSI | `/api/iscsi/` | 5 | iSCSI target discovery and session management |
+| USB | `/api/usb/` | 4 | USB device listing and passthrough |
+| SPICE | `/api/vms/{name}/spice/` | 2 | SPICE display connection |
 | Declarative | `/api/vms/apply` | 2 | YAML spec apply and export |
 | Auto-Scale | `/api/autoscale/` | 4 | Scaling policies and events |
 | WebSocket | `/api/ws/` | 3 | Console, VNC, events |
