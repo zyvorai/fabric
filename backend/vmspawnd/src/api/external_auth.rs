@@ -17,7 +17,9 @@ use security::{RequireRead, RequireAdmin};
 
 /// Tracks a pending OIDC login flow so the callback can find the provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct OidcPendingState {
+pub struct OidcPendingState {
+    /// The state parameter value (used as the store key).
+    pub state_id: String,
     pub provider_id: String,
     pub created: DateTime<Utc>,
 }
@@ -242,11 +244,16 @@ pub async fn oidc_login_url(
 
     // Persist the state -> provider mapping so the callback can look it up
     let pending = OidcPendingState {
+        state_id: state_param.clone(),
         provider_id: provider_id.clone(),
         created: Utc::now(),
     };
     state.store.save_entity("oidc_pending_states", &state_param, &pending)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+    // Fetch OIDC discovery to get the real authorization endpoint
+    let (auth_endpoint, _token_endpoint) =
+        discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
 
     let scopes = oidc_config.scopes.join(" ");
 
@@ -255,8 +262,8 @@ pub async fn oidc_login_url(
     let encoded_scopes = percent_encode(&scopes);
 
     let url = format!(
-        "{}/authorize?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
-        oidc_config.issuer_url.trim_end_matches('/'),
+        "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
+        auth_endpoint,
         percent_encode(&oidc_config.client_id),
         encoded_redirect,
         encoded_scopes,
@@ -264,6 +271,40 @@ pub async fn oidc_login_url(
     );
 
     Ok(Json(OidcLoginUrl { url, state: state_param }))
+}
+
+/// Fetch the OIDC discovery document and extract the authorization and token endpoints.
+/// Falls back to conventional `{issuer}/authorize` and `{issuer}/token` if discovery fails.
+async fn discover_oidc_endpoints(
+    http_client: &reqwest::Client,
+    issuer_url: &str,
+) -> (String, String) {
+    let discovery_url = format!(
+        "{}/.well-known/openid-configuration",
+        issuer_url.trim_end_matches('/')
+    );
+
+    if let Ok(resp) = http_client.get(&discovery_url).send().await {
+        if let Ok(doc) = resp.json::<serde_json::Value>().await {
+            let auth_endpoint = doc
+                .get("authorization_endpoint")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let token_endpoint = doc
+                .get("token_endpoint")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+
+            if let (Some(auth), Some(token)) = (auth_endpoint, token_endpoint) {
+                tracing::debug!("OIDC discovery: auth={}, token={}", auth, token);
+                return (auth, token);
+            }
+        }
+    }
+
+    tracing::debug!("OIDC discovery failed, using conventional endpoints");
+    let base = issuer_url.trim_end_matches('/');
+    (format!("{}/authorize", base), format!("{}/token", base))
 }
 
 /// RFC 3986 percent-encoding for URL components.
@@ -323,7 +364,8 @@ pub async fn oidc_callback(
     }
 
     // 3. Exchange the authorization code for tokens at the provider's token endpoint
-    let token_url = format!("{}/token", oidc_config.issuer_url.trim_end_matches('/'));
+    let (_auth_endpoint, token_url) =
+        discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
 
     let token_response = state.http_client
         .post(&token_url)

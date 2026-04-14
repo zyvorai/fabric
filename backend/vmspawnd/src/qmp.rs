@@ -28,6 +28,7 @@ impl QmpClient {
     pub fn execute(&self, command: &str, args: Value) -> Result<Value> {
         const ALLOWED_QMP_COMMANDS: &[&str] = &[
             "query-status", "query-block", "query-blockstats", "query-cpus-fast",
+            "query-hotpluggable-cpus",
             "query-memory-size-summary", "query-vnc", "query-spice",
             "system_powerdown", "system_reset", "stop", "cont",
             "balloon", "block_resize", "blockdev-snapshot-sync",

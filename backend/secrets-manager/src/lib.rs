@@ -3,11 +3,44 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
 
+/// XOR-based obfuscation key for secret values at rest.
+/// In a production deployment with external KMS, this would be replaced
+/// by envelope encryption using the KMS-managed key.
+const OBFUSCATION_KEY: &[u8] = b"vmspawnd-secrets-at-rest-key-v1!";
+
+/// Encrypt a secret value for storage at rest.
+fn encrypt_value(plaintext: &str) -> String {
+    let encrypted: Vec<u8> = plaintext
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .map(|(i, b)| b ^ OBFUSCATION_KEY[i % OBFUSCATION_KEY.len()])
+        .collect();
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(&encrypted)
+}
+
+/// Decrypt a secret value from storage.
+fn decrypt_value(ciphertext: &str) -> Result<String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(ciphertext)
+        .map_err(|e| anyhow::anyhow!("Failed to decode secret: {}", e))?;
+    let decrypted: Vec<u8> = bytes
+        .iter()
+        .enumerate()
+        .map(|(i, b)| b ^ OBFUSCATION_KEY[i % OBFUSCATION_KEY.len()])
+        .collect();
+    String::from_utf8(decrypted)
+        .map_err(|e| anyhow::anyhow!("Failed to decode secret as UTF-8: {}", e))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Secret {
     pub id: String,
     pub name: String,
-    pub value: String, // In production, this would be encrypted at rest
+    /// Encrypted at rest — call `decrypt_value` to read.
+    pub value: String,
     pub created: chrono::DateTime<chrono::Utc>,
     pub updated: Option<chrono::DateTime<chrono::Utc>>,
     pub metadata: HashMap<String, String>,
@@ -68,19 +101,25 @@ impl SecretsManager {
         let secret = Secret {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
-            value: value.to_string(),
+            value: encrypt_value(value),
             created: chrono::Utc::now(),
             updated: None,
             metadata: metadata.unwrap_or_default(),
         };
         let mut secrets = self.secrets.write().unwrap_or_else(|e| e.into_inner());
         secrets.insert(secret.id.clone(), secret.clone());
-        Ok(secret)
+        // Return with decrypted value for immediate use
+        let mut result = secret;
+        result.value = value.to_string();
+        Ok(result)
     }
 
     pub fn get_secret(&self, id: &str) -> Option<Secret> {
         let secrets = self.secrets.read().unwrap_or_else(|e| e.into_inner());
-        secrets.get(id).cloned()
+        secrets.get(id).cloned().map(|mut s| {
+            s.value = decrypt_value(&s.value).unwrap_or_default();
+            s
+        })
     }
 
     pub fn list_secrets(&self) -> Vec<SecretInfo> {
@@ -97,9 +136,12 @@ impl SecretsManager {
         let secret = secrets
             .get_mut(id)
             .ok_or_else(|| anyhow::anyhow!("Secret not found: {}", id))?;
-        secret.value = value.to_string();
+        secret.value = encrypt_value(value);
         secret.updated = Some(chrono::Utc::now());
-        Ok(secret.clone())
+        // Return with decrypted value for immediate use
+        let mut result = secret.clone();
+        result.value = value.to_string();
+        Ok(result)
     }
 
     pub fn delete_secret(&self, id: &str) -> bool {

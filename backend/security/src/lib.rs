@@ -47,7 +47,8 @@ impl Role {
 pub struct JwtConfig {
     pub secret: String,
     pub expiration_hours: i64,
-    revoked_tokens: std::sync::Mutex<std::collections::HashSet<String>>,
+    /// Maps JTI -> expiration timestamp so expired entries can be evicted.
+    revoked_tokens: std::sync::Mutex<std::collections::HashMap<String, usize>>,
 }
 
 impl JwtConfig {
@@ -55,7 +56,7 @@ impl JwtConfig {
         Self {
             secret,
             expiration_hours: 24,
-            revoked_tokens: std::sync::Mutex::new(std::collections::HashSet::new()),
+            revoked_tokens: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
     }
 
@@ -96,7 +97,7 @@ impl JwtConfig {
 
         let claims = token_data.claims;
         if let Ok(revoked) = self.revoked_tokens.lock() {
-            if !claims.jti.is_empty() && revoked.contains(&claims.jti) {
+            if !claims.jti.is_empty() && revoked.contains_key(&claims.jti) {
                 return Err(anyhow::anyhow!("Token has been revoked"));
             }
         }
@@ -104,11 +105,17 @@ impl JwtConfig {
     }
 
     pub fn revoke_token(&self, jti: &str) {
+        self.revoke_token_with_exp(jti, 0);
+    }
+
+    /// Revoke a token, recording its expiration time for later cleanup.
+    pub fn revoke_token_with_exp(&self, jti: &str, exp: usize) {
         if let Ok(mut revoked) = self.revoked_tokens.lock() {
-            revoked.insert(jti.to_string());
-            // Limit revocation set size to prevent memory issues
+            revoked.insert(jti.to_string(), exp);
+            // Evict expired entries when the set grows large
             if revoked.len() > 100_000 {
-                revoked.clear(); // In production, clear only expired entries
+                let now = chrono::Utc::now().timestamp() as usize;
+                revoked.retain(|_, token_exp| *token_exp == 0 || *token_exp > now);
             }
         }
     }
@@ -272,6 +279,7 @@ pub struct LoginResponse {
 // Audit logging
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditLog {
+    pub id: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub user_id: String,
     pub action: String,
@@ -282,6 +290,7 @@ pub struct AuditLog {
 impl AuditLog {
     pub fn new(user_id: String, action: String, resource: String, status: String) -> Self {
         Self {
+            id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now(),
             user_id,
             action,
@@ -291,7 +300,6 @@ impl AuditLog {
     }
 
     pub fn log(&self) -> Result<()> {
-        // In production, write to audit log file or database
         tracing::info!(
             "AUDIT: {} {} {} {} at {}",
             self.user_id,

@@ -23,8 +23,8 @@ pub struct PaginationQuery {
     pub limit: Option<usize>,
 }
 
-/// Helper: record an audit log entry.
-fn audit(_state: &AppState, user: &str, action: &str, resource: &str, status: &str) {
+/// Helper: record an audit log entry to both tracing and the state store.
+fn audit(state: &AppState, user: &str, action: &str, resource: &str, status: &str) {
     let entry = security::AuditLog::new(
         user.to_string(),
         action.to_string(),
@@ -33,6 +33,10 @@ fn audit(_state: &AppState, user: &str, action: &str, resource: &str, status: &s
     );
     if let Err(e) = entry.log() {
         tracing::warn!("Failed to write audit log: {}", e);
+    }
+    // Persist to state store for queryable audit history
+    if let Err(e) = state.store.save_entity("audit_logs", &entry.id, &entry) {
+        tracing::warn!("Failed to persist audit log: {}", e);
     }
 }
 

@@ -204,6 +204,8 @@ impl Server {
         spawn_bg!(self.state, "mirror_reconciler", run_mirror_reconciler);
         spawn_bg!(self.state, "nat_reconciler", run_nat_reconciler);
         spawn_bg!(self.state, "net_monitor", run_net_monitor);
+        spawn_bg!(self.state, "oidc_state_cleanup", run_oidc_state_cleanup);
+        spawn_bg!(self.state, "snapshot_retention", run_snapshot_retention);
 
         axum::serve(listener, app)
             .with_graceful_shutdown(shutdown_signal())
@@ -1000,6 +1002,107 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                     tracing::error!("Failed to save: {}", e);
                 }
             });
+        }
+    }
+}
+
+/// Background task that purges stale OIDC pending state entries every 5 minutes.
+async fn run_oidc_state_cleanup(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(300));
+    loop {
+        interval.tick().await;
+
+        let entries = match state
+            .store
+            .list_entities::<crate::api::external_auth::OidcPendingState>("oidc_pending_states")
+        {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let now = chrono::Utc::now();
+        let mut purged = 0u32;
+        for entry in &entries {
+            if (now - entry.created).num_seconds() > 600 {
+                if let Err(e) = state
+                    .store
+                    .delete_entity("oidc_pending_states", &entry.state_id)
+                {
+                    tracing::warn!("Failed to purge stale OIDC state: {}", e);
+                } else {
+                    purged += 1;
+                }
+            }
+        }
+
+        if purged > 0 {
+            tracing::debug!("Purged {} stale OIDC pending states", purged);
+        }
+    }
+}
+
+/// Background task that enforces snapshot retention policy every hour.
+/// Deletes the oldest scheduled snapshots beyond the configured retention count.
+async fn run_snapshot_retention(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+    loop {
+        interval.tick().await;
+
+        // Load the retention setting
+        let retention = state
+            .store
+            .get_entity::<crate::api::settings::AppSettings>("settings", "app")
+            .ok()
+            .flatten()
+            .map(|s| s.snapshot_retention)
+            .unwrap_or_else(crate::validation::default_retention);
+
+        if retention == 0 {
+            continue; // 0 means unlimited
+        }
+
+        // List all VMs and check each one's snapshots
+        let vms: Vec<vm_model::VM> = state.store.list_vms().unwrap_or_default();
+        for vm in &vms {
+            let store_key = format!("snapshots_{}", vm.name);
+            let mut snapshots: Vec<crate::api::snapshots::VMSnapshot> = state
+                .store
+                .list_entities(&store_key)
+                .unwrap_or_default();
+
+            // Only enforce retention on scheduled snapshots
+            snapshots.retain(|s| s.name.starts_with("scheduled-"));
+
+            if snapshots.len() as u32 <= retention {
+                continue;
+            }
+
+            // Sort oldest first
+            snapshots.sort_by(|a, b| a.created.cmp(&b.created));
+
+            let to_remove = snapshots.len() - retention as usize;
+            for snap in snapshots.iter().take(to_remove) {
+                // Delete from qemu-img
+                if let Some(ref path) = crate::validation::find_vm_image(&vm.name) {
+                    if crate::validation::validate_snapshot_name(&snap.name).is_ok() {
+                        let _ = std::process::Command::new("qemu-img")
+                            .args(["snapshot", "-d", &snap.name, path])
+                            .output();
+                    }
+                }
+                // Delete from store
+                if let Err(e) = state.store.delete_entity(&store_key, &snap.id) {
+                    tracing::warn!(
+                        "Failed to delete snapshot '{}' for VM '{}': {}",
+                        snap.name, vm.name, e
+                    );
+                } else {
+                    tracing::info!(
+                        "Retention: deleted snapshot '{}' for VM '{}' ({} > {} limit)",
+                        snap.name, vm.name, snapshots.len(), retention
+                    );
+                }
+            }
         }
     }
 }

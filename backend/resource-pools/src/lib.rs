@@ -669,11 +669,16 @@ impl ResourcePoolManager {
             .sum()
     }
 
-    /// Compute total used resources (child reservations + VM count heuristic).
+    /// Compute total used resources (child reservations + per-VM estimates).
     ///
-    /// In a real system the per-VM usage would come from a metrics store; here
-    /// we approximate by counting VMs (each VM counts as a unit of demand that
-    /// has already been admitted).
+    /// Uses the pool's CPU share level to derive a per-VM reservation estimate:
+    /// - Low shares: 500 MHz / 512 MB per VM (lightweight workloads)
+    /// - Normal shares: 1000 MHz / 1024 MB per VM (standard workloads)
+    /// - High shares: 2000 MHz / 2048 MB per VM (compute-intensive workloads)
+    /// - Custom: proportional to the custom share value
+    ///
+    /// The estimate is capped so VMs never exceed the pool's remaining capacity
+    /// after child reservations.
     fn compute_used_resources(
         pools: &HashMap<String, ResourcePool>,
         pool: &ResourcePool,
@@ -681,25 +686,33 @@ impl ResourcePoolManager {
         let child_cpu: u64 = Self::sum_child_reservations_cpu(pools, pool);
         let child_mem: u64 = Self::sum_child_reservations_mem(pools, pool);
 
-        // Each VM in the pool is assumed to consume a proportional slice of
-        // the pool's own reservation (simple heuristic).  In production this
-        // would be replaced by real telemetry.
         let vm_count = pool.vms.len() as u64;
-        let per_vm_cpu = if vm_count > 0 {
-            pool.cpu_reservation_mhz.saturating_sub(child_cpu) / vm_count.max(1)
-        } else {
-            0
+        if vm_count == 0 {
+            return (child_cpu, child_mem);
+        }
+
+        // Derive per-VM estimates from the pool's share level
+        let per_vm_cpu = match &pool.cpu_shares {
+            CpuShares::Low => 500,
+            CpuShares::Normal => 1000,
+            CpuShares::High => 2000,
+            CpuShares::Custom(v) => (*v as u64) / 2,
         };
-        let per_vm_mem = if vm_count > 0 {
-            pool.memory_reservation_mb.saturating_sub(child_mem) / vm_count.max(1)
-        } else {
-            0
+        let per_vm_mem = match &pool.memory_shares {
+            MemoryShares::Low => 512,
+            MemoryShares::Normal => 1024,
+            MemoryShares::High => 2048,
+            MemoryShares::Custom(v) => (*v as u64) / 2,
         };
 
-        (
-            child_cpu + vm_count * per_vm_cpu,
-            child_mem + vm_count * per_vm_mem,
-        )
+        // Cap so VMs don't exceed the pool's remaining capacity
+        let remaining_cpu = pool.cpu_reservation_mhz.saturating_sub(child_cpu);
+        let remaining_mem = pool.memory_reservation_mb.saturating_sub(child_mem);
+
+        let total_vm_cpu = (vm_count * per_vm_cpu).min(remaining_cpu);
+        let total_vm_mem = (vm_count * per_vm_mem).min(remaining_mem);
+
+        (child_cpu + total_vm_cpu, child_mem + total_vm_mem)
     }
 
     /// Compute available (remaining) resources for a pool.

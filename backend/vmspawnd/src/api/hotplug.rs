@@ -80,9 +80,14 @@ pub async fn hotplug_cpu(
                         continue;
                     }
                     if let Some(props) = cpu.get("props") {
+                        // Use the CPU type reported by QEMU instead of hardcoding x86_64
+                        let driver = cpu
+                            .get("type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("host-x86_64-cpu");
                         let cpu_id = format!("cpu-hotplug-{}", added);
                         let args = serde_json::json!({
-                            "driver": "host-x86_64-cpu",
+                            "driver": driver,
                             "id": cpu_id,
                             "socket-id": props.get("socket-id").and_then(|v| v.as_u64()).unwrap_or(0),
                             "core-id": props.get("core-id").and_then(|v| v.as_u64()).unwrap_or(0),
