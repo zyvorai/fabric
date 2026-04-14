@@ -4052,6 +4052,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "axum",
+ "base64",
  "billing",
  "certificate-manager",
  "chrono",

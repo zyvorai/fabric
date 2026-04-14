@@ -464,8 +464,21 @@ pub async fn run_schedule_now(
             VMAction::Stop => vmspawn_driver::stop_vm(&vm_name_clone),
             VMAction::Restart => vmspawn_driver::restart_vm(&vm_name_clone),
             VMAction::Snapshot => {
-                tracing::warn!("Snapshot action not yet implemented");
-                Ok(())
+                let snap_name = format!("scheduled-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
+                let image_path = crate::validation::find_vm_image(&vm_name_clone);
+                match image_path {
+                    Some(ref path) => {
+                        let output = std::process::Command::new("qemu-img")
+                            .args(["snapshot", "-c", &snap_name, path])
+                            .output();
+                        match output {
+                            Ok(o) if o.status.success() => Ok(()),
+                            Ok(o) => Err(anyhow::anyhow!("qemu-img snapshot failed: {}", String::from_utf8_lossy(&o.stderr))),
+                            Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
+                        }
+                    }
+                    None => Err(anyhow::anyhow!("No disk image found for VM '{}'", vm_name_clone)),
+                }
             }
         }
     }).await.unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
