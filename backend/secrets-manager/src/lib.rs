@@ -200,4 +200,27 @@ mod tests {
         assert!(mgr.create_secret("", "val", None).is_err());
         assert!(mgr.create_secret("key", "", None).is_err());
     }
+
+    // --- Encryption at rest tests ---
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let values = ["hello", "s3cret!", "a-longer-value-with-special-chars!@#$%"];
+        for val in &values {
+            let encrypted = encrypt_value(val);
+            let decrypted = decrypt_value(&encrypted).unwrap();
+            assert_eq!(&decrypted, val);
+        }
+    }
+
+    #[test]
+    fn test_encrypt_not_plaintext() {
+        let encrypted = encrypt_value("my-secret-password");
+        assert_ne!(encrypted, "my-secret-password");
+    }
+
+    #[test]
+    fn test_decrypt_invalid_base64() {
+        assert!(decrypt_value("not-valid-base64!!!").is_err());
+    }
 }

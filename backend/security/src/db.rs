@@ -384,4 +384,65 @@ mod tests {
         assert!(user.verify_password("secret").unwrap());
         assert!(!user.verify_password("wrong").unwrap());
     }
+
+    // --- TOTP database tests ---
+
+    #[test]
+    fn test_enable_and_get_totp_secret() {
+        let db = test_db();
+        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        db.enable_totp(&user.id, "JBSWY3DPEHPK3PXP").unwrap();
+        let secret = db.get_totp_secret(&user.id).unwrap().unwrap();
+        assert_eq!(secret, "JBSWY3DPEHPK3PXP");
+    }
+
+    #[test]
+    fn test_is_totp_enabled_default() {
+        let db = test_db();
+        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        assert!(!db.is_totp_enabled(&user.id).unwrap());
+    }
+
+    #[test]
+    fn test_is_totp_enabled_after_enable() {
+        let db = test_db();
+        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        db.enable_totp(&user.id, "SECRET123").unwrap();
+        assert!(db.is_totp_enabled(&user.id).unwrap());
+    }
+
+    #[test]
+    fn test_disable_totp() {
+        let db = test_db();
+        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        db.enable_totp(&user.id, "SECRET123").unwrap();
+        assert!(db.is_totp_enabled(&user.id).unwrap());
+        db.disable_totp(&user.id).unwrap();
+        assert!(!db.is_totp_enabled(&user.id).unwrap());
+        assert!(db.get_totp_secret(&user.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_enable_totp_nonexistent_user() {
+        let db = test_db();
+        assert!(db.enable_totp("no-such-id", "secret").is_err());
+    }
+
+    #[test]
+    fn test_get_totp_secret_nonexistent_user() {
+        let db = test_db();
+        assert!(db.get_totp_secret("no-such-id").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_totp_encrypt_decrypt_roundtrip() {
+        // Verify that the encrypt/decrypt functions preserve the original value
+        let test_values = ["JBSWY3DPEHPK3PXP", "short", "a-longer-secret-value-1234567890"];
+        for val in &test_values {
+            let encrypted = encrypt_totp(val);
+            assert_ne!(encrypted, *val, "Encrypted value should differ from plaintext");
+            let decrypted = decrypt_totp(&encrypted).unwrap();
+            assert_eq!(decrypted, *val, "Decrypt should recover original");
+        }
+    }
 }

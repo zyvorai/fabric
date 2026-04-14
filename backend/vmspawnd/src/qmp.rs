@@ -4,6 +4,25 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
+/// Commands allowed through the QMP interface.
+const ALLOWED_QMP_COMMANDS: &[&str] = &[
+    "query-status", "query-block", "query-blockstats", "query-cpus-fast",
+    "query-hotpluggable-cpus",
+    "query-memory-size-summary", "query-vnc", "query-spice",
+    "system_powerdown", "system_reset", "stop", "cont",
+    "balloon", "block_resize", "blockdev-snapshot-sync",
+    "blockdev-add", "blockdev-del",
+    "device_add", "device_del", "netdev_add", "netdev_del",
+    "object-add", "object-del", "chardev-add", "chardev-remove",
+    "savevm", "loadvm", "delvm",
+    "cpu-add", "drive-backup",
+];
+
+/// Check whether a QMP command is in the allowed list.
+fn is_command_allowed(command: &str) -> bool {
+    ALLOWED_QMP_COMMANDS.contains(&command)
+}
+
 /// Minimal QMP (QEMU Machine Protocol) client for communicating with QEMU
 /// monitor sockets exposed by systemd-vmspawn.
 pub struct QmpClient {
@@ -26,19 +45,7 @@ impl QmpClient {
 
     /// Execute a QMP command and return the response
     pub fn execute(&self, command: &str, args: Value) -> Result<Value> {
-        const ALLOWED_QMP_COMMANDS: &[&str] = &[
-            "query-status", "query-block", "query-blockstats", "query-cpus-fast",
-            "query-hotpluggable-cpus",
-            "query-memory-size-summary", "query-vnc", "query-spice",
-            "system_powerdown", "system_reset", "stop", "cont",
-            "balloon", "block_resize", "blockdev-snapshot-sync",
-            "blockdev-add", "blockdev-del",
-            "device_add", "device_del", "netdev_add", "netdev_del",
-            "object-add", "object-del", "chardev-add", "chardev-remove",
-            "savevm", "loadvm", "delvm",
-            "cpu-add", "drive-backup",
-        ];
-        if !ALLOWED_QMP_COMMANDS.contains(&command) {
+        if !is_command_allowed(command) {
             return Err(anyhow::anyhow!("QMP command '{}' is not in the allowed list", command));
         }
 
@@ -88,5 +95,36 @@ impl QmpClient {
         }
 
         Ok(response.get("return").cloned().unwrap_or(Value::Null))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_disallowed_command_rejected() {
+        assert!(!is_command_allowed("human-monitor-command"));
+        assert!(!is_command_allowed("quit"));
+        assert!(!is_command_allowed(""));
+        assert!(!is_command_allowed("rm -rf /"));
+    }
+
+    #[test]
+    fn test_allowed_commands_pass() {
+        for cmd in ALLOWED_QMP_COMMANDS {
+            assert!(is_command_allowed(cmd), "Command '{}' should be allowed", cmd);
+        }
+        // Verify specific commands critical for hotplug
+        assert!(is_command_allowed("blockdev-add"));
+        assert!(is_command_allowed("blockdev-del"));
+        assert!(is_command_allowed("device_add"));
+        assert!(is_command_allowed("query-hotpluggable-cpus"));
+    }
+
+    #[test]
+    fn test_is_available_nonexistent() {
+        let client = QmpClient::new("nonexistent-vm-12345");
+        assert!(!client.is_available());
     }
 }

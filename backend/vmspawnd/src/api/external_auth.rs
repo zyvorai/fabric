@@ -486,3 +486,61 @@ fn parse_role(role_str: &str) -> security::Role {
         _ => security::Role::Viewer,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decode_id_token_valid() {
+        use base64::Engine;
+        let header = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(r#"{"alg":"RS256","typ":"JWT"}"#);
+        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(r#"{"sub":"user1","email":"u@test.com","name":"Test"}"#);
+        let token = format!("{}.{}.fake-signature", header, payload);
+        let claims = decode_id_token_claims(&token).unwrap();
+        assert_eq!(claims.get("sub").unwrap().as_str().unwrap(), "user1");
+        assert_eq!(claims.get("email").unwrap().as_str().unwrap(), "u@test.com");
+    }
+
+    #[test]
+    fn test_decode_id_token_invalid_parts() {
+        assert!(decode_id_token_claims("only-two.parts").is_err());
+        assert!(decode_id_token_claims("").is_err());
+    }
+
+    #[test]
+    fn test_decode_id_token_invalid_base64() {
+        assert!(decode_id_token_claims("header.!!!invalid!!!.sig").is_err());
+    }
+
+    #[test]
+    fn test_percent_encode_unreserved() {
+        assert_eq!(percent_encode("abc123-._~"), "abc123-._~");
+    }
+
+    #[test]
+    fn test_percent_encode_reserved() {
+        let encoded = percent_encode("hello world&foo=bar");
+        assert!(encoded.contains("%20")); // space
+        assert!(encoded.contains("%26")); // &
+        assert!(encoded.contains("%3D")); // =
+        assert!(!encoded.contains(' '));
+    }
+
+    #[test]
+    fn test_parse_role_variants() {
+        assert_eq!(parse_role("admin"), security::Role::Admin);
+        assert_eq!(parse_role("user"), security::Role::User);
+        assert_eq!(parse_role("viewer"), security::Role::Viewer);
+        assert_eq!(parse_role("unknown"), security::Role::Viewer);
+    }
+
+    #[test]
+    fn test_parse_role_case_insensitive() {
+        assert_eq!(parse_role("ADMIN"), security::Role::Admin);
+        assert_eq!(parse_role("User"), security::Role::User);
+        assert_eq!(parse_role("AdMiN"), security::Role::Admin);
+    }
+}

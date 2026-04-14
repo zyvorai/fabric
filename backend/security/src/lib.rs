@@ -316,3 +316,108 @@ impl AuditLog {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_jwt() -> JwtConfig {
+        JwtConfig::new("test-secret-key-for-unit-tests".to_string())
+    }
+
+    #[test]
+    fn test_generate_and_validate_token() {
+        let jwt = test_jwt();
+        let token = jwt.generate_token("alice", Role::Admin).unwrap();
+        let claims = jwt.validate_token(&token).unwrap();
+        assert_eq!(claims.sub, "alice");
+        assert_eq!(claims.role, Role::Admin);
+        assert!(!claims.jti.is_empty());
+    }
+
+    #[test]
+    fn test_validate_token_wrong_secret() {
+        let jwt_a = JwtConfig::new("secret-A".to_string());
+        let jwt_b = JwtConfig::new("secret-B".to_string());
+        let token = jwt_a.generate_token("alice", Role::User).unwrap();
+        assert!(jwt_b.validate_token(&token).is_err());
+    }
+
+    #[test]
+    fn test_revoke_token_rejects_validation() {
+        let jwt = test_jwt();
+        let token = jwt.generate_token("alice", Role::User).unwrap();
+        let claims = jwt.validate_token(&token).unwrap();
+        jwt.revoke_token(&claims.jti);
+        let result = jwt.validate_token(&token);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("revoked"));
+    }
+
+    #[test]
+    fn test_revoke_token_with_exp() {
+        let jwt = test_jwt();
+        let token = jwt.generate_token("bob", Role::Viewer).unwrap();
+        let claims = jwt.validate_token(&token).unwrap();
+        jwt.revoke_token_with_exp(&claims.jti, claims.exp);
+        assert!(jwt.validate_token(&token).is_err());
+    }
+
+    #[test]
+    fn test_generate_token_all_roles() {
+        let jwt = test_jwt();
+        for role in &[Role::Admin, Role::User, Role::Viewer] {
+            let token = jwt.generate_token("user", role.clone()).unwrap();
+            let claims = jwt.validate_token(&token).unwrap();
+            assert_eq!(&claims.role, role);
+        }
+    }
+
+    #[test]
+    fn test_role_permissions() {
+        assert!(Role::Admin.can_read());
+        assert!(Role::Admin.can_write());
+        assert!(Role::Admin.can_manage());
+
+        assert!(Role::User.can_read());
+        assert!(Role::User.can_write());
+        assert!(!Role::User.can_manage());
+
+        assert!(Role::Viewer.can_read());
+        assert!(!Role::Viewer.can_write());
+        assert!(!Role::Viewer.can_manage());
+    }
+
+    #[test]
+    fn test_validate_expired_token() {
+        let jwt = test_jwt();
+        // Manually construct an expired token
+        let claims = Claims {
+            sub: "expired-user".to_string(),
+            role: Role::User,
+            exp: 1, // Unix timestamp 1 = 1970-01-01, long expired
+            jti: "test-jti".to_string(),
+        };
+        let token = jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &jsonwebtoken::EncodingKey::from_secret(jwt.secret.as_bytes()),
+        ).unwrap();
+        assert!(jwt.validate_token(&token).is_err());
+    }
+
+    #[test]
+    fn test_revoked_tokens_eviction() {
+        let jwt = test_jwt();
+        let past_exp = 1usize; // long expired
+        // Insert enough entries to trigger eviction
+        for i in 0..100_001 {
+            jwt.revoke_token_with_exp(&format!("jti-{}", i), past_exp);
+        }
+        // Expired entries should have been evicted
+        let revoked = jwt.revoked_tokens.lock().unwrap();
+        // After eviction of expired entries, the map should be much smaller
+        // (only entries with exp=0 or exp>now survive — our entries are all past_exp=1 which is expired)
+        assert!(revoked.len() < 100_001, "Eviction should have removed expired entries");
+    }
+}

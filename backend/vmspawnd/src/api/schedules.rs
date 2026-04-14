@@ -576,3 +576,67 @@ pub async fn get_all_schedule_history(
 
     Ok(Json(history))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_req(name: &str, vm: &str, action: VMAction, stype: ScheduleType, time: &str, days: Option<Vec<u8>>) -> CreateScheduleRequest {
+        CreateScheduleRequest {
+            name: name.to_string(),
+            vm_name: vm.to_string(),
+            action,
+            schedule_type: stype,
+            time: time.to_string(),
+            days_of_week: days,
+            enabled: true,
+        }
+    }
+
+    #[test]
+    fn test_validate_valid_daily() {
+        let req = make_req("backup", "web-01", VMAction::Stop, ScheduleType::Daily, "23:30", None);
+        assert!(validate_schedule(&req).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invalid_time() {
+        let req = make_req("x", "vm", VMAction::Start, ScheduleType::Daily, "25:00", None);
+        assert!(validate_schedule(&req).is_err());
+        let req2 = make_req("x", "vm", VMAction::Start, ScheduleType::Daily, "abc", None);
+        assert!(validate_schedule(&req2).is_err());
+    }
+
+    #[test]
+    fn test_validate_weekly_no_days() {
+        let req = make_req("x", "vm", VMAction::Start, ScheduleType::Weekly, "10:00", None);
+        assert!(validate_schedule(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_weekly_invalid_day() {
+        let req = make_req("x", "vm", VMAction::Start, ScheduleType::Weekly, "10:00", Some(vec![7]));
+        assert!(validate_schedule(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_empty_vm_name() {
+        let req = make_req("sched", " ", VMAction::Stop, ScheduleType::Daily, "10:00", None);
+        assert!(validate_schedule(&req).is_err());
+    }
+
+    #[test]
+    fn test_next_run_daily() {
+        let next = calculate_next_run(&ScheduleType::Daily, "12:00", &None);
+        assert!(next.is_some());
+        let dt = next.unwrap();
+        assert!(dt > chrono::Utc::now());
+        assert_eq!(dt.minute(), 0);
+    }
+
+    #[test]
+    fn test_next_run_weekly_empty_days() {
+        let next = calculate_next_run(&ScheduleType::Weekly, "12:00", &Some(vec![]));
+        assert!(next.is_none());
+    }
+}

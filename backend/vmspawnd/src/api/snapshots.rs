@@ -308,3 +308,65 @@ fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {
         .unwrap_or_default()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_snap(id: &str, parent: Option<&str>) -> VMSnapshot {
+        VMSnapshot {
+            id: id.to_string(),
+            vm_name: "test-vm".to_string(),
+            name: format!("snap-{}", id),
+            description: None,
+            snapshot_type: SnapshotType::Disk,
+            parent_id: parent.map(|s| s.to_string()),
+            size_bytes: 0,
+            created: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_tree_empty() {
+        let tree = build_snapshot_tree(&[]);
+        assert!(tree.is_empty());
+    }
+
+    #[test]
+    fn test_tree_single_root() {
+        let snaps = vec![make_snap("a", None)];
+        let tree = build_snapshot_tree(&snaps);
+        assert_eq!(tree.len(), 1);
+        assert_eq!(tree[0].snapshot.id, "a");
+        assert!(tree[0].children.is_empty());
+    }
+
+    #[test]
+    fn test_tree_parent_child() {
+        let snaps = vec![make_snap("root", None), make_snap("child", Some("root"))];
+        let tree = build_snapshot_tree(&snaps);
+        assert_eq!(tree.len(), 1);
+        assert_eq!(tree[0].snapshot.id, "root");
+        assert_eq!(tree[0].children.len(), 1);
+        assert_eq!(tree[0].children[0].snapshot.id, "child");
+    }
+
+    #[test]
+    fn test_tree_depth_limit() {
+        // Build a chain of 110 snapshots, each parenting the next
+        let mut snaps = vec![make_snap("0", None)];
+        for i in 1..110 {
+            snaps.push(make_snap(&i.to_string(), Some(&(i - 1).to_string())));
+        }
+        let tree = build_snapshot_tree(&snaps);
+        assert_eq!(tree.len(), 1);
+        // Walk down — should stop at depth 100
+        let mut node = &tree[0];
+        let mut depth = 0;
+        while !node.children.is_empty() {
+            node = &node.children[0];
+            depth += 1;
+        }
+        assert!(depth <= 100, "Tree should stop at depth 100, got {}", depth);
+    }
+}
+

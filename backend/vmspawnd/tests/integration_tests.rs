@@ -1135,3 +1135,346 @@ async fn test_list_vms_pagination() {
     assert!(result["total"].as_u64().unwrap() >= 3);
     assert_eq!(result["limit"].as_u64().unwrap(), 2);
 }
+
+// ─── RBAC (Role-Based Access Control) ───────────────────────────────────────
+
+#[tokio::test]
+async fn test_viewer_cannot_create_vm() {
+    let app = common::create_test_app_with_role(security::Role::Viewer).await;
+    let body = serde_json::json!({"name": "test-vm", "cpus": 2, "memory": 512, "disk": 10, "image": "test.raw"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/vms")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_viewer_cannot_delete_vm() {
+    let app = common::create_test_app_with_role(security::Role::Viewer).await;
+    let req = Request::builder()
+        .method("DELETE")
+        .uri("/api/vms/test-vm")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_viewer_can_list_vms() {
+    let app = common::create_test_app_with_role(security::Role::Viewer).await;
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/vms")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_user_cannot_delete_vm() {
+    let app = common::create_test_app_with_role(security::Role::User).await;
+    let req = Request::builder()
+        .method("DELETE")
+        .uri("/api/vms/test-vm")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_viewer_cannot_create_schedule() {
+    let app = common::create_test_app_with_role(security::Role::Viewer).await;
+    let body = json!({"name": "sched", "vm_name": "vm", "action": "stop", "schedule_type": "daily", "time": "10:00"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/schedules")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn test_viewer_cannot_create_secret() {
+    let app = common::create_test_app_with_role(security::Role::Viewer).await;
+    let body = json!({"name": "db-pass", "value": "secret123"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/secrets")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+// ─── VM Lifecycle ───────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_create_vm_returns_fields() {
+    let app = common::create_test_app().await;
+    let body = json!({"name": "lifecycle-test", "cpus": 2, "memory": 512, "disk": 10, "image": "test.raw"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/vms")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let vm: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(vm["name"].as_str().unwrap(), "lifecycle-test");
+    assert_eq!(vm["cpus"].as_u64().unwrap(), 2);
+    assert_eq!(vm["memory"].as_u64().unwrap(), 512);
+}
+
+#[tokio::test]
+async fn test_create_vm_invalid_name_rejected() {
+    let app = common::create_test_app().await;
+    let body = json!({"name": "; rm -rf /", "cpus": 2, "memory": 512, "disk": 10, "image": "test.raw"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/vms")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_delete_vm_success() {
+    let app = common::create_test_app().await;
+
+    // Create
+    let body = json!({"name": "delete-me", "cpus": 1, "memory": 256, "disk": 5, "image": "test.raw"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/vms")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    // Delete
+    let req = Request::builder()
+        .method("DELETE")
+        .uri("/api/vms/delete-me")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    // Verify gone
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/vms/delete-me")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+// ─── Schedule CRUD ──────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_schedule_lifecycle() {
+    let app = common::create_test_app().await;
+
+    // Create
+    let body = json!({"name": "nightly-stop", "vm_name": "web-01", "action": "stop", "schedule_type": "daily", "time": "23:00"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/schedules")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let schedule: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let id = schedule["id"].as_str().unwrap();
+
+    // Get by ID
+    let req = Request::builder()
+        .method("GET")
+        .uri(&format!("/api/schedules/{}", id))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Delete
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(&format!("/api/schedules/{}", id))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    // Verify gone
+    let req = Request::builder()
+        .method("GET")
+        .uri(&format!("/api/schedules/{}", id))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_create_schedule_invalid_time() {
+    let app = common::create_test_app().await;
+    let body = json!({"name": "bad", "vm_name": "vm", "action": "stop", "schedule_type": "daily", "time": "25:99"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/schedules")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_create_schedule_snapshot_action() {
+    let app = common::create_test_app().await;
+    let body = json!({"name": "weekly-snap", "vm_name": "db-01", "action": "snapshot", "schedule_type": "weekly", "time": "02:00", "days_of_week": [0, 6]});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/schedules")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+}
+
+// ─── Backup API ─────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_list_backups_empty() {
+    let app = common::create_test_app().await;
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/backups")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_backup_stats() {
+    let app = common::create_test_app().await;
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/backups/stats")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_get_nonexistent_backup() {
+    let app = common::create_test_app().await;
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/backups/no-such-id")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+// ─── Secrets API ────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_secrets_lifecycle() {
+    let app = common::create_test_app().await;
+
+    // Create
+    let body = json!({"name": "db-password", "value": "s3cret!"});
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/secrets")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let secret: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let id = secret["id"].as_str().unwrap();
+    assert_eq!(secret["name"].as_str().unwrap(), "db-password");
+
+    // List (should appear)
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/secrets")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let list: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(!list.is_empty());
+
+    // Delete
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(&format!("/api/secrets/{}", id))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+// ─── Snapshot endpoints ─────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_list_snapshots_empty() {
+    let app = common::create_test_app().await;
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/vms/some-vm/snapshots")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let snapshots: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(snapshots.is_empty());
+}
+
+#[tokio::test]
+async fn test_snapshot_tree_empty() {
+    let app = common::create_test_app().await;
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/vms/some-vm/snapshots/tree")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let tree: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(tree.is_empty());
+}
