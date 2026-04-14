@@ -296,8 +296,15 @@ async fn discover_oidc_endpoints(
                 .map(String::from);
 
             if let (Some(auth), Some(token)) = (auth_endpoint, token_endpoint) {
-                tracing::debug!("OIDC discovery: auth={}, token={}", auth, token);
-                return (auth, token);
+                // Validate discovered endpoints against SSRF to prevent
+                // a malicious provider from redirecting to internal services
+                if crate::api::notifications::validate_external_url_public(&auth).is_ok()
+                    && crate::api::notifications::validate_external_url_public(&token).is_ok()
+                {
+                    tracing::debug!("OIDC discovery: auth={}, token={}", auth, token);
+                    return (auth, token);
+                }
+                tracing::warn!("OIDC discovery endpoints failed SSRF validation, using fallback");
             }
         }
     }

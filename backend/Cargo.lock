@@ -2914,6 +2914,7 @@ dependencies = [
  "anyhow",
  "axum",
  "base32",
+ "base64",
  "bcrypt",
  "chrono",
  "jsonwebtoken",

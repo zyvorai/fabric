@@ -298,8 +298,9 @@ pub async fn delete_backup(
         return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Backup file is outside allowed directory"}))));
     }
 
-    if storage_path.exists() {
-        if let Err(e) = tokio::fs::remove_file(storage_path).await {
+    if resolved.exists() {
+        // Use the canonicalized path for deletion to prevent TOCTOU symlink attacks
+        if let Err(e) = tokio::fs::remove_file(&resolved).await {
             tracing::error!("Failed to delete backup file {}: {}", backup.storage_location, e);
             // Don't fail the request if file deletion fails - continue to remove from state store
         } else {

@@ -34,36 +34,27 @@ pub async fn export_vm(
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     tracing::info!("Exporting VM '{}' to OVA", vm_name);
 
-    // Validate VM name
-    if vm_name.is_empty()
-        || vm_name.len() > 64
-        || !vm_name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
-    {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "Invalid VM name"})),
-        ));
+    // Validate VM name using central validation
+    if let Err((status, msg)) = crate::validation::validate_vm_name(&vm_name) {
+        return Err((status, Json(serde_json::json!({"error": msg}))));
     }
 
     // Verify VM exists in the store
-    let vm: Option<vm_model::VM> = state
+    let vm = state
         .store
-        .get_entity("vms", &vm_name)
+        .get_vm(&vm_name)
         .map_err(|_| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": "Failed to query VM store"})),
             )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": format!("VM '{}' not found", vm_name)})),
+            )
         })?;
-
-    let vm = vm.ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": format!("VM '{}' not found", vm_name)})),
-        )
-    })?;
 
     // Determine disk path — validate against allowed prefixes
     let disk_path = req.disk_path.unwrap_or_else(|| {

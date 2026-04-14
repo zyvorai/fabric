@@ -96,11 +96,14 @@ impl JwtConfig {
         )?;
 
         let claims = token_data.claims;
-        if let Ok(revoked) = self.revoked_tokens.lock() {
-            if !claims.jti.is_empty() && revoked.contains_key(&claims.jti) {
-                return Err(anyhow::anyhow!("Token has been revoked"));
-            }
+        let revoked = self.revoked_tokens.lock().unwrap_or_else(|e| {
+            tracing::warn!("Revoked tokens mutex was poisoned, recovering");
+            e.into_inner()
+        });
+        if !claims.jti.is_empty() && revoked.contains_key(&claims.jti) {
+            return Err(anyhow::anyhow!("Token has been revoked"));
         }
+        drop(revoked);
         Ok(claims)
     }
 
@@ -185,7 +188,8 @@ where
 
 /// Extractor that requires the caller to have write permission (Admin or User).
 /// Rejects Viewer role with 403 Forbidden.
-/// When auth is disabled (no claims in extensions), allows the request through.
+/// When auth is disabled (no claims in extensions), defaults to Viewer role
+/// which will be rejected by the role check below.
 pub struct RequireWrite(pub Claims);
 
 impl<S> axum::extract::FromRequestParts<S> for RequireWrite
@@ -213,7 +217,8 @@ where
 
 /// Extractor that requires the caller to have admin permission (Admin only).
 /// Rejects User and Viewer roles with 403 Forbidden.
-/// When auth is disabled (no claims in extensions), allows the request through.
+/// When auth is disabled (no claims in extensions), defaults to Viewer role
+/// which will be rejected by the role check below.
 pub struct RequireAdmin(pub Claims);
 
 impl<S> axum::extract::FromRequestParts<S> for RequireAdmin

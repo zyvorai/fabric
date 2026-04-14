@@ -21,3 +21,4 @@ uuid.workspace = true
 pam = "0.8"
 totp-rs = { workspace = true }
 base32 = { workspace = true }
+base64 = "0.22"

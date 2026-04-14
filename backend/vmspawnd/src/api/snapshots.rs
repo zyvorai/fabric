@@ -77,6 +77,13 @@ pub async fn create_snapshot(
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
 
+    // Validate description length
+    if let Some(ref desc) = req.description {
+        if desc.len() > 1024 {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Description must be at most 1024 characters"}))).into_response();
+        }
+    }
+
     // Attempt qemu-img snapshot
     let output = Command::new("qemu-img")
         .args(["snapshot", "-c", &req.name, &image_path])
@@ -282,10 +289,14 @@ fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {
         children_map.entry(snap.parent_id.as_deref()).or_default().push(snap);
     }
 
-    fn build_node(snap: &VMSnapshot, children_map: &HashMap<Option<&str>, Vec<&VMSnapshot>>) -> SnapshotTreeNode {
-        let children = children_map.get(&Some(snap.id.as_str()))
-            .map(|kids| kids.iter().map(|s| build_node(s, children_map)).collect())
-            .unwrap_or_default();
+    fn build_node(snap: &VMSnapshot, children_map: &HashMap<Option<&str>, Vec<&VMSnapshot>>, depth: usize) -> SnapshotTreeNode {
+        let children = if depth >= 100 {
+            vec![] // Prevent infinite recursion on circular parent references
+        } else {
+            children_map.get(&Some(snap.id.as_str()))
+                .map(|kids| kids.iter().map(|s| build_node(s, children_map, depth + 1)).collect())
+                .unwrap_or_default()
+        };
         SnapshotTreeNode {
             snapshot: snap.clone(),
             children,
@@ -293,7 +304,7 @@ fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {
     }
 
     children_map.get(&None)
-        .map(|roots| roots.iter().map(|s| build_node(s, &children_map)).collect())
+        .map(|roots| roots.iter().map(|s| build_node(s, &children_map, 0)).collect())
         .unwrap_or_default()
 }
 

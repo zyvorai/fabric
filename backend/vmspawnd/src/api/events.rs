@@ -125,9 +125,13 @@ pub fn record_event(state: &Arc<AppState>, event_type: VMEventType, vm_name: &st
     // Broadcast to SSE subscribers (ignore if no receivers)
     let _ = state.event_tx.send(event);
 
-    // Periodic pruning: every 100 events, remove old entries beyond retention limit
+    // Periodic pruning: every 100 events, remove old entries beyond retention limit.
+    // Run in a background task to avoid blocking the request path.
     if EVENT_COUNTER.fetch_add(1, Ordering::Relaxed) % 100 == 0 {
-        prune_old_events(state, 1000);
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            prune_old_events(&state_clone, 1000);
+        });
     }
 }
 

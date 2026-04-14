@@ -4,6 +4,34 @@ use std::sync::Mutex;
 
 use crate::{Role, User};
 
+/// Simple obfuscation key for TOTP secrets at rest in SQLite.
+const TOTP_KEY: &[u8] = b"vmspawnd-totp-at-rest-key-2026v1!";
+
+fn encrypt_totp(plaintext: &str) -> String {
+    use base64::Engine;
+    let encrypted: Vec<u8> = plaintext
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .map(|(i, b)| b ^ TOTP_KEY[i % TOTP_KEY.len()])
+        .collect();
+    base64::engine::general_purpose::STANDARD.encode(&encrypted)
+}
+
+fn decrypt_totp(ciphertext: &str) -> Result<String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(ciphertext)
+        .map_err(|e| anyhow::anyhow!("Failed to decode TOTP secret: {}", e))?;
+    let decrypted: Vec<u8> = bytes
+        .iter()
+        .enumerate()
+        .map(|(i, b)| b ^ TOTP_KEY[i % TOTP_KEY.len()])
+        .collect();
+    String::from_utf8(decrypted)
+        .map_err(|e| anyhow::anyhow!("Invalid TOTP secret UTF-8: {}", e))
+}
+
 pub struct UserDb {
     conn: Mutex<rusqlite::Connection>,
 }
@@ -188,12 +216,13 @@ impl UserDb {
         self.execute_raw(sql)
     }
 
-    /// Enable TOTP 2FA for a user by storing their secret.
+    /// Enable TOTP 2FA for a user by storing their secret (encrypted at rest).
     pub fn enable_totp(&self, user_id: &str, secret: &str) -> Result<()> {
+        let encrypted = encrypt_totp(secret);
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
         let rows = conn.execute(
             "UPDATE users SET totp_secret = ?1, totp_enabled = 1 WHERE id = ?2",
-            params![secret, user_id],
+            params![encrypted, user_id],
         )?;
         if rows == 0 {
             anyhow::bail!("User not found: {}", user_id);
@@ -201,7 +230,7 @@ impl UserDb {
         Ok(())
     }
 
-    /// Get the TOTP secret for a user, if set.
+    /// Get the TOTP secret for a user, if set (decrypted from at-rest storage).
     pub fn get_totp_secret(&self, user_id: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
         let mut stmt = conn.prepare(
@@ -212,7 +241,8 @@ impl UserDb {
             Ok(secret)
         });
         match result {
-            Ok(secret) => Ok(secret),
+            Ok(Some(encrypted)) => Ok(Some(decrypt_totp(&encrypted)?)),
+            Ok(None) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }

@@ -115,7 +115,13 @@ pub async fn build_image(
     let req_clone = req.clone();
 
     let build_id_log = build_id.clone();
+    let shutdown = state.shutdown.clone();
     let handle = tokio::spawn(async move {
+        // Check if shutdown was requested before starting the build
+        if shutdown.is_cancelled() {
+            tracing::debug!("Image build '{}' cancelled: shutdown in progress", build_id_clone);
+            return;
+        }
         // Update state to building
         if let Ok(Some(mut s)) = state_clone.store.get_entity::<ImageBuildStatus>("image_builds", &build_id_clone) {
             s.state = BuildState::Building;

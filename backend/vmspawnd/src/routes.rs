@@ -142,7 +142,7 @@ pub async fn create_vm(
         }
         Err(e) => {
             audit(&state, &claims.sub, "CREATE", &format!("vm/{}", req.name), "FAILED");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response()
         }
     }
 }
@@ -170,6 +170,15 @@ pub async fn delete_vm(
         if let Some(ref ip) = vm.ip {
             if let Err(e) = state.policy_engine.allocator.remove_ip_mapping(ip) {
                 tracing::warn!("Failed to remove IP mapping for VM '{}': {}", name, e);
+            }
+        }
+    }
+
+    // Clean up disk image before removing from store
+    if let Some(image_path) = crate::validation::find_vm_image(&name) {
+        if let Err(e) = tokio::fs::remove_file(&image_path).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!("Failed to delete disk image for VM '{}': {}", name, e);
             }
         }
     }
@@ -365,7 +374,7 @@ pub async fn restart_vm(
         }
         Err(e) => {
             audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "FAILED");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response()
         }
     }
 }
@@ -381,7 +390,12 @@ pub async fn pause_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    match vmspawn_driver::pause_vm(&name) {
+    let name_clone = name.clone();
+    let result = tokio::task::spawn_blocking(move || vmspawn_driver::pause_vm(&name_clone))
+        .await
+        .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+
+    match result {
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Paused;
@@ -394,7 +408,7 @@ pub async fn pause_vm(
             crate::api::events::record_event(&state, crate::api::events::VMEventType::Paused, &name, None);
             (StatusCode::OK, Json(json!({ "status": "paused" }))).into_response()
         }
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response(),
     }
 }
 
@@ -409,7 +423,12 @@ pub async fn resume_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    match vmspawn_driver::resume_vm(&name) {
+    let name_clone = name.clone();
+    let result = tokio::task::spawn_blocking(move || vmspawn_driver::resume_vm(&name_clone))
+        .await
+        .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+
+    match result {
         Ok(_) => {
             if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
                 vm.state = vm_model::VMState::Running;
@@ -422,7 +441,7 @@ pub async fn resume_vm(
             crate::api::events::record_event(&state, crate::api::events::VMEventType::Resumed, &name, None);
             (StatusCode::OK, Json(json!({ "status": "running" }))).into_response()
         }
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response(),
     }
 }
 

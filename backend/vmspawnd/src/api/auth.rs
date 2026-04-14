@@ -151,33 +151,36 @@ pub async fn login(
     LOGIN_LIMITER.clear(&req.username);
 
     // Check if TOTP 2FA is enabled for this user
+    // Note: TOTP DB methods query by user ID (not username), so we must look up the user first.
     if let Some(ref user_db) = state.user_db {
-        let totp_enabled = user_db
-            .is_totp_enabled(&req.username)
-            .unwrap_or(false);
-        if totp_enabled {
-            match &req.totp_code {
-                None => {
-                    return Err((
-                        StatusCode::FORBIDDEN,
-                        Json(serde_json::json!({
-                            "error": "2FA code required",
-                            "requires_2fa": true
-                        })),
-                    ));
-                }
-                Some(code) => {
-                    let secret = user_db
-                        .get_totp_secret(&req.username)
-                        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
-                    if let Some(secret) = secret {
-                        let valid = security::totp::verify_code(&secret, code)
+        if let Ok(Some(db_user)) = user_db.get_by_username(&req.username) {
+            let totp_enabled = user_db
+                .is_totp_enabled(&db_user.id)
+                .unwrap_or(false);
+            if totp_enabled {
+                match &req.totp_code {
+                    None => {
+                        return Err((
+                            StatusCode::FORBIDDEN,
+                            Json(serde_json::json!({
+                                "error": "2FA code required",
+                                "requires_2fa": true
+                            })),
+                        ));
+                    }
+                    Some(code) => {
+                        let secret = user_db
+                            .get_totp_secret(&db_user.id)
                             .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
-                        if !valid {
-                            return Err((
-                                StatusCode::UNAUTHORIZED,
-                                Json(serde_json::json!({"error": "Invalid 2FA code"})),
-                            ));
+                        if let Some(secret) = secret {
+                            let valid = security::totp::verify_code(&secret, code)
+                                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
+                            if !valid {
+                                return Err((
+                                    StatusCode::UNAUTHORIZED,
+                                    Json(serde_json::json!({"error": "Invalid 2FA code"})),
+                                ));
+                            }
                         }
                     }
                 }

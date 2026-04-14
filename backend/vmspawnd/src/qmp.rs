@@ -32,9 +32,10 @@ impl QmpClient {
             "query-memory-size-summary", "query-vnc", "query-spice",
             "system_powerdown", "system_reset", "stop", "cont",
             "balloon", "block_resize", "blockdev-snapshot-sync",
+            "blockdev-add", "blockdev-del",
             "device_add", "device_del", "netdev_add", "netdev_del",
             "object-add", "object-del", "chardev-add", "chardev-remove",
-            "human-monitor-command", "savevm", "loadvm", "delvm",
+            "savevm", "loadvm", "delvm",
             "cpu-add", "drive-backup",
         ];
         if !ALLOWED_QMP_COMMANDS.contains(&command) {
