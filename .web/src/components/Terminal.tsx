@@ -1,0 +1,76 @@
+import { useEffect, useRef } from 'react'
+import { Terminal as XTerm } from '@xterm/xterm'
+import '@xterm/xterm/css/xterm.css'
+
+interface TerminalProps {
+  vmName: string
+}
+
+export default function Terminal({ vmName }: TerminalProps) {
+  const terminalRef = useRef<HTMLDivElement>(null)
+  const xtermRef = useRef<XTerm | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+
+  useEffect(() => {
+    if (!terminalRef.current) return
+
+    // Create terminal
+    const term = new XTerm({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#000000',
+        foreground: '#ffffff',
+      },
+    })
+
+    term.open(terminalRef.current)
+    xtermRef.current = term
+
+    // Connect WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${protocol}//${window.location.host}/ws/console/${vmName}`
+    const ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      term.write('Connected to VM console\r\n')
+    }
+
+    ws.onmessage = (event) => {
+      term.write(event.data)
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+      term.write('\r\nWebSocket error\r\n')
+    }
+
+    ws.onclose = () => {
+      term.write('\r\nConnection closed\r\n')
+    }
+
+    // Send data from terminal to WebSocket
+    term.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data)
+      }
+    })
+
+    wsRef.current = ws
+
+    // Cleanup
+    return () => {
+      ws.close()
+      term.dispose()
+    }
+  }, [vmName])
+
+  return (
+    <div
+      ref={terminalRef}
+      className="w-full h-full bg-black rounded"
+      style={{ minHeight: '500px' }}
+    />
+  )
+}
