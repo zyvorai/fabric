@@ -2,6 +2,8 @@
 set -euo pipefail
 
 echo "=== vmspawnd installer ==="
+echo "Zyvor suite — https://zyvor.dev · © @zyvor 2026"
+echo "No git clone required after you have this tree."
 echo ""
 
 # Build backend
