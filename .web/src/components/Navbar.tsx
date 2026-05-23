@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
+import { ZyvorInline } from './ZyvorBrand'
 
 interface NavGroup {
   label: string
@@ -297,6 +298,10 @@ export default function Navbar() {
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+
+            <div className="hidden lg:flex items-center pl-3 border-l border-slate-700">
+              <ZyvorInline product="vmspawn" />
+            </div>
 
             {/* User / Logout */}
             {user && (

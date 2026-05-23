@@ -9,8 +9,6 @@ import KeyboardShortcutsPanel from './components/KeyboardShortcutsPanel'
 import CommandPalette from './components/CommandPalette'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
-import { ZyvorFooter } from './components/ZyvorBrand'
-
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const VMList = lazy(() => import('./pages/VMList'))
 const VMDetails = lazy(() => import('./pages/VMDetails'))
@@ -218,7 +216,6 @@ function MainLayout() {
           </PageErrorBoundary>
         </div>
       </main>
-      <ZyvorFooter product="vmspawn" />
     </div>
   )
 }

@@ -1,29 +1,72 @@
 /**
- * Zyvor product suite branding — place in src/components/ or components/
- * Logo: copy zyvor-logo.png to your app public/ folder (Vite: /zyvor-logo.png).
+ * Zyvor product suite branding — text only (no logo image).
+ * Embed ZyvorInline in headers/footers; use ZyvorFooter for a minimal app footer line.
  */
 import React from 'react';
 
-const ZYVOR_URL = 'https://zyvor.dev';
-const ZYVOR_COPY = '© @zyvor 2026';
+export const ZYVOR_URL = 'https://zyvor.dev';
+export const ZYVOR_COPY = '© @zyvor 2026';
+
+const ORANGE = '#f97316';
+const MUTED = 'rgba(148, 163, 184, 0.75)';
 
 const linkStyle: React.CSSProperties = {
-  color: 'inherit',
+  color: ORANGE,
   textDecoration: 'none',
-  opacity: 0.9,
+  fontWeight: 500,
 };
 
 const linkHover = (e: React.MouseEvent<HTMLAnchorElement>) => {
-  e.currentTarget.style.opacity = '1';
-  e.currentTarget.style.color = '#f97316';
+  e.currentTarget.style.color = '#fb923c';
 };
 
 const linkLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
-  e.currentTarget.style.opacity = '0.9';
-  e.currentTarget.style.color = 'inherit';
+  e.currentTarget.style.color = ORANGE;
 };
 
-/** Compact footer for app shells — use once per layout below <Outlet /> or page content. */
+/** Single embedded line: zyvor.dev · © @zyvor 2026 · Product */
+export function ZyvorInline({
+  product,
+  className = '',
+  style,
+}: {
+  product?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <span
+      className={`zyvor-inline whitespace-normal ${className}`.trim()}
+      style={{
+        fontSize: '12px',
+        lineHeight: 1.5,
+        color: MUTED,
+        ...style,
+      }}
+    >
+      <a
+        href={ZYVOR_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ ...linkStyle, fontWeight: 600 }}
+        onMouseEnter={linkHover}
+        onMouseLeave={linkLeave}
+      >
+        zyvor.dev
+      </a>
+      <span aria-hidden> · </span>
+      <span>{ZYVOR_COPY}</span>
+      {product ? (
+        <>
+          <span aria-hidden> · </span>
+          <span style={{ opacity: 0.85 }}>{product}</span>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
+/** Minimal footer — one inline line, no logo, no extra background strip. */
 export function ZyvorFooter({
   product,
   className = '',
@@ -33,69 +76,49 @@ export function ZyvorFooter({
 }) {
   return (
     <footer
-      className={`zyvor-footer ${className}`.trim()}
+      className={`zyvor-footer shrink-0 py-2 text-center ${className}`.trim()}
       style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '10px 16px',
-        padding: '14px 20px',
         marginTop: 'auto',
-        borderTop: '1px solid rgba(148, 163, 184, 0.15)',
-        fontSize: '12px',
-        color: 'rgba(148, 163, 184, 0.9)',
         background: 'transparent',
+        border: 'none',
       }}
       role="contentinfo"
     >
-      <a
-        href={ZYVOR_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Zyvor — zyvor.dev"
-        style={{ display: 'flex', alignItems: 'center', lineHeight: 0 }}
-      >
-        <img
-          src="/zyvor-logo.png"
-          alt="Zyvor"
-          style={{ height: 26, width: 'auto', display: 'block' }}
-        />
-      </a>
-      <span>
-        <a
-          href={ZYVOR_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={linkStyle}
-          onMouseEnter={linkHover}
-          onMouseLeave={linkLeave}
-        >
-          {ZYVOR_COPY}
-        </a>
-        {product ? (
-          <span style={{ opacity: 0.55, marginLeft: 8 }}>· {product}</span>
-        ) : null}
-      </span>
+      <ZyvorInline product={product} />
     </footer>
   );
 }
 
-/** Small logo in nav/header. */
-export function ZyvorLogoMark({ height = 24 }: { height?: number }) {
+/** @deprecated Use ZyvorInline — same inline text, no separate box. */
+export function ZyvorHelpStrip({
+  product,
+  className = '',
+}: {
+  product?: string;
+  className?: string;
+}) {
+  return <ZyvorInline product={product} className={className} />;
+}
+
+/** Header mark: zyvor.dev link. */
+export function ZyvorLogoMark({ className = '' }: { className?: string }) {
   return (
     <a
       href={ZYVOR_URL}
       target="_blank"
       rel="noopener noreferrer"
-      title="Zyvor — zyvor.dev"
-      style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0 }}
+      title="zyvor.dev"
+      className={className}
+      style={{
+        fontWeight: 600,
+        fontSize: '13px',
+        color: ORANGE,
+        textDecoration: 'none',
+      }}
+      onMouseEnter={linkHover}
+      onMouseLeave={linkLeave}
     >
-      <img
-        src="/zyvor-logo.png"
-        alt="Zyvor"
-        style={{ height, width: 'auto', display: 'block' }}
-      />
+      zyvor.dev
     </a>
   );
 }
