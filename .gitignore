@@ -38,3 +38,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Local AI caches
+.grok/
+**/.DS_Store
