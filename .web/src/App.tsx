@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
+import { ZyvorFooter } from './components/ZyvorBrand';
 import { Suspense, lazy, ReactNode } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
@@ -216,6 +217,7 @@ function MainLayout() {
           </PageErrorBoundary>
         </div>
       </main>
+      <ZyvorFooter />
     </div>
   )
 }
