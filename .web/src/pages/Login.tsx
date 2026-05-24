@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
+import { ZyvorFooter } from '../components/ZyvorBrand'
 import { Lock, User, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
 
 export default function Login() {
@@ -141,12 +142,7 @@ export default function Login() {
             )}
           </button>
 
-          {/* Footer */}
-          <div className="mt-5 pt-4 border-t border-slate-700/50 text-center">
-            <span className="text-slate-500 text-xs">
-              Virtual Machine Manager &middot; Powered by systemd-vmspawn
-            </span>
-          </div>
+          <ZyvorFooter className="mt-5" />
         </form>
       </div>
     </div>
