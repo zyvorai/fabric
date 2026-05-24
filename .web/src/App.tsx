@@ -217,7 +217,7 @@ function MainLayout() {
           </PageErrorBoundary>
         </div>
       </main>
-      <ZyvorFooter />
+      <ZyvorFooter product="vmspawn" />
     </div>
   )
 }
