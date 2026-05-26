@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useCallback } from 'react';
 import { Bell, AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
 import { notificationApi } from '../utils/api';

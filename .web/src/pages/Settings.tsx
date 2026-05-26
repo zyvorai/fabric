@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useEffect, useState } from 'react'
 import { Settings as SettingsIcon, Save, RotateCcw, Bell, Globe, Shield, Database, Loader2 } from 'lucide-react'
 import { useToastContext } from '../contexts/ToastContext'

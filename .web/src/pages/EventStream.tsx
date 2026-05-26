@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Radio, Pause, Play, Trash2, Filter } from 'lucide-react'
 import { getToken } from '../api/client'

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { Clock, CheckCircle, AlertCircle, Loader2, Terminal, XCircle, RefreshCw } from 'lucide-react'
 import { apiFetch } from '../api/client'

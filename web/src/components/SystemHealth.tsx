@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { Activity, Cpu, HardDrive, MemoryStick } from 'lucide-react';
 import { systemApi } from '../utils/api';
 import { usePolling } from '../hooks/usePolling';

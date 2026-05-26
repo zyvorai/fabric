@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 //! zbus proxy definitions for org.freedesktop.systemd1
 //!
 //! Reference: <https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html>

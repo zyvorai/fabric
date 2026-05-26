@@ -1,20 +1,147 @@
-MIT License
+PacketWolf / NetPredator — Proprietary Software License Agreement
 
-Copyright (c) 2026 vmspawnd contributors
+Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+Brand / website: https://zyvor.dev
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+IMPORTANT — READ CAREFULLY BEFORE INSTALLING, DEPLOYING, OR USING THIS SOFTWARE.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This Proprietary Software License Agreement ("Agreement") is a legal contract between
+you ("Licensee", "Customer", or "you") and ZyvorAI Labs Private Limited, a company
+incorporated under the Companies Act, 2013 (India),
+with its registered office at A 802 Wisteria, Keshav Nagar Manjri Rd., Mundhwa,
+Pune City, Pune — 411036, Maharashtra, India ("Licensor", "Zyvor", "we", "us"),
+for the PacketWolf / NetPredator software, documentation, container images, binaries,
+eBPF objects, Helm charts, scripts (including deploy-remote.sh), and all related
+materials (collectively, the "Software").
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Licensor distributes the Software under the zyvor.dev brand. Incorporation is
+evidenced by the Ministry of Corporate Affairs Certificate of Incorporation issued
+via SPICE+ (reference AC3303222, dated 6 May 2026).
+
+BY DOWNLOADING, CLONING, BUILDING, DEPLOYING, OR USING THE SOFTWARE, YOU AGREE TO BE
+BOUND BY THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT USE THE SOFTWARE.
+
+1. GRANT OF LICENSE
+   Licensor grants Licensee a limited, non-exclusive, non-transferable, revocable
+   license to use the Software solely for Licensee's internal business operations,
+   subject to this Agreement and any separate written order or enterprise agreement
+   signed with Licensor. No rights are granted except as expressly stated.
+
+2. RESTRICTIONS — LICENSEE SHALL NOT:
+   (a) copy, distribute, publish, sublicense, sell, rent, lease, or lend the Software
+       to any third party;
+   (b) make the Software available as a hosted service, SaaS, or managed offering to
+       third parties without written permission from Licensor;
+   (c) reverse engineer, decompile, disassemble, or attempt to derive source code,
+       algorithms, or trade secrets from the Software, except where prohibited by law;
+   (d) remove or alter copyright, license, or proprietary notices;
+   (e) use the Software to develop a competing product or service;
+   (f) disclose benchmarks, performance results, or security findings publicly without
+       prior written consent;
+   (g) deploy to production or customer environments without accepting this Agreement
+       via the official deployment scripts or written acceptance recorded by Licensor.
+
+3. OWNERSHIP AND TRADEMARKS
+   The Software is licensed, not sold. Licensor retains all right, title, and interest
+   in the Software, including all intellectual property rights. Licensee acquires no
+   ownership rights. This Agreement does not grant any license to use Licensor's
+   trademarks, service marks, logos, or trade dress, including without limitation
+   "Zyvor", "zyvor.dev", "PacketWolf", "NetPredator", "Ragnarok", "Aether",
+   "HyperSDK", and "GuestKit", except as required for reasonable nominative
+   reference to describe compatibility. See legal/TRADEMARK-NOTICE.md in customer
+   bundles (or docs/legal/ in the source repository).
+
+4. CONFIDENTIALITY
+   The Software and non-public documentation are confidential information of Licensor.
+   Licensee shall protect them using at least the same degree of care used for its own
+   confidential information, and shall not disclose them except to employees and
+   contractors bound by written confidentiality obligations who need access for
+   permitted use.
+
+5. PROPRIETARY SOFTWARE; THIRD-PARTY COMPONENTS
+   The Software is proprietary to Licensor. Licensor does not distribute the Software
+   under Apache, MIT, LGPL, or similar open-source licenses. The Software may
+   include third-party components (e.g., libraries) subject to their own licenses;
+   see NOTICE files where provided. Those third-party licenses apply only to those
+   components, not to Licensor's proprietary code, documentation, or binaries.
+   Hosted services, trust and attestation features, commercial extensions, sovereign
+   deployment packs, and AI automation packs are licensed only under this Agreement
+   or a separate written enterprise agreement.
+
+6. SUPPORT AND UPDATES
+   Unless otherwise agreed in writing, Licensor has no obligation to provide support,
+   maintenance, or updates. Any updates provided remain subject to this Agreement.
+
+7. WARRANTY DISCLAIMER
+   THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. LICENSOR DOES NOT
+   WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE, UNINTERRUPTED, OR SECURE.
+
+8. LIMITATION OF LIABILITY
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, LICENSOR SHALL NOT BE LIABLE FOR
+   ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF
+   PROFITS, DATA, GOODWILL, OR BUSINESS INTERRUPTION, ARISING FROM OR RELATED TO THIS
+   AGREEMENT OR THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY. LICENSOR'S TOTAL
+   LIABILITY SHALL NOT EXCEED THE AMOUNTS PAID BY LICENSEE FOR THE SOFTWARE IN THE
+   TWELVE (12) MONTHS PRECEDING THE CLAIM, OR TEN THOUSAND INDIAN RUPEES (INR 10,000)
+   IF NO FEES WERE PAID.
+
+9. SECURITY, ATTESTATION, AND CONFIDENTIAL COMPUTING
+   Features relating to confidential computing, remote attestation, trusted execution
+   environments (TEEs), hardware roots of trust, eBPF/kernel instrumentation, or
+   network policy enforcement may reduce certain attack surfaces but do NOT guarantee
+   absolute security or immunity from compromise. Licensee is solely responsible for
+   architecture, configuration, key management, patching, and operational security.
+
+10. AI AND AUTOMATION
+    Any AI-generated recommendations, diagnostics, remediation suggestions, policy
+    proposals, or automation outputs are advisory in nature. Licensee must review and
+    approve changes before applying them in production. Licensor does not warrant
+    accuracy or fitness of AI outputs and is not liable for autonomous actions taken
+    by Licensee based on such outputs.
+
+11. REGULATORY AND COMPLIANCE
+    Licensee is solely responsible for determining whether deployments satisfy
+    applicable regulatory, sovereign, sectoral, data-protection, export, or other
+    compliance obligations. The Software does not by itself constitute legal or
+    compliance advice.
+
+12. EXPORT CONTROL AND SANCTIONS
+    The Software may include or enable encryption and security capabilities subject
+    to export control laws. Licensee shall not export, re-export, or use the Software
+    in violation of applicable export control or sanctions laws (including India,
+    UN, US, EU restrictions as applicable). Licensee represents it is not a prohibited
+    end-user or located in a comprehensively embargoed jurisdiction without required
+    licenses.
+
+13. TERMINATION
+    This Agreement terminates automatically upon breach by Licensee. Upon termination,
+    Licensee must cease all use, destroy all copies, and certify destruction if
+    requested. Provisions that by their nature should survive termination shall survive.
+
+14. GOVERNING LAW AND JURISDICTION
+    This Agreement is governed by the laws of India. Courts at Pune, Maharashtra
+    shall have exclusive jurisdiction, subject to mandatory provisions of applicable law.
+
+15. ACCEPTANCE RECORD
+    Running ./scripts/deploy-remote.sh, ./scripts/package-binary-remote.sh,
+    ./install.sh (customer bundle), or setting PACKETWOLF_LICENSE_ACCEPT after reading
+    this file constitutes electronic acceptance. Licensor may record acceptance
+    metadata (user, host, timestamp, license hash) for compliance.
+
+16. AUTHORIZED SIGNATORY
+    Software and licensing agreements may be executed by a duly authorized
+    **Director** of Licensor. The company's directors are Pravat Nalini Sahani
+    (DIN 11703375) and Susanta Sahani (DIN 11703376). Other company filings may be
+    executed per board resolutions and MCA records (SPICE+ SRN AC3303222).
+
+17. CONTACT
+    General: info@zyvor.dev
+    Legal / licensing: legal@zyvor.dev
+    Website: https://zyvor.dev
+    Enterprise agreement templates: docs/legal/ (source) or legal/ (customer bundle)
+
+License version: 1.6
+Product: PacketWolf / NetPredator
+Licensor: ZyvorAI Labs Private Limited · https://zyvor.dev · info@zyvor.dev

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { Clock, Activity, AlertTriangle, AlertCircle, Settings, Server } from 'lucide-react';
 import { auditApi } from '../utils/api';
 import { AuditLogEntry } from '../types';

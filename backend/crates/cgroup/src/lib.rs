@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 //! Unified cgroup v2 management for vmspawnd.
 //!
 //! Provides a clean API for all cgroup v2 controllers with consistent path handling.

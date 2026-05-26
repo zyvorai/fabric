@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { Search, ArrowRight, Server, Plus, Home, Terminal, Network, HardDrive, Settings, BarChart3, FileText, Bell, Calendar, Shield, RotateCw, Play, Square, Cpu } from 'lucide-react'

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 export { default as PoliciesTab, CreatePolicyModal } from './PoliciesTab'
 export { default as FirewallTab, CreateFirewallProfileModal } from './FirewallTab'
 export { default as ServicesTab, CreateServiceModal } from './ServicesTab'

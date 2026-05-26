@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useCallback } from 'react';
 import { Network as NetworkIcon, Plus, Trash2, Globe, Cable, Radio, Layers, Link2, ArrowRightLeft } from 'lucide-react';
 import { networkApi } from '../utils/api';

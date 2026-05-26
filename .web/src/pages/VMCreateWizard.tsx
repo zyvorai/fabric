@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState } from 'react'
 import { Plus, ArrowRight, ArrowLeft, Check, Loader2, Copy } from 'lucide-react'
 import { apiFetch } from '../api/client'

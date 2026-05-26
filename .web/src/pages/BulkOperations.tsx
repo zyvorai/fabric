@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useEffect, useMemo } from 'react'
 import { Search, CheckSquare, Square, Power, Camera, Loader2, AlertTriangle, CheckCircle, Clock, RefreshCw, Monitor, MinusSquare, Play } from 'lucide-react'
 import { apiFetch } from '../api/client'

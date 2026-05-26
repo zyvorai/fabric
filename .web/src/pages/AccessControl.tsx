@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useEffect, useCallback } from 'react'
 import { Users, Plus, Trash2, Loader2, CheckCircle } from 'lucide-react'
 import { apiFetch } from '../api/client'

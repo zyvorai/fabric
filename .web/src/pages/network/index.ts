@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 export { default as BridgesTab, CreateBridgeModal } from './BridgesTab'
 export { default as BondsTab, CreateBondModal } from './BondsTab'
 export { default as VlansTab, CreateVlanModal } from './VlansTab'

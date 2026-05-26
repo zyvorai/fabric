@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { login as apiLogin, getMe, UserInfo } from '../api/auth'
 import { getToken, setToken, clearToken } from '../api/client'

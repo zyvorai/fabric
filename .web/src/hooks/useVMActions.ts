@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useCallback } from 'react'
 import { startVM, stopVM, restartVM, pauseVM, resumeVM, deleteVM } from '../api/vm'
 import { createBackup } from '../api/backup'

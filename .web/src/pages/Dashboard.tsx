@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useEffect, useState, useCallback } from 'react'
 import { listVMs, getMetrics, VM, VMMetrics } from '../api/vm'
 import { Activity, Server, Cpu, HardDrive, TrendingUp, ArrowUpRight, Power } from 'lucide-react'

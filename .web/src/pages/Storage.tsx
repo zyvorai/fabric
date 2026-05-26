@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useEffect, useCallback } from 'react'
 import { HardDrive, Plus, Trash2, Copy, RefreshCw, Database } from 'lucide-react'
 import { apiGet, apiDelete } from '../api/client'

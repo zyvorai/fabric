@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Terminal, Wifi, WifiOff, Send } from 'lucide-react';
 import { useViewContext } from '../App';

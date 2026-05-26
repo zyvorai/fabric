@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
 import { ZyvorFooter } from './components/ZyvorBrand';
 import { Suspense, lazy, ReactNode } from 'react'

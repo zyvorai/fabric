@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { useState, useCallback } from 'react';
 import { FileStack, Plus, Trash2, Rocket, Cpu, MemoryStick, HardDrive } from 'lucide-react';
 import { templateApi } from '../utils/api';

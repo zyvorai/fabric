@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 /// Generate an OVF XML descriptor for a virtual machine.
 pub fn generate_ovf(name: &str, cpus: u32, memory_mb: u64, disk_size: u64) -> String {
     format!(

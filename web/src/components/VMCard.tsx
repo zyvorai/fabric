@@ -1,3 +1,7 @@
+// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+// Proprietary software — see LICENSE in the repository root.
+// https://zyvor.dev · info@zyvor.dev
+
 import { Cpu, HardDrive } from 'lucide-react';
 import { useViewContext } from '../App';
 import { getStatusBadgeClasses, formatMemory } from '../utils/format';
