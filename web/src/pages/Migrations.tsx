@@ -272,7 +272,7 @@ function StartMigrationDialog({
     listVMs()
       .then(setVMs)
       .catch((e) => toastFailure(toast, 'Failed to load VMs', e))
-  }, [])
+  }, [toast])
 
   const handleStart = async () => {
     if (!vmName || !targetHost.trim()) {
