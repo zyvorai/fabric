@@ -30,7 +30,25 @@ REPOS = [
     "vmspawn",
 ]
 
-SKIP_REPO = {"guestkit"}
+# Keep upstream OSS license files and metadata (do not proprietary-sync).
+OPEN_SOURCE_REPO_PATHS = {
+    "guestkit",
+    "tt/cloud-netconfig",
+    "tt/hyper2kvm",
+    "tt/hypersdk",
+    "tt/hypersdk-org-profile",
+    "tt/netctl",
+    "tt/netevd",
+}
+
+SPDX_LINE = re.compile(
+    r"^(//|#) SPDX-License-Identifier:.*\n",
+    re.MULTILINE,
+)
+LICENSE_BADGE = re.compile(
+    r"^\s*\[!\[[^\]]*License[^\]]*\][^\]]*\]\([^)]+\)[^\n]*\n",
+    re.MULTILINE | re.IGNORECASE,
+)
 
 CARGO_LICENSE = 'LicenseRef-Zyvor-Proprietary'
 NPM_LICENSE = "SEE LICENSE IN LICENSE"
@@ -246,6 +264,10 @@ def ensure_contact_line(text: str, ext: str) -> str:
     return text
 
 
+def strip_spdx_lines(text: str) -> str:
+    return SPDX_LINE.sub("", text)
+
+
 def add_source_header(path: Path, stats: dict) -> None:
     ext = path.suffix
     if ext not in SOURCE_EXTS:
@@ -254,6 +276,11 @@ def add_source_header(path: Path, stats: dict) -> None:
         text = path.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
         return
+    stripped = strip_spdx_lines(text)
+    if stripped != text:
+        text = stripped
+        path.write_text(text, encoding="utf-8")
+        stats["headers"] += 1
     if HEADER_MARK in text[:400] and CONTACT_MARK in text[:600]:
         return
     if HEADER_MARK in text[:400]:
@@ -278,9 +305,31 @@ def add_source_header(path: Path, stats: dict) -> None:
         stats["headers"] += 1
 
 
+def strip_oss_readme_markers(text: str) -> str:
+    text = LICENSE_BADGE.sub("", text)
+    text = re.sub(
+        r"^\s*\| \[[^\]]*LICENSE[^\]]*\][^\|]*\| \*\*(LGPL|Apache|MIT)[^\|]*\|[^\n]*\n",
+        "",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
+    text = re.sub(
+        r"^\s*- \[[^\]]*LICENSE[^\]]*\][^\n]*— (LGPL|Apache|MIT)[^\n]*\n",
+        "",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
+    return text
+
+
 def update_readme(path: Path, stats: dict) -> None:
     text = path.read_text(encoding="utf-8")
+    before = text
+    text = strip_oss_readme_markers(text)
     if HEADER_MARK in text and "Proprietary" in text and "[LICENSE](LICENSE)" in text:
+        if text != before:
+            path.write_text(text, encoding="utf-8")
+            stats["readme"] += 1
         return
     lower = text.lower()
     if "apache license" in lower or "licensed under the apache" in lower:
@@ -306,16 +355,15 @@ def update_readme(path: Path, stats: dict) -> None:
             flags=re.IGNORECASE,
             count=1,
         )
-        stats["readme"] += 1
     elif "## License" not in text and "license" in lower:
         text = text.rstrip() + README_PROPRIETARY
-        stats["readme"] += 1
     elif "## License" not in text:
         text = text.rstrip() + README_PROPRIETARY
-        stats["readme"] += 1
-    else:
+    elif text == before:
         return
-    path.write_text(text, encoding="utf-8")
+    if text != before:
+        path.write_text(text, encoding="utf-8")
+        stats["readme"] += 1
 
 
 def process_repo(repo_root: Path) -> dict:
@@ -375,7 +423,7 @@ def main() -> int:
     root = canonical_root()
     parent = root.parent
     print(f"Parent: {parent}")
-    print(f"Excluded: {', '.join(sorted(SKIP_REPO))}")
+    print(f"Excluded (OSS licenses): {', '.join(sorted(OPEN_SOURCE_REPO_PATHS))}")
     print("")
 
     totals = {
@@ -391,6 +439,9 @@ def main() -> int:
         repo = parent / name
         if not repo.is_dir():
             print(f"skip {name} (missing)")
+            continue
+        if name in OPEN_SOURCE_REPO_PATHS:
+            print(f"skip {name} (open-source license preserved)")
             continue
         stats = process_repo(repo)
         print(

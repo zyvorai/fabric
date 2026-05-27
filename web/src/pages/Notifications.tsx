@@ -139,6 +139,14 @@ export default function Notifications() {
 
   return (
     <div>
+      {loadError && (
+        <ErrorBanner
+          title="Could not load notifications"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={loadData}
+        />
+      )}
       <PageHeader
         title="Notifications"
         description="Manage notification channels and alert rules"

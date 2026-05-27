@@ -7,9 +7,7 @@ IMPORTANT — READ CAREFULLY BEFORE INSTALLING, DEPLOYING, OR USING THIS SOFTWAR
 
 This Proprietary Software License Agreement ("Agreement") is a legal contract between
 you ("Licensee", "Customer", or "you") and ZyvorAI Labs Private Limited, a company
-incorporated under the Companies Act, 2013 (India),
-with its registered office at A 802 Wisteria, Keshav Nagar Manjri Rd., Mundhwa,
-Pune City, Pune — 411036, Maharashtra, India ("Licensor", "Zyvor", "we", "us"),
+incorporated under the Companies Act, 2013 (India) ("Licensor", "Zyvor", "we", "us"),
 for the PacketWolf / NetPredator software, documentation, container images, binaries,
 eBPF objects, Helm charts, scripts (including deploy-remote.sh), and all related
 materials (collectively, the "Software").
@@ -142,6 +140,6 @@ BOUND BY THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT USE THE SOFTWARE.
     Website: https://zyvor.dev
     Enterprise agreement templates: docs/legal/ (source) or legal/ (customer bundle)
 
-License version: 1.9
+License version: 2.0
 Product: PacketWolf / NetPredator
 Licensor: ZyvorAI Labs Private Limited · https://zyvor.dev · info@zyvor.dev

@@ -36,7 +36,6 @@ export const navGroups: NavGroup[] = [
       { to: '/profiles', icon: <Layers className="w-4 h-4 text-purple-400" />, label: 'Profiles' },
       { to: '/datacenters', icon: <Building2 className="w-4 h-4 text-amber-400" />, label: 'Datacenters' },
       { to: '/vm-browser', icon: <Monitor className="w-4 h-4 text-sky-400" />, label: 'VM Browser' },
-      { to: '/vm-wizard', icon: <Plus className="w-4 h-4 text-green-400" />, label: 'VM Wizard' },
     ],
   },
   {

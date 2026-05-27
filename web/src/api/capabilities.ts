@@ -15,6 +15,8 @@ export interface Capabilities {
   machined: SubsystemStatus
   storage: SubsystemStatus
   network_security: SubsystemStatus
+  auth: SubsystemStatus
+  events: SubsystemStatus
 }
 
 export function getCapabilities(): Promise<Capabilities> {

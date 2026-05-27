@@ -17,7 +17,7 @@ ZyvorAI Labs Private Limited
     └── HyperSDK Platform (SDKs, tooling, integrations)
 ```
 
-- **All product code is proprietary** — no Apache, MIT, LGPL, or other OSS distribution (PacketWolf, Ragnarok, Aether, GuestKit, HyperSDK).
+- **All product code is proprietary** — no Apache, MIT, or other OSS distribution (PacketWolf, Ragnarok, Aether, HyperSDK, netctl, netevd, etc.). **GuestKit** remains **LGPL-3.0-or-later** (open-source guest layer).
 - **Hosted SaaS**, AI rules, and sovereign features are **commercial** under MSA/ELA.
 - **Trademarks** are **not** granted by the software license—see [TRADEMARK-NOTICE.md](TRADEMARK-NOTICE.md).
 

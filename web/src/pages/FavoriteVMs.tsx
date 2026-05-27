@@ -111,9 +111,12 @@ export default function FavoriteVMs() {
       </div>
 
       {error && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-5 mb-4">
-          <div className="flex items-start gap-3"><AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" /><div><p className="text-sm font-medium text-amber-300">{error}</p><button onClick={loadVMs} className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-colors">Try again</button></div></div>
-        </div>
+        <ErrorBanner
+          title="Could not load VMs"
+          headline={error}
+          hints={hintsForError(error, 'vm')}
+          onRetry={loadVMs}
+        />
       )}
 
       {loading ? (

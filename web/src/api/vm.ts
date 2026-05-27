@@ -20,6 +20,8 @@ export interface CreateVMRequest {
   image: string
   cpus: number
   memory: number
+  /** Disk size in GB (daemon default: 20). */
+  disk?: number
 }
 
 export interface VMMetrics {

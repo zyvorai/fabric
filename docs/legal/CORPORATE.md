@@ -27,7 +27,6 @@ All products are **proprietary** (no Apache/MIT/LGPL distribution). Trademarks a
 | Incorporated | 6 May 2026 |
 | Company type | Private limited by shares (Companies Act, 2013, India) |
 | State of registration | Maharashtra |
-| Registered office | A 802 Wisteria, Keshav Nagar Manjri Rd., Mundhwa, Pune City, Pune — 411036, Maharashtra, India |
 
 ## MCA / SPICE+ filing references
 

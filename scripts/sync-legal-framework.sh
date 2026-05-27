@@ -13,7 +13,9 @@ PROJECTS=(
   Aether cockpit forge hyper2kvm- hypercluster hypersdk- hypersdk-web
   IronWolf machina mkosi-kernel nightforge ragnarok v9s VMRogue vmspawn
 )
-# guestkit excluded — separate license
+# Excluded (keep OSS licenses + their own legal docs):
+# guestkit (LGPL), tt/cloud-netconfig, tt/hyper2kvm, tt/hypersdk,
+# tt/hypersdk-org-profile, tt/netctl, tt/netevd
 
 if [[ ! -d "${LEGAL_SRC}" ]]; then
   echo "ERROR: missing ${LEGAL_SRC}" >&2
@@ -22,7 +24,7 @@ fi
 
 echo "Sync legal framework from ${LEGAL_SRC}"
 echo "Parent: ${PARENT}"
-echo "Excluded: guestkit (separate license)"
+echo "Excluded: guestkit + tt/{cloud-netconfig,hyper2kvm,hypersdk,hypersdk-org-profile,netctl,netevd}"
 echo ""
 
 for name in "${PROJECTS[@]}"; do

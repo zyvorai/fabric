@@ -2,9 +2,10 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { createVM } from '../api/vm'
+import { apiGet } from '../api/client'
 import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor } from 'lucide-react'
 import WizardStepper from '../components/WizardStepper'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -39,11 +40,32 @@ export default function CreateVM() {
   const [image, setImage] = useState('')
   const [cpus, setCpus] = useState(2)
   const [memory, setMemory] = useState(2048)
+  const [diskGb, setDiskGb] = useState(20)
+  const [imageOptions, setImageOptions] = useState<{ name: string; path: string }[]>([])
+  const [imagesLoading, setImagesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedOptions>(defaultAdvanced)
   const [wizardStep, setWizardStep] = useState(0)
+
+  useEffect(() => {
+    if (wizardStep !== 0) return
+    let cancelled = false
+    setImagesLoading(true)
+    apiGet<{ name: string; path: string }[]>('/api/images')
+      .then((data) => {
+        if (cancelled) return
+        setImageOptions((Array.isArray(data) ? data : []).filter((i) => i.path))
+      })
+      .catch(() => {
+        if (!cancelled) setImageOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setImagesLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [wizardStep])
 
   const memoryPresets = [
     { label: '512 MB', value: 512 },
@@ -96,7 +118,7 @@ export default function CreateVM() {
     setError('')
 
     try {
-      await createVM({ name, image, cpus, memory })
+      await createVM({ name, image, cpus, memory, disk: diskGb })
       navigate('/vms')
     } catch (err) {
       setError(formatUserError(err))
@@ -159,20 +181,38 @@ export default function CreateVM() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="vm-image" className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Image Path
-                </label>
-                <input
-                  id="vm-image"
-                  type="text"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  placeholder="/var/lib/vmspawnd/images/ubuntu-24.04.qcow2"
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm font-mono"
-                  required
-                />
-              </div>
+            <div>
+              <label htmlFor="vm-image" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Disk image
+              </label>
+              {imageOptions.length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const opt = imageOptions.find((o) => o.path === e.target.value)
+                    if (opt) setImage(opt.path)
+                  }}
+                  className="w-full mb-2 px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-slate-300 text-sm"
+                >
+                  <option value="">{imagesLoading ? 'Loading images…' : 'Pick from catalog…'}</option>
+                  {imageOptions.map((opt) => (
+                    <option key={opt.path} value={opt.path}>
+                      {opt.name} — {opt.path}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <input
+                id="vm-image"
+                type="text"
+                value={image}
+                onChange={(e) => setImage(e.target.value)}
+                placeholder="/var/lib/vmspawnd/images/ubuntu-24.04.qcow2"
+                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm font-mono"
+                required
+              />
+              <p className="text-xs text-slate-500 mt-1">Choose from the catalog or enter a path on the host.</p>
+            </div>
             </div>
           )}
 
@@ -248,19 +288,37 @@ export default function CreateVM() {
                 </div>
               </div>
 
+              <div>
+              <label htmlFor="vm-disk" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Root disk (GB)
+              </label>
+              <input
+                id="vm-disk"
+                type="number"
+                min={1}
+                max={2048}
+                value={diskGb}
+                onChange={(e) => setDiskGb(Math.max(1, parseInt(e.target.value) || 20))}
+                className="w-28 px-3 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white"
+              />
+            </div>
+
               <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="w-full flex items-center justify-between px-6 py-4 text-sm font-medium text-slate-400 hover:text-slate-300 transition-colors"
-                >
-                  <span className="uppercase tracking-wider">Advanced Options</span>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between px-6 py-4 text-sm font-medium text-slate-400 hover:text-slate-300 transition-colors"
+            >
+              <span className="uppercase tracking-wider">Advanced Options (preview)</span>
                   {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
 
-                {showAdvanced && (
-                  <div className="px-6 pb-6 space-y-5 border-t border-slate-700/50 pt-5">
-                    <div>
+            {showAdvanced && (
+              <div className="px-6 pb-6 space-y-5 border-t border-slate-700/50 pt-5">
+                <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                  Firmware, display, and CPU mode are not applied at create time yet. Only name, image, vCPUs, memory, and disk size are sent to the API.
+                </p>
+                <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
                         <Shield className="w-4 h-4 text-slate-500" />
                         Firmware
@@ -333,11 +391,15 @@ export default function CreateVM() {
                   <dt className="text-slate-500">vCPUs</dt>
                   <dd className="text-white">{cpus}</dd>
                 </div>
-                <div className="flex justify-between gap-4">
+                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
                   <dt className="text-slate-500">Memory</dt>
                   <dd className="text-white">
                     {memory} MB ({(memory / 1024).toFixed(1)} GB)
                   </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-500">Root disk</dt>
+                  <dd className="text-white">{diskGb} GB</dd>
                 </div>
               </dl>
             </div>

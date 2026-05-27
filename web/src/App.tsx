@@ -101,7 +101,6 @@ const BatchMigrationBuilderPage = lazy(() => import('./pages/BatchMigrationBuild
 const MigrationTemplatesPage = lazy(() => import('./pages/MigrationTemplates'))
 const SnapshotManagerPage = lazy(() => import('./pages/SnapshotManager'))
 const StorageManagerPage = lazy(() => import('./pages/StorageManager'))
-const VMCreateWizardPage = lazy(() => import('./pages/VMCreateWizard'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -282,7 +281,7 @@ function MainLayout() {
                 <Route path="/migration-templates" element={<MigrationTemplatesPage />} />
                 <Route path="/snapshot-manager" element={<SnapshotManagerPage />} />
                 <Route path="/storage-manager" element={<StorageManagerPage />} />
-                <Route path="/vm-wizard" element={<VMCreateWizardPage />} />
+                <Route path="/vm-wizard" element={<Navigate to="/create" replace />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -32,6 +32,8 @@ pub struct CapabilitiesResponse {
     pub machined: SubsystemStatus,
     pub storage: SubsystemStatus,
     pub network_security: SubsystemStatus,
+    pub auth: SubsystemStatus,
+    pub events: SubsystemStatus,
 }
 
 /// GET /api/v1/capabilities — live status of core platform subsystems.
@@ -42,11 +44,15 @@ pub async fn get_capabilities(
     let machined = probe_machined(&state).await;
     let storage = probe_storage(&state).await;
     let network_security = probe_network_security(&state);
+    let auth = probe_auth(&state);
+    let events = probe_events(&state);
 
     Json(CapabilitiesResponse {
         machined,
         storage,
         network_security,
+        auth,
+        events,
     })
 }
 
@@ -87,6 +93,31 @@ async fn probe_storage(state: &AppState) -> SubsystemStatus {
                 detail: Some("Storage manager unavailable".to_string()),
             }
         }
+    }
+}
+
+fn probe_auth(state: &AppState) -> SubsystemStatus {
+    match (&state.jwt_config, &state.user_db) {
+        (Some(_), Some(_)) => SubsystemStatus {
+            phase: SubsystemPhase::Live,
+            detail: Some("JWT and user database configured".to_string()),
+        },
+        (None, _) => SubsystemStatus {
+            phase: SubsystemPhase::Off,
+            detail: Some("Authentication disabled".to_string()),
+        },
+        _ => SubsystemStatus {
+            phase: SubsystemPhase::Unreachable,
+            detail: Some("Auth enabled but user database unavailable".to_string()),
+        },
+    }
+}
+
+fn probe_events(state: &AppState) -> SubsystemStatus {
+    let receivers = state.event_tx.receiver_count();
+    SubsystemStatus {
+        phase: SubsystemPhase::Live,
+        detail: Some(format!("SSE broadcast ready · {receivers} subscriber(s)")),
     }
 }
 
