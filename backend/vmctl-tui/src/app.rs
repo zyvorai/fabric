@@ -49,6 +49,17 @@ pub enum CommandEffect {
     StartSelected,
     StopSelected,
     SnapSelected,
+    Refresh,
+}
+
+async fn http_error_message(res: reqwest::Response) -> String {
+    let status = res.status();
+    let text = res.text().await.unwrap_or_default();
+    api_error::format_http_error_body(
+        status.as_u16(),
+        status.canonical_reason().unwrap_or(""),
+        &text,
+    )
 }
 
 pub struct App {
@@ -731,8 +742,9 @@ impl App {
                     self.add_status(format!("Started VM '{}'", vm_name), StatusLevel::Success);
                 }
                 Ok(res) => {
+                    let msg = http_error_message(res).await;
                     self.add_status(
-                        format!("Failed to start '{}': {}", vm_name, res.status()),
+                        format!("Failed to start '{}': {}", vm_name, msg),
                         StatusLevel::Error,
                     );
                 }
@@ -761,8 +773,9 @@ impl App {
                     self.add_status(format!("Stopped VM '{}'", vm_name), StatusLevel::Success);
                 }
                 Ok(res) => {
+                    let msg = http_error_message(res).await;
                     self.add_status(
-                        format!("Failed to stop '{}': {}", vm_name, res.status()),
+                        format!("Failed to stop '{}': {}", vm_name, msg),
                         StatusLevel::Error,
                     );
                 }
@@ -924,10 +937,7 @@ impl App {
             "start" => CommandEffect::StartSelected,
             "stop" => CommandEffect::StopSelected,
             "snap" | "snapshot" => CommandEffect::SnapSelected,
-            "refresh" | "r" => {
-                self.push_recent_task("refresh (use R in normal mode)");
-                CommandEffect::None
-            }
+            "refresh" => CommandEffect::Refresh,
             other => {
                 self.show_toast(format!("Unknown command: :{other}"), StatusLevel::Error);
                 CommandEffect::None
@@ -961,9 +971,9 @@ impl App {
                     self.show_toast(format!("Snapshot created for '{}'", vm_name), StatusLevel::Success);
                 }
                 Ok(res) => {
-                    let text = res.text().await.unwrap_or_default();
+                    let msg = http_error_message(res).await;
                     self.show_toast(
-                        format!("Snapshot failed for '{}': {}", vm_name, api_error::format_user_error(&text)),
+                        format!("Snapshot failed for '{}': {}", vm_name, msg),
                         StatusLevel::Error,
                     );
                 }

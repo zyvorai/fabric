@@ -123,6 +123,9 @@ async fn run_app<B: ratatui::backend::Backend>(
                                         CommandEffect::SnapSelected => {
                                             app.snap_selected().await?;
                                         }
+                                        CommandEffect::Refresh => {
+                                            app.refresh().await?;
+                                        }
                                         CommandEffect::None => {}
                                     }
                                 }

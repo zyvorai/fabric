@@ -293,6 +293,14 @@ The full API surface covers 480+ REST endpoints. See [docs/api.md](docs/api.md) 
 
 ---
 
+## Web UI and legacy frontend
+
+The production dashboard lives in [`web/`](web/) (React + Vite, router-based). Build with `cd web && npm install && npm run build`; the daemon serves the built assets.
+
+[`web-legacy/`](web-legacy/) is an archived state-SPA snapshot kept for comparison. It is **not** built or installed by default. UX conventions for the current UI are documented in [`docs/ux.md`](docs/ux.md).
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |

@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import Breadcrumb from '../components/Breadcrumb'
 
 interface ReadinessCheck { name: string; status: string; message: string; detail?: string }
 
@@ -34,10 +35,22 @@ export default function MigrationReadiness() {
   const errorCount = checks.filter((c) => c.status === 'error').length
   const warningCount = checks.filter((c) => c.status === 'warning').length
 
-  if (loading) return <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3"><div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" /><span className="text-sm">Checking migration readiness...</span></div>
-  if (error) return <div className="bg-slate-800/50 rounded-xl p-6 border border-red-700/50"><div className="text-red-400 text-sm mb-3">Failed to check readiness: {error}</div><button onClick={fetchReadiness} className="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">Retry</button></div>
+  if (loading) return (
+    <div className="space-y-6">
+      <Breadcrumb />
+      <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3"><div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" /><span className="text-sm">Checking migration readiness...</span></div>
+    </div>
+  )
+  if (error) return (
+    <div className="space-y-6">
+      <Breadcrumb />
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-red-700/50"><div className="text-red-400 text-sm mb-3">Failed to check readiness: {error}</div><button onClick={fetchReadiness} className="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">Retry</button></div>
+    </div>
+  )
 
   return (
+    <div className="space-y-6">
+      <Breadcrumb />
     <div className="flex flex-col gap-4">
       <div className={`rounded-xl p-4 border flex items-center justify-between ${hasIssues ? 'bg-yellow-500/10 border-yellow-700/50' : 'bg-green-500/10 border-green-700/50'}`}>
         <div className="flex items-center gap-3">
@@ -63,6 +76,7 @@ export default function MigrationReadiness() {
           </div>
         ))}
       </div>
+    </div>
     </div>
   )
 }

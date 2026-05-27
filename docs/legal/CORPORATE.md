@@ -34,22 +34,14 @@ All products are **proprietary** (no Apache/MIT/LGPL distribution). Trademarks a
 |----------|-----------|------|
 | Integrated SPICE+ (INC-32) | SRN **AC3303222** | Application 2 May 2026 |
 | Certificate of Incorporation | Part B approval **AC3303222** | 6 May 2026 |
-| DIN allotment (Susanta Sahani) | Same SRN **AC3303222** | 6 May 2026 |
 | e-MOA (INC-33) | SRN 1-25393253535 | Filed with incorporation |
 | e-AOA (INC-34) | SRN 1-25393253525 | Table F (company limited by shares) |
 
 Source PDFs (internal): `SPICE + Part B_Approval Letter_AC3303222-1.pdf`, `SPICE + Part B_DIN Approval Letter_AC3303222-1.pdf`, `INC-33_1-25393253535.pdf`, `INC-34_1-25393253525.pdf`.
 
-## Directors (board)
+## Authorized signatory
 
-| Name | DIN | Role |
-|------|-----|------|
-| Pravat Nalini Sahani | 11703375 | Director |
-| Susanta Sahani | 11703376 | Director |
-
-**Signatory for software / licensing:** a **Director** of ZyvorAI Labs Private Limited (authorized by the board).
-
-Board resolution dated **6 May 2026** (GST): Susanta Sahani (DIN 11703376) authorized to apply for GST, sign returns, and represent the company before GST authorities.
+Software and licensing agreements may be executed by a **Director** of ZyvorAI Labs Private Limited (authorized by the board).
 
 ## Main objects (from e-MOA, summary)
 
@@ -87,13 +79,11 @@ Always use **ZyvorAI Labs Private Limited** on licenses, contracts, and customer
 | File | Purpose |
 |------|---------|
 | `SPICE + Part B_Approval Letter_AC3303222-1.pdf` | Certificate of Incorporation |
-| `SPICE + Part B_DIN Approval Letter_AC3303222-1.pdf` | DIN 11703376 allotment |
+| `SPICE + Part B_DIN Approval Letter_AC3303222-1.pdf` | Director identification (internal) |
 | `ZYVORAI_LABS_GST_Board_Resolution.pdf` | GST registration authority (board) |
 | `zyvorai_board_resolution_polished-1.pdf` | Same GST resolution (formatted) |
 | `Zyvor_Labs_GST_Board_Resolution_Updated.pdf` | Alternate company name — verify before use |
 | `INC-33_1-25393253535.pdf` | e-MOA / objects clause |
 | `INC-34_1-25393253525.pdf` | e-AOA (Table F) |
-| `ZavorAI_Director_Stamp_Request.pdf` | Director stamp request (name typo) |
-| `responsibility_matrix_susant_sibu.pdf` | Internal ops matrix (not corporate filing) |
 
 Keep incorporation and board PDFs with company records; do not redistribute publicly.

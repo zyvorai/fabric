@@ -78,7 +78,7 @@ with 37+ pages for managing VMs, storage, network security, and more.
 %{_datadir}/vmspawnd/web/
 
 %changelog
-* Mon Mar 03 2026 Susant Sahani <ssahani@gmail.com> - 0.1.0-1
+* Mon Mar 03 2026 ZyvorAI Labs Private Limited <ssahani@gmail.com> - 0.1.0-1
 - Initial package
 - vmspawnd daemon with REST API and WebSocket
 - vmctl CLI with JSON/YAML output and 15+ subcommand groups

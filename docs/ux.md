@@ -39,7 +39,11 @@ Daemon returns `{ "error": "…", "error_code": "operation_failed" }` on failure
 
 Do not display raw HTML or bare `error_code` strings. [`Toast.tsx`](../web/src/components/Toast.tsx) sanitizes error messages.
 
-Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format_user_error` for status lines.
+Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format_http_error_body` for failed start/stop/snapshot HTTP responses.
+
+### Domain hints
+
+[`daemonHints.ts`](../web/src/utils/daemonHints.ts) exports `hintsForError(err, domain?)` for contextual banner copy (machined, storage, auth). Wire via `ErrorBanner` `hints={hintsForError(loadError, 'vm')}` on Dashboard, VM list/detail, Storage, Network, and tier-2 Operations pages.
 
 ### Stable codes
 
@@ -65,21 +69,31 @@ Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format
 
 ## TUI (`vmctl-tui`)
 
-Machina-aligned **GuestKit** orange theme, inventory sidebar, `:` colon commands (`:vms`, `:dashboard`, `:start`, `:stop`, `:snap`, `:help`), `/` fuzzy search, styled confirmation overlay (`[y]` red / `[n]` green), recent tasks bar, 3s toasts.
+Machina-aligned **GuestKit** orange theme, inventory sidebar, `:` colon commands (`:vms`, `:dashboard`, `:start`, `:stop`, `:snap`, `:refresh`, `:help`), `/` fuzzy search, styled confirmation overlay (`[y]` red / `[n]` green), recent tasks bar, 3s toasts. Failed VM actions parse API `error_code` via `format_http_error_body`.
 
 ## Dashboard health cards
 
-`GET /api/v1/capabilities` returns subsystem phases (`off` | `unreachable` | `live`) for **machined**, **storage**, and **network_security**. The dashboard reads these via [`PlatformInfoContext`](../web/src/contexts/PlatformInfoContext.tsx) and refreshes every 30s.
+`GET /api/v1/capabilities` returns subsystem phases (`off` | `unreachable` | `live`) for **machined**, **storage**, **network_security**, **auth**, and **events**. The dashboard reads these via [`PlatformInfoContext`](../web/src/contexts/PlatformInfoContext.tsx) and refreshes every 30s.
 
 ## Create VM wizard
 
+Canonical route: **`/create`**. `/vm-wizard` redirects to `/create` (legacy [`VMCreateWizard`](../web/src/pages/VMCreateWizard.tsx) is unused).
+
 [`CreateVM`](../web/src/pages/CreateVM.tsx) uses [`WizardStepper`](../web/src/components/WizardStepper.tsx) with three gated steps:
 
-1. **Basics** — name and image path (validated before Next)
-2. **Resources** — vCPUs, memory presets, optional advanced options
-3. **Review** — summary and submit
+1. **Basics** — name, image picker from `GET /api/images` plus manual path override
+2. **Resources** — vCPUs, memory presets, disk size (GB), optional advanced panel (preview only; not sent to API yet)
+3. **Review** — summary and submit (`name`, `image`, `cpus`, `memory`, `disk`)
 
 Back/Next buttons only show fields for the active step.
+
+## Page errors (tier 2)
+
+Operations and infrastructure pages use `loadError` + [`ErrorBanner`](../web/src/components/ErrorBanner.tsx) + `toastFailure`: Templates, Logs, Machines, Schedules, Storage Pools, Disk Images, Audit Logs, Notifications, Migrations, System Health, Favorite VMs. Use `Promise.allSettled` when loading multiple catalogs.
+
+## Breadcrumbs
+
+[`Breadcrumb`](../web/src/components/Breadcrumb.tsx) on VM detail, Settings, Machines, Storage Pools, Backups, and migration subpages. Labels come from [`routeLabels`](../web/src/utils/routes.tsx).
 
 ## Build
 

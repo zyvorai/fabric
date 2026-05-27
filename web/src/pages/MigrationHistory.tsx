@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import Breadcrumb from '../components/Breadcrumb'
 
 interface HistoryEntry { id: string; name: string; vm_name: string; status: string; error?: string; started_at?: string; completed_at?: string; duration?: string; output_path?: string }
 
@@ -31,11 +32,28 @@ export default function MigrationHistory() {
 
   useEffect(() => { fetchHistory() }, [fetchHistory])
 
-  if (loading) return <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3"><div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" /><span className="text-sm">Loading migration history...</span></div>
-  if (error) return <div className="bg-slate-800/50 rounded-xl p-6 border border-red-700/50"><div className="text-red-400 text-sm mb-3">Failed to load history: {error}</div><button onClick={fetchHistory} title="Retry" className="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">Retry</button></div>
-  if (history.length === 0) return <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3"><span className="text-sm">No migration history yet</span><span className="text-xs text-slate-600">Completed and failed migrations will appear here</span></div>
+  if (loading) return (
+    <div className="space-y-6">
+      <Breadcrumb />
+      <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3"><div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" /><span className="text-sm">Loading migration history...</span></div>
+    </div>
+  )
+  if (error) return (
+    <div className="space-y-6">
+      <Breadcrumb />
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-red-700/50"><div className="text-red-400 text-sm mb-3">Failed to load history: {error}</div><button onClick={fetchHistory} title="Retry" className="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">Retry</button></div>
+    </div>
+  )
+  if (history.length === 0) return (
+    <div className="space-y-6">
+      <Breadcrumb />
+      <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3"><span className="text-sm">No migration history yet</span><span className="text-xs text-slate-600">Completed and failed migrations will appear here</span></div>
+    </div>
+  )
 
   return (
+    <div className="space-y-6">
+      <Breadcrumb />
     <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead><tr className="border-b border-slate-700/50">
@@ -62,6 +80,7 @@ export default function MigrationHistory() {
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }

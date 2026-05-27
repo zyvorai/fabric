@@ -23,6 +23,7 @@ import { PageHeader } from '../components/ui'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
+import Breadcrumb from '../components/Breadcrumb'
 
 export default function Backups() {
   const toast = useToastContext()
@@ -136,6 +137,7 @@ export default function Backups() {
 
   return (
     <div>
+      <Breadcrumb />
       {loadError && (
         <ErrorBanner
           title="Could not load backups"

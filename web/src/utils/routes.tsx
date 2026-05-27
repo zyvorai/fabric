@@ -4,7 +4,7 @@
 
 import type React from 'react'
 import {
-  Server, Plus, Home, Terminal, Network, HardDrive,
+  Server, Home, Terminal, Network, HardDrive,
   Layers, Shield, Calendar, FileText, BarChart3, Save, Bell,
   Database, Cpu, Building2, GitBranch,
   Zap, Lock, RefreshCw, Archive, Key, Activity, PackageCheck, Camera,
@@ -170,9 +170,20 @@ export const routeLabels: Record<string, string> = {
   '/network': 'Network',
   '/network-security': 'Net Security',
   '/storage': 'Storage',
+  '/storage-pools': 'Storage Pools',
   '/live-metrics': 'Live Metrics',
   '/backups': 'Backups',
   '/disk-images': 'Disk Images',
   '/audit': 'Audit',
   '/logs': 'Logs',
+  '/machines': 'Machines',
+  '/migrations': 'Migrations',
+  '/migration-readiness': 'Migration Readiness',
+  '/migration-history': 'Migration History',
+  '/migration-report': 'Migration Report',
+  '/migration-wizard': 'Migration Wizard',
+  '/migration-templates': 'Migration Templates',
+  '/batch-migration': 'Batch Migration',
+  '/templates': 'Templates',
+  '/schedules': 'Schedules',
 }

@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect } from 'react'
-import { Star, Search, Monitor, RefreshCw, Cpu, HardDrive, AlertTriangle } from 'lucide-react'
+import { Star, Search, Monitor, RefreshCw, Cpu, HardDrive } from 'lucide-react'
 import { Link } from 'react-router'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'

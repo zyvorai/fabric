@@ -1,7 +1,7 @@
 Source: vmspawnd
 Section: admin
 Priority: optional
-Maintainer: Susant Sahani <ssahani@gmail.com>
+Maintainer: ZyvorAI Labs Private Limited <ssahani@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                cargo,
                rustc,

@@ -18,6 +18,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import Breadcrumb from '../components/Breadcrumb'
 
 export default function Machines() {
   const toast = useToastContext()
@@ -108,6 +109,7 @@ export default function Machines() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb />
       {loadError && (
         <ErrorBanner
           title="Could not load machines"
