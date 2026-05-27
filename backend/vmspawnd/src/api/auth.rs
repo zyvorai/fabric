@@ -316,22 +316,47 @@ pub async fn me(
         .ok_or_else(|| crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required"))?
         .clone();
 
-    let user_db = state.user_db.as_ref().ok_or_else(|| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
-
-    let user = user_db
-        .get_by_id(&claims.sub)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "User not found"))?;
-
-    let role_str = match user.role {
+    let role_str = match claims.role {
         security::Role::Admin => "admin",
         security::Role::User => "user",
         security::Role::Viewer => "viewer",
-    }.to_string();
+    }
+    .to_string();
 
+    if let Some(ref user_db) = state.user_db {
+        if let Ok(Some(user)) = user_db.get_by_id(&claims.sub) {
+            let role_str = match user.role {
+                security::Role::Admin => "admin",
+                security::Role::User => "user",
+                security::Role::Viewer => "viewer",
+            }
+            .to_string();
+            return Ok(Json(MeResponse {
+                id: user.id,
+                username: user.username,
+                role: role_str,
+            }));
+        }
+
+        if let Ok(Some(user)) = user_db.get_by_username(&claims.sub) {
+            let role_str = match user.role {
+                security::Role::Admin => "admin",
+                security::Role::User => "user",
+                security::Role::Viewer => "viewer",
+            }
+            .to_string();
+            return Ok(Json(MeResponse {
+                id: user.id,
+                username: user.username,
+                role: role_str,
+            }));
+        }
+    }
+
+    // PAM-authenticated system user (JWT sub is the Linux username).
     Ok(Json(MeResponse {
-        id: user.id,
-        username: user.username,
+        id: claims.sub.clone(),
+        username: claims.sub,
         role: role_str,
     }))
 }

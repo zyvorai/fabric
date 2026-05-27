@@ -31,6 +31,7 @@ echo "[4/6] Installing configuration..."
 sudo install -d /etc/vmspawnd
 sudo install -m 0644 configs/vmspawnd.toml /etc/vmspawnd/vmspawnd.toml
 sudo install -m 0644 configs/vmspawnd.env  /etc/vmspawnd/vmspawnd.env
+sudo install -m 0644 configs/pam.d/vmspawnd /etc/pam.d/vmspawnd
 
 # Create directories
 sudo install -d /var/lib/vmspawnd/images

@@ -531,6 +531,10 @@ done
 for extra in vmspawnd.socket vmspawnd-backup.timer vmspawnd-cleanup.timer; do
     [ -f \"systemd/\$extra\" ] && \$SUDO install -m 644 \"systemd/\$extra\" \"/usr/lib/systemd/system/\$extra\"
 done
+if [ -f configs/pam.d/vmspawnd ]; then
+    \$SUDO install -m 644 configs/pam.d/vmspawnd /etc/pam.d/vmspawnd
+    echo '  ✅ PAM service -> /etc/pam.d/vmspawnd'
+fi
 
 \$SUDO systemctl daemon-reload
 if [ \"\$NO_START\" != true ]; then

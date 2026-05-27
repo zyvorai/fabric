@@ -10,7 +10,8 @@ ExecStart=/usr/bin/vmspawnd
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s
-WatchdogSec=60s
+# Watchdog requires sd_notify(WATCHDOG=1) from the daemon; enable once implemented.
+# WatchdogSec=60s
 
 # Environment
 Environment=VSPAWN_LOG_LEVEL=info

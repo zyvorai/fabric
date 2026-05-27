@@ -365,14 +365,21 @@ export default function Login() {
 
             <div className="mt-6 pt-5 border-t border-slate-700/50 flex items-center justify-center gap-2 text-xs text-slate-500">
               <CheckCircle className="h-3.5 w-3.5 text-emerald-500/70" aria-hidden />
-              <span>Secured with local accounts and system PAM</span>
+              <span>Local admin account or system PAM (Linux password)</span>
             </div>
           </form>
 
           <p className="text-xs text-center mt-4 max-w-sm mx-auto leading-relaxed text-slate-500">
-            Use the <code className="text-[11px] px-1 rounded bg-slate-800/80 text-slate-300">admin</code> account
-            (see <code className="text-[11px] px-1 rounded bg-slate-800/80 text-slate-300">.admin_password</code> on
-            the host) or your system SSH credentials.
+            <strong className="text-slate-400 font-medium">Local admin:</strong> use{' '}
+            <code className="text-[11px] px-1 rounded bg-slate-800/80 text-slate-300">admin</code> with the
+            password in{' '}
+            <code className="text-[11px] px-1 rounded bg-slate-800/80 text-slate-300">.admin_password</code> on
+            the host.
+            <br />
+            <strong className="text-slate-400 font-medium">System user:</strong> sign in with your Linux account
+            (same password as SSH). SSH key-only accounts need{' '}
+            <code className="text-[11px] px-1 rounded bg-slate-800/80 text-slate-300">passwd</code> set on the
+            server first.
           </p>
 
           <div className="lg:hidden text-center mt-6">
