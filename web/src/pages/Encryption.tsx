@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, RefreshCw, Key, Shield } from 'lucide-react'
 import {
   listProviders,
@@ -20,6 +20,8 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function Encryption() {
   const toast = useToastContext()
@@ -27,17 +29,13 @@ export default function Encryption() {
   const [providers, setProviders] = useState<KeyProvider[]>([])
   const [policies, setPolicies] = useState<EncryptionPolicy[]>([])
   const [encryptedVMs, setEncryptedVMs] = useState<VmEncryptionStatus[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load encryption data')
   const [activeTab, setActiveTab] = useState<'providers' | 'policies' | 'vms'>('providers')
   const [showCreateProvider, setShowCreateProvider] = useState(false)
   const [showCreatePolicy, setShowCreatePolicy] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [prov, pol, vms] = await Promise.all([
         listProviders(),
         listEncryptionPolicies(),
@@ -46,12 +44,12 @@ export default function Encryption() {
       setProviders(prov)
       setPolicies(pol)
       setEncryptedVMs(vms)
-    } catch (error) {
-      console.error('Failed to load encryption data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleRemoveProvider = async (id: string) => {
     const ok = await confirm('Remove Key Provider', 'Remove this key provider?', { variant: 'danger', confirmLabel: 'Remove' })
@@ -85,13 +83,12 @@ export default function Encryption() {
     return colors[status] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>
-  }
 
   return (
     <div className="p-6">
       <PageHeader
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         title="Encryption"
         actions={
           <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
@@ -99,6 +96,8 @@ export default function Encryption() {
           </button>
         }
       />
+
+      <PageLoadBanner title="Could not load encryption data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

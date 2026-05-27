@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, ChevronRight, ChevronDown, Trash2, Server, Wrench } from 'lucide-react'
 import {
   listDatacenters,
@@ -26,6 +26,8 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function Datacenters() {
   const toast = useToastContext()
@@ -34,19 +36,15 @@ export default function Datacenters() {
   const [clusters, setClusters] = useState<Cluster[]>([])
   const [hosts, setHosts] = useState<HostInfo[]>([])
   const [summaries, setSummaries] = useState<Map<string, DatacenterSummary>>(new Map())
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load datacenters')
   const [expandedDCs, setExpandedDCs] = useState<Set<string>>(new Set())
   const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set())
   const [showCreateDC, setShowCreateDC] = useState(false)
   const [showCreateCluster, setShowCreateCluster] = useState<string | null>(null)
   const [showRegisterHost, setShowRegisterHost] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [dcs, cls, hs] = await Promise.all([
         listDatacenters(),
         listClusters(),
@@ -64,12 +62,12 @@ export default function Datacenters() {
         } catch { /* skip */ }
       }
       setSummaries(sums)
-    } catch (error) {
-      console.error('Failed to load datacenters:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const toggleDC = (id: string) => {
     setExpandedDCs(prev => {
@@ -139,14 +137,12 @@ export default function Datacenters() {
     return colors[status] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>
-  }
-
   return (
     <div className="p-6">
       <PageHeader
         title="Datacenters"
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         actions={
           <button
             onClick={() => setShowCreateDC(true)}
@@ -157,7 +153,16 @@ export default function Datacenters() {
           </button>
         }
       />
+      <PageLoadBanner
+        title="Could not load datacenters"
+        headline={loadError}
+        onRetry={() => void loadData()}
+      />
 
+      {loading && !loadError ? (
+        <div className="text-center py-8 text-slate-400">Loading…</div>
+      ) : !loadError ? (
+      <>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
@@ -351,6 +356,8 @@ export default function Datacenters() {
           })
         )}
       </div>
+      </>
+      ) : null}
 
       {/* Create Datacenter Modal */}
       {showCreateDC && (

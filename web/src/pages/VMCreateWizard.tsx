@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { Plus, ArrowRight, ArrowLeft, Check, Loader2, Copy } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 
 type Step = 'name' | 'resources' | 'install' | 'network' | 'review'
 
@@ -50,9 +51,14 @@ export default function VMCreateWizard() {
     setSubmitting(true); setResult(null)
     try {
       const res = await apiFetch('/api/vms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, cpus, memory: `${memory}M`, disk_size: `${diskSize}G`, disk_format: diskFormat, firmware, network: networkType, bridge: networkType === 'bridge' ? bridge : undefined, iso: bootSource === 'iso' ? isoPath : undefined, image: bootSource === 'disk' ? diskPath : undefined, pxe: bootSource === 'pxe', auto_start: autoStart }) })
-      if (!res.ok) { const body = await res.json().catch(() => null); throw new Error(body?.error || `HTTP ${res.status}`) }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error || formatHttpErrorBody(res.status, res.statusText, ''))
+      }
       setResult({ ok: true, message: `VM "${name}" created successfully!` })
-    } catch (err: any) { setResult({ ok: false, message: err.message }) } finally { setSubmitting(false) }
+    } catch (err) {
+      setResult({ ok: false, message: formatUserError(err) })
+    } finally { setSubmitting(false) }
   }
 
   const handleCopyCommand = () => { navigator.clipboard.writeText(generateCommand()); setCopied(true); setTimeout(() => setCopied(false), 2000) }

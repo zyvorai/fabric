@@ -5,6 +5,9 @@
 import { useState, useCallback } from 'react'
 import { Terminal, Send, Clock, Trash2, ChevronRight, Loader2, Copy, Check } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { formatUserError } from '../utils/apiError'
+import { hintsForError } from '../utils/daemonHints'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -103,7 +106,7 @@ export default function APIPlayground() {
         ...prev.slice(0, 19),
       ])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed')
+      setError(formatUserError(err))
     } finally {
       setLoading(false)
     }
@@ -226,7 +229,12 @@ export default function APIPlayground() {
           )}
 
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">{error}</div>
+            <ErrorBanner
+              title="Request failed"
+              headline={error}
+              hints={hintsForError(error)}
+              onRetry={handleSend}
+            />
           )}
 
           {response && (

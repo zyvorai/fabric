@@ -3,8 +3,12 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Activity, Cpu, Database, HardDrive, Network, Pause, Play } from 'lucide-react'
+import { Cpu, Database, HardDrive, Network, Pause, Play } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { hintsForError } from '../utils/daemonHints'
 
 interface MetricPoint { timestamp: number; cpu: number; memory: number; disk_read: number; disk_write: number; net_rx: number; net_tx: number }
 
@@ -37,14 +41,18 @@ function fmtB(bytes: number): string {
 export default function LiveMetrics() {
   const [history, setHistory] = useState<MetricPoint[]>([])
   const [paused, setPaused] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const pausedRef = useRef(false)
 
   const fetchMetrics = useCallback(async () => {
     if (pausedRef.current) return
     try {
       const res = await apiFetch('/api/system/metrics')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       const point: MetricPoint = {
         timestamp: Date.now(),
@@ -55,9 +63,19 @@ export default function LiveMetrics() {
         net_rx: data.net_rx_bytes ?? 0,
         net_tx: data.net_tx_bytes ?? 0,
       }
-      setHistory(prev => [...prev.slice(-(MAX_POINTS - 1)), point])
-      setError(null)
-    } catch (err: any) { setError(err.message) }
+      setHistory((prev) => {
+        setLoadError(null)
+        setRefreshError(null)
+        return [...prev.slice(-(MAX_POINTS - 1)), point]
+      })
+    } catch (err) {
+      const msg = formatUserError(err)
+      setHistory((prev) => {
+        if (prev.length === 0) setLoadError(msg)
+        else setRefreshError(msg)
+        return prev
+      })
+    }
   }, [])
 
   useEffect(() => {
@@ -89,24 +107,36 @@ export default function LiveMetrics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><Activity className="w-6 h-6 text-green-400" /> Live Metrics</h1>
-          <p className="text-sm text-slate-400 mt-1">Real-time system performance (1s interval, {MAX_POINTS}s window)</p>
-        </div>
+      <PageHeader
+        title="Live Metrics"
+        description={`Real-time system performance (1s interval, ${MAX_POINTS}s window)`}
+        actions={
         <div className="flex items-center gap-3">
           <button onClick={() => setPaused(!paused)} title={paused ? 'Resume metrics streaming' : 'Pause metrics streaming'} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${paused ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
             {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
             {paused ? 'Resume' : 'Pause'}
           </button>
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${paused ? 'bg-amber-400' : error ? 'bg-red-400' : 'bg-green-400 animate-pulse'}`} />
-            <span className="text-xs text-slate-500">{paused ? 'Paused' : error ? 'Error' : 'Streaming'}</span>
+            <span className={`w-2 h-2 rounded-full ${paused ? 'bg-amber-400' : loadError || refreshError ? 'bg-red-400' : 'bg-green-400 animate-pulse'}`} />
+            <span className="text-xs text-slate-500">{paused ? 'Paused' : loadError || refreshError ? 'Error' : 'Streaming'}</span>
           </div>
         </div>
-      </div>
+        }
+      />
 
-      {error && <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">Connection issue: {error}</div>}
+      {loadError && (
+        <ErrorBanner
+          title="Could not load live metrics"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+        />
+      )}
+
+      {refreshError && !loadError && (
+        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+          Refresh failed: {refreshError} — showing last known data
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {metrics.map(m => (
@@ -129,7 +159,7 @@ export default function LiveMetrics() {
         ))}
       </div>
 
-      {history.length === 0 && !error && (
+      {history.length === 0 && !loadError && (
         <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500 text-sm">Waiting for metrics data...</div>
       )}
     </div>

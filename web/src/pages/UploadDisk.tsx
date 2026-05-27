@@ -3,8 +3,11 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useRef, useCallback } from 'react'
-import { Upload, X, HardDrive, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Upload, X, CheckCircle, HardDrive } from 'lucide-react'
 import { getToken } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { hintsForError } from '../utils/daemonHints'
 
 interface UploadedFile { name: string; path: string; size_bytes: number; format: string; uploadedAt: string }
 
@@ -84,10 +87,7 @@ export default function UploadDisk() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20"><Upload className="w-5 h-5 text-rose-400" /></div>
-        <div><h2 className="text-xl font-bold text-white">Upload Disk Image</h2><p className="text-sm text-slate-400">Upload VM disk images to the server</p></div>
-      </div>
+      <PageHeader title="Upload Disk Image" description="Upload VM disk images to the server" />
 
       {/* Drop zone */}
       <div
@@ -137,10 +137,11 @@ export default function UploadDisk() {
       )}
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-300">{error}</p>
-        </div>
+        <ErrorBanner
+          title="Upload failed"
+          headline={error}
+          hints={hintsForError(error, 'storage')}
+        />
       )}
 
       {uploadResult && (

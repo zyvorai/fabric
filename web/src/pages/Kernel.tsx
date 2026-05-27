@@ -2,64 +2,54 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 export default function Kernel() {
+  const toast = useToastContext()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [moduleFilter, setModuleFilter] = useState('')
 
-  useEffect(() => {
-    let active = true
-
-    const fetchData = () => {
-      apiFetch('/api/system/kernel')
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          return res.json()
-        })
-        .then((json) => {
-          if (active) {
-            setData(json)
-            setError(null)
-            setLoading(false)
-          }
-        })
-        .catch((err) => {
-          if (active) {
-            setError(err.message)
-            setLoading(false)
-          }
-        })
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/system/kernel')
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
+      setData(await res.json())
+      setLoadError(null)
+      setRefreshError(null)
+    } catch (err) {
+      const msg = formatUserError(err)
+      setData((prev: any) => {
+        if (prev == null) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load kernel data', err)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
+    } finally {
+      setLoading(false)
     }
+  }, [toast])
 
+  useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 10000)
-    return () => {
-      active = false
-      clearInterval(interval)
-    }
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (error && !data) {
-    return (
-      <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center">
-        <p className="text-sm font-semibold text-red-400">Failed to load kernel data</p>
-        <p className="text-xs text-red-400/70 mt-1">{error}</p>
-        <button onClick={() => { setLoading(true); setError(null) }} className="mt-3 px-4 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors">Retry</button>
-      </div>
-    )
-  }
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const modules: any[] = data?.modules || []
   const sysctls: any[] = data?.sysctl || (data?.sysctl_params ? Object.entries(data.sysctl_params).map(([k, v]) => ({ key: k, value: v })) : [])
@@ -69,16 +59,34 @@ export default function Kernel() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gradient-purple">Kernel</h1>
-        <p className="text-sm text-slate-400 mt-1">Kernel information and configuration</p>
-      </div>
+      <PageHeader
+        title="Kernel"
+        description="Kernel information and configuration"
+        onRefresh={fetchData}
+        refreshing={loading}
+      />
 
-      {error && (
+      {loadError && (
+        <ErrorBanner
+          title="Could not load kernel data"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={fetchData}
+        />
+      )}
+
+      {refreshError && !loadError && (
         <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
-          Connection issue: {error} - showing last known data
+          Refresh failed: {refreshError} — showing last known data
         </div>
       )}
+
+      {loading && !data && !loadError ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : !loadError ? (
+        <>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card-purple rounded-xl border border-slate-700/50 p-5 card-glow-purple transition-all hover:scale-[1.02]">
@@ -184,6 +192,8 @@ export default function Kernel() {
           </div>
         </div>
       )}
+        </>
+      ) : null}
     </div>
   )
 }

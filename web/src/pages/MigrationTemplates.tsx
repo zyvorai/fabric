@@ -3,8 +3,9 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect } from 'react'
-import { FileText, Plus, Trash2, Copy, Check } from 'lucide-react'
+import { Plus, Trash2, Copy, Check } from 'lucide-react'
 import Breadcrumb from '../components/Breadcrumb'
+import { PageHeader } from '../components/ui'
 
 interface MigrationTemplate { id: string; name: string; description: string; format: string; cpus: number; memory: number; network: string; compress: boolean; created_at: string }
 
@@ -47,10 +48,20 @@ export default function MigrationTemplates() {
   return (
     <div className="space-y-6">
       <Breadcrumb />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3"><FileText className="w-6 h-6 text-indigo-400" /><div><h1 className="text-xl font-bold text-white">Migration Templates</h1><p className="text-sm text-slate-400">Reusable migration configurations</p></div></div>
-        <button onClick={() => setShowAdd(!showAdd)} title="Create new template" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /> New Template</button>
-      </div>
+      <PageHeader
+        title="Migration Templates"
+        description="Reusable migration configurations"
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => setShowAdd(!showAdd)}
+            title="Create new template"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New Template
+          </button>
+        }
+      />
 
       {showAdd && (
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">

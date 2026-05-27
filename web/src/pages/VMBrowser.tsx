@@ -2,10 +2,14 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
-import { Search, Monitor, RefreshCw, Cpu, HardDrive, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Search, Monitor, Cpu, HardDrive } from 'lucide-react'
 import { Link } from 'react-router'
 import { apiFetch } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 function stateColor(state: string): string {
   const s = (state || '').toLowerCase()
@@ -24,21 +28,24 @@ function fmtMem(bytes: number): string {
 
 export default function VMBrowser() {
   const [vms, setVMs] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { loading, loadError, run } = usePageLoader('Failed to load VMs')
   const [search, setSearch] = useState('')
 
-  const loadVMs = async () => {
-    setLoading(true); setError('')
-    try {
+  const loadVMs = useCallback(() => {
+    return run(async () => {
       const res = await apiFetch('/api/vms')
-      if (!res.ok) throw new Error('Could not retrieve VM list.')
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setVMs(Array.isArray(data) ? data : data.vms || [])
-    } catch (e: any) { setError(e.message || 'Unknown error') } finally { setLoading(false) }
-  }
+    })
+  }, [run])
 
-  useEffect(() => { loadVMs() }, [])
+  useEffect(() => {
+    void loadVMs()
+  }, [loadVMs])
 
   const filtered = vms.filter(vm => {
     if (!search) return true
@@ -50,15 +57,13 @@ export default function VMBrowser() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-lg shadow-sky-500/20"><Monitor className="w-4 h-4 text-white" /></div>
-          <div><h1 className="text-xl font-bold text-white">VM Browser</h1><p className="text-sm text-slate-400">{loading ? 'Loading...' : `${vms.length} VMs, ${runningCount} running`}</p></div>
-        </div>
-        <button onClick={loadVMs} disabled={loading} title="Refresh VM list" className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${loading ? 'bg-slate-700/50 text-slate-500' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-500 hover:to-blue-600 shadow-lg shadow-blue-500/20'}`}>
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {loading ? 'Loading...' : 'Refresh'}
-        </button>
-      </div>
+      <PageHeader
+        title="VM Browser"
+        description={loading ? 'Loading…' : `${vms.length} VMs, ${runningCount} running`}
+        onRefresh={() => void loadVMs()}
+        refreshing={loading}
+      />
+      <PageLoadBanner title="Could not load VMs" headline={loadError} onRetry={() => void loadVMs()} />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -66,13 +71,7 @@ export default function VMBrowser() {
           className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
       </div>
 
-      {error && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-5">
-          <div className="flex items-start gap-3"><AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" /><div><p className="text-sm font-medium text-amber-300">{error}</p><button onClick={loadVMs} className="mt-3 text-xs text-blue-400 hover:text-blue-300">Try again</button></div></div>
-        </div>
-      )}
-
-      {loading ? (
+      {loading && !loadError ? (
         <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-slate-800/50 animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500"><Monitor className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">{vms.length === 0 ? 'No VMs found' : 'No VMs match your search'}</p></div>

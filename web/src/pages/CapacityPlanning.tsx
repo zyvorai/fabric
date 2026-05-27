@@ -2,9 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, TrendingDown, Cpu, HardDrive, Database, AlertTriangle } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 interface ResourceMetric { label: string; used: number; total: number; unit: string; trend: number; projected_full?: string }
 
@@ -19,60 +22,63 @@ function fmtVal(val: number, unit: string): string {
 export default function CapacityPlanning() {
   const [metrics, setMetrics] = useState<ResourceMetric[]>([])
   const [vmCount, setVmCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { loading, loadError, run } = usePageLoader('Failed to load capacity data')
+
+  const load = useCallback(() => {
+    return run(async () => {
+      const [sysRes, vmRes] = await Promise.allSettled([
+        apiFetch('/api/system/capacity'),
+        apiFetch('/api/vms'),
+      ])
+
+      if (sysRes.status === 'fulfilled' && sysRes.value.ok) {
+        const data = await sysRes.value.json()
+        setMetrics(data.metrics || data.resources || [])
+      } else {
+        const memRes = await apiFetch('/api/system/memory')
+        if (memRes.ok) {
+          const mem = await memRes.json()
+          setMetrics([
+            { label: 'Memory', used: (mem.total_kb - mem.available_kb) / 1024 / 1024, total: mem.total_kb / 1024 / 1024, unit: 'GB', trend: 2.1, projected_full: 'N/A' },
+            { label: 'CPU Cores', used: 0, total: 0, unit: 'cores', trend: 0 },
+            { label: 'Storage', used: 0, total: 0, unit: 'GB', trend: 3.5 },
+          ])
+        }
+      }
+
+      if (vmRes.status === 'fulfilled' && vmRes.value.ok) {
+        const data = await vmRes.value.json()
+        const vms = Array.isArray(data) ? data : data.vms || []
+        setVmCount(vms.length)
+      }
+    })
+  }, [run])
 
   useEffect(() => {
-    let active = true
-    const load = async () => {
-      try {
-        const [sysRes, vmRes] = await Promise.allSettled([
-          apiFetch('/api/system/capacity'),
-          apiFetch('/api/vms'),
-        ])
-
-        if (sysRes.status === 'fulfilled' && sysRes.value.ok) {
-          const data = await sysRes.value.json()
-          setMetrics(data.metrics || data.resources || [])
-        } else {
-          // Build from system memory/cpu if capacity endpoint not available
-          const memRes = await apiFetch('/api/system/memory')
-          if (memRes.ok) {
-            const mem = await memRes.json()
-            setMetrics([
-              { label: 'Memory', used: (mem.total_kb - mem.available_kb) / 1024 / 1024, total: mem.total_kb / 1024 / 1024, unit: 'GB', trend: 2.1, projected_full: 'N/A' },
-              { label: 'CPU Cores', used: 0, total: 0, unit: 'cores', trend: 0 },
-              { label: 'Storage', used: 0, total: 0, unit: 'GB', trend: 3.5 },
-            ])
-          }
-        }
-
-        if (vmRes.status === 'fulfilled' && vmRes.value.ok) {
-          const data = await vmRes.value.json()
-          const vms = Array.isArray(data) ? data : data.vms || []
-          setVmCount(vms.length)
-        }
-
-        if (active) { setError(null); setLoading(false) }
-      } catch (err: any) { if (active) { setError(err.message); setLoading(false) } }
-    }
-    load()
-    const interval = setInterval(load, 30000)
-    return () => { active = false; clearInterval(interval) }
-  }, [])
+    void load()
+    const interval = setInterval(() => void load(), 30000)
+    return () => clearInterval(interval)
+  }, [load])
 
   const warningResources = metrics.filter(m => usagePercent(m.used, m.total) > 75)
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Loading capacity data...</div>
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3"><TrendingUp className="w-6 h-6 text-emerald-400" /> Capacity Planning</h1>
-        <p className="text-sm text-slate-400 mt-1">Resource utilization and growth projections</p>
-      </div>
-
-      {error && <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">Connection issue: {error}</div>}
+      <PageHeader
+        title="Capacity Planning"
+        description="Resource utilization and growth projections"
+        onRefresh={() => void load()}
+        refreshing={loading}
+      />
+      <PageLoadBanner title="Could not load capacity data" headline={loadError} onRetry={() => void load()} />
+      {loading && !loadError && (
+        <div className="flex items-center justify-center h-32 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Loading capacity data…
+        </div>
+      )}
+      {!loadError && (
+      <>
 
       {warningResources.length > 0 && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
@@ -143,8 +149,10 @@ export default function CapacityPlanning() {
         })}
       </div>
 
-      {metrics.length === 0 && !error && (
+      {metrics.length === 0 && (
         <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500 text-sm">No capacity data available</div>
+      )}
+      </>
       )}
     </div>
   )

@@ -4,6 +4,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../api/client'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 
 type PanelKey = 'top' | 'iostat' | 'vmstat' | 'netstat'
 
@@ -35,12 +37,15 @@ export default function Debug() {
     setPanels((prev) => ({ ...prev, [key]: { ...prev[key], loading: true, error: null } }))
     try {
       const res = await apiFetch(panel.endpoint)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       const lines = Array.isArray(data.lines) ? data.lines : []
       setPanels((prev) => ({ ...prev, [key]: { lines, loading: false, error: null } }))
-    } catch (err: any) {
-      setPanels((prev) => ({ ...prev, [key]: { ...prev[key], loading: false, error: err.message } }))
+    } catch (err) {
+      setPanels((prev) => ({ ...prev, [key]: { ...prev[key], loading: false, error: formatUserError(err) } }))
     }
   }, [])
 
@@ -66,11 +71,11 @@ export default function Debug() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Debug</h1>
-          <p className="text-sm text-slate-400 mt-1">System diagnostic tools</p>
-        </div>
+      <PageHeader
+        title="Debug"
+        description="System diagnostic tools"
+        onRefresh={fetchAll}
+        actions={
         <div className="flex items-center gap-3">
           <button
             onClick={fetchAll}
@@ -87,7 +92,8 @@ export default function Debug() {
             <span className="text-sm text-slate-300">Auto-refresh (3s)</span>
           </label>
         </div>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {PANELS.map((panel) => {

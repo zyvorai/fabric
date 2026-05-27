@@ -3,8 +3,14 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Clock, Upload, AlertTriangle, Rocket, XCircle, Filter, RefreshCw } from 'lucide-react'
+import { Clock, Upload, AlertTriangle, Rocket, XCircle, Filter } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface TimelineEntry {
   id: string
@@ -46,10 +52,12 @@ function formatTimestamp(ts: string): string {
 }
 
 export default function Timeline() {
+  const toast = useToastContext()
   const [entries, setEntries] = useState<TimelineEntry[]>([])
   const [filter, setFilter] = useState<FilterType>('all')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
   const fetchData = useCallback(async () => {
@@ -92,14 +100,24 @@ export default function Timeline() {
 
       merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       setEntries(merged)
-      setError('')
+      setLoadError(null)
+      setRefreshError(null)
       setLastRefresh(new Date())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch timeline data')
+      const msg = formatUserError(err)
+      setEntries((prev) => {
+        if (prev.length === 0) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load timeline', err)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     fetchData()
@@ -119,16 +137,25 @@ export default function Timeline() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Clock className="w-6 h-6 text-purple-400" />
-          <h2 className="text-xl font-bold text-white">Activity Timeline</h2>
+      <PageHeader
+        title="Activity Timeline"
+        onRefresh={() => void fetchData()}
+        refreshing={loading}
+        description={`Updated ${formatTimestamp(lastRefresh.toISOString())}`}
+      />
+      {loadError && (
+        <ErrorBanner
+          title="Could not load timeline"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={() => void fetchData()}
+        />
+      )}
+      {refreshError && !loadError && (
+        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+          {refreshError} — showing last known data
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Updated {formatTimestamp(lastRefresh.toISOString())}</span>
-        </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-2">
         <Filter className="w-4 h-4 text-slate-500" />
@@ -147,13 +174,7 @@ export default function Timeline() {
         ))}
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
+      {loading && !loadError ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
         </div>

@@ -3,8 +3,12 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Database, RefreshCw } from 'lucide-react'
+import { Database } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 interface StoragePool { name: string; state: string; type: string; capacity: number; allocation: number; available: number }
 interface Volume { name: string; path: string; capacity: number; allocation: number; format: string }
@@ -19,16 +23,35 @@ export default function StorageManager() {
   const [pools, setPools] = useState<StoragePool[]>([])
   const [selectedPool, setSelectedPool] = useState<string | null>(null)
   const [volumes, setVolumes] = useState<Volume[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { loading, loadError, run } = usePageLoader('Failed to load storage pools')
+  const [volumeError, setVolumeError] = useState<string | null>(null)
 
-  const fetchPools = useCallback(async () => {
-    setLoading(true); setError(null)
-    try { const res = await apiFetch('/api/storage/pools'); if (!res.ok) throw new Error(`HTTP ${res.status}`); const data = await res.json(); setPools(Array.isArray(data) ? data : data.pools || []) } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+  const fetchPools = useCallback(() => {
+    return run(async () => {
+      const res = await apiFetch('/api/storage/pools')
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
+      const data = await res.json()
+      setPools(Array.isArray(data) ? data : data.pools || [])
+    })
+  }, [run])
 
   const fetchVolumes = useCallback(async (poolName: string) => {
-    try { const res = await apiFetch(`/api/storage/pools/${poolName}/volumes`); if (res.ok) { const data = await res.json(); setVolumes(Array.isArray(data) ? data : data.volumes || []) } } catch (err: any) { setError(`Failed to load volumes: ${err.message}`); setVolumes([]) }
+    setVolumeError(null)
+    try {
+      const res = await apiFetch(`/api/storage/pools/${poolName}/volumes`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
+      const data = await res.json()
+      setVolumes(Array.isArray(data) ? data : data.volumes || [])
+    } catch (err) {
+      setVolumeError(err instanceof Error ? err.message : 'Failed to load volumes')
+      setVolumes([])
+    }
   }, [])
 
   useEffect(() => { fetchPools() }, [fetchPools])
@@ -38,11 +61,17 @@ export default function StorageManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3"><Database className="w-6 h-6 text-blue-400" /><div><h1 className="text-xl font-bold text-white">Storage Manager</h1><p className="text-sm text-slate-400">Storage pools and volumes</p></div></div>
-        <button onClick={fetchPools} title="Refresh pools" className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /> Refresh</button>
-      </div>
-      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400">{error}<button onClick={fetchPools} className="ml-3 text-xs underline">Retry</button></div>}
+      <PageLoadBanner title="Could not load storage pools" headline={loadError} onRetry={() => void fetchPools()} />
+
+      <PageHeader
+        title="Storage Manager"
+        description="Storage pools and volumes"
+        onRefresh={() => void fetchPools()}
+        refreshing={loading}
+      />
+      {volumeError && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-400">{volumeError}</div>
+      )}
 
       {pools.length === 0 ? (
         <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500"><Database className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No storage pools found</p></div>

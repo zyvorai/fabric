@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import {
   listLibraries,
@@ -25,6 +25,8 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function ContentLibrary() {
   const toast = useToastContext()
@@ -33,25 +35,24 @@ export default function ContentLibrary() {
   const [items, setItems] = useState<LibraryItem[]>([])
   const [specs, setSpecs] = useState<GuestCustomizationSpec[]>([])
   const [profiles, setProfiles] = useState<HostProfile[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load content library')
   const [activeTab, setActiveTab] = useState<'libraries' | 'items' | 'specs' | 'profiles'>('libraries')
   const [selectedLibrary, setSelectedLibrary] = useState<string | null>(null)
   const [showCreateLibrary, setShowCreateLibrary] = useState(false)
   const [showCreateSpec, setShowCreateSpec] = useState(false)
   const [showCreateProfile, setShowCreateProfile] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [libs, sp, pr] = await Promise.all([
-        listLibraries(), listCustomizationSpecs(), listHostProfiles(),
+        listLibraries(),
+        listCustomizationSpecs(),
+        listHostProfiles(),
       ])
-      setLibraries(libs); setSpecs(sp); setProfiles(pr)
+      setLibraries(libs)
+      setSpecs(sp)
+      setProfiles(pr)
 
-      // Load items for all libraries
       const allItems: LibraryItem[] = []
       for (const lib of libs) {
         try {
@@ -60,12 +61,12 @@ export default function ContentLibrary() {
         } catch { /* skip */ }
       }
       setItems(allItems)
-    } catch (error) {
-      console.error('Failed to load content library data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleDeleteLibrary = async (id: string) => {
     if (!await confirm('Delete Library', 'Delete this library and all its items?')) return
@@ -110,11 +111,12 @@ export default function ContentLibrary() {
 
   const filteredItems = selectedLibrary ? items.filter(i => i.library_id === selectedLibrary) : items
 
-  if (loading) return <div className="text-center py-8">Loading...</div>
 
   return (
     <div className="p-6">
       <PageHeader
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         title="Content Library"
         actions={
           <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
@@ -122,6 +124,8 @@ export default function ContentLibrary() {
           </button>
         }
       />
+
+      <PageLoadBanner title="Could not load content library" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

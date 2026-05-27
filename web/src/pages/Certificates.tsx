@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, RefreshCw, Check, Shield } from 'lucide-react'
 import {
   listCas,
@@ -26,6 +26,8 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function Certificates() {
   const toast = useToastContext()
@@ -36,29 +38,33 @@ export default function Certificates() {
   const [attestations, setAttestations] = useState<TrustAttestation[]>([])
   const [baselines, setBaselines] = useState<VmSecurityBaseline[]>([])
   const [health, setHealth] = useState<CertHealthDashboard | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load certificates')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cas' | 'certs' | 'csrs' | 'attestation' | 'baselines'>('dashboard')
   const [showCreateCA, setShowCreateCA] = useState(false)
   const [showCreateBaseline, setShowCreateBaseline] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [ca, ct, cr, at, bl, hl] = await Promise.all([
-        listCas(), listCertificates(), listCertRequests(),
-        listAttestations(), listSecurityBaselines(), getCertHealthDashboard().catch(() => null),
+        listCas(),
+        listCertificates(),
+        listCertRequests(),
+        listAttestations(),
+        listSecurityBaselines(),
+        getCertHealthDashboard().catch(() => null),
       ])
-      setCAs(ca); setCerts(ct); setCSRs(cr)
-      setAttestations(at); setBaselines(bl); setHealth(hl)
-    } catch (error) {
-      console.error('Failed to load certificates data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      setCAs(ca)
+      setCerts(ct)
+      setCSRs(cr)
+      setAttestations(at)
+      setBaselines(bl)
+      setHealth(hl)
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleRevoke = async (id: string) => {
     const ok = await confirm('Revoke Certificate', 'Revoke this certificate?', { variant: 'danger', confirmLabel: 'Delete' })
@@ -88,11 +94,12 @@ export default function Certificates() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
-  if (loading) return <div className="text-center py-8">Loading...</div>
 
   return (
     <div className="p-6">
       <PageHeader
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         title="Certificates & Security"
         actions={
           <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
@@ -100,6 +107,8 @@ export default function Certificates() {
           </button>
         }
       />
+
+      <PageLoadBanner title="Could not load certificates" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1 overflow-x-auto">

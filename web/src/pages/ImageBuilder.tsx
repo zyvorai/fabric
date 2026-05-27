@@ -2,48 +2,56 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useEffect, useState } from 'react'
-import { Package, Plus, RefreshCw } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { Package, Plus } from 'lucide-react'
 import { buildImage, listBuilds, listImages, ImageBuildStatus, ImageInfo } from '../api/images'
 import { useToastContext } from '../contexts/ToastContext'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function ImageBuilder() {
   const toast = useToastContext()
   const [builds, setBuilds] = useState<ImageBuildStatus[]>([])
   const [images, setImages] = useState<ImageInfo[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load image builder data')
   const [showBuildDialog, setShowBuildDialog] = useState(false)
 
-  useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const [b, i] = await Promise.all([listBuilds().catch(() => []), listImages().catch(() => [])])
+  const loadData = useCallback(() => {
+    return run(async () => {
+      const [b, i] = await Promise.all([listBuilds(), listImages()])
       setBuilds(b)
       setImages(i)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>
-  }
+  useEffect(() => {
+    void loadData()
+    const interval = setInterval(() => void loadData(), 5000)
+    return () => clearInterval(interval)
+  }, [loadData])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3"><Package className="w-8 h-8" /> Image Builder</h1>
-        <div className="flex gap-2">
-          <button onClick={loadData} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition flex items-center gap-2"><RefreshCw className="w-4 h-4" />Refresh</button>
-          <button onClick={() => setShowBuildDialog(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2"><Plus className="w-4 h-4" />Build Image</button>
+      <PageHeader
+        title="Image Builder"
+        onRefresh={() => void loadData()}
+        refreshing={loading}
+        actions={
+          <button onClick={() => setShowBuildDialog(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Build Image
+          </button>
+        }
+      />
+      <PageLoadBanner title="Could not load image builder data" headline={loadError} onRetry={() => void loadData()} />
+      {loading && !loadError && (
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
         </div>
-      </div>
-
+      )}
+      {!loadError && (
+      <>
       {/* Active builds */}
       {builds.filter(b => b.state === 'pending' || b.state === 'building').length > 0 && (
         <div className="space-y-3">
@@ -127,7 +135,9 @@ export default function ImageBuilder() {
       )}
 
       {showBuildDialog && (
-        <BuildImageDialog onClose={() => setShowBuildDialog(false)} onSuccess={() => { toast.success('Build started'); setShowBuildDialog(false); loadData() }} />
+        <BuildImageDialog onClose={() => setShowBuildDialog(false)} onSuccess={() => { toast.success('Build started'); setShowBuildDialog(false); void loadData() }} />
+      )}
+      </>
       )}
     </div>
   )

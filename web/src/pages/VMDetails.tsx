@@ -23,6 +23,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import Breadcrumb from '../components/Breadcrumb'
 import CopyButton from '../components/CopyButton'
 import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 
 type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs'
@@ -449,7 +450,7 @@ function DisksTab({ vm }: { vm: VM }) {
         const props = await getMachineProperties(vm.name)
         if (!cancelled) setProperties(props)
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load disk information')
+        if (!cancelled) setError(formatUserError(err))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -547,7 +548,7 @@ function NetworkTab({ vm }: { vm: VM }) {
         const props = await getMachineProperties(vm.name)
         if (!cancelled) setProperties(props)
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load network information')
+        if (!cancelled) setError(formatUserError(err))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -657,7 +658,7 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       setSnapshots(data)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load snapshots')
+      setError(formatUserError(err))
     } finally {
       setLoading(false)
     }
@@ -683,7 +684,7 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       setNewType('Full')
       await loadSnapshots()
     } catch (err) {
-      toast.error(`Failed to create snapshot: ${err instanceof Error ? err.message : String(err)}`)
+      toastFailure(toast, 'Failed to create snapshot', err)
     } finally {
       setCreating(false)
     }
@@ -696,7 +697,7 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       toast.success(`Snapshot '${snap.name}' deleted`)
       await loadSnapshots()
     } catch (err) {
-      toast.error(`Failed to delete snapshot: ${err instanceof Error ? err.message : String(err)}`)
+      toastFailure(toast, 'Failed to delete snapshot', err)
     } finally {
       setActionInProgress(null)
     }
@@ -708,7 +709,7 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       await revertSnapshot(vm.name, snap.id)
       toast.success(`Reverted to snapshot '${snap.name}'`)
     } catch (err) {
-      toast.error(`Failed to revert snapshot: ${err instanceof Error ? err.message : String(err)}`)
+      toastFailure(toast, 'Failed to revert snapshot', err)
     } finally {
       setActionInProgress(null)
     }
@@ -893,7 +894,7 @@ function LogsTab({ vm }: { vm: VM }) {
       setLogs(data)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load logs')
+      setError(formatUserError(err))
     } finally {
       setLoading(false)
     }

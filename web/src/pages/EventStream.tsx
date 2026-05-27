@@ -3,8 +3,11 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Radio, Pause, Play, Trash2, Filter } from 'lucide-react'
+import { Pause, Play, Trash2, Filter } from 'lucide-react'
 import { getToken } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { hintsForError } from '../utils/daemonHints'
 
 interface StreamEvent {
   id: number
@@ -39,6 +42,7 @@ export default function EventStream() {
   const [paused, setPaused] = useState(false)
   const [levelFilter, setLevelFilter] = useState<string>('all')
   const [connected, setConnected] = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const pausedRef = useRef(false)
@@ -55,14 +59,22 @@ export default function EventStream() {
 
     ws.onopen = () => {
       setConnected(true)
+      setConnectionError(null)
       // Send auth token via message after connection instead of URL query param
       const token = getToken()
       if (token) {
         ws.send(JSON.stringify({ type: 'auth', token }))
       }
     }
-    ws.onclose = () => { setConnected(false); reconnectRef.current = setTimeout(connect, 3000) }
-    ws.onerror = () => ws.close()
+    ws.onclose = () => {
+      setConnected(false)
+      setConnectionError('Event stream disconnected — reconnecting automatically')
+      reconnectRef.current = setTimeout(connect, 3000)
+    }
+    ws.onerror = () => {
+      setConnectionError('WebSocket connection failed — check that the daemon is running')
+      ws.close()
+    }
 
     ws.onmessage = (msg) => {
       if (pausedRef.current) return
@@ -104,11 +116,10 @@ export default function EventStream() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><Radio className="w-6 h-6 text-rose-400" /> Event Stream</h1>
-          <p className="text-sm text-slate-400 mt-1">Real-time system events via WebSocket</p>
-        </div>
+      <PageHeader
+        title="Event Stream"
+        description="Real-time system events via WebSocket"
+        actions={
         <div className="flex items-center gap-3">
           <button onClick={() => setPaused(!paused)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${paused ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
             {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />} {paused ? 'Resume' : 'Pause'}
@@ -119,7 +130,19 @@ export default function EventStream() {
             <span className="text-xs text-slate-500">{connected ? (paused ? 'Paused' : 'Connected') : 'Disconnected'}</span>
           </div>
         </div>
-      </div>
+        }
+      />
+      {connectionError && !connected && (
+        <ErrorBanner
+          title="Event stream unavailable"
+          headline={connectionError}
+          hints={hintsForError(connectionError)}
+          onRetry={() => {
+            wsRef.current?.close()
+            connect()
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">

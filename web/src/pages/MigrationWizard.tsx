@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import Breadcrumb from '../components/Breadcrumb'
 
 type WizardStep = 'source' | 'configure' | 'review'
@@ -39,9 +40,14 @@ export default function MigrationWizard() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source_type: sourceType, source_path: sourcePath, remote_host: remoteHost, vm_name: vmName, target_format: targetFormat, output_dir: outputDir, cpus, memory, auto_start: autoStart }),
       })
-      if (!res.ok) { const body = await res.json().catch(() => null); throw new Error(body?.error || `HTTP ${res.status}`) }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error || formatHttpErrorBody(res.status, res.statusText, ''))
+      }
       setResult({ ok: true, message: 'Migration submitted successfully!' })
-    } catch (err: any) { setResult({ ok: false, message: err.message }) } finally { setSubmitting(false) }
+    } catch (err) {
+      setResult({ ok: false, message: formatUserError(err) })
+    } finally { setSubmitting(false) }
   }
 
   return (

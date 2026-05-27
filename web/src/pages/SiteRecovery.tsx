@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, RefreshCw, Play, AlertTriangle } from 'lucide-react'
 import {
   listPlans,
@@ -20,6 +20,8 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function SiteRecovery() {
   const toast = useToastContext()
@@ -27,29 +29,27 @@ export default function SiteRecovery() {
   const [plans, setPlans] = useState<RecoveryPlan[]>([])
   const [executions, setExecutions] = useState<RecoveryExecution[]>([])
   const [dashboard, setDashboard] = useState<DrDashboard | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load site recovery data')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'plans' | 'executions'>('dashboard')
   const [showCreatePlan, setShowCreatePlan] = useState(false)
   const [showExecute, setShowExecute] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 10000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [p, e, d] = await Promise.all([
-        listPlans(), listExecutions(), getDrDashboard().catch(() => null),
+        listPlans(),
+        listExecutions(),
+        getDrDashboard().catch(() => null),
       ])
-      setPlans(p); setExecutions(e); setDashboard(d)
-    } catch (error) {
-      console.error('Failed to load site recovery data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      setPlans(p)
+      setExecutions(e)
+      setDashboard(d)
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleDeletePlan = async (id: string) => {
     const ok = await confirm('Delete Recovery Plan', 'Delete this recovery plan?', { variant: 'danger', confirmLabel: 'Delete' })
@@ -92,15 +92,16 @@ export default function SiteRecovery() {
     return m[status] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) return <div className="text-center py-8">Loading...</div>
 
   return (
     <div className="p-6">
+      <PageLoadBanner title="Could not load site recovery data" headline={loadError} onRetry={() => void loadData()} />
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Site Recovery</h1>
         <div className="flex gap-2">
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-            <RefreshCw className="w-4 h-4" /> Refresh
+          <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
           <button onClick={() => setShowCreatePlan(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">

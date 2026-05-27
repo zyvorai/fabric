@@ -3,8 +3,14 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Shield, CheckCircle, AlertTriangle, XCircle, RefreshCw } from 'lucide-react'
+import { Shield, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface ComplianceCheck {
   id: string
@@ -57,20 +63,40 @@ function statusBadge(status: string): string {
 }
 
 export default function ComplianceDashboard() {
+  const toast = useToastContext()
   const [data, setData] = useState<ComplianceSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [scanning, setScanning] = useState(false)
 
   const fetchCompliance = useCallback(async () => {
-    setLoading(true); setError(null)
+    setLoading(true)
     try {
       const res = await apiFetch('/api/system/compliance')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       setData(await res.json())
-    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+      setLoadError(null)
+      setRefreshError(null)
+    } catch (err) {
+      const msg = formatUserError(err)
+      setData((prev) => {
+        if (prev == null) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load compliance data', err)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => { fetchCompliance() }, [fetchCompliance])
 
@@ -82,8 +108,17 @@ export default function ComplianceDashboard() {
     } catch (err) { console.error('Compliance scan failed:', err) } finally { setScanning(false) }
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Running compliance checks...</div>
-  if (error && !data) return <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center"><p className="text-red-400 font-medium">Failed to load compliance data</p><p className="text-red-400/70 text-sm mt-1">{error}</p><button onClick={fetchCompliance} className="mt-3 px-4 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors">Retry</button></div>
+  if (loading && !data && !loadError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Compliance Dashboard" description="Security and configuration compliance posture" />
+        <div className="flex items-center justify-center h-64 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Running compliance checks…
+        </div>
+      </div>
+    )
+  }
 
   const summary = data || { score: 0, total: 0, passed: 0, warnings: 0, failed: 0, categories: [], checks: [], last_scan: '' }
   const categories = ['all', ...summary.categories]
@@ -91,17 +126,31 @@ export default function ComplianceDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><Shield className="w-6 h-6 text-blue-400" /> Compliance Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-1">Security and configuration compliance posture</p>
-        </div>
-        <button onClick={runScan} disabled={scanning} title="Run compliance scan" className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} /> {scanning ? 'Scanning...' : 'Run Scan'}
-        </button>
-      </div>
+      <PageHeader
+        title="Compliance Dashboard"
+        description="Security and configuration compliance posture"
+        onRefresh={fetchCompliance}
+        refreshing={loading}
+        actions={
+          <button onClick={runScan} disabled={scanning} title="Run compliance scan" className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+            <Shield className={`w-4 h-4 ${scanning ? 'animate-pulse' : ''}`} /> {scanning ? 'Scanning…' : 'Run Scan'}
+          </button>
+        }
+      />
 
-      {error && <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">Connection issue: {error} - showing last known data</div>}
+      {loadError && (
+        <ErrorBanner
+          title="Could not load compliance data"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={fetchCompliance}
+        />
+      )}
+      {refreshError && !loadError && (
+        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+          {refreshError} — showing last known data
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 flex flex-col items-center justify-center">

@@ -4,6 +4,9 @@
 
 import { useState, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { hintsForError } from '../utils/daemonHints'
 
 type MetricKey = 'cpu' | 'memory' | 'disk' | 'network'
 
@@ -64,7 +67,10 @@ export default function Explain() {
         apiFetch(`/api/system/timeseries?period=1h&metric=${metric}`),
       ])
 
-      if (!explainRes.ok) throw new Error(`HTTP ${explainRes.status}`)
+      if (!explainRes.ok) {
+        const body = await explainRes.text()
+        throw new Error(formatHttpErrorBody(explainRes.status, explainRes.statusText, body))
+      }
       const explainData = await explainRes.json()
       setExplanation(explainData)
 
@@ -72,8 +78,8 @@ export default function Explain() {
         const tsData = await tsRes.json()
         setTimeseries(Array.isArray(tsData) ? tsData : tsData.points ?? [])
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(formatUserError(err))
     } finally {
       setLoading(false)
     }
@@ -111,12 +117,13 @@ export default function Explain() {
         </div>
       )}
 
-      {error && (
-        <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center">
-          <p className="text-red-400 font-medium">Failed to load explanation</p>
-          <p className="text-red-400/70 text-sm mt-1">{error}</p>
-          {activeMetric && <button onClick={() => fetchExplanation(activeMetric)} className="mt-3 px-4 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors">Retry</button>}
-        </div>
+      {error && activeMetric && (
+        <ErrorBanner
+          title="Could not load explanation"
+          headline={error}
+          hints={hintsForError(error)}
+          onRetry={() => void fetchExplanation(activeMetric)}
+        />
       )}
 
       {!activeMetric && !loading && (

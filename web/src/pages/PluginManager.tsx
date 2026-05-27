@@ -3,8 +3,14 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Package, Power, RefreshCw, Loader2 } from 'lucide-react'
+import { Package, Power, Loader2 } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface Plugin {
   name: string
@@ -37,20 +43,31 @@ function typeColor(type: string): string {
 }
 
 export default function PluginManager() {
+  const toast = useToastContext()
   const [plugins, setPlugins] = useState<Plugin[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
 
   const fetchPlugins = useCallback(async () => {
-    setLoading(true); setError(null)
+    setLoading(true)
+    setLoadError(null)
     try {
       const res = await apiFetch('/api/plugins')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setPlugins(Array.isArray(data) ? data : data.plugins || [])
-    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+    } catch (err) {
+      setLoadError(formatUserError(err))
+      toastFailure(toast, 'Failed to load plugins', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => { fetchPlugins() }, [fetchPlugins])
 
@@ -58,28 +75,56 @@ export default function PluginManager() {
     setToggling(name)
     try {
       const res = await apiFetch(`/api/plugins/${name}/${enabled ? 'disable' : 'enable'}`, { method: 'POST' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       setPlugins(prev => prev.map(p => p.name === name ? { ...p, enabled: !enabled, status: !enabled ? 'running' : 'stopped' } : p))
-    } catch (err: any) { setError(`Failed to toggle ${name}: ${err.message}`) } finally { setToggling(null) }
+      setActionError(null)
+    } catch (err) {
+      setActionError(formatUserError(err))
+      toastFailure(toast, `Failed to toggle ${name}`, err)
+    } finally { setToggling(null) }
   }
 
   const runningCount = plugins.filter(p => p.status === 'running').length
   const errorCount = plugins.filter(p => p.status === 'error').length
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Loading plugins...</div>
+  if (loading && plugins.length === 0 && !loadError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Plugin Manager" description="Manage server extensions and integrations" />
+        <div className="flex items-center justify-center h-64 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Loading plugins…
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><Package className="w-6 h-6 text-pink-400" /> Plugin Manager</h1>
-          <p className="text-sm text-slate-400 mt-1">Manage server extensions and integrations</p>
-        </div>
-        <button onClick={fetchPlugins} title="Refresh plugins" className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /> Refresh</button>
-      </div>
+      <PageHeader
+        title="Plugin Manager"
+        description="Manage server extensions and integrations"
+        onRefresh={fetchPlugins}
+        refreshing={loading}
+      />
 
-      {error && <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-4 text-sm text-red-400">{error}</div>}
+      {loadError && (
+        <ErrorBanner
+          title="Could not load plugins"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={fetchPlugins}
+        />
+      )}
+      {actionError && (
+        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-sm text-amber-400">{actionError}</div>
+      )}
 
+      {!loadError && (
+      <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{plugins.length}</div>
@@ -134,6 +179,8 @@ export default function PluginManager() {
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   )

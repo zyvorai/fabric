@@ -2,9 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Download, Search, HardDrive, ArrowUpDown, FolderSearch } from 'lucide-react'
 import { apiFetch, getToken } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 interface DiskImage { name: string; path: string; format: string; size_bytes: number; mod_time: string }
 type SortField = 'name' | 'size_bytes' | 'mod_time'
@@ -28,25 +31,29 @@ const formatBadgeColor: Record<string, string> = {
 
 export default function DownloadDisk() {
   const [images, setImages] = useState<DiskImage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { loading, loadError, run } = usePageLoader('Failed to load disk images')
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('mod_time')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [customPath, setCustomPath] = useState('')
 
-  const fetchImages = (extraPath?: string) => {
-    setLoading(true); setError('')
-    let url = '/api/images'
-    if (extraPath) url += `?path=${encodeURIComponent(extraPath)}`
-    apiFetch(url)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() })
-      .then((data) => setImages(data.images || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }
+  const fetchImages = useCallback((extraPath?: string) => {
+    return run(async () => {
+      let url = '/api/images'
+      if (extraPath) url += `?path=${encodeURIComponent(extraPath)}`
+      const res = await apiFetch(url)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
+      const data = await res.json()
+      setImages(data.images || [])
+    })
+  }, [run])
 
-  useEffect(() => { fetchImages() }, [])
+  useEffect(() => {
+    void fetchImages()
+  }, [fetchImages])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
@@ -118,7 +125,7 @@ export default function DownloadDisk() {
           className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500" />
       </div>
 
-      {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-400">Failed to load disk images: {error}</div>}
+      <PageLoadBanner title="Could not load disk images" headline={loadError} onRetry={() => void fetchImages()} />
       {loading && <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>}
 
       {!loading && filtered.length === 0 && <div className="text-center py-12 text-slate-500"><HardDrive className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No disk images found</p></div>}

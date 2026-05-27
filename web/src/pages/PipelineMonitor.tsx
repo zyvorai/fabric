@@ -2,9 +2,15 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect, Fragment } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
+import { RefreshCw, Workflow } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader, EmptyState } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface PipelineJob {
   id: string
@@ -45,64 +51,68 @@ function getStageIndex(stage: string): number {
 }
 
 export default function PipelineMonitor() {
+  const toast = useToastContext()
   const [jobs, setJobs] = useState<PipelineJob[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/pipeline/jobs')
+      if (!response.ok) {
+        const body = await response.text()
+        throw new Error(formatHttpErrorBody(response.status, response.statusText, body))
+      }
+      const data = await response.json()
+      setJobs(Array.isArray(data) ? data : data.jobs || [])
+      setLoadError(null)
+    } catch (err) {
+      const msg = formatUserError(err)
+      setLoadError(msg)
+      toastFailure(toast, 'Failed to load pipeline jobs', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => {
-    let active = true
-    const fetchJobs = async () => {
-      try {
-        const response = await apiFetch('/api/pipeline/jobs')
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const data = await response.json()
-        if (active) {
-          setJobs(Array.isArray(data) ? data : data.jobs || [])
-          setError(null)
-        }
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Failed to fetch jobs')
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
     fetchJobs()
     const interval = setInterval(fetchJobs, 3000)
-    return () => { active = false; clearInterval(interval) }
-  }, [])
+    return () => clearInterval(interval)
+  }, [fetchJobs])
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-700/50">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <RefreshCw className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-gradient-blue">Pipeline Monitor</span>
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${error ? 'bg-red-500' : 'bg-green-500'}`} />
-            <span className="text-xs text-slate-500">{error ? 'Disconnected' : 'Auto-refresh 3s'}</span>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Pipeline Monitor"
+        description="Migration and conversion pipeline jobs (auto-refresh 3s)"
+        onRefresh={fetchJobs}
+        refreshing={loading}
+      />
 
+      {loadError && (
+        <ErrorBanner
+          title="Could not load pipeline jobs"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={fetchJobs}
+        />
+      )}
+
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <div className="p-5">
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5 mb-4">
-            <p className="text-xs text-red-400">Failed to fetch pipeline data: {error}</p>
-          </div>
-        )}
-
-        {loading && !error && (
+        {loading && !loadError && (
           <div className="flex items-center justify-center py-10 text-sm text-slate-500">
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Loading pipeline jobs...
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Loading pipeline jobs…
           </div>
         )}
 
-        {!loading && jobs.length === 0 && !error && (
-          <div className="text-center py-10 text-sm text-slate-500">No active pipeline jobs</div>
+        {!loading && jobs.length === 0 && !loadError && (
+          <EmptyState
+            icon={<Workflow className="w-10 h-10" />}
+            title="No active pipeline jobs"
+            description="Jobs appear here when migrations or conversions are running"
+          />
         )}
 
         {jobs.map((job) => {
@@ -159,6 +169,7 @@ export default function PipelineMonitor() {
             </div>
           )
         })}
+      </div>
       </div>
     </div>
   )

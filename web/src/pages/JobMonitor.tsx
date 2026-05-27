@@ -3,8 +3,14 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
-import { Clock, CheckCircle, AlertCircle, Loader2, Terminal, XCircle, RefreshCw } from 'lucide-react'
+import { Clock, CheckCircle, AlertCircle, Loader2, Terminal, XCircle } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface Job {
   id: string
@@ -39,23 +45,42 @@ function formatDuration(start: string, end: string): string {
 }
 
 export default function JobMonitor() {
+  const toast = useToastContext()
   const [jobs, setJobs] = useState<Job[]>([])
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [follow, setFollow] = useState(true)
   const logRef = useRef<HTMLPreElement>(null)
 
   const fetchJobs = useCallback(async () => {
     try {
       const res = await apiFetch('/api/jobs')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setJobs(Array.isArray(data) ? data : data.jobs || [])
-      setError(null)
-    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+      setLoadError(null)
+      setRefreshError(null)
+    } catch (err) {
+      const msg = formatUserError(err)
+      setJobs((prev) => {
+        if (prev.length === 0) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load jobs', err)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   const fetchLogs = useCallback(async (jobId: string) => {
     try {
@@ -73,16 +98,41 @@ export default function JobMonitor() {
   const selected = jobs.find(j => j.id === selectedJob)
   const stageIndex = selected ? PIPELINE_STAGES.indexOf(selected.phase?.toLowerCase()) : -1
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Loading jobs...</div>
+  if (loading && jobs.length === 0 && !loadError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Job Monitor" description="Real-time job tracking with live logs" />
+        <div className="flex items-center justify-center h-64 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Loading jobs…
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-white">Job Monitor</h1><p className="text-sm text-slate-400 mt-1">Real-time job tracking with live logs</p></div>
-        <button onClick={fetchJobs} title="Refresh jobs" className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /> Refresh</button>
-      </div>
-      {error && <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-4 text-sm text-red-400">{error}<button onClick={fetchJobs} className="ml-3 text-xs underline">Retry</button></div>}
+      <PageHeader
+        title="Job Monitor"
+        description="Real-time job tracking with live logs"
+        onRefresh={fetchJobs}
+        refreshing={loading}
+      />
+      {loadError && (
+        <ErrorBanner
+          title="Could not load jobs"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={fetchJobs}
+        />
+      )}
+      {refreshError && !loadError && (
+        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+          {refreshError} — showing last known data
+        </div>
+      )}
 
+      {!loadError && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Job list */}
         <div className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -151,6 +201,7 @@ export default function JobMonitor() {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

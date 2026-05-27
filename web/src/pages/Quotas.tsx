@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Plus, Edit, Trash2, Power, PowerOff, AlertTriangle } from 'lucide-react'
 import {
   listQuotas,
@@ -18,36 +18,29 @@ import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QuotaDialog from '../components/QuotaDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function Quotas() {
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [quotas, setQuotas] = useState<ResourceQuota[]>([])
   const [usage, setUsage] = useState<QuotaUsage[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load quotas')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingQuota, setEditingQuota] = useState<ResourceQuota | null>(null)
 
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const [quotasData, usageData] = await Promise.all([
-        listQuotas(),
-        getAllQuotaUsage()
-      ])
+  const loadData = useCallback(() => {
+    return run(async () => {
+      const [quotasData, usageData] = await Promise.all([listQuotas(), getAllQuotaUsage()])
       setQuotas(quotasData)
       setUsage(usageData)
-    } catch (error) {
-      console.error('Failed to load quotas:', error)
-      toast.error('Failed to load quotas')
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleDelete = async (id: string) => {
     const ok = await confirm('Delete Quota', 'Delete this quota? This action cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })
@@ -87,13 +80,12 @@ export default function Quotas() {
     return 'bg-green-500'
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>
-  }
 
   return (
     <div>
       <PageHeader
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         title="Resource Quotas"
         description="Manage resource limits and allocations"
         actions={
@@ -106,6 +98,8 @@ export default function Quotas() {
           </button>
         }
       />
+
+      <PageLoadBanner title="Could not load quotas" headline={loadError} onRetry={() => void loadData()} />
 
       {quotas.length === 0 ? (
         <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">

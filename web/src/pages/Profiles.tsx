@@ -2,25 +2,30 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useEffect, useState } from 'react'
-import { Cpu, MemoryStick, HardDrive, Plus, Trash2, Layers } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { Cpu, MemoryStick, HardDrive, Plus, Trash2 } from 'lucide-react'
 import { listProfiles, createProfile, deleteProfile, VMProfile } from '../api/profiles'
 import { useToastContext } from '../contexts/ToastContext'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function Profiles() {
   const toast = useToastContext()
   const [profiles, setProfiles] = useState<VMProfile[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load profiles')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
-  useEffect(() => { loadProfiles() }, [])
-
-  const loadProfiles = async () => {
-    try {
+  const loadProfiles = useCallback(() => {
+    return run(async () => {
       const data = await listProfiles()
       setProfiles(data)
-    } catch (e) { console.error(e) } finally { setLoading(false) }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadProfiles()
+  }, [loadProfiles])
 
   const handleDelete = async (name: string) => {
     try {
@@ -38,14 +43,21 @@ export default function Profiles() {
     gpu: 'bg-red-500/20 text-red-400 border-red-500/30',
   }
 
-  if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3"><Layers className="w-8 h-8" /> Instance Types</h1>
-        <button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"><Plus className="w-4 h-4" />Create Profile</button>
-      </div>
+      <PageHeader
+        title="Instance Types"
+        onRefresh={() => void loadProfiles()}
+        refreshing={loading}
+        actions={
+          <button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"><Plus className="w-4 h-4" />Create Profile</button>
+        }
+      />
+      <PageLoadBanner title="Could not load profiles" headline={loadError} onRetry={() => void loadProfiles()} />
+      {loading && !loadError && (
+        <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" /></div>
+      )}
+      {!loadError && (
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {profiles.map(p => (
@@ -68,8 +80,9 @@ export default function Profiles() {
           </div>
         ))}
       </div>
+      )}
 
-      {showCreateDialog && <CreateProfileDialog onClose={() => setShowCreateDialog(false)} onSuccess={() => { toast.success('Profile created'); setShowCreateDialog(false); loadProfiles() }} />}
+      {showCreateDialog && <CreateProfileDialog onClose={() => setShowCreateDialog(false)} onSuccess={() => { toast.success('Profile created'); setShowCreateDialog(false); void loadProfiles() }} />}
     </div>
   )
 }

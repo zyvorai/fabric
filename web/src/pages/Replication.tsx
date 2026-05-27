@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, RefreshCw, Pause, Play } from 'lucide-react'
 import {
   listSites,
@@ -23,6 +23,8 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function Replication() {
   const toast = useToastContext()
@@ -31,31 +33,29 @@ export default function Replication() {
   const [replications, setReplications] = useState<ReplicationConfig[]>([])
   const [violations, setViolations] = useState<ReplicationMetrics[]>([])
   const [health, setHealth] = useState<ReplicationHealthSummary | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load replication data')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'sites' | 'configs' | 'violations'>('dashboard')
   const [showCreateSite, setShowCreateSite] = useState(false)
   const [showCreateConfig, setShowCreateConfig] = useState(false)
 
-  useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 15000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [s, r, v, h] = await Promise.all([
-        listSites(), listReplications(),
+        listSites(),
+        listReplications(),
         checkRpoViolations().catch(() => []),
         getReplicationHealth().catch(() => null),
       ])
-      setSites(s); setReplications(r); setViolations(v); setHealth(h)
-    } catch (error) {
-      console.error('Failed to load replication data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      setSites(s)
+      setReplications(r)
+      setViolations(v)
+      setHealth(h)
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleRemoveSite = async (id: string) => {
     const ok = await confirm('Remove Site', 'Remove this replication site?', { variant: 'danger', confirmLabel: 'Delete' })
@@ -84,11 +84,12 @@ export default function Replication() {
     return m[status] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) return <div className="text-center py-8">Loading...</div>
 
   return (
     <div className="p-6">
       <PageHeader
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         title="Replication"
         actions={
           <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
@@ -97,6 +98,8 @@ export default function Replication() {
         }
       />
 
+
+      <PageLoadBanner title="Could not load replication data" headline={loadError} onRetry={() => void loadData()} />
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
         {(['dashboard', 'sites', 'configs', 'violations'] as const).map(tab => (

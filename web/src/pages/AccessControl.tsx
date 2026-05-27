@@ -6,6 +6,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { Users, Plus, Trash2, Loader2, CheckCircle } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import { useToastContext } from '../contexts/ToastContext'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
 
 interface UserAccount { id: string; username: string; role: string; enabled: boolean; created_at: string; last_login?: string }
 
@@ -25,7 +30,7 @@ export default function AccessControl() {
   const toast = useToastContext()
   const [users, setUsers] = useState<UserAccount[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -35,14 +40,24 @@ export default function AccessControl() {
   const [addSuccess, setAddSuccess] = useState('')
 
   const fetchUsers = useCallback(async () => {
-    setLoading(true); setError(null)
+    setLoading(true)
+    setLoadError(null)
     try {
       const res = await apiFetch('/api/users')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setUsers(Array.isArray(data) ? data : data.users || [])
-    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+    } catch (err) {
+      const msg = formatUserError(err)
+      setLoadError(msg)
+      toastFailure(toast, 'Failed to load users', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
@@ -57,7 +72,10 @@ export default function AccessControl() {
       if (!res.ok) { const body = await res.json().catch(() => null); throw new Error(body?.error || `HTTP ${res.status}`) }
       setAddSuccess(`User "${newUsername}" created`); setNewUsername(''); setNewPassword(''); setShowAdd(false); fetchUsers()
       setTimeout(() => setAddSuccess(''), 3000)
-    } catch (err: any) { setAddError(err.message) } finally { setAdding(false) }
+    } catch (err) {
+      setAddError(formatUserError(err))
+      toastFailure(toast, 'Failed to create user', err)
+    } finally { setAdding(false) }
   }
 
   const handleDelete = async (id: string, username: string) => {
@@ -67,7 +85,7 @@ export default function AccessControl() {
       setUsers(prev => prev.filter(u => u.id !== id))
       toast.success(`User "${username}" deleted`)
     } catch (err) {
-      toast.error(`Failed to delete user: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      toastFailure(toast, 'Failed to delete user', err)
     }
   }
 
@@ -76,7 +94,7 @@ export default function AccessControl() {
       await apiFetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !enabled }) })
       setUsers(prev => prev.map(u => u.id === id ? { ...u, enabled: !enabled } : u))
     } catch (err) {
-      toast.error(`Failed to update user: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      toastFailure(toast, 'Failed to update user', err)
     }
   }
 
@@ -84,21 +102,41 @@ export default function AccessControl() {
   const operatorCount = users.filter(u => u.role === 'operator').length
   const viewerCount = users.filter(u => u.role === 'viewer').length
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Loading users...</div>
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><Users className="w-6 h-6 text-indigo-400" /> Access Control</h1>
-          <p className="text-sm text-slate-400 mt-1">User accounts and role management</p>
-        </div>
-        <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
-          <Plus className="w-4 h-4" /> Add User
-        </button>
-      </div>
+      <PageHeader
+        title="Access Control"
+        description="User accounts and role management"
+        onRefresh={fetchUsers}
+        refreshing={loading}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => setShowAdd(!showAdd)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add User
+          </button>
+        }
+      />
 
-      {error && <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-4 text-sm text-red-400">{error}</div>}
+      {loadError && (
+        <ErrorBanner
+          title="Could not load users"
+          headline={loadError}
+          hints={hintsForError(loadError, 'auth')}
+          onRetry={fetchUsers}
+        />
+      )}
+
+      {loading && !loadError ? (
+        <div className="flex items-center justify-center h-64 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Loading users…
+        </div>
+      ) : !loadError ? (
+        <>
+
       {addSuccess && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400 flex items-center gap-2"><CheckCircle className="w-4 h-4" />{addSuccess}</div>}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -177,6 +215,8 @@ export default function AccessControl() {
           </table>
         </div>
       )}
+        </>
+      ) : null}
     </div>
   )
 }

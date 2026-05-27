@@ -2,9 +2,15 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RefreshCw, HardDrive, ArrowRight, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { hintsForError } from '../utils/daemonHints'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 interface DiskImage {
   path: string
@@ -41,7 +47,7 @@ function formatBytes(bytes: number): string {
 
 export default function DiskConverter() {
   const [diskImages, setDiskImages] = useState<DiskImage[]>([])
-  const [loadingImages, setLoadingImages] = useState(false)
+  const { loading: loadingImages, loadError, run } = usePageLoader('Failed to load disk images')
   const [sourcePath, setSourcePath] = useState('')
   const [targetFormat, setTargetFormat] = useState<string>('qcow2')
   const [outputPath, setOutputPath] = useState('')
@@ -51,18 +57,21 @@ export default function DiskConverter() {
   const [job, setJob] = useState<JobStatus | null>(null)
   const [polling, setPolling] = useState(false)
 
-  const loadDiskImages = async () => {
-    setLoadingImages(true)
-    try {
+  const loadDiskImages = useCallback(() => {
+    return run(async () => {
       const res = await apiFetch('/api/images')
-      if (res.ok) {
-        const data = await res.json()
-        setDiskImages(data.images || data.disk_images || [])
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
       }
-    } catch { /* endpoint may not be available */ } finally { setLoadingImages(false) }
-  }
+      const data = await res.json()
+      setDiskImages(data.images || data.disk_images || [])
+    })
+  }, [run])
 
-  useEffect(() => { loadDiskImages() }, [])
+  useEffect(() => {
+    void loadDiskImages()
+  }, [loadDiskImages])
 
   useEffect(() => {
     if (!outputEdited) setOutputPath(deriveOutputPath(sourcePath, targetFormat))
@@ -107,7 +116,9 @@ export default function DiskConverter() {
       if (!jobId) throw new Error('No job ID returned from server')
       setJob({ id: jobId, status: 'pending', progress: 0 })
       setPolling(true)
-    } catch (e: any) { setError(e.message || 'Failed to submit conversion job') } finally { setSubmitting(false) }
+    } catch (e) {
+      setError(formatUserError(e))
+    } finally { setSubmitting(false) }
   }
 
   const handleReset = () => {
@@ -119,18 +130,12 @@ export default function DiskConverter() {
   const jobRunning = job && !jobDone && !jobFailed && job.status !== 'cancelled'
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-white flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-700 flex items-center justify-center shadow-lg shadow-teal-500/20">
-              <HardDrive className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-gradient-blue">Disk Format Converter</span>
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">Convert disk images between qcow2, vmdk, vhd, vhdx, and raw formats</p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <PageHeader title="Disk Format Converter" description="Convert disk images between qcow2, vmdk, vhd, vhdx, and raw formats" />
+      <PageLoadBanner title="Could not load disk images" headline={loadError} onRetry={() => void loadDiskImages()} />
+      {error && (
+        <ErrorBanner title="Conversion error" headline={error} hints={hintsForError(error, 'storage')} onRetry={handleConvert} />
+      )}
 
       <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
         <div className="mb-4">
@@ -152,7 +157,7 @@ export default function DiskConverter() {
             <div className="space-y-2">
               <input type="text" value={sourcePath} onChange={(e) => { setSourcePath(e.target.value); setOutputEdited(false) }} placeholder="/path/to/disk.vmdk"
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-              <button onClick={loadDiskImages} disabled={loadingImages} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+              <button onClick={() => void loadDiskImages()} disabled={loadingImages} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
                 <RefreshCw className={`w-3 h-3 ${loadingImages ? 'animate-spin' : ''}`} /> Load available disk images
               </button>
             </div>

@@ -5,6 +5,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Zap, CheckCircle, AlertTriangle, Loader2, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 interface Recommendation {
   resource: string
@@ -44,20 +48,21 @@ function impactIcon(impact: string) {
 
 export default function ResourceOptimizer() {
   const [optimizations, setOptimizations] = useState<VMOptimization[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [applying, setApplying] = useState<string | null>(null)
+  const { loading, loadError, run } = usePageLoader('Failed to load recommendations')
+    const [applying, setApplying] = useState<string | null>(null)
   const [results, setResults] = useState<Record<string, OptimizationResult>>({})
 
-  const fetchRecommendations = useCallback(async () => {
-    setLoading(true); setError(null)
-    try {
+  const fetchRecommendations = useCallback(() => {
+    return run(async () => {
       const res = await apiFetch('/api/system/optimization/recommendations')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setOptimizations(Array.isArray(data) ? data : data.recommendations || [])
-    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+    })
+  }, [run])
 
   useEffect(() => { fetchRecommendations() }, [fetchRecommendations])
 
@@ -77,18 +82,27 @@ export default function ResourceOptimizer() {
   const highImpact = optimizations.reduce((sum, o) => sum + o.recommendations.filter(r => r.impact?.toLowerCase() === 'high').length, 0)
   const medImpact = optimizations.reduce((sum, o) => sum + o.recommendations.filter(r => r.impact?.toLowerCase() === 'medium').length, 0)
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Analyzing resources...</div>
-  if (error) return <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center"><p className="text-red-400 font-medium">Failed to load recommendations</p><p className="text-red-400/70 text-sm mt-1">{error}</p><button onClick={fetchRecommendations} className="mt-3 px-4 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors">Retry</button></div>
+  if (loading && optimizations.length === 0 && !loadError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Resource Optimizer" description="Right-sizing recommendations for your VMs" />
+        <div className="flex items-center justify-center h-64 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Analyzing resources…
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><Zap className="w-6 h-6 text-yellow-400" /> Resource Optimizer</h1>
-          <p className="text-sm text-slate-400 mt-1">Right-sizing recommendations for your VMs</p>
-        </div>
-        <button onClick={fetchRecommendations} title="Refresh recommendations" className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors">Refresh</button>
-      </div>
+      <PageHeader
+        title="Resource Optimizer"
+        description="Right-sizing recommendations for your VMs"
+        onRefresh={() => void fetchRecommendations()}
+        refreshing={loading}
+      />
+      <PageLoadBanner title="Could not load recommendations" headline={loadError} onRetry={() => void fetchRecommendations()} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">

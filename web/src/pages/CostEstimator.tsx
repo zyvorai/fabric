@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { apiFetch } from '../api/client'
+import { PageHeader } from '../components/ui'
 
 interface ProviderEstimate {
   name: string
@@ -115,12 +116,10 @@ export default function CostEstimator() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Storage Cost Estimator</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Compare cloud storage costs for your VM infrastructure
-        </p>
-      </div>
+      <PageHeader
+        title="Storage Cost Estimator"
+        description="Compare cloud storage costs for your VM infrastructure"
+      />
 
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-5">
         <h3 className="text-sm font-semibold text-slate-200">Configuration</h3>

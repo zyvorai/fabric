@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, RefreshCw, Play } from 'lucide-react'
 import {
   listBaselines,
@@ -20,6 +20,8 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function LifecycleManager() {
   const toast = useToastContext()
@@ -28,29 +30,28 @@ export default function LifecycleManager() {
   const [scans, setScans] = useState<HostComplianceStatus[]>([])
   const [tasks, setTasks] = useState<RemediationTask[]>([])
   const [updates, setUpdates] = useState<RollingUpdatePlan[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load lifecycle data')
   const [activeTab, setActiveTab] = useState<'baselines' | 'compliance' | 'remediation' | 'updates'>('baselines')
   const [showCreateBaseline, setShowCreateBaseline] = useState(false)
 
-  useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 10000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [b, s, t, u] = await Promise.all([
-        listBaselines(), getComplianceStatus(),
-        listRemediations(), listRollingUpdates(),
+        listBaselines(),
+        getComplianceStatus(),
+        listRemediations(),
+        listRollingUpdates(),
       ])
-      setBaselines(b); setScans(s); setTasks(t); setUpdates(u)
-    } catch (error) {
-      console.error('Failed to load lifecycle data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      setBaselines(b)
+      setScans(s)
+      setTasks(t)
+      setUpdates(u)
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleDeleteBaseline = async (id: string) => {
     const ok = await confirm('Delete Baseline', 'Delete this baseline?', { variant: 'danger', confirmLabel: 'Delete' })
@@ -85,16 +86,17 @@ export default function LifecycleManager() {
     return m[status] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) return <div className="text-center py-8">Loading...</div>
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Lifecycle Manager</h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-          <RefreshCw className="w-4 h-4" /> Refresh
+        <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
+
+      <PageLoadBanner title="Could not load lifecycle data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

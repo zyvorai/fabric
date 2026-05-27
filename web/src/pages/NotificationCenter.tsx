@@ -5,6 +5,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { X } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { PageHeader } from '../components/ui'
+import { formatUserError } from '../utils/apiError'
 
 interface Notification {
   id: string
@@ -43,6 +45,7 @@ let nextId = 1
 
 export default function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [pollError, setPollError] = useState<string | null>(null)
   const knownAlertsRef = useRef<Set<string>>(new Set())
   const initialLoadRef = useRef(true)
 
@@ -58,8 +61,12 @@ export default function NotificationCenter() {
     const poll = async () => {
       try {
         const resp = await apiFetch('/api/system/alerts')
-        if (!resp.ok) return
+        if (!resp.ok) {
+          const body = await resp.text()
+          throw new Error(body || `HTTP ${resp.status}`)
+        }
         const data = await resp.json()
+        setPollError(null)
         const alerts: any[] = data.alerts || (Array.isArray(data) ? data : [])
         for (const a of alerts) {
           const key = a.id || a.name || a.message || ''
@@ -69,7 +76,9 @@ export default function NotificationCenter() {
             addNotification(a.severity === 'warning' ? 'warning' : 'alert', a.name || 'Alert fired', a.message)
           }
         }
-      } catch (err) { console.error('Failed to poll alerts:', err) }
+      } catch (err) {
+        setPollError(formatUserError(err))
+      }
       initialLoadRef.current = false
     }
     poll()
@@ -91,21 +100,25 @@ export default function NotificationCenter() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold text-white">Notification Center</h2>
-          {unreadCount > 0 && (
-            <span className="flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-rose-500 text-white text-xs font-bold">
-              {unreadCount}
-            </span>
-          )}
+      <PageHeader
+        title="Notification Center"
+        description="VM events, alerts, and system warnings"
+        actions={
+          notifications.length > 0 ? (
+            <button onClick={clearAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors">
+              Clear All
+            </button>
+          ) : undefined
+        }
+      />
+      {unreadCount > 0 && (
+        <div className="text-xs text-slate-400">{unreadCount} unread</div>
+      )}
+      {pollError && (
+        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+          {pollError} — alert polling paused until next retry
         </div>
-        {notifications.length > 0 && (
-          <button onClick={clearAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors">
-            Clear All
-          </button>
-        )}
-      </div>
+      )}
 
       <div className="flex gap-3 flex-wrap">
         {(['vm_started', 'vm_stopped', 'alert', 'warning'] as Notification['type'][]).map((type) => {

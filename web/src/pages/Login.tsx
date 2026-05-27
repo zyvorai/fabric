@@ -14,6 +14,7 @@ import {
   LoginRemember,
   type PremiumLoginFeature,
 } from '../components/PremiumLoginShell'
+import { formatUserError } from '../utils/apiError'
 import {
   Lock,
   User,
@@ -89,7 +90,7 @@ export default function Login() {
       }
       navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(formatUserError(err))
       setPassword('')
     } finally {
       setSubmitting(false)

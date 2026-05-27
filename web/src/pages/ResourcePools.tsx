@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
 import {
   listPools,
@@ -18,24 +18,22 @@ import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function ResourcePools() {
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<ResourcePool[]>([])
   const [summaries, setSummaries] = useState<Map<string, ResourcePoolSummary>>(new Map())
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load resource pools')
   const [expandedPools, setExpandedPools] = useState<Set<string>>(new Set())
   const [showCreatePool, setShowCreatePool] = useState(false)
   const [showAdmissionTest, setShowAdmissionTest] = useState<string | null>(null)
   const [admissionResult, setAdmissionResult] = useState<AdmissionControlResult | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const data = await listPools()
       setPools(data)
       const sums = new Map<string, ResourcePoolSummary>()
@@ -46,12 +44,12 @@ export default function ResourcePools() {
         } catch { /* skip */ }
       }
       setSummaries(sums)
-    } catch (error) {
-      console.error('Failed to load resource pools:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const togglePool = (id: string) => {
     setExpandedPools(prev => {
@@ -146,13 +144,12 @@ export default function ResourcePools() {
     )
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>
-  }
 
   return (
     <div className="p-6">
       <PageHeader
+        onRefresh={() => void loadData()}
+        refreshing={loading}
         title="Resource Pools"
         actions={
           <button onClick={() => setShowCreatePool(true)}
@@ -161,6 +158,8 @@ export default function ResourcePools() {
           </button>
         }
       />
+
+      <PageLoadBanner title="Could not load resource pools" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

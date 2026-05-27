@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import {
   listDistributedPools,
@@ -22,6 +22,8 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function DistributedStorage() {
   const toast = useToastContext()
@@ -30,20 +32,14 @@ export default function DistributedStorage() {
   const [policies, setPolicies] = useState<StoragePolicy[]>([])
   const [migrations, setMigrations] = useState<StorageMigration[]>([])
   const [dsClusters, setDsClusters] = useState<DatastoreCluster[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load distributed storage')
   const [activeTab, setActiveTab] = useState<'pools' | 'policies' | 'migrations' | 'clusters'>('pools')
   const [showCreatePool, setShowCreatePool] = useState(false)
   const [showCreatePolicy, setShowCreatePolicy] = useState(false)
   const [showCreateCluster, setShowCreateCluster] = useState(false)
 
-  useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 10000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [p, pol, mig, cl] = await Promise.all([
         listDistributedPools(),
         listStoragePolicies(),
@@ -54,12 +50,12 @@ export default function DistributedStorage() {
       setPolicies(pol)
       setMigrations(mig)
       setDsClusters(cl)
-    } catch (error) {
-      console.error('Failed to load distributed storage data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleDeletePool = async (id: string) => {
     const ok = await confirm('Delete Pool', 'Delete this storage pool?', { variant: 'danger', confirmLabel: 'Delete' })
@@ -106,16 +102,15 @@ export default function DistributedStorage() {
     return colors[status] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>
-  }
 
   return (
     <div className="p-6">
+      <PageLoadBanner title="Could not load distributed storage" headline={loadError} onRetry={() => void loadData()} />
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Distributed Storage</h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-          <RefreshCw className="w-4 h-4" /> Refresh
+        <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 

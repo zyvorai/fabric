@@ -5,6 +5,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, Plus, Trash2, Send, CheckCircle, XCircle, Loader2, Globe, ToggleLeft, ToggleRight } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { usePageLoader } from '../hooks/usePageLoader'
+import { useToastContext } from '../contexts/ToastContext'
+import { toastFailure } from '../utils/toastError'
 
 interface Webhook {
   id: string
@@ -18,9 +24,9 @@ const availableEvents = ['vm.started', 'vm.stopped', 'vm.created', 'vm.deleted',
 const webhookTypes = ['generic', 'slack', 'discord']
 
 export default function Webhooks() {
+  const toast = useToastContext()
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { loading, loadError, run } = usePageLoader('Failed to load webhooks')
   const [showAdd, setShowAdd] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null)
@@ -31,22 +37,20 @@ export default function Webhooks() {
   const [addError, setAddError] = useState('')
   const [adding, setAdding] = useState(false)
 
-  const fetchWebhooks = useCallback(async () => {
-    try {
+  const fetchWebhooks = useCallback(() => {
+    return run(async () => {
       const res = await apiFetch('/api/webhooks')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setWebhooks(Array.isArray(data) ? data : data.webhooks || [])
-      setError('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch webhooks')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    })
+  }, [run])
 
   useEffect(() => {
-    fetchWebhooks()
+    void fetchWebhooks()
   }, [fetchWebhooks])
 
   const handleAdd = async () => {
@@ -81,8 +85,8 @@ export default function Webhooks() {
       const res = await apiFetch(`/api/webhooks/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setWebhooks((prev) => prev.filter((w) => w.id !== id))
-    } catch (err: any) {
-      setError(`Failed to delete webhook: ${err.message}`)
+    } catch (err) {
+      toastFailure(toast, 'Failed to delete webhook', err)
     }
   }
 
@@ -109,23 +113,22 @@ export default function Webhooks() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bell className="w-6 h-6 text-orange-400" />
-          <h2 className="text-xl font-bold text-white">Webhook Configuration</h2>
-        </div>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Webhook
-        </button>
-      </div>
+      <PageHeader
+        title="Webhook Configuration"
+        onRefresh={() => void fetchWebhooks()}
+        refreshing={loading}
+        actions={
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Webhook
+          </button>
+        }
+      />
 
-      {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">{error}</div>
-      )}
+      <PageLoadBanner title="Could not load webhooks" headline={loadError} onRetry={() => void fetchWebhooks()} />
 
       {showAdd && (
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-4">

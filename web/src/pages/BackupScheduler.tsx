@@ -4,6 +4,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface VM { name: string; state?: string }
 interface Schedule { id: string; name: string; cron: string; next_run?: string; vms: string[]; enabled: boolean; output_dir: string; retention: number; format: string; compression: boolean }
@@ -21,11 +27,13 @@ function parseCronToHuman(cron: string): string {
 }
 
 export default function BackupScheduler() {
+  const toast = useToastContext()
   const [vms, setVMs] = useState<VM[]>([])
   const [selectedVMs, setSelectedVMs] = useState<Set<string>>(new Set())
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [preset, setPreset] = useState<Preset>('daily2am')
@@ -37,33 +45,108 @@ export default function BackupScheduler() {
   const [scheduleName, setScheduleName] = useState('')
   const activeCron = preset === 'custom' ? customCron : presetCrons[preset]
 
-  const fetchVMs = useCallback(async () => { try { const resp = await apiFetch('/api/vms'); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); const data = await resp.json(); setVMs(Array.isArray(data) ? data : data.vms || []) } catch (err: any) { setVMs([]); setError(prev => prev || `VMs: ${err.message}`) } }, [])
-  const fetchSchedules = useCallback(async () => { try { const resp = await apiFetch('/api/schedules'); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); const data = await resp.json(); setSchedules(Array.isArray(data) ? data : data.schedules || []) } catch (err: any) { setSchedules([]); setError(prev => prev || `Schedules: ${err.message}`) } }, [])
+  const fetchVMs = useCallback(async () => {
+    try {
+      const resp = await apiFetch('/api/vms')
+      if (!resp.ok) {
+        const body = await resp.text()
+        throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
+      }
+      const data = await resp.json()
+      setVMs(Array.isArray(data) ? data : data.vms || [])
+    } catch (err) {
+      setVMs([])
+      throw err
+    }
+  }, [])
 
-  useEffect(() => { const load = async () => { setLoading(true); await Promise.all([fetchVMs(), fetchSchedules()]); setLoading(false) }; load() }, [fetchVMs, fetchSchedules])
+  const fetchSchedules = useCallback(async () => {
+    try {
+      const resp = await apiFetch('/api/schedules')
+      if (!resp.ok) {
+        const body = await resp.text()
+        throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
+      }
+      const data = await resp.json()
+      setSchedules(Array.isArray(data) ? data : data.schedules || [])
+    } catch (err) {
+      setSchedules([])
+      throw err
+    }
+  }, [])
+
+  const loadAll = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      await Promise.all([fetchVMs(), fetchSchedules()])
+    } catch (err) {
+      const msg = formatUserError(err)
+      setLoadError(msg)
+      toastFailure(toast, 'Failed to load backup scheduler data', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchVMs, fetchSchedules, toast])
+
+  useEffect(() => {
+    loadAll()
+  }, [loadAll])
 
   const toggleVM = (name: string) => { setSelectedVMs((prev) => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next }) }
   const toggleAll = () => { if (selectedVMs.size === vms.length) setSelectedVMs(new Set()); else setSelectedVMs(new Set(vms.map((v) => v.name))) }
 
   const handleCreate = async () => {
-    if (selectedVMs.size === 0) { setError('Select at least one VM'); return }
-    if (!scheduleName.trim()) { setError('Enter a schedule name'); return }
-    setCreating(true); setError(null); setSuccessMsg(null)
+    if (selectedVMs.size === 0) { setActionError('Select at least one VM'); return }
+    if (!scheduleName.trim()) { setActionError('Enter a schedule name'); return }
+    setCreating(true); setActionError(null); setSuccessMsg(null)
     try {
       const resp = await apiFetch('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: scheduleName, cron: activeCron, vms: Array.from(selectedVMs), output_dir: outputDir, retention, format, compression }) })
-      if (!resp.ok) { const body = await resp.json().catch(() => null); throw new Error(body?.error || `HTTP ${resp.status}`) }
-      setSuccessMsg('Schedule created successfully'); setScheduleName(''); setSelectedVMs(new Set()); fetchSchedules()
-    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to create schedule') } finally { setCreating(false) }
+      if (!resp.ok) {
+        const body = await resp.text()
+        throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
+      }
+      setSuccessMsg('Schedule created successfully')
+      toast.success('Backup schedule created')
+      setScheduleName('')
+      setSelectedVMs(new Set())
+      fetchSchedules()
+    } catch (err) {
+      const msg = formatUserError(err)
+      setActionError(msg)
+      toastFailure(toast, 'Failed to create schedule', err)
+    } finally { setCreating(false) }
   }
-
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-bold text-white">Backup Scheduler</h2><p className="text-sm text-slate-400 mt-1">Create and manage automated VM backup schedules</p></div>
-      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
+      <PageHeader
+        title="Backup Scheduler"
+        description="Create and manage automated VM backup schedules"
+        onRefresh={loadAll}
+        refreshing={loading}
+      />
+      {loadError && (
+        <ErrorBanner
+          title="Could not load scheduler data"
+          headline={loadError}
+          hints={hintsForError(loadError, 'storage')}
+          onRetry={loadAll}
+        />
+      )}
+      {actionError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{actionError}</div>
+      )}
       {successMsg && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">{successMsg}</div>}
 
+      {loading && !loadError && (
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {!loading && !loadError && (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-slate-200 mb-3">Select VMs</h3>
@@ -119,6 +202,8 @@ export default function BackupScheduler() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }

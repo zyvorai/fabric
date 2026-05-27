@@ -3,8 +3,12 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { GitBranch, RefreshCw, Server, ArrowRight } from 'lucide-react'
+import { GitBranch, Server, ArrowRight } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 interface ServiceNode { name: string; type: string; vm: string; port?: number; status: string }
 interface ServiceLink { from: string; to: string; protocol: string; port: number }
@@ -33,18 +37,19 @@ function typeBadge(type: string): string {
 
 export default function ServiceMap() {
   const [data, setData] = useState<ServiceMapData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const { loading, loadError, run } = usePageLoader('Failed to load service map')
+    const [selectedNode, setSelectedNode] = useState<string | null>(null)
 
-  const fetchMap = useCallback(async () => {
-    setLoading(true); setError(null)
-    try {
+  const fetchMap = useCallback(() => {
+    return run(async () => {
       const res = await apiFetch('/api/services/map')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       setData(await res.json())
-    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
-  }, [])
+    })
+  }, [run])
 
   useEffect(() => { fetchMap(); const interval = setInterval(fetchMap, 15000); return () => clearInterval(interval) }, [fetchMap])
 
@@ -62,15 +67,14 @@ export default function ServiceMap() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3"><GitBranch className="w-6 h-6 text-teal-400" /> Service Map</h1>
-          <p className="text-sm text-slate-400 mt-1">Service dependencies and health across VMs</p>
-        </div>
-        <button onClick={fetchMap} title="Refresh service map" className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"><RefreshCw className="w-4 h-4" /> Refresh</button>
-      </div>
+      <PageLoadBanner title="Could not load service map" headline={loadError} onRetry={() => void fetchMap()} />
 
-      {error && <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-4 text-sm text-red-400">{error}</div>}
+      <PageHeader
+        title="Service Map"
+        description="Service dependencies and health across VMs"
+        onRefresh={() => void fetchMap()}
+        refreshing={loading}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">

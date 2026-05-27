@@ -5,6 +5,8 @@
 import { useState, useCallback, useRef } from 'react'
 import { FileUp, Upload, Download, Eye, Send, CheckCircle, XCircle, Clock, Loader2, FileText } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 
 interface VMEntry { name: string; cpus: number; memory: string; image: string }
 type VMStatus = 'pending' | 'submitting' | 'submitted' | 'error'
@@ -65,9 +67,15 @@ export default function BatchImport() {
       setItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: 'submitting' } : it))
       try {
         const res = await apiFetch('/api/vms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: items[i].name, cpus: items[i].cpus, memory: items[i].memory, image: items[i].image }) })
-        if (!res.ok) { const body = await res.json().catch(() => ({ error: 'Request failed' })); throw new Error(body.error || `HTTP ${res.status}`) }
-        setItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: 'submitted' } : it))
-      } catch (err) { setItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: 'error', error: err instanceof Error ? err.message : 'Unknown error' } : it)) }
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: 'Request failed' }))
+          throw new Error(body.error || formatHttpErrorBody(res.status, res.statusText, ''))
+        }
+        setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: 'submitted' } : it)))
+      } catch (err) {
+        const msg = formatUserError(err)
+        setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: 'error', error: msg } : it)))
+      }
     }
     setSubmitting(false)
   }, [items])
@@ -98,7 +106,9 @@ export default function BatchImport() {
           <div><label className="block text-sm font-medium text-slate-400 mb-2">Or paste YAML/JSON directly</label>
             <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={12} className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-sm text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-y" placeholder={exampleYAML} />
           </div>
-          {parseError && <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400"><XCircle className="w-4 h-4 flex-shrink-0" />{parseError}</div>}
+          {parseError && (
+            <ErrorBanner title="Could not parse input" headline={parseError} />
+          )}
           <button onClick={handlePreview} disabled={!inputText.trim()} className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"><Eye className="w-4 h-4" /> Preview</button>
         </div>
       ) : (

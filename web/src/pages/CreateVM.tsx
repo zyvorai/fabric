@@ -8,8 +8,12 @@ import { createVM } from '../api/vm'
 import { apiGet } from '../api/client'
 import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor } from 'lucide-react'
 import WizardStepper from '../components/WizardStepper'
+import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui/PageHeader'
 import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface AdvancedOptions {
   firmware: 'bios' | 'uefi'
@@ -36,6 +40,7 @@ const VM_NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/
 
 export default function CreateVM() {
   const navigate = useNavigate()
+  const toast = useToastContext()
   const [name, setName] = useState('')
   const [image, setImage] = useState('')
   const [cpus, setCpus] = useState(2)
@@ -44,28 +49,38 @@ export default function CreateVM() {
   const [imageOptions, setImageOptions] = useState<{ name: string; path: string }[]>([])
   const [imagesLoading, setImagesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [validationError, setValidationError] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [imagesError, setImagesError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedOptions>(defaultAdvanced)
   const [wizardStep, setWizardStep] = useState(0)
+  const [imagesReload, setImagesReload] = useState(0)
 
   useEffect(() => {
     if (wizardStep !== 0) return
+    void imagesReload
     let cancelled = false
     setImagesLoading(true)
+    setImagesError(null)
     apiGet<{ name: string; path: string }[]>('/api/images')
       .then((data) => {
         if (cancelled) return
         setImageOptions((Array.isArray(data) ? data : []).filter((i) => i.path))
       })
-      .catch(() => {
-        if (!cancelled) setImageOptions([])
+      .catch((err) => {
+        if (!cancelled) {
+          setImageOptions([])
+          const msg = formatUserError(err)
+          setImagesError(msg)
+          toastFailure(toast, 'Could not load disk images', err)
+        }
       })
       .finally(() => {
         if (!cancelled) setImagesLoading(false)
       })
     return () => { cancelled = true }
-  }, [wizardStep])
+  }, [wizardStep, imagesReload, toast])
 
   const memoryPresets = [
     { label: '512 MB', value: 512 },
@@ -94,15 +109,15 @@ export default function CreateVM() {
   const goNext = () => {
     const msg = validateStep(wizardStep)
     if (msg) {
-      setError(msg)
+      setValidationError(msg)
       return
     }
-    setError('')
+    setValidationError('')
     setWizardStep((s) => Math.min(s + 1, WIZARD_STEPS.length - 1))
   }
 
   const goBack = () => {
-    setError('')
+    setValidationError('')
     setWizardStep((s) => Math.max(s - 1, 0))
   }
 
@@ -110,18 +125,22 @@ export default function CreateVM() {
     e.preventDefault()
     const msg = validateStep(0) || validateStep(1)
     if (msg) {
-      setError(msg)
+      setValidationError(msg)
       return
     }
 
     setLoading(true)
-    setError('')
+    setValidationError('')
+    setSubmitError(null)
 
     try {
       await createVM({ name, image, cpus, memory, disk: diskGb })
+      toast.success(`VM '${name}' created`)
       navigate('/vms')
     } catch (err) {
-      setError(formatUserError(err))
+      const msg = formatUserError(err)
+      setSubmitError(msg)
+      toastFailure(toast, 'Failed to create VM', err)
     } finally {
       setLoading(false)
     }
@@ -149,15 +168,32 @@ export default function CreateVM() {
           onStep={(step) => {
             if (step < wizardStep) {
               setWizardStep(step)
-              setError('')
+              setValidationError('')
             }
           }}
         />
 
+        {imagesError && wizardStep === 0 && (
+          <ErrorBanner
+            title="Could not load disk images"
+            headline={imagesError}
+            hints={hintsForError(imagesError, 'storage')}
+            onRetry={() => setImagesReload((n) => n + 1)}
+          />
+        )}
+
+        {submitError && (
+          <ErrorBanner
+            title="Could not create virtual machine"
+            headline={submitError}
+            hints={hintsForError(submitError, 'vm')}
+          />
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {error && (
+          {validationError && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-              {error}
+              {validationError}
             </div>
           )}
 

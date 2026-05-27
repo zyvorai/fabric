@@ -4,6 +4,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 function stateBadge(state: string): { label: string; classes: string } {
   switch (state) {
@@ -24,9 +30,10 @@ function cpuBarColor(cpu: number): string {
 }
 
 export default function Processes() {
+  const toast = useToastContext()
   const [processes, setProcesses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedPid, setSelectedPid] = useState<number | null>(null)
   const [detail, setDetail] = useState<any | null>(null)
@@ -35,16 +42,21 @@ export default function Processes() {
   const fetchProcesses = useCallback(async () => {
     try {
       const res = await apiFetch('/api/system/processes')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const data = await res.json()
       setProcesses(Array.isArray(data) ? data : data.processes ?? [])
-      setError(null)
-    } catch (err: any) {
-      setError(err.message)
+      setLoadError(null)
+    } catch (err) {
+      const msg = formatUserError(err)
+      setLoadError(msg)
+      toastFailure(toast, 'Failed to load processes', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     fetchProcesses()
@@ -61,8 +73,8 @@ export default function Processes() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setDetail(data)
-    } catch (err: any) {
-      setDetail({ error: err.message })
+    } catch (err) {
+      setDetail({ error: formatUserError(err) })
     } finally {
       setDetailLoading(false)
     }
@@ -82,37 +94,31 @@ export default function Processes() {
   const runningCount = processes.filter((p: any) => p.state === 'R').length
   const sleepingCount = processes.filter((p: any) => p.state === 'S').length
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400">
-        <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
-        Loading processes...
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center">
-        <p className="text-red-400 font-medium">Failed to load processes</p>
-        <p className="text-red-400/70 text-sm mt-1">{error}</p>
-        <button
-          onClick={fetchProcesses}
-          title="Retry"
-          className="mt-3 px-4 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Processes</h1>
-        <p className="text-sm text-slate-400 mt-1">System process monitor (auto-refresh 3s)</p>
-      </div>
+      <PageHeader
+        title="Processes"
+        description="System process monitor (auto-refresh 3s)"
+        onRefresh={fetchProcesses}
+        refreshing={loading}
+      />
+
+      {loadError && (
+        <ErrorBanner
+          title="Could not load processes"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={fetchProcesses}
+        />
+      )}
+
+      {loading && !loadError ? (
+        <div className="flex items-center justify-center h-64 text-slate-400">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+          Loading processes…
+        </div>
+      ) : !loadError ? (
+        <>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
@@ -257,6 +263,8 @@ export default function Processes() {
           ) : null}
         </div>
       )}
+        </>
+      ) : null}
     </div>
   )
 }

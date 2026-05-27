@@ -2,8 +2,14 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
+import { useToastContext } from '../contexts/ToastContext'
 
 function severityColor(severity: string): string {
   const s = (severity || '').toLowerCase()
@@ -26,77 +32,86 @@ function riskBg(score: number): string {
 }
 
 export default function SecurityDashboard() {
+  const toast = useToastContext()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/system/security')
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
+      setData(await res.json())
+      setLoadError(null)
+      setRefreshError(null)
+    } catch (err) {
+      const msg = formatUserError(err)
+      setData((prev: any) => {
+        if (prev == null) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load security data', err)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => {
-    let active = true
-
-    const fetchData = () => {
-      apiFetch('/api/system/security')
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          return res.json()
-        })
-        .then((json) => {
-          if (active) {
-            setData(json)
-            setError(null)
-            setLoading(false)
-          }
-        })
-        .catch((err) => {
-          if (active) {
-            setError(err.message)
-            setLoading(false)
-          }
-        })
-    }
-
     fetchData()
     const interval = setInterval(fetchData, 5000)
-    return () => {
-      active = false
-      clearInterval(interval)
-    }
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (error && !data) {
-    return (
-      <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center">
-        <p className="text-sm font-semibold text-red-400">Failed to load security data</p>
-        <p className="text-xs text-red-400/70 mt-1">{error}</p>
-        <button onClick={() => { setLoading(true); setError(null) }} className="mt-3 px-4 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors">Retry</button>
-      </div>
-    )
-  }
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const riskScore = data?.risk_score ?? 0
   const alerts: any[] = data?.alerts || []
   const failedLogins: any[] = data?.failed_logins || []
   const listeningPorts: any[] = data?.listening_ports || []
 
+  if (loading && !data && !loadError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Security" description="Security posture and threat monitoring" />
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gradient-purple">Security</h1>
-        <p className="text-sm text-slate-400 mt-1">Security posture and threat monitoring</p>
-      </div>
+      <PageHeader
+        title="Security"
+        description="Security posture and threat monitoring"
+        onRefresh={fetchData}
+        refreshing={loading}
+      />
 
-      {error && (
+      {loadError && (
+        <ErrorBanner
+          title="Could not load security data"
+          headline={loadError}
+          hints={hintsForError(loadError, 'auth')}
+          onRetry={fetchData}
+        />
+      )}
+
+      {refreshError && !loadError && (
         <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
-          Connection issue: {error} - showing last known data
+          Refresh failed: {refreshError} — showing last known data
         </div>
       )}
+
+      {!loadError && (
+        <>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="stat-card-red rounded-xl border border-slate-700/50 p-6 flex flex-col items-center justify-center">
@@ -208,6 +223,8 @@ export default function SecurityDashboard() {
             </table>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

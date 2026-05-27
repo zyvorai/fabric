@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Check, X, Trash2, RefreshCw } from 'lucide-react'
 import {
   getDrsConfig,
@@ -24,6 +24,8 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageLoadBanner from '../components/PageLoadBanner'
+import { usePageLoader } from '../hooks/usePageLoader'
 
 export default function DRS() {
   const toast = useToastContext()
@@ -33,17 +35,13 @@ export default function DRS() {
   const [balance, setBalance] = useState<ClusterBalance | null>(null)
   const [recommendations, setRecommendations] = useState<MigrationRecommendation[]>([])
   const [rules, setRules] = useState<AffinityRule[]>([])
-  const [loading, setLoading] = useState(true)
+  const { loading, loadError, run } = usePageLoader('Failed to load DRS data')
   const [showCreateRule, setShowCreateRule] = useState(false)
   const [placementResult, setPlacementResult] = useState<PlacementResult | null>(null)
   const [activeTab, setActiveTab] = useState<'balance' | 'recommendations' | 'rules' | 'placement'>('balance')
 
-  useEffect(() => {
-    loadData()
-  }, [clusterId])
-
-  const loadData = async () => {
-    try {
+  const loadData = useCallback(() => {
+    return run(async () => {
       const [cfg, bal, recs, rls] = await Promise.all([
         getDrsConfig(clusterId).catch(() => null),
         analyzeBalance(clusterId).catch(() => null),
@@ -54,12 +52,12 @@ export default function DRS() {
       setBalance(bal)
       setRecommendations(recs)
       setRules(rls)
-    } catch (error) {
-      console.error('Failed to load DRS data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+  }, [run, clusterId])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleConfigUpdate = async (updates: Partial<DrsConfig>) => {
     try {
@@ -112,18 +110,17 @@ export default function DRS() {
     return colors[p] || 'bg-slate-500/20 text-slate-400'
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>
-  }
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Distributed Resource Scheduler</h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-          <RefreshCw className="w-4 h-4" /> Refresh
+        <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
+
+      <PageLoadBanner title="Could not load DRS data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* DRS Configuration */}
       {config && (

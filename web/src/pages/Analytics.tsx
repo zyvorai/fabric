@@ -17,7 +17,11 @@ import {
   ResourceUtilization
 } from '../api/analytics'
 import { useToastContext } from '../contexts/ToastContext'
+import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
+import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
 
 interface TopVMEntry {
   vm_name: string
@@ -35,6 +39,7 @@ export default function Analytics() {
   })
   const [utilization, setUtilization] = useState<ResourceUtilization | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
   const [exporting, setExporting] = useState(false)
 
@@ -44,6 +49,7 @@ export default function Analytics() {
   }, [timeRange])
 
   const loadData = async () => {
+    setLoadError(null)
     try {
       const [perfData, insightsData, utilizationData, topCPU, topMemory, topNetwork] = await Promise.all([
         getSystemPerformance(timeRange),
@@ -58,8 +64,9 @@ export default function Analytics() {
       setUtilization(utilizationData)
       setTopVMs({ cpu: topCPU, memory: topMemory, network: topNetwork })
     } catch (error) {
-      console.error('Failed to load analytics:', error)
-      toast.error('Failed to load analytics data')
+      const msg = formatUserError(error)
+      setLoadError(msg)
+      toastFailure(toast, 'Failed to load analytics', error)
     } finally {
       setLoading(false)
     }
@@ -106,10 +113,12 @@ export default function Analytics() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Performance Analytics"
         description="Resource utilization and performance insights"
+        onRefresh={loadData}
+        refreshing={loading}
         actions={
           <>
             <select
@@ -153,6 +162,15 @@ export default function Analytics() {
           </>
         }
       />
+
+      {loadError && (
+        <ErrorBanner
+          title="Could not load analytics"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={loadData}
+        />
+      )}
 
       {/* Resource Utilization Overview */}
       {utilization && (

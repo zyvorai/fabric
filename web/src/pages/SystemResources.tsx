@@ -19,6 +19,11 @@ import {
   type OptimizationRecommendation,
 } from '../api/system'
 import { useToastContext } from '../contexts/ToastContext'
+import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
+import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { hintsForError } from '../utils/daemonHints'
 
 export default function SystemResources() {
   const toast = useToastContext()
@@ -29,6 +34,7 @@ export default function SystemResources() {
   const [hugepages1gb, setHugepages1gb] = useState<HugepageStats | null>(null)
   const [recommendations, setRecommendations] = useState<OptimizationRecommendation[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'cpu' | 'numa' | 'memory' | 'optimization'>('cpu')
 
   useEffect(() => {
@@ -36,6 +42,7 @@ export default function SystemResources() {
   }, [])
 
   const loadResources = async () => {
+    setLoadError(null)
     try {
       const [cpu, numa, memory, hp2mb, hp1gb, recs] = await Promise.all([
         getCpuTopology().catch(() => null),
@@ -52,8 +59,14 @@ export default function SystemResources() {
       setHugepages2mb(hp2mb)
       setHugepages1gb(hp1gb)
       setRecommendations(recs)
+
+      if (!cpu && !numa && !memory) {
+        setLoadError('No system resource data is available from the host.')
+      }
     } catch (error) {
-      console.error('Failed to load system resources:', error)
+      const msg = formatUserError(error)
+      setLoadError(msg)
+      toastFailure(toast, 'Failed to load system resources', error)
     } finally {
       setLoading(false)
     }
@@ -68,16 +81,34 @@ export default function SystemResources() {
   }
 
   if (loading) {
-    return <div className="p-8">Loading system resources...</div>
+    return (
+      <div className="p-8 space-y-6">
+        <PageHeader title="System Resources" description="Hardware topology and resource allocation" />
+        <div className="text-slate-400">Loading system resources…</div>
+      </div>
+    )
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">System Resources</h1>
-          <p className="text-slate-400">Hardware topology and resource allocation</p>
-        </div>
+    <div className="p-8 space-y-6">
+      <PageHeader
+        title="System Resources"
+        description="Hardware topology and resource allocation"
+        onRefresh={loadResources}
+        refreshing={loading}
+      />
+
+      {loadError && (
+        <ErrorBanner
+          title="Could not load system resources"
+          headline={loadError}
+          hints={hintsForError(loadError)}
+          onRetry={loadResources}
+        />
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <div />
         <button
           onClick={loadResources}
           className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded transition"
