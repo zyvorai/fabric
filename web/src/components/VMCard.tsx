@@ -7,6 +7,7 @@ import { Link } from 'react-router'
 import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag, MoreVertical, ExternalLink } from 'lucide-react'
 import { VM } from '../api/vm'
 import { useVMActions } from '../hooks/useVMActions'
+import { usePermissions } from '../hooks/usePermissions'
 import { getTagColor } from './TagEditor'
 import { StatusBadge } from './ui'
 import CloneVMDialog from './CloneVMDialog'
@@ -24,6 +25,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { canWrite } = usePermissions()
   const { handleStart, handleStop, handlePause, handleResume, handleDelete } = useVMActions(vm.name, onUpdate)
 
   // Close menu on outside click
@@ -85,6 +87,8 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
                       <Terminal className="w-3.5 h-3.5" />
                       Open Console
                     </Link>
+                    {canWrite && (
+                      <>
                     <button
                       onClick={() => { setShowMenu(false); setShowCloneDialog(true) }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
@@ -107,6 +111,8 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
                       <Trash2 className="w-3.5 h-3.5" />
                       Delete VM
                     </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -152,43 +158,47 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
 
         {/* Actions */}
         <div className="px-5 py-3 border-t border-slate-700/50 bg-slate-900/50 flex items-center gap-2">
-          {vm.state === 'stopped' ? (
-            <button
-              onClick={handleStart}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/15 text-green-400 hover:bg-green-600/25 rounded-md transition-colors text-sm font-medium"
-            >
-              <Play className="w-3.5 h-3.5" />
-              Start
-            </button>
-          ) : vm.state === 'paused' ? (
-            <button
-              onClick={handleResume}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/15 text-green-400 hover:bg-green-600/25 rounded-md transition-colors text-sm font-medium"
-            >
-              <Play className="w-3.5 h-3.5" />
-              Resume
-            </button>
-          ) : (
+          {canWrite && (
             <>
-              <button
-                onClick={handleStop}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/15 text-red-400 hover:bg-red-600/25 rounded-md transition-colors text-sm font-medium"
-              >
-                <Square className="w-3.5 h-3.5" />
-                Stop
-              </button>
-              <button
-                onClick={handlePause}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600/15 text-yellow-400 hover:bg-yellow-600/25 rounded-md transition-colors text-sm font-medium"
-              >
-                <Pause className="w-3.5 h-3.5" />
-                Pause
-              </button>
+              {vm.state === 'stopped' ? (
+                <button
+                  onClick={handleStart}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/15 text-green-400 hover:bg-green-600/25 rounded-md transition-colors text-sm font-medium"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  Start
+                </button>
+              ) : vm.state === 'paused' ? (
+                <button
+                  onClick={handleResume}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/15 text-green-400 hover:bg-green-600/25 rounded-md transition-colors text-sm font-medium"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  Resume
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleStop}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/15 text-red-400 hover:bg-red-600/25 rounded-md transition-colors text-sm font-medium"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                    Stop
+                  </button>
+                  <button
+                    onClick={handlePause}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600/15 text-yellow-400 hover:bg-yellow-600/25 rounded-md transition-colors text-sm font-medium"
+                  >
+                    <Pause className="w-3.5 h-3.5" />
+                    Pause
+                  </button>
+                </>
+              )}
             </>
           )}
           <Link
             to={`/vms/${vm.name}/console`}
-            className="ml-auto p-1.5 rounded-md text-slate-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors"
+            className={`${canWrite ? 'ml-auto' : ''} p-1.5 rounded-md text-slate-500 hover:text-blue-400 hover:bg-blue-400/10 transition-colors`}
             title="Open Console"
           >
             <Terminal className="w-4 h-4" />

@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { createVM } from '../api/vm'
 import { apiGet } from '../api/client'
+import { applyCreateAdvancedOptions } from '../utils/applyCreateAdvancedOptions'
 import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor } from 'lucide-react'
 import WizardStepper from '../components/WizardStepper'
 import ErrorBanner from '../components/ErrorBanner'
@@ -135,8 +136,17 @@ export default function CreateVM() {
 
     try {
       await createVM({ name, image, cpus, memory, disk: diskGb })
+      if (showAdvanced) {
+        try {
+          await applyCreateAdvancedOptions(name, advanced)
+        } catch (advErr) {
+          toastFailure(toast, 'VM created but advanced options could not be applied', advErr)
+          navigate(`/vms/${name}`)
+          return
+        }
+      }
       toast.success(`VM '${name}' created`)
-      navigate('/vms')
+      navigate(`/vms/${name}`)
     } catch (err) {
       const msg = formatUserError(err)
       setSubmitError(msg)
@@ -345,14 +355,14 @@ export default function CreateVM() {
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="w-full flex items-center justify-between px-6 py-4 text-sm font-medium text-slate-400 hover:text-slate-300 transition-colors"
             >
-              <span className="uppercase tracking-wider">Advanced Options (preview)</span>
+              <span className="uppercase tracking-wider">Advanced Options</span>
                   {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
 
             {showAdvanced && (
               <div className="px-6 pb-6 space-y-5 border-t border-slate-700/50 pt-5">
-                <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-                  Firmware, display, and CPU mode are not applied at create time yet. Only name, image, vCPUs, memory, and disk size are sent to the API.
+                <p className="text-xs text-slate-500 bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2">
+                  Applied after the VM is created (boot, display, CPU mode, and UEFI settings).
                 </p>
                 <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">

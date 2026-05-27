@@ -101,6 +101,7 @@ const BatchMigrationBuilderPage = lazy(() => import('./pages/BatchMigrationBuild
 const MigrationTemplatesPage = lazy(() => import('./pages/MigrationTemplates'))
 const SnapshotManagerPage = lazy(() => import('./pages/SnapshotManager'))
 const StorageManagerPage = lazy(() => import('./pages/StorageManager'))
+const AutoscalePage = lazy(() => import('./pages/Autoscale'))
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -212,6 +213,7 @@ function MainLayout() {
                 <Route path="/templates" element={<Templates />} />
                 <Route path="/quotas" element={<Quotas />} />
                 <Route path="/schedules" element={<Schedules />} />
+                <Route path="/autoscale" element={<AutoscalePage />} />
                 <Route path="/audit" element={<AuditLogs />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/backups" element={<Backups />} />

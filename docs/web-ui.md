@@ -12,7 +12,7 @@ A modern React-based web interface for vmspawnd with real-time updates, 37+ page
 - Cilium-style network security management with 9 tabs
 - Command palette for quick navigation (`Ctrl+K` / `Cmd+K`)
 - Toast notifications for operation feedback
-- Dark theme with system preference detection
+- Three dark themes (`dark`, `steel`, `aurora`) with system preference detection
 - Responsive design for desktop and tablet
 
 ---
@@ -63,8 +63,8 @@ Output goes to `dist/`. In production, vmspawnd serves these static files direct
 
 ### VM Management
 - **VM List** -- Filterable, sortable grid with inline status and quick actions
-- **VM Detail** -- Configuration, metrics graphs, storage, network, snapshots, tags
-- **VM Create** -- Multi-step form with cloud-init, TPM, and VNC options
+- **VM Detail** — Configuration, metrics, storage, network, snapshots, hotplug, devices, cloud-init, tags
+- **VM Create** — Multi-step wizard; optional advanced boot/display/CPU settings applied after create
 - **VM Console** -- Interactive terminal via xterm.js over WebSocket
 - **VM VNC** -- Graphical display via noVNC over WebSocket
 - **VM Metrics** -- CPU, memory, disk, and network graphs with selectable time ranges
@@ -133,11 +133,20 @@ Output goes to `dist/`. In production, vmspawnd serves these static files direct
 - Build recipe management and execution tracking
 
 ### Tags and Autoscale
-- Tag management with cross-resource filtering
-- Autoscale policy management with scaling history
+- Tag editing from VM cards; filter VMs by tag on the VM list
+- **`/autoscale`** — per-VM CPU/memory scaling policies and event history
 
 ### Hotplug
-- Live CPU, memory, disk, and NIC modifications for running VMs
+- VM detail **Hotplug** tab: live CPU, memory, disk, and NIC changes for running VMs
+
+### Device passthrough
+- VM detail **Devices** tab: attach/detach host USB and PCI (GPU) devices
+
+### Cloud-init
+- VM detail **Cloud-init** tab: generate and attach NoCloud ISO (user-data + optional network config)
+
+### RBAC
+- Viewer role hides mutate actions (start/stop/delete/create) across VM list and detail pages
 
 ---
 
@@ -184,7 +193,7 @@ Press `Ctrl+K` (or `Cmd+K` on macOS) to open:
 | ResourceGauge | CPU/memory utilization gauge |
 | DataTable | Sortable, filterable table with pagination |
 | Sidebar | Collapsible navigation sidebar |
-| ThemeToggle | Light/dark theme switcher |
+| ThemeToggle | Dark / steel / aurora theme switcher |
 
 ---
 

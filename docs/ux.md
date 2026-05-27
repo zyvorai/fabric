@@ -77,12 +77,12 @@ Machina-aligned **GuestKit** orange theme, inventory sidebar, `:` colon commands
 
 ## Create VM wizard
 
-Canonical route: **`/create`**. `/vm-wizard` redirects to `/create` (legacy [`VMCreateWizard`](../web/src/pages/VMCreateWizard.tsx) is unused).
+Canonical route: **`/create`**. `/vm-wizard` redirects to `/create`.
 
 [`CreateVM`](../web/src/pages/CreateVM.tsx) uses [`WizardStepper`](../web/src/components/WizardStepper.tsx) with three gated steps:
 
 1. **Basics** — name, image picker from `GET /api/images` plus manual path override
-2. **Resources** — vCPUs, memory presets, disk size (GB), optional advanced panel (preview only; not sent to API yet)
+2. **Resources** — vCPUs, memory presets, disk size (GB), optional advanced panel (boot, display, CPU mode applied after create)
 3. **Review** — summary and submit (`name`, `image`, `cpus`, `memory`, `disk`)
 
 Back/Next buttons only show fields for the active step.

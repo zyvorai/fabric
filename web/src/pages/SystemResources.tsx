@@ -235,8 +235,8 @@ export default function SystemResources() {
                 const result = await optimizeVM(vmName)
                 toast.success(`Optimized '${vmName}': ${result.applied.length} settings applied`)
                 loadResources()
-              } catch (_error) {
-                toast.error(`Failed to optimize '${vmName}'`)
+              } catch (error) {
+                toastFailure(toast, `Failed to optimize '${vmName}'`, error)
               }
             }} />
           )}

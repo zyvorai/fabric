@@ -9,7 +9,7 @@ import { listVMs, startVM, stopVM, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { navGroups } from '../utils/routes'
-import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
 import { getPageLabel } from '../utils/pageLabels'
 import { getPinnedPages, isPagePinned, togglePinnedPage } from '../utils/pinnedPages'
 import { getRecentPages, recordRecentPage } from '../utils/recentPages'
@@ -45,8 +45,8 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
     try {
       const data = await listVMs()
       setVMs(data)
-    } catch (err) { console.error('Failed to load VMs for command palette:', err) }
-  }, [])
+    } catch (err) { toastFailure(toast, 'Failed to load VMs for command palette', err) }
+  }, [toast])
 
   useEffect(() => {
     if (isOpen) {
@@ -83,7 +83,7 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
         await fn(name)
         toast.success(`${label} '${name}' OK`)
       } catch (e: unknown) {
-        toast.error(`${label} '${name}' failed: ${formatUserError(e)}`)
+        toastFailure(toast, `${label} '${name}' failed`, e)
       }
     },
     [close, toast],

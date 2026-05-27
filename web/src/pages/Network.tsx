@@ -28,6 +28,7 @@ import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { useToastContext } from '../contexts/ToastContext'
 import { hintsForError } from '../utils/daemonHints'
+import SubsystemBanner from '../components/SubsystemBanner'
 
 type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'status'
 type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | null
@@ -187,6 +188,7 @@ export default function Network() {
 
   return (
     <div className="space-y-6">
+      <SubsystemBanner subsystem="machined" title="Network stack" />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-3">
           <NetworkIcon className="w-8 h-8" />

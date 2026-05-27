@@ -9,6 +9,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { toastFailure } from '../utils/toastError'
 
 export default function ImageBuilder() {
   const toast = useToastContext()
@@ -157,7 +158,7 @@ function BuildImageDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
       await buildImage({ name, distribution: distro, packages: packages.split(',').map(p => p.trim()).filter(Boolean), autologin: true })
       onSuccess()
     } catch (e) {
-      toast.error(`Build failed: ${e}`)
+      toastFailure(toast, 'Build failed', e)
     } finally {
       setBuilding(false)
     }

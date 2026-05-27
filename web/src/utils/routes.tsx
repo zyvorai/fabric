@@ -76,6 +76,7 @@ export const navGroups: NavGroup[] = [
       { to: '/content-library', icon: <Archive className="w-4 h-4 text-purple-400" />, label: 'Content Library' },
       { to: '/image-builder', icon: <Package className="w-4 h-4 text-pink-400" />, label: 'Image Builder' },
       { to: '/schedules', icon: <Calendar className="w-4 h-4 text-teal-400" />, label: 'Schedules' },
+      { to: '/autoscale', icon: <TrendingUp className="w-4 h-4 text-emerald-400" />, label: 'Autoscale' },
       { to: '/snapshots', icon: <Camera className="w-4 h-4 text-violet-400" />, label: 'Snapshots' },
       { to: '/backups', icon: <Save className="w-4 h-4 text-amber-400" />, label: 'Backups' },
       { to: '/quotas', icon: <Shield className="w-4 h-4 text-orange-400" />, label: 'Quotas' },
@@ -186,4 +187,5 @@ export const routeLabels: Record<string, string> = {
   '/batch-migration': 'Batch Migration',
   '/templates': 'Templates',
   '/schedules': 'Schedules',
+  '/autoscale': 'Autoscale',
 }

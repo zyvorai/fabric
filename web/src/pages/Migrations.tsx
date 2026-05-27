@@ -52,8 +52,8 @@ export default function Migrations() {
       await cancelMigration(id)
       toast.success('Migration cancelled')
       loadMigrations()
-    } catch (_error) {
-      toast.error('Failed to cancel migration')
+    } catch (error) {
+      toastFailure(toast, 'Failed to cancel migration', error)
     }
   }
 
@@ -290,7 +290,7 @@ function StartMigrationDialog({
       await startMigration(req)
       onSuccess()
     } catch (error) {
-      toast.error(`Failed to start migration: ${error}`)
+      toastFailure(toast, 'Failed to start migration', error)
     } finally {
       setIsStarting(false)
     }

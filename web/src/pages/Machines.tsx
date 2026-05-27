@@ -19,6 +19,7 @@ import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import Breadcrumb from '../components/Breadcrumb'
+import SubsystemBanner from '../components/SubsystemBanner'
 
 export default function Machines() {
   const toast = useToastContext()
@@ -154,6 +155,7 @@ export default function Machines() {
   return (
     <div className="space-y-6">
       <Breadcrumb />
+      <SubsystemBanner subsystem="machined" title="systemd-machined" />
       {loadError && (
         <ErrorBanner
           title="Could not load machines"

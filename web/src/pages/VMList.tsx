@@ -12,15 +12,18 @@ import { getTagColor } from '../components/TagEditor'
 import { PageHeader, EmptyState, StatusBadge } from '../components/ui'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { SkeletonCard } from '../components/Skeleton'
 import { useVMActions } from '../hooks/useVMActions'
 import { useToastContext } from '../contexts/ToastContext'
+import ReadOnlyNotice from '../components/ReadOnlyNotice'
+import { usePermissions } from '../hooks/usePermissions'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 type ViewMode = 'grid' | 'table'
 
-function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: () => void; selected: boolean; onSelect: (name: string) => void }) {
+function VMTableRow({ vm, onUpdate, selected, onSelect, canWrite }: { vm: VM; onUpdate: () => void; selected: boolean; onSelect: (name: string) => void; canWrite: boolean }) {
   const { handleStart, handleStop, handlePause, handleResume, handleBackup } = useVMActions(vm.name, onUpdate)
 
   return (
@@ -79,6 +82,7 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
         )}
       </td>
       <td className="py-3 px-4">
+        {canWrite ? (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {vm.state === 'stopped' ? (
             <button onClick={handleStart} className="p-1.5 rounded-md text-green-400 hover:bg-green-400/10 transition-colors" title="Start">
@@ -108,6 +112,9 @@ function VMTableRow({ vm, onUpdate, selected, onSelect }: { vm: VM; onUpdate: ()
             <MoreVertical className="w-3.5 h-3.5" />
           </Link>
         </div>
+        ) : (
+          <Link to={`/vms/${vm.name}`} className="text-xs text-blue-400 hover:text-blue-300">View</Link>
+        )}
       </td>
     </tr>
   )
@@ -117,6 +124,7 @@ export default function VMList() {
   const [vms, setVMs] = useState<VM[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [groupByTags, setGroupByTags] = useState(false)
@@ -124,6 +132,7 @@ export default function VMList() {
   const [bulkAction, setBulkAction] = useState<'delete' | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const toast = useToastContext()
+  const { canWrite } = usePermissions()
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem('vm-view-mode') as ViewMode) || 'grid'
   })
@@ -132,13 +141,22 @@ export default function VMList() {
   useEffect(() => { localStorage.setItem('vm-view-mode', viewMode) }, [viewMode])
 
   const loadVMs = async () => {
-    setLoadError(null)
     try {
       const data = await listVMs()
       setVMs(data)
+      setLoadError(null)
+      setRefreshError(null)
     } catch (error) {
-      setLoadError(formatUserError(error))
-      toast.error(`Failed to load VMs: ${formatUserError(error)}`)
+      const msg = formatUserError(error)
+      setVMs((prev) => {
+        if (prev.length === 0) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load virtual machines', error)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
     } finally {
       setLoading(false)
     }
@@ -284,6 +302,15 @@ export default function VMList() {
           tone="red"
         />
       )}
+      {!loadError && refreshError && (
+        <ErrorBanner
+          title="Could not refresh virtual machines"
+          headline={refreshError}
+          onRetry={() => void loadVMs()}
+          tone="amber"
+        />
+      )}
+      {!canWrite && <ReadOnlyNotice />}
       <PageHeader
         title="Virtual Machines"
         onRefresh={() => { setLoading(true); void loadVMs() }}
@@ -437,7 +464,7 @@ export default function VMList() {
                   {vmsInGroup.map((vm) => (<VMCard key={`${tag}-${vm.name}`} vm={vm} onUpdate={loadVMs} />))}
                 </div>
               ) : (
-                <VMTable vms={vmsInGroup} onUpdate={loadVMs} selectedVMs={selectedVMs} onSelect={toggleSelect} />
+                <VMTable vms={vmsInGroup} onUpdate={loadVMs} selectedVMs={selectedVMs} onSelect={toggleSelect} canWrite={canWrite} />
               )}
             </div>
           ))}
@@ -447,11 +474,11 @@ export default function VMList() {
           {filteredVMs.map((vm) => (<VMCard key={vm.name} vm={vm} onUpdate={loadVMs} />))}
         </div>
       ) : (
-        <VMTable vms={filteredVMs} onUpdate={loadVMs} selectedVMs={selectedVMs} onSelect={toggleSelect} />
+        <VMTable vms={filteredVMs} onUpdate={loadVMs} selectedVMs={selectedVMs} onSelect={toggleSelect} canWrite={canWrite} />
       )}
 
       {/* Bulk Action Bar */}
-      {selectedCount > 0 && (
+      {canWrite && selectedCount > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slide-in">
           <div className="flex items-center gap-3 bg-slate-800/50 border border-slate-700/50 rounded-xl shadow-2xl px-5 py-3">
             <span className="text-sm font-medium text-white tabular-nums">{selectedCount} selected</span>
@@ -517,7 +544,7 @@ export default function VMList() {
   )
 }
 
-function VMTable({ vms, onUpdate, selectedVMs, onSelect }: { vms: VM[]; onUpdate: () => void; selectedVMs: Set<string>; onSelect: (name: string) => void }) {
+function VMTable({ vms, onUpdate, selectedVMs, onSelect, canWrite }: { vms: VM[]; onUpdate: () => void; selectedVMs: Set<string>; onSelect: (name: string) => void; canWrite: boolean }) {
   return (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
@@ -535,7 +562,7 @@ function VMTable({ vms, onUpdate, selectedVMs, onSelect }: { vms: VM[]; onUpdate
         </thead>
         <tbody>
           {vms.map((vm) => (
-            <VMTableRow key={vm.name} vm={vm} onUpdate={onUpdate} selected={selectedVMs.has(vm.name)} onSelect={onSelect} />
+            <VMTableRow key={vm.name} vm={vm} onUpdate={onUpdate} selected={selectedVMs.has(vm.name)} onSelect={onSelect} canWrite={canWrite} />
           ))}
         </tbody>
       </table>

@@ -9,6 +9,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { toastFailure } from '../utils/toastError'
 
 export default function Profiles() {
   const toast = useToastContext()
@@ -100,7 +101,9 @@ function CreateProfileDialog({ onClose, onSuccess }: { onClose: () => void; onSu
     try {
       await createProfile({ name, description: `Custom ${name} profile`, cpus, memory, disk, category: category as VMProfile['category'], network_bandwidth: undefined })
       onSuccess()
-    } catch (e) { toast.error(`Failed: ${e}`) }
+    } catch (e) {
+      toastFailure(toast, 'Failed to create profile', e)
+    }
   }
 
   return (

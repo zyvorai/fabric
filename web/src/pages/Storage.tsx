@@ -10,6 +10,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import SubsystemBanner from '../components/SubsystemBanner'
 
 interface StoragePool {
   id: string
@@ -77,7 +78,7 @@ export default function Storage() {
       await apiDelete(`/api/storage/pools/${pool}/volumes/${volumeId}`)
       await loadData()
     } catch (error) {
-      toast.error(`Failed to delete volume: ${error}`)
+      toastFailure(toast, 'Failed to delete volume', error)
     }
   }
 
@@ -138,6 +139,7 @@ export default function Storage() {
 
   return (
     <div className="space-y-6">
+      <SubsystemBanner subsystem="storage" title="Storage subsystem" />
       {loadError && (
         <ErrorBanner
           title="Could not load storage"

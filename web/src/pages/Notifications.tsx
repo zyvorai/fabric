@@ -72,8 +72,8 @@ export default function Notifications() {
       await deleteChannel(id)
       toast.success('Channel deleted')
       loadData()
-    } catch (_error) {
-      toast.error('Failed to delete channel')
+    } catch (error) {
+      toastFailure(toast, 'Failed to delete channel', error)
     }
   }
 
@@ -81,8 +81,8 @@ export default function Notifications() {
     try {
       await testChannel(id)
       toast.success(`Test notification sent to ${name}`)
-    } catch (_error) {
-      toast.error('Failed to send test notification')
+    } catch (error) {
+      toastFailure(toast, 'Failed to send test notification', error)
     }
   }
 
@@ -94,8 +94,8 @@ export default function Notifications() {
       await deleteRule(id)
       toast.success('Rule deleted')
       loadData()
-    } catch (_error) {
-      toast.error('Failed to delete rule')
+    } catch (error) {
+      toastFailure(toast, 'Failed to delete rule', error)
     }
   }
 
@@ -109,8 +109,8 @@ export default function Notifications() {
         toast.success('Rule enabled')
       }
       loadData()
-    } catch (_error) {
-      toast.error(`Failed to ${rule.enabled ? 'disable' : 'enable'} rule`)
+    } catch (error) {
+      toastFailure(toast, `Failed to ${rule.enabled ? 'disable' : 'enable'} rule`, error)
     }
   }
 

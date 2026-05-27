@@ -46,19 +46,28 @@ export default function Dashboard() {
   const [vms, setVMs] = useState<VM[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [metricsHistory, setMetricsHistory] = useState<MetricsPoint[]>([])
   const { subscribe, vmUpdates } = useWebSocketContext()
   const toast = useToastContext()
   const { capabilities, loading: capsLoading } = usePlatformInfo()
 
   const loadVMs = useCallback(async () => {
-    setLoadError(null)
     try {
       setVMs(await listVMs())
+      setLoadError(null)
+      setRefreshError(null)
     } catch (err) {
       const msg = formatUserError(err)
-      setLoadError(msg)
-      toastFailure(toast, 'Failed to load virtual machines', err)
+      setVMs((prev) => {
+        if (prev.length === 0) {
+          setLoadError(msg)
+          toastFailure(toast, 'Failed to load virtual machines', err)
+        } else {
+          setRefreshError(msg)
+        }
+        return prev
+      })
     } finally {
       setLoading(false)
     }
@@ -121,6 +130,14 @@ export default function Dashboard() {
           headline={loadError}
           hints={hintsForError(loadError)}
           onRetry={loadVMs}
+        />
+      )}
+      {!loadError && refreshError && (
+        <ErrorBanner
+          title="Could not refresh dashboard"
+          headline={refreshError}
+          onRetry={loadVMs}
+          tone="amber"
         />
       )}
 

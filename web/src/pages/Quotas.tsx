@@ -20,6 +20,7 @@ import QuotaDialog from '../components/QuotaDialog'
 import { PageHeader } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { toastFailure } from '../utils/toastError'
 
 export default function Quotas() {
   const toast = useToastContext()
@@ -50,8 +51,8 @@ export default function Quotas() {
       await deleteQuota(id)
       toast.success('Quota deleted successfully')
       loadData()
-    } catch (_error) {
-      toast.error('Failed to delete quota')
+    } catch (error) {
+      toastFailure(toast, 'Failed to delete quota', error)
     }
   }
 
@@ -65,8 +66,8 @@ export default function Quotas() {
         toast.success('Quota enabled')
       }
       loadData()
-    } catch (_error) {
-      toast.error(`Failed to ${quota.enabled ? 'disable' : 'enable'} quota`)
+    } catch (error) {
+      toastFailure(toast, `Failed to ${quota.enabled ? 'disable' : 'enable'} quota`, error)
     }
   }
 

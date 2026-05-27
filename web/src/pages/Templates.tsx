@@ -57,7 +57,7 @@ export default function Templates() {
       toast.success(`Template '${name}' deleted successfully`)
       loadTemplates()
     } catch (_error) {
-      toast.error(`Failed to delete template '${name}'`)
+      toastFailure(toast, `Failed to delete template '${name}'`, _error)
     }
   }
 
@@ -248,7 +248,7 @@ function CreateVMFromTemplateDialog({
       onSuccess()
       onClose()
     } catch (error) {
-      toast.error(`Failed to create VM: ${error}`)
+      toastFailure(toast, 'Failed to create VM from template', error)
     } finally {
       setIsCreating(false)
     }

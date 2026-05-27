@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { X, Copy } from 'lucide-react'
 import { cloneVM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
+import { toastFailure } from '../utils/toastError'
 
 interface CloneVMDialogProps {
   vmName: string
@@ -36,7 +37,7 @@ export default function CloneVMDialog({ vmName, onClose, onSuccess }: CloneVMDia
       onSuccess()
       onClose()
     } catch (error) {
-      toast.error(`Failed to clone VM: ${error}`)
+      toastFailure(toast, 'Failed to clone VM', error)
     } finally {
       setIsCloning(false)
     }

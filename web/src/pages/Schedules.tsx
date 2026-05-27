@@ -70,8 +70,8 @@ export default function Schedules() {
       await deleteSchedule(id)
       toast.success('Schedule deleted successfully')
       loadData()
-    } catch (_error) {
-      toast.error('Failed to delete schedule')
+    } catch (error) {
+      toastFailure(toast, 'Failed to delete schedule', error)
     }
   }
 
@@ -85,8 +85,8 @@ export default function Schedules() {
         toast.success('Schedule enabled')
       }
       loadData()
-    } catch (_error) {
-      toast.error(`Failed to ${schedule.enabled ? 'disable' : 'enable'} schedule`)
+    } catch (error) {
+      toastFailure(toast, `Failed to ${schedule.enabled ? 'disable' : 'enable'} schedule`, error)
     }
   }
 
@@ -98,8 +98,8 @@ export default function Schedules() {
       await runScheduleNow(schedule.id)
       toast.success('Schedule executed successfully')
       setTimeout(loadData, 1000) // Refresh after execution
-    } catch (_error) {
-      toast.error('Failed to run schedule')
+    } catch (error) {
+      toastFailure(toast, 'Failed to run schedule', error)
     }
   }
 

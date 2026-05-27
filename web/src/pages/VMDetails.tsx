@@ -11,7 +11,7 @@ import { getMachineProperties } from '../api/machines'
 import {
   Play, Square, RotateCw, Trash2, Info, Activity, HardDrive,
   Network, Camera, Terminal, Cpu, MemoryStick, Pause, Copy, Wifi,
-  AlertCircle, Loader2, RefreshCw, Plus,
+  AlertCircle, Loader2, RefreshCw, Plus, Plug, Usb, Cloud,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useToastContext } from '../contexts/ToastContext'
@@ -25,13 +25,19 @@ import CopyButton from '../components/CopyButton'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import { usePermissions } from '../hooks/usePermissions'
+import ReadOnlyNotice from '../components/ReadOnlyNotice'
+import HotplugTab from './vm-details/HotplugTab'
+import DevicesTab from './vm-details/DevicesTab'
+import CloudInitTab from './vm-details/CloudInitTab'
 
-type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs'
+type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit'
 
 export default function VMDetails() {
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const toast = useToastContext()
+  const { canWrite } = usePermissions()
   const [vm, setVM] = useState<VM | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -132,12 +138,16 @@ export default function VMDetails() {
     { id: 'disks', label: 'Disks', icon: HardDrive },
     { id: 'network', label: 'Network', icon: Network },
     { id: 'snapshots', label: 'Snapshots', icon: Camera },
+    { id: 'hotplug', label: 'Hotplug', icon: Plug },
+    { id: 'devices', label: 'Devices', icon: Usb },
+    { id: 'cloudinit', label: 'Cloud-init', icon: Cloud },
     { id: 'logs', label: 'Logs', icon: Terminal },
   ]
 
   return (
     <div className="space-y-6">
       <Breadcrumb />
+      {!canWrite && <ReadOnlyNotice />}
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -171,19 +181,23 @@ export default function VMDetails() {
         </div>
 
         <div className="flex items-center gap-2">
-          {vm.state === 'stopped' ? (
-            <ActionBtn onClick={handleStart} color="green" icon={Play} label="Start" />
-          ) : vm.state === 'paused' ? (
-            <ActionBtn onClick={handleResume} color="green" icon={Play} label="Resume" />
-          ) : (
+          {canWrite && (
             <>
-              <ActionBtn onClick={handleStop} color="red" icon={Square} label="Stop" />
-              <ActionBtn onClick={handlePause} color="yellow" icon={Pause} label="Pause" />
-              <ActionBtn onClick={handleRestart} color="blue" icon={RotateCw} label="Restart" />
+              {vm.state === 'stopped' ? (
+                <ActionBtn onClick={handleStart} color="green" icon={Play} label="Start" />
+              ) : vm.state === 'paused' ? (
+                <ActionBtn onClick={handleResume} color="green" icon={Play} label="Resume" />
+              ) : (
+                <>
+                  <ActionBtn onClick={handleStop} color="red" icon={Square} label="Stop" />
+                  <ActionBtn onClick={handlePause} color="yellow" icon={Pause} label="Pause" />
+                  <ActionBtn onClick={handleRestart} color="blue" icon={RotateCw} label="Restart" />
+                </>
+              )}
+              <div className="w-px h-6 bg-slate-800 mx-1" />
+              <ActionBtn onClick={() => setShowCloneDialog(true)} color="purple" icon={Copy} label="Clone" />
             </>
           )}
-          <div className="w-px h-6 bg-slate-800 mx-1" />
-          <ActionBtn onClick={() => setShowCloneDialog(true)} color="purple" icon={Copy} label="Clone" />
           <Link
             to={`/vms/${vm.name}/console`}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
@@ -191,13 +205,15 @@ export default function VMDetails() {
             <Terminal className="w-3.5 h-3.5" />
             Console
           </Link>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-            title="Delete VM"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+              title="Delete VM"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -235,6 +251,9 @@ export default function VMDetails() {
         {activeTab === 'disks' && <DisksTab vm={vm} />}
         {activeTab === 'network' && <NetworkTab vm={vm} />}
         {activeTab === 'snapshots' && <SnapshotsTab vm={vm} />}
+        {activeTab === 'hotplug' && <HotplugTab vm={vm} />}
+        {activeTab === 'devices' && <DevicesTab vm={vm} />}
+        {activeTab === 'cloudinit' && <CloudInitTab vm={vm} />}
         {activeTab === 'logs' && <LogsTab vm={vm} />}
       </div>
 
