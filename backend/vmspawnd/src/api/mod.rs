@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 pub mod auth;
+pub mod capabilities;
 
 // Phase 1 API modules for advanced features
 pub mod analytics;

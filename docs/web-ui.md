@@ -36,7 +36,7 @@ A modern React-based web interface for vmspawnd with real-time updates, 37+ page
 ## Development
 
 ```bash
-cd web
+cd web   # production router-based UI (formerly `.web/`)
 npm install
 npm run dev
 ```

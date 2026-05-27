@@ -73,14 +73,24 @@ pub fn render_tabs(f: &mut Frame, app: &App, area: Rect) {
 pub fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     // If there's a pending action, show confirmation prompt
     if let Some(ref action) = app.pending_action {
-        let msg = match action {
-            PendingAction::DeleteVM(name) => format!("Delete VM '{}'? [y/N]", name),
-            PendingAction::BulkDelete(names) => format!("Delete {} VMs? [y/N]", names.len()),
+        let (prompt, detail) = match action {
+            PendingAction::DeleteVM(name) => (String::from("Delete VM?"), name.clone()),
+            PendingAction::BulkDelete(names) => (
+                format!("Delete {} VMs?", names.len()),
+                names.join(", "),
+            ),
         };
         let paragraph = Paragraph::new(Line::from(vec![
             Span::styled(" CONFIRM ", Style::default().fg(Color::Black).bg(Color::Red).add_modifier(Modifier::BOLD)),
             Span::raw(" "),
-            Span::styled(msg, Style::default().fg(Color::Yellow)),
+            Span::styled(prompt, Style::default().fg(Color::Yellow)),
+            Span::raw(" "),
+            Span::styled(detail, Style::default().fg(Color::White)),
+            Span::raw("  "),
+            Span::styled("[y]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::raw(" yes  "),
+            Span::styled("[n]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::raw(" no"),
         ]));
         f.render_widget(paragraph, area);
         return;

@@ -47,7 +47,7 @@ pub async fn create_bridge(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_bridge));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = BridgeConfig {
@@ -70,7 +70,7 @@ pub async fn create_bridge(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_bridge(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
@@ -78,7 +78,7 @@ pub async fn create_bridge(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -90,8 +90,8 @@ pub async fn get_bridge(
     tracing::debug!("networkd::{}", stringify!(get_bridge));
     match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bridge not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bridge"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bridge").into_response(),
     }
 }
 
@@ -103,12 +103,12 @@ pub async fn update_bridge(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(update_bridge));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     let existing = match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => b,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bridge not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bridge"}))).into_response(),
+        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found").into_response(),
+        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bridge").into_response(),
     };
 
     let mgr = networkd_manager(&state);
@@ -137,7 +137,7 @@ pub async fn update_bridge(
     };
 
     if let Err(e) = mgr.apply_bridge(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
@@ -145,7 +145,7 @@ pub async fn update_bridge(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             Json(cfg).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -181,10 +181,14 @@ pub async fn create_vlan(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_vlan));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     if let Err(msg) = crate::validation::validate_hostname(&req.parent_interface) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid parent interface: {}", msg),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = VlanConfig {
@@ -203,7 +207,7 @@ pub async fn create_vlan(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_vlan(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
@@ -211,7 +215,7 @@ pub async fn create_vlan(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -223,8 +227,8 @@ pub async fn get_vlan(
     tracing::debug!("networkd::{}", stringify!(get_vlan));
     match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VLAN not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load VLAN"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VLAN").into_response(),
     }
 }
 
@@ -236,15 +240,19 @@ pub async fn update_vlan(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(update_vlan));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     if let Err(msg) = crate::validation::validate_hostname(&req.parent_interface) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid parent interface: {}", msg),
+        )
+        .into_response();
     }
     let existing = match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => v,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VLAN not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load VLAN"}))).into_response(),
+        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found").into_response(),
+        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VLAN").into_response(),
     };
 
     let mgr = networkd_manager(&state);
@@ -267,7 +275,7 @@ pub async fn update_vlan(
     };
 
     if let Err(e) = mgr.apply_vlan(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
@@ -275,7 +283,7 @@ pub async fn update_vlan(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             Json(cfg).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -311,10 +319,14 @@ pub async fn create_macvtap(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_macvtap));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     if let Err(msg) = crate::validation::validate_hostname(&req.parent_interface) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid parent interface: {}", msg),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let mac = req.mac_address.unwrap_or_else(|| NetworkdManager::generate_mac_address());
@@ -331,7 +343,7 @@ pub async fn create_macvtap(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_macvtap(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_macvtaps", &cfg.id, &cfg) {
@@ -339,7 +351,7 @@ pub async fn create_macvtap(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -351,8 +363,8 @@ pub async fn get_macvtap(
     tracing::debug!("networkd::{}", stringify!(get_macvtap));
     match state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Macvtap not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load macvtap"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Macvtap not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load macvtap").into_response(),
     }
 }
 
@@ -388,7 +400,7 @@ pub async fn create_tap(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_tap));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = TapConfig {
@@ -407,7 +419,7 @@ pub async fn create_tap(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_tap(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_taps", &cfg.id, &cfg) {
@@ -415,7 +427,7 @@ pub async fn create_tap(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -427,8 +439,8 @@ pub async fn get_tap(
     tracing::debug!("networkd::{}", stringify!(get_tap));
     match state.store.get_entity::<TapConfig>("networkd_taps", &id) {
         Ok(Some(t)) => Json(t).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "TAP device not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load TAP device"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "TAP device not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load TAP device").into_response(),
     }
 }
 
@@ -456,7 +468,7 @@ pub async fn list_links(RequireRead(_claims): RequireRead, State(state): State<A
     let mgr = networkd_manager(&state);
     match mgr.list_links() {
         Ok(links) => Json(links).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -469,7 +481,7 @@ pub async fn get_device_status(
     let mgr = networkd_manager(&state);
     match mgr.device_status(&name) {
         Ok(status) => Json(serde_json::json!({"name": name, "status": status})).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -478,7 +490,7 @@ pub async fn reload_networkd(RequireWrite(_claims): RequireWrite, State(state): 
     let mgr = networkd_manager(&state);
     match mgr.reload() {
         Ok(_) => Json(serde_json::json!({"status": "reloaded"})).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -487,7 +499,7 @@ pub async fn list_managed_files(RequireRead(_claims): RequireRead, State(state):
     let mgr = networkd_manager(&state);
     match mgr.list_managed_files() {
         Ok(files) => Json(files).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -508,11 +520,15 @@ pub async fn create_bond(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_bond));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     for iface in &req.slave_interfaces {
         if let Err(msg) = crate::validation::validate_hostname(iface) {
-            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid slave interface '{}': {}", iface, msg)}))).into_response();
+            return crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                format!("Invalid slave interface '{}': {}", iface, msg),
+            )
+            .into_response();
         }
     }
     let now = Utc::now().to_rfc3339();
@@ -541,7 +557,7 @@ pub async fn create_bond(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_bond(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
@@ -549,7 +565,7 @@ pub async fn create_bond(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -561,8 +577,8 @@ pub async fn get_bond(
     tracing::debug!("networkd::{}", stringify!(get_bond));
     match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bond not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bond"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bond").into_response(),
     }
 }
 
@@ -574,17 +590,21 @@ pub async fn update_bond(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(update_bond));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     for iface in &req.slave_interfaces {
         if let Err(msg) = crate::validation::validate_hostname(iface) {
-            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid slave interface '{}': {}", iface, msg)}))).into_response();
+            return crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                format!("Invalid slave interface '{}': {}", iface, msg),
+            )
+            .into_response();
         }
     }
     let existing = match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => b,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Bond not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load bond"}))).into_response(),
+        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found").into_response(),
+        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bond").into_response(),
     };
 
     let mgr = networkd_manager(&state);
@@ -616,7 +636,7 @@ pub async fn update_bond(
     };
 
     if let Err(e) = mgr.apply_bond(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
@@ -624,7 +644,7 @@ pub async fn update_bond(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             Json(cfg).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -660,7 +680,7 @@ pub async fn create_network_file(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_network_file));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.match_name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = NetworkFileConfig {
@@ -682,7 +702,7 @@ pub async fn create_network_file(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_network_file(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_netfiles", &cfg.id, &cfg) {
@@ -690,7 +710,7 @@ pub async fn create_network_file(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -702,8 +722,8 @@ pub async fn get_network_file(
     tracing::debug!("networkd::{}", stringify!(get_network_file));
     match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
         Ok(Some(n)) => Json(n).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Network file not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load network file"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Network file not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load network file").into_response(),
     }
 }
 
@@ -740,7 +760,7 @@ pub async fn create_link_file(
     tracing::debug!("networkd::{}", stringify!(create_link_file));
     if let Some(ref name) = req.name {
         if let Err((status, msg)) = crate::validation::validate_vm_name(name) {
-            return (status, Json(serde_json::json!({"error": msg}))).into_response();
+            return crate::api_error::json_error(status, msg).into_response();
         }
     }
     let now = Utc::now().to_rfc3339();
@@ -761,7 +781,7 @@ pub async fn create_link_file(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_link_file(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_linkfiles", &cfg.id, &cfg) {
@@ -769,7 +789,7 @@ pub async fn create_link_file(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -811,7 +831,7 @@ pub async fn create_port_forward(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_port_forward));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = PortForwardConfig {
@@ -831,10 +851,7 @@ pub async fn create_port_forward(
     if cfg.enabled {
         let nft = NftManager::new();
         if let Err(e) = nft.apply(&cfg) {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
+            return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
                 .into_response();
         }
     }
@@ -848,10 +865,7 @@ pub async fn create_port_forward(
             Json(cfg),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
-        )
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             .into_response(),
     }
 }
@@ -867,8 +881,8 @@ pub async fn get_port_forward(
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
     {
         Ok(Some(pf)) => Json(pf).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Port forward not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load port forward"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Port forward not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load port forward").into_response(),
     }
 }
 
@@ -903,10 +917,7 @@ pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state
             "rules": configs.len(),
         }))
         .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
-        )
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             .into_response(),
     }
 }
@@ -928,11 +939,15 @@ pub async fn create_vxlan(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_vxlan));
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
     if let Some(ref iface) = req.parent_interface {
         if let Err(msg) = crate::validation::validate_hostname(iface) {
-            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid parent interface: {}", msg)}))).into_response();
+            return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid parent interface: {}", msg),
+        )
+        .into_response();
         }
     }
     let now = Utc::now().to_rfc3339();
@@ -955,7 +970,7 @@ pub async fn create_vxlan(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_vxlan(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_vxlans", &cfg.id, &cfg) {
@@ -963,7 +978,7 @@ pub async fn create_vxlan(
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -975,8 +990,8 @@ pub async fn get_vxlan(
     tracing::debug!("networkd::{}", stringify!(get_vxlan));
     match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "VXLAN not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load VXLAN"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "VXLAN not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VXLAN").into_response(),
     }
 }
 
@@ -1012,7 +1027,11 @@ pub async fn create_sriov(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(create_sriov));
     if let Err(msg) = crate::validation::validate_hostname(&req.pf_name) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid PF name: {}", msg)}))).into_response();
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid PF name: {}", msg),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = SriovConfig {
@@ -1026,12 +1045,12 @@ pub async fn create_sriov(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_sriov(&cfg) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
     match state.store.save_entity("networkd_sriov", &cfg.id, &cfg) {
         Ok(_) => (StatusCode::CREATED, Json(cfg)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -1043,8 +1062,8 @@ pub async fn get_sriov(
     tracing::debug!("networkd::{}", stringify!(get_sriov));
     match state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "SR-IOV config not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load SR-IOV config"}))).into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "SR-IOV config not found").into_response(),
+        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load SR-IOV config").into_response(),
     }
 }
 
@@ -1071,7 +1090,7 @@ pub async fn scan_configs(RequireRead(_claims): RequireRead, State(state): State
     let dir = std::path::Path::new(&state.config.network.networkd_config_dir);
     match networking::parser::scan_networkd_dir(dir) {
         Ok(configs) => Json(configs).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -1097,14 +1116,14 @@ pub async fn configure_dhcp_server(
     tracing::debug!("networkd::{}", stringify!(configure_dhcp_server));
 
     if let Err((status, msg)) = crate::validation::validate_device_name(&req.bridge_name) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
 
     if let Err(e) = crate::validation::validate_ip_address(&req.pool_start) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, e).into_response();
     }
     if let Err(e) = crate::validation::validate_ip_address(&req.pool_end) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, e).into_response();
     }
 
     let lease_time = req.lease_time_sec.unwrap_or(3600);
@@ -1141,11 +1160,11 @@ pub async fn configure_dhcp_server(
             }))
             .into_response()
         }
-        Err(e) => (
+        Err(e) => crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to write config: {}", e)})),
+            format!("Failed to write config: {}", e),
         )
-            .into_response(),
+        .into_response(),
     }
 }
 
@@ -1154,7 +1173,7 @@ pub async fn list_netlink_interfaces(RequireRead(_claims): RequireRead) -> impl 
     tracing::debug!("networkd::{}", stringify!(list_netlink_interfaces));
     match networking::netlink::list_interfaces().await {
         Ok(ifaces) => Json(ifaces).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -1163,7 +1182,7 @@ pub async fn list_physical_interfaces(RequireRead(_claims): RequireRead) -> impl
     tracing::debug!("networkd::{}", stringify!(list_physical_interfaces));
     match networking::netlink::list_physical_interfaces().await {
         Ok(ifaces) => Json(ifaces).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -1172,6 +1191,6 @@ pub async fn list_available_interfaces(RequireRead(_claims): RequireRead) -> imp
     tracing::debug!("networkd::{}", stringify!(list_available_interfaces));
     match networking::netlink::list_available_interfaces().await {
         Ok(ifaces) => Json(ifaces).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }

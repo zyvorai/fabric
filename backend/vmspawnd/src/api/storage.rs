@@ -466,13 +466,13 @@ pub async fn discover_iscsi_targets(
 ) -> Result<Json<Vec<String>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("storage::{}", stringify!(discover_iscsi_targets));
     crate::validation::validate_hostname(&req.portal)
-        .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::discover_targets(&req.portal)
         .map(Json)
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Discovery failed: {}", e)})),
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Discovery failed: {}", e)),
             )
         })
 }
@@ -484,13 +484,13 @@ pub async fn login_iscsi_target(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("storage::{}", stringify!(login_iscsi_target));
     crate::validation::validate_hostname(&req.portal)
-        .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::login_target(&req.portal, &req.target_iqn)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             )
         })
 }
@@ -502,13 +502,13 @@ pub async fn logout_iscsi_target(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("storage::{}", stringify!(logout_iscsi_target));
     crate::validation::validate_hostname(&req.portal)
-        .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::logout_target(&req.portal, &req.target_iqn)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             )
         })
 }
@@ -524,7 +524,7 @@ pub async fn list_iscsi_sessions(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             )
         })
 }

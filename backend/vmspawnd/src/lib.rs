@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 pub mod api;
+pub mod api_error;
 pub mod config;
 pub mod plugins;
 pub mod qmp;

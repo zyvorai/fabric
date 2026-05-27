@@ -23,6 +23,11 @@ FILES=(
   lib/zyvor-canonical.sh
   lib/license-accept.sh
   lib/copy-legal-to-bundle.sh
+  lib/copy-zyvor-legal-to-bundle.sh
+  lib/package-ui.sh
+  lib/write-customer-help.sh
+  lib/START_HERE.txt
+  lib/generate-customer-pdfs.py
 )
 
 echo "Canonical: ${CANONICAL_ROOT}"

@@ -718,7 +718,7 @@ Process exits
 The web UI is a React 19 + TypeScript application built with Vite:
 
 ```
-.web/
+web/
   src/
     components/     -- React components
     pages/          -- Route-level page components

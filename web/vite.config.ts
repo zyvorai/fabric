@@ -4,16 +4,17 @@
 
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react()],
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-  },
+  plugins: [react(), tailwindcss()],
   server: {
+    port: 3000,
     proxy: {
-      '/api': 'http://localhost:9095',
+      '/api': {
+        target: 'http://localhost:9095',
+        changeOrigin: true,
+      },
       '/ws': {
         target: 'ws://localhost:9095',
         ws: true,

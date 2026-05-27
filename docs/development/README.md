@@ -28,7 +28,7 @@ cd backend && cargo build
 cargo test
 
 # Build the web UI
-cd ../.web && npm install && npm run build
+cd ../web && npm install && npm run build
 
 # Run the daemon locally (needs root for KVM/network access)
 sudo ./backend/target/debug/vmspawnd
@@ -87,7 +87,7 @@ vmspawn/
   |   |   +-- cgroup/          # Cgroup v2 integration
   |   +-- Cargo.toml           # Workspace definition
   |
-  +-- .web/                    # React + TypeScript web UI
+  +-- web/                    # React + TypeScript web UI
   |   +-- src/                 # Source code
   |   +-- dist/                # Built static files
   |   +-- package.json         # npm dependencies

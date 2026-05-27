@@ -47,7 +47,7 @@ cd backend && cargo build
 cargo test
 
 # Set up the web UI
-cd ../.web && npm install
+cd ../web && npm install
 ```
 
 ### Editor Setup

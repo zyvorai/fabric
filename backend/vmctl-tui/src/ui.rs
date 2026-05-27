@@ -2,53 +2,169 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use crate::app::{App, View};
+use crate::app::{App, StatusLevel, View};
 use crate::views;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Sparkline, Tabs},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Sparkline},
     Frame,
 };
+
+// GuestKit theme (Machina-aligned)
+const ORANGE: Color = Color::Rgb(222, 115, 86);
+const LIGHT_ORANGE: Color = Color::Rgb(255, 145, 115);
+const TEXT_COLOR: Color = Color::Rgb(220, 220, 220);
+const SUCCESS_COLOR: Color = Color::Rgb(50, 205, 50);
+const ERROR_COLOR: Color = Color::Rgb(220, 50, 47);
+const WARNING_COLOR: Color = Color::Rgb(255, 200, 0);
 
 pub fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Tabs
-            Constraint::Min(0),     // Content
-            Constraint::Length(3),  // Footer
+            Constraint::Length(1),
+            Constraint::Min(0),
+            Constraint::Length(1),
+            Constraint::Length(1),
         ])
         .split(f.area());
 
-    // Render tabs
-    views::render_tabs(f, app, chunks[0]);
+    render_header_bar(f, chunks[0], app);
 
-    // Render content based on current view
+    let main = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(22), Constraint::Min(0)])
+        .split(chunks[1]);
+
+    render_inventory_sidebar(f, main[0], app);
+    render_main_content(f, app, main[1]);
+
+    render_recent_tasks_bar(f, chunks[2], app);
+    render_bottom_bar(f, chunks[3], app);
+
+    if let Some((ref msg, ref when, ref level)) = app.toast {
+        if when.elapsed().as_secs() < 3 {
+            render_toast(f, f.area(), msg, *level);
+        }
+    }
+}
+
+fn render_header_bar(f: &mut Frame, area: Rect, app: &App) {
+    let running = app.vms.iter().filter(|v| v.state == "running").count();
+    let line = Line::from(vec![
+        Span::styled(" vmspawnd ", Style::default().fg(ORANGE).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("  VMs: {}  running: {} ", app.vms.len(), running),
+            Style::default().fg(TEXT_COLOR),
+        ),
+    ]);
+    f.render_widget(Paragraph::new(line), area);
+}
+
+fn render_inventory_sidebar(f: &mut Frame, area: Rect, app: &App) {
+    let items: Vec<ListItem> = View::all()
+        .iter()
+        .map(|v| {
+            let selected = *v == app.current_view
+                || (*v == View::VMs && app.current_view == View::VMDetail);
+            ListItem::new(Line::from(Span::styled(
+                v.title(),
+                if selected {
+                    Style::default()
+                        .fg(LIGHT_ORANGE)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(TEXT_COLOR)
+                },
+            )))
+        })
+        .collect();
+
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(Span::styled(" INVENTORY ", Style::default().fg(ORANGE))),
+    );
+    f.render_widget(list, area);
+}
+
+fn render_main_content(f: &mut Frame, app: &App, area: Rect) {
     match app.current_view {
-        View::Dashboard => views::render_dashboard(f, app, chunks[1]),
-        View::VMs => views::render_vms_view(f, app, chunks[1]),
-        View::Logs => render_logs_view(f, app, chunks[1]),
-        View::Metrics => render_metrics_view(f, app, chunks[1]),
-        View::Network => render_network_view(f, app, chunks[1]),
-        View::NetSecurity => render_netsec_view(f, app, chunks[1]),
-        View::Storage => render_storage_view(f, app, chunks[1]),
-        View::Help => views::render_help(f, chunks[1]),
-        View::VMDetail => views::render_vm_detail_view(f, app, chunks[1]),
+        View::Dashboard => views::render_dashboard(f, app, area),
+        View::VMs => views::render_vms_view(f, app, area),
+        View::Logs => render_logs_view(f, app, area),
+        View::Metrics => render_metrics_view(f, app, area),
+        View::Network => render_network_view(f, app, area),
+        View::NetSecurity => render_netsec_view(f, app, area),
+        View::Storage => render_storage_view(f, app, area),
+        View::Help => views::render_help(f, area),
+        View::VMDetail => views::render_vm_detail_view(f, app, area),
+    }
+}
+
+fn render_recent_tasks_bar(f: &mut Frame, area: Rect, app: &App) {
+    let text = if app.recent_tasks.is_empty() {
+        " Recent: (none) ".to_string()
+    } else {
+        format!(" Recent: {} ", app.recent_tasks.join(" · "))
+    };
+    f.render_widget(
+        Paragraph::new(text).style(Style::default().fg(Color::DarkGray)),
+        area,
+    );
+}
+
+fn render_bottom_bar(f: &mut Frame, area: Rect, app: &App) {
+    if app.command_mode {
+        let line = Line::from(vec![
+            Span::styled(": ", Style::default().fg(ORANGE)),
+            Span::raw(app.command_buffer.clone()),
+            Span::styled("█", Style::default().fg(ORANGE)),
+        ]);
+        f.render_widget(Paragraph::new(line), area);
+        return;
+    }
+    if app.search_mode {
+        let line = Line::from(vec![
+            Span::styled("/ ", Style::default().fg(ORANGE)),
+            Span::raw(app.search_query.clone()),
+        ]);
+        f.render_widget(Paragraph::new(line), area);
+        return;
     }
 
-    // Render footer with status bar
-    let footer_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),  // Status bar
-            Constraint::Length(2),  // Footer
-        ])
-        .split(chunks[2]);
+    let hints = " q quit  R refresh  / search  : command  ? help  j/k nav  Enter detail ";
+    f.render_widget(
+        Paragraph::new(hints).style(Style::default().fg(Color::DarkGray)),
+        area,
+    );
 
-    views::render_status_bar(f, app, footer_chunks[0]);
-    render_footer(f, app, footer_chunks[1]);
+    // Status messages overlay on second line if we had more space — show latest in header area via views::render_status_bar in content when pending
+    if app.pending_action.is_some() {
+        views::render_status_bar(f, app, area);
+    }
+}
+
+fn render_toast(f: &mut Frame, area: Rect, msg: &str, level: StatusLevel) {
+    let color = match level {
+        StatusLevel::Success => SUCCESS_COLOR,
+        StatusLevel::Warning => WARNING_COLOR,
+        StatusLevel::Error => ERROR_COLOR,
+    };
+    let w = (msg.len() as u16 + 4).min(area.width.saturating_sub(2)).max(20);
+    let h = 3u16;
+    let x = area.width.saturating_sub(w + 1);
+    let rect = Rect::new(x, 1, w, h);
+    f.render_widget(Clear, rect);
+    f.render_widget(
+        Paragraph::new(msg)
+            .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(color)))
+            .style(Style::default().fg(TEXT_COLOR))
+            .wrap(ratatui::widgets::Wrap { trim: true }),
+        rect,
+    );
 }
 
 fn render_logs_view(f: &mut Frame, app: &App, area: Rect) {

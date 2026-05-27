@@ -261,7 +261,7 @@ cargo test -p vmspawnd --test '*'
 ### Development Build
 
 ```bash
-cd vmspawn/.web
+cd vmspawn/web
 
 # Install dependencies
 npm install
@@ -276,19 +276,19 @@ API requests to `http://127.0.0.1:9095`.
 ### Production Build
 
 ```bash
-cd vmspawn/.web
+cd vmspawn/web
 
 # Type-check and build for production
 npm run build
 ```
 
-The production build outputs static files to `.web/dist/`, which vmspawnd
+The production build outputs static files to `web/dist/`, which vmspawnd
 serves directly via `tower-http::ServeDir`.
 
 ### Linting and Testing
 
 ```bash
-cd vmspawn/.web
+cd vmspawn/web
 
 # Run ESLint
 npm run lint
@@ -324,7 +324,7 @@ sudo ./target/debug/vmspawnd
 ### Terminal 2: Frontend
 
 ```bash
-cd vmspawn/.web
+cd vmspawn/web
 npm run dev
 ```
 

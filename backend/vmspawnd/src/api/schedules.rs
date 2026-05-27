@@ -247,7 +247,7 @@ pub async fn list_schedules(
 ) -> Result<Json<Vec<Schedule>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(list_schedules));
     let schedules = state.store.list_entities::<Schedule>("schedules")
-        .map_err(|e| { tracing::error!("Failed to load schedules: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load schedules"}))) })?;
+        .map_err(|e| { tracing::error!("Failed to load schedules: {}", e); crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedules") })?;
 
     Ok(Json(schedules))
 }
@@ -260,8 +260,8 @@ pub async fn get_schedule(
     tracing::debug!("schedules::{}", stringify!(get_schedule));
     // Load from state store
     let schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load schedule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Schedule not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     Ok(Json(schedule))
 }
@@ -275,7 +275,7 @@ pub async fn create_schedule(
     // Validate schedule
     if let Err(err) = validate_schedule(&req) {
         tracing::warn!("Invalid schedule: {}", err);
-        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
+        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, err));
     }
 
     let next_run = if req.enabled {
@@ -301,7 +301,7 @@ pub async fn create_schedule(
     // Save to state store
     if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
         tracing::error!("Failed to save schedule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save schedule"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save schedule"));
     }
 
     Ok((StatusCode::CREATED, Json(schedule)))
@@ -316,21 +316,21 @@ pub async fn update_schedule(
     tracing::debug!("schedules::{}", stringify!(update_schedule));
     // Load existing schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load schedule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Schedule not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     let mut recalculate_next_run = false;
 
     // Update fields if provided
     if let Some(name) = req.name {
         if name.trim().is_empty() {
-            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Schedule name cannot be empty"}))));
+            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Schedule name cannot be empty"));
         }
         schedule.name = name;
     }
     if let Some(vm_name) = req.vm_name {
         if vm_name.trim().is_empty() {
-            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "VM name cannot be empty"}))));
+            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "VM name cannot be empty"));
         }
         schedule.vm_name = vm_name;
     }
@@ -345,7 +345,7 @@ pub async fn update_schedule(
         // Validate time format
         let parts: Vec<&str> = time.split(':').collect();
         if parts.len() != 2 {
-            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Time must be in HH:MM format"}))));
+            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Time must be in HH:MM format"));
         }
         schedule.time = time;
         recalculate_next_run = true;
@@ -371,7 +371,7 @@ pub async fn update_schedule(
     // Save to state store
     if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
         tracing::error!("Failed to update schedule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update schedule"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update schedule"));
     }
 
     Ok(Json(schedule))
@@ -386,7 +386,7 @@ pub async fn delete_schedule(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("schedules", &id) {
         tracing::error!("Failed to delete schedule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete schedule"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete schedule"));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -400,8 +400,8 @@ pub async fn enable_schedule(
     tracing::debug!("schedules::{}", stringify!(enable_schedule));
     // Load schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load schedule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Schedule not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     // Set enabled = true
     schedule.enabled = true;
@@ -412,7 +412,7 @@ pub async fn enable_schedule(
     // Save to state store
     if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
         tracing::error!("Failed to enable schedule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to enable schedule"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to enable schedule"));
     }
 
     Ok(StatusCode::OK)
@@ -426,8 +426,8 @@ pub async fn disable_schedule(
     tracing::debug!("schedules::{}", stringify!(disable_schedule));
     // Load schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load schedule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Schedule not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     // Set enabled = false
     schedule.enabled = false;
@@ -438,7 +438,7 @@ pub async fn disable_schedule(
     // Save to state store
     if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
         tracing::error!("Failed to disable schedule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to disable schedule"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to disable schedule"));
     }
 
     Ok(StatusCode::OK)
@@ -452,8 +452,8 @@ pub async fn run_schedule_now(
     tracing::debug!("schedules::{}", stringify!(run_schedule_now));
     // Load schedule from state store
     let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load schedule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Schedule not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     // Execute the scheduled action immediately (call VM API)
     tracing::info!("Executing schedule {} immediately: {:?} on VM {}",
@@ -505,7 +505,7 @@ pub async fn run_schedule_now(
     // Save to state store
     if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
         tracing::error!("Failed to update schedule last_run: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update schedule"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update schedule"));
     }
 
     // Add entry to history

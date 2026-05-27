@@ -2,96 +2,46 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useCallback, useRef, useEffect, createElement } from 'react';
+import { useState, useCallback } from 'react'
+import { Toast, ToastType } from '../components/Toast'
 
-type ToastType = 'success' | 'error' | 'warning' | 'info';
+export function useToast() {
+  const [toasts, setToasts] = useState<Toast[]>([])
 
-interface Toast {
-  id: string;
-  message: string;
-  type: ToastType;
-}
-
-let idCounter = 0;
-
-const icons: Record<ToastType, string> = {
-  success: '\u2713',
-  error: '\u2717',
-  warning: '\u26A0',
-  info: '\u2139',
-};
-
-const colors: Record<ToastType, string> = {
-  success: 'bg-green-600',
-  error: 'bg-red-600',
-  warning: 'bg-amber-600',
-  info: 'bg-blue-600',
-};
-
-export function useToast(): {
-  toasts: Toast[];
-  addToast: (message: string, type?: ToastType) => void;
-  removeToast: (id: string) => void;
-  ToastContainer: React.FC;
-} {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const addToast = useCallback((type: ToastType, message: string, duration?: number) => {
+    const id = Math.random().toString(36).substr(2, 9)
+    const newToast: Toast = { id, type, message, duration }
+    setToasts((prev) => [...prev, newToast])
+    return id
+  }, [])
 
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-    const timer = timersRef.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timersRef.current.delete(id);
-    }
-  }, []);
+    setToasts((prev) => prev.filter((toast) => toast.id !== id))
+  }, [])
 
-  const addToast = useCallback(
-    (message: string, type: ToastType = 'info') => {
-      const id = `toast-${++idCounter}`;
-      setToasts((prev) => [...prev, { id, message, type }]);
-      const timer = setTimeout(() => removeToast(id), 4000);
-      timersRef.current.set(id, timer);
-    },
-    [removeToast]
-  );
+  const success = useCallback((message: string, duration?: number) => {
+    return addToast('success', message, duration)
+  }, [addToast])
 
-  // Cleanup all timers on unmount
-  useEffect(() => {
-    const timers = timersRef.current;
-    return () => {
-      timers.forEach((t) => clearTimeout(t));
-      timers.clear();
-    };
-  }, []);
+  const error = useCallback((message: string, duration?: number) => {
+    return addToast('error', message, duration)
+  }, [addToast])
 
-  const ToastContainer: React.FC = () => {
-    if (toasts.length === 0) return null;
+  const warning = useCallback((message: string, duration?: number) => {
+    return addToast('warning', message, duration)
+  }, [addToast])
 
-    return createElement(
-      'div',
-      { className: 'fixed top-20 right-6 z-50 space-y-2' },
-      toasts.map((toast) =>
-        createElement(
-          'div',
-          {
-            key: toast.id,
-            className: `${colors[toast.type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] animate-slide-in`,
-          },
-          createElement('span', { className: 'text-lg flex-shrink-0' }, icons[toast.type]),
-          createElement('span', { className: 'text-sm flex-1' }, toast.message),
-          createElement(
-            'button',
-            {
-              className: 'text-white/70 hover:text-white transition-colors flex-shrink-0',
-              onClick: () => removeToast(toast.id),
-            },
-            '\u2715'
-          )
-        )
-      )
-    );
-  };
+  const info = useCallback((message: string, duration?: number) => {
+    return addToast('info', message, duration)
+  }, [addToast])
 
-  return { toasts, addToast, removeToast, ToastContainer };
+  return {
+    toasts,
+    addToast,
+    removeToast,
+    success,
+    error,
+    warning,
+    info,
+  }
 }

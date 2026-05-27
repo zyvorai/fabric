@@ -43,6 +43,14 @@ pub enum PendingAction {
     BulkDelete(Vec<String>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandEffect {
+    None,
+    StartSelected,
+    StopSelected,
+    SnapSelected,
+}
+
 pub struct App {
     pub vms: Vec<VM>,
     pub selected: usize,
@@ -80,6 +88,10 @@ pub struct App {
     pub bridges: Vec<serde_json::Value>,
     pub vlans: Vec<serde_json::Value>,
     pub links: Vec<serde_json::Value>,
+    pub command_mode: bool,
+    pub command_buffer: String,
+    pub recent_tasks: VecDeque<String>,
+    pub toast: Option<(String, Instant, StatusLevel)>,
     client: Client,
 }
 
@@ -119,6 +131,10 @@ impl App {
             bridges: Vec::new(),
             vlans: Vec::new(),
             links: Vec::new(),
+            command_mode: false,
+            command_buffer: String::new(),
+            recent_tasks: VecDeque::new(),
+            toast: None,
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
@@ -127,8 +143,9 @@ impl App {
     }
 
     pub fn add_status(&mut self, text: String, level: StatusLevel) {
+        let formatted = api_error::format_user_error(&text);
         self.status_messages.push_back(StatusMessage {
-            text,
+            text: formatted,
             level,
             created: Instant::now(),
         });
@@ -309,17 +326,60 @@ impl App {
         self.add_status("Action cancelled".to_string(), StatusLevel::Warning);
     }
 
+    fn fuzzy_score(text: &str, query: &str) -> i32 {
+        let text_l = text.to_lowercase();
+        let q = query.to_lowercase();
+        if q.is_empty() {
+            return 0;
+        }
+        if text_l == q {
+            return 1000;
+        }
+        if text_l.starts_with(&q) {
+            return 800;
+        }
+        if text_l.contains(&q) {
+            return 500;
+        }
+        let chars: Vec<char> = text_l.chars().collect();
+        let mut ti = 0usize;
+        let mut score = 0i32;
+        for ch in q.chars() {
+            let mut matched = false;
+            while ti < chars.len() {
+                if chars[ti] == ch {
+                    score += 10;
+                    ti += 1;
+                    matched = true;
+                    break;
+                }
+                ti += 1;
+            }
+            if !matched {
+                return -1;
+            }
+        }
+        score
+    }
+
     pub fn filtered_vms(&self) -> Vec<&VM> {
         if self.search_query.is_empty() {
-            self.vms.iter().collect()
-        } else {
-            self.vms
-                .iter()
-                .filter(|vm| {
-                    vm.name.to_lowercase().contains(&self.search_query.to_lowercase())
-                })
-                .collect()
+            return self.vms.iter().collect();
         }
+        let mut scored: Vec<(i32, &VM)> = self
+            .vms
+            .iter()
+            .filter_map(|vm| {
+                let s = Self::fuzzy_score(&vm.name, &self.search_query);
+                if s >= 0 {
+                    Some((s, vm))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.into_iter().map(|(_, vm)| vm).collect()
     }
 
     pub fn clear_search(&mut self) {
@@ -782,6 +842,133 @@ impl App {
                         format!("Failed to backup '{}': {}", vm_name, e),
                         StatusLevel::Error,
                     );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn enter_command_mode(&mut self) {
+        self.command_mode = true;
+        self.command_buffer.clear();
+    }
+
+    pub fn exit_command_mode(&mut self) {
+        self.command_mode = false;
+        self.command_buffer.clear();
+    }
+
+    pub fn push_recent_task(&mut self, task: impl Into<String>) {
+        let task = task.into();
+        if task.is_empty() {
+            return;
+        }
+        self.recent_tasks.push_front(task);
+        while self.recent_tasks.len() > 3 {
+            self.recent_tasks.pop_back();
+        }
+    }
+
+    pub fn show_toast(&mut self, text: impl Into<String>, level: StatusLevel) {
+        self.toast = Some((api_error::format_user_error(&text.into()), Instant::now(), level));
+    }
+
+    pub fn clear_expired_toast(&mut self) {
+        if let Some((_, when, _)) = &self.toast {
+            if when.elapsed().as_secs() >= 3 {
+                self.toast = None;
+            }
+        }
+    }
+
+    pub fn run_command(&mut self) -> CommandEffect {
+        let raw = self.command_buffer.trim().to_string();
+        if raw.is_empty() {
+            self.exit_command_mode();
+            return CommandEffect::None;
+        }
+        let cmd = raw.strip_prefix(':').unwrap_or(raw.as_str()).to_lowercase();
+        let effect = match cmd.as_str() {
+            "vms" | "vm" => {
+                self.switch_to_view(View::VMs);
+                CommandEffect::None
+            }
+            "dashboard" | "d" => {
+                self.switch_to_view(View::Dashboard);
+                CommandEffect::None
+            }
+            "logs" | "l" => {
+                self.switch_to_view(View::Logs);
+                CommandEffect::None
+            }
+            "metrics" | "m" => {
+                self.switch_to_view(View::Metrics);
+                CommandEffect::None
+            }
+            "network" | "n" => {
+                self.switch_to_view(View::Network);
+                CommandEffect::None
+            }
+            "netsec" | "ns" => {
+                self.switch_to_view(View::NetSecurity);
+                CommandEffect::None
+            }
+            "storage" | "s" => {
+                self.switch_to_view(View::Storage);
+                CommandEffect::None
+            }
+            "help" | "?" => {
+                self.switch_to_view(View::Help);
+                CommandEffect::None
+            }
+            "start" => CommandEffect::StartSelected,
+            "stop" => CommandEffect::StopSelected,
+            "snap" | "snapshot" => CommandEffect::SnapSelected,
+            "refresh" | "r" => {
+                self.push_recent_task("refresh (use R in normal mode)");
+                CommandEffect::None
+            }
+            other => {
+                self.show_toast(format!("Unknown command: :{other}"), StatusLevel::Error);
+                CommandEffect::None
+            }
+        };
+        self.push_recent_task(format!(":{cmd}"));
+        self.exit_command_mode();
+        effect
+    }
+
+    pub async fn snap_selected(&mut self) -> Result<()> {
+        let filtered = self.filtered_vms();
+        if let Some(vm) = filtered.get(self.selected) {
+            let vm_name = vm.name.clone();
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let body = serde_json::json!({
+                "name": format!("snap-{ts}"),
+                "snapshot_type": "Disk"
+            });
+            match self
+                .client
+                .post(format!("{}/vms/{}/snapshots", API_BASE, vm_name))
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(res) if res.status().is_success() => {
+                    self.show_toast(format!("Snapshot created for '{}'", vm_name), StatusLevel::Success);
+                }
+                Ok(res) => {
+                    let text = res.text().await.unwrap_or_default();
+                    self.show_toast(
+                        format!("Snapshot failed for '{}': {}", vm_name, api_error::format_user_error(&text)),
+                        StatusLevel::Error,
+                    );
+                }
+                Err(e) => {
+                    self.show_toast(format!("Snapshot failed: {}", e), StatusLevel::Error);
                 }
             }
         }

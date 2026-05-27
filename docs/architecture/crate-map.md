@@ -125,7 +125,7 @@ Enterprise management features for large-scale VM deployments.
 
 | Component       | Path         | Description                                              |
 |-----------------|--------------|----------------------------------------------------------|
-| `vmspawnd-web`  | `.web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
+| `vmspawnd-web`  | `web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
 
 ---
 

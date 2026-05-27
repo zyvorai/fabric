@@ -8,7 +8,7 @@ mod ui;
 mod views;
 
 use anyhow::Result;
-use app::{App, View};
+use app::{App, CommandEffect, View};
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
     // Setup terminal (no mouse capture - cleaner terminal interaction)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, crossterm::event::EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -57,7 +57,8 @@ async fn main() -> Result<()> {
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
-        LeaveAlternateScreen
+        LeaveAlternateScreen,
+        crossterm::event::DisableMouseCapture
     )?;
     terminal.show_cursor()?;
 
@@ -79,6 +80,7 @@ async fn run_app<B: ratatui::backend::Backend>(
     loop {
         // Clear expired status messages
         app.clear_expired_status();
+        app.clear_expired_toast();
 
         terminal.draw(|f| ui::ui(f, app))?;
 
@@ -107,7 +109,30 @@ async fn run_app<B: ratatui::backend::Backend>(
                             continue;
                         }
 
-                        if app.search_mode {
+                        if app.command_mode {
+                            match key.code {
+                                KeyCode::Esc => app.exit_command_mode(),
+                                KeyCode::Enter => {
+                                    match app.run_command() {
+                                        CommandEffect::StartSelected => {
+                                            app.start_selected().await?;
+                                        }
+                                        CommandEffect::StopSelected => {
+                                            app.stop_selected().await?;
+                                        }
+                                        CommandEffect::SnapSelected => {
+                                            app.snap_selected().await?;
+                                        }
+                                        CommandEffect::None => {}
+                                    }
+                                }
+                                KeyCode::Backspace => {
+                                    app.command_buffer.pop();
+                                }
+                                KeyCode::Char(c) => app.command_buffer.push(c),
+                                _ => {}
+                            }
+                        } else if app.search_mode {
                             // Handle search mode input
                             match key.code {
                                 KeyCode::Esc => app.clear_search(),
@@ -134,6 +159,7 @@ async fn run_app<B: ratatui::backend::Backend>(
                                 }
                                 KeyCode::Char('?') => app.switch_to_view(View::Help),
                                 KeyCode::Char('/') => app.enter_search_mode(),
+                                KeyCode::Char(':') => app.enter_command_mode(),
                                 KeyCode::Esc => {
                                     if app.current_view == View::VMDetail {
                                         app.switch_to_view(View::VMs);

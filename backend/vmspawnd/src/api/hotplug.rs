@@ -62,7 +62,7 @@ pub async fn hotplug_cpu(
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_cpu));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
-        return (s, Json(serde_json::json!({"error": m}))).into_response();
+        return crate::api_error::json_error(s, m).into_response();
     }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
@@ -101,11 +101,14 @@ pub async fn hotplug_cpu(
                         match qmp.execute("device_add", args) {
                             Ok(_) => added += 1,
                             Err(e) => {
-                                return (
-                                    StatusCode::INTERNAL_SERVER_ERROR,
-                                    Json(serde_json::json!({"error": format!("CPU hotplug failed: {}", e), "added": added})),
-                                )
-                                    .into_response();
+                                let mut body = api_error::api_error_json(
+                                    "operation_failed",
+                                    format!("CPU hotplug failed: {}", e),
+                                );
+                                if let Some(obj) = body.as_object_mut() {
+                                    obj.insert("added".to_string(), serde_json::json!(added));
+                                }
+                                return (StatusCode::INTERNAL_SERVER_ERROR, Json(body)).into_response();
                             }
                         }
                     }
@@ -121,7 +124,7 @@ pub async fn hotplug_cpu(
         }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to query CPUs: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to query CPUs: {}", e)),
         )
             .into_response(),
     }
@@ -136,7 +139,7 @@ pub async fn hotplug_memory(
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_memory));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
-        return (s, Json(serde_json::json!({"error": m}))).into_response();
+        return crate::api_error::json_error(s, m).into_response();
     }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
@@ -157,7 +160,7 @@ pub async fn hotplug_memory(
     if let Err(e) = qmp.execute("object-add", backend_args) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Memory backend add failed: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Memory backend add failed: {}", e)),
         )
             .into_response();
     }
@@ -186,7 +189,7 @@ pub async fn hotplug_memory(
             }
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("DIMM hotplug failed: {}", e)})),
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("DIMM hotplug failed: {}", e)),
             )
                 .into_response()
         }
@@ -202,12 +205,12 @@ pub async fn hotplug_disk(
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_disk));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
-        return (s, Json(serde_json::json!({"error": m}))).into_response();
+        return crate::api_error::json_error(s, m).into_response();
     }
 
     // Validate disk path to prevent traversal
     if let Err((status, msg)) = crate::validation::validate_host_path(&req.path) {
-        return (status, Json(serde_json::json!({"error": msg}))).into_response();
+        return crate::api_error::json_error(status, msg).into_response();
     }
 
     let qmp = QmpClient::new(&vm_name);
@@ -231,7 +234,7 @@ pub async fn hotplug_disk(
     if let Err(e) = qmp.execute("blockdev-add", blockdev_args) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("blockdev-add failed: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("blockdev-add failed: {}", e)),
         )
             .into_response();
     }
@@ -261,7 +264,7 @@ pub async fn hotplug_disk(
         }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("device_add failed: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("device_add failed: {}", e)),
         )
             .into_response(),
     }
@@ -275,13 +278,13 @@ pub async fn hotremove_disk(
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotremove_disk));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
-        return (s, Json(serde_json::json!({"error": m}))).into_response();
+        return crate::api_error::json_error(s, m).into_response();
     }
     // Validate device_id format (alphanumeric, hyphens, underscores, dots)
     if device_id.is_empty() || device_id.len() > 128
         || !device_id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
     {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid device ID"}))).into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid device ID").into_response();
     }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
@@ -297,7 +300,7 @@ pub async fn hotremove_disk(
         .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("device_del failed: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("device_del failed: {}", e)),
         )
             .into_response(),
     }
@@ -312,7 +315,7 @@ pub async fn hotplug_nic(
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotplug_nic));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
-        return (s, Json(serde_json::json!({"error": m}))).into_response();
+        return crate::api_error::json_error(s, m).into_response();
     }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
@@ -324,7 +327,7 @@ pub async fn hotplug_nic(
 
     // Validate bridge name
     if let Err(msg) = crate::validation::validate_hostname(&req.bridge) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid bridge name: {}", msg)}))).into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, format!("Invalid bridge name: {}", msg)).into_response();
     }
 
     // Add netdev (tap backend attached to bridge)
@@ -338,7 +341,7 @@ pub async fn hotplug_nic(
     if let Err(e) = qmp.execute("netdev_add", netdev_args) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("netdev_add failed: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("netdev_add failed: {}", e)),
         )
             .into_response();
     }
@@ -347,7 +350,11 @@ pub async fn hotplug_nic(
     const ALLOWED_NIC_MODELS: &[&str] = &["virtio-net-pci", "e1000", "e1000e", "rtl8139"];
     let model = req.model.as_deref().unwrap_or("virtio-net-pci");
     if !ALLOWED_NIC_MODELS.contains(&model) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid NIC model '{}'. Allowed: {}", model, ALLOWED_NIC_MODELS.join(", "))}))).into_response();
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid NIC model '{}'. Allowed: {}", model, ALLOWED_NIC_MODELS.join(", ")),
+        )
+        .into_response();
     }
 
     // Add NIC device
@@ -371,7 +378,7 @@ pub async fn hotplug_nic(
             }
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("NIC device_add failed: {}", e)})),
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("NIC device_add failed: {}", e)),
             )
                 .into_response()
         }
@@ -386,13 +393,13 @@ pub async fn hotremove_nic(
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotremove_nic));
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
-        return (s, Json(serde_json::json!({"error": m}))).into_response();
+        return crate::api_error::json_error(s, m).into_response();
     }
     // Validate device_id format (alphanumeric, hyphens, underscores, dots)
     if device_id.is_empty() || device_id.len() > 128
         || !device_id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
     {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid device ID"}))).into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid device ID").into_response();
     }
     let qmp = QmpClient::new(&vm_name);
     if !qmp.is_available() {
@@ -408,7 +415,7 @@ pub async fn hotremove_nic(
         .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("NIC device_del failed: {}", e)})),
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("NIC device_del failed: {}", e)),
         )
             .into_response(),
     }

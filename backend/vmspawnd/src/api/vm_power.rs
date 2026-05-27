@@ -30,17 +30,17 @@ pub async fn hibernate_vm(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    validate_vm_name(&vm_name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
     // Check VM is running — fail explicitly if not found
     let vm = state.store.get_vm(&vm_name)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("VM '{}' not found", vm_name)}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("VM '{}' not found", vm_name)))?;
 
     if vm.state != vm_model::VMState::Running {
-        return Err((StatusCode::CONFLICT, Json(json!({"error": "VM must be running to hibernate"}))));
+        return Err(crate::api_error::json_error(StatusCode::CONFLICT, "VM must be running to hibernate"));
     }
 
     // Use QMP to save VM state via savevm
@@ -50,7 +50,7 @@ pub async fn hibernate_vm(
         let snap_name = format!("hibernate-{}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
         if let Err(e) = qmp.execute("savevm", json!({"name": snap_name})) {
             return Err((StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Failed to save VM state: {}", e)}))));
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save VM state: {}", e)));
         }
 
         // Stop the VM after saving state
@@ -83,12 +83,12 @@ pub async fn hibernate_vm(
             .args(["poweroff", &vm_name])
             .output()
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+            .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err((StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("machinectl poweroff failed: {}", stderr)}))));
+                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("machinectl poweroff failed: {}", stderr)));
         }
 
         if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
@@ -106,14 +106,14 @@ pub async fn resume_hibernate(
     State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    validate_vm_name(&vm_name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
     // Check for hibernate snapshot
     let info = state.store.get_entity::<HibernateInfo>("hibernate", &vm_name)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "No hibernation snapshot found"}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "No hibernation snapshot found"))?;
 
     // Start VM and restore snapshot
     let image_path = crate::validation::find_vm_image_or_default(&vm_name);
@@ -121,7 +121,7 @@ pub async fn resume_hibernate(
     // Validate the stored snapshot name before passing to command
     if let Err((_, msg)) = crate::validation::validate_snapshot_name(&info.snapshot_name) {
         return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Corrupted hibernate data: {}", msg)}))));
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Corrupted hibernate data: {}", msg)));
     }
 
     // Use qemu-img snapshot -a to restore, then start
@@ -129,19 +129,19 @@ pub async fn resume_hibernate(
         .args(["snapshot", "-a", &info.snapshot_name, &image_path])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Failed to restore snapshot: {}", stderr)}))));
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to restore snapshot: {}", stderr)));
     }
 
     // Start the VM
     use vmspawnd_driver_core::VMDriver;
     if let Err(e) = state.driver.start(&vm_name).await {
         return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Failed to start VM: {}", e)}))));
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to start VM: {}", e)));
     }
 
     // Update state and clean up
@@ -182,13 +182,13 @@ pub async fn migrate_storage(
     Path(vm_name): Path<String>,
     Json(req): Json<StorageMigrateRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    validate_vm_name(&vm_name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
     // Find source disk
     let source_path = crate::validation::find_vm_image(&vm_name)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "No disk image found"}))))?;
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "No disk image found"))?;
 
     let source_format = std::path::Path::new(&source_path)
         .extension()
@@ -202,12 +202,12 @@ pub async fn migrate_storage(
 
     // Validate pool name using standard validator
     crate::validation::validate_vm_name(&req.target_pool)
-        .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid pool name: {}", m)}))))?;
+        .map_err(|(s, m)| (s, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid pool name: {}", m)))?;
 
     // Determine target path based on pool
     let target_dir = format!("/var/lib/vmspawnd/pools/{}", req.target_pool);
     tokio::fs::create_dir_all(&target_dir).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to create target dir: {}", e)}))))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create target dir: {}", e)))?;
 
     let target_path = format!("{}/{}.{}", target_dir, vm_name, target_format);
 
@@ -218,23 +218,23 @@ pub async fn migrate_storage(
         .args(["convert", "-p", "-f", source_format, "-O", target_format, &source_path, &target_path])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Storage migration failed: {}", stderr)}))));
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Storage migration failed: {}", stderr)));
     }
 
     // Update VM image path — fail explicitly if VM not found
     let mut vm = state.store.get_vm(&vm_name)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "VM record not found after migration — not deleting old image"}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "VM record not found after migration — not deleting old image"))?;
 
     vm.image = target_path.clone();
     vm.updated = Some(chrono::Utc::now());
     state.store.save_vm(&vm)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Remove old image only after successful store update
     if let Err(e) = tokio::fs::remove_file(&source_path).await {
@@ -302,7 +302,7 @@ pub async fn list_affinity_rules(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
 ) -> Result<Json<Vec<AffinityRule>>, (StatusCode, Json<serde_json::Value>)> {
     let rules = state.store.list_entities::<AffinityRule>("vm_affinity_rules")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(rules))
 }
 
@@ -314,17 +314,20 @@ pub async fn create_affinity_rule(
 ) -> Result<(StatusCode, Json<AffinityRule>), (StatusCode, Json<serde_json::Value>)> {
     // Validate name
     if req.name.is_empty() || req.name.len() > 128 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Rule name must be between 1 and 128 characters"}))));
+        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Rule name must be between 1 and 128 characters"));
     }
 
     // Validate vm_names count
     if req.vm_names.len() > MAX_AFFINITY_VM_NAMES {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": format!("Too many VM names (max {})", MAX_AFFINITY_VM_NAMES)}))));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Too many VM names (max {})", MAX_AFFINITY_VM_NAMES),
+        ));
     }
 
     // Validate each VM name
     for name in &req.vm_names {
-        validate_vm_name(name).map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid VM name '{}': {}", name, m)}))))?;
+        validate_vm_name(name).map_err(|(s, m)| (s, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid VM name '{}': {}", name, m)))?;
     }
 
     let rule = AffinityRule {
@@ -338,7 +341,7 @@ pub async fn create_affinity_rule(
     };
 
     state.store.save_entity("vm_affinity_rules", &rule.id, &rule)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok((StatusCode::CREATED, Json(rule)))
 }
@@ -351,11 +354,11 @@ pub async fn delete_affinity_rule(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     // Check existence first
     let _rule = state.store.get_entity::<AffinityRule>("vm_affinity_rules", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Affinity rule not found"}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Affinity rule not found"))?;
 
     state.store.delete_entity("vm_affinity_rules", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -388,7 +391,7 @@ pub async fn get_rate_limits(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
 ) -> Result<Json<ApiKeyRateLimit>, (StatusCode, Json<serde_json::Value>)> {
     let config = state.store.get_entity::<ApiKeyRateLimit>("config", "rate_limits")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .unwrap_or_default();
     Ok(Json(config))
 }
@@ -402,17 +405,17 @@ pub async fn update_rate_limits(
     // Validate rate limit bounds
     if config.enabled {
         if config.requests_per_minute < 1 || config.requests_per_minute > 10000 {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "requests_per_minute must be between 1 and 10000"}))));
+            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "requests_per_minute must be between 1 and 10000"));
         }
         if config.requests_per_hour < 1 || config.requests_per_hour > 100000 {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "requests_per_hour must be between 1 and 100000"}))));
+            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "requests_per_hour must be between 1 and 100000"));
         }
         if config.requests_per_hour < config.requests_per_minute {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "requests_per_hour must be >= requests_per_minute"}))));
+            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "requests_per_hour must be >= requests_per_minute"));
         }
     }
 
     state.store.save_entity("config", "rate_limits", &config)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(config))
 }

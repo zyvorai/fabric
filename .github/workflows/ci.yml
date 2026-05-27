@@ -43,5 +43,11 @@ jobs:
     - name: Install dependencies
       run: cd web && npm install
 
+    - name: Typecheck
+      run: cd web && npm run typecheck
+
+    - name: Test
+      run: cd web && npm test
+
     - name: Build
       run: cd web && npm run build

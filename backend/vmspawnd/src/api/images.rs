@@ -81,11 +81,11 @@ pub async fn build_image(
 
     // Validate image name
     crate::validation::validate_vm_name(&req.name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     // Validate package names
     if req.packages.len() > 100 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Maximum 100 packages allowed"}))));
+        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Maximum 100 packages allowed"));
     }
     for pkg in &req.packages {
         if pkg.is_empty() || pkg.len() > 128 || !pkg.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+')) {
@@ -376,19 +376,19 @@ pub async fn download_cloud_image(
     tracing::debug!("images::{}", stringify!(download_cloud_image));
 
     crate::validation::validate_vm_name(&req.name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     let catalog = cloud_image_catalog();
     let url = if let Some(ref custom_url) = req.url {
         // Validate user-provided URL against SSRF
         crate::api::notifications::validate_external_url_public(custom_url)
-            .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
+            .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
         custom_url.clone()
     } else {
         catalog.iter()
             .find(|img| img.name == req.name)
             .map(|img| img.url.clone())
-            .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("Cloud image '{}' not found in catalog", req.name)}))))?
+            .ok_or_else(|| (StatusCode::NOT_FOUND, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Cloud image '{}' not found in catalog", req.name)))?
     };
 
     let download_id = uuid::Uuid::new_v4().to_string();
@@ -403,7 +403,7 @@ pub async fn download_cloud_image(
     };
 
     state.store.save_entity("image_downloads", &download_id, &status).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
 
     // Spawn background download
@@ -478,7 +478,7 @@ pub async fn list_downloads(
 ) -> Result<Json<Vec<DownloadStatus>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(list_downloads));
     let downloads = state.store.list_entities::<DownloadStatus>("image_downloads").map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
     Ok(Json(downloads))
 }
@@ -557,11 +557,11 @@ pub async fn download_iso(
 
     // Validate name
     crate::validation::validate_vm_name(&req.name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     // Validate URL against SSRF
     crate::api::notifications::validate_external_url_public(&req.url)
-        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": e}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
 
     let download_id = uuid::Uuid::new_v4().to_string();
     let status = DownloadStatus {
@@ -575,7 +575,7 @@ pub async fn download_iso(
     };
 
     state.store.save_entity("iso_downloads", &download_id, &status).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
 
     let state_clone = state.clone();
@@ -633,11 +633,11 @@ pub async fn delete_iso(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(delete_iso));
     crate::validation::validate_vm_name(&name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let path = format!("/var/lib/vmspawnd/iso/{}.iso", name);
     if let Err(e) = tokio::fs::remove_file(&path).await {
         if e.kind() != std::io::ErrorKind::NotFound {
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))));
+            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
         }
     }
     Ok(StatusCode::NO_CONTENT)
@@ -665,7 +665,7 @@ pub async fn resize_disk(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(resize_disk));
     crate::validation::validate_vm_name(&vm_name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     // Validate size format: must be a positive number followed by optional unit
     let size_valid = {
@@ -677,22 +677,22 @@ pub async fn resize_disk(
         }
     };
     if !size_valid {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Size must be a positive number with optional unit suffix (e.g. '50G', '100M')"}))));
+        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Size must be a positive number with optional unit suffix (e.g. '50G', '100M')"));
     }
 
     let image_path = crate::validation::find_vm_image(&vm_name)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": format!("No disk image found for VM '{}'", vm_name)}))))?;
+        .ok_or_else(|| (StatusCode::NOT_FOUND, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("No disk image found for VM '{}'", vm_name)))?;
 
     // Resize with qemu-img
     let output = tokio::process::Command::new("qemu-img")
         .args(["resize", &image_path, &req.size])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("qemu-img resize failed: {}", stderr)}))));
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img resize failed: {}", stderr)));
     }
 
     // If online and VM is running, also resize the block device via QMP
@@ -784,9 +784,9 @@ pub async fn import_vm_image(
     tracing::debug!("images::{}", stringify!(import_vm_image));
 
     crate::validation::validate_vm_name(&req.name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     crate::validation::validate_host_path(&req.source_path)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
 
     // Validate target format
     validate_image_format(&req.target_format)?;
@@ -796,7 +796,7 @@ pub async fn import_vm_image(
 
     // Check for duplicate VM name
     if let Ok(Some(_)) = state.store.get_vm(&req.name) {
-        return Err((StatusCode::CONFLICT, Json(json!({"error": "VM with this name already exists"}))));
+        return Err(crate::api_error::json_error(StatusCode::CONFLICT, "VM with this name already exists"));
     }
 
     // Detect source format from extension
@@ -808,7 +808,7 @@ pub async fn import_vm_image(
 
     let dest_dir = "/var/lib/vmspawnd/images";
     tokio::fs::create_dir_all(dest_dir).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to create directory: {}", e)}))))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)))?;
     let dest_path = format!("{}/{}.{}", dest_dir, req.name, req.target_format);
 
     // Convert using qemu-img convert
@@ -816,11 +816,11 @@ pub async fn import_vm_image(
         .args(["convert", "-f", &source_format, "-O", &req.target_format, &req.source_path, &dest_path])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("qemu-img convert failed: {}", e)}))))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img convert failed: {}", e)))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Image conversion failed: {}", stderr)}))));
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Image conversion failed: {}", stderr)));
     }
 
     let size = tokio::fs::metadata(&dest_path).await.map(|m| m.len()).unwrap_or(0);
@@ -828,7 +828,7 @@ pub async fn import_vm_image(
     // Create VM entry
     let vm = vm_model::VM::new(req.name.clone(), dest_path.clone(), req.cpus, req.memory);
     state.store.save_vm(&vm).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
 
     tracing::info!("Imported VM '{}' from {} ({} -> {})", req.name, req.source_path, source_format, req.target_format);

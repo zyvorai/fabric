@@ -32,6 +32,7 @@ tokio-stream = "0.1"
 tokio-util = "0.7"
 
 networking = { path = "../networking" }
+api-error = { path = "../crates/api-error" }
 vm-model = { path = "../vm-model" }
 security = { path = "../security" }
 state-store = { path = "../state-store" }

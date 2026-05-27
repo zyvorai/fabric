@@ -184,8 +184,8 @@ pub async fn get_backup(
     tracing::debug!("backups::{}", stringify!(get_backup));
     // Load from state store
     let backup = state.store.get_entity::<Backup>("backups", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Backup not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup not found"))?;
 
     Ok(Json(backup))
 }
@@ -203,11 +203,14 @@ pub async fn create_backup(
         }
         Ok(None) => {
             tracing::warn!("Cannot create backup: VM '{}' not found", req.vm_name);
-            return Err((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": format!("VM '{}' not found", req.vm_name)}))));
+            return Err(crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                format!("VM '{}' not found", req.vm_name),
+            ));
         }
         Err(e) => {
             tracing::error!("Failed to check VM existence: {}", e);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to check VM existence"}))));
+            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to check VM existence"));
         }
     }
 
@@ -227,7 +230,7 @@ pub async fn create_backup(
     // Save job to state store
     if let Err(e) = state.store.save_entity("backup_jobs", &job.id, &job) {
         tracing::error!("Failed to save backup job: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save backup job"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save backup job"));
     }
 
     // Start backup process in supervised background worker
@@ -285,11 +288,11 @@ pub async fn delete_backup(
         Ok(Some(b)) => b,
         Ok(None) => {
             tracing::warn!("Backup {} not found", id);
-            return Err((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Backup not found"}))));
+            return Err(crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup not found"));
         }
         Err(e) => {
             tracing::error!("Failed to load backup: {}", e);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup"}))));
+            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup"));
         }
     };
 
@@ -299,7 +302,7 @@ pub async fn delete_backup(
     let resolved = storage_path.canonicalize().unwrap_or_else(|_| storage_path.to_path_buf());
     if !resolved.to_string_lossy().starts_with(&backup_dir_prefix) {
         tracing::error!("Refusing to delete backup outside allowed directory: {}", backup.storage_location);
-        return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Backup file is outside allowed directory"}))));
+        return Err(crate::api_error::json_error(StatusCode::FORBIDDEN, "Backup file is outside allowed directory"));
     }
 
     if resolved.exists() {
@@ -317,7 +320,7 @@ pub async fn delete_backup(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("backups", &id) {
         tracing::error!("Failed to delete backup from state store: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete backup from state store"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete backup from state store"));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -331,8 +334,8 @@ pub async fn restore_backup(
     tracing::debug!("backups::{}", stringify!(restore_backup));
     // Validate backup exists
     let backup = state.store.get_entity::<Backup>("backups", &req.backup_id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Backup not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup not found"))?;
 
     let target_vm = req.target_vm_name.clone()
         .unwrap_or_else(|| backup.vm_name.clone());
@@ -353,7 +356,7 @@ pub async fn restore_backup(
     // Save job to state store
     if let Err(e) = state.store.save_entity("backup_jobs", &job.id, &job) {
         tracing::error!("Failed to save restore job: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save restore job"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save restore job"));
     }
 
     // Start restore process in supervised background worker
@@ -426,8 +429,8 @@ pub async fn get_backup_job(
     tracing::debug!("backups::{}", stringify!(get_backup_job));
     // Load from state store
     let job = state.store.get_entity::<BackupJob>("backup_jobs", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup job"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Backup job not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup job"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup job not found"))?;
 
     Ok(Json(job))
 }
@@ -442,7 +445,7 @@ pub async fn list_backup_policies(
 ) -> Result<Json<Vec<BackupPolicy>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(list_backup_policies));
     let policies = state.store.list_entities::<BackupPolicy>("backup_policies")
-        .map_err(|e| { tracing::error!("Failed to load backup policies: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup policies"}))) })?;
+        .map_err(|e| { tracing::error!("Failed to load backup policies: {}", e); crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup policies") })?;
 
     Ok(Json(policies))
 }
@@ -454,7 +457,7 @@ pub async fn create_backup_policy(
 ) -> Result<(StatusCode, Json<BackupPolicy>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(create_backup_policy));
     crate::validation::validate_entity_name(&req.name)
-        .map_err(|(s, m)| (s, Json(serde_json::json!({"error": m}))))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let policy = BackupPolicy {
         id: Uuid::new_v4().to_string(),
         name: req.name,
@@ -470,7 +473,7 @@ pub async fn create_backup_policy(
     // Save to state store
     if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
         tracing::error!("Failed to save backup policy: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
 
     Ok((StatusCode::CREATED, Json(policy)))
@@ -485,7 +488,7 @@ pub async fn delete_backup_policy(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("backup_policies", &id) {
         tracing::error!("Failed to delete backup policy: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete backup policy"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete backup policy"));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -499,8 +502,8 @@ pub async fn enable_backup_policy(
     tracing::debug!("backups::{}", stringify!(enable_backup_policy));
     // Load policy from state store
     let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup policy"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Backup policy not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup policy"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup policy not found"))?;
 
     // Set enabled = true
     policy.enabled = true;
@@ -511,7 +514,7 @@ pub async fn enable_backup_policy(
     // Save to state store
     if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
         tracing::error!("Failed to enable backup policy: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to enable backup policy"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to enable backup policy"));
     }
 
     Ok(StatusCode::OK)
@@ -525,8 +528,8 @@ pub async fn disable_backup_policy(
     tracing::debug!("backups::{}", stringify!(disable_backup_policy));
     // Load policy from state store
     let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load backup policy"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Backup policy not found"}))))?;
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup policy"))?
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup policy not found"))?;
 
     // Set enabled = false
     policy.enabled = false;
@@ -537,7 +540,7 @@ pub async fn disable_backup_policy(
     // Save to state store
     if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
         tracing::error!("Failed to disable backup policy: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to disable backup policy"}))));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to disable backup policy"));
     }
 
     Ok(StatusCode::OK)

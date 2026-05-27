@@ -91,7 +91,7 @@ _rsync() {
         --exclude='*.qcow2' --exclude='*.raw' --exclude='*.vmdk' \
         --exclude='*.iso' --exclude='*.img' --exclude='*.ova' \
         --exclude='.git' --exclude='target/' --exclude='node_modules/' \
-        --exclude='.web/node_modules/' --exclude='.web/dist/' \
+        --exclude='web/node_modules/' --exclude='web/dist/' \
         --exclude='web/dist/' --exclude='web/node_modules/' \
         --exclude='*.tpmstate' --exclude='*.tpmstate/' \
         -e "$ssh_cmd" \
@@ -340,7 +340,7 @@ _ssh "
 
     # Build web dashboard if npm is available
     WEB_DIR=''
-    for dir in .web web; do
+    for dir in web; do
         if [ -f \$dir/package.json ]; then
             WEB_DIR=\$dir
             break

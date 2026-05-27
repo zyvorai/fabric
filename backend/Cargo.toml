@@ -34,6 +34,7 @@ members = [
     "crates/machinectl-driver",
     "crates/lock-manager",
     "crates/cgroup",
+    "crates/api-error",
     "network-policy",
     "service-mesh",
     "traffic-shaping",

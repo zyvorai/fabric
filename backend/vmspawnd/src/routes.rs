@@ -44,10 +44,7 @@ fn audit(state: &AppState, user: &str, action: &str, resource: &str, status: &st
     }
 }
 
-/// Standard JSON error response.
-fn json_error(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
-    (status, Json(json!({ "error": msg.into() })))
-}
+use crate::api_error::{json_error, json_error_code};
 
 /// JSON error with path sanitization for non-admin users.
 fn json_error_safe(status: StatusCode, msg: impl Into<String>, claims: &security::Claims) -> (StatusCode, Json<serde_json::Value>) {
@@ -57,7 +54,7 @@ fn json_error_safe(status: StatusCode, msg: impl Into<String>, claims: &security
     } else {
         crate::validation::sanitize_error(&msg)
     };
-    (status, Json(json!({ "error": safe_msg })))
+    json_error(status, safe_msg)
 }
 
 pub async fn list_vms(
