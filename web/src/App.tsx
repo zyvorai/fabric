@@ -13,6 +13,7 @@ import { PlatformInfoProvider } from './contexts/PlatformInfoContext'
 import PageSkeleton from './components/PageSkeleton'
 import { PageErrorBoundary } from './components/ErrorBoundary'
 import Navbar from './components/Navbar'
+import Breadcrumb from './components/Breadcrumb'
 import CommandPalette from './components/CommandPalette'
 import HelpDialog, { type HelpTab } from './components/HelpDialog'
 import Login from './pages/Login'
@@ -198,7 +199,7 @@ function MainLayout() {
     theme === 'steel' ? ' steel-content' : theme === 'aurora' ? ' aurora-content' : ''
 
   return (
-    <div className={`${shellClass} flex flex-col h-screen`}>
+    <div className={`${shellClass} flex flex-col min-h-screen`}>
       <GlobalShortcuts
         helpOpen={helpOpen}
         helpTab={helpTab}
@@ -209,13 +210,14 @@ function MainLayout() {
       <Navbar onOpenHelp={openHelp} />
       <CommandPalette onOpenHelp={openHelp} />
       <main
-        className={`app-shell flex-1 min-w-0 overflow-auto py-6 lg:py-8 page-bg${contentClass}`}
+        id="main-content"
+        className={`app-shell flex-1 min-w-0 py-6 lg:py-8${contentClass}`}
         role="main"
       >
-        <div className="animate-fade-in">
-          <PageErrorBoundary>
-            <Suspense fallback={<PageSkeleton />}>
-              <Routes>
+        <Breadcrumb />
+        <PageErrorBoundary>
+          <Suspense fallback={<PageSkeleton />}>
+            <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/vms" element={<VMList />} />
                 <Route path="/vms/:name" element={<VMDetails />} />
@@ -299,12 +301,11 @@ function MainLayout() {
                 <Route path="/storage-manager" element={<StorageManagerPage />} />
                 <Route path="/vm-wizard" element={<Navigate to="/create" replace />} />
                 <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </PageErrorBoundary>
-        </div>
+            </Routes>
+          </Suspense>
+        </PageErrorBoundary>
       </main>
-      <ZyvorFooter product="vmspawn" />
+      <ZyvorFooter />
     </div>
   )
 }

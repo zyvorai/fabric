@@ -4,7 +4,7 @@
 
 /**
  * Zyvor suite branding — text only.
- * Footer: zyvor.dev · © 2026 (both orange) · optional host OS
+ * Brand line: zyvor.dev · © 2026 (all orange, no footer bar).
  */
 import React from 'react';
 
@@ -14,7 +14,6 @@ export const ZYVOR_COPY = '© 2026';
 export const ZYVOR_LINE = `zyvor.dev · ${ZYVOR_COPY}`;
 
 const ORANGE = '#f97316';
-const MUTED = 'rgba(148, 163, 184, 0.75)';
 
 const linkStyle: React.CSSProperties = {
   color: ORANGE,
@@ -30,7 +29,12 @@ const linkLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
   e.currentTarget.style.color = ORANGE;
 };
 
-const sep = <span aria-hidden style={{ color: MUTED }}> · </span>;
+const orangeSep = (
+  <span aria-hidden style={{ color: ORANGE }}>
+    {' '}
+    ·{' '}
+  </span>
+);
 
 function ZyvorDevLink({ className = '' }: { className?: string }) {
   return (
@@ -55,40 +59,6 @@ type BrandProps = {
   style?: React.CSSProperties;
   includeCopyright?: boolean;
 };
-
-/** Compact line: zyvor.dev · © 2026 */
-export function ZyvorInline({
-  className = '',
-  style,
-  includeCopyright = true,
-}: BrandProps) {
-  return (
-    <span
-      className={`zyvor-inline whitespace-normal ${className}`.trim()}
-      style={{
-        fontSize: '12px',
-        lineHeight: 1.5,
-        color: MUTED,
-        ...style,
-      }}
-    >
-      <ZyvorDevLink />
-      {includeCopyright ? (
-        <>
-          {sep}
-          <span style={{ color: ORANGE, fontWeight: 500 }}>{ZYVOR_COPY}</span>
-        </>
-      ) : null}
-    </span>
-  );
-}
-
-const orangeSep = (
-  <span aria-hidden style={{ color: ORANGE }}>
-    {' '}
-    ·{' '}
-  </span>
-);
 
 /** Orange brand line: zyvor.dev · © 2026 (no background bar). */
 export function ZyvorBrandLine({
@@ -117,6 +87,11 @@ export function ZyvorBrandLine({
   );
 }
 
+/** @deprecated Use ZyvorBrandLine */
+export function ZyvorInline(props: BrandProps) {
+  return <ZyvorBrandLine {...props} />;
+}
+
 type FooterProps = {
   className?: string;
   /** Host OS pretty name (e.g. Rocky Linux 9.4) — shown when provided. */
@@ -125,28 +100,15 @@ type FooterProps = {
   product?: string;
 };
 
-/** Page footer — zyvor.dev and © 2026 in orange; optional host OS line. */
+/** Page footer — transparent; orange brand line only. */
 export function ZyvorFooter({ className = '', hostOs }: FooterProps) {
   return (
     <footer
-      className={`zyvor-footer shrink-0 py-3 text-center ${className}`.trim()}
-      style={{
-        marginTop: 'auto',
-        background: 'transparent',
-        border: 'none',
-      }}
+      className={`zyvor-footer shrink-0 py-3 text-center bg-transparent border-0 ${className}`.trim()}
+      style={{ marginTop: 'auto' }}
       role="contentinfo"
     >
-      <div
-        style={{
-          fontSize: '12px',
-          lineHeight: 1.5,
-        }}
-      >
-        <ZyvorDevLink />
-        {sep}
-        <span style={{ color: ORANGE, fontWeight: 500 }}>{ZYVOR_COPY}</span>
-      </div>
+      <ZyvorBrandLine />
       {hostOs ? (
         <div
           className="mt-1 text-[11px] text-slate-500"
@@ -159,7 +121,7 @@ export function ZyvorFooter({ className = '', hostOs }: FooterProps) {
   );
 }
 
-/** @deprecated Use ZyvorFooter or ZyvorInline. */
+/** @deprecated Use ZyvorFooter or ZyvorBrandLine. */
 export function ZyvorHelpStrip(_props: BrandProps) {
   return null;
 }
