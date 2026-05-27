@@ -37,7 +37,7 @@ pub async fn hibernate_vm(
     // Check VM is running — fail explicitly if not found
     let vm = state.store.get_vm(&vm_name)
         .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("VM '{}' not found", vm_name)))?;
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, format!("VM '{}' not found", vm_name)))?;
 
     if vm.state != vm_model::VMState::Running {
         return Err(crate::api_error::json_error(StatusCode::CONFLICT, "VM must be running to hibernate"));
@@ -49,8 +49,7 @@ pub async fn hibernate_vm(
         // Create a snapshot that includes memory state
         let snap_name = format!("hibernate-{}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
         if let Err(e) = qmp.execute("savevm", json!({"name": snap_name})) {
-            return Err((StatusCode::INTERNAL_SERVER_ERROR,
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save VM state: {}", e)));
+            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save VM state: {}", e)));
         }
 
         // Stop the VM after saving state
@@ -87,8 +86,7 @@ pub async fn hibernate_vm(
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR,
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("machinectl poweroff failed: {}", stderr)));
+            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("machinectl poweroff failed: {}", stderr)));
         }
 
         if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
@@ -120,8 +118,7 @@ pub async fn resume_hibernate(
 
     // Validate the stored snapshot name before passing to command
     if let Err((_, msg)) = crate::validation::validate_snapshot_name(&info.snapshot_name) {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Corrupted hibernate data: {}", msg)));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Corrupted hibernate data: {}", msg)));
     }
 
     // Use qemu-img snapshot -a to restore, then start
@@ -133,15 +130,13 @@ pub async fn resume_hibernate(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to restore snapshot: {}", stderr)));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to restore snapshot: {}", stderr)));
     }
 
     // Start the VM
     use vmspawnd_driver_core::VMDriver;
     if let Err(e) = state.driver.start(&vm_name).await {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to start VM: {}", e)));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to start VM: {}", e)));
     }
 
     // Update state and clean up
@@ -202,12 +197,12 @@ pub async fn migrate_storage(
 
     // Validate pool name using standard validator
     crate::validation::validate_vm_name(&req.target_pool)
-        .map_err(|(s, m)| (s, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid pool name: {}", m)))?;
+        .map_err(|(s, m)| crate::api_error::json_error(s, format!("Invalid pool name: {}", m)))?;
 
     // Determine target path based on pool
     let target_dir = format!("/var/lib/vmspawnd/pools/{}", req.target_pool);
     tokio::fs::create_dir_all(&target_dir).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create target dir: {}", e)))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create target dir: {}", e)))?;
 
     let target_path = format!("{}/{}.{}", target_dir, vm_name, target_format);
 
@@ -222,8 +217,7 @@ pub async fn migrate_storage(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR,
-            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Storage migration failed: {}", stderr)));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Storage migration failed: {}", stderr)));
     }
 
     // Update VM image path — fail explicitly if VM not found
@@ -327,7 +321,7 @@ pub async fn create_affinity_rule(
 
     // Validate each VM name
     for name in &req.vm_names {
-        validate_vm_name(name).map_err(|(s, m)| (s, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid VM name '{}': {}", name, m)))?;
+        validate_vm_name(name).map_err(|(s, m)| crate::api_error::json_error(s, format!("Invalid VM name '{}': {}", name, m)))?;
     }
 
     let rule = AffinityRule {

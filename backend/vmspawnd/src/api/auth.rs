@@ -135,32 +135,23 @@ pub async fn login(
 
     let jwt_config = state.jwt_config.as_ref().ok_or_else(|| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
 
-    // Authenticate via PAM (system users)
-    let pam_result = tokio::task::spawn_blocking({
-        let username = req.username.clone();
-        let password = req.password.clone();
-        move || security::pam_auth::authenticate(&username, &password)
-    })
-    .await
-    .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
-
-    if let Err(_e) = pam_result {
-        tracing::warn!("PAM authentication failed for '{}'", req.username);
-        LOGIN_LIMITER.record_failure(&req.username);
-        GLOBAL_LOGIN_LIMITER.record_failure("__global__");
-        return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+    enum AuthSource {
+        Database { user_id: String, role: security::Role },
+        Pam,
     }
 
-    // Successful PAM login — clear rate limit
-    LOGIN_LIMITER.clear(&req.username);
-
-    // Check if TOTP 2FA is enabled for this user
-    // Note: TOTP DB methods query by user ID (not username), so we must look up the user first.
-    if let Some(ref user_db) = state.user_db {
+    let auth_source = if let Some(ref user_db) = state.user_db {
         if let Ok(Some(db_user)) = user_db.get_by_username(&req.username) {
-            let totp_enabled = user_db
-                .is_totp_enabled(&db_user.id)
-                .unwrap_or(false);
+            let password_ok = db_user
+                .verify_password(&req.password)
+                .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+            if !password_ok {
+                LOGIN_LIMITER.record_failure(&req.username);
+                GLOBAL_LOGIN_LIMITER.record_failure("__global__");
+                return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+            }
+
+            let totp_enabled = user_db.is_totp_enabled(&db_user.id).unwrap_or(false);
             if totp_enabled {
                 match &req.totp_code {
                     None => {
@@ -188,17 +179,98 @@ pub async fn login(
                     }
                 }
             }
+
+            AuthSource::Database {
+                user_id: db_user.id,
+                role: db_user.role,
+            }
+        } else {
+            let pam_result = tokio::task::spawn_blocking({
+                let username = req.username.clone();
+                let password = req.password.clone();
+                move || security::pam_auth::authenticate(&username, &password)
+            })
+            .await
+            .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+
+            if pam_result.is_err() {
+                tracing::warn!("PAM authentication failed for '{}'", req.username);
+                LOGIN_LIMITER.record_failure(&req.username);
+                GLOBAL_LOGIN_LIMITER.record_failure("__global__");
+                return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+            }
+
+            AuthSource::Pam
+        }
+    } else {
+        let pam_result = tokio::task::spawn_blocking({
+            let username = req.username.clone();
+            let password = req.password.clone();
+            move || security::pam_auth::authenticate(&username, &password)
+        })
+        .await
+        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+
+        if pam_result.is_err() {
+            tracing::warn!("PAM authentication failed for '{}'", req.username);
+            LOGIN_LIMITER.record_failure(&req.username);
+            GLOBAL_LOGIN_LIMITER.record_failure("__global__");
+            return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+        }
+
+        AuthSource::Pam
+    };
+
+    LOGIN_LIMITER.clear(&req.username);
+
+    // PAM users with 2FA configured in the local DB still require TOTP.
+    if matches!(auth_source, AuthSource::Pam) {
+        if let Some(ref user_db) = state.user_db {
+            if let Ok(Some(db_user)) = user_db.get_by_username(&req.username) {
+                let totp_enabled = user_db.is_totp_enabled(&db_user.id).unwrap_or(false);
+                if totp_enabled {
+                    match &req.totp_code {
+                        None => {
+                            return Err(crate::api_error::json_error_extras(
+                                StatusCode::FORBIDDEN,
+                                "unauthorized",
+                                "2FA code required",
+                                serde_json::json!({ "requires_2fa": true }),
+                            ));
+                        }
+                        Some(code) => {
+                            let secret = user_db
+                                .get_totp_secret(&db_user.id)
+                                .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+                            if let Some(secret) = secret {
+                                let valid = security::totp::verify_code(&secret, code)
+                                    .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+                                if !valid {
+                                    return Err(crate::api_error::json_error(
+                                        StatusCode::UNAUTHORIZED,
+                                        "Invalid 2FA code",
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // Determine role: root and wheel/sudo group members get admin, others get user
-    let role = if req.username == "root" || is_admin_user(&req.username).await {
-        security::Role::Admin
-    } else {
-        security::Role::User
+    let (user_id, role) = match auth_source {
+        AuthSource::Database { user_id, role } => (user_id, role),
+        AuthSource::Pam => {
+            let role = if req.username == "root" || is_admin_user(&req.username).await {
+                security::Role::Admin
+            } else {
+                security::Role::User
+            };
+            (req.username.clone(), role)
+        }
     };
 
-    let user_id = req.username.clone();
     let token = jwt_config
         .generate_token(&user_id, role.clone())
         .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
@@ -213,7 +285,7 @@ pub async fn login(
         token,
         user_id: user_id.clone(),
         role: role_str,
-        username: user_id,
+        username: req.username,
     }))
 }
 

@@ -8,7 +8,7 @@ import { Suspense, lazy, ReactNode, useState, useCallback, useMemo } from 'react
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { ThemeProvider } from './contexts/ThemeContext'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { PlatformInfoProvider } from './contexts/PlatformInfoContext'
 import PageSkeleton from './components/PageSkeleton'
 import { PageErrorBoundary } from './components/ErrorBoundary'
@@ -175,6 +175,7 @@ function GlobalShortcuts({
 }
 
 function MainLayout() {
+  const { theme } = useTheme()
   const [helpOpen, setHelpOpen] = useState(false)
   const [helpTab, setHelpTab] = useState<HelpTab>('shortcuts')
   useRecordRecentPage()
@@ -186,8 +187,18 @@ function MainLayout() {
 
   const closeHelp = useCallback(() => setHelpOpen(false), [])
 
+  const shellClass =
+    theme === 'steel'
+      ? 'dashboard-steel min-h-screen flex flex-col text-[#d7dde5]'
+      : theme === 'aurora'
+        ? 'dashboard-aurora min-h-screen flex flex-col text-[#e8e4f8]'
+        : 'min-h-screen bg-slate-950 text-slate-100'
+
+  const contentClass =
+    theme === 'steel' ? ' steel-content' : theme === 'aurora' ? ' aurora-content' : ''
+
   return (
-    <div className="h-screen flex flex-col bg-slate-950">
+    <div className={`${shellClass} flex flex-col h-screen`}>
       <GlobalShortcuts
         helpOpen={helpOpen}
         helpTab={helpTab}
@@ -197,8 +208,11 @@ function MainLayout() {
       />
       <Navbar onOpenHelp={openHelp} />
       <CommandPalette onOpenHelp={openHelp} />
-      <main className="flex-1 overflow-auto px-6 py-6 page-bg">
-        <div className="animate-fade-in max-w-[var(--layout-max-width,87.5rem)] mx-auto">
+      <main
+        className={`app-shell flex-1 min-w-0 overflow-auto py-6 lg:py-8 page-bg${contentClass}`}
+        role="main"
+      >
+        <div className="animate-fade-in">
           <PageErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>
               <Routes>

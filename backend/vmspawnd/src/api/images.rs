@@ -388,7 +388,7 @@ pub async fn download_cloud_image(
         catalog.iter()
             .find(|img| img.name == req.name)
             .map(|img| img.url.clone())
-            .ok_or_else(|| (StatusCode::NOT_FOUND, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Cloud image '{}' not found in catalog", req.name)))?
+            .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, format!("Cloud image '{}' not found in catalog", req.name)))?
     };
 
     let download_id = uuid::Uuid::new_v4().to_string();
@@ -681,7 +681,7 @@ pub async fn resize_disk(
     }
 
     let image_path = crate::validation::find_vm_image(&vm_name)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("No disk image found for VM '{}'", vm_name)))?;
+        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, format!("No disk image found for VM '{}'", vm_name)))?;
 
     // Resize with qemu-img
     let output = tokio::process::Command::new("qemu-img")
@@ -692,7 +692,7 @@ pub async fn resize_disk(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img resize failed: {}", stderr)));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img resize failed: {}", stderr)));
     }
 
     // If online and VM is running, also resize the block device via QMP
@@ -808,7 +808,7 @@ pub async fn import_vm_image(
 
     let dest_dir = "/var/lib/vmspawnd/images";
     tokio::fs::create_dir_all(dest_dir).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)))?;
     let dest_path = format!("{}/{}.{}", dest_dir, req.name, req.target_format);
 
     // Convert using qemu-img convert
@@ -816,11 +816,11 @@ pub async fn import_vm_image(
         .args(["convert", "-f", &source_format, "-O", &req.target_format, &req.source_path, &dest_path])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img convert failed: {}", e)))?;
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img convert failed: {}", e)))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Image conversion failed: {}", stderr)));
+        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Image conversion failed: {}", stderr)));
     }
 
     let size = tokio::fs::metadata(&dest_path).await.map(|m| m.len()).unwrap_or(0);

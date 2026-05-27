@@ -76,6 +76,8 @@ export type PremiumLoginShellProps = {
   panelTitle?: string;
   panelSubtitle?: string;
   panelHint?: ReactNode;
+  hostLabel?: string;
+  panelActions?: ReactNode;
   footer?: ReactNode;
   formClassName?: string;
   children: ReactNode;
@@ -99,6 +101,8 @@ export function PremiumLoginShell({
   panelTitle = 'Welcome back',
   panelSubtitle = 'Sign in to continue',
   panelHint,
+  hostLabel,
+  panelActions,
   footer,
   formClassName = '',
   children,
@@ -107,12 +111,18 @@ export function PremiumLoginShell({
   const accentClass = accent === 'blue' ? '' : `login-accent-${accent}`;
   const heroClass = heroWidth === '55' ? 'lg:w-[55%]' : 'lg:w-[58%]';
   const beamClass = heroWidth === '55' ? 'login-beam-w55' : 'login-beam-w58';
+  const pageClass = [
+    'login-page flex-1 flex flex-col lg:flex-row relative overflow-hidden',
+    accentClass,
+    pageThemeClass,
+    reducedMotion ? 'login-page-reduced-motion' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div
-        className={`login-page flex-1 flex flex-col lg:flex-row relative overflow-hidden ${accentClass} ${pageThemeClass}`.trim()}
-      >
+      <div className={pageClass}>
         {!reducedMotion && <div className="login-aurora" aria-hidden />}
         {!reducedMotion && <div className="login-scanline" aria-hidden />}
 
@@ -124,38 +134,41 @@ export function PremiumLoginShell({
           <div className="login-hero-mesh" aria-hidden />
           <div className="login-spotlight" aria-hidden />
 
-          {orbs.map((orb, i) => (
-            <div
-              key={i}
-              className={`login-orb login-orb-${orb.hue ?? 'blue'}`}
-              style={
-                {
-                  width: orb.size,
-                  height: orb.size,
-                  top: orb.top,
-                  left: orb.left,
-                  '--login-delay': orb.delay,
-                  '--login-duration': orb.duration,
-                } as CSSProperties
-              }
-            />
-          ))}
-
-          <div className="login-particles" aria-hidden>
-            {PARTICLE_SEEDS.map((p) => (
-              <span
-                key={p.id}
-                className="login-particle"
-                style={{
-                  left: p.left,
-                  top: p.top,
-                  width: p.size,
-                  height: p.size,
-                  animationDelay: p.delay,
-                }}
+          {!reducedMotion &&
+            orbs.map((orb, i) => (
+              <div
+                key={i}
+                className={`login-orb login-orb-${orb.hue ?? 'blue'}`}
+                style={
+                  {
+                    width: orb.size,
+                    height: orb.size,
+                    top: orb.top,
+                    left: orb.left,
+                    '--login-delay': orb.delay,
+                    '--login-duration': orb.duration,
+                  } as CSSProperties
+                }
               />
             ))}
-          </div>
+
+          {!reducedMotion && (
+            <div className="login-particles" aria-hidden>
+              {PARTICLE_SEEDS.map((p) => (
+                <span
+                  key={p.id}
+                  className="login-particle"
+                  style={{
+                    left: p.left,
+                    top: p.top,
+                    width: p.size,
+                    height: p.size,
+                    animationDelay: p.delay,
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="relative z-10">
             <div className="login-fade-in flex items-center gap-4 mb-8">
@@ -223,7 +236,7 @@ export function PremiumLoginShell({
             </div>
           ) : null}
 
-          {heroFooter ? <div className="relative z-10 login-fade-in login-fade-in-d4">{heroFooter}</div> : null}
+          {heroFooter ? <div className="relative z-10 pt-4 shrink-0 login-fade-in login-fade-in-d4">{heroFooter}</div> : null}
         </aside>
 
         <div className={`login-beam hidden lg:block ${beamClass}`} aria-hidden />
@@ -232,15 +245,30 @@ export function PremiumLoginShell({
           <div className="login-panel-grid" aria-hidden />
           <div className="login-panel-glow" aria-hidden />
           <div className="w-full max-w-[420px] relative z-10">
+            {panelActions ? <div className="flex justify-end mb-2">{panelActions}</div> : null}
+
             <div className="lg:hidden text-center mb-8">
               <div className="login-logo-ring inline-block mb-4">{logo}</div>
               <h1 className="text-2xl font-bold text-white">{productName}</h1>
               <p className="text-sm mt-1 text-slate-400">{mobileSubtitle ?? productSubtitle ?? panelSubtitle}</p>
+              {hostLabel ? (
+                <p className="text-xs mt-2 font-mono text-slate-500" title="Hypervisor host">
+                  {hostLabel}
+                </p>
+              ) : null}
             </div>
 
             <div className="hidden lg:block mb-8">
               <h2 className="text-2xl font-bold mb-1 text-white">{panelTitle}</h2>
-              <p className="text-sm text-slate-400">{panelSubtitle}</p>
+              <p className="text-sm text-slate-400">
+                {panelSubtitle}
+                {hostLabel ? (
+                  <>
+                    {' '}
+                    on <span className="font-mono text-slate-300">{hostLabel}</span>
+                  </>
+                ) : null}
+              </p>
             </div>
 
             <div className={`login-glass login-glass-border rounded-2xl p-8 shadow-2xl ${formClassName}`.trim()}>
@@ -250,6 +278,8 @@ export function PremiumLoginShell({
             {panelHint ? (
               <p className="text-xs text-center mt-4 max-w-sm mx-auto leading-relaxed text-slate-500">{panelHint}</p>
             ) : null}
+
+            {heroFooter ? <div className="lg:hidden text-center mt-6">{heroFooter}</div> : null}
           </div>
         </main>
       </div>
@@ -258,9 +288,12 @@ export function PremiumLoginShell({
   );
 }
 
-export function LoginError({ message }: { message: string }) {
+export function LoginError({ message, reducedMotion = false }: { message: string; reducedMotion?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 bg-red-950/50 border border-red-500/40 rounded-xl p-3 mb-6 login-shake" role="alert">
+    <div
+      className={`flex items-center gap-2.5 bg-red-950/50 border border-red-500/40 rounded-xl p-3 mb-6${reducedMotion ? '' : ' login-shake'}`}
+      role="alert"
+    >
       <AlertCircle className="h-4 w-4 text-red-400 shrink-0" aria-hidden />
       <span className="text-sm text-red-300">{message}</span>
     </div>

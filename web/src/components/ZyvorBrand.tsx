@@ -83,6 +83,40 @@ export function ZyvorInline({
   );
 }
 
+const orangeSep = (
+  <span aria-hidden style={{ color: ORANGE }}>
+    {' '}
+    ·{' '}
+  </span>
+);
+
+/** Orange brand line: zyvor.dev · © 2026 (no background bar). */
+export function ZyvorBrandLine({
+  className = '',
+  style,
+  includeCopyright = true,
+}: BrandProps) {
+  return (
+    <span
+      className={`zyvor-brand-line whitespace-normal ${className}`.trim()}
+      style={{
+        fontSize: '12px',
+        lineHeight: 1.5,
+        color: ORANGE,
+        ...style,
+      }}
+    >
+      <ZyvorDevLink />
+      {includeCopyright ? (
+        <>
+          {orangeSep}
+          <span style={{ color: ORANGE, fontWeight: 500 }}>{ZYVOR_COPY}</span>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
 type FooterProps = {
   className?: string;
   /** Host OS pretty name (e.g. Rocky Linux 9.4) — shown when provided. */

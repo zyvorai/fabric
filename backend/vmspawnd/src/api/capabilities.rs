@@ -74,25 +74,11 @@ async fn probe_machined(state: &AppState) -> SubsystemStatus {
 
 async fn probe_storage(state: &AppState) -> SubsystemStatus {
     let manager = state.storage_manager.read().await;
-    match manager.list_pools().await {
-        Ok(pools) => {
-            let n = pools.len();
-            SubsystemStatus {
-                phase: if n > 0 {
-                    SubsystemPhase::Live
-                } else {
-                    SubsystemPhase::Live
-                },
-                detail: Some(format!("{n} storage pool(s)")),
-            }
-        }
-        Err(e) => {
-            tracing::debug!("capabilities: storage probe failed: {}", e);
-            SubsystemStatus {
-                phase: SubsystemPhase::Unreachable,
-                detail: Some("Storage manager unavailable".to_string()),
-            }
-        }
+    let pools = manager.list_pools().await;
+    let n = pools.len();
+    SubsystemStatus {
+        phase: SubsystemPhase::Live,
+        detail: Some(format!("{n} storage pool(s)")),
     }
 }
 

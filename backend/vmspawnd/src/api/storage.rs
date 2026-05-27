@@ -469,12 +469,7 @@ pub async fn discover_iscsi_targets(
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::discover_targets(&req.portal)
         .map(Json)
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Discovery failed: {}", e)),
-            )
-        })
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Discovery failed: {}", e)))
 }
 
 /// POST /api/storage/iscsi/login - Login to an iSCSI target
@@ -487,12 +482,7 @@ pub async fn login_iscsi_target(
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::login_target(&req.portal, &req.target_iqn)
         .map(|_| StatusCode::OK)
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-            )
-        })
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/storage/iscsi/logout - Logout from an iSCSI target
@@ -505,12 +495,7 @@ pub async fn logout_iscsi_target(
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::logout_target(&req.portal, &req.target_iqn)
         .map(|_| StatusCode::OK)
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-            )
-        })
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// GET /api/storage/iscsi/sessions - List active iSCSI sessions
@@ -521,12 +506,7 @@ pub async fn list_iscsi_sessions(
     tracing::debug!("storage::{}", stringify!(list_iscsi_sessions));
     vmspawnd_storage::iscsi::list_sessions()
         .map(Json)
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-            )
-        })
+        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 #[cfg(test)]

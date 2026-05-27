@@ -503,3 +503,84 @@
 .login-accent-steel .login-btn-primary:hover:not(:disabled) { box-shadow: 0 8px 32px rgba(113, 113, 122, 0.45); }
 .login-accent-steel .login-input:focus { border-color: rgba(161, 161, 170, 0.6); box-shadow: 0 0 0 3px rgba(161, 161, 170, 0.15); }
 .login-accent-steel .group:focus-within .login-field-icon { color: #d4d4d8; }
+
+@keyframes aurora-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.login-page-aurora .login-text-gradient {
+  background: linear-gradient(135deg, #67e8f9 0%, #e9d5ff 45%, #f9a8d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.login-page-aurora .login-hero {
+  background: linear-gradient(145deg, #020408 0%, #0a0618 35%, #1a0a2e 65%, #050816 100%);
+}
+.login-page-aurora .login-panel {
+  background-color: #050816;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.14), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 80%, rgba(168, 85, 247, 0.12), transparent),
+    linear-gradient(180deg, #030712 0%, #0a0618 100%);
+}
+.login-page-aurora .login-glass {
+  background: rgba(12, 8, 28, 0.82);
+  border-color: rgba(167, 139, 250, 0.28);
+  box-shadow: 0 0 40px rgba(34, 211, 238, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.login-page-aurora .login-input {
+  background: rgba(8, 6, 20, 0.9);
+  border-color: rgba(167, 139, 250, 0.3);
+  color: #f5f3ff;
+}
+.login-page-aurora .login-input:focus {
+  border-color: rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+}
+.login-page-aurora .login-btn-primary {
+  border-color: rgba(34, 211, 238, 0.45);
+  background: linear-gradient(135deg, #0891b2 0%, #7c3aed 50%, #db2777 100%);
+  background-size: 200% 200%;
+  animation: login-shimmer 3s ease-in-out infinite, aurora-shimmer 6s ease infinite;
+}
+.login-page-aurora .login-aurora {
+  opacity: 1;
+  background:
+    radial-gradient(ellipse 55% 45% at 15% 20%, rgba(34, 211, 238, 0.28), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 85% 75%, rgba(236, 72, 153, 0.18), transparent 50%),
+    radial-gradient(ellipse 45% 50% at 70% 15%, rgba(168, 85, 247, 0.22), transparent 55%);
+}
+.login-page-aurora .login-beam {
+  background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.95) 25%, rgba(168, 85, 247, 0.95) 55%, rgba(236, 72, 153, 0.9) 75%, transparent);
+  box-shadow: 0 0 32px rgba(34, 211, 238, 0.5), 0 0 64px rgba(168, 85, 247, 0.35);
+}
+.login-page-aurora .login-feature-card-highlight {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.45) 0%, rgba(15, 10, 32, 0.65) 100%);
+  border: 1px solid rgba(236, 72, 153, 0.35);
+  box-shadow: 0 0 40px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.login-theme-switch .login-theme-btn {
+  border: 1px solid transparent;
+}
+.login-page-reduced-motion .login-aurora,
+.login-page-reduced-motion .login-scanline,
+.login-page-reduced-motion .login-orb,
+.login-page-reduced-motion .login-particle,
+.login-page-reduced-motion .login-beam {
+  display: none !important;
+}
+.login-page-reduced-motion .login-logo-ring,
+.login-page-reduced-motion .login-glass,
+.login-page-reduced-motion .login-btn-primary::after {
+  animation: none !important;
+}
+.login-page-reduced-motion .login-fade-in,
+.login-page-reduced-motion .login-fade-in-d1,
+.login-page-reduced-motion .login-fade-in-d2,
+.login-page-reduced-motion .login-fade-in-d3,
+.login-page-reduced-motion .login-fade-in-d4 {
+  animation: none !important;
+  opacity: 1 !important;
+}
