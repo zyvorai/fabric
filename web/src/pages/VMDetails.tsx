@@ -76,8 +76,7 @@ export default function VMDetails() {
       toast.success(`VM '${name}' deleted successfully`)
       navigate('/vms')
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      toast.error(`Failed to delete VM '${name}': ${msg}`)
+      toastFailure(toast, `Failed to delete VM '${name}'`, error)
     }
   }, [name, toast, navigate])
 

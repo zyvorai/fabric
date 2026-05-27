@@ -58,7 +58,7 @@ export default function Dashboard() {
     } catch (err) {
       const msg = formatUserError(err)
       setLoadError(msg)
-      toast.error(`Failed to load virtual machines: ${msg}`)
+      toastFailure(toast, 'Failed to load virtual machines', err)
     } finally {
       setLoading(false)
     }

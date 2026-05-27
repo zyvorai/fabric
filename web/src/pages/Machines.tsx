@@ -82,7 +82,7 @@ export default function Machines() {
       const out = await shellMachine(selectedMachine, shellCmd)
       setShellOutput(out)
     } catch (e) {
-      toast.error(`Shell failed: ${e}`)
+      toastFailure(toast, 'Shell command failed', e)
     }
   }
 
@@ -95,7 +95,51 @@ export default function Machines() {
       setPullName('')
       loadData()
     } catch (e) {
-      toast.error(`Pull failed: ${e}`)
+      toastFailure(toast, 'Failed to pull image', e)
+    }
+  }
+
+  const handleReboot = async () => {
+    if (!selectedMachine) return
+    try {
+      await rebootMachine(selectedMachine)
+      toast.success('Rebooting...')
+      loadData()
+    } catch (e) {
+      toastFailure(toast, 'Failed to reboot machine', e)
+    }
+  }
+
+  const handlePoweroff = async () => {
+    if (!selectedMachine) return
+    try {
+      await poweroffMachine(selectedMachine)
+      toast.success('Powering off...')
+      loadData()
+    } catch (e) {
+      toastFailure(toast, 'Failed to power off machine', e)
+    }
+  }
+
+  const handleTerminate = async () => {
+    if (!selectedMachine) return
+    try {
+      await terminateMachine(selectedMachine)
+      toast.success('Terminated')
+      loadData()
+      setSelectedMachine(null)
+    } catch (e) {
+      toastFailure(toast, 'Failed to terminate machine', e)
+    }
+  }
+
+  const handleRemoveImage = async (imageName: string) => {
+    try {
+      await removeMachineImage(imageName)
+      toast.success(`Removed '${imageName}'`)
+      loadData()
+    } catch (e) {
+      toastFailure(toast, 'Failed to remove image', e)
     }
   }
 
@@ -164,11 +208,11 @@ export default function Machines() {
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-lg">{selectedMachine}</h3>
                   <div className="flex gap-2">
-                    <button onClick={async () => { await rebootMachine(selectedMachine); toast.success('Rebooting...'); loadData() }}
+                    <button onClick={handleReboot}
                       className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm flex items-center gap-1"><RotateCw className="w-3 h-3" />Reboot</button>
-                    <button onClick={async () => { await poweroffMachine(selectedMachine); toast.success('Powering off...'); loadData() }}
+                    <button onClick={handlePoweroff}
                       className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm flex items-center gap-1"><Power className="w-3 h-3" />Poweroff</button>
-                    <button onClick={async () => { await terminateMachine(selectedMachine); toast.success('Terminated'); loadData(); setSelectedMachine(null) }}
+                    <button onClick={handleTerminate}
                       className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm flex items-center gap-1"><XCircle className="w-3 h-3" />Kill</button>
                   </div>
                 </div>
@@ -251,7 +295,7 @@ export default function Machines() {
                     <td className="p-4 font-mono text-sm">{img.size}</td>
                     <td className="p-4">{img.read_only ? 'Yes' : 'No'}</td>
                     <td className="p-4">
-                      <button onClick={async () => { await removeMachineImage(img.name); toast.success(`Removed '${img.name}'`); loadData() }}
+                      <button onClick={() => handleRemoveImage(img.name)}
                         className="p-2 bg-red-600 hover:bg-red-700 rounded"><Trash2 className="w-3 h-3" /></button>
                     </td>
                   </tr>
