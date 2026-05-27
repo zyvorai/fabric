@@ -120,6 +120,11 @@ export default function NetworkSecurity() {
     }
   }, [toast])
 
+  const failAction = useCallback((label: string, e: unknown) => {
+    setError(extractErrorMessage(e))
+    toastFailure(toast, label, e)
+  }, [toast])
+
   useEffect(() => { fetchAll() }, [fetchAll])
 
   // ─── Delete handlers ─────────────────────────────────────────────────────
@@ -127,105 +132,105 @@ export default function NetworkSecurity() {
   const handleDeletePolicy = async (id: string) => {
     if (!await confirm('Delete Policy', 'Delete this network policy?')) return
     try { await api.deleteNetworkPolicy(id); setPolicies(prev => prev.filter(p => p.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete network policy', e) }
   }
 
   const handleDeleteFwProfile = async (id: string) => {
     if (!await confirm('Delete Profile', 'Delete this firewall profile?')) return
     try { await api.deleteFirewallProfile(id); setFwProfiles(prev => prev.filter(p => p.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete firewall profile', e) }
   }
 
   const handleDeleteFwZone = async (id: string) => {
     if (!await confirm('Delete Zone', 'Delete this firewall zone?')) return
     try { await api.deleteFirewallZone(id); setFwZones(prev => prev.filter(z => z.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete firewall zone', e) }
   }
 
   const handleDeleteFwAssignment = async (id: string) => {
     if (!await confirm('Delete Assignment', 'Remove this VM firewall assignment?')) return
     try { await api.deleteVMFirewallAssignment(id); setFwAssignments(prev => prev.filter(a => a.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to remove firewall assignment', e) }
   }
 
   const handleDeleteService = async (id: string) => {
     if (!await confirm('Delete Service', 'Delete this service?')) return
     try { await api.deleteService(id); setServices(prev => prev.filter(s => s.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete service', e) }
   }
 
   const handleDeleteQos = async (id: string) => {
     if (!await confirm('Delete QoS Policy', 'Delete this QoS policy?')) return
     try { await api.deleteQosPolicy(id); setQosPolicies(prev => prev.filter(p => p.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete QoS policy', e) }
   }
 
   const handleDeleteDnsZone = async (id: string) => {
     if (!await confirm('Delete DNS Zone', 'Delete this DNS zone?')) return
     try { await api.deleteDnsZone(id); setDnsZones(prev => prev.filter(z => z.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete DNS zone', e) }
   }
 
   const handleDeleteDnsPolicy = async (id: string) => {
     if (!await confirm('Delete DNS Policy', 'Delete this DNS policy?')) return
     try { await api.deleteDnsPolicy(id); setDnsPolicies(prev => prev.filter(p => p.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete DNS policy', e) }
   }
 
   const handleDeleteVpnTunnel = async (id: string) => {
     if (!await confirm('Delete Tunnel', 'Delete this VPN tunnel?')) return
     try { await api.deleteVpnTunnel(id); setVpnTunnels(prev => prev.filter(t => t.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete VPN tunnel', e) }
   }
 
   const handleDeleteVpnNetwork = async (id: string) => {
     if (!await confirm('Delete Network', 'Delete this VPN network?')) return
     try { await api.deleteVpnNetwork(id); setVpnNetworks(prev => prev.filter(n => n.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete VPN network', e) }
   }
 
   const handleDeleteMirror = async (id: string) => {
     if (!await confirm('Delete Session', 'Delete this mirror session?')) return
     try { await api.deleteMirrorSession(id); setMirrorSessions(prev => prev.filter(s => s.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete mirror session', e) }
   }
 
   const handleDeleteNatRule = async (id: string) => {
     if (!await confirm('Delete NAT Rule', 'Delete this NAT rule?')) return
     try { await api.deleteNatRule(id); setNatRules(prev => prev.filter(r => r.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete NAT rule', e) }
   }
 
   const handleDeleteNatPool = async (id: string) => {
     if (!await confirm('Delete NAT Pool', 'Delete this NAT pool?')) return
     try { await api.deleteNatPool(id); setNatPools(prev => prev.filter(p => p.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete NAT pool', e) }
   }
 
   const handleDeleteNatGateway = async (id: string) => {
     if (!await confirm('Delete NAT Gateway', 'Delete this NAT gateway?')) return
     try { await api.deleteNatGateway(id); setNatGateways(prev => prev.filter(g => g.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete NAT gateway', e) }
   }
 
   const handleDeleteMonitorPolicy = async (id: string) => {
     if (!await confirm('Delete Monitor Policy', 'Delete this monitor policy?')) return
     try { await api.deleteMonitorPolicy(id); setMonitorPolicies(prev => prev.filter(p => p.id !== id)) }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Failed to delete monitor policy', e) }
   }
 
   const handleAcknowledgeAlert = async (id: string) => {
     try {
       await api.acknowledgeBandwidthAlert(id)
       setAlerts(prev => prev.map(a => a.id === id ? { ...a, acknowledged: true } : a))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to acknowledge alert', e) }
   }
 
   // ─── Sync handlers ───────────────────────────────────────────────────────
 
   const handleSync = async (syncFn: () => Promise<unknown>) => {
     try { await syncFn(); await fetchAll() }
-    catch (e: unknown) { setError(extractErrorMessage(e)) }
+    catch (e: unknown) { failAction('Sync failed', e) }
   }
 
   const closeModal = () => setActiveModal(null)

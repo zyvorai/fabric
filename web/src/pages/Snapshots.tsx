@@ -53,8 +53,7 @@ export default function Snapshots() {
       await deleteSnapshot(vmName, id)
       await loadSnapshots()
     } catch (error) {
-      console.error('Failed to delete snapshot:', error)
-      toast.error(`Failed to delete snapshot: ${error}`)
+      toastFailure(toast, 'Failed to delete snapshot', error)
     }
   }
 
@@ -64,8 +63,7 @@ export default function Snapshots() {
       await revertSnapshot(vmName, id)
       toast.success('Successfully reverted to snapshot')
     } catch (error) {
-      console.error('Failed to revert snapshot:', error)
-      toast.error(`Failed to revert: ${error}`)
+      toastFailure(toast, 'Failed to revert snapshot', error)
     }
   }
 
@@ -229,8 +227,7 @@ function CreateSnapshotDialog({
       onCreated()
       onClose()
     } catch (error) {
-      console.error('Failed to create snapshot:', error)
-      toast.error(`Failed to create snapshot: ${error}`)
+      toastFailure(toast, 'Failed to create snapshot', error)
     }
   }
 

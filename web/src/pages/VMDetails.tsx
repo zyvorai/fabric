@@ -55,8 +55,12 @@ export default function VMDetails() {
       const data = await getVM(name)
       setVM(data)
     } catch (error) {
-      setLoadError(formatUserError(error))
-      console.error('Failed to load VM:', error)
+      const msg = formatUserError(error)
+      setLoadError(msg)
+      setVM((prev) => {
+        if (prev == null) toastFailure(toast, `Failed to load VM '${name}'`, error)
+        return prev
+      })
     } finally {
       setLoading(false)
     }

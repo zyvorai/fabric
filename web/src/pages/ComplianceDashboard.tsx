@@ -105,7 +105,9 @@ export default function ComplianceDashboard() {
     try {
       await apiFetch('/api/system/compliance/scan', { method: 'POST' })
       await fetchCompliance()
-    } catch (err) { console.error('Compliance scan failed:', err) } finally { setScanning(false) }
+    } catch (err) {
+      toastFailure(toast, 'Compliance scan failed', err)
+    } finally { setScanning(false) }
   }
 
   if (loading && !data && !loadError) {

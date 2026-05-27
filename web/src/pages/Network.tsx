@@ -84,6 +84,11 @@ export default function Network() {
     }
   }, [toast])
 
+  const failAction = useCallback((label: string, e: unknown) => {
+    setError(extractErrorMessage(e))
+    toastFailure(toast, label, e)
+  }, [toast])
+
   useEffect(() => { fetchAll() }, [fetchAll])
 
   const handleReload = async () => {
@@ -91,7 +96,7 @@ export default function Network() {
       await api.reloadNetworkd()
       await fetchAll()
     } catch (e: unknown) {
-      setError(extractErrorMessage(e))
+      failAction('Failed to reload networkd', e)
     }
   }
 
@@ -100,7 +105,7 @@ export default function Network() {
     try {
       await api.deleteBridge(id)
       setBridges(prev => prev.filter(b => b.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete bridge', e) }
   }
 
   const handleDeleteVlan = async (id: string) => {
@@ -108,7 +113,7 @@ export default function Network() {
     try {
       await api.deleteVlan(id)
       setVlans(prev => prev.filter(v => v.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete VLAN', e) }
   }
 
   const handleDeleteMacvtap = async (id: string) => {
@@ -116,7 +121,7 @@ export default function Network() {
     try {
       await api.deleteMacvtap(id)
       setMacvtaps(prev => prev.filter(m => m.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete macvtap', e) }
   }
 
   const handleDeleteTap = async (id: string) => {
@@ -124,7 +129,7 @@ export default function Network() {
     try {
       await api.deleteTap(id)
       setTaps(prev => prev.filter(t => t.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete tap', e) }
   }
 
   const handleDeleteBond = async (id: string) => {
@@ -132,7 +137,7 @@ export default function Network() {
     try {
       await api.deleteBond(id)
       setBonds(prev => prev.filter(b => b.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete bond', e) }
   }
 
   const handleDeleteNetfile = async (id: string) => {
@@ -140,7 +145,7 @@ export default function Network() {
     try {
       await api.deleteNetworkFile(id)
       setNetfiles(prev => prev.filter(n => n.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete network file', e) }
   }
 
   const handleDeleteLinkfile = async (id: string) => {
@@ -148,7 +153,7 @@ export default function Network() {
     try {
       await api.deleteLinkFile(id)
       setLinkfiles(prev => prev.filter(l => l.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete link file', e) }
   }
 
   const handleDeletePortForward = async (id: string) => {
@@ -156,14 +161,14 @@ export default function Network() {
     try {
       await api.deletePortForward(id)
       setPortForwards(prev => prev.filter(p => p.id !== id))
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to delete port forward', e) }
   }
 
   const handleSyncPortForwards = async () => {
     try {
       await api.syncPortForwards()
       await fetchAll()
-    } catch (e: unknown) { setError(extractErrorMessage(e)) }
+    } catch (e: unknown) { failAction('Failed to sync port forwards', e) }
   }
 
   const closeModal = () => setActiveModal(null)

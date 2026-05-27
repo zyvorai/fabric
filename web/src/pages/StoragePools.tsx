@@ -53,16 +53,16 @@ export default function StoragePools() {
           try {
             const health = await getNfsHealth(pool.name)
             setNfsHealth((prev) => new Map(prev).set(pool.name, health))
-          } catch (error) {
-            console.error(`Failed to get NFS health for ${pool.name}:`, error)
+          } catch {
+            // Health is optional; skip toast per pool to avoid noise
           }
         }
         if (typeof pool.pool_type === 'object' && 'Ceph' in pool.pool_type) {
           try {
             const health = await getCephHealth(pool.name)
             setCephHealth((prev) => new Map(prev).set(pool.name, health))
-          } catch (error) {
-            console.error(`Failed to get Ceph health for ${pool.name}:`, error)
+          } catch {
+            // Health is optional; skip toast per pool to avoid noise
           }
         }
       }
@@ -80,8 +80,7 @@ export default function StoragePools() {
       await startStoragePool(name)
       await loadPools()
     } catch (error) {
-      console.error('Failed to start pool:', error)
-      toast.error(`Failed to start pool: ${error}`)
+      toastFailure(toast, 'Failed to start pool', error)
     }
   }
 
@@ -90,8 +89,7 @@ export default function StoragePools() {
       await stopStoragePool(name)
       await loadPools()
     } catch (error) {
-      console.error('Failed to stop pool:', error)
-      toast.error(`Failed to stop pool: ${error}`)
+      toastFailure(toast, 'Failed to stop pool', error)
     }
   }
 
@@ -103,8 +101,7 @@ export default function StoragePools() {
       await deleteStoragePool(name)
       await loadPools()
     } catch (error) {
-      console.error('Failed to delete pool:', error)
-      toast.error(`Failed to delete pool: ${error}`)
+      toastFailure(toast, 'Failed to delete pool', error)
     }
   }
 
@@ -113,7 +110,7 @@ export default function StoragePools() {
       await refreshPoolStats(name)
       await loadPools()
     } catch (error) {
-      console.error('Failed to refresh pool stats:', error)
+      toastFailure(toast, 'Failed to refresh pool stats', error)
     }
   }
 
@@ -450,8 +447,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
       onCreated()
       onClose()
     } catch (error) {
-      console.error('Failed to create pool:', error)
-      toast.error(`Failed to create pool: ${error}`)
+      toastFailure(toast, 'Failed to create pool', error)
     }
   }
 

@@ -13,6 +13,7 @@ import { StatusBadge } from '../components/ui'
 import { Link } from 'react-router'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { PageHeader } from '../components/ui/PageHeader'
 import { usePlatformInfo } from '../contexts/PlatformInfoContext'
@@ -76,8 +77,8 @@ export default function Dashboard() {
       const avgCpu = metrics.length > 0 ? metrics.reduce((s, m) => s + m.cpu_usage, 0) / metrics.length : 0
       const avgMem = metrics.length > 0 ? metrics.reduce((s, m) => s + m.memory_usage, 0) / metrics.length : 0
       setMetricsHistory((prev) => [...prev.slice(-29), { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), cpu: parseFloat(avgCpu.toFixed(1)), memory: parseFloat(avgMem.toFixed(1)) }])
-    } catch (err) { console.error('Failed to load metrics:', err) }
-  }, [])
+    } catch (err) { toastFailure(toast, 'Failed to load metrics', err) }
+  }, [toast])
 
   useEffect(() => { loadVMs(); loadMetrics(); const i = setInterval(loadMetrics, 10000); return () => clearInterval(i) }, [loadVMs, loadMetrics])
   useEffect(() => { const unsub = subscribe((msg) => { if (['vm_state_changed', 'vm_created', 'vm_deleted'].includes(msg.type)) loadVMs() }); return unsub }, [subscribe, loadVMs])

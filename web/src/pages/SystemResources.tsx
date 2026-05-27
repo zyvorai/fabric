@@ -636,8 +636,7 @@ function AllocateHugepagesDialog({
       await allocateHugepages({ size, count })
       onAllocated()
     } catch (error) {
-      console.error('Failed to allocate hugepages:', error)
-      toast.error(`Failed to allocate hugepages: ${error}`)
+      toastFailure(toast, 'Failed to allocate hugepages', error)
     }
   }
 

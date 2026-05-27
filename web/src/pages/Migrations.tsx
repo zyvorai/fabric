@@ -269,7 +269,9 @@ function StartMigrationDialog({
   const [isStarting, setIsStarting] = useState(false)
 
   useEffect(() => {
-    listVMs().then(setVMs).catch(console.error)
+    listVMs()
+      .then(setVMs)
+      .catch((e) => toastFailure(toast, 'Failed to load VMs', e))
   }, [])
 
   const handleStart = async () => {

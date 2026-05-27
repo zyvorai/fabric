@@ -73,7 +73,7 @@ export default function Machines() {
       ])
       setMachineProps(props)
       setSshInfo(ssh)
-    } catch (err) { console.error('Failed to load machine details:', err) }
+    } catch (err) { toastFailure(toast, 'Failed to load machine details', err) }
   }
 
   const runShell = async () => {
