@@ -44,7 +44,11 @@ export default function FavoriteVMs() {
       if (!res.ok) throw new Error('Could not retrieve VM list.')
       const data = await res.json()
       setVMs(Array.isArray(data) ? data : data.vms || [])
-    } catch (e: any) { setError(e.message || 'Unknown error') } finally { setLoading(false) }
+    } catch (e: unknown) {
+      const msg = formatUserError(e)
+      setError(msg)
+      toastFailure(toast, 'Failed to load VMs', e)
+    } finally { setLoading(false) }
   }
 
   useEffect(() => { loadVMs() }, [])
