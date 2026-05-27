@@ -6,7 +6,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { X } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import { PageHeader } from '../components/ui'
-import { formatUserError } from '../utils/apiError'
+import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { toastFailure } from '../utils/toastError'
+import { useToastContext } from '../contexts/ToastContext'
 
 interface Notification {
   id: string
@@ -44,6 +46,7 @@ function formatTimeAgo(date: Date): string {
 let nextId = 1
 
 export default function NotificationCenter() {
+  const toast = useToastContext()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [pollError, setPollError] = useState<string | null>(null)
   const knownAlertsRef = useRef<Set<string>>(new Set())
@@ -63,7 +66,7 @@ export default function NotificationCenter() {
         const resp = await apiFetch('/api/system/alerts')
         if (!resp.ok) {
           const body = await resp.text()
-          throw new Error(body || `HTTP ${resp.status}`)
+          throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
         }
         const data = await resp.json()
         setPollError(null)
@@ -77,14 +80,18 @@ export default function NotificationCenter() {
           }
         }
       } catch (err) {
-        setPollError(formatUserError(err))
+        const msg = formatUserError(err)
+        setPollError((prev) => {
+          if (!prev) toastFailure(toast, 'Failed to load alerts', err)
+          return msg
+        })
       }
       initialLoadRef.current = false
     }
     poll()
     const interval = setInterval(poll, 10000)
     return () => clearInterval(interval)
-  }, [addNotification])
+  }, [addNotification, toast])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

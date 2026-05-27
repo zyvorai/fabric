@@ -5,7 +5,9 @@
 import { useState } from 'react'
 import { Plus, ArrowRight, ArrowLeft, Check, Loader2, Copy } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { hintsForError } from '../utils/daemonHints'
 
 type Step = 'name' | 'resources' | 'install' | 'network' | 'review'
 
@@ -118,7 +120,12 @@ export default function VMCreateWizard() {
             <div className="flex items-center justify-between mb-2"><span className="text-xs text-slate-500">CLI Command</span><button onClick={handleCopyCommand} title="Copy command" className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">{copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />} {copied ? 'Copied' : 'Copy'}</button></div>
             <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{generateCommand()}</pre>
           </div>
-          {result && <div className={`p-3 rounded-lg text-sm ${result.ok ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-red-500/10 border border-red-500/30 text-red-400'}`}>{result.message}</div>}
+          {result?.ok && (
+            <div className="p-3 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400">{result.message}</div>
+          )}
+          {result && !result.ok && (
+            <ErrorBanner title="Could not create VM" headline={result.message} hints={hintsForError(result.message, 'vm')} />
+          )}
         </>)}
       </div>
 

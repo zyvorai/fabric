@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { X } from 'lucide-react'
+import { formatUserError } from '../../utils/apiError'
 
 export function ModalWrapper({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -44,7 +45,7 @@ export function CheckboxField({ label, checked, onChange }: { label: string; che
   )
 }
 
+/** User-facing message for network modal submit failures (shared with Network page). */
 export function extractErrorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message
-  return String(e)
+  return formatUserError(e)
 }

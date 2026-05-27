@@ -5,7 +5,9 @@
 import { useState } from 'react'
 import { ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import ErrorBanner from '../components/ErrorBanner'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { hintsForError } from '../utils/daemonHints'
 import Breadcrumb from '../components/Breadcrumb'
 
 type WizardStep = 'source' | 'configure' | 'review'
@@ -110,7 +112,12 @@ export default function MigrationWizard() {
               <div className="flex justify-between"><span className="text-slate-400">Output</span><span className="text-slate-200 font-mono">{outputDir}</span></div>
               <div className="flex justify-between"><span className="text-slate-400">Auto-start</span><span className="text-slate-200">{autoStart ? 'Yes' : 'No'}</span></div>
             </div>
-            {result && <div className={`p-3 rounded-lg text-sm ${result.ok ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-red-500/10 border border-red-500/30 text-red-400'}`}>{result.message}</div>}
+            {result?.ok && (
+              <div className="p-3 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400">{result.message}</div>
+            )}
+            {result && !result.ok && (
+              <ErrorBanner title="Migration failed" headline={result.message} hints={hintsForError(result.message)} />
+            )}
           </div>
         )}
       </div>
