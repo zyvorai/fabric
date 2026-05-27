@@ -83,7 +83,22 @@ export default function SystemHealth() {
   }, [])
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
-  if (err && !data) return <div className="bg-red-500/10 rounded-xl border border-red-500/30 p-6 text-center text-sm text-red-400">{err}</div>
+  if (err && !data) {
+    return (
+      <ErrorBanner
+        title="Could not load system health"
+        headline={formatUserError(err)}
+        hints={hintsForError(err)}
+        onRetry={() => {
+          setLoading(true)
+          apiFetch('/api/system/info')
+            .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+            .then((j) => { setData(j); setErr(''); setLoading(false) })
+            .catch((e) => { setErr(formatUserError(e)); setLoading(false) })
+        }}
+      />
+    )
+  }
 
   const health = data?.health
   const cpu = data?.cpu

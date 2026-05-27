@@ -30,6 +30,7 @@ function stateColor(state: string): string {
 }
 
 export default function FavoriteVMs() {
+  const toast = useToastContext()
   const [vms, setVMs] = useState<any[]>([])
   const [favorites, setFavorites] = useState<FavoriteVM[]>(loadFavorites)
   const [loading, setLoading] = useState(true)
