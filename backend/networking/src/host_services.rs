@@ -78,6 +78,7 @@ fn parse_ss_line(line: &str) -> Option<HostListener> {
 
     let key = format!("{proto}:{bind_address}:{port}");
     let description = process
+        .as_ref()
         .map(|p| format!("Host listener {proto}/{port} ({p})"))
         .unwrap_or_else(|| format!("Host listener {proto}/{port}"));
 

@@ -113,8 +113,12 @@ fn extract_iptables_to(line: &str) -> (Option<String>, Option<u16>) {
     } else {
         return (None, None);
     };
-    let rest = line.split(marker).nth(1)?.trim();
-    let value = rest.split_whitespace().next()?;
+    let Some(rest) = line.split(marker).nth(1) else {
+        return (None, None);
+    };
+    let Some(value) = rest.trim().split_whitespace().next() else {
+        return (None, None);
+    };
     if let Some((ip, port)) = value.split_once(':') {
         return (Some(ip.to_string()), port.parse().ok());
     }
