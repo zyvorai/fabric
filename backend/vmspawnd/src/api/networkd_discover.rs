@@ -247,6 +247,42 @@ pub fn merge_link_files(
     items
 }
 
+pub fn find_host_bridge(state: &AppState, id: &str) -> Option<BridgeConfig> {
+    merge_bridges(state, vec![]).into_iter().find(|b| b.id == id)
+}
+
+pub fn find_host_bond(state: &AppState, id: &str) -> Option<BondConfig> {
+    merge_bonds(state, vec![]).into_iter().find(|b| b.id == id)
+}
+
+pub fn find_host_vlan(state: &AppState, id: &str) -> Option<VlanConfig> {
+    merge_vlans(state, vec![]).into_iter().find(|v| v.id == id)
+}
+
+pub fn find_host_macvtap(state: &AppState, id: &str) -> Option<MacvtapConfig> {
+    merge_macvtaps(state, vec![]).into_iter().find(|m| m.id == id)
+}
+
+pub fn find_host_tap(state: &AppState, id: &str) -> Option<TapConfig> {
+    merge_taps(state, vec![]).into_iter().find(|t| t.id == id)
+}
+
+pub fn find_host_netfile(state: &AppState, id: &str) -> Option<NetworkFileConfig> {
+    merge_netfiles(state, vec![]).into_iter().find(|n| n.id == id)
+}
+
+pub fn find_host_link_file(state: &AppState, id: &str) -> Option<LinkFileConfig> {
+    merge_link_files(state, vec![]).into_iter().find(|l| l.id == id)
+}
+
+pub fn find_host_port_forward(id: &str) -> Option<PortForwardConfig> {
+    let nft = NftManager::new();
+    nft.discover_dnat_rules()
+        .ok()?
+        .into_iter()
+        .find(|p| p.id == id)
+}
+
 pub fn merge_port_forwards(mut items: Vec<PortForwardConfig>) -> Vec<PortForwardConfig> {
     let known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
     let known_rules: HashSet<(u16, String, u16)> = items

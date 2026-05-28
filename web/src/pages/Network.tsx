@@ -2,14 +2,15 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect, useCallback } from 'react'
-import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu } from 'lucide-react'
 import * as api from '../api/networkd'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type {
   BridgeConfig, VlanConfig, MacvtapConfig, TapConfig, LinkInfo,
   BondConfig, NetworkFileConfig, LinkFileConfig, PortForwardConfig,
+  VxlanConfig, SriovConfig,
 } from '../api/networkd'
 import {
   BridgesTab, CreateBridgeModal,
@@ -20,8 +21,11 @@ import {
   NetfilesTab, CreateNetfileModal,
   LinkfilesTab, CreateLinkfileModal,
   PortForwardsTab, CreatePortForwardModal,
+  VxlansTab, CreateVxlanModal,
+  SriovTab, CreateSriovModal,
   StatusTab,
 } from './network/index'
+import { countNetfileTypes } from './network/NetfilesTab'
 import { extractErrorMessage } from './network/ModalShared'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
@@ -30,8 +34,8 @@ import { useToastContext } from '../contexts/ToastContext'
 import { hintsForError } from '../utils/daemonHints'
 import SubsystemBanner from '../components/SubsystemBanner'
 
-type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'status'
-type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | null
+type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'status'
+type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | null
 
 export default function Network() {
   const toast = useToastContext()
@@ -44,6 +48,8 @@ export default function Network() {
   const [netfiles, setNetfiles] = useState<NetworkFileConfig[]>([])
   const [linkfiles, setLinkfiles] = useState<LinkFileConfig[]>([])
   const [portForwards, setPortForwards] = useState<PortForwardConfig[]>([])
+  const [vxlans, setVxlans] = useState<VxlanConfig[]>([])
+  const [sriov, setSriov] = useState<SriovConfig[]>([])
   const [links, setLinks] = useState<LinkInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +62,7 @@ export default function Network() {
     setLoading(true)
     setError(null)
     try {
-      const [b, bo, v, m, t, nf, lf, pf, l] = await Promise.all([
+      const [b, bo, v, m, t, nf, lf, pf, vx, sr, l] = await Promise.all([
         api.listBridges(),
         api.listBonds(),
         api.listVlans(),
@@ -65,6 +71,8 @@ export default function Network() {
         api.listNetworkFiles(),
         api.listLinkFiles(),
         api.listPortForwards(),
+        api.listVxlans(),
+        api.listSriov(),
         api.listLinks().catch(() => []),
       ])
       setBridges(b)
@@ -75,6 +83,8 @@ export default function Network() {
       setNetfiles(nf)
       setLinkfiles(lf)
       setPortForwards(pf)
+      setVxlans(vx)
+      setSriov(sr)
       setLinks(l)
     } catch (e: unknown) {
       const msg = formatUserError(e)
@@ -172,6 +182,24 @@ export default function Network() {
     } catch (e: unknown) { failAction('Failed to sync port forwards', e) }
   }
 
+  const handleDeleteVxlan = async (id: string) => {
+    if (!await confirm('Delete VXLAN', 'Delete this VXLAN configuration?')) return
+    try {
+      await api.deleteVxlan(id)
+      setVxlans(prev => prev.filter(v => v.id !== id))
+    } catch (e: unknown) { failAction('Failed to delete VXLAN', e) }
+  }
+
+  const handleDeleteSriov = async (id: string) => {
+    if (!await confirm('Delete SR-IOV', 'Delete this SR-IOV configuration?')) return
+    try {
+      await api.deleteSriov(id)
+      setSriov(prev => prev.filter(s => s.id !== id))
+    } catch (e: unknown) { failAction('Failed to delete SR-IOV', e) }
+  }
+
+  const netfileCounts = useMemo(() => countNetfileTypes(netfiles), [netfiles])
+
   const closeModal = () => setActiveModal(null)
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -183,6 +211,8 @@ export default function Network() {
     { key: 'netfiles', label: 'Interfaces', icon: <Settings className="w-4 h-4" /> },
     { key: 'linkfiles', label: 'Link Files', icon: <FileText className="w-4 h-4" /> },
     { key: 'portforwards', label: 'Port Forwards', icon: <ArrowRightLeft className="w-4 h-4" /> },
+    { key: 'vxlan', label: 'VXLAN', icon: <Radio className="w-4 h-4" /> },
+    { key: 'sriov', label: 'SR-IOV', icon: <Cpu className="w-4 h-4" /> },
     { key: 'status', label: 'Status', icon: <RefreshCw className="w-4 h-4" /> },
   ]
 
@@ -210,7 +240,7 @@ export default function Network() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-4">
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
           <div className="text-slate-400 text-xs mb-1">Bridges</div>
           <div className="text-2xl font-bold text-blue-400">{bridges.length}</div>
@@ -233,7 +263,10 @@ export default function Network() {
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
           <div className="text-slate-400 text-xs mb-1">Interfaces</div>
-          <div className="text-2xl font-bold text-yellow-400">{netfiles.length}</div>
+          <div className="text-2xl font-bold text-yellow-400">{netfileCounts.total}</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">
+            {netfileCounts.physical} phys · {netfileCounts.container} ctr
+          </div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
           <div className="text-slate-400 text-xs mb-1">Link Files</div>
@@ -242,6 +275,14 @@ export default function Network() {
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
           <div className="text-slate-400 text-xs mb-1">Port Forwards</div>
           <div className="text-2xl font-bold text-red-400">{portForwards.length}</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">VXLAN</div>
+          <div className="text-2xl font-bold text-indigo-400">{vxlans.length}</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+          <div className="text-slate-400 text-xs mb-1">SR-IOV</div>
+          <div className="text-2xl font-bold text-violet-400">{sriov.length}</div>
         </div>
       </div>
 
@@ -293,6 +334,12 @@ export default function Network() {
           {activeTab === 'portforwards' && (
             <PortForwardsTab portForwards={portForwards} onDelete={handleDeletePortForward} onCreate={() => setActiveModal('portforward')} onSync={handleSyncPortForwards} />
           )}
+          {activeTab === 'vxlan' && (
+            <VxlansTab vxlans={vxlans} onDelete={handleDeleteVxlan} onCreate={() => setActiveModal('vxlan')} />
+          )}
+          {activeTab === 'sriov' && (
+            <SriovTab sriov={sriov} onDelete={handleDeleteSriov} onCreate={() => setActiveModal('sriov')} />
+          )}
           {activeTab === 'status' && <StatusTab links={links} onRefresh={fetchAll} />}
         </>
       )}
@@ -306,6 +353,8 @@ export default function Network() {
       {activeModal === 'netfile' && <CreateNetfileModal onClose={closeModal} onCreated={(n) => { setNetfiles(prev => [...prev, n]); closeModal() }} />}
       {activeModal === 'linkfile' && <CreateLinkfileModal onClose={closeModal} onCreated={(l) => { setLinkfiles(prev => [...prev, l]); closeModal() }} />}
       {activeModal === 'portforward' && <CreatePortForwardModal onClose={closeModal} onCreated={(pf) => { setPortForwards(prev => [...prev, pf]); closeModal() }} />}
+      {activeModal === 'vxlan' && <CreateVxlanModal onClose={closeModal} onCreated={(v) => { setVxlans(prev => [...prev, v]); closeModal() }} />}
+      {activeModal === 'sriov' && <CreateSriovModal onClose={closeModal} onCreated={(s) => { setSriov(prev => [...prev, s]); closeModal() }} />}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}

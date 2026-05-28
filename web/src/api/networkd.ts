@@ -387,6 +387,89 @@ export async function deleteLinkFile(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/link-files/${id}`)
 }
 
+// ─── VXLAN ────────────────────────────────────────────────────────────────────
+
+export interface VxlanConfig {
+  id: string
+  name: string
+  vni: number
+  remote?: string
+  local?: string
+  port?: number
+  parent_interface?: string
+  mtu?: number
+  addresses: string[]
+  gateway?: string
+  dns: string[]
+  dhcp: DhcpMode
+  created: string
+  updated: string
+}
+
+export interface CreateVxlanRequest {
+  name: string
+  vni: number
+  remote?: string
+  local?: string
+  port?: number
+  parent_interface?: string
+  mtu?: number
+  addresses?: string[]
+  gateway?: string
+  dns?: string[]
+  dhcp?: DhcpMode
+}
+
+export async function listVxlans(): Promise<VxlanConfig[]> {
+  return apiGet<VxlanConfig[]>(`${API_BASE}/networkd/vxlans`)
+}
+
+export async function createVxlan(req: CreateVxlanRequest): Promise<VxlanConfig> {
+  return apiPost<VxlanConfig>(`${API_BASE}/networkd/vxlans`, req)
+}
+
+export async function deleteVxlan(id: string): Promise<void> {
+  return apiDelete(`${API_BASE}/networkd/vxlans/${id}`)
+}
+
+// ─── SR-IOV ───────────────────────────────────────────────────────────────────
+
+export interface VfConfig {
+  vf_index: number
+  mac_address?: string
+  vlan?: number
+  qos?: number
+  spoofchk?: boolean
+  trust?: boolean
+}
+
+export interface SriovConfig {
+  id: string
+  pf_name: string
+  num_vfs: number
+  vf_configs: VfConfig[]
+  created: string
+  updated: string
+}
+
+export interface CreateSriovRequest {
+  pf_name: string
+  num_vfs: number
+  vf_configs?: VfConfig[]
+}
+
+export async function listSriov(): Promise<SriovConfig[]> {
+  return apiGet<SriovConfig[]>(`${API_BASE}/networkd/sriov`)
+}
+
+export async function createSriov(req: CreateSriovRequest): Promise<SriovConfig> {
+  return apiPost<SriovConfig>(`${API_BASE}/networkd/sriov`, req)
+}
+
+export async function deleteSriov(id: string): Promise<void> {
+  return apiDelete(`${API_BASE}/networkd/sriov/${id}`)
+}
+
 // ─── Port Forwards ───────────────────────────────────────────────────────────
 
 export type Protocol = 'tcp' | 'udp' | 'both'

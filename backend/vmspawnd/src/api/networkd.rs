@@ -115,7 +115,14 @@ pub async fn get_bridge(
     tracing::debug!("networkd::{}", stringify!(get_bridge));
     match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(b) = super::networkd_discover::find_host_bridge(&state, &id) {
+                    return Json(b).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bridge").into_response(),
     }
 }
@@ -263,7 +270,14 @@ pub async fn get_vlan(
     tracing::debug!("networkd::{}", stringify!(get_vlan));
     match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(v) = super::networkd_discover::find_host_vlan(&state, &id) {
+                    return Json(v).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VLAN").into_response(),
     }
 }
@@ -406,7 +420,14 @@ pub async fn get_macvtap(
     tracing::debug!("networkd::{}", stringify!(get_macvtap));
     match state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Macvtap not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(m) = super::networkd_discover::find_host_macvtap(&state, &id) {
+                    return Json(m).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Macvtap not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load macvtap").into_response(),
     }
 }
@@ -487,7 +508,14 @@ pub async fn get_tap(
     tracing::debug!("networkd::{}", stringify!(get_tap));
     match state.store.get_entity::<TapConfig>("networkd_taps", &id) {
         Ok(Some(t)) => Json(t).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "TAP device not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(t) = super::networkd_discover::find_host_tap(&state, &id) {
+                    return Json(t).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "TAP device not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load TAP device").into_response(),
     }
 }
@@ -640,7 +668,14 @@ pub async fn get_bond(
     tracing::debug!("networkd::{}", stringify!(get_bond));
     match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(b) = super::networkd_discover::find_host_bond(&state, &id) {
+                    return Json(b).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bond").into_response(),
     }
 }
@@ -792,7 +827,14 @@ pub async fn get_network_file(
     tracing::debug!("networkd::{}", stringify!(get_network_file));
     match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
         Ok(Some(n)) => Json(n).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Network file not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(n) = super::networkd_discover::find_host_netfile(&state, &id) {
+                    return Json(n).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Network file not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load network file").into_response(),
     }
 }
@@ -960,7 +1002,14 @@ pub async fn get_port_forward(
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
     {
         Ok(Some(pf)) => Json(pf).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Port forward not found").into_response(),
+        Ok(None) => {
+            if super::networkd_discover::is_host_managed_id(&id) {
+                if let Some(pf) = super::networkd_discover::find_host_port_forward(&id) {
+                    return Json(pf).into_response();
+                }
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Port forward not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load port forward").into_response(),
     }
 }
@@ -1089,7 +1138,7 @@ pub async fn delete_vxlan(
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_vxlans", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -1160,7 +1209,7 @@ pub async fn delete_sriov(
         if let Err(e) = mgr.remove_sriov(&cfg.pf_name) { tracing::warn!("Failed to remove device: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_sriov", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
