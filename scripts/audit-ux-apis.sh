@@ -64,6 +64,14 @@ ENDPOINTS=(
   /api/networkd/vxlans
   /api/networkd/sriov
   /api/services
+  /api/nat-rules
+  /api/nat-pools
+  /api/nat-gateways
+  /api/firewall-profiles
+  /api/firewall-zones
+  /api/firewall-assignments
+  /api/qos-policies
+  /api/network-policies
   /api/drs/recommendations/default
   /api/webhooks/deliveries
   /api/events

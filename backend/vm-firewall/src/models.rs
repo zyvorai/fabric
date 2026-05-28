@@ -106,6 +106,10 @@ pub struct FirewallProfile {
     pub updated: DateTime<Utc>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 /// A firewall zone (e.g. trusted, untrusted, dmz).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FirewallZone {
@@ -115,6 +119,8 @@ pub struct FirewallZone {
     pub description: String,
     #[serde(default)]
     pub default_profile_id: Option<Uuid>,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }

@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { FirewallProfile, CreateFirewallProfileRequest, FirewallRule, FirewallAction, FirewallZone, VMFirewallAssignment } from '../../api/network-security'
-import { ModalWrapper, InputField, extractErrorMessage } from '../network/ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { StatusBadge } from './ModalShared'
 
 interface FirewallTabProps {
@@ -15,12 +15,13 @@ interface FirewallTabProps {
   assignments: VMFirewallAssignment[]
   onDeleteProfile: (id: string) => void
   onDeleteZone: (id: string) => void
-  onDeleteAssignment: (id: string) => void
+  onDeleteAssignment: (vmName: string) => void
+  onAdoptZone?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onDeleteZone, onDeleteAssignment, onCreate, onSync }: FirewallTabProps) {
+function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onDeleteZone, onDeleteAssignment, onAdoptZone, onCreate, onSync }: FirewallTabProps) {
   const [view, setView] = useState<'profiles' | 'zones' | 'assignments'>('profiles')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -103,12 +104,17 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
               <tbody className="divide-y divide-slate-700/50">
                 {zones.map(z => (
                   <tr key={z.id} className="hover:bg-white/[0.03] transition">
-                    <td className="p-4 font-medium">{z.name}</td>
-                    <td className="p-4 font-mono text-sm text-slate-400">{z.profile_id}</td>
+                    <td className="p-4 font-medium">
+                      {z.name}{isHostManaged(z) && <HostBadge />}
+                      {z.description && <div className="text-xs text-slate-500 mt-1 max-w-md truncate">{z.description}</div>}
+                    </td>
+                    <td className="p-4 font-mono text-sm text-slate-400">{z.default_profile_id ?? '-'}</td>
                     <td className="p-4">
-                      <button onClick={() => onDeleteZone(z.id)} className="p-2 hover:bg-red-600 rounded transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <HostManagedActions
+                        item={{ id: z.id, managed: z.managed }}
+                        onDelete={() => onDeleteZone(z.id)}
+                        onAdopt={onAdoptZone ? () => onAdoptZone(z.id) : undefined}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -134,12 +140,12 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {assignments.map(a => (
-                  <tr key={a.id} className="hover:bg-white/[0.03] transition">
+                  <tr key={a.vm_name} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">{a.vm_name}</td>
                     <td className="p-4 font-mono text-sm text-slate-400">{a.profile_id}</td>
                     <td className="p-4 font-mono text-sm text-slate-400">{a.zone_id ?? '-'}</td>
                     <td className="p-4">
-                      <button onClick={() => onDeleteAssignment(a.id)} className="p-2 hover:bg-red-600 rounded transition">
+                      <button onClick={() => onDeleteAssignment(a.vm_name)} className="p-2 hover:bg-red-600 rounded transition">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>

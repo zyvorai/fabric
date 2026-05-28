@@ -57,6 +57,7 @@ pub mod vm_firewall;
 pub mod vpn_mesh;
 pub mod packet_mirror;
 pub mod nat_gateway;
+pub mod net_security_discover;
 pub mod net_monitor;
 
 // Phase 5 API modules for platform features

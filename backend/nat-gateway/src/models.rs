@@ -101,6 +101,8 @@ pub struct NatRule {
     pub outbound_interface: Option<String>,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -279,6 +281,7 @@ mod tests {
             pool_id: None,
             outbound_interface: None,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };
@@ -286,6 +289,7 @@ mod tests {
         let json = serde_json::to_string(&rule).unwrap();
         let deserialized: NatRule = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.name, "web-dnat");
+        assert!(deserialized.managed);
         assert_eq!(deserialized.rule_type, NatRuleType::Dnat);
         assert_eq!(deserialized.protocol, NatProtocol::Tcp);
     }

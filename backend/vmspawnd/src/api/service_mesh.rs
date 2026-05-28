@@ -18,6 +18,7 @@ use service_mesh::compiler::VMSnapshot;
 use service_mesh::models::{
     BackendHealth, CreateServiceRequest, Service, ServiceStatus,
 };
+use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -48,6 +49,7 @@ pub async fn create_service(
         algorithm: req.algorithm,
         health_check: req.health_check,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -76,7 +78,10 @@ pub async fn list_services(
 ) -> impl IntoResponse {
     tracing::debug!("service_mesh::{}", stringify!(list_services));
     match state.store.list_entities::<Service>(STORE_KEY) {
-        Ok(services) => (StatusCode::OK, Json(services)).into_response(),
+        Ok(services) => {
+            let merged = super::net_security_discover::merge_services(&state, services);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -93,11 +98,16 @@ pub async fn get_service(
     tracing::debug!("service_mesh::{}", stringify!(get_service));
     match state.store.get_entity::<Service>(STORE_KEY, &id) {
         Ok(Some(service)) => (StatusCode::OK, Json(service)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Service not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(host) = super::net_security_discover::find_host_service(&state, &id) {
+                return (StatusCode::OK, Json(host)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Service not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -141,6 +151,7 @@ pub async fn update_service(
         algorithm: req.algorithm,
         health_check: req.health_check,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -166,6 +177,17 @@ pub async fn delete_service(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("service_mesh::{}", stringify!(delete_service));
+    if let Some(host) = super::net_security_discover::find_host_service(&state, &id) {
+        if super::net_security_discover::is_host_managed_service(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This service is a host listener and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -179,6 +201,68 @@ pub async fn delete_service(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_service(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("service_mesh::{}", stringify!(adopt_service));
+    let host = match super::net_security_discover::find_host_service(&state, &req.host_id) {
+        Some(s) if super::net_security_discover::is_host_managed_service(&s) => s,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host listener not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<Service> = state.store.list_entities(STORE_KEY).unwrap_or_default();
+    if stored.iter().any(|s| s.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Service '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let service = Service {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        virtual_ip: host.virtual_ip,
+        selector: host.selector,
+        ports: host.ports,
+        algorithm: host.algorithm,
+        health_check: host.health_check,
+        enabled: host.enabled,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &service.id.to_string(), &service)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_services(&state).await {
+        tracing::warn!("Post-adopt service reconciliation failed: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(service)).into_response()
 }
 
 // ── Backend health ──────────────────────────────────────────────────

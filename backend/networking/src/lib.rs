@@ -3,6 +3,9 @@
 // https://zyvor.dev · info@zyvor.dev
 
 pub mod host_discovery;
+pub mod host_firewalld;
+pub mod host_nat;
+pub mod host_services;
 pub mod models;
 pub mod netlink;
 pub mod nftables;

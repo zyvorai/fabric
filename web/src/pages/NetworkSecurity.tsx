@@ -147,10 +147,31 @@ export default function NetworkSecurity() {
     catch (e: unknown) { failAction('Failed to delete firewall zone', e) }
   }
 
-  const handleDeleteFwAssignment = async (id: string) => {
+  const handleDeleteFwAssignment = async (vmName: string) => {
     if (!await confirm('Delete Assignment', 'Remove this VM firewall assignment?')) return
-    try { await api.deleteVMFirewallAssignment(id); setFwAssignments(prev => prev.filter(a => a.id !== id)) }
+    try { await api.deleteVMFirewallAssignment(vmName); setFwAssignments(prev => prev.filter(a => a.vm_name !== vmName)) }
     catch (e: unknown) { failAction('Failed to remove firewall assignment', e) }
+  }
+
+  const handleAdoptNatRule = async (id: string) => {
+    try {
+      const adopted = await api.adoptNatRule(id)
+      setNatRules(prev => [...prev.filter(r => r.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt NAT rule', e) }
+  }
+
+  const handleAdoptService = async (id: string) => {
+    try {
+      const adopted = await api.adoptService(id)
+      setServices(prev => [...prev.filter(s => s.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt host listener', e) }
+  }
+
+  const handleAdoptFwZone = async (id: string) => {
+    try {
+      const adopted = await api.adoptFirewallZone(id)
+      setFwZones(prev => [...prev.filter(z => z.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt firewalld zone', e) }
   }
 
   const handleDeleteService = async (id: string) => {
@@ -339,11 +360,12 @@ export default function NetworkSecurity() {
             <FirewallTab
               profiles={fwProfiles} zones={fwZones} assignments={fwAssignments}
               onDeleteProfile={handleDeleteFwProfile} onDeleteZone={handleDeleteFwZone} onDeleteAssignment={handleDeleteFwAssignment}
+              onAdoptZone={handleAdoptFwZone}
               onCreate={() => setActiveModal('firewall-profile')} onSync={() => handleSync(api.syncFirewall)}
             />
           )}
           {activeTab === 'services' && (
-            <ServicesTab services={services} onDelete={handleDeleteService} onCreate={() => setActiveModal('service')} onSync={() => handleSync(api.syncServices)} />
+            <ServicesTab services={services} onDelete={handleDeleteService} onAdopt={handleAdoptService} onCreate={() => setActiveModal('service')} onSync={() => handleSync(api.syncServices)} />
           )}
           {activeTab === 'qos' && (
             <QosTab policies={qosPolicies} onDelete={handleDeleteQos} onCreate={() => setActiveModal('qos')} onSync={() => handleSync(api.syncQos)} />
@@ -369,6 +391,7 @@ export default function NetworkSecurity() {
             <NatTab
               rules={natRules} pools={natPools} gateways={natGateways}
               onDeleteRule={handleDeleteNatRule} onDeletePool={handleDeleteNatPool} onDeleteGateway={handleDeleteNatGateway}
+              onAdoptRule={handleAdoptNatRule}
               onCreate={() => setActiveModal('nat-rule')} onSync={() => handleSync(api.syncNat)}
             />
           )}

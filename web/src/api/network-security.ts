@@ -106,8 +106,8 @@ export interface FirewallZone {
   id: string
   name: string
   description?: string
-  labels: Record<string, string>
-  profile_id: string
+  default_profile_id?: string
+  managed?: boolean
   created: string
   updated: string
 }
@@ -115,16 +115,13 @@ export interface FirewallZone {
 export interface CreateFirewallZoneRequest {
   name: string
   description?: string
-  labels?: Record<string, string>
-  profile_id: string
+  default_profile_id?: string
 }
 
 export interface VMFirewallAssignment {
-  id: string
   vm_name: string
   profile_id: string
   zone_id?: string
-  created: string
 }
 
 export interface CreateVMFirewallAssignmentRequest {
@@ -134,60 +131,67 @@ export interface CreateVMFirewallAssignmentRequest {
 }
 
 export async function listFirewallProfiles(): Promise<FirewallProfile[]> {
-  return apiGet<FirewallProfile[]>(`${API_BASE}/vm-firewall/profiles`)
+  return apiGet<FirewallProfile[]>(`${API_BASE}/firewall-profiles`)
 }
 
 export async function createFirewallProfile(req: CreateFirewallProfileRequest): Promise<FirewallProfile> {
-  return apiPost<FirewallProfile>(`${API_BASE}/vm-firewall/profiles`, req)
+  return apiPost<FirewallProfile>(`${API_BASE}/firewall-profiles`, req)
 }
 
 export async function getFirewallProfile(id: string): Promise<FirewallProfile> {
-  return apiGet<FirewallProfile>(`${API_BASE}/vm-firewall/profiles/${id}`)
+  return apiGet<FirewallProfile>(`${API_BASE}/firewall-profiles/${id}`)
 }
 
 export async function updateFirewallProfile(id: string, req: CreateFirewallProfileRequest): Promise<FirewallProfile> {
-  return apiPut<FirewallProfile>(`${API_BASE}/vm-firewall/profiles/${id}`, req)
+  return apiPut<FirewallProfile>(`${API_BASE}/firewall-profiles/${id}`, req)
 }
 
 export async function deleteFirewallProfile(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/vm-firewall/profiles/${id}`)
+  return apiDelete(`${API_BASE}/firewall-profiles/${id}`)
 }
 
 export async function listFirewallZones(): Promise<FirewallZone[]> {
-  return apiGet<FirewallZone[]>(`${API_BASE}/vm-firewall/zones`)
+  return apiGet<FirewallZone[]>(`${API_BASE}/firewall-zones`)
 }
 
 export async function createFirewallZone(req: CreateFirewallZoneRequest): Promise<FirewallZone> {
-  return apiPost<FirewallZone>(`${API_BASE}/vm-firewall/zones`, req)
+  return apiPost<FirewallZone>(`${API_BASE}/firewall-zones`, req)
 }
 
 export async function deleteFirewallZone(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/vm-firewall/zones/${id}`)
+  return apiDelete(`${API_BASE}/firewall-zones/${id}`)
+}
+
+export async function adoptFirewallZone(hostId: string): Promise<FirewallZone> {
+  return apiPost<FirewallZone>(`${API_BASE}/firewall-zones/adopt`, { host_id: hostId })
 }
 
 export async function listVMFirewallAssignments(): Promise<VMFirewallAssignment[]> {
-  return apiGet<VMFirewallAssignment[]>(`${API_BASE}/vm-firewall/assignments`)
+  return apiGet<VMFirewallAssignment[]>(`${API_BASE}/firewall-assignments`)
 }
 
 export async function createVMFirewallAssignment(req: CreateVMFirewallAssignmentRequest): Promise<VMFirewallAssignment> {
-  return apiPost<VMFirewallAssignment>(`${API_BASE}/vm-firewall/assignments`, req)
+  return apiPut<VMFirewallAssignment>(`${API_BASE}/vms/${req.vm_name}/firewall`, {
+    profile_id: req.profile_id,
+    zone_id: req.zone_id,
+  })
 }
 
-export async function deleteVMFirewallAssignment(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/vm-firewall/assignments/${id}`)
+export async function deleteVMFirewallAssignment(vmName: string): Promise<void> {
+  return apiDelete(`${API_BASE}/vms/${vmName}/firewall`)
 }
 
 export async function syncFirewall(): Promise<{ status: string; profiles: number }> {
-  return apiPost<{ status: string; profiles: number }>(`${API_BASE}/vm-firewall/sync`)
+  return apiPost<{ status: string; profiles: number }>(`${API_BASE}/firewall/sync`)
 }
 
 export async function firewallStatus(): Promise<{ active_profiles: number; assigned_vms: number }> {
-  return apiGet<{ active_profiles: number; assigned_vms: number }>(`${API_BASE}/vm-firewall/status`)
+  return apiGet<{ active_profiles: number; assigned_vms: number }>(`${API_BASE}/firewall/status`)
 }
 
 // ─── Service Mesh ────────────────────────────────────────────────────────────
 
-export type LoadBalancerAlgorithm = 'round-robin' | 'least-conn' | 'random' | 'ip-hash'
+export type LoadBalancerAlgorithm = 'round_robin' | 'random' | 'ip_hash'
 
 export interface ServiceBackend {
   address: string
@@ -195,18 +199,22 @@ export interface ServiceBackend {
   weight?: number
 }
 
+export interface ServicePort {
+  port: number
+  target_port?: number
+  protocol?: 'tcp' | 'udp'
+}
+
 export interface Service {
   id: string
   name: string
   description?: string
   virtual_ip: string
-  port: number
-  protocol: string
+  ports: ServicePort[]
   algorithm: LoadBalancerAlgorithm
-  backends: ServiceBackend[]
-  labels: Record<string, string>
-  health_check?: boolean
+  selector?: { match_labels?: Record<string, string> }
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -215,41 +223,42 @@ export interface CreateServiceRequest {
   name: string
   description?: string
   virtual_ip: string
-  port: number
-  protocol?: string
+  ports: ServicePort[]
   algorithm?: LoadBalancerAlgorithm
-  backends?: ServiceBackend[]
-  labels?: Record<string, string>
-  health_check?: boolean
+  selector?: { match_labels?: Record<string, string> }
   enabled?: boolean
 }
 
 export async function listServices(): Promise<Service[]> {
-  return apiGet<Service[]>(`${API_BASE}/service-mesh/services`)
+  return apiGet<Service[]>(`${API_BASE}/services`)
 }
 
 export async function createService(req: CreateServiceRequest): Promise<Service> {
-  return apiPost<Service>(`${API_BASE}/service-mesh/services`, req)
+  return apiPost<Service>(`${API_BASE}/services`, req)
 }
 
 export async function getService(id: string): Promise<Service> {
-  return apiGet<Service>(`${API_BASE}/service-mesh/services/${id}`)
+  return apiGet<Service>(`${API_BASE}/services/${id}`)
 }
 
 export async function updateService(id: string, req: CreateServiceRequest): Promise<Service> {
-  return apiPut<Service>(`${API_BASE}/service-mesh/services/${id}`, req)
+  return apiPut<Service>(`${API_BASE}/services/${id}`, req)
 }
 
 export async function deleteService(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/service-mesh/services/${id}`)
+  return apiDelete(`${API_BASE}/services/${id}`)
+}
+
+export async function adoptService(hostId: string): Promise<Service> {
+  return apiPost<Service>(`${API_BASE}/services/adopt`, { host_id: hostId })
 }
 
 export async function syncServices(): Promise<{ status: string; services: number }> {
-  return apiPost<{ status: string; services: number }>(`${API_BASE}/service-mesh/sync`)
+  return apiPost<{ status: string; services: number }>(`${API_BASE}/services/sync`)
 }
 
 export async function serviceMeshStatus(): Promise<{ active_services: number; total_backends: number }> {
-  return apiGet<{ active_services: number; total_backends: number }>(`${API_BASE}/service-mesh/status`)
+  return apiGet<{ active_services: number; total_backends: number }>(`${API_BASE}/services/status`)
 }
 
 // ─── QoS / Traffic Shaping ───────────────────────────────────────────────────
@@ -281,31 +290,31 @@ export interface CreateQoSPolicyRequest {
 }
 
 export async function listQosPolicies(): Promise<QoSPolicy[]> {
-  return apiGet<QoSPolicy[]>(`${API_BASE}/traffic-shaping/policies`)
+  return apiGet<QoSPolicy[]>(`${API_BASE}/qos-policies`)
 }
 
 export async function createQosPolicy(req: CreateQoSPolicyRequest): Promise<QoSPolicy> {
-  return apiPost<QoSPolicy>(`${API_BASE}/traffic-shaping/policies`, req)
+  return apiPost<QoSPolicy>(`${API_BASE}/qos-policies`, req)
 }
 
 export async function getQosPolicy(id: string): Promise<QoSPolicy> {
-  return apiGet<QoSPolicy>(`${API_BASE}/traffic-shaping/policies/${id}`)
+  return apiGet<QoSPolicy>(`${API_BASE}/qos-policies/${id}`)
 }
 
 export async function updateQosPolicy(id: string, req: CreateQoSPolicyRequest): Promise<QoSPolicy> {
-  return apiPut<QoSPolicy>(`${API_BASE}/traffic-shaping/policies/${id}`, req)
+  return apiPut<QoSPolicy>(`${API_BASE}/qos-policies/${id}`, req)
 }
 
 export async function deleteQosPolicy(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/traffic-shaping/policies/${id}`)
+  return apiDelete(`${API_BASE}/qos-policies/${id}`)
 }
 
 export async function syncQos(): Promise<{ status: string; policies: number }> {
-  return apiPost<{ status: string; policies: number }>(`${API_BASE}/traffic-shaping/sync`)
+  return apiPost<{ status: string; policies: number }>(`${API_BASE}/qos-policies/sync`)
 }
 
 export async function qosStatus(): Promise<{ active_policies: number; shaped_vms: number }> {
-  return apiGet<{ active_policies: number; shaped_vms: number }>(`${API_BASE}/traffic-shaping/status`)
+  return apiGet<{ active_policies: number; shaped_vms: number }>(`${API_BASE}/qos-policies/status`)
 }
 
 // ─── DNS ─────────────────────────────────────────────────────────────────────
@@ -360,47 +369,47 @@ export interface CreateDnsPolicyRequest {
 }
 
 export async function listDnsZones(): Promise<DnsZone[]> {
-  return apiGet<DnsZone[]>(`${API_BASE}/dns-policy/zones`)
+  return apiGet<DnsZone[]>(`${API_BASE}/dns-zones`)
 }
 
 export async function createDnsZone(req: CreateDnsZoneRequest): Promise<DnsZone> {
-  return apiPost<DnsZone>(`${API_BASE}/dns-policy/zones`, req)
+  return apiPost<DnsZone>(`${API_BASE}/dns-zones`, req)
 }
 
 export async function getDnsZone(id: string): Promise<DnsZone> {
-  return apiGet<DnsZone>(`${API_BASE}/dns-policy/zones/${id}`)
+  return apiGet<DnsZone>(`${API_BASE}/dns-zones/${id}`)
 }
 
 export async function updateDnsZone(id: string, req: CreateDnsZoneRequest): Promise<DnsZone> {
-  return apiPut<DnsZone>(`${API_BASE}/dns-policy/zones/${id}`, req)
+  return apiPut<DnsZone>(`${API_BASE}/dns-zones/${id}`, req)
 }
 
 export async function deleteDnsZone(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/dns-policy/zones/${id}`)
+  return apiDelete(`${API_BASE}/dns-zones/${id}`)
 }
 
 export async function listDnsPolicies(): Promise<DnsPolicy[]> {
-  return apiGet<DnsPolicy[]>(`${API_BASE}/dns-policy/policies`)
+  return apiGet<DnsPolicy[]>(`${API_BASE}/dns-policies`)
 }
 
 export async function createDnsPolicy(req: CreateDnsPolicyRequest): Promise<DnsPolicy> {
-  return apiPost<DnsPolicy>(`${API_BASE}/dns-policy/policies`, req)
+  return apiPost<DnsPolicy>(`${API_BASE}/dns-policies`, req)
 }
 
 export async function getDnsPolicy(id: string): Promise<DnsPolicy> {
-  return apiGet<DnsPolicy>(`${API_BASE}/dns-policy/policies/${id}`)
+  return apiGet<DnsPolicy>(`${API_BASE}/dns-policies/${id}`)
 }
 
 export async function updateDnsPolicy(id: string, req: CreateDnsPolicyRequest): Promise<DnsPolicy> {
-  return apiPut<DnsPolicy>(`${API_BASE}/dns-policy/policies/${id}`, req)
+  return apiPut<DnsPolicy>(`${API_BASE}/dns-policies/${id}`, req)
 }
 
 export async function deleteDnsPolicy(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/dns-policy/policies/${id}`)
+  return apiDelete(`${API_BASE}/dns-policies/${id}`)
 }
 
 export async function syncDns(): Promise<{ status: string; zones: number }> {
-  return apiPost<{ status: string; zones: number }>(`${API_BASE}/dns-policy/sync`)
+  return apiPost<{ status: string; zones: number }>(`${API_BASE}/dns-policies/sync`)
 }
 
 // ─── VPN Mesh ────────────────────────────────────────────────────────────────
@@ -458,43 +467,43 @@ export interface CreateVpnNetworkRequest {
 }
 
 export async function listVpnTunnels(): Promise<VpnTunnel[]> {
-  return apiGet<VpnTunnel[]>(`${API_BASE}/vpn-mesh/tunnels`)
+  return apiGet<VpnTunnel[]>(`${API_BASE}/vpn-tunnels`)
 }
 
 export async function createVpnTunnel(req: CreateVpnTunnelRequest): Promise<VpnTunnel> {
-  return apiPost<VpnTunnel>(`${API_BASE}/vpn-mesh/tunnels`, req)
+  return apiPost<VpnTunnel>(`${API_BASE}/vpn-tunnels`, req)
 }
 
 export async function getVpnTunnel(id: string): Promise<VpnTunnel> {
-  return apiGet<VpnTunnel>(`${API_BASE}/vpn-mesh/tunnels/${id}`)
+  return apiGet<VpnTunnel>(`${API_BASE}/vpn-tunnels/${id}`)
 }
 
 export async function updateVpnTunnel(id: string, req: CreateVpnTunnelRequest): Promise<VpnTunnel> {
-  return apiPut<VpnTunnel>(`${API_BASE}/vpn-mesh/tunnels/${id}`, req)
+  return apiPut<VpnTunnel>(`${API_BASE}/vpn-tunnels/${id}`, req)
 }
 
 export async function deleteVpnTunnel(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/vpn-mesh/tunnels/${id}`)
+  return apiDelete(`${API_BASE}/vpn-tunnels/${id}`)
 }
 
 export async function listVpnNetworks(): Promise<VpnNetwork[]> {
-  return apiGet<VpnNetwork[]>(`${API_BASE}/vpn-mesh/networks`)
+  return apiGet<VpnNetwork[]>(`${API_BASE}/vpn-networks`)
 }
 
 export async function createVpnNetwork(req: CreateVpnNetworkRequest): Promise<VpnNetwork> {
-  return apiPost<VpnNetwork>(`${API_BASE}/vpn-mesh/networks`, req)
+  return apiPost<VpnNetwork>(`${API_BASE}/vpn-networks`, req)
 }
 
 export async function deleteVpnNetwork(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/vpn-mesh/networks/${id}`)
+  return apiDelete(`${API_BASE}/vpn-networks/${id}`)
 }
 
 export async function syncVpn(): Promise<{ status: string; tunnels: number }> {
-  return apiPost<{ status: string; tunnels: number }>(`${API_BASE}/vpn-mesh/sync`)
+  return apiPost<{ status: string; tunnels: number }>(`${API_BASE}/vpn-tunnels/sync`)
 }
 
 export async function vpnStatus(): Promise<{ active_tunnels: number; networks: number }> {
-  return apiGet<{ active_tunnels: number; networks: number }>(`${API_BASE}/vpn-mesh/status`)
+  return apiGet<{ active_tunnels: number; networks: number }>(`${API_BASE}/vpn-tunnels/status`)
 }
 
 // ─── Packet Mirror ───────────────────────────────────────────────────────────
@@ -531,49 +540,51 @@ export interface CreateMirrorSessionRequest {
 }
 
 export async function listMirrorSessions(): Promise<MirrorSession[]> {
-  return apiGet<MirrorSession[]>(`${API_BASE}/packet-mirror/sessions`)
+  return apiGet<MirrorSession[]>(`${API_BASE}/mirror-sessions`)
 }
 
 export async function createMirrorSession(req: CreateMirrorSessionRequest): Promise<MirrorSession> {
-  return apiPost<MirrorSession>(`${API_BASE}/packet-mirror/sessions`, req)
+  return apiPost<MirrorSession>(`${API_BASE}/mirror-sessions`, req)
 }
 
 export async function getMirrorSession(id: string): Promise<MirrorSession> {
-  return apiGet<MirrorSession>(`${API_BASE}/packet-mirror/sessions/${id}`)
+  return apiGet<MirrorSession>(`${API_BASE}/mirror-sessions/${id}`)
 }
 
 export async function updateMirrorSession(id: string, req: CreateMirrorSessionRequest): Promise<MirrorSession> {
-  return apiPut<MirrorSession>(`${API_BASE}/packet-mirror/sessions/${id}`, req)
+  return apiPut<MirrorSession>(`${API_BASE}/mirror-sessions/${id}`, req)
 }
 
 export async function deleteMirrorSession(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/packet-mirror/sessions/${id}`)
+  return apiDelete(`${API_BASE}/mirror-sessions/${id}`)
 }
 
 export async function syncMirror(): Promise<{ status: string; sessions: number }> {
-  return apiPost<{ status: string; sessions: number }>(`${API_BASE}/packet-mirror/sync`)
+  return apiPost<{ status: string; sessions: number }>(`${API_BASE}/mirror-sessions/sync`)
 }
 
 export async function mirrorStatus(): Promise<{ active_sessions: number; mirrored_vms: number }> {
-  return apiGet<{ active_sessions: number; mirrored_vms: number }>(`${API_BASE}/packet-mirror/status`)
+  return apiGet<{ active_sessions: number; mirrored_vms: number }>(`${API_BASE}/mirror-sessions/status`)
 }
 
 // ─── NAT Gateway ─────────────────────────────────────────────────────────────
 
-export type NatType = 'masquerade' | 'snat' | 'dnat' | 'hairpin'
+export type NatRuleType = 'masquerade' | 'snat' | 'dnat' | 'hairpin'
 
 export interface NatRule {
   id: string
   name: string
   description?: string
-  nat_type: NatType
+  rule_type: NatRuleType
   source_cidr?: string
   dest_cidr?: string
-  protocol?: string
-  port?: number
-  translate_address?: string
+  protocol?: 'tcp' | 'udp' | 'any'
+  dest_port?: number
+  translate_to?: string
   translate_port?: number
+  outbound_interface?: string
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -581,42 +592,38 @@ export interface NatRule {
 export interface CreateNatRuleRequest {
   name: string
   description?: string
-  nat_type: NatType
+  rule_type: NatRuleType
   source_cidr?: string
   dest_cidr?: string
-  protocol?: string
-  port?: number
-  translate_address?: string
+  protocol?: 'tcp' | 'udp' | 'any'
+  dest_port?: number
+  translate_to?: string
   translate_port?: number
+  outbound_interface?: string
   enabled?: boolean
 }
 
 export interface NatPool {
   id: string
   name: string
-  description?: string
-  address_range: string
-  port_range_start?: number
-  port_range_end?: number
+  ip_ranges: string[]
+  port_range?: string
   created: string
   updated: string
 }
 
 export interface CreateNatPoolRequest {
   name: string
-  description?: string
-  address_range: string
-  port_range_start?: number
-  port_range_end?: number
+  ip_ranges: string[]
+  port_range?: string
 }
 
 export interface NatGatewayConfig {
   id: string
   name: string
   description?: string
-  labels: Record<string, string>
-  pool_id?: string
-  rule_ids: string[]
+  subnet: string
+  outbound_interface: string
   enabled: boolean
   created: string
   updated: string
@@ -625,62 +632,65 @@ export interface NatGatewayConfig {
 export interface CreateNatGatewayRequest {
   name: string
   description?: string
-  labels?: Record<string, string>
-  pool_id?: string
-  rule_ids?: string[]
+  subnet: string
+  outbound_interface: string
   enabled?: boolean
 }
 
 export async function listNatRules(): Promise<NatRule[]> {
-  return apiGet<NatRule[]>(`${API_BASE}/nat-gateway/rules`)
+  return apiGet<NatRule[]>(`${API_BASE}/nat-rules`)
 }
 
 export async function createNatRule(req: CreateNatRuleRequest): Promise<NatRule> {
-  return apiPost<NatRule>(`${API_BASE}/nat-gateway/rules`, req)
+  return apiPost<NatRule>(`${API_BASE}/nat-rules`, req)
 }
 
 export async function getNatRule(id: string): Promise<NatRule> {
-  return apiGet<NatRule>(`${API_BASE}/nat-gateway/rules/${id}`)
+  return apiGet<NatRule>(`${API_BASE}/nat-rules/${id}`)
 }
 
 export async function updateNatRule(id: string, req: CreateNatRuleRequest): Promise<NatRule> {
-  return apiPut<NatRule>(`${API_BASE}/nat-gateway/rules/${id}`, req)
+  return apiPut<NatRule>(`${API_BASE}/nat-rules/${id}`, req)
 }
 
 export async function deleteNatRule(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/nat-gateway/rules/${id}`)
+  return apiDelete(`${API_BASE}/nat-rules/${id}`)
+}
+
+export async function adoptNatRule(hostId: string): Promise<NatRule> {
+  return apiPost<NatRule>(`${API_BASE}/nat-rules/adopt`, { host_id: hostId })
 }
 
 export async function listNatPools(): Promise<NatPool[]> {
-  return apiGet<NatPool[]>(`${API_BASE}/nat-gateway/pools`)
+  return apiGet<NatPool[]>(`${API_BASE}/nat-pools`)
 }
 
 export async function createNatPool(req: CreateNatPoolRequest): Promise<NatPool> {
-  return apiPost<NatPool>(`${API_BASE}/nat-gateway/pools`, req)
+  return apiPost<NatPool>(`${API_BASE}/nat-pools`, req)
 }
 
 export async function deleteNatPool(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/nat-gateway/pools/${id}`)
+  return apiDelete(`${API_BASE}/nat-pools/${id}`)
 }
 
 export async function listNatGateways(): Promise<NatGatewayConfig[]> {
-  return apiGet<NatGatewayConfig[]>(`${API_BASE}/nat-gateway/gateways`)
+  return apiGet<NatGatewayConfig[]>(`${API_BASE}/nat-gateways`)
 }
 
 export async function createNatGateway(req: CreateNatGatewayRequest): Promise<NatGatewayConfig> {
-  return apiPost<NatGatewayConfig>(`${API_BASE}/nat-gateway/gateways`, req)
+  return apiPost<NatGatewayConfig>(`${API_BASE}/nat-gateways`, req)
 }
 
 export async function deleteNatGateway(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/nat-gateway/gateways/${id}`)
+  return apiDelete(`${API_BASE}/nat-gateways/${id}`)
 }
 
 export async function syncNat(): Promise<{ status: string; rules: number }> {
-  return apiPost<{ status: string; rules: number }>(`${API_BASE}/nat-gateway/sync`)
+  return apiPost<{ status: string; rules: number }>(`${API_BASE}/nat-rules/sync`)
 }
 
 export async function natStatus(): Promise<{ active_rules: number; gateways: number }> {
-  return apiGet<{ active_rules: number; gateways: number }>(`${API_BASE}/nat-gateway/status`)
+  return apiGet<{ active_rules: number; gateways: number }>(`${API_BASE}/nat-rules/status`)
 }
 
 // ─── Network Monitor ─────────────────────────────────────────────────────────
@@ -742,41 +752,41 @@ export interface BandwidthAlert {
 }
 
 export async function listMonitorPolicies(): Promise<MonitorPolicy[]> {
-  return apiGet<MonitorPolicy[]>(`${API_BASE}/net-monitor/policies`)
+  return apiGet<MonitorPolicy[]>(`${API_BASE}/monitor-policies`)
 }
 
 export async function createMonitorPolicy(req: CreateMonitorPolicyRequest): Promise<MonitorPolicy> {
-  return apiPost<MonitorPolicy>(`${API_BASE}/net-monitor/policies`, req)
+  return apiPost<MonitorPolicy>(`${API_BASE}/monitor-policies`, req)
 }
 
 export async function getMonitorPolicy(id: string): Promise<MonitorPolicy> {
-  return apiGet<MonitorPolicy>(`${API_BASE}/net-monitor/policies/${id}`)
+  return apiGet<MonitorPolicy>(`${API_BASE}/monitor-policies/${id}`)
 }
 
 export async function updateMonitorPolicy(id: string, req: CreateMonitorPolicyRequest): Promise<MonitorPolicy> {
-  return apiPut<MonitorPolicy>(`${API_BASE}/net-monitor/policies/${id}`, req)
+  return apiPut<MonitorPolicy>(`${API_BASE}/monitor-policies/${id}`, req)
 }
 
 export async function deleteMonitorPolicy(id: string): Promise<void> {
-  return apiDelete(`${API_BASE}/net-monitor/policies/${id}`)
+  return apiDelete(`${API_BASE}/monitor-policies/${id}`)
 }
 
 export async function syncMonitor(): Promise<{ status: string; policies: number }> {
-  return apiPost<{ status: string; policies: number }>(`${API_BASE}/net-monitor/sync`)
+  return apiPost<{ status: string; policies: number }>(`${API_BASE}/monitor-policies/sync`)
 }
 
 export async function monitorStatus(): Promise<{ active_policies: number; monitored_vms: number }> {
-  return apiGet<{ active_policies: number; monitored_vms: number }>(`${API_BASE}/net-monitor/status`)
+  return apiGet<{ active_policies: number; monitored_vms: number }>(`${API_BASE}/monitor-policies/status`)
 }
 
 export async function listNetworkMetrics(): Promise<NetworkMetrics[]> {
-  return apiGet<NetworkMetrics[]>(`${API_BASE}/net-monitor/metrics`)
+  return apiGet<NetworkMetrics[]>(`${API_BASE}/network-metrics`)
 }
 
 export async function listBandwidthAlerts(): Promise<BandwidthAlert[]> {
-  return apiGet<BandwidthAlert[]>(`${API_BASE}/net-monitor/alerts`)
+  return apiGet<BandwidthAlert[]>(`${API_BASE}/bandwidth-alerts`)
 }
 
 export async function acknowledgeBandwidthAlert(id: string): Promise<void> {
-  return apiPostVoid(`${API_BASE}/net-monitor/alerts/${id}/acknowledge`)
+  return apiPostVoid(`${API_BASE}/bandwidth-alerts/${id}/acknowledge`)
 }

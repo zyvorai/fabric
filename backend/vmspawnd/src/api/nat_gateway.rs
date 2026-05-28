@@ -19,6 +19,7 @@ use nat_gateway::models::{
     CreateNatGatewayRequest, CreateNatPoolRequest, CreateNatRuleRequest, NatGatewayConfig, NatPool,
     NatRule, NatStatus,
 };
+use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -74,6 +75,7 @@ pub async fn create_nat_rule(
         pool_id: req.pool_id,
         outbound_interface: req.outbound_interface,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -102,7 +104,10 @@ pub async fn list_nat_rules(
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(list_nat_rules));
     match state.store.list_entities::<NatRule>(RULE_STORE_KEY) {
-        Ok(rules) => (StatusCode::OK, Json(rules)).into_response(),
+        Ok(rules) => {
+            let merged = super::net_security_discover::merge_nat_rules(&state, rules);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -119,11 +124,16 @@ pub async fn get_nat_rule(
     tracing::debug!("nat_gateway::{}", stringify!(get_nat_rule));
     match state.store.get_entity::<NatRule>(RULE_STORE_KEY, &id) {
         Ok(Some(rule)) => (StatusCode::OK, Json(rule)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "NAT rule not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(host) = super::net_security_discover::find_host_nat_rule(&state, &id) {
+                return (StatusCode::OK, Json(host)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "NAT rule not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -139,6 +149,18 @@ pub async fn update_nat_rule(
     Json(req): Json<CreateNatRuleRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(update_nat_rule));
+    if let Some(host) = super::net_security_discover::find_host_nat_rule(&state, &id) {
+        if super::net_security_discover::is_host_managed_nat(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "Cannot update a host-discovered NAT rule; adopt it first"
+                })),
+            )
+                .into_response();
+        }
+    }
+
     let existing = match state.store.get_entity::<NatRule>(RULE_STORE_KEY, &id) {
         Ok(Some(r)) => r,
         Ok(None) => {
@@ -173,6 +195,7 @@ pub async fn update_nat_rule(
         pool_id: req.pool_id,
         outbound_interface: req.outbound_interface,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -198,6 +221,17 @@ pub async fn delete_nat_rule(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(delete_nat_rule));
+    if let Some(host) = super::net_security_discover::find_host_nat_rule(&state, &id) {
+        if super::net_security_discover::is_host_managed_nat(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This NAT rule exists on the host and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(RULE_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -211,6 +245,77 @@ pub async fn delete_nat_rule(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_nat_rule(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("nat_gateway::{}", stringify!(adopt_nat_rule));
+    let host = match super::net_security_discover::find_host_nat_rule(&state, &req.host_id) {
+        Some(r) if super::net_security_discover::is_host_managed_nat(&r) => r,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host NAT rule not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<NatRule> = state
+        .store
+        .list_entities(RULE_STORE_KEY)
+        .unwrap_or_default();
+    if stored.iter().any(|r| r.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("NAT rule '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let rule = NatRule {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        rule_type: host.rule_type,
+        selector: host.selector,
+        protocol: host.protocol,
+        source_cidr: host.source_cidr,
+        dest_cidr: host.dest_cidr,
+        dest_port: host.dest_port,
+        dest_port_end: host.dest_port_end,
+        translate_to: host.translate_to,
+        translate_port: host.translate_port,
+        pool_id: host.pool_id,
+        outbound_interface: host.outbound_interface,
+        enabled: host.enabled,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(RULE_STORE_KEY, &rule.id.to_string(), &rule)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_nat(&state).await {
+        tracing::warn!("Post-adopt NAT reconciliation failed: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(rule)).into_response()
 }
 
 // ── NAT Pool CRUD ───────────────────────────────────────────────────

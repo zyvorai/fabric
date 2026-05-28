@@ -149,6 +149,8 @@ pub struct Service {
     pub health_check: HealthCheck,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }

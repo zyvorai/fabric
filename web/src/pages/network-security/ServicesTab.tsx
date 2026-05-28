@@ -6,17 +6,18 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { Service, CreateServiceRequest, LoadBalancerAlgorithm } from '../../api/network-security'
-import { ModalWrapper, InputField, extractErrorMessage } from '../network/ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
 
 interface ServicesTabProps {
   services: Service[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function ServicesTabContent({ services, onDelete, onCreate, onSync }: ServicesTabProps) {
+function ServicesTabContent({ services, onDelete, onAdopt, onCreate, onSync }: ServicesTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -48,29 +49,34 @@ function ServicesTabContent({ services, onDelete, onCreate, onSync }: ServicesTa
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {services.map(s => (
+              {services.map(s => {
+                const port = s.ports?.[0]
+                const labels = s.selector?.match_labels ?? {}
+                return (
                 <tr key={s.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
-                    <div className="font-medium">{s.name}</div>
+                    <div className="font-medium">{s.name}{isHostManaged(s) && <HostBadge />}</div>
                     {s.description && <div className="text-xs text-slate-500 mt-1">{s.description}</div>}
                   </td>
                   <td className="p-4 font-mono text-sm text-blue-400">{s.virtual_ip}</td>
-                  <td className="p-4 font-mono text-sm">{s.port}/{s.protocol}</td>
+                  <td className="p-4 font-mono text-sm">{port ? `${port.port}/${port.protocol ?? 'tcp'}` : '-'}</td>
                   <td className="p-4">
                     <StatusBadge status={s.algorithm} color="blue" />
                   </td>
-                  <td className="p-4 font-medium text-cyan-400">{s.backends.length}</td>
-                  <td className="p-4"><LabelTags labels={s.labels} /></td>
+                  <td className="p-4 font-medium text-cyan-400">{isHostManaged(s) ? 'host' : 'vm'}</td>
+                  <td className="p-4"><LabelTags labels={labels} /></td>
                   <td className="p-4">
                     <StatusBadge status={s.enabled ? 'active' : 'disabled'} color={s.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(s.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions
+                      item={{ id: s.id, managed: s.managed }}
+                      onDelete={() => onDelete(s.id)}
+                      onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}
+                    />
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -85,7 +91,7 @@ export function CreateServiceModal({ onClose, onCreated }: { onClose: () => void
   const [virtualIp, setVirtualIp] = useState('')
   const [port, setPort] = useState('')
   const [protocol, setProtocol] = useState('tcp')
-  const [algorithm, setAlgorithm] = useState<LoadBalancerAlgorithm>('round-robin')
+  const [algorithm, setAlgorithm] = useState<LoadBalancerAlgorithm>('round_robin')
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
@@ -99,10 +105,9 @@ export function CreateServiceModal({ onClose, onCreated }: { onClose: () => void
         name: name.trim(),
         description: description.trim() || undefined,
         virtual_ip: virtualIp.trim(),
-        port: parseInt(port),
-        protocol,
+        ports: [{ port: parseInt(port), protocol: protocol as 'tcp' | 'udp' }],
         algorithm,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
+        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
       }
       const s = await api.createService(req)
       onCreated(s)
@@ -132,10 +137,9 @@ export function CreateServiceModal({ onClose, onCreated }: { onClose: () => void
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Algorithm</label>
           <select value={algorithm} onChange={e => setAlgorithm(e.target.value as LoadBalancerAlgorithm)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-            <option value="round-robin">Round Robin</option>
-            <option value="least-conn">Least Connections</option>
+            <option value="round_robin">Round Robin</option>
             <option value="random">Random</option>
-            <option value="ip-hash">IP Hash</option>
+            <option value="ip_hash">IP Hash</option>
           </select>
         </div>
         <LabelSelectorInput labels={labels} onChange={setLabels} />

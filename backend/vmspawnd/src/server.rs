@@ -624,6 +624,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/identities/{id}", get(api::network_policy::get_identity))
             // Service mesh routes
             .route("/services", get(api::service_mesh::list_services).post(api::service_mesh::create_service))
+            .route("/services/adopt", post(api::service_mesh::adopt_service))
             .route("/services/map", get(api::ux_extensions::service_map))
             .route("/services/sync", post(api::service_mesh::sync_services))
             .route("/services/status", get(api::service_mesh::get_service_status))
@@ -645,7 +646,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/firewall-profiles", get(api::vm_firewall::list_profiles).post(api::vm_firewall::create_profile))
             .route("/firewall-profiles/{id}", get(api::vm_firewall::get_profile).put(api::vm_firewall::update_profile).delete(api::vm_firewall::delete_profile))
             .route("/firewall-zones", get(api::vm_firewall::list_zones).post(api::vm_firewall::create_zone))
+            .route("/firewall-zones/adopt", post(api::vm_firewall::adopt_zone))
             .route("/firewall-zones/{id}", get(api::vm_firewall::get_zone).delete(api::vm_firewall::delete_zone))
+            .route("/firewall-assignments", get(api::vm_firewall::list_assignments))
             .route("/vms/{name}/firewall", get(api::vm_firewall::get_vm_firewall).put(api::vm_firewall::assign_vm_firewall).delete(api::vm_firewall::remove_vm_firewall))
             .route("/firewall/sync", post(api::vm_firewall::sync_firewall))
             .route("/firewall/status", get(api::vm_firewall::get_firewall_status))
@@ -664,6 +667,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/mirror-sessions/{id}", get(api::packet_mirror::get_mirror_session).put(api::packet_mirror::update_mirror_session).delete(api::packet_mirror::delete_mirror_session))
             // NAT gateway routes
             .route("/nat-rules", get(api::nat_gateway::list_nat_rules).post(api::nat_gateway::create_nat_rule))
+            .route("/nat-rules/adopt", post(api::nat_gateway::adopt_nat_rule))
             .route("/nat-rules/sync", post(api::nat_gateway::sync_nat_rules))
             .route("/nat-rules/status", get(api::nat_gateway::get_nat_status))
             .route("/nat-rules/{id}", get(api::nat_gateway::get_nat_rule).put(api::nat_gateway::update_nat_rule).delete(api::nat_gateway::delete_nat_rule))

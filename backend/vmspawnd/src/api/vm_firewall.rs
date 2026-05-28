@@ -20,6 +20,7 @@ use vm_firewall::models::{
     AssignFirewallRequest, CreateFirewallProfileRequest, CreateFirewallZoneRequest,
     FirewallProfile, FirewallStatus, FirewallZone, VMFirewallAssignment,
 };
+use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -211,6 +212,7 @@ pub async fn create_zone(
         name: req.name,
         description: req.description,
         default_profile_id: req.default_profile_id,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -235,7 +237,10 @@ pub async fn list_zones(
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(list_zones));
     match state.store.list_entities::<FirewallZone>(ZONES_KEY) {
-        Ok(zones) => (StatusCode::OK, Json(zones)).into_response(),
+        Ok(zones) => {
+            let merged = super::net_security_discover::merge_firewall_zones(&state, zones);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -252,11 +257,16 @@ pub async fn get_zone(
     tracing::debug!("vm_firewall::{}", stringify!(get_zone));
     match state.store.get_entity::<FirewallZone>(ZONES_KEY, &id) {
         Ok(Some(zone)) => (StatusCode::OK, Json(zone)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Firewall zone not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(host) = super::net_security_discover::find_host_firewall_zone(&state, &id) {
+                return (StatusCode::OK, Json(host)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Firewall zone not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -271,6 +281,17 @@ pub async fn delete_zone(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(delete_zone));
+    if let Some(host) = super::net_security_discover::find_host_firewall_zone(&state, &id) {
+        if super::net_security_discover::is_host_managed_zone(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This firewall zone is managed by firewalld on the host"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(ZONES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -282,7 +303,78 @@ pub async fn delete_zone(
     StatusCode::NO_CONTENT.into_response()
 }
 
+pub async fn adopt_zone(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(adopt_zone));
+    let host = match super::net_security_discover::find_host_firewall_zone(&state, &req.host_id) {
+        Some(z) if super::net_security_discover::is_host_managed_zone(&z) => z,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host firewalld zone not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<FirewallZone> = state.store.list_entities(ZONES_KEY).unwrap_or_default();
+    if stored.iter().any(|z| z.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Zone '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let zone = FirewallZone {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        default_profile_id: host.default_profile_id,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(ZONES_KEY, &zone.id.to_string(), &zone)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    (StatusCode::CREATED, Json(zone)).into_response()
+}
+
 // ── VM Firewall Assignment ──────────────────────────────────────────
+
+pub async fn list_assignments(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(list_assignments));
+    match state
+        .store
+        .list_entities::<VMFirewallAssignment>(ASSIGNMENTS_KEY)
+    {
+        Ok(assignments) => (StatusCode::OK, Json(assignments)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
 
 pub async fn get_vm_firewall(
     RequireRead(_claims): RequireRead,
