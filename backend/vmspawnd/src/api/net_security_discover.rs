@@ -6,12 +6,14 @@ use std::collections::HashSet;
 
 use chrono::Utc;
 use nat_gateway::models::{NatProtocol, NatRule, NatRuleType};
-use dns_policy::models::DnsZone;
+use dns_policy::models::{DnsPolicy, DnsRecordType, DnsZone};
 use net_monitor::models::{
     AlertAction, AlertSeverity, BandwidthThreshold, MonitorPolicy, ThresholdUnit, TrafficDirection,
 };
 use networking::host_dns::{self, DiscoveredDnsZone};
+use networking::host_resolv::{self, DiscoveredDnsUpstream};
 use networking::host_firewalld::{self, DiscoveredFirewalldZone};
+use networking::host_identities::{self, DiscoveredHostIdentity};
 use networking::host_monitor_tc::{self, DiscoveredHostMonitor};
 use networking::host_nat::{self, DiscoveredHostNatRule};
 use networking::host_nft_filter::{self, DiscoveredNftFilterChain};
@@ -21,7 +23,8 @@ use networking::host_tc::{self, DiscoveredTcQdisc};
 use networking::host_tc_mirror::{self, DiscoveredTcMirror};
 use networking::host_wireguard::{self, DiscoveredWireGuard};
 use packet_mirror::models::{CollectorType, MirrorDirection, MirrorSession};
-use network_policy::models::NetworkPolicy;
+use network_policy::models::{NetworkPolicy, SecurityIdentity};
+use network_policy::identity::IdentityAllocator;
 use service_mesh::models::{LoadBalancerAlgorithm, Service, ServicePort, ServiceProtocol};
 use traffic_shaping::models::{BandwidthRate, BandwidthUnit, QoSPolicy, TrafficClass};
 use vm_firewall::models::{FirewallAction, FirewallProfile, FirewallZone};
@@ -58,6 +61,10 @@ pub fn is_host_managed_dns_zone(zone: &DnsZone) -> bool {
     !zone.managed
 }
 
+pub fn is_host_managed_dns_policy(policy: &DnsPolicy) -> bool {
+    !policy.managed
+}
+
 pub fn is_host_managed_mirror(session: &MirrorSession) -> bool {
     !session.managed
 }
@@ -68,6 +75,10 @@ pub fn is_host_managed_monitor(policy: &MonitorPolicy) -> bool {
 
 pub fn is_host_managed_network_policy(policy: &NetworkPolicy) -> bool {
     !policy.managed
+}
+
+pub fn is_host_managed_identity(identity: &SecurityIdentity) -> bool {
+    !identity.managed
 }
 
 fn host_nat_uuid(key: &str) -> Uuid {
@@ -116,6 +127,20 @@ fn host_dns_zone_uuid(name: &str) -> Uuid {
     Uuid::new_v5(
         &Uuid::NAMESPACE_DNS,
         format!("vmspawnd:host:dnszone:{name}").as_bytes(),
+    )
+}
+
+fn host_dns_policy_uuid(key: &str) -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:dnspol:{key}").as_bytes(),
+    )
+}
+
+fn host_dns_upstream_zone_id() -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        b"vmspawnd:host:dns:upstream-zone",
     )
 }
 
@@ -541,6 +566,57 @@ pub fn find_host_dns_zone(_state: &AppState, id: &str) -> Option<DnsZone> {
         .find(|z| z.id == uuid)
 }
 
+fn dns_policy_from_upstream(d: DiscoveredDnsUpstream) -> DnsPolicy {
+    let now = Utc::now();
+    let key = format!("{}:{}", d.source, d.server);
+    DnsPolicy {
+        id: host_dns_policy_uuid(&key),
+        name: format!("host-upstream-{}", d.server.replace(':', "-")),
+        description: format!("Host DNS upstream {} ({})", d.server, d.source),
+        zone_id: host_dns_upstream_zone_id(),
+        selector: Default::default(),
+        record_template: d.server,
+        record_type: DnsRecordType::A,
+        enabled: false,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_dns_policies() -> Vec<DnsPolicy> {
+    host_resolv::discover_host_dns_upstreams()
+        .unwrap_or_else(|e| {
+            tracing::warn!("host DNS upstream discovery failed: {}", e);
+            Vec::new()
+        })
+        .into_iter()
+        .map(dns_policy_from_upstream)
+        .collect()
+}
+
+pub fn merge_dns_policies(_state: &AppState, mut items: Vec<DnsPolicy>) -> Vec<DnsPolicy> {
+    let mut known_ids: HashSet<Uuid> = items.iter().map(|p| p.id).collect();
+    let mut known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
+
+    for host in discover_host_dns_policies() {
+        if known_ids.contains(&host.id) || known_names.contains(&host.name) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_names.insert(host.name.clone());
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_dns_policy(_state: &AppState, id: &str) -> Option<DnsPolicy> {
+    let uuid = Uuid::parse_str(id).ok()?;
+    merge_dns_policies(_state, vec![])
+        .into_iter()
+        .find(|p| p.id == uuid)
+}
+
 fn mirror_from_discovered(d: DiscoveredTcMirror) -> MirrorSession {
     let direction = match d.direction.as_str() {
         "egress" => MirrorDirection::Egress,
@@ -703,4 +779,76 @@ pub fn find_host_network_policy(_state: &AppState, id: &str) -> Option<NetworkPo
     merge_network_policies(_state, vec![])
         .into_iter()
         .find(|p| p.id == uuid)
+}
+
+const HOST_IDENTITY_BASE: u32 = 200_000;
+
+fn host_identity_id(key: &str) -> u32 {
+    let uuid = Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:identity:{key}").as_bytes(),
+    );
+    let bytes = uuid.as_bytes();
+    let n = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    HOST_IDENTITY_BASE + (n % 100_000)
+}
+
+fn identity_from_discovered(d: DiscoveredHostIdentity) -> SecurityIdentity {
+    let now = Utc::now();
+    SecurityIdentity {
+        id: host_identity_id(&d.key),
+        labels: d.labels,
+        endpoints: d.endpoints,
+        description: d.description,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_security_identities() -> Vec<SecurityIdentity> {
+    host_identities::discover_host_identities()
+        .unwrap_or_else(|e| {
+            tracing::warn!("host identity discovery failed: {}", e);
+            Vec::new()
+        })
+        .into_iter()
+        .map(identity_from_discovered)
+        .collect()
+}
+
+pub fn merge_identities(mut items: Vec<SecurityIdentity>) -> Vec<SecurityIdentity> {
+    let mut known_ids: HashSet<u32> = items.iter().map(|i| i.id).collect();
+    let mut known_keys: HashSet<String> = items
+        .iter()
+        .map(|i| {
+            let map: std::collections::HashMap<String, String> =
+                i.labels.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            IdentityAllocator::canonical_key(&map)
+        })
+        .collect();
+
+    for host in discover_host_security_identities() {
+        let key = {
+            let map: std::collections::HashMap<String, String> = host
+                .labels
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            IdentityAllocator::canonical_key(&map)
+        };
+        if known_ids.contains(&host.id) || known_keys.contains(&key) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_keys.insert(key);
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_identity(id: u32) -> Option<SecurityIdentity> {
+    merge_identities(vec![])
+        .into_iter()
+        .find(|i| i.id == id)
 }

@@ -14,7 +14,7 @@ import type {
   NetworkPolicy, FirewallProfile, FirewallZone, VMFirewallAssignment,
   Service, QoSPolicy, DnsZone, DnsPolicy, VpnTunnel, VpnNetwork,
   MirrorSession, NatRule, NatPool, NatGatewayConfig,
-  MonitorPolicy, NetworkMetrics, BandwidthAlert,
+  MonitorPolicy, NetworkMetrics, BandwidthAlert, SecurityIdentity,
 } from '../api/network-security'
 import {
   PoliciesTab, CreatePolicyModal,
@@ -46,6 +46,7 @@ export default function NetworkSecurity() {
 
   // Data state
   const [policies, setPolicies] = useState<NetworkPolicy[]>([])
+  const [identities, setIdentities] = useState<SecurityIdentity[]>([])
   const [fwProfiles, setFwProfiles] = useState<FirewallProfile[]>([])
   const [fwZones, setFwZones] = useState<FirewallZone[]>([])
   const [fwAssignments, setFwAssignments] = useState<VMFirewallAssignment[]>([])
@@ -73,10 +74,11 @@ export default function NetworkSecurity() {
     setError(null)
     try {
       const [
-        pol, fwp, fwz, fwa, svc, qos, dz, dp,
+        pol, ids, fwp, fwz, fwa, svc, qos, dz, dp,
         vt, vn, ms, nr, np, ng, mp, met, al,
       ] = await Promise.all([
         api.listNetworkPolicies().catch(() => []),
+        api.listIdentities().catch(() => []),
         api.listFirewallProfiles().catch(() => []),
         api.listFirewallZones().catch(() => []),
         api.listVMFirewallAssignments().catch(() => []),
@@ -95,6 +97,7 @@ export default function NetworkSecurity() {
         api.listBandwidthAlerts().catch(() => []),
       ])
       setPolicies(pol)
+      setIdentities(ids)
       setFwProfiles(fwp)
       setFwZones(fwz)
       setFwAssignments(fwa)
@@ -202,6 +205,13 @@ export default function NetworkSecurity() {
     } catch (e: unknown) { failAction('Failed to adopt DNS zone', e) }
   }
 
+  const handleAdoptDnsPolicy = async (id: string) => {
+    try {
+      const adopted = await api.adoptDnsPolicy(id)
+      setDnsPolicies(prev => [...prev.filter(p => p.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt DNS policy', e) }
+  }
+
   const handleAdoptMirrorSession = async (id: string) => {
     try {
       const adopted = await api.adoptMirrorSession(id)
@@ -221,6 +231,13 @@ export default function NetworkSecurity() {
       const adopted = await api.adoptNetworkPolicy(id)
       setPolicies(prev => [...prev.filter(p => p.id !== id), adopted])
     } catch (e: unknown) { failAction('Failed to adopt network policy', e) }
+  }
+
+  const handleAdoptIdentity = async (id: string) => {
+    try {
+      const adopted = await api.adoptIdentity(id)
+      setIdentities(prev => [...prev.filter(i => String(i.id) !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt identity', e) }
   }
 
   const handleDeleteService = async (id: string) => {
@@ -405,8 +422,10 @@ export default function NetworkSecurity() {
           {activeTab === 'policies' && (
             <PoliciesTab
               policies={policies}
+              identities={identities}
               onDelete={handleDeletePolicy}
               onAdopt={handleAdoptNetworkPolicy}
+              onAdoptIdentity={handleAdoptIdentity}
               onCreate={() => setActiveModal('policy')}
               onSync={() => handleSync(api.syncNetworkPolicies)}
             />
@@ -430,7 +449,7 @@ export default function NetworkSecurity() {
             <DnsTab
               zones={dnsZones} policies={dnsPolicies}
               onDeleteZone={handleDeleteDnsZone} onDeletePolicy={handleDeleteDnsPolicy}
-              onAdoptZone={handleAdoptDnsZone}
+              onAdoptZone={handleAdoptDnsZone} onAdoptPolicy={handleAdoptDnsPolicy}
               onCreate={() => setActiveModal('dns-zone')} onSync={() => handleSync(api.syncDns)}
             />
           )}
@@ -476,7 +495,7 @@ export default function NetworkSecurity() {
       {activeModal === 'service' && <CreateServiceModal onClose={closeModal} onCreated={(s) => { setServices(prev => [...prev, s]); closeModal() }} />}
       {activeModal === 'qos' && <CreateQosModal onClose={closeModal} onCreated={(p) => { setQosPolicies(prev => [...prev, p]); closeModal() }} />}
       {activeModal === 'dns-zone' && <CreateDnsZoneModal onClose={closeModal} onCreated={(z) => { setDnsZones(prev => [...prev, z]); closeModal() }} />}
-      {activeModal === 'dns-policy' && <CreateDnsPolicyModal onClose={closeModal} onCreated={(p) => { setDnsPolicies(prev => [...prev, p]); closeModal() }} />}
+      {activeModal === 'dns-policy' && <CreateDnsPolicyModal zones={dnsZones} onClose={closeModal} onCreated={(p) => { setDnsPolicies(prev => [...prev, p]); closeModal() }} />}
       {activeModal === 'vpn-tunnel' && <CreateVpnTunnelModal onClose={closeModal} onCreated={(t) => { setVpnTunnels(prev => [...prev, t]); closeModal() }} />}
       {activeModal === 'vpn-network' && <CreateVpnNetworkModal onClose={closeModal} onCreated={(n) => { setVpnNetworks(prev => [...prev, n]); closeModal() }} />}
       {activeModal === 'mirror' && <CreateMirrorModal onClose={closeModal} onCreated={(s) => { setMirrorSessions(prev => [...prev, s]); closeModal() }} />}

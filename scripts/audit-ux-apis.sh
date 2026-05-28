@@ -72,11 +72,21 @@ ENDPOINTS=(
   /api/firewall-assignments
   /api/qos-policies
   /api/dns-zones
+  /api/dns-policies
   /api/vpn-tunnels
   /api/vpn-networks
   /api/mirror-sessions
   /api/monitor-policies
   /api/network-policies
+  /api/network-policies/status
+  /api/identities
+  /api/services/status
+  /api/qos-policies/status
+  /api/monitor-policies/status
+  /api/firewall/status
+  /api/nat-rules/status
+  /api/mirror-sessions/status
+  /api/vpn-tunnels/status
   /api/drs/recommendations/default
   /api/webhooks/deliveries
   /api/events

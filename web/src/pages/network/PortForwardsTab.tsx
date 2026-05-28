@@ -2,11 +2,21 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus, RefreshCw } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { PortForwardConfig, CreatePortForwardRequest, Protocol } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+
+type PfOriginFilter = 'all' | 'managed' | 'host' | 'vmspawnd'
+
+function portForwardOrigin(pf: PortForwardConfig): Exclude<PfOriginFilter, 'all'> {
+  if (!isHostManaged(pf)) return 'managed'
+  if (pf.id.startsWith('host:nft-ext')) return 'host'
+  if (pf.id.startsWith('host:nft')) return 'vmspawnd'
+  return 'host'
+}
 
 interface PortForwardsTabProps {
   portForwards: PortForwardConfig[]
@@ -17,6 +27,33 @@ interface PortForwardsTabProps {
 }
 
 function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onSync }: PortForwardsTabProps) {
+  const [search, setSearch] = useState('')
+  const [originFilter, setOriginFilter] = useState<PfOriginFilter>('all')
+  const [page, setPage] = useState(1)
+  const [showAll, setShowAll] = useState(false)
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = [...portForwards].sort((a, b) => a.name.localeCompare(b.name))
+    if (originFilter !== 'all') {
+      list = list.filter(pf => portForwardOrigin(pf) === originFilter)
+    }
+    if (!q) return list
+    return list.filter(pf => {
+      const hay = [
+        pf.name,
+        pf.description ?? '',
+        pf.protocol,
+        String(pf.host_port),
+        pf.guest_ip,
+        String(pf.guest_port),
+      ].join(' ').toLowerCase()
+      return hay.includes(q)
+    })
+  }, [portForwards, search, originFilter])
+
+  const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -33,7 +70,41 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
       {portForwards.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No port forwards configured. Add one to expose a VM service to the host network.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search name, port, guest IP…"
+            total={portForwards.length}
+            filtered={filtered.length}
+            page={page}
+            pageSize={DEFAULT_PAGE_SIZE}
+            onPageChange={setPage}
+            showAll={showAll}
+            onShowAllChange={setShowAll}
+          />
+          <div className="px-4 pb-2 flex flex-wrap gap-1">
+            {([
+              ['all', 'All'],
+              ['managed', 'Managed'],
+              ['vmspawnd', 'vmspawnd nft'],
+              ['host', 'External'],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setOriginFilter(key); setPage(1) }}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                  originFilter === key
+                    ? 'bg-red-600/30 text-red-300 border border-red-500/40'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700/50 hover:text-slate-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-800">
               <tr>
@@ -46,7 +117,7 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {portForwards.map(pf => (
+              {pageItems.map(pf => (
                 <tr key={pf.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">
                     <span className="flex items-center gap-2 flex-wrap">
@@ -74,7 +145,11 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
               ))}
             </tbody>
           </table>
-        </div>
+          {filtered.length === 0 && (
+            <div className="p-8 text-center text-slate-500 text-sm">No port forwards match your filters.</div>
+          )}
+          </div>
+        </>
       )}
     </div>
   )

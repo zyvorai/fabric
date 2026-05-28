@@ -173,6 +173,7 @@ mod tests {
         DnsPolicy {
             id: Uuid::new_v4(),
             name: name.to_string(),
+            description: String::new(),
             zone_id,
             selector: LabelSelector {
                 match_labels: selector
@@ -183,6 +184,7 @@ mod tests {
             record_template: template.to_string(),
             record_type,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

@@ -15,11 +15,12 @@ interface DnsTabProps {
   onDeleteZone: (id: string) => void
   onDeletePolicy: (id: string) => void
   onAdoptZone?: (id: string) => void
+  onAdoptPolicy?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZone, onCreate, onSync }: DnsTabProps) {
+function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZone, onAdoptPolicy, onCreate, onSync }: DnsTabProps) {
   const [view, setView] = useState<'zones' | 'policies'>('zones')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -96,9 +97,9 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
               <thead className="bg-slate-800">
                 <tr>
                   <th className="text-left p-4 font-medium text-slate-300">Name</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Zone / Template</th>
                   <th className="text-left p-4 font-medium text-slate-300">Labels</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Upstreams</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Blocked</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Type</th>
                   <th className="text-left p-4 font-medium text-slate-300">Status</th>
                   <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
@@ -106,17 +107,25 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
               <tbody className="divide-y divide-slate-700/50">
                 {policies.map(p => (
                   <tr key={p.id} className="hover:bg-white/[0.03] transition">
-                    <td className="p-4 font-medium">{p.name}</td>
-                    <td className="p-4"><LabelTags labels={p.labels} /></td>
-                    <td className="p-4 font-mono text-sm text-slate-400">{p.upstream_servers.length}</td>
-                    <td className="p-4 font-mono text-sm text-red-400">{p.blocked_domains.length}</td>
+                    <td className="p-4 font-medium">
+                      {p.name}
+                      {isHostManaged(p) && <HostBadge />}
+                      {p.description && <div className="text-xs text-slate-500 font-normal mt-0.5">{p.description}</div>}
+                    </td>
+                    <td className="p-4 font-mono text-sm text-slate-400">
+                      {p.record_template ?? p.upstream_servers?.join(', ') ?? '—'}
+                    </td>
+                    <td className="p-4"><LabelTags labels={p.selector?.match_labels ?? p.labels} /></td>
+                    <td className="p-4 text-slate-400">{p.record_type ?? '—'}</td>
                     <td className="p-4">
                       <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <button onClick={() => onDeletePolicy(p.id)} className="p-2 hover:bg-red-600 rounded transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <HostManagedActions
+                        item={{ id: p.id, managed: p.managed }}
+                        onDelete={() => onDeletePolicy(p.id)}
+                        onAdopt={onAdoptPolicy ? () => onAdoptPolicy(p.id) : undefined}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -219,26 +228,30 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
   )
 }
 
-export function CreateDnsPolicyModal({ onClose, onCreated }: { onClose: () => void; onCreated: (p: DnsPolicy) => void }) {
+export function CreateDnsPolicyModal({ zones, onClose, onCreated }: { zones: DnsZone[]; onClose: () => void; onCreated: (p: DnsPolicy) => void }) {
   const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [zoneId, setZoneId] = useState(zones[0]?.id ?? '')
   const [labels, setLabels] = useState<Record<string, string>>({})
-  const [upstreams, setUpstreams] = useState('')
-  const [blocked, setBlocked] = useState('')
+  const [recordTemplate, setRecordTemplate] = useState('{name}.vmspawnd.local')
+  const [recordType, setRecordType] = useState<DnsRecordType>('A')
+  const [enabled, setEnabled] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
 
   const handleSubmit = async () => {
     if (!name.trim()) { setErr('Name is required'); return }
+    if (!zoneId) { setErr('Select a DNS zone first'); return }
+    if (!recordTemplate.trim()) { setErr('Record template is required'); return }
     setSubmitting(true)
     setErr('')
     try {
       const req: CreateDnsPolicyRequest = {
         name: name.trim(),
-        description: description.trim() || undefined,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
-        upstream_servers: upstreams.trim() ? upstreams.split(',').map(s => s.trim()) : undefined,
-        blocked_domains: blocked.trim() ? blocked.split(',').map(s => s.trim()) : undefined,
+        zone_id: zoneId,
+        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        record_template: recordTemplate.trim(),
+        record_type: recordType,
+        enabled,
       }
       const p = await api.createDnsPolicy(req)
       onCreated(p)
@@ -252,13 +265,31 @@ export function CreateDnsPolicyModal({ onClose, onCreated }: { onClose: () => vo
   return (
     <ModalWrapper title="Create DNS Policy" onClose={onClose}>
       <div className="space-y-4">
-        <InputField label="Name" value={name} onChange={setName} placeholder="secure-dns" />
-        <InputField label="Description" value={description} onChange={setDescription} placeholder="Secure DNS policy" />
+        <InputField label="Name" value={name} onChange={setName} placeholder="vm-a-records" />
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Zone</label>
+          <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            {zones.length === 0 ? <option value="">No zones — create a zone first</option> : zones.map(z => (
+              <option key={z.id} value={z.id}>{z.name}</option>
+            ))}
+          </select>
+        </div>
         <LabelSelectorInput labels={labels} onChange={setLabels} />
-        <InputField label="Upstream Servers (comma-separated)" value={upstreams} onChange={setUpstreams} placeholder="8.8.8.8, 1.1.1.1" />
-        <InputField label="Blocked Domains (comma-separated)" value={blocked} onChange={setBlocked} placeholder="malware.com, ads.example.com" />
+        <InputField label="Record Template" value={recordTemplate} onChange={setRecordTemplate} placeholder="{name}.vmspawnd.local" />
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Record Type</label>
+          <select value={recordType} onChange={e => setRecordType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            {(['A', 'CNAME', 'SRV'] as DnsRecordType[]).map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-300">
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="rounded border-slate-600" />
+          Enabled
+        </label>
         {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        <button onClick={handleSubmit} disabled={submitting || !zoneId} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create DNS Policy'}
         </button>
       </div>

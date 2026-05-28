@@ -74,6 +74,8 @@ fn default_true() -> bool {
 pub struct DnsPolicy {
     pub id: Uuid,
     pub name: String,
+    #[serde(default)]
+    pub description: String,
     pub zone_id: Uuid,
     pub selector: LabelSelector,
     pub record_template: String,
@@ -81,6 +83,8 @@ pub struct DnsPolicy {
     pub record_type: DnsRecordType,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -185,11 +189,13 @@ mod tests {
         let policy = DnsPolicy {
             id: Uuid::new_v4(),
             name: "web-dns".to_string(),
+            description: String::new(),
             zone_id: Uuid::new_v4(),
             selector: LabelSelector::default(),
             record_template: "{name}.{label:app}.vmspawnd.local".to_string(),
             record_type: DnsRecordType::A,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };

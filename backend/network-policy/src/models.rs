@@ -19,6 +19,10 @@ pub struct SecurityIdentity {
     pub id: u32,
     pub labels: BTreeMap<String, String>,
     pub endpoints: Vec<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }

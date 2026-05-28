@@ -278,7 +278,8 @@ pub async fn list_identities(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     tracing::debug!("network_policy::{}", stringify!(list_identities));
-    let identities = state.policy_engine.allocator.list_identities();
+    let managed = state.policy_engine.allocator.list_identities();
+    let identities = super::net_security_discover::merge_identities(managed);
     (StatusCode::OK, Json(identities)).into_response()
 }
 
@@ -288,11 +289,110 @@ pub async fn get_identity(
     Path(id): Path<u32>,
 ) -> impl IntoResponse {
     tracing::debug!("network_policy::{}", stringify!(get_identity));
+    if let Some(identity) = state.policy_engine.allocator.get_identity(id) {
+        return (StatusCode::OK, Json(identity)).into_response();
+    }
+    if let Some(identity) = super::net_security_discover::find_host_identity(id) {
+        return (StatusCode::OK, Json(identity)).into_response();
+    }
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "error": "Identity not found" })),
+    )
+        .into_response()
+}
+
+pub async fn adopt_identity(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(adopt_identity));
+    let host_id = match req.host_id.parse::<u32>() {
+        Ok(id) => id,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Invalid host identity id" })),
+            )
+                .into_response();
+        }
+    };
+
+    let host = match super::net_security_discover::find_host_identity(host_id) {
+        Some(i) if super::net_security_discover::is_host_managed_identity(&i) => i,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host identity not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let labels: std::collections::HashMap<String, String> = host
+        .labels
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+
+    if state
+        .policy_engine
+        .allocator
+        .get_identity_for_labels(&labels)
+        .is_some()
+    {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": "An identity with these labels is already managed by vmspawnd"
+            })),
+        )
+            .into_response();
+    }
+
+    let mut allocated_id = None;
+    for endpoint in &host.endpoints {
+        match state
+            .policy_engine
+            .allocator
+            .allocate_or_get(&labels, endpoint)
+        {
+            Ok(id) => {
+                allocated_id = Some(id);
+                if endpoint.parse::<std::net::IpAddr>().is_ok() {
+                    if let Err(e) = state
+                        .policy_engine
+                        .allocator
+                        .update_ip_mapping(endpoint, id)
+                    {
+                        tracing::warn!("Failed to map IP {} to identity {}: {}", endpoint, id, e);
+                    }
+                }
+            }
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    let Some(id) = allocated_id else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Host identity has no endpoints to adopt" })),
+        )
+            .into_response();
+    };
+
     match state.policy_engine.allocator.get_identity(id) {
-        Some(identity) => (StatusCode::OK, Json(identity)).into_response(),
+        Some(identity) => (StatusCode::CREATED, Json(identity)).into_response(),
         None => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Identity not found" })),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to load adopted identity" })),
         )
             .into_response(),
     }

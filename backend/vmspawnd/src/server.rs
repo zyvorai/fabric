@@ -626,6 +626,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/network-policies/status", get(api::network_policy::get_policy_status))
             .route("/network-policies/{id}", get(api::network_policy::get_policy).put(api::network_policy::update_policy).delete(api::network_policy::delete_policy))
             .route("/identities", get(api::network_policy::list_identities))
+            .route("/identities/adopt", post(api::network_policy::adopt_identity))
             .route("/identities/{id}", get(api::network_policy::get_identity))
             // Service mesh routes
             .route("/services", get(api::service_mesh::list_services).post(api::service_mesh::create_service))
@@ -646,6 +647,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/dns-zones/adopt", post(api::dns_policy::adopt_zone))
             .route("/dns-zones/{id}", get(api::dns_policy::get_zone).delete(api::dns_policy::delete_zone))
             .route("/dns-policies", get(api::dns_policy::list_policies).post(api::dns_policy::create_policy))
+            .route("/dns-policies/adopt", post(api::dns_policy::adopt_policy))
             .route("/dns-policies/sync", post(api::dns_policy::sync_dns_policies))
             .route("/dns-policies/{id}", get(api::dns_policy::get_policy).put(api::dns_policy::update_policy).delete(api::dns_policy::delete_policy))
             .route("/dns-records", get(api::dns_policy::list_dns_records))

@@ -193,11 +193,13 @@ pub async fn create_policy(
     let policy = DnsPolicy {
         id: Uuid::new_v4(),
         name: req.name,
+        description: String::new(),
         zone_id: req.zone_id,
         selector: req.selector,
         record_template: req.record_template,
         record_type: req.record_type,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -226,7 +228,10 @@ pub async fn list_policies(
 ) -> impl IntoResponse {
     tracing::debug!("dns_policy::{}", stringify!(list_policies));
     match state.store.list_entities::<DnsPolicy>(POLICIES_KEY) {
-        Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
+        Ok(policies) => {
+            let merged = super::net_security_discover::merge_dns_policies(&state, policies);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -243,11 +248,16 @@ pub async fn get_policy(
     tracing::debug!("dns_policy::{}", stringify!(get_policy));
     match state.store.get_entity::<DnsPolicy>(POLICIES_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "DNS policy not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(policy) = super::net_security_discover::find_host_dns_policy(&state, &id) {
+                return (StatusCode::OK, Json(policy)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "DNS policy not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -284,11 +294,13 @@ pub async fn update_policy(
     let policy = DnsPolicy {
         id: existing.id,
         name: req.name,
+        description: existing.description,
         zone_id: req.zone_id,
         selector: req.selector,
         record_template: req.record_template,
         record_type: req.record_type,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -314,6 +326,17 @@ pub async fn delete_policy(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("dns_policy::{}", stringify!(delete_policy));
+    if let Some(host) = super::net_security_discover::find_host_dns_policy(&state, &id) {
+        if super::net_security_discover::is_host_managed_dns_policy(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This DNS policy reflects host resolver config and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(POLICIES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -327,6 +350,69 @@ pub async fn delete_policy(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_policy(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(adopt_policy));
+    let host = match super::net_security_discover::find_host_dns_policy(&state, &req.host_id) {
+        Some(p) if super::net_security_discover::is_host_managed_dns_policy(&p) => p,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host DNS policy not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let zones: Vec<DnsZone> = state.store.list_entities(ZONES_KEY).unwrap_or_default();
+    let zone_id = zones
+        .first()
+        .map(|z| z.id)
+        .unwrap_or(host.zone_id);
+
+    let stored: Vec<DnsPolicy> = state.store.list_entities(POLICIES_KEY).unwrap_or_default();
+    if stored.iter().any(|p| p.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("DNS policy '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let policy = DnsPolicy {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        zone_id,
+        selector: host.selector,
+        record_template: host.record_template,
+        record_type: host.record_type,
+        enabled: false,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(POLICIES_KEY, &policy.id.to_string(), &policy)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    (StatusCode::CREATED, Json(policy)).into_response()
 }
 
 // ── DNS records and sync ────────────────────────────────────────────

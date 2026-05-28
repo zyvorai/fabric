@@ -79,6 +79,28 @@ export async function networkPolicyStatus(): Promise<{ enforced: number; pending
   return apiGet<{ enforced: number; pending: number }>(`${API_BASE}/network-policies/status`)
 }
 
+export interface SecurityIdentity {
+  id: number
+  labels: Record<string, string>
+  endpoints: string[]
+  description?: string
+  managed?: boolean
+  created: string
+  updated: string
+}
+
+export async function listIdentities(): Promise<SecurityIdentity[]> {
+  return apiGet<SecurityIdentity[]>(`${API_BASE}/identities`)
+}
+
+export async function getIdentity(id: number): Promise<SecurityIdentity> {
+  return apiGet<SecurityIdentity>(`${API_BASE}/identities/${id}`)
+}
+
+export async function adoptIdentity(hostId: string): Promise<SecurityIdentity> {
+  return apiPost<SecurityIdentity>(`${API_BASE}/identities/adopt`, { host_id: hostId })
+}
+
 // ─── Firewall ────────────────────────────────────────────────────────────────
 
 export type FirewallAction = 'accept' | 'drop' | 'reject' | 'log'
@@ -377,20 +399,25 @@ export interface DnsPolicy {
   id: string
   name: string
   description?: string
-  labels: Record<string, string>
-  upstream_servers: string[]
-  blocked_domains: string[]
+  zone_id?: string
+  selector?: { match_labels?: Record<string, string> }
+  record_template?: string
+  record_type?: string
+  labels?: Record<string, string>
+  upstream_servers?: string[]
+  blocked_domains?: string[]
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
 
 export interface CreateDnsPolicyRequest {
   name: string
-  description?: string
-  labels?: Record<string, string>
-  upstream_servers?: string[]
-  blocked_domains?: string[]
+  zone_id: string
+  selector?: { match_labels?: Record<string, string> }
+  record_template: string
+  record_type?: DnsRecordType
   enabled?: boolean
 }
 
@@ -436,6 +463,10 @@ export async function updateDnsPolicy(id: string, req: CreateDnsPolicyRequest): 
 
 export async function deleteDnsPolicy(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/dns-policies/${id}`)
+}
+
+export async function adoptDnsPolicy(hostId: string): Promise<DnsPolicy> {
+  return apiPost<DnsPolicy>(`${API_BASE}/dns-policies/adopt`, { host_id: hostId })
 }
 
 export async function syncDns(): Promise<{ status: string; zones: number }> {

@@ -53,7 +53,7 @@ DEPLOY_SSH_TTY_OPTS=()
 
 usage() {
     cat <<'EOF'
-deploy-remote.sh USER@HOST | USER HOST [PASSWORD] [--sync-only|--quick|--e2e|--cleanup|--dry-run|--uninstall]
+deploy-remote.sh USER@HOST | USER HOST [PASSWORD] [--sync-only|--quick|--e2e|--verify-apis|--cleanup|--dry-run|--uninstall]
         [--remote-build|--remote-check] [--bind ADDR] [--open-firewall] [--no-start] [--deps-only]
 
 Prefer: ./scripts/deploy remote USER@HOST [flags]  |  ./scripts/deploy status
@@ -77,6 +77,7 @@ Examples:
   deploy-remote.sh 212.8.252.194 sus --quick    # HOST USER (auto-swapped)
   deploy-remote.sh sus@host --remote-check
   deploy-remote.sh sus@host --e2e
+  deploy-remote.sh sus@host --verify-apis
   deploy-remote.sh check sus@host
 
 Env: DEPLOY_HOST DEPLOY_USER DEPLOY_DIR SSH_PORT SSHPASS HEALTH_URL STRICT SYNC_ONLY
@@ -202,6 +203,7 @@ REMOTE_BUILD=false
 REMOTE_CHECK=false
 DRY_RUN=false
 RUN_E2E=false
+VERIFY_APIS=false
 
 parse_flags() {
     while [[ $# -gt 0 ]]; do
@@ -209,6 +211,7 @@ parse_flags() {
             --sync-only) SKIP_INSTALL=true; shift ;;
             --quick) QUICK=true; shift ;;
             --e2e) RUN_E2E=true; shift ;;
+            --verify-apis) VERIFY_APIS=true; shift ;;
             --cleanup) CLEANUP=true; shift ;;
             --uninstall) UNINSTALL=true; shift ;;
             --open-firewall) OPEN_FW=true; shift ;;
@@ -617,6 +620,16 @@ if $RUN_E2E; then
         deploy_ui_celebrate "E2E passed"
     else
         warn "E2E failed (deploy itself succeeded)"
+    fi
+fi
+
+if $VERIFY_APIS; then
+    deploy_ui_highlight "🔍 UX API audit"
+    ADMIN_PW="$(ssh_r_bash "$REMOTE" "sudo cat /var/lib/vmspawnd/.admin_password 2>/dev/null | tr -d '\r'" || true)"
+    if [[ -n "$ADMIN_PW" ]] && VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
+        deploy_ui_celebrate "API audit passed"
+    else
+        warn "API audit failed (deploy itself succeeded)"
     fi
 fi
 printf '\n'

@@ -32,6 +32,7 @@ Flags (passed to deploy-remote.sh):
   --bind ADDR       API listen address (default 0.0.0.0 for remote IPv4)
   --open-firewall   open firewalld port 9095
   --e2e             run vmspawnctl verify after deploy
+  --verify-apis     run scripts/audit-ux-apis.sh against deployed host
   --dry-run         show plan only
   --uninstall       remove vmspawnd from remote
   --cleanup         remove remote deploy tree after install

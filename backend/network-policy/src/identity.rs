@@ -79,6 +79,8 @@ impl IdentityAllocator {
             id,
             labels: sorted_labels,
             endpoints: vec![vm_name.to_string()],
+            description: String::new(),
+            managed: true,
             created: now,
             updated: now,
         };

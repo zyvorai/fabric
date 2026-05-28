@@ -5,33 +5,50 @@
 import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
-import type { NetworkPolicy, CreateNetworkPolicyRequest, PolicyRule, PolicyDirection, PolicyAction } from '../../api/network-security'
+import type { NetworkPolicy, CreateNetworkPolicyRequest, PolicyRule, PolicyDirection, PolicyAction, SecurityIdentity } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
 
 interface PoliciesTabProps {
   policies: NetworkPolicy[]
+  identities: SecurityIdentity[]
   onDelete: (id: string) => void
   onAdopt?: (id: string) => void
+  onAdoptIdentity?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function PoliciesTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: PoliciesTabProps) {
+function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptIdentity, onCreate, onSync }: PoliciesTabProps) {
+  const [view, setView] = useState<'policies' | 'identities'>('policies')
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Network Policies</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold">Network Policies</h2>
+          <div className="flex bg-slate-800 rounded-lg p-0.5">
+            {(['policies', 'identities'] as const).map(v => (
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-2">
           <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
-            <Plus className="w-4 h-4" /> Add Policy
-          </button>
+          {view === 'policies' && (
+            <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+              <Plus className="w-4 h-4" /> Add Policy
+            </button>
+          )}
         </div>
       </div>
-      {policies.length === 0 ? (
+
+      {view === 'policies' && (
+      policies.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No network policies configured. Create one to define ingress/egress rules with label selectors.</div>
       ) : (
         <div className="overflow-x-auto">
@@ -83,6 +100,49 @@ function PoliciesTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: P
             </tbody>
           </table>
         </div>
+      )
+      )}
+
+      {view === 'identities' && (
+        identities.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">No security identities yet. Identities are created from VM labels or discovered from firewalld zones and nftables sets on the host.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800">
+                <tr>
+                  <th className="text-left p-4 font-medium text-slate-300">ID</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Endpoints</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {identities.map(i => (
+                  <tr key={i.id} className="hover:bg-white/[0.03] transition">
+                    <td className="p-4 font-mono text-sm">
+                      {i.id}
+                      {isHostManaged(i) && <HostBadge />}
+                      {i.description && <div className="text-xs text-slate-500 font-normal mt-0.5 max-w-xs">{i.description}</div>}
+                    </td>
+                    <td className="p-4"><LabelTags labels={i.labels} /></td>
+                    <td className="p-4 font-mono text-xs text-slate-400 max-w-md truncate" title={i.endpoints.join(', ')}>
+                      {i.endpoints.length > 0 ? i.endpoints.join(', ') : '—'}
+                    </td>
+                    <td className="p-4">
+                      <HostManagedActions
+                        item={{ id: String(i.id), managed: i.managed }}
+                        onDelete={() => {}}
+                        onAdopt={onAdoptIdentity ? () => onAdoptIdentity(String(i.id)) : undefined}
+                        adoptLabel="Adopt"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   )
