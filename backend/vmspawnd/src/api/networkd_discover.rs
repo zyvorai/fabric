@@ -277,24 +277,28 @@ pub fn find_host_link_file(state: &AppState, id: &str) -> Option<LinkFileConfig>
 
 pub fn find_host_port_forward(id: &str) -> Option<PortForwardConfig> {
     let nft = NftManager::new();
-    nft.discover_dnat_rules()
-        .ok()?
-        .into_iter()
-        .find(|p| p.id == id)
+    let mut all = nft.discover_dnat_rules().unwrap_or_default();
+    all.extend(nft.discover_external_dnat_rules().unwrap_or_default());
+    all.into_iter().find(|p| p.id == id)
 }
 
 pub fn merge_port_forwards(mut items: Vec<PortForwardConfig>) -> Vec<PortForwardConfig> {
-    let known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
-    let known_rules: HashSet<(u16, String, u16)> = items
+    let mut known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
+    let mut known_rules: HashSet<(u16, String, u16)> = items
         .iter()
         .map(|p| (p.host_port, p.guest_ip.clone(), p.guest_port))
         .collect();
 
     let nft = NftManager::new();
-    let discovered = nft.discover_dnat_rules().unwrap_or_else(|e| {
-        tracing::warn!("nftables port forward discovery failed: {}", e);
+    let mut discovered = nft.discover_dnat_rules().unwrap_or_else(|e| {
+        tracing::warn!("vmspawnd nftables discovery failed: {}", e);
         Vec::new()
     });
+    let external = nft.discover_external_dnat_rules().unwrap_or_else(|e| {
+        tracing::warn!("external nftables discovery failed: {}", e);
+        Vec::new()
+    });
+    discovered.extend(external);
 
     for d in discovered {
         if known_names.contains(&d.name) {
@@ -303,6 +307,8 @@ pub fn merge_port_forwards(mut items: Vec<PortForwardConfig>) -> Vec<PortForward
         if known_rules.contains(&(d.host_port, d.guest_ip.clone(), d.guest_port)) {
             continue;
         }
+        known_names.insert(d.name.clone());
+        known_rules.insert((d.host_port, d.guest_ip.clone(), d.guest_port));
         items.push(d);
     }
     items

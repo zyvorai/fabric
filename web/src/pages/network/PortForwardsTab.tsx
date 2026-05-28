@@ -47,9 +47,14 @@ function PortForwardsTabContent({ portForwards, onDelete, onCreate, onSync }: Po
             <tbody className="divide-y divide-slate-700/50">
               {portForwards.map(pf => (
                 <tr key={pf.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium flex items-center gap-2">
-                    {pf.name}
-                    {isHostManaged(pf) && <HostBadge />}
+                  <td className="p-4 font-medium">
+                    <span className="flex items-center gap-2 flex-wrap">
+                      {pf.name}
+                      {isHostManaged(pf) && <HostBadge />}
+                    </span>
+                    {pf.description && (
+                      <span className="block text-xs text-slate-500 font-normal mt-0.5">{pf.description}</span>
+                    )}
                   </td>
                   <td className="p-4">
                     <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">{pf.protocol}</span>

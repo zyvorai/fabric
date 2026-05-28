@@ -11,10 +11,11 @@ import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions,
 interface TapsTabProps {
   taps: TapConfig[]
   onDelete: (id: string) => void
+  onAdopt: (id: string) => void
   onCreate: () => void
 }
 
-function TapsTabContent({ taps, onDelete, onCreate }: TapsTabProps) {
+function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -47,7 +48,7 @@ function TapsTabContent({ taps, onDelete, onCreate }: TapsTabProps) {
                   <td className="p-4">{t.multi_queue ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">{t.vnet_hdr ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <HostManagedActions item={t} onDelete={() => onDelete(t.id)} />
+                    <HostManagedActions item={t} onDelete={() => onDelete(t.id)} onAdopt={() => onAdopt(t.id)} />
                   </td>
                 </tr>
               ))}

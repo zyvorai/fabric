@@ -11,10 +11,11 @@ import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged,
 interface VlansTabProps {
   vlans: VlanConfig[]
   onDelete: (id: string) => void
+  onAdopt: (id: string) => void
   onCreate: () => void
 }
 
-function VlansTabContent({ vlans, onDelete, onCreate }: VlansTabProps) {
+function VlansTabContent({ vlans, onDelete, onAdopt, onCreate }: VlansTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -47,7 +48,7 @@ function VlansTabContent({ vlans, onDelete, onCreate }: VlansTabProps) {
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{v.dhcp}</td>
                   <td className="p-4">
-                    <HostManagedActions item={v} onDelete={() => onDelete(v.id)} />
+                    <HostManagedActions item={v} onDelete={() => onDelete(v.id)} onAdopt={() => onAdopt(v.id)} />
                   </td>
                 </tr>
               ))}

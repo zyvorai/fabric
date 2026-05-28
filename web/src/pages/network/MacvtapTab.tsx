@@ -11,10 +11,11 @@ import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged,
 interface MacvtapTabProps {
   macvtaps: MacvtapConfig[]
   onDelete: (id: string) => void
+  onAdopt: (id: string) => void
   onCreate: () => void
 }
 
-function MacvtapTabContent({ macvtaps, onDelete, onCreate }: MacvtapTabProps) {
+function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -49,7 +50,7 @@ function MacvtapTabContent({ macvtaps, onDelete, onCreate }: MacvtapTabProps) {
                   <td className="p-4 text-slate-400 font-mono text-sm">{m.mac_address ?? '-'}</td>
                   <td className="p-4 text-slate-400">{m.mtu ?? '-'}</td>
                   <td className="p-4">
-                    <HostManagedActions item={m} onDelete={() => onDelete(m.id)} />
+                    <HostManagedActions item={m} onDelete={() => onDelete(m.id)} onAdopt={() => onAdopt(m.id)} />
                   </td>
                 </tr>
               ))}

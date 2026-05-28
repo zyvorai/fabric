@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
 import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu } from 'lucide-react'
 import * as api from '../api/networkd'
 import { useConfirm } from '../hooks/useConfirm'
@@ -185,6 +185,24 @@ export default function Network() {
     } catch (e: unknown) { failAction('Failed to adopt interface', e) }
   }
 
+  const adoptHost = async <T extends { id: string; name?: string; match_name?: string }>(
+    label: string,
+    hostId: string,
+    adoptFn: (id: string) => Promise<T>,
+    setState: Dispatch<SetStateAction<T[]>>,
+  ) => {
+    const name = hostId.replace(/^host:/, '')
+    if (!await confirm(`Adopt ${label}`, `Import "${name}" into vmspawnd and write systemd-networkd config?`)) return
+    try {
+      const adopted = await adoptFn(hostId)
+      setState(prev => [...prev.filter(x => x.id !== hostId), adopted])
+      const display = adopted.match_name ?? adopted.name ?? name
+      toast.success(`${label} "${display}" is now managed by vmspawnd`)
+    } catch (e: unknown) {
+      failAction(`Failed to adopt ${label.toLowerCase()}`, e)
+    }
+  }
+
   const handleDeleteLinkfile = async (id: string) => {
     if (!await confirm('Delete Link File', 'Delete this link file config?')) return
     try {
@@ -340,16 +358,16 @@ export default function Network() {
             <BridgesTab bridges={bridges} onDelete={handleDeleteBridge} onAdopt={handleAdoptBridge} onCreate={() => setActiveModal('bridge')} />
           )}
           {activeTab === 'bonds' && (
-            <BondsTab bonds={bonds} onDelete={handleDeleteBond} onCreate={() => setActiveModal('bond')} />
+            <BondsTab bonds={bonds} onDelete={handleDeleteBond} onAdopt={id => adoptHost('Bond', id, api.adoptBond, setBonds)} onCreate={() => setActiveModal('bond')} />
           )}
           {activeTab === 'vlans' && (
-            <VlansTab vlans={vlans} onDelete={handleDeleteVlan} onCreate={() => setActiveModal('vlan')} />
+            <VlansTab vlans={vlans} onDelete={handleDeleteVlan} onAdopt={id => adoptHost('VLAN', id, api.adoptVlan, setVlans)} onCreate={() => setActiveModal('vlan')} />
           )}
           {activeTab === 'macvtap' && (
-            <MacvtapTab macvtaps={macvtaps} onDelete={handleDeleteMacvtap} onCreate={() => setActiveModal('macvtap')} />
+            <MacvtapTab macvtaps={macvtaps} onDelete={handleDeleteMacvtap} onAdopt={id => adoptHost('Macvtap', id, api.adoptMacvtap, setMacvtaps)} onCreate={() => setActiveModal('macvtap')} />
           )}
           {activeTab === 'taps' && (
-            <TapsTab taps={taps} onDelete={handleDeleteTap} onCreate={() => setActiveModal('tap')} />
+            <TapsTab taps={taps} onDelete={handleDeleteTap} onAdopt={id => adoptHost('Tap', id, api.adoptTap, setTaps)} onCreate={() => setActiveModal('tap')} />
           )}
           {activeTab === 'netfiles' && (
             <NetfilesTab netfiles={netfiles} onDelete={handleDeleteNetfile} onAdopt={handleAdoptNetfile} onCreate={() => setActiveModal('netfile')} />

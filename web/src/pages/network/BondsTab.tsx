@@ -11,10 +11,11 @@ import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged,
 interface BondsTabProps {
   bonds: BondConfig[]
   onDelete: (id: string) => void
+  onAdopt: (id: string) => void
   onCreate: () => void
 }
 
-function BondsTabContent({ bonds, onDelete, onCreate }: BondsTabProps) {
+function BondsTabContent({ bonds, onDelete, onAdopt, onCreate }: BondsTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -49,7 +50,7 @@ function BondsTabContent({ bonds, onDelete, onCreate }: BondsTabProps) {
                   <td className="p-4 text-slate-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4">
-                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} />
+                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
                   </td>
                 </tr>
               ))}

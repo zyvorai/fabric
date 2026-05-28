@@ -301,6 +301,10 @@ export async function deleteVlan(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/vlans/${id}`)
 }
 
+export async function adoptVlan(hostId: string): Promise<VlanConfig> {
+  return apiPost<VlanConfig>(`${API_BASE}/networkd/vlans/adopt`, { host_id: hostId })
+}
+
 // ─── Macvtap ──────────────────────────────────────────────────────────────────
 
 export async function listMacvtaps(): Promise<MacvtapConfig[]> {
@@ -319,6 +323,10 @@ export async function deleteMacvtap(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/macvtaps/${id}`)
 }
 
+export async function adoptMacvtap(hostId: string): Promise<MacvtapConfig> {
+  return apiPost<MacvtapConfig>(`${API_BASE}/networkd/macvtaps/adopt`, { host_id: hostId })
+}
+
 // ─── Tap ──────────────────────────────────────────────────────────────────────
 
 export async function listTaps(): Promise<TapConfig[]> {
@@ -335,6 +343,10 @@ export async function getTap(id: string): Promise<TapConfig> {
 
 export async function deleteTap(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/taps/${id}`)
+}
+
+export async function adoptTap(hostId: string): Promise<TapConfig> {
+  return apiPost<TapConfig>(`${API_BASE}/networkd/taps/adopt`, { host_id: hostId })
 }
 
 // ─── Bonds ────────────────────────────────────────────────────────────────────
@@ -357,6 +369,10 @@ export async function updateBond(id: string, req: CreateBondRequest): Promise<Bo
 
 export async function deleteBond(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/bonds/${id}`)
+}
+
+export async function adoptBond(hostId: string): Promise<BondConfig> {
+  return apiPost<BondConfig>(`${API_BASE}/networkd/bonds/adopt`, { host_id: hostId })
 }
 
 // ─── Network Files ────────────────────────────────────────────────────────────

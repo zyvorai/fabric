@@ -410,6 +410,52 @@ pub async fn update_vlan(
     }
 }
 
+pub async fn adopt_vlan(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_vlan));
+    if !super::networkd_discover::is_host_managed_id(&req.host_id) {
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+    }
+    let host = match super::networkd_discover::find_host_vlan(&state, &req.host_id) {
+        Some(v) => v,
+        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host VLAN not found").into_response(),
+    };
+    let stored: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_default();
+    if stored.iter().any(|v| v.name == host.name) {
+        return crate::api_error::json_error(StatusCode::CONFLICT, format!("VLAN '{}' already managed", host.name)).into_response();
+    }
+    let now = Utc::now().to_rfc3339();
+    let cfg = VlanConfig {
+        id: Uuid::new_v4().to_string(),
+        name: host.name,
+        vlan_id: host.vlan_id,
+        parent_interface: host.parent_interface,
+        mtu: host.mtu,
+        addresses: host.addresses,
+        gateway: host.gateway,
+        dns: host.dns,
+        dhcp: host.dhcp,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+        operational_state: host.operational_state,
+    };
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_vlan(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
+        Ok(_) => {
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
+        }
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 pub async fn delete_vlan(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
@@ -503,6 +549,49 @@ pub async fn get_macvtap(
     }
 }
 
+pub async fn adopt_macvtap(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_macvtap));
+    if !super::networkd_discover::is_host_managed_id(&req.host_id) {
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+    }
+    let host = match super::networkd_discover::find_host_macvtap(&state, &req.host_id) {
+        Some(m) => m,
+        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host macvtap not found").into_response(),
+    };
+    let stored: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_default();
+    if stored.iter().any(|m| m.name == host.name) {
+        return crate::api_error::json_error(StatusCode::CONFLICT, format!("Macvtap '{}' already managed", host.name)).into_response();
+    }
+    let now = Utc::now().to_rfc3339();
+    let cfg = MacvtapConfig {
+        id: Uuid::new_v4().to_string(),
+        name: host.name,
+        parent_interface: host.parent_interface,
+        mode: host.mode,
+        mtu: host.mtu,
+        mac_address: host.mac_address,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+        operational_state: host.operational_state,
+    };
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_macvtap(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    match state.store.save_entity("networkd_macvtaps", &cfg.id, &cfg) {
+        Ok(_) => {
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
+        }
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 pub async fn delete_macvtap(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
@@ -588,6 +677,52 @@ pub async fn get_tap(
             crate::api_error::json_error(StatusCode::NOT_FOUND, "TAP device not found").into_response()
         }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load TAP device").into_response(),
+    }
+}
+
+pub async fn adopt_tap(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_tap));
+    if !super::networkd_discover::is_host_managed_id(&req.host_id) {
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+    }
+    let host = match super::networkd_discover::find_host_tap(&state, &req.host_id) {
+        Some(t) => t,
+        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host tap not found").into_response(),
+    };
+    let stored: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_default();
+    if stored.iter().any(|t| t.name == host.name) {
+        return crate::api_error::json_error(StatusCode::CONFLICT, format!("Tap '{}' already managed", host.name)).into_response();
+    }
+    let now = Utc::now().to_rfc3339();
+    let cfg = TapConfig {
+        id: Uuid::new_v4().to_string(),
+        name: host.name,
+        user: host.user,
+        group: host.group,
+        multi_queue: host.multi_queue,
+        vnet_hdr: host.vnet_hdr,
+        bridge: host.bridge,
+        mtu: host.mtu,
+        mac_address: host.mac_address,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+        operational_state: host.operational_state,
+    };
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_tap(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    match state.store.save_entity("networkd_taps", &cfg.id, &cfg) {
+        Ok(_) => {
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
+        }
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
@@ -814,6 +949,61 @@ pub async fn update_bond(
         Ok(_) => {
             if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
             Json(cfg).into_response()
+        }
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+pub async fn adopt_bond(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_bond));
+    if !super::networkd_discover::is_host_managed_id(&req.host_id) {
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+    }
+    let host = match super::networkd_discover::find_host_bond(&state, &req.host_id) {
+        Some(b) => b,
+        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host bond not found").into_response(),
+    };
+    let stored: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_default();
+    if stored.iter().any(|b| b.name == host.name) {
+        return crate::api_error::json_error(StatusCode::CONFLICT, format!("Bond '{}' already managed", host.name)).into_response();
+    }
+    let now = Utc::now().to_rfc3339();
+    let cfg = BondConfig {
+        id: Uuid::new_v4().to_string(),
+        name: host.name,
+        mode: host.mode,
+        mii_monitor_sec: host.mii_monitor_sec,
+        up_delay_sec: host.up_delay_sec,
+        down_delay_sec: host.down_delay_sec,
+        lacp_rate: host.lacp_rate,
+        transmit_hash_policy: host.transmit_hash_policy,
+        min_links: host.min_links,
+        primary_slave: host.primary_slave,
+        slave_interfaces: host.slave_interfaces,
+        mtu: host.mtu,
+        mac_address: host.mac_address,
+        addresses: host.addresses,
+        gateway: host.gateway,
+        dns: host.dns,
+        dhcp: host.dhcp,
+        routes: host.routes,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+        operational_state: host.operational_state,
+    };
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_bond(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
+        Ok(_) => {
+            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            (StatusCode::CREATED, Json(cfg)).into_response()
         }
         Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
