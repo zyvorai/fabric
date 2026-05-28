@@ -433,6 +433,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/events/stream", get(api::events::event_stream))
             // Floating IP routes
             .route("/floating-ips", get(api::network_cloud::list_floating_ips).post(api::network_cloud::create_floating_ip))
+            .route("/floating-ips/adopt", post(api::network_cloud::adopt_floating_ip))
             .route("/floating-ips/{id}", delete(api::network_cloud::delete_floating_ip))
             .route("/floating-ips/{id}/assign", post(api::network_cloud::assign_floating_ip))
             .route("/floating-ips/{id}/unassign", post(api::network_cloud::unassign_floating_ip))
@@ -620,6 +621,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/networkd/netlink/available", get(api::networkd::list_available_interfaces))
             // Network policy routes
             .route("/network-policies", get(api::network_policy::list_policies).post(api::network_policy::create_policy))
+            .route("/network-policies/adopt", post(api::network_policy::adopt_policy))
             .route("/network-policies/sync", post(api::network_policy::sync_policies))
             .route("/network-policies/status", get(api::network_policy::get_policy_status))
             .route("/network-policies/{id}", get(api::network_policy::get_policy).put(api::network_policy::update_policy).delete(api::network_policy::delete_policy))

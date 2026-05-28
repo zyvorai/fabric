@@ -23,12 +23,16 @@ export interface NetworkPolicy {
   id: string
   name: string
   description?: string
-  labels: Record<string, string>
-  ingress_rules: PolicyRule[]
-  egress_rules: PolicyRule[]
-  priority: number
+  labels?: Record<string, string>
+  endpoint_selector?: { match_labels?: Record<string, string> }
+  ingress_rules?: PolicyRule[]
+  egress_rules?: PolicyRule[]
+  ingress?: unknown[]
+  egress?: unknown[]
+  priority?: number
   enabled: boolean
-  matched_vms: number
+  managed?: boolean
+  matched_vms?: number
   created: string
   updated: string
 }
@@ -61,6 +65,10 @@ export async function updateNetworkPolicy(id: string, req: CreateNetworkPolicyRe
 
 export async function deleteNetworkPolicy(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/network-policies/${id}`)
+}
+
+export async function adoptNetworkPolicy(hostId: string): Promise<NetworkPolicy> {
+  return apiPost<NetworkPolicy>(`${API_BASE}/network-policies/adopt`, { host_id: hostId })
 }
 
 export async function syncNetworkPolicies(): Promise<{ status: string; policies: number }> {

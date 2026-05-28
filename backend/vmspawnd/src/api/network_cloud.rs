@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
+use networking::models::AdoptHostRequest;
 use security::{RequireRead, RequireWrite, RequireAdmin};
 
 // ============================================================================
@@ -26,7 +27,13 @@ pub struct FloatingIp {
     pub address: String,
     pub interface: String,
     pub assigned_vm: Option<String>,
+    #[serde(default = "default_managed_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
+}
+
+fn default_managed_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +67,7 @@ pub async fn create_floating_ip(
         address: req.address,
         interface: req.interface,
         assigned_vm: None,
+        managed: true,
         created: Utc::now(),
     };
 
@@ -76,8 +84,14 @@ pub async fn list_floating_ips(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<FloatingIp>> {
     tracing::debug!("network_cloud::{}", stringify!(list_floating_ips));
-    let ips: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(ips)
+    let ips: Vec<FloatingIp> = state
+        .store
+        .list_entities("floating_ips")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
+    Json(super::network_cloud_discover::merge_floating_ips(&state, ips))
 }
 
 /// POST /api/floating-ips/:id/assign - Assign floating IP to a VM (Admin only)
@@ -166,6 +180,16 @@ pub async fn delete_floating_ip(
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(delete_floating_ip));
+    if let Some(host) = super::network_cloud_discover::find_host_floating_ip(&state, &id) {
+        if super::network_cloud_discover::is_host_managed_floating_ip(&host) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This floating IP exists on the host and is not managed by vmspawnd"
+                })),
+            ));
+        }
+    }
     if let Ok(Some(fip)) = state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         if let Err(e) = Command::new("ip")
             .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
@@ -181,6 +205,61 @@ pub async fn delete_floating_ip(
     })?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/floating-ips/adopt - Import a host secondary address into vmspawnd
+pub async fn adopt_floating_ip(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> Result<Json<FloatingIp>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(adopt_floating_ip));
+    let host = match super::network_cloud_discover::find_host_floating_ip(&state, &req.host_id) {
+        Some(f) if super::network_cloud_discover::is_host_managed_floating_ip(&f) => f,
+        _ => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host floating IP not found" })),
+            ));
+        }
+    };
+
+    let stored: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_default();
+    if stored
+        .iter()
+        .any(|f| f.address == host.address && f.interface == host.interface)
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!(
+                    "Floating IP {} on {} is already managed by vmspawnd",
+                    host.address, host.interface
+                )
+            })),
+        ));
+    }
+
+    let fip = FloatingIp {
+        id: uuid::Uuid::new_v4().to_string(),
+        address: host.address,
+        interface: host.interface,
+        assigned_vm: host.assigned_vm,
+        managed: true,
+        created: Utc::now(),
+    };
+
+    state
+        .store
+        .save_entity("floating_ips", &fip.id, &fip)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(fip))
 }
 
 // ============================================================================

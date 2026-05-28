@@ -15,11 +15,13 @@ use networking::host_firewalld::{self, DiscoveredFirewalldZone};
 use networking::host_monitor_tc::{self, DiscoveredHostMonitor};
 use networking::host_nat::{self, DiscoveredHostNatRule};
 use networking::host_nft_filter::{self, DiscoveredNftFilterChain};
+use networking::host_nft_policy::{self, DiscoveredNftPolicyChain};
 use networking::host_services::{self, HostListener};
 use networking::host_tc::{self, DiscoveredTcQdisc};
 use networking::host_tc_mirror::{self, DiscoveredTcMirror};
 use networking::host_wireguard::{self, DiscoveredWireGuard};
 use packet_mirror::models::{CollectorType, MirrorDirection, MirrorSession};
+use network_policy::models::NetworkPolicy;
 use service_mesh::models::{LoadBalancerAlgorithm, Service, ServicePort, ServiceProtocol};
 use traffic_shaping::models::{BandwidthRate, BandwidthUnit, QoSPolicy, TrafficClass};
 use vm_firewall::models::{FirewallAction, FirewallProfile, FirewallZone};
@@ -61,6 +63,10 @@ pub fn is_host_managed_mirror(session: &MirrorSession) -> bool {
 }
 
 pub fn is_host_managed_monitor(policy: &MonitorPolicy) -> bool {
+    !policy.managed
+}
+
+pub fn is_host_managed_network_policy(policy: &NetworkPolicy) -> bool {
     !policy.managed
 }
 
@@ -124,6 +130,13 @@ fn host_monitor_uuid(key: &str) -> Uuid {
     Uuid::new_v5(
         &Uuid::NAMESPACE_DNS,
         format!("vmspawnd:host:monitor:{key}").as_bytes(),
+    )
+}
+
+fn host_network_policy_uuid(key: &str) -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:netpol:{key}").as_bytes(),
     )
 }
 
@@ -639,6 +652,55 @@ pub fn merge_monitor_policies(_state: &AppState, mut items: Vec<MonitorPolicy>) 
 pub fn find_host_monitor_policy(_state: &AppState, id: &str) -> Option<MonitorPolicy> {
     let uuid = Uuid::parse_str(id).ok()?;
     merge_monitor_policies(_state, vec![])
+        .into_iter()
+        .find(|p| p.id == uuid)
+}
+
+fn network_policy_from_discovered(d: DiscoveredNftPolicyChain) -> NetworkPolicy {
+    let now = Utc::now();
+    NetworkPolicy {
+        id: host_network_policy_uuid(&d.key),
+        name: d.name,
+        description: d.description,
+        endpoint_selector: Default::default(),
+        ingress: Vec::new(),
+        egress: Vec::new(),
+        enabled: false,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_network_policies() -> Vec<NetworkPolicy> {
+    host_nft_policy::discover_host_nft_policy_chains()
+        .unwrap_or_else(|e| {
+            tracing::warn!("host nft policy discovery failed: {}", e);
+            Vec::new()
+        })
+        .into_iter()
+        .map(network_policy_from_discovered)
+        .collect()
+}
+
+pub fn merge_network_policies(_state: &AppState, mut items: Vec<NetworkPolicy>) -> Vec<NetworkPolicy> {
+    let mut known_ids: HashSet<Uuid> = items.iter().map(|p| p.id).collect();
+    let mut known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
+
+    for host in discover_host_network_policies() {
+        if known_ids.contains(&host.id) || known_names.contains(&host.name) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_names.insert(host.name.clone());
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_network_policy(_state: &AppState, id: &str) -> Option<NetworkPolicy> {
+    let uuid = Uuid::parse_str(id).ok()?;
+    merge_network_policies(_state, vec![])
         .into_iter()
         .find(|p| p.id == uuid)
 }

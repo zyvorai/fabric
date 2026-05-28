@@ -5,9 +5,11 @@
 pub mod host_discovery;
 pub mod host_dns;
 pub mod host_firewalld;
+pub mod host_floating_ips;
 pub mod host_monitor_tc;
 pub mod host_nat;
 pub mod host_nft_filter;
+pub mod host_nft_policy;
 pub mod host_services;
 pub mod host_tc;
 pub mod host_tc_mirror;

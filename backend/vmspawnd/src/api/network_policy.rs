@@ -18,6 +18,7 @@ use network_policy::compiler::VMSnapshot;
 use network_policy::models::{
     CreateNetworkPolicyRequest, NetworkPolicy, PolicyStatus,
 };
+use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -63,6 +64,7 @@ pub async fn create_policy(
         ingress: req.ingress,
         egress: req.egress,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -89,7 +91,10 @@ pub async fn list_policies(
 ) -> impl IntoResponse {
     tracing::debug!("network_policy::{}", stringify!(list_policies));
     match state.store.list_entities::<NetworkPolicy>(STORE_KEY) {
-        Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
+        Ok(policies) => {
+            let merged = super::net_security_discover::merge_network_policies(&state, policies);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -106,11 +111,17 @@ pub async fn get_policy(
     tracing::debug!("network_policy::{}", stringify!(get_policy));
     match state.store.get_entity::<NetworkPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Network policy not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(policy) = super::net_security_discover::find_host_network_policy(&state, &id)
+            {
+                return (StatusCode::OK, Json(policy)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Network policy not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -152,6 +163,7 @@ pub async fn update_policy(
         ingress: req.ingress,
         egress: req.egress,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -177,6 +189,17 @@ pub async fn delete_policy(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("network_policy::{}", stringify!(delete_policy));
+    if let Some(host) = super::net_security_discover::find_host_network_policy(&state, &id) {
+        if super::net_security_discover::is_host_managed_network_policy(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This network policy reflects host nftables and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -190,6 +213,62 @@ pub async fn delete_policy(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_policy(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("network_policy::{}", stringify!(adopt_policy));
+    let host = match super::net_security_discover::find_host_network_policy(&state, &req.host_id) {
+        Some(p) if super::net_security_discover::is_host_managed_network_policy(&p) => p,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host network policy not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<NetworkPolicy> = state.store.list_entities(STORE_KEY).unwrap_or_default();
+    if stored.iter().any(|p| p.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Network policy '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let policy = NetworkPolicy {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        endpoint_selector: host.endpoint_selector,
+        ingress: host.ingress,
+        egress: host.egress,
+        enabled: false,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &policy.id.to_string(), &policy)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    (StatusCode::CREATED, Json(policy)).into_response()
 }
 
 // ── Identity queries ─────────────────────────────────────────────────

@@ -216,6 +216,13 @@ export default function NetworkSecurity() {
     } catch (e: unknown) { failAction('Failed to adopt monitor policy', e) }
   }
 
+  const handleAdoptNetworkPolicy = async (id: string) => {
+    try {
+      const adopted = await api.adoptNetworkPolicy(id)
+      setPolicies(prev => [...prev.filter(p => p.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt network policy', e) }
+  }
+
   const handleDeleteService = async (id: string) => {
     if (!await confirm('Delete Service', 'Delete this service?')) return
     try { await api.deleteService(id); setServices(prev => prev.filter(s => s.id !== id)) }
@@ -396,7 +403,13 @@ export default function NetworkSecurity() {
       ) : (
         <>
           {activeTab === 'policies' && (
-            <PoliciesTab policies={policies} onDelete={handleDeletePolicy} onCreate={() => setActiveModal('policy')} onSync={() => handleSync(api.syncNetworkPolicies)} />
+            <PoliciesTab
+              policies={policies}
+              onDelete={handleDeletePolicy}
+              onAdopt={handleAdoptNetworkPolicy}
+              onCreate={() => setActiveModal('policy')}
+              onSync={() => handleSync(api.syncNetworkPolicies)}
+            />
           )}
           {activeTab === 'firewall' && (
             <FirewallTab

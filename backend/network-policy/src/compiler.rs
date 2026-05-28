@@ -212,6 +212,7 @@ mod tests {
             ingress,
             egress,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

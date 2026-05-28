@@ -18,6 +18,7 @@ pub mod images;
 pub mod machined;
 pub mod migration;
 pub mod network_cloud;
+pub mod network_cloud_discover;
 pub mod notifications;
 pub mod profiles;
 pub mod quotas;

@@ -6,17 +6,18 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { NetworkPolicy, CreateNetworkPolicyRequest, PolicyRule, PolicyDirection, PolicyAction } from '../../api/network-security'
-import { ModalWrapper, InputField, extractErrorMessage } from '../network/ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
 
 interface PoliciesTabProps {
   policies: NetworkPolicy[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function PoliciesTabContent({ policies, onDelete, onCreate, onSync }: PoliciesTabProps) {
+function PoliciesTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: PoliciesTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -48,31 +49,37 @@ function PoliciesTabContent({ policies, onDelete, onCreate, onSync }: PoliciesTa
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {policies.map(p => (
+              {policies.map(p => {
+                const ingressCount = p.ingress_rules?.length ?? p.ingress?.length ?? 0
+                const egressCount = p.egress_rules?.length ?? p.egress?.length ?? 0
+                const labels = p.labels ?? p.endpoint_selector?.match_labels
+                return (
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
-                    <div className="font-medium">{p.name}</div>
+                    <div className="font-medium">{p.name}{isHostManaged(p) && <HostBadge />}</div>
                     {p.description && <div className="text-xs text-slate-500 mt-1">{p.description}</div>}
                   </td>
-                  <td className="p-4"><LabelTags labels={p.labels} /></td>
+                  <td className="p-4"><LabelTags labels={labels} /></td>
                   <td className="p-4">
-                    <StatusBadge status={`${p.ingress_rules.length} rules`} color="green" />
+                    <StatusBadge status={`${ingressCount} rules`} color="green" />
                   </td>
                   <td className="p-4">
-                    <StatusBadge status={`${p.egress_rules.length} rules`} color="yellow" />
+                    <StatusBadge status={`${egressCount} rules`} color="yellow" />
                   </td>
-                  <td className="p-4 font-mono text-sm">{p.priority}</td>
-                  <td className="p-4 text-blue-400 font-medium">{p.matched_vms}</td>
+                  <td className="p-4 font-mono text-sm">{p.priority ?? '—'}</td>
+                  <td className="p-4 text-blue-400 font-medium">{p.matched_vms ?? (isHostManaged(p) ? 'host' : '—')}</td>
                   <td className="p-4">
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(p.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions
+                      item={{ id: p.id, managed: p.managed }}
+                      onDelete={() => onDelete(p.id)}
+                      onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
+                    />
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

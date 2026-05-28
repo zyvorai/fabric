@@ -3,8 +3,9 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
-import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu } from 'lucide-react'
+import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu, Globe } from 'lucide-react'
 import * as api from '../api/networkd'
+import * as cloudApi from '../api/network-cloud'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type {
@@ -23,8 +24,10 @@ import {
   PortForwardsTab, CreatePortForwardModal,
   VxlansTab, CreateVxlanModal,
   SriovTab, CreateSriovModal,
+  FloatingIpsTab,
   StatusTab,
 } from './network/index'
+import type { FloatingIp } from '../api/network-cloud'
 import { countNetfileTypes } from './network/NetfilesTab'
 import { extractErrorMessage } from './network/ModalShared'
 import ErrorBanner from '../components/ErrorBanner'
@@ -34,7 +37,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import { hintsForError } from '../utils/daemonHints'
 import SubsystemBanner from '../components/SubsystemBanner'
 
-type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'status'
+type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'floatingips' | 'status'
 type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | null
 
 export default function Network() {
@@ -50,6 +53,7 @@ export default function Network() {
   const [portForwards, setPortForwards] = useState<PortForwardConfig[]>([])
   const [vxlans, setVxlans] = useState<VxlanConfig[]>([])
   const [sriov, setSriov] = useState<SriovConfig[]>([])
+  const [floatingIps, setFloatingIps] = useState<FloatingIp[]>([])
   const [links, setLinks] = useState<LinkInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +66,7 @@ export default function Network() {
     setLoading(true)
     setError(null)
     try {
-      const [b, bo, v, m, t, nf, lf, pf, vx, sr, l] = await Promise.all([
+      const [b, bo, v, m, t, nf, lf, pf, vx, sr, fip, l] = await Promise.all([
         api.listBridges(),
         api.listBonds(),
         api.listVlans(),
@@ -73,6 +77,7 @@ export default function Network() {
         api.listPortForwards(),
         api.listVxlans(),
         api.listSriov(),
+        cloudApi.listFloatingIps().catch(() => []),
         api.listLinks().catch(() => []),
       ])
       setBridges(b)
@@ -85,6 +90,7 @@ export default function Network() {
       setPortForwards(pf)
       setVxlans(vx)
       setSriov(sr)
+      setFloatingIps(fip)
       setLinks(l)
     } catch (e: unknown) {
       const msg = formatUserError(e)
@@ -242,6 +248,23 @@ export default function Network() {
     } catch (e: unknown) { failAction('Failed to delete SR-IOV', e) }
   }
 
+  const handleDeleteFloatingIp = async (id: string) => {
+    if (!await confirm('Delete Floating IP', 'Remove this floating IP from vmspawnd?')) return
+    try {
+      await cloudApi.deleteFloatingIp(id)
+      setFloatingIps(prev => prev.filter(f => f.id !== id))
+    } catch (e: unknown) { failAction('Failed to delete floating IP', e) }
+  }
+
+  const handleAdoptFloatingIp = async (hostId: string) => {
+    if (!await confirm('Adopt Floating IP', 'Import this host address into vmspawnd?')) return
+    try {
+      const adopted = await cloudApi.adoptFloatingIp(hostId)
+      setFloatingIps(prev => [...prev.filter(f => f.id !== hostId), adopted])
+      toast.success(`Floating IP ${adopted.address} is now managed by vmspawnd`)
+    } catch (e: unknown) { failAction('Failed to adopt floating IP', e) }
+  }
+
   const netfileCounts = useMemo(() => countNetfileTypes(netfiles), [netfiles])
 
   const closeModal = () => setActiveModal(null)
@@ -257,6 +280,7 @@ export default function Network() {
     { key: 'portforwards', label: 'Port Forwards', icon: <ArrowRightLeft className="w-4 h-4" /> },
     { key: 'vxlan', label: 'VXLAN', icon: <Radio className="w-4 h-4" /> },
     { key: 'sriov', label: 'SR-IOV', icon: <Cpu className="w-4 h-4" /> },
+    { key: 'floatingips', label: 'Floating IPs', icon: <Globe className="w-4 h-4" /> },
     { key: 'status', label: 'Status', icon: <RefreshCw className="w-4 h-4" /> },
   ]
 
@@ -398,6 +422,13 @@ export default function Network() {
               onDelete={handleDeleteSriov}
               onAdopt={id => adoptHost('SR-IOV', id, api.adoptSriov, setSriov)}
               onCreate={() => setActiveModal('sriov')}
+            />
+          )}
+          {activeTab === 'floatingips' && (
+            <FloatingIpsTab
+              floatingIps={floatingIps}
+              onDelete={handleDeleteFloatingIp}
+              onAdopt={handleAdoptFloatingIp}
             />
           )}
           {activeTab === 'status' && <StatusTab links={links} onRefresh={fetchAll} />}
