@@ -69,6 +69,8 @@ export interface VlanConfig {
   dhcp: DhcpMode
   created: string
   updated: string
+  managed?: boolean
+  operational_state?: string
 }
 
 export interface CreateVlanRequest {
@@ -91,6 +93,8 @@ export interface MacvtapConfig {
   mac_address?: string
   created: string
   updated: string
+  managed?: boolean
+  operational_state?: string
 }
 
 export interface CreateMacvtapRequest {
@@ -113,6 +117,8 @@ export interface TapConfig {
   mac_address?: string
   created: string
   updated: string
+  managed?: boolean
+  operational_state?: string
 }
 
 export interface CreateTapRequest {
@@ -147,6 +153,8 @@ export interface BondConfig {
   routes: RouteEntry[]
   created: string
   updated: string
+  managed?: boolean
+  operational_state?: string
 }
 
 export interface CreateBondRequest {
@@ -184,6 +192,8 @@ export interface NetworkFileConfig {
   description?: string
   created: string
   updated: string
+  managed?: boolean
+  operational_state?: string
 }
 
 export interface CreateNetworkFileRequest {
@@ -213,6 +223,8 @@ export interface LinkFileConfig {
   description?: string
   created: string
   updated: string
+  managed?: boolean
+  source_file?: string
 }
 
 export interface CreateLinkFileRequest {
@@ -391,6 +403,7 @@ export interface PortForwardConfig {
   description?: string
   created: string
   updated: string
+  managed?: boolean
 }
 
 export interface CreatePortForwardRequest {

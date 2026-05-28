@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState } from 'react'
-import { Plus, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { PortForwardConfig, CreatePortForwardRequest, Protocol } from '../../api/networkd'
-import { ModalWrapper, InputField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface PortForwardsTabProps {
   portForwards: PortForwardConfig[]
@@ -47,7 +47,10 @@ function PortForwardsTabContent({ portForwards, onDelete, onCreate, onSync }: Po
             <tbody className="divide-y divide-slate-700/50">
               {portForwards.map(pf => (
                 <tr key={pf.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{pf.name}</td>
+                  <td className="p-4 font-medium flex items-center gap-2">
+                    {pf.name}
+                    {isHostManaged(pf) && <HostBadge />}
+                  </td>
                   <td className="p-4">
                     <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">{pf.protocol}</span>
                   </td>
@@ -55,9 +58,7 @@ function PortForwardsTabContent({ portForwards, onDelete, onCreate, onSync }: Po
                   <td className="p-4 font-mono text-sm text-slate-400">{pf.guest_ip}:{pf.guest_port}</td>
                   <td className="p-4">{pf.enabled ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(pf.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions item={pf} onDelete={() => onDelete(pf.id)} />
                   </td>
                 </tr>
               ))}

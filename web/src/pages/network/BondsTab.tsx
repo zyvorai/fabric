@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { BondConfig, CreateBondRequest, BondMode } from '../../api/networkd'
-import { ModalWrapper, InputField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface BondsTabProps {
   bonds: BondConfig[]
@@ -41,7 +41,7 @@ function BondsTabContent({ bonds, onDelete, onCreate }: BondsTabProps) {
             <tbody className="divide-y divide-slate-700/50">
               {bonds.map(b => (
                 <tr key={b.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{b.name}</td>
+                  <td className="p-4 font-medium">{b.name}{isHostManaged(b) && <HostBadge />}</td>
                   <td className="p-4">
                     <span className="px-2 py-1 rounded text-xs font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{b.mode}</span>
                   </td>
@@ -49,9 +49,7 @@ function BondsTabContent({ bonds, onDelete, onCreate }: BondsTabProps) {
                   <td className="p-4 text-slate-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(b.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} />
                   </td>
                 </tr>
               ))}

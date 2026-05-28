@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { TapConfig, CreateTapRequest } from '../../api/networkd'
-import { ModalWrapper, InputField, CheckboxField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface TapsTabProps {
   taps: TapConfig[]
@@ -41,15 +41,13 @@ function TapsTabContent({ taps, onDelete, onCreate }: TapsTabProps) {
             <tbody className="divide-y divide-slate-700/50">
               {taps.map(t => (
                 <tr key={t.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{t.name}</td>
+                  <td className="p-4 font-medium">{t.name}{isHostManaged(t) && <HostBadge />}</td>
                   <td className="p-4 text-slate-400">{t.bridge ?? '-'}</td>
                   <td className="p-4 text-slate-400">{t.user ?? '-'}</td>
                   <td className="p-4">{t.multi_queue ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">{t.vnet_hdr ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(t.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions item={t} onDelete={() => onDelete(t.id)} />
                   </td>
                 </tr>
               ))}

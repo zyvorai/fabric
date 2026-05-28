@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { BridgeConfig, CreateBridgeRequest } from '../../api/networkd'
-import { ModalWrapper, InputField, CheckboxField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface BridgesTabProps {
   bridges: BridgeConfig[]
@@ -43,26 +43,14 @@ function BridgesTabContent({ bridges, onDelete, onCreate }: BridgesTabProps) {
                 <tr key={b.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">
                     {b.name}
-                    {b.managed === false && (
-                      <span className="ml-2 px-2 py-0.5 rounded text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                        Host
-                      </span>
-                    )}
+                    {isHostManaged(b) && <HostBadge />}
                   </td>
                   <td className="p-4 text-slate-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
                   <td className="p-4">{b.stp ? <span className="text-green-400">on</span> : <span className="text-slate-500">off</span>}</td>
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4 text-slate-400">{b.mtu ?? '-'}</td>
                   <td className="p-4">
-                    {b.managed !== false ? (
-                      <button onClick={() => onDelete(b.id)} className="p-2 hover:bg-red-600 rounded transition" title="Delete bridge">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-500" title="Managed outside vmspawnd (e.g. libvirt)">
-                        {b.operational_state ?? 'external'}
-                      </span>
-                    )}
+                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} />
                   </td>
                 </tr>
               ))}

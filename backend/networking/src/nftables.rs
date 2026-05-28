@@ -136,6 +136,12 @@ impl NftManager {
         Ok(())
     }
 
+    /// Discover DNAT rules in the vmspawnd prerouting chain (live nftables).
+    pub fn discover_dnat_rules(&self) -> Result<Vec<PortForwardConfig>> {
+        let json = self.list_rules()?;
+        Ok(parse_dnat_rules_from_json(&json))
+    }
+
     /// Return the JSON output of `nft -j list table ip vmspawnd`.
     pub fn list_rules(&self) -> Result<serde_json::Value> {
         let output = Command::new("nft")
@@ -275,6 +281,165 @@ fn subnet_from_ip(ip: &str) -> String {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedDnatRule {
+    name: String,
+    protocol: Protocol,
+    host_port: u16,
+    guest_ip: String,
+    guest_port: u16,
+    interface: Option<String>,
+}
+
+/// Parse DNAT port-forward rules from `nft -j list table ip vmspawnd`.
+fn parse_dnat_rules_from_json(json: &serde_json::Value) -> Vec<PortForwardConfig> {
+    let mut partial: Vec<ParsedDnatRule> = Vec::new();
+
+    let Some(items) = json.get("nftables").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+
+    for item in items {
+        let Some(rule) = item.get("rule") else { continue };
+        if rule.get("chain").and_then(|c| c.as_str()) != Some("prerouting") {
+            continue;
+        }
+        let Some(exprs) = rule.get("expr").and_then(|e| e.as_array()) else {
+            continue;
+        };
+
+        let mut name = None;
+        let mut protocol = None;
+        let mut host_port = None;
+        let mut guest_ip = None;
+        let mut guest_port = None;
+        let mut interface = None;
+
+        for expr in exprs {
+            if let Some(comment) = expr.get("comment").and_then(|c| c.as_str()) {
+                if !comment.starts_with("vm-nat-") {
+                    name = Some(comment.to_string());
+                }
+                continue;
+            }
+            if let Some(dnat) = expr.get("dnat") {
+                guest_ip = dnat
+                    .get("addr")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string);
+                guest_port = dnat.get("port").and_then(|v| v.as_u64()).map(|p| p as u16);
+                continue;
+            }
+            if let Some(m) = expr.get("match") {
+                if let Some(payload) = m.get("left").and_then(|l| l.get("payload")) {
+                    let proto = payload.get("protocol").and_then(|p| p.as_str());
+                    let field = payload.get("field").and_then(|f| f.as_str());
+                    if field == Some("dport") {
+                        if let Some(right) = m.get("right").and_then(|r| r.as_u64()) {
+                            host_port = Some(right as u16);
+                        }
+                        if proto == Some("tcp") {
+                            protocol = Some(Protocol::Tcp);
+                        } else if proto == Some("udp") {
+                            protocol = Some(Protocol::Udp);
+                        }
+                    }
+                }
+                if let Some(meta) = m.get("left").and_then(|l| l.get("meta")) {
+                    if meta.get("key").and_then(|k| k.as_str()) == Some("iifname") {
+                        if let Some(iface) = m.get("right").and_then(|r| r.as_str()) {
+                            interface = Some(iface.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        let (Some(name), Some(host_port), Some(guest_ip), Some(guest_port)) =
+            (name, host_port, guest_ip, guest_port)
+        else {
+            continue;
+        };
+
+        partial.push(ParsedDnatRule {
+            name,
+            protocol: protocol.unwrap_or(Protocol::Tcp),
+            host_port,
+            guest_ip,
+            guest_port,
+            interface,
+        });
+    }
+
+    merge_discovered_dnat_rules(partial)
+}
+
+fn merge_discovered_dnat_rules(rules: Vec<ParsedDnatRule>) -> Vec<PortForwardConfig> {
+    use std::collections::HashMap;
+
+    let mut by_key: HashMap<(String, u16, String, u16), (ParsedDnatRule, bool, bool)> =
+        HashMap::new();
+
+    for r in rules {
+        let key = (
+            r.name.clone(),
+            r.host_port,
+            r.guest_ip.clone(),
+            r.guest_port,
+        );
+        let entry = by_key.entry(key).or_insert_with(|| {
+            (
+                ParsedDnatRule {
+                    name: r.name.clone(),
+                    protocol: r.protocol,
+                    host_port: r.host_port,
+                    guest_ip: r.guest_ip.clone(),
+                    guest_port: r.guest_port,
+                    interface: r.interface.clone(),
+                },
+                false,
+                false,
+            )
+        });
+        if r.interface.is_some() && entry.0.interface.is_none() {
+            entry.0.interface = r.interface.clone();
+        }
+        match r.protocol {
+            Protocol::Tcp => entry.1 = true,
+            Protocol::Udp => entry.2 = true,
+            Protocol::Both => {
+                entry.1 = true;
+                entry.2 = true;
+            }
+        }
+    }
+
+    by_key
+        .into_values()
+        .map(|(mut r, has_tcp, has_udp)| {
+            r.protocol = match (has_tcp, has_udp) {
+                (true, true) => Protocol::Both,
+                (_, true) => Protocol::Udp,
+                _ => Protocol::Tcp,
+            };
+            PortForwardConfig {
+                id: format!("host:nft:{}", r.name),
+                name: r.name,
+                protocol: r.protocol,
+                host_port: r.host_port,
+                guest_ip: r.guest_ip,
+                guest_port: r.guest_port,
+                interface: r.interface,
+                enabled: true,
+                description: Some("Live nftables DNAT rule".into()),
+                created: String::new(),
+                updated: String::new(),
+                managed: false,
+            }
+        })
+        .collect()
+}
+
 /// Parse JSON rule output and find handles whose comment matches needle.
 fn find_rule_handles(json: &serde_json::Value, chain: &str, comment_needle: &str) -> Vec<u64> {
     let mut handles = Vec::new();
@@ -357,7 +522,43 @@ mod tests {
             description: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
         }
+    }
+
+    #[test]
+    fn test_parse_dnat_rules_from_json() {
+        let json = serde_json::json!({
+            "nftables": [
+                {
+                    "rule": {
+                        "chain": "prerouting",
+                        "expr": [
+                            {"match": {"op": "==", "left": {"payload": {"protocol": "tcp", "field": "dport"}}, "right": 8080}},
+                            {"dnat": {"addr": "192.168.100.10", "port": 80}},
+                            {"comment": "web-server"}
+                        ]
+                    }
+                },
+                {
+                    "rule": {
+                        "chain": "prerouting",
+                        "expr": [
+                            {"match": {"op": "==", "left": {"payload": {"protocol": "udp", "field": "dport"}}, "right": 8080}},
+                            {"dnat": {"addr": "192.168.100.10", "port": 80}},
+                            {"comment": "web-server"}
+                        ]
+                    }
+                }
+            ]
+        });
+        let rules = parse_dnat_rules_from_json(&json);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].name, "web-server");
+        assert_eq!(rules[0].protocol, Protocol::Both);
+        assert_eq!(rules[0].host_port, 8080);
+        assert!(!rules[0].managed);
+        assert!(rules[0].id.starts_with("host:nft:"));
     }
 
     #[test]

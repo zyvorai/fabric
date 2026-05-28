@@ -263,6 +263,10 @@ pub struct VlanConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operational_state: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -299,6 +303,10 @@ pub struct MacvtapConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operational_state: Option<String>,
 }
 
 fn default_macvtap_mode() -> MacvtapMode {
@@ -342,6 +350,10 @@ pub struct TapConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operational_state: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -406,6 +418,10 @@ pub struct BondConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operational_state: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -478,6 +494,10 @@ pub struct NetworkFileConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operational_state: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -535,6 +555,10 @@ pub struct LinkFileConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_file: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -640,6 +664,9 @@ pub struct PortForwardConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    /// False when discovered from live nftables but not stored in vmspawnd.
+    #[serde(default = "default_true")]
+    pub managed: bool,
 }
 
 fn default_enabled() -> bool {

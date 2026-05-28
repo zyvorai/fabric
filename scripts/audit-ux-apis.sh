@@ -54,6 +54,15 @@ ENDPOINTS=(
   /api/billing/usage
   /api/networkd/links
   /api/networkd/bridges
+  /api/networkd/bonds
+  /api/networkd/vlans
+  /api/networkd/macvtaps
+  /api/networkd/taps
+  /api/networkd/network-files
+  /api/networkd/link-files
+  /api/networkd/port-forwards
+  /api/networkd/vxlans
+  /api/networkd/sriov
   /api/services
   /api/drs/recommendations/default
   /api/webhooks/deliveries

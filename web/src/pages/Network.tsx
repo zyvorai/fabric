@@ -233,7 +233,7 @@ export default function Network() {
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
           <div className="text-slate-400 text-xs mb-1">Interfaces</div>
-          <div className="text-2xl font-bold text-yellow-400">{links.length || netfiles.length}</div>
+          <div className="text-2xl font-bold text-yellow-400">{netfiles.length}</div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
           <div className="text-slate-400 text-xs mb-1">Link Files</div>

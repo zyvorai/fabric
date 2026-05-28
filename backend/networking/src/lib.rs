@@ -2,6 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+pub mod host_discovery;
 pub mod models;
 pub mod netlink;
 pub mod nftables;
@@ -393,6 +394,11 @@ impl NetworkdManager {
 
         links.sort_by(|a, b| a.index.cmp(&b.index));
         Ok(links)
+    }
+
+    /// Host interface discovery (shared by API list endpoints).
+    pub fn discover_host_interfaces(&self) -> Result<Vec<host_discovery::HostNetDevice>> {
+        host_discovery::discover_interfaces()
     }
 
     fn list_bridge_names_ip(&self) -> Result<std::collections::HashSet<String>> {

@@ -23,11 +23,28 @@ use networking::models::{
 use networking::nftables::NftManager;
 use networking::NetworkdManager;
 
-fn networkd_manager(state: &AppState) -> NetworkdManager {
+pub(crate) fn networkd_manager(state: &AppState) -> NetworkdManager {
     NetworkdManager::new(
         &state.config.network.networkd_config_dir,
         &state.config.network.networkd_file_prefix,
     )
+}
+
+fn reject_host_delete(id: &str, kind: &str) -> Option<axum::response::Response> {
+    if super::networkd_discover::is_host_managed_id(id) {
+        Some(
+            crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "This {} exists on the host and is not managed by vmspawnd",
+                    kind
+                ),
+            )
+            .into_response(),
+        )
+    } else {
+        None
+    }
 }
 
 // ============================================================================
@@ -36,44 +53,14 @@ fn networkd_manager(state: &AppState) -> NetworkdManager {
 
 pub async fn list_bridges(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bridges));
-    let mut items: Vec<BridgeConfig> = state
+    let items: Vec<BridgeConfig> = state
         .store
         .list_entities("networkd_bridges")
         .unwrap_or_else(|e| {
             tracing::error!("Storage error: {}", e);
             Vec::new()
         });
-
-    let known: std::collections::HashSet<String> = items.iter().map(|b| b.name.clone()).collect();
-    let mgr = networkd_manager(&state);
-    if let Ok(links) = mgr.list_links() {
-        for link in links.into_iter().filter(|l| l.kind.eq_ignore_ascii_case("bridge")) {
-            if known.contains(&link.name) {
-                continue;
-            }
-            items.push(BridgeConfig {
-                id: format!("host:{}", link.name),
-                name: link.name,
-                stp: None,
-                forward_delay_sec: None,
-                hello_time_sec: None,
-                max_age_sec: None,
-                vlan_filtering: None,
-                mtu: None,
-                mac_address: None,
-                addresses: Vec::new(),
-                gateway: None,
-                dns: Vec::new(),
-                dhcp: networking::models::DhcpMode::default(),
-                created: String::new(),
-                updated: String::new(),
-                managed: false,
-                operational_state: Some(link.operational_state),
-            });
-        }
-    }
-
-    Json(items)
+    Json(super::networkd_discover::merge_bridges(&state, items))
 }
 
 pub async fn create_bridge(
@@ -218,7 +205,7 @@ pub async fn delete_bridge(
 pub async fn list_vlans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vlans));
     let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_vlans(&state, items))
 }
 
 pub async fn create_vlan(
@@ -250,6 +237,8 @@ pub async fn create_vlan(
         dhcp: req.dhcp,
         created: now.clone(),
         updated: now,
+        managed: true,
+        operational_state: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -319,6 +308,8 @@ pub async fn update_vlan(
         dhcp: req.dhcp,
         created: existing.created,
         updated: Utc::now().to_rfc3339(),
+        managed: existing.managed,
+        operational_state: existing.operational_state,
     };
 
     if let Err(e) = mgr.apply_vlan(&cfg) {
@@ -340,13 +331,16 @@ pub async fn delete_vlan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_vlan));
+    if let Some(resp) = reject_host_delete(&id, "VLAN") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_vlans", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -356,7 +350,7 @@ pub async fn delete_vlan(
 pub async fn list_macvtaps(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_macvtaps));
     let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_macvtaps(&state, items))
 }
 
 pub async fn create_macvtap(
@@ -386,6 +380,8 @@ pub async fn create_macvtap(
         mac_address: Some(mac),
         created: now.clone(),
         updated: now,
+        managed: true,
+        operational_state: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -421,13 +417,16 @@ pub async fn delete_macvtap(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_macvtap));
+    if let Some(resp) = reject_host_delete(&id, "macvtap") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_macvtaps", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -437,7 +436,7 @@ pub async fn delete_macvtap(
 pub async fn list_taps(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_taps));
     let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_taps(&state, items))
 }
 
 pub async fn create_tap(
@@ -462,6 +461,8 @@ pub async fn create_tap(
         mac_address: req.mac_address,
         created: now.clone(),
         updated: now,
+        managed: true,
+        operational_state: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -497,13 +498,16 @@ pub async fn delete_tap(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_tap));
+    if let Some(resp) = reject_host_delete(&id, "tap device") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<TapConfig>("networkd_taps", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_taps", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -546,11 +550,18 @@ pub async fn reload_networkd(RequireWrite(_claims): RequireWrite, State(state): 
 
 pub async fn list_managed_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_managed_files));
-    let mgr = networkd_manager(&state);
-    match mgr.list_managed_files() {
-        Ok(files) => Json(files).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    let mut files = networking::host_discovery::list_systemd_network_files(
+        &state.config.network.networkd_config_dir,
+    );
+    if let Ok(managed) = networkd_manager(&state).list_managed_files() {
+        for f in managed {
+            if !files.contains(&f) {
+                files.push(f);
+            }
+        }
     }
+    files.sort();
+    Json(files).into_response()
 }
 
 // ============================================================================
@@ -560,7 +571,7 @@ pub async fn list_managed_files(RequireRead(_claims): RequireRead, State(state):
 pub async fn list_bonds(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bonds));
     let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_bonds(&state, items))
 }
 
 pub async fn create_bond(
@@ -603,6 +614,8 @@ pub async fn create_bond(
         routes: req.routes,
         created: now.clone(),
         updated: now,
+        managed: true,
+        operational_state: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -683,6 +696,8 @@ pub async fn update_bond(
         routes: req.routes,
         created: existing.created,
         updated: Utc::now().to_rfc3339(),
+        managed: existing.managed,
+        operational_state: existing.operational_state,
     };
 
     if let Err(e) = mgr.apply_bond(&cfg) {
@@ -704,13 +719,16 @@ pub async fn delete_bond(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_bond));
+    if let Some(resp) = reject_host_delete(&id, "bond") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_bonds", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -720,7 +738,7 @@ pub async fn delete_bond(
 pub async fn list_network_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_network_files));
     let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_netfiles(&state, items))
 }
 
 pub async fn create_network_file(
@@ -748,6 +766,8 @@ pub async fn create_network_file(
         description: req.description,
         created: now.clone(),
         updated: now,
+        managed: true,
+        operational_state: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -783,13 +803,16 @@ pub async fn delete_network_file(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_network_file));
+    if let Some(resp) = reject_host_delete(&id, "interface") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
         if let Err(e) = mgr.remove_device(&format!("net-{}", cfg.match_name)) { tracing::warn!("Failed to remove device: {}", e); }
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_netfiles", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -799,7 +822,7 @@ pub async fn delete_network_file(
 pub async fn list_link_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_link_files));
     let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_link_files(&state, items))
 }
 
 pub async fn create_link_file(
@@ -827,6 +850,8 @@ pub async fn create_link_file(
         description: req.description,
         created: now.clone(),
         updated: now,
+        managed: true,
+        source_file: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -849,6 +874,9 @@ pub async fn delete_link_file(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_link_file));
+    if let Some(resp) = reject_host_delete(&id, "link file") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<LinkFileConfig>("networkd_linkfiles", &id) {
         let file_id = cfg.name.as_deref()
@@ -858,7 +886,7 @@ pub async fn delete_link_file(
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_linkfiles", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -871,7 +899,7 @@ pub async fn list_port_forwards(RequireRead(_claims): RequireRead, State(state):
         .store
         .list_entities("networkd_port_forwards")
         .unwrap_or_default();
-    Json(items)
+    Json(super::networkd_discover::merge_port_forwards(items))
 }
 
 pub async fn create_port_forward(
@@ -896,6 +924,7 @@ pub async fn create_port_forward(
         description: req.description,
         created: now.clone(),
         updated: now,
+        managed: true,
     };
 
     if cfg.enabled {
@@ -942,6 +971,9 @@ pub async fn delete_port_forward(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_port_forward));
+    if let Some(resp) = reject_host_delete(&id, "port forward") {
+        return resp;
+    }
     if let Ok(Some(cfg)) = state
         .store
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
@@ -950,7 +982,7 @@ pub async fn delete_port_forward(
         if let Err(e) = nft.remove(&cfg) { tracing::warn!("Failed to remove nft rule: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_port_forwards", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state): State<Arc<AppState>>) -> impl IntoResponse {

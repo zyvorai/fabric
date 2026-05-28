@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { VlanConfig, CreateVlanRequest } from '../../api/networkd'
-import { ModalWrapper, InputField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface VlansTabProps {
   vlans: VlanConfig[]
@@ -41,15 +41,13 @@ function VlansTabContent({ vlans, onDelete, onCreate }: VlansTabProps) {
             <tbody className="divide-y divide-slate-700/50">
               {vlans.map(v => (
                 <tr key={v.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{v.name}</td>
+                  <td className="p-4 font-medium">{v.name}{isHostManaged(v) && <HostBadge />}</td>
                   <td className="p-4 font-mono text-purple-400">{v.vlan_id}</td>
                   <td className="p-4 text-slate-400">{v.parent_interface}</td>
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{v.dhcp}</td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(v.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions item={v} onDelete={() => onDelete(v.id)} />
                   </td>
                 </tr>
               ))}

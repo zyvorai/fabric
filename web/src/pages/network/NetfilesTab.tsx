@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { NetworkFileConfig, CreateNetworkFileRequest } from '../../api/networkd'
-import { ModalWrapper, InputField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface NetfilesTabProps {
   netfiles: NetworkFileConfig[]
@@ -42,16 +42,18 @@ function NetfilesTabContent({ netfiles, onDelete, onCreate }: NetfilesTabProps) 
             <tbody className="divide-y divide-slate-700/50">
               {netfiles.map(n => (
                 <tr key={n.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{n.match_name}</td>
+                  <td className="p-4 font-medium">
+                    {n.match_name}
+                    {isHostManaged(n) && <HostBadge />}
+                    {n.description && <span className="block text-xs text-slate-500 font-normal">{n.description}</span>}
+                  </td>
                   <td className="p-4 text-slate-400 font-mono text-sm">{n.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{n.dhcp}</td>
                   <td className="p-4 text-slate-400">{n.bridge ?? '-'}</td>
                   <td className="p-4 text-slate-400">{n.bond ?? '-'}</td>
                   <td className="p-4 text-slate-400">{n.mtu ?? '-'}</td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(n.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions item={n} onDelete={() => onDelete(n.id)} stateLabel={n.operational_state} />
                   </td>
                 </tr>
               ))}

@@ -41,6 +41,7 @@ pub mod fault_tolerance;
 pub mod lifecycle;
 pub mod network_policy;
 pub mod networkd;
+pub mod networkd_discover;
 pub mod replication_api;
 pub mod resource_pools;
 pub mod site_recovery_api;

@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { X } from 'lucide-react'
+import { Trash2, X } from 'lucide-react'
 import { formatUserError } from '../../utils/apiError'
 
 export function ModalWrapper({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -33,6 +33,41 @@ export function InputField({ label, value, onChange, placeholder, type = 'text' 
         className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
       />
     </div>
+  )
+}
+
+export function HostBadge() {
+  return (
+    <span className="ml-2 px-2 py-0.5 rounded text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30">
+      Host
+    </span>
+  )
+}
+
+export function isHostManaged(item: { id?: string; managed?: boolean }): boolean {
+  return item.managed === false || (item.id?.startsWith('host:') ?? false)
+}
+
+export function HostManagedActions({
+  item,
+  onDelete,
+  stateLabel,
+}: {
+  item: { id: string; managed?: boolean; operational_state?: string }
+  onDelete: () => void
+  stateLabel?: string
+}) {
+  if (isHostManaged(item)) {
+    return (
+      <span className="text-xs text-slate-500" title="Managed outside vmspawnd">
+        {stateLabel ?? item.operational_state ?? 'external'}
+      </span>
+    )
+  }
+  return (
+    <button onClick={onDelete} className="p-2 hover:bg-red-600 rounded transition" type="button">
+      <Trash2 className="w-4 h-4" />
+    </button>
   )
 }
 
