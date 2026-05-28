@@ -24,7 +24,7 @@ import {
   PortForwardsTab, CreatePortForwardModal,
   VxlansTab, CreateVxlanModal,
   SriovTab, CreateSriovModal,
-  FloatingIpsTab,
+  FloatingIpsTab, CreateFloatingIpModal,
   StatusTab,
 } from './network/index'
 import type { FloatingIp } from '../api/network-cloud'
@@ -38,7 +38,7 @@ import { hintsForError } from '../utils/daemonHints'
 import SubsystemBanner from '../components/SubsystemBanner'
 
 type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'floatingips' | 'status'
-type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | null
+type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | 'floatingip' | null
 
 export default function Network() {
   const toast = useToastContext()
@@ -265,6 +265,31 @@ export default function Network() {
     } catch (e: unknown) { failAction('Failed to adopt floating IP', e) }
   }
 
+  const handleAssignFloatingIp = async (id: string, vmName: string) => {
+    try {
+      const updated = await cloudApi.assignFloatingIp(id, vmName)
+      setFloatingIps(prev => prev.map(f => f.id === id ? updated : f))
+      toast.success(`Assigned ${updated.address} to ${vmName}`)
+    } catch (e: unknown) { failAction('Failed to assign floating IP', e) }
+  }
+
+  const handleUnassignFloatingIp = async (id: string) => {
+    if (!await confirm('Unassign Floating IP', 'Remove this address from the interface?')) return
+    try {
+      const updated = await cloudApi.unassignFloatingIp(id)
+      setFloatingIps(prev => prev.map(f => f.id === id ? updated : f))
+    } catch (e: unknown) { failAction('Failed to unassign floating IP', e) }
+  }
+
+  const interfaceOptions = useMemo(() => {
+    const names = new Set<string>()
+    for (const b of bridges) names.add(b.name)
+    for (const l of links) {
+      if (l.kind === 'bridge' || l.name.match(/^(eno|eth|enp|ens|virbr)/)) names.add(l.name)
+    }
+    return [...names].sort()
+  }, [bridges, links])
+
   const netfileCounts = useMemo(() => countNetfileTypes(netfiles), [netfiles])
 
   const closeModal = () => setActiveModal(null)
@@ -429,6 +454,9 @@ export default function Network() {
               floatingIps={floatingIps}
               onDelete={handleDeleteFloatingIp}
               onAdopt={handleAdoptFloatingIp}
+              onAssign={handleAssignFloatingIp}
+              onUnassign={handleUnassignFloatingIp}
+              onCreate={() => setActiveModal('floatingip')}
             />
           )}
           {activeTab === 'status' && <StatusTab links={links} onRefresh={fetchAll} />}
@@ -446,6 +474,7 @@ export default function Network() {
       {activeModal === 'portforward' && <CreatePortForwardModal onClose={closeModal} onCreated={(pf) => { setPortForwards(prev => [...prev, pf]); closeModal() }} />}
       {activeModal === 'vxlan' && <CreateVxlanModal onClose={closeModal} onCreated={(v) => { setVxlans(prev => [...prev, v]); closeModal() }} />}
       {activeModal === 'sriov' && <CreateSriovModal onClose={closeModal} onCreated={(s) => { setSriov(prev => [...prev, s]); closeModal() }} />}
+      {activeModal === 'floatingip' && <CreateFloatingIpModal interfaceOptions={interfaceOptions} onClose={closeModal} onCreated={(f) => { setFloatingIps(prev => [...prev, f]); closeModal() }} />}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}

@@ -2,18 +2,25 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useMemo, useState } from 'react'
-import type { FloatingIp } from '../../api/network-cloud'
-import { HostBadge, HostManagedActions, isHostManaged } from './ModalShared'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, Link2, Unlink } from 'lucide-react'
+import * as cloudApi from '../../api/network-cloud'
+import type { FloatingIp, CreateFloatingIpRequest } from '../../api/network-cloud'
+import type { VM } from '../../api/vm'
+import { listVMs } from '../../api/vm'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 
 interface FloatingIpsTabProps {
   floatingIps: FloatingIp[]
   onDelete: (id: string) => void
   onAdopt?: (id: string) => void
+  onAssign?: (id: string, vmName: string) => void
+  onUnassign?: (id: string) => void
+  onCreate: () => void
 }
 
-function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt }: FloatingIpsTabProps) {
+function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUnassign, onCreate }: FloatingIpsTabProps) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -29,9 +36,12 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt }: FloatingIpsTa
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Floating IPs</h2>
+        <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          <Plus className="w-4 h-4" /> Add Floating IP
+        </button>
       </div>
       {floatingIps.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No floating IPs configured. Host secondary addresses appear here when discovered.</div>
+        <div className="p-12 text-center text-slate-400">No floating IPs configured. Host secondary addresses appear here when discovered, or create one to assign to a VM.</div>
       ) : (
         <>
           <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search address, interface, VM…" total={floatingIps.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
@@ -55,11 +65,30 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt }: FloatingIpsTa
                   <td className="p-4 font-mono text-sm text-slate-400">{f.interface}</td>
                   <td className="p-4 text-slate-400">{f.assigned_vm ?? '—'}</td>
                   <td className="p-4">
-                    <HostManagedActions
-                      item={f}
-                      onDelete={() => onDelete(f.id)}
-                      onAdopt={onAdopt ? () => onAdopt(f.id) : undefined}
-                    />
+                    {isHostManaged(f) ? (
+                      <HostManagedActions
+                        item={f}
+                        onDelete={() => onDelete(f.id)}
+                        onAdopt={onAdopt ? () => onAdopt(f.id) : undefined}
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {f.assigned_vm ? (
+                          onUnassign && (
+                            <button type="button" onClick={() => onUnassign(f.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Unassign from VM">
+                              <Unlink className="w-3 h-3" /> Unassign
+                            </button>
+                          )
+                        ) : (
+                          onAssign && (
+                            <AssignButton fip={f} onAssign={onAssign} />
+                          )
+                        )}
+                        <button type="button" onClick={() => onDelete(f.id)} className="p-2 hover:bg-red-600/20 rounded transition text-red-400" title="Delete">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -70,6 +99,147 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt }: FloatingIpsTa
         </>
       )}
     </div>
+  )
+}
+
+function AssignButton({ fip, onAssign }: { fip: FloatingIp; onAssign: (id: string, vmName: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/40 transition">
+        <Link2 className="w-3 h-3" /> Assign
+      </button>
+      {open && (
+        <AssignFloatingIpModal
+          fip={fip}
+          onClose={() => setOpen(false)}
+          onAssigned={(vmName) => { onAssign(fip.id, vmName); setOpen(false) }}
+        />
+      )}
+    </>
+  )
+}
+
+export function CreateFloatingIpModal({
+  interfaceOptions,
+  onClose,
+  onCreated,
+}: {
+  interfaceOptions: string[]
+  onClose: () => void
+  onCreated: (f: FloatingIp) => void
+}) {
+  const [address, setAddress] = useState('')
+  const [iface, setIface] = useState(interfaceOptions[0] ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleSubmit = async () => {
+    if (!address.trim() || !iface.trim()) { setErr('Address and interface are required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateFloatingIpRequest = { address: address.trim(), interface: iface.trim() }
+      const f = await cloudApi.createFloatingIp(req)
+      onCreated(f)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Create Floating IP" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Address" value={address} onChange={setAddress} placeholder="203.0.113.10" />
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Interface</label>
+          {interfaceOptions.length > 0 ? (
+            <select value={iface} onChange={e => setIface(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              {interfaceOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={iface}
+              onChange={e => setIface(e.target.value)}
+              placeholder="eno1"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            />
+          )}
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Creating…' : 'Create Floating IP'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+function AssignFloatingIpModal({
+  fip,
+  onClose,
+  onAssigned,
+}: {
+  fip: FloatingIp
+  onClose: () => void
+  onAssigned: (vmName: string) => void
+}) {
+  const [vms, setVms] = useState<VM[]>([])
+  const [vmName, setVmName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    listVMs()
+      .then(list => { setVms(list); setVmName(list[0]?.name ?? '') })
+      .catch((e: unknown) => setErr(extractErrorMessage(e)))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSubmit = async () => {
+    if (!vmName) { setErr('Select a VM'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      await cloudApi.assignFloatingIp(fip.id, vmName)
+      onAssigned(vmName)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title={`Assign ${fip.address}`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-400">Bind this address on <span className="font-mono text-slate-300">{fip.interface}</span> and record the VM assignment.</p>
+        {loading ? (
+          <p className="text-sm text-slate-500">Loading VMs…</p>
+        ) : vms.length === 0 ? (
+          <p className="text-sm text-amber-400">No VMs available. Create a VM first.</p>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">VM</label>
+            <select value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              {vms.map(vm => (
+                <option key={vm.name} value={vm.name}>{vm.name} ({vm.state})</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting || loading || vms.length === 0} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Assigning…' : 'Assign to VM'}
+        </button>
+      </div>
+    </ModalWrapper>
   )
 }
 

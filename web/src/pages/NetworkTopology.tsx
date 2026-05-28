@@ -146,6 +146,24 @@ export default function NetworkTopology() {
     return a.localeCompare(b)
   })
 
+  const attachmentEdges = useMemo(() => {
+    const edges: { vm: string; vmState: string; network: string; ifaceType: string; mac: string }[] = []
+    for (const vm of vms) {
+      for (const iface of vm.interfaces ?? []) {
+        if (iface.source) {
+          edges.push({
+            vm: vm.name,
+            vmState: vm.state,
+            network: iface.source,
+            ifaceType: iface.type,
+            mac: iface.mac || '—',
+          })
+        }
+      }
+    }
+    return edges.sort((a, b) => a.vm.localeCompare(b.vm) || a.network.localeCompare(b.network))
+  }, [vms])
+
   const hasContent = vms.length > 0 || networks.length > 0 || hostNodes.length > 0
 
   return (
@@ -214,6 +232,39 @@ export default function NetworkTopology() {
                     )}
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {attachmentEdges.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-slate-300 mb-3">VM → network connections</h2>
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-800 text-slate-400 text-xs">
+                    <tr>
+                      <th className="text-left p-3 font-medium">VM</th>
+                      <th className="text-left p-3 font-medium w-8" />
+                      <th className="text-left p-3 font-medium">Network / bridge</th>
+                      <th className="text-left p-3 font-medium">Type</th>
+                      <th className="text-left p-3 font-medium">MAC</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {attachmentEdges.map((e, i) => (
+                      <tr key={`${e.vm}-${e.network}-${i}`} className="hover:bg-white/[0.03]">
+                        <td className="p-3">
+                          <span className="font-medium text-white">{e.vm}</span>
+                          <span className="text-xs text-slate-500 ml-2">{e.vmState}</span>
+                        </td>
+                        <td className="p-3 text-slate-500">→</td>
+                        <td className="p-3 font-medium text-blue-400">{e.network}</td>
+                        <td className="p-3 text-slate-400">{e.ifaceType}</td>
+                        <td className="p-3 font-mono text-xs text-slate-500">{e.mac}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}

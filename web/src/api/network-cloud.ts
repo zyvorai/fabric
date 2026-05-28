@@ -35,3 +35,11 @@ export async function deleteFloatingIp(id: string): Promise<void> {
 export async function adoptFloatingIp(hostId: string): Promise<FloatingIp> {
   return apiPost<FloatingIp>(`${API_BASE}/floating-ips/adopt`, { host_id: hostId })
 }
+
+export async function assignFloatingIp(id: string, vmName: string): Promise<FloatingIp> {
+  return apiPost<FloatingIp>(`${API_BASE}/floating-ips/${id}/assign`, { vm_name: vmName })
+}
+
+export async function unassignFloatingIp(id: string): Promise<FloatingIp> {
+  return apiPost<FloatingIp>(`${API_BASE}/floating-ips/${id}/unassign`, {})
+}
