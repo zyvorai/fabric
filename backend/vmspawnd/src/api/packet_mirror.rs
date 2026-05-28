@@ -14,6 +14,7 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use networking::models::AdoptHostRequest;
 use packet_mirror::compiler::VMSnapshot;
 use packet_mirror::models::{CreateMirrorSessionRequest, MirrorSession, MirrorStatus};
 
@@ -69,6 +70,7 @@ pub async fn create_mirror_session(
         direction: req.direction,
         filter: req.filter,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -97,7 +99,10 @@ pub async fn list_mirror_sessions(
 ) -> impl IntoResponse {
     tracing::debug!("packet_mirror::{}", stringify!(list_mirror_sessions));
     match state.store.list_entities::<MirrorSession>(STORE_KEY) {
-        Ok(sessions) => (StatusCode::OK, Json(sessions)).into_response(),
+        Ok(sessions) => {
+            let merged = super::net_security_discover::merge_mirror_sessions(&state, sessions);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -114,11 +119,17 @@ pub async fn get_mirror_session(
     tracing::debug!("packet_mirror::{}", stringify!(get_mirror_session));
     match state.store.get_entity::<MirrorSession>(STORE_KEY, &id) {
         Ok(Some(session)) => (StatusCode::OK, Json(session)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Mirror session not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(session) = super::net_security_discover::find_host_mirror_session(&state, &id)
+            {
+                return (StatusCode::OK, Json(session)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Mirror session not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -162,6 +173,7 @@ pub async fn update_mirror_session(
         direction: req.direction,
         filter: req.filter,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -187,6 +199,17 @@ pub async fn delete_mirror_session(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("packet_mirror::{}", stringify!(delete_mirror_session));
+    if let Some(host) = super::net_security_discover::find_host_mirror_session(&state, &id) {
+        if super::net_security_discover::is_host_managed_mirror(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This mirror session exists on the host and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -200,6 +223,64 @@ pub async fn delete_mirror_session(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_mirror_session(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("packet_mirror::{}", stringify!(adopt_mirror_session));
+    let host = match super::net_security_discover::find_host_mirror_session(&state, &req.host_id) {
+        Some(s) if super::net_security_discover::is_host_managed_mirror(&s) => s,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host mirror session not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<MirrorSession> = state.store.list_entities(STORE_KEY).unwrap_or_default();
+    if stored.iter().any(|s| s.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Mirror session '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let session = MirrorSession {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        selector: host.selector,
+        collector_type: host.collector_type,
+        collector_target: host.collector_target,
+        direction: host.direction,
+        filter: host.filter,
+        enabled: false,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &session.id.to_string(), &session)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    (StatusCode::CREATED, Json(session)).into_response()
 }
 
 // ── Sync and status ─────────────────────────────────────────────────

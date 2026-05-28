@@ -132,6 +132,8 @@ pub struct MonitorPolicy {
     pub sample_interval_secs: u64,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -302,6 +304,7 @@ mod tests {
             webhook_url: None,
             sample_interval_secs: 10,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };

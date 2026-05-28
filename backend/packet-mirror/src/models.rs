@@ -85,6 +85,8 @@ pub struct MirrorSession {
     pub filter: Option<MirrorFilter>,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -194,6 +196,7 @@ mod tests {
             direction: MirrorDirection::Ingress,
             filter: None,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };

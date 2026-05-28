@@ -641,6 +641,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/qos-policies/{id}", get(api::traffic_shaping::get_qos_policy).put(api::traffic_shaping::update_qos_policy).delete(api::traffic_shaping::delete_qos_policy))
             // DNS policy routes
             .route("/dns-zones", get(api::dns_policy::list_zones).post(api::dns_policy::create_zone))
+            .route("/dns-zones/adopt", post(api::dns_policy::adopt_zone))
             .route("/dns-zones/{id}", get(api::dns_policy::get_zone).delete(api::dns_policy::delete_zone))
             .route("/dns-policies", get(api::dns_policy::list_policies).post(api::dns_policy::create_policy))
             .route("/dns-policies/sync", post(api::dns_policy::sync_dns_policies))
@@ -668,6 +669,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/vpn-networks/{id}", get(api::vpn_mesh::get_vpn_network).put(api::vpn_mesh::update_vpn_network).delete(api::vpn_mesh::delete_vpn_network))
             // Packet mirror routes
             .route("/mirror-sessions", get(api::packet_mirror::list_mirror_sessions).post(api::packet_mirror::create_mirror_session))
+            .route("/mirror-sessions/adopt", post(api::packet_mirror::adopt_mirror_session))
             .route("/mirror-sessions/sync", post(api::packet_mirror::sync_mirror_sessions))
             .route("/mirror-sessions/status", get(api::packet_mirror::get_mirror_status))
             .route("/mirror-sessions/{id}", get(api::packet_mirror::get_mirror_session).put(api::packet_mirror::update_mirror_session).delete(api::packet_mirror::delete_mirror_session))
@@ -683,6 +685,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/nat-gateways/{id}", get(api::nat_gateway::get_nat_gateway).delete(api::nat_gateway::delete_nat_gateway))
             // Network monitor routes
             .route("/monitor-policies", get(api::net_monitor::list_monitor_policies).post(api::net_monitor::create_monitor_policy))
+            .route("/monitor-policies/adopt", post(api::net_monitor::adopt_monitor_policy))
             .route("/monitor-policies/sync", post(api::net_monitor::sync_monitor_policies))
             .route("/monitor-policies/status", get(api::net_monitor::get_monitor_status))
             .route("/monitor-policies/{id}", get(api::net_monitor::get_monitor_policy).put(api::net_monitor::update_monitor_policy).delete(api::net_monitor::delete_monitor_policy))

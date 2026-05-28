@@ -349,9 +349,10 @@ export interface DnsZone {
   id: string
   name: string
   description?: string
-  domain: string
-  records: DnsRecord[]
-  enabled: boolean
+  domain?: string
+  records?: DnsRecord[]
+  enabled?: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -403,6 +404,10 @@ export async function updateDnsZone(id: string, req: CreateDnsZoneRequest): Prom
 
 export async function deleteDnsZone(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/dns-zones/${id}`)
+}
+
+export async function adoptDnsZone(hostId: string): Promise<DnsZone> {
+  return apiPost<DnsZone>(`${API_BASE}/dns-zones/adopt`, { host_id: hostId })
 }
 
 export async function listDnsPolicies(): Promise<DnsPolicy[]> {
@@ -538,14 +543,18 @@ export interface MirrorSession {
   id: string
   name: string
   description?: string
-  source_vm: string
+  source_vm?: string
+  selector?: { match_labels?: Record<string, string> }
+  collector_type?: string
+  collector_target?: string
   direction: MirrorDirection
-  collector_address: string
-  collector_port: number
+  collector_address?: string
+  collector_port?: number
   filter_protocol?: string
   filter_port?: number
   filter_cidr?: string
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -581,6 +590,10 @@ export async function updateMirrorSession(id: string, req: CreateMirrorSessionRe
 
 export async function deleteMirrorSession(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/mirror-sessions/${id}`)
+}
+
+export async function adoptMirrorSession(hostId: string): Promise<MirrorSession> {
+  return apiPost<MirrorSession>(`${API_BASE}/mirror-sessions/adopt`, { host_id: hostId })
 }
 
 export async function syncMirror(): Promise<{ status: string; sessions: number }> {
@@ -734,10 +747,13 @@ export interface MonitorPolicy {
   id: string
   name: string
   description?: string
-  labels: Record<string, string>
+  labels?: Record<string, string>
+  selector?: { match_labels?: Record<string, string> }
   thresholds: MonitorThreshold[]
-  interval_seconds: number
+  interval_seconds?: number
+  sample_interval_secs?: number
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -793,6 +809,10 @@ export async function updateMonitorPolicy(id: string, req: CreateMonitorPolicyRe
 
 export async function deleteMonitorPolicy(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/monitor-policies/${id}`)
+}
+
+export async function adoptMonitorPolicy(hostId: string): Promise<MonitorPolicy> {
+  return apiPost<MonitorPolicy>(`${API_BASE}/monitor-policies/adopt`, { host_id: hostId })
 }
 
 export async function syncMonitor(): Promise<{ status: string; policies: number }> {

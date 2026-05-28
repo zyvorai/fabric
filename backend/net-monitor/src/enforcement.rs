@@ -229,6 +229,7 @@ mod tests {
             webhook_url: None,
             sample_interval_secs: 10,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

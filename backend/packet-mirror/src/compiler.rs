@@ -93,6 +93,7 @@ mod tests {
             direction,
             filter,
             enabled,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

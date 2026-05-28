@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use net_monitor::collector::VMSnapshot;
 use net_monitor::models::{CreateMonitorPolicyRequest, MonitorPolicy, MonitorStatus};
+use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -48,6 +49,7 @@ pub async fn create_monitor_policy(
         webhook_url: req.webhook_url,
         sample_interval_secs: req.sample_interval_secs,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -76,7 +78,10 @@ pub async fn list_monitor_policies(
 ) -> impl IntoResponse {
     tracing::debug!("net_monitor::{}", stringify!(list_monitor_policies));
     match state.store.list_entities::<MonitorPolicy>(STORE_KEY) {
-        Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
+        Ok(policies) => {
+            let merged = super::net_security_discover::merge_monitor_policies(&state, policies);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -93,11 +98,17 @@ pub async fn get_monitor_policy(
     tracing::debug!("net_monitor::{}", stringify!(get_monitor_policy));
     match state.store.get_entity::<MonitorPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Monitor policy not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(policy) = super::net_security_discover::find_host_monitor_policy(&state, &id)
+            {
+                return (StatusCode::OK, Json(policy)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Monitor policy not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -141,6 +152,7 @@ pub async fn update_monitor_policy(
         webhook_url: req.webhook_url,
         sample_interval_secs: req.sample_interval_secs,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -166,6 +178,17 @@ pub async fn delete_monitor_policy(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("net_monitor::{}", stringify!(delete_monitor_policy));
+    if let Some(host) = super::net_security_discover::find_host_monitor_policy(&state, &id) {
+        if super::net_security_discover::is_host_managed_monitor(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This monitor policy reflects host traffic control and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -179,6 +202,64 @@ pub async fn delete_monitor_policy(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_monitor_policy(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(adopt_monitor_policy));
+    let host = match super::net_security_discover::find_host_monitor_policy(&state, &req.host_id) {
+        Some(p) if super::net_security_discover::is_host_managed_monitor(&p) => p,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host monitor policy not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<MonitorPolicy> = state.store.list_entities(STORE_KEY).unwrap_or_default();
+    if stored.iter().any(|p| p.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Monitor policy '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let policy = MonitorPolicy {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        selector: host.selector,
+        thresholds: host.thresholds,
+        action: host.action,
+        webhook_url: host.webhook_url,
+        sample_interval_secs: host.sample_interval_secs,
+        enabled: false,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &policy.id.to_string(), &policy)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    (StatusCode::CREATED, Json(policy)).into_response()
 }
 
 // ── Sync and status ─────────────────────────────────────────────────

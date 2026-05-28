@@ -195,6 +195,27 @@ export default function NetworkSecurity() {
     } catch (e: unknown) { failAction('Failed to adopt WireGuard tunnel', e) }
   }
 
+  const handleAdoptDnsZone = async (id: string) => {
+    try {
+      const adopted = await api.adoptDnsZone(id)
+      setDnsZones(prev => [...prev.filter(z => z.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt DNS zone', e) }
+  }
+
+  const handleAdoptMirrorSession = async (id: string) => {
+    try {
+      const adopted = await api.adoptMirrorSession(id)
+      setMirrorSessions(prev => [...prev.filter(s => s.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt mirror session', e) }
+  }
+
+  const handleAdoptMonitorPolicy = async (id: string) => {
+    try {
+      const adopted = await api.adoptMonitorPolicy(id)
+      setMonitorPolicies(prev => [...prev.filter(p => p.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt monitor policy', e) }
+  }
+
   const handleDeleteService = async (id: string) => {
     if (!await confirm('Delete Service', 'Delete this service?')) return
     try { await api.deleteService(id); setServices(prev => prev.filter(s => s.id !== id)) }
@@ -396,6 +417,7 @@ export default function NetworkSecurity() {
             <DnsTab
               zones={dnsZones} policies={dnsPolicies}
               onDeleteZone={handleDeleteDnsZone} onDeletePolicy={handleDeleteDnsPolicy}
+              onAdoptZone={handleAdoptDnsZone}
               onCreate={() => setActiveModal('dns-zone')} onSync={() => handleSync(api.syncDns)}
             />
           )}
@@ -408,7 +430,13 @@ export default function NetworkSecurity() {
             />
           )}
           {activeTab === 'mirror' && (
-            <MirrorTab sessions={mirrorSessions} onDelete={handleDeleteMirror} onCreate={() => setActiveModal('mirror')} onSync={() => handleSync(api.syncMirror)} />
+            <MirrorTab
+              sessions={mirrorSessions}
+              onDelete={handleDeleteMirror}
+              onAdopt={handleAdoptMirrorSession}
+              onCreate={() => setActiveModal('mirror')}
+              onSync={() => handleSync(api.syncMirror)}
+            />
           )}
           {activeTab === 'nat' && (
             <NatTab
@@ -421,7 +449,8 @@ export default function NetworkSecurity() {
           {activeTab === 'monitor' && (
             <MonitorTab
               policies={monitorPolicies} metrics={metrics} alerts={alerts}
-              onDelete={handleDeleteMonitorPolicy} onAcknowledge={handleAcknowledgeAlert}
+              onDelete={handleDeleteMonitorPolicy} onAdopt={handleAdoptMonitorPolicy}
+              onAcknowledge={handleAcknowledgeAlert}
               onCreate={() => setActiveModal('monitor')} onSync={() => handleSync(api.syncMonitor)}
             />
           )}

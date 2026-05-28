@@ -157,6 +157,7 @@ mod tests {
             id: Uuid::new_v4(),
             name: name.to_string(),
             description: String::new(),
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

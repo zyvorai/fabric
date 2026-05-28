@@ -6,12 +6,20 @@ use std::collections::HashSet;
 
 use chrono::Utc;
 use nat_gateway::models::{NatProtocol, NatRule, NatRuleType};
+use dns_policy::models::DnsZone;
+use net_monitor::models::{
+    AlertAction, AlertSeverity, BandwidthThreshold, MonitorPolicy, ThresholdUnit, TrafficDirection,
+};
+use networking::host_dns::{self, DiscoveredDnsZone};
 use networking::host_firewalld::{self, DiscoveredFirewalldZone};
+use networking::host_monitor_tc::{self, DiscoveredHostMonitor};
 use networking::host_nat::{self, DiscoveredHostNatRule};
 use networking::host_nft_filter::{self, DiscoveredNftFilterChain};
 use networking::host_services::{self, HostListener};
 use networking::host_tc::{self, DiscoveredTcQdisc};
+use networking::host_tc_mirror::{self, DiscoveredTcMirror};
 use networking::host_wireguard::{self, DiscoveredWireGuard};
+use packet_mirror::models::{CollectorType, MirrorDirection, MirrorSession};
 use service_mesh::models::{LoadBalancerAlgorithm, Service, ServicePort, ServiceProtocol};
 use traffic_shaping::models::{BandwidthRate, BandwidthUnit, QoSPolicy, TrafficClass};
 use vm_firewall::models::{FirewallAction, FirewallProfile, FirewallZone};
@@ -42,6 +50,18 @@ pub fn is_host_managed_profile(profile: &FirewallProfile) -> bool {
 
 pub fn is_host_managed_vpn_tunnel(tunnel: &VpnTunnel) -> bool {
     !tunnel.managed
+}
+
+pub fn is_host_managed_dns_zone(zone: &DnsZone) -> bool {
+    !zone.managed
+}
+
+pub fn is_host_managed_mirror(session: &MirrorSession) -> bool {
+    !session.managed
+}
+
+pub fn is_host_managed_monitor(policy: &MonitorPolicy) -> bool {
+    !policy.managed
 }
 
 fn host_nat_uuid(key: &str) -> Uuid {
@@ -83,6 +103,27 @@ fn host_vpn_uuid(interface_name: &str) -> Uuid {
     Uuid::new_v5(
         &Uuid::NAMESPACE_DNS,
         format!("vmspawnd:host:vpn:{interface_name}").as_bytes(),
+    )
+}
+
+fn host_dns_zone_uuid(name: &str) -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:dnszone:{name}").as_bytes(),
+    )
+}
+
+fn host_mirror_uuid(key: &str) -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:mirror:{key}").as_bytes(),
+    )
+}
+
+fn host_monitor_uuid(key: &str) -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:monitor:{key}").as_bytes(),
     )
 }
 
@@ -440,4 +481,164 @@ pub fn find_host_vpn_tunnel(_state: &AppState, id: &str) -> Option<VpnTunnel> {
     merge_vpn_tunnels(_state, vec![])
         .into_iter()
         .find(|t| t.id == uuid)
+}
+
+fn dns_zone_from_discovered(d: DiscoveredDnsZone) -> DnsZone {
+    let now = Utc::now();
+    DnsZone {
+        id: host_dns_zone_uuid(&d.name),
+        name: d.name,
+        description: d.description,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_dns_zones() -> Vec<DnsZone> {
+    host_dns::discover_host_dns_zones()
+        .unwrap_or_else(|e| {
+            tracing::warn!("host DNS zone discovery failed: {}", e);
+            Vec::new()
+        })
+        .into_iter()
+        .map(dns_zone_from_discovered)
+        .collect()
+}
+
+pub fn merge_dns_zones(_state: &AppState, mut items: Vec<DnsZone>) -> Vec<DnsZone> {
+    let mut known_ids: HashSet<Uuid> = items.iter().map(|z| z.id).collect();
+    let mut known_names: HashSet<String> = items.iter().map(|z| z.name.clone()).collect();
+
+    for host in discover_host_dns_zones() {
+        if known_ids.contains(&host.id) || known_names.contains(&host.name) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_names.insert(host.name.clone());
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_dns_zone(_state: &AppState, id: &str) -> Option<DnsZone> {
+    let uuid = Uuid::parse_str(id).ok()?;
+    merge_dns_zones(_state, vec![])
+        .into_iter()
+        .find(|z| z.id == uuid)
+}
+
+fn mirror_from_discovered(d: DiscoveredTcMirror) -> MirrorSession {
+    let direction = match d.direction.as_str() {
+        "egress" => MirrorDirection::Egress,
+        "ingress" => MirrorDirection::Ingress,
+        _ => MirrorDirection::Both,
+    };
+    let now = Utc::now();
+    MirrorSession {
+        id: host_mirror_uuid(&d.key),
+        name: format!("host-mirror-{}-{}", d.source_iface, d.collector_iface),
+        description: format!(
+            "Host tc mirror {} → {} ({})",
+            d.source_iface, d.collector_iface, d.direction
+        ),
+        selector: Default::default(),
+        collector_type: CollectorType::Interface,
+        collector_target: d.collector_iface,
+        direction,
+        filter: None,
+        enabled: false,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_mirror_sessions() -> Vec<MirrorSession> {
+    host_tc_mirror::discover_host_tc_mirrors()
+        .unwrap_or_else(|e| {
+            tracing::warn!("host tc mirror discovery failed: {}", e);
+            Vec::new()
+        })
+        .into_iter()
+        .map(mirror_from_discovered)
+        .collect()
+}
+
+pub fn merge_mirror_sessions(_state: &AppState, mut items: Vec<MirrorSession>) -> Vec<MirrorSession> {
+    let mut known_ids: HashSet<Uuid> = items.iter().map(|s| s.id).collect();
+    let mut known_keys: HashSet<String> = items
+        .iter()
+        .map(|s| format!("{}:{}", s.name, s.collector_target))
+        .collect();
+
+    for host in discover_host_mirror_sessions() {
+        let key = format!("{}:{}", host.name, host.collector_target);
+        if known_ids.contains(&host.id) || known_keys.contains(&key) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_keys.insert(key);
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_mirror_session(_state: &AppState, id: &str) -> Option<MirrorSession> {
+    let uuid = Uuid::parse_str(id).ok()?;
+    merge_mirror_sessions(_state, vec![])
+        .into_iter()
+        .find(|s| s.id == uuid)
+}
+
+fn monitor_from_discovered(d: DiscoveredHostMonitor) -> MonitorPolicy {
+    let now = Utc::now();
+    MonitorPolicy {
+        id: host_monitor_uuid(&d.key),
+        name: d.name,
+        description: d.description,
+        selector: Default::default(),
+        thresholds: vec![BandwidthThreshold {
+            value: d.rate_mbps,
+            unit: ThresholdUnit::Mbps,
+            direction: TrafficDirection::Both,
+            severity: AlertSeverity::Warning,
+        }],
+        action: AlertAction::Log,
+        webhook_url: None,
+        sample_interval_secs: 10,
+        enabled: false,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_monitor_policies() -> Vec<MonitorPolicy> {
+    host_monitor_tc::discover_host_monitor_from_tc()
+        .into_iter()
+        .map(monitor_from_discovered)
+        .collect()
+}
+
+pub fn merge_monitor_policies(_state: &AppState, mut items: Vec<MonitorPolicy>) -> Vec<MonitorPolicy> {
+    let mut known_ids: HashSet<Uuid> = items.iter().map(|p| p.id).collect();
+    let mut known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
+
+    for host in discover_host_monitor_policies() {
+        if known_ids.contains(&host.id) || known_names.contains(&host.name) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_names.insert(host.name.clone());
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_monitor_policy(_state: &AppState, id: &str) -> Option<MonitorPolicy> {
+    let uuid = Uuid::parse_str(id).ok()?;
+    merge_monitor_policies(_state, vec![])
+        .into_iter()
+        .find(|p| p.id == uuid)
 }

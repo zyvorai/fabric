@@ -6,17 +6,18 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { MirrorSession, CreateMirrorSessionRequest, MirrorDirection } from '../../api/network-security'
-import { ModalWrapper, InputField, extractErrorMessage } from '../network/ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { StatusBadge } from './ModalShared'
 
 interface MirrorTabProps {
   sessions: MirrorSession[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function MirrorTabContent({ sessions, onDelete, onCreate, onSync }: MirrorTabProps) {
+function MirrorTabContent({ sessions, onDelete, onAdopt, onCreate, onSync }: MirrorTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -49,18 +50,22 @@ function MirrorTabContent({ sessions, onDelete, onCreate, onSync }: MirrorTabPro
             <tbody className="divide-y divide-slate-700/50">
               {sessions.map(s => (
                 <tr key={s.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4">
-                    <div className="font-medium">{s.name}</div>
-                    {s.description && <div className="text-xs text-slate-500 mt-1">{s.description}</div>}
-                  </td>
-                  <td className="p-4 font-mono text-sm text-blue-400">{s.source_vm}</td>
+                    <td className="p-4">
+                      <div className="font-medium">{s.name}{isHostManaged(s) && <HostBadge />}</div>
+                      {s.description && <div className="text-xs text-slate-500 mt-1">{s.description}</div>}
+                    </td>
+                    <td className="p-4 font-mono text-sm text-blue-400">
+                      {s.source_vm ?? (Object.keys(s.selector?.match_labels ?? {}).length > 0 ? 'vm' : 'host')}
+                    </td>
                   <td className="p-4">
                     <StatusBadge
                       status={s.direction}
                       color={s.direction === 'both' ? 'blue' : s.direction === 'ingress' ? 'green' : 'yellow'}
                     />
                   </td>
-                  <td className="p-4 font-mono text-sm text-slate-400">{s.collector_address}:{s.collector_port}</td>
+                    <td className="p-4 font-mono text-sm text-slate-400">
+                      {s.collector_target ?? (s.collector_address ? `${s.collector_address}:${s.collector_port ?? ''}` : '—')}
+                    </td>
                   <td className="p-4 text-sm text-slate-400">
                     {s.filter_protocol || s.filter_port || s.filter_cidr ? (
                       <span>{[s.filter_protocol, s.filter_port && `:${s.filter_port}`, s.filter_cidr].filter(Boolean).join(' ')}</span>
@@ -71,11 +76,13 @@ function MirrorTabContent({ sessions, onDelete, onCreate, onSync }: MirrorTabPro
                   <td className="p-4">
                     <StatusBadge status={s.enabled ? 'active' : 'disabled'} color={s.enabled ? 'green' : 'gray'} />
                   </td>
-                  <td className="p-4">
-                    <button onClick={() => onDelete(s.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+                    <td className="p-4">
+                      <HostManagedActions
+                        item={{ id: s.id, managed: s.managed }}
+                        onDelete={() => onDelete(s.id)}
+                        onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}
+                      />
+                    </td>
                 </tr>
               ))}
             </tbody>

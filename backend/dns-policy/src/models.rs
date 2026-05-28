@@ -59,6 +59,8 @@ pub struct DnsZone {
     pub name: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -161,6 +163,7 @@ mod tests {
             id: Uuid::new_v4(),
             name: "vmspawnd.local".to_string(),
             description: "Default zone".to_string(),
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };
