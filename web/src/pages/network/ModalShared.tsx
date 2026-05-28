@@ -51,17 +51,33 @@ export function isHostManaged(item: { id?: string; managed?: boolean }): boolean
 export function HostManagedActions({
   item,
   onDelete,
+  onAdopt,
   stateLabel,
+  adoptLabel = 'Adopt',
 }: {
   item: { id: string; managed?: boolean; operational_state?: string }
   onDelete: () => void
+  onAdopt?: () => void
   stateLabel?: string
+  adoptLabel?: string
 }) {
   if (isHostManaged(item)) {
     return (
-      <span className="text-xs text-slate-500" title="Managed outside vmspawnd">
-        {stateLabel ?? item.operational_state ?? 'external'}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-slate-500" title="Managed outside vmspawnd">
+          {stateLabel ?? item.operational_state ?? 'external'}
+        </span>
+        {onAdopt && (
+          <button
+            type="button"
+            onClick={onAdopt}
+            className="px-2 py-1 text-xs rounded bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/40 transition"
+            title="Import into vmspawnd and write systemd-networkd config"
+          >
+            {adoptLabel}
+          </button>
+        )}
+      </div>
     )
   }
   return (

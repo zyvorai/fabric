@@ -581,6 +581,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             // systemd-networkd VM networking routes
             .route("/network/topology", get(api::ux_extensions::network_topology))
             .route("/networkd/bridges", get(api::networkd::list_bridges).post(api::networkd::create_bridge))
+            .route("/networkd/bridges/adopt", post(api::networkd::adopt_bridge))
             .route("/networkd/bridges/{id}", get(api::networkd::get_bridge).put(api::networkd::update_bridge).delete(api::networkd::delete_bridge))
             .route("/networkd/vlans", get(api::networkd::list_vlans).post(api::networkd::create_vlan))
             .route("/networkd/vlans/{id}", get(api::networkd::get_vlan).put(api::networkd::update_vlan).delete(api::networkd::delete_vlan))
@@ -591,6 +592,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/networkd/bonds", get(api::networkd::list_bonds).post(api::networkd::create_bond))
             .route("/networkd/bonds/{id}", get(api::networkd::get_bond).put(api::networkd::update_bond).delete(api::networkd::delete_bond))
             .route("/networkd/network-files", get(api::networkd::list_network_files).post(api::networkd::create_network_file))
+            .route("/networkd/network-files/adopt", post(api::networkd::adopt_network_file))
             .route("/networkd/network-files/{id}", get(api::networkd::get_network_file).delete(api::networkd::delete_network_file))
             .route("/networkd/link-files", get(api::networkd::list_link_files).post(api::networkd::create_link_file))
             .route("/networkd/link-files/{id}", delete(api::networkd::delete_link_file))

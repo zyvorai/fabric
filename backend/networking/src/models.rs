@@ -214,6 +214,12 @@ fn default_true() -> bool {
     true
 }
 
+/// Adopt a host-discovered entity (id must start with `host:`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdoptHostRequest {
+    pub host_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateBridgeRequest {
     pub name: String,

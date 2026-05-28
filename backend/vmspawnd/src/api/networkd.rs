@@ -15,10 +15,11 @@ use uuid::Uuid;
 use crate::server::AppState;
 use security::{RequireRead, RequireWrite, RequireAdmin};
 use networking::models::{
-    BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest, CreateLinkFileRequest,
-    CreateMacvtapRequest, CreateNetworkFileRequest, CreatePortForwardRequest, CreateSriovRequest,
-    CreateTapRequest, CreateVlanRequest, CreateVxlanRequest, LinkFileConfig, MacvtapConfig,
-    NetworkFileConfig, PortForwardConfig, SriovConfig, TapConfig, VlanConfig, VxlanConfig,
+    AdoptHostRequest, BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest,
+    CreateLinkFileRequest, CreateMacvtapRequest, CreateNetworkFileRequest,
+    CreatePortForwardRequest, CreateSriovRequest, CreateTapRequest, CreateVlanRequest,
+    CreateVxlanRequest, LinkFileConfig, MacvtapConfig, NetworkFileConfig, PortForwardConfig,
+    SriovConfig, TapConfig, VlanConfig, VxlanConfig,
 };
 use networking::nftables::NftManager;
 use networking::NetworkdManager;
@@ -180,6 +181,76 @@ pub async fn update_bridge(
             Json(cfg).into_response()
         }
         Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+pub async fn adopt_bridge(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_bridge));
+    if !super::networkd_discover::is_host_managed_id(&req.host_id) {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "host_id must be a host-discovered bridge (host:…)",
+        )
+        .into_response();
+    }
+    let host = match super::networkd_discover::find_host_bridge(&state, &req.host_id) {
+        Some(b) => b,
+        None => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host bridge not found")
+                .into_response()
+        }
+    };
+    let stored: Vec<BridgeConfig> = state
+        .store
+        .list_entities("networkd_bridges")
+        .unwrap_or_default();
+    if stored.iter().any(|b| b.name == host.name) {
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("Bridge '{}' is already managed by vmspawnd", host.name),
+        )
+        .into_response();
+    }
+
+    let now = Utc::now().to_rfc3339();
+    let cfg = BridgeConfig {
+        id: Uuid::new_v4().to_string(),
+        name: host.name,
+        stp: host.stp,
+        forward_delay_sec: host.forward_delay_sec,
+        hello_time_sec: host.hello_time_sec,
+        max_age_sec: host.max_age_sec,
+        vlan_filtering: host.vlan_filtering,
+        mtu: host.mtu,
+        mac_address: host.mac_address,
+        addresses: host.addresses,
+        gateway: host.gateway,
+        dns: host.dns,
+        dhcp: host.dhcp,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+        operational_state: host.operational_state,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_bridge(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
+        Ok(_) => {
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
+            (StatusCode::CREATED, Json(cfg)).into_response()
+        }
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -836,6 +907,81 @@ pub async fn get_network_file(
             crate::api_error::json_error(StatusCode::NOT_FOUND, "Network file not found").into_response()
         }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load network file").into_response(),
+    }
+}
+
+pub async fn adopt_network_file(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_network_file));
+    if !super::networkd_discover::is_host_managed_id(&req.host_id) {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "host_id must be a host-discovered interface (host:…)",
+        )
+        .into_response();
+    }
+    let host = match super::networkd_discover::find_host_netfile(&state, &req.host_id) {
+        Some(n) => n,
+        None => {
+            return crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                "Host interface not found",
+            )
+            .into_response()
+        }
+    };
+    let stored: Vec<NetworkFileConfig> = state
+        .store
+        .list_entities("networkd_netfiles")
+        .unwrap_or_default();
+    if stored.iter().any(|n| n.match_name == host.match_name) {
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!(
+                "Interface '{}' is already managed by vmspawnd",
+                host.match_name
+            ),
+        )
+        .into_response();
+    }
+
+    let now = Utc::now().to_rfc3339();
+    let cfg = NetworkFileConfig {
+        id: Uuid::new_v4().to_string(),
+        match_name: host.match_name,
+        match_mac: host.match_mac,
+        addresses: host.addresses,
+        gateway: host.gateway,
+        dns: host.dns,
+        dhcp: host.dhcp,
+        bridge: host.bridge,
+        bond: host.bond,
+        mtu: host.mtu,
+        routes: host.routes,
+        description: host.description,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+        operational_state: host.operational_state,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_network_file(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    match state.store.save_entity("networkd_netfiles", &cfg.id, &cfg) {
+        Ok(_) => {
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
+            (StatusCode::CREATED, Json(cfg)).into_response()
+        }
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 

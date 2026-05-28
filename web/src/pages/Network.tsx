@@ -119,6 +119,19 @@ export default function Network() {
     } catch (e: unknown) { failAction('Failed to delete bridge', e) }
   }
 
+  const handleAdoptBridge = async (hostId: string) => {
+    const name = hostId.replace(/^host:/, '')
+    if (!await confirm(
+      'Adopt Bridge',
+      `Import "${name}" into vmspawnd? This writes systemd-networkd config files and reloads networkd.`,
+    )) return
+    try {
+      const adopted = await api.adoptBridge(hostId)
+      setBridges(prev => [...prev.filter(b => b.id !== hostId), adopted])
+      toast.success(`Bridge "${adopted.name}" is now managed by vmspawnd`)
+    } catch (e: unknown) { failAction('Failed to adopt bridge', e) }
+  }
+
   const handleDeleteVlan = async (id: string) => {
     if (!await confirm('Delete VLAN', 'Delete this VLAN?')) return
     try {
@@ -157,6 +170,19 @@ export default function Network() {
       await api.deleteNetworkFile(id)
       setNetfiles(prev => prev.filter(n => n.id !== id))
     } catch (e: unknown) { failAction('Failed to delete network file', e) }
+  }
+
+  const handleAdoptNetfile = async (hostId: string) => {
+    const name = hostId.replace(/^host:/, '')
+    if (!await confirm(
+      'Adopt Interface',
+      `Import "${name}" into vmspawnd? This writes a .network file and reloads networkd.`,
+    )) return
+    try {
+      const adopted = await api.adoptNetworkFile(hostId)
+      setNetfiles(prev => [...prev.filter(n => n.id !== hostId), adopted])
+      toast.success(`Interface "${adopted.match_name}" is now managed by vmspawnd`)
+    } catch (e: unknown) { failAction('Failed to adopt interface', e) }
   }
 
   const handleDeleteLinkfile = async (id: string) => {
@@ -311,7 +337,7 @@ export default function Network() {
       ) : (
         <>
           {activeTab === 'bridges' && (
-            <BridgesTab bridges={bridges} onDelete={handleDeleteBridge} onCreate={() => setActiveModal('bridge')} />
+            <BridgesTab bridges={bridges} onDelete={handleDeleteBridge} onAdopt={handleAdoptBridge} onCreate={() => setActiveModal('bridge')} />
           )}
           {activeTab === 'bonds' && (
             <BondsTab bonds={bonds} onDelete={handleDeleteBond} onCreate={() => setActiveModal('bond')} />
@@ -326,7 +352,7 @@ export default function Network() {
             <TapsTab taps={taps} onDelete={handleDeleteTap} onCreate={() => setActiveModal('tap')} />
           )}
           {activeTab === 'netfiles' && (
-            <NetfilesTab netfiles={netfiles} onDelete={handleDeleteNetfile} onCreate={() => setActiveModal('netfile')} />
+            <NetfilesTab netfiles={netfiles} onDelete={handleDeleteNetfile} onAdopt={handleAdoptNetfile} onCreate={() => setActiveModal('netfile')} />
           )}
           {activeTab === 'linkfiles' && (
             <LinkfilesTab linkfiles={linkfiles} onDelete={handleDeleteLinkfile} onCreate={() => setActiveModal('linkfile')} />

@@ -18,6 +18,7 @@ import {
 interface NetfilesTabProps {
   netfiles: NetworkFileConfig[]
   onDelete: (id: string) => void
+  onAdopt: (id: string) => void
   onCreate: () => void
 }
 
@@ -31,7 +32,7 @@ export function countNetfileTypes(netfiles: NetworkFileConfig[]) {
   return { physical, container, total: netfiles.length }
 }
 
-function NetfilesTabContent({ netfiles, onDelete, onCreate }: NetfilesTabProps) {
+function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesTabProps) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<NetfileTypeFilter>('all')
   const [page, setPage] = useState(1)
@@ -132,7 +133,7 @@ function NetfilesTabContent({ netfiles, onDelete, onCreate }: NetfilesTabProps) 
                     <td className="p-4 text-slate-400">{n.bond ?? '-'}</td>
                     <td className="p-4 text-slate-400">{n.mtu ?? '-'}</td>
                     <td className="p-4">
-                      <HostManagedActions item={n} onDelete={() => onDelete(n.id)} stateLabel={n.operational_state} />
+                      <HostManagedActions item={n} onDelete={() => onDelete(n.id)} onAdopt={() => onAdopt(n.id)} stateLabel={n.operational_state} />
                     </td>
                   </tr>
                 ))}

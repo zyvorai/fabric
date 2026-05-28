@@ -275,6 +275,10 @@ export async function deleteBridge(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/bridges/${id}`)
 }
 
+export async function adoptBridge(hostId: string): Promise<BridgeConfig> {
+  return apiPost<BridgeConfig>(`${API_BASE}/networkd/bridges/adopt`, { host_id: hostId })
+}
+
 // ─── VLANs ────────────────────────────────────────────────────────────────────
 
 export async function listVlans(): Promise<VlanConfig[]> {
@@ -371,6 +375,10 @@ export async function getNetworkFile(id: string): Promise<NetworkFileConfig> {
 
 export async function deleteNetworkFile(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/network-files/${id}`)
+}
+
+export async function adoptNetworkFile(hostId: string): Promise<NetworkFileConfig> {
+  return apiPost<NetworkFileConfig>(`${API_BASE}/networkd/network-files/adopt`, { host_id: hostId })
 }
 
 // ─── Link Files ───────────────────────────────────────────────────────────────

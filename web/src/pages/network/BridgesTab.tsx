@@ -11,10 +11,11 @@ import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions,
 interface BridgesTabProps {
   bridges: BridgeConfig[]
   onDelete: (id: string) => void
+  onAdopt: (id: string) => void
   onCreate: () => void
 }
 
-function BridgesTabContent({ bridges, onDelete, onCreate }: BridgesTabProps) {
+function BridgesTabContent({ bridges, onDelete, onAdopt, onCreate }: BridgesTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -50,7 +51,7 @@ function BridgesTabContent({ bridges, onDelete, onCreate }: BridgesTabProps) {
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4 text-slate-400">{b.mtu ?? '-'}</td>
                   <td className="p-4">
-                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} />
+                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
                   </td>
                 </tr>
               ))}
