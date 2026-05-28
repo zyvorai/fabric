@@ -75,3 +75,6 @@ pub mod billing;
 // Phase 3 infrastructure modules
 pub mod compliance;
 pub mod usb;
+pub mod processes;
+pub mod host_insight;
+pub mod ux_extensions;

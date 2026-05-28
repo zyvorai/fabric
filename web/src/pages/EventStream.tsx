@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Pause, Play, Trash2, Filter } from 'lucide-react'
-import { getToken } from '../api/client'
+import { useEventStream, type VMEventPayload } from '../hooks/useEventStream'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
 import { hintsForError } from '../utils/daemonHints'
@@ -35,159 +35,130 @@ function levelBg(level: string): string {
   }
 }
 
+function mapPayload(payload: VMEventPayload): StreamEvent {
+  const levelRaw = payload.event_type.toLowerCase()
+  const level: StreamEvent['level'] =
+    levelRaw.includes('error') || levelRaw.includes('fail')
+      ? 'error'
+      : levelRaw.includes('warn')
+        ? 'warning'
+        : levelRaw.includes('debug')
+          ? 'debug'
+          : 'info'
+  return {
+    id: ++eventIdCounter,
+    timestamp: new Date(payload.timestamp),
+    type: payload.event_type,
+    source: payload.vm_name,
+    message: payload.detail || payload.event_type,
+    level,
+  }
+}
+
 let eventIdCounter = 0
 
 export default function EventStream() {
   const [events, setEvents] = useState<StreamEvent[]>([])
   const [paused, setPaused] = useState(false)
   const [levelFilter, setLevelFilter] = useState<string>('all')
-  const [connected, setConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const wsRef = useRef<WebSocket | null>(null)
   const pausedRef = useRef(false)
 
   useEffect(() => { pausedRef.current = paused }, [paused])
 
-  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const connect = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/events`
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      setConnected(true)
-      setConnectionError(null)
-      // Send auth token via message after connection instead of URL query param
-      const token = getToken()
-      if (token) {
-        ws.send(JSON.stringify({ type: 'auth', token }))
-      }
-    }
-    ws.onclose = () => {
-      setConnected(false)
-      setConnectionError('Event stream disconnected — reconnecting automatically')
-      reconnectRef.current = setTimeout(connect, 3000)
-    }
-    ws.onerror = () => {
-      setConnectionError('WebSocket connection failed — check that the daemon is running')
-      ws.close()
-    }
-
-    ws.onmessage = (msg) => {
-      if (pausedRef.current) return
-      try {
-        const data = JSON.parse(msg.data)
-        const event: StreamEvent = {
-          id: ++eventIdCounter,
-          timestamp: new Date(),
-          type: data.type || data.event || 'unknown',
-          source: data.source || data.vm || 'system',
-          message: data.message || data.description || JSON.stringify(data),
-          level: data.level || data.severity || 'info',
-        }
-        setEvents(prev => [event, ...prev].slice(0, 500))
-      } catch {
-        // Non-JSON messages (e.g. auth ack) are expected and safe to skip
-      }
-    }
-
-    return ws
+  const onEvent = useCallback((payload: VMEventPayload) => {
+    if (pausedRef.current) return
+    setEvents((prev) => [mapPayload(payload), ...prev].slice(0, 500))
+    setConnectionError(null)
   }, [])
 
+  const { connected } = useEventStream({ onEvent })
+
   useEffect(() => {
-    const ws = connect()
-    return () => { ws.close(); if (reconnectRef.current) clearTimeout(reconnectRef.current) }
-  }, [connect])
+    if (!connected && events.length === 0) {
+      setConnectionError('Connecting to event stream…')
+    } else if (connected) {
+      setConnectionError(null)
+    }
+  }, [connected, events.length])
 
-  const filteredEvents = levelFilter === 'all' ? events : events.filter(e => e.level === levelFilter)
-  const errorCount = events.filter(e => e.level === 'error').length
-  const warningCount = events.filter(e => e.level === 'warning').length
+  useEffect(() => {
+    if (!paused && containerRef.current) {
+      containerRef.current.scrollTop = 0
+    }
+  }, [events, paused])
 
-  const filters: { value: string; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'info', label: 'Info' },
-    { value: 'warning', label: 'Warning' },
-    { value: 'error', label: 'Error' },
-    { value: 'debug', label: 'Debug' },
-  ]
+  const filtered = events.filter((e) => levelFilter === 'all' || e.level === levelFilter)
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Event Stream"
-        description="Real-time system events via WebSocket"
-        actions={
-        <div className="flex items-center gap-3">
-          <button onClick={() => setPaused(!paused)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${paused ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
-            {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />} {paused ? 'Resume' : 'Pause'}
-          </button>
-          <button onClick={() => setEvents([])} title="Clear all events" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /> Clear</button>
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${connected ? (paused ? 'bg-amber-400' : 'bg-green-400 animate-pulse') : 'bg-red-400'}`} />
-            <span className="text-xs text-slate-500">{connected ? (paused ? 'Paused' : 'Connected') : 'Disconnected'}</span>
-          </div>
-        </div>
-        }
+        description="Live VM lifecycle events via authenticated SSE"
       />
+
       {connectionError && !connected && (
-        <ErrorBanner
-          title="Event stream unavailable"
-          headline={connectionError}
-          hints={hintsForError(connectionError)}
-          onRetry={() => {
-            wsRef.current?.close()
-            connect()
-          }}
-        />
+        <ErrorBanner title="Connection error" headline={connectionError} hints={hintsForError(connectionError)} />
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{events.length}</div>
-          <div className="text-xs text-slate-400 mt-1">Total Events</div>
-        </div>
-        <div className="stat-card-red rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{errorCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Errors</div>
-        </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{warningCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Warnings</div>
-        </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 p-5 card-glow-green transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{events.length - errorCount - warningCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Info</div>
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={`inline-flex items-center gap-2 text-sm ${connected ? 'text-emerald-400' : 'text-amber-400'}`}
+        >
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+          {connected ? 'Connected' : 'Reconnecting…'}
+        </span>
+        <button
+          type="button"
+          onClick={() => setPaused(!paused)}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+          {paused ? 'Resume' : 'Pause'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEvents([])}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Trash2 className="w-4 h-4" />
+          Clear
+        </button>
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Filter className="w-4 h-4" />
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className="input-field text-sm py-1"
+          >
+            <option value="all">All levels</option>
+            <option value="info">Info</option>
+            <option value="warning">Warning</option>
+            <option value="error">Error</option>
+            <option value="debug">Debug</option>
+          </select>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-slate-500" />
-        {filters.map(f => (
-          <button key={f.value} onClick={() => setLevelFilter(f.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${levelFilter === f.value ? 'bg-rose-600/20 text-rose-400 border border-rose-500/30' : 'text-slate-400 hover:text-slate-200 bg-slate-800/50 border border-slate-700 hover:border-slate-600'}`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div ref={containerRef} className="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden max-h-[600px] overflow-y-auto">
-        {filteredEvents.length === 0 ? (
-          <div className="p-10 text-center text-slate-500 text-sm">{events.length === 0 ? 'Waiting for events...' : 'No events match this filter'}</div>
+      <div
+        ref={containerRef}
+        className="rounded-xl border border-slate-700/50 bg-slate-900/50 max-h-[70vh] overflow-y-auto font-mono text-sm"
+      >
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">Waiting for events…</div>
         ) : (
-          <div className="divide-y divide-slate-800/50">
-            {filteredEvents.map(event => (
-              <div key={event.id} className={`px-4 py-2.5 flex items-start gap-3 text-xs font-mono ${levelBg(event.level)} hover:bg-slate-800/30 transition-colors`}>
-                <span className="text-slate-600 whitespace-nowrap shrink-0">{event.timestamp.toLocaleTimeString()}.{String(event.timestamp.getMilliseconds()).padStart(3, '0')}</span>
-                <span className={`shrink-0 uppercase font-bold w-12 ${levelColor(event.level)}`}>{event.level}</span>
-                <span className="text-slate-500 shrink-0 w-20 truncate" title={event.source}>[{event.source}]</span>
-                <span className="text-cyan-400 shrink-0 w-24 truncate">{event.type}</span>
-                <span className="text-slate-300 break-all">{event.message}</span>
-              </div>
-            ))}
-          </div>
+          filtered.map((ev) => (
+            <div
+              key={ev.id}
+              className={`flex gap-3 px-4 py-2 border-b border-slate-800/50 ${levelBg(ev.level)}`}
+            >
+              <span className="text-slate-500 shrink-0">{ev.timestamp.toLocaleTimeString()}</span>
+              <span className={`shrink-0 uppercase text-xs font-bold ${levelColor(ev.level)}`}>{ev.level}</span>
+              <span className="text-cyan-400 shrink-0">{ev.source}</span>
+              <span className="text-slate-300 truncate">{ev.message}</span>
+            </div>
+          ))
         )}
       </div>
     </div>

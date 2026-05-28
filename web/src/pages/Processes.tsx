@@ -2,14 +2,50 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
-import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { formatHttpErrorBody, formatUserError, sanitizeErrorText } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
+
+interface ProcessDetail {
+  error?: string
+  cmdline?: string
+  io_read_bytes?: number
+  io_write_bytes?: number
+  fds?: number
+  voluntary_ctx_switches?: number
+  involuntary_ctx_switches?: number
+}
+
+interface ProcessRow {
+  pid: number
+  name: string
+  cpu_percent?: number
+  memory_mb?: number
+  memory_bytes?: number
+  state?: string
+  threads?: number
+  num_threads?: number
+}
+
+async function parseJsonResponse<T>(res: Response): Promise<T> {
+  const contentType = res.headers.get('content-type') ?? ''
+  const text = await res.text()
+  const trimmed = text.trimStart()
+  const looksJson = contentType.includes('json') || trimmed.startsWith('{') || trimmed.startsWith('[')
+  if (!looksJson) {
+    throw new Error(sanitizeErrorText(text) || 'The API returned a non-JSON response')
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(sanitizeErrorText(text) || 'Failed to parse API response as JSON')
+  }
+}
 
 function stateBadge(state: string): { label: string; classes: string } {
   switch (state) {
@@ -31,28 +67,33 @@ function cpuBarColor(cpu: number): string {
 
 export default function Processes() {
   const toast = useToastContext()
-  const [processes, setProcesses] = useState<any[]>([])
+  const [processes, setProcesses] = useState<ProcessRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedPid, setSelectedPid] = useState<number | null>(null)
-  const [detail, setDetail] = useState<any | null>(null)
+  const [detail, setDetail] = useState<ProcessDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const hadLoadErrorRef = useRef(false)
 
-  const fetchProcesses = useCallback(async () => {
+  const fetchProcesses = useCallback(async (opts?: { showToast?: boolean }) => {
     try {
       const res = await apiFetch('/api/system/processes')
       if (!res.ok) {
         const body = await res.text()
         throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
       }
-      const data = await res.json()
+      const data = await parseJsonResponse<ProcessRow[] | { processes?: ProcessRow[] }>(res)
       setProcesses(Array.isArray(data) ? data : data.processes ?? [])
       setLoadError(null)
+      hadLoadErrorRef.current = false
     } catch (err) {
       const msg = formatUserError(err)
       setLoadError(msg)
-      toastFailure(toast, 'Failed to load processes', err)
+      if (opts?.showToast) {
+        toastFailure(toast, 'Failed to load processes', err)
+      }
+      hadLoadErrorRef.current = true
     } finally {
       setLoading(false)
     }
@@ -71,7 +112,7 @@ export default function Processes() {
     try {
       const res = await apiFetch(`/api/system/process?pid=${pid}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await parseJsonResponse<ProcessDetail>(res)
       setDetail(data)
     } catch (err) {
       setDetail({ error: formatUserError(err) })
@@ -80,7 +121,7 @@ export default function Processes() {
     }
   }, [])
 
-  const filtered = processes.filter((p: any) => {
+  const filtered = processes.filter((p) => {
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -91,15 +132,15 @@ export default function Processes() {
   })
 
   const totalCount = processes.length
-  const runningCount = processes.filter((p: any) => p.state === 'R').length
-  const sleepingCount = processes.filter((p: any) => p.state === 'S').length
+  const runningCount = processes.filter((p) => p.state === 'R').length
+  const sleepingCount = processes.filter((p) => p.state === 'S').length
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Processes"
         description="System process monitor (auto-refresh 3s)"
-        onRefresh={fetchProcesses}
+        onRefresh={() => fetchProcesses({ showToast: true })}
         refreshing={loading}
       />
 
@@ -108,7 +149,7 @@ export default function Processes() {
           title="Could not load processes"
           headline={loadError}
           hints={hintsForError(loadError)}
-          onRetry={fetchProcesses}
+          onRetry={() => fetchProcesses({ showToast: true })}
         />
       )}
 
@@ -165,8 +206,8 @@ export default function Processes() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((proc: any) => {
-                  const badge = stateBadge(proc.state)
+                {filtered.map((proc) => {
+                  const badge = stateBadge(proc.state ?? '?')
                   const cpuPct = Math.min(proc.cpu_percent ?? 0, 100)
                   return (
                     <tr

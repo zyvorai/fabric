@@ -32,8 +32,8 @@ export default function Logs() {
   const [loading, setLoading] = useState(true)
   const logContainerRef = useRef<HTMLDivElement>(null)
 
-  const loadLogs = useCallback(async () => {
-    setLoadError(null)
+  const loadLogs = useCallback(async (silent = false) => {
+    if (!silent) setLoadError(null)
     try {
       const data = await apiGet<any[]>('/api/audit/logs')
       const entries: LogEntry[] = data.map(entry => ({
@@ -47,18 +47,21 @@ export default function Logs() {
         detail: entry.detail,
       }))
       setLogs(entries)
+      setLoadError(null)
     } catch (error) {
       const msg = formatUserError(error)
-      setLoadError(msg)
-      toastFailure(toast, 'Failed to load logs', error)
+      if (!silent || logs.length === 0) {
+        setLoadError(msg)
+        if (!silent) toastFailure(toast, 'Failed to load logs', error)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
-  }, [toast])
+  }, [toast, logs.length])
 
   useEffect(() => {
-    loadLogs()
-    const interval = setInterval(loadLogs, 5000)
+    void loadLogs(false)
+    const interval = setInterval(() => void loadLogs(true), 5000)
     return () => clearInterval(interval)
   }, [loadLogs])
 

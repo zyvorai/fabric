@@ -28,17 +28,16 @@ interface ApiResponse {
 }
 
 const presetEndpoints: { method: HttpMethod; path: string; label: string }[] = [
-  { method: 'GET', path: '/api/health', label: 'Health Check' },
+  { method: 'GET', path: '/health', label: 'Health Check' },
   { method: 'GET', path: '/api/vms', label: 'List VMs' },
   { method: 'GET', path: '/api/system/cpu/topology', label: 'CPU Topology' },
   { method: 'GET', path: '/api/system/memory', label: 'System Memory' },
   { method: 'GET', path: '/api/system/numa/topology', label: 'NUMA Topology' },
-  { method: 'GET', path: '/api/network/interfaces', label: 'Network Interfaces' },
+  { method: 'GET', path: '/api/networkd/links', label: 'Network Links' },
   { method: 'GET', path: '/api/storage/pools', label: 'Storage Pools' },
   { method: 'GET', path: '/api/templates', label: 'Templates' },
-  { method: 'GET', path: '/api/snapshots', label: 'Snapshots' },
   { method: 'GET', path: '/api/backups', label: 'Backups' },
-  { method: 'GET', path: '/api/audit', label: 'Audit Logs' },
+  { method: 'GET', path: '/api/audit/logs', label: 'Audit Logs' },
   { method: 'GET', path: '/api/certificates', label: 'Certificates' },
   { method: 'GET', path: '/api/quotas', label: 'Quotas' },
   { method: 'GET', path: '/api/schedules', label: 'Schedules' },

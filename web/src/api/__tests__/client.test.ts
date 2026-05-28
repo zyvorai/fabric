@@ -37,9 +37,13 @@ const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
 
 function okJson(data: unknown): Response {
+  const body = JSON.stringify(data)
   return {
     ok: true,
     status: 200,
+    statusText: 'OK',
+    headers: new Headers({ 'content-type': 'application/json' }),
+    text: () => Promise.resolve(body),
     json: () => Promise.resolve(data),
     blob: () => Promise.resolve(new Blob()),
   } as unknown as Response

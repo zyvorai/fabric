@@ -830,6 +830,29 @@ code {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+#app-topnav .nav-icon-btn-active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.steel-theme #app-topnav .nav-icon-btn-active::after,
+.aurora-theme #app-topnav .nav-icon-btn-active::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.steel-theme #app-topnav .nav-icon-btn-active,
+.aurora-theme #app-topnav .nav-icon-btn-active {
+  position: relative;
+}
+
 .steel-theme .input-field {
   background: linear-gradient(180deg, #141a22 0%, #0e141c 100%);
   border-color: rgba(140, 160, 190, 0.22);

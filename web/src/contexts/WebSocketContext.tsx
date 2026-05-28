@@ -2,9 +2,11 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { createContext, useContext, ReactNode, useState, useRef } from 'react'
-import { useWebSocket, WebSocketMessage } from '../hooks/useWebSocket'
+import { createContext, useContext, ReactNode, useState, useRef, useCallback } from 'react'
+import { useEventStream, type VMEventPayload } from '../hooks/useEventStream'
+import { WebSocketMessage } from '../hooks/useWebSocket'
 import { VM } from '../api/vm'
+import { useAuth } from './AuthContext'
 
 interface WebSocketContextType {
   isConnected: boolean
@@ -14,72 +16,62 @@ interface WebSocketContextType {
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined)
 
+function mapEventToMessage(event: VMEventPayload): WebSocketMessage | null {
+  const type = event.event_type
+  if (type === 'started' || type === 'stopped' || type === 'paused' || type === 'resumed') {
+    return {
+      type: 'vm_state_changed',
+      data: { name: event.vm_name, state: type },
+    }
+  }
+  if (type === 'created') {
+    return { type: 'vm_created', data: { name: event.vm_name } }
+  }
+  if (type === 'deleted') {
+    return { type: 'vm_deleted', data: { name: event.vm_name } }
+  }
+  return null
+}
+
 export function WebSocketProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [vmUpdates, setVmUpdates] = useState<Map<string, Partial<VM>>>(new Map())
   const subscribersRef = useRef<Set<(message: WebSocketMessage) => void>>(new Set())
 
-  // Determine WebSocket URL - use API_WS_URL env var if set, otherwise derive from current location
-  const wsUrl = import.meta.env.VITE_WS_URL
-    || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/events`
-
-  const handleMessage = (message: WebSocketMessage) => {
-    // Notify all subscribers
-    subscribersRef.current.forEach((callback) => callback(message))
-
-    const data = message.data as Record<string, string | Record<string, unknown>>
-    const vmName = data.name as string
-
-    // Update VM state cache
-    switch (message.type) {
-      case 'vm_state_changed':
-        if (vmName) {
+  const handleEvent = useCallback((event: VMEventPayload) => {
+    const message = mapEventToMessage(event)
+    if (message) {
+      subscribersRef.current.forEach((callback) => callback(message))
+      const vmName = event.vm_name
+      if (!vmName) return
+      switch (message.type) {
+        case 'vm_state_changed':
           setVmUpdates((prev) => {
             const updated = new Map(prev)
-            updated.set(vmName, {
-              state: data.state as string,
-            } as Partial<VM>)
+            updated.set(vmName, { state: message.data.state as string } as Partial<VM>)
             return updated
           })
-        }
-        break
-
-      case 'vm_metrics':
-        if (vmName) {
-          setVmUpdates((prev) => {
-            const updated = new Map(prev)
-            const metrics = (data.metrics || {}) as Record<string, unknown>
-            updated.set(vmName, {
-              ...prev.get(vmName),
-              ...metrics,
-            } as Partial<VM>)
-            return updated
-          })
-        }
-        break
-
-      case 'vm_deleted':
-        if (vmName) {
+          break
+        case 'vm_deleted':
           setVmUpdates((prev) => {
             const updated = new Map(prev)
             updated.delete(vmName)
             return updated
           })
-        }
-        break
+          break
+        default:
+          break
+      }
     }
-  }
+  }, [])
 
-  const { isConnected } = useWebSocket({
-    url: wsUrl,
-    onMessage: handleMessage,
-    reconnect: true,
-    reconnectInterval: 3000,
+  const { connected: isConnected } = useEventStream({
+    enabled: Boolean(user),
+    onEvent: handleEvent,
   })
 
   const subscribe = (callback: (message: WebSocketMessage) => void) => {
     subscribersRef.current.add(callback)
-
-    // Return unsubscribe function
     return () => {
       subscribersRef.current.delete(callback)
     }

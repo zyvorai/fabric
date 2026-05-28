@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { formatHttpErrorBody } from '../utils/apiError'
+import { parseJsonResponse } from '../utils/parseJsonResponse'
 
 const TOKEN_KEY = 'vmspawnd_token'
 
@@ -46,7 +47,7 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 export async function apiGet<T>(url: string): Promise<T> {
   const res = await apiFetch(url)
   if (!res.ok) await throwApiError(res)
-  return res.json()
+  return parseJsonResponse<T>(res)
 }
 
 export async function apiPost<T>(url: string, body?: unknown): Promise<T> {
@@ -56,7 +57,7 @@ export async function apiPost<T>(url: string, body?: unknown): Promise<T> {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) await throwApiError(res)
-  return res.json()
+  return parseJsonResponse<T>(res)
 }
 
 export async function apiPostVoid(url: string, body?: unknown): Promise<void> {
@@ -75,7 +76,7 @@ export async function apiPut<T>(url: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) await throwApiError(res)
-  return res.json()
+  return parseJsonResponse<T>(res)
 }
 
 export async function apiPutVoid(url: string, body: unknown): Promise<void> {

@@ -46,8 +46,8 @@ export default function FaultTolerance() {
       const metricsMap = new Map<string, FtMetrics>()
       for (const vm of vms) {
         try {
-          const m = await getFtMetrics(vm.vm_id)
-          metricsMap.set(vm.vm_id, m)
+          const m = await getFtMetrics(vm.vm_name)
+          metricsMap.set(vm.vm_name, m)
         } catch { /* skip */ }
       }
       setMetrics(metricsMap)
@@ -140,7 +140,7 @@ export default function FaultTolerance() {
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-slate-400 text-sm mb-1">Needs Attention</div>
-          <div className="text-2xl font-bold text-yellow-400">{ftVMs.filter(v => v.status !== 'running' && v.enabled).length}</div>
+          <div className="text-2xl font-bold text-yellow-400">{ftVMs.filter(v => v.status !== 'Enabled' && v.status !== 'enabled').length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-slate-400 text-sm mb-1">Failover Events</div>
@@ -176,23 +176,23 @@ export default function FaultTolerance() {
               {ftVMs.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-slate-400">No FT-protected VMs.</td></tr>
               ) : ftVMs.map(vm => (
-                <tr key={vm.vm_id} className="hover:bg-slate-900">
+                <tr key={vm.vm_name} className="hover:bg-slate-900">
                   <td className="p-4 font-medium">{vm.vm_name}</td>
-                  <td className="p-4 text-sm text-slate-400">{vm.secondary_hostname || 'Not assigned'}</td>
+                  <td className="p-4 text-sm text-slate-400">{vm.secondary_host_id || 'Not assigned'}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(vm.status)}`}>{vm.status}</span>
                   </td>
-                  <td className="p-4 text-sm">{vm.logging_bandwidth_mbps} Mbps</td>
-                  <td className="p-4 text-sm">{vm.checkpoint_interval_seconds}s</td>
+                  <td className="p-4 text-sm">{vm.bandwidth_limit_mbps ?? '—'} Mbps</td>
+                  <td className="p-4 text-sm">—</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => handleTestFailover(vm.vm_id)} className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1" title="Test failover">
+                      <button onClick={() => handleTestFailover(vm.vm_name)} className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1" title="Test failover">
                         Test
                       </button>
-                      <button onClick={() => handleTriggerFailover(vm.vm_id)} className="text-yellow-400 hover:text-yellow-300 text-sm px-2 py-1" title="Trigger failover">
+                      <button onClick={() => handleTriggerFailover(vm.vm_name)} className="text-yellow-400 hover:text-yellow-300 text-sm px-2 py-1" title="Trigger failover">
                         <Play className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDisableFT(vm.vm_id)} className="text-red-600 hover:text-red-800 p-1" title="Disable FT">
+                      <button onClick={() => handleDisableFT(vm.vm_name)} className="text-red-600 hover:text-red-800 p-1" title="Disable FT">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -256,7 +256,7 @@ export default function FaultTolerance() {
           ) : (
             <div className="divide-y divide-slate-700/50">
               {events.map(evt => (
-                <div key={`${evt.vm_id}-${evt.started_at}`} className="p-4 flex items-start gap-4">
+                <div key={`${evt.vm_name}-${evt.started_at}`} className="p-4 flex items-start gap-4">
                   <div className={`w-3 h-3 rounded-full mt-1 ${evt.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -265,7 +265,7 @@ export default function FaultTolerance() {
                       <span className="text-xs px-2 py-0.5 bg-slate-800 rounded">{evt.failover_type}</span>
                     </div>
                     <div className="text-sm text-slate-400">
-                      {evt.source_hostname} &rarr; {evt.target_hostname}
+                      {evt.source_host_id} &rarr; {evt.target_host_id}
                       {evt.downtime_ms > 0 && <span className="ml-2">| Downtime: {evt.downtime_ms}ms</span>}
                     </div>
                     <div className="text-xs text-slate-500 mt-1">{new Date(evt.started_at).toLocaleString()}</div>
@@ -284,10 +284,10 @@ export default function FaultTolerance() {
           {ftVMs.length === 0 ? (
             <div className="text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No FT-protected VMs to show metrics for.</div>
           ) : ftVMs.map(vm => {
-            const m = metrics.get(vm.vm_id)
+            const m = metrics.get(vm.vm_name)
             if (!m) return null
             return (
-              <div key={vm.vm_id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <div key={vm.vm_name} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
                 <h3 className="font-semibold mb-3">{vm.vm_name}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
@@ -342,13 +342,18 @@ export default function FaultTolerance() {
 
 function EnableFTModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const toast = useToastContext()
-  const [vmId, setVmId] = useState('')
+  const [vmName, setVmName] = useState('')
+  const [primaryHostId, setPrimaryHostId] = useState('local')
   const [secondaryHostId, setSecondaryHostId] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await enableFt({ vm_id: vmId, secondary_host_id: secondaryHostId || undefined })
+      await enableFt({
+        vm_name: vmName,
+        primary_host_id: primaryHostId,
+        secondary_host_id: secondaryHostId || 'auto',
+      })
       onCreated()
     } catch { toast.error('Failed to enable FT') }
   }
@@ -359,12 +364,17 @@ function EnableFTModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         <h2 className="text-xl font-bold mb-4">Enable Fault Tolerance</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">VM ID</label>
-            <input type="text" value={vmId} onChange={e => setVmId(e.target.value)}
+            <label className="block text-sm font-medium mb-1">VM name</label>
+            <input type="text" value={vmName} onChange={e => setVmName(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Secondary Host ID (optional)</label>
+            <label className="block text-sm font-medium mb-1">Primary host ID</label>
+            <input type="text" value={primaryHostId} onChange={e => setPrimaryHostId(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Secondary host ID</label>
             <input type="text" value={secondaryHostId} onChange={e => setSecondaryHostId(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2"
               placeholder="Auto-select if empty" />

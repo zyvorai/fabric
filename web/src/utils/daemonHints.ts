@@ -59,7 +59,7 @@ export function hintsForError(err: unknown, domain?: 'vm' | 'storage' | 'network
   if (hints.length === 0) {
     hints.push(
       'Confirm vmspawnd is running: systemctl status vmspawnd',
-      'Check API reachability at /api/v1/health',
+      'Check API reachability at /health',
       'Verify your session has not expired',
     )
   }

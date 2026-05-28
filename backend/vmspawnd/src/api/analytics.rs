@@ -141,10 +141,13 @@ pub async fn get_vm_performance(
     crate::validation::validate_vm_name(&vm_name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     // Try to load real metrics from state store
-    let metrics_key = format!("metrics/vm/{}/{}", vm_name, query.range);
+    let metrics_key = format!("metrics-vm-{}-{}", vm_name, query.range);
+    let legacy_key = format!("metrics/vm/{}/{}", vm_name, query.range);
     let metrics = if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
-        // Use stored metrics
         tracing::debug!("Loaded {} stored metrics for VM {}", stored_performance.metrics.len(), vm_name);
+        stored_performance.metrics
+    } else if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &legacy_key) {
+        tracing::debug!("Loaded {} legacy stored metrics for VM {}", stored_performance.metrics.len(), vm_name);
         stored_performance.metrics
     } else {
         // No metrics available — return empty set
@@ -166,13 +169,17 @@ pub async fn get_system_performance(
     Query(query): Query<TimeRangeQuery>,
 ) -> Result<Json<Vec<SystemPerformance>>, (StatusCode, Json<serde_json::Value>)> {
     // Try to load real system metrics from state store
-    let metrics_key = format!("metrics/system/{}", query.range);
+    let metrics_key = format!("metrics-system-{}", query.range);
+    let legacy_key = format!("metrics/system/{}", query.range);
     if let Ok(Some(stored_performance)) = state.store.get_entity::<Vec<SystemPerformance>>("performance", &metrics_key) {
         tracing::debug!("Loaded {} stored system performance entries", stored_performance.len());
         return Ok(Json(stored_performance));
     }
+    if let Ok(Some(stored_performance)) = state.store.get_entity::<Vec<SystemPerformance>>("performance", &legacy_key) {
+        tracing::debug!("Loaded {} legacy stored system performance entries", stored_performance.len());
+        return Ok(Json(stored_performance));
+    }
 
-    // No metrics available — return empty
     tracing::debug!("No stored system metrics found");
     Ok(Json(Vec::new()))
 }
@@ -189,8 +196,21 @@ pub async fn get_performance_insights(
 
     for vm in vms {
         // Try to load recent metrics for this VM
-        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
-        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+        let metrics_key = format!("metrics-vm-{}-1h", vm.name);
+        let legacy_key = format!("metrics/vm/{}/1h", vm.name);
+        let performance = state
+            .store
+            .get_entity::<VMPerformance>("performance", &metrics_key)
+            .ok()
+            .flatten()
+            .or_else(|| {
+                state
+                    .store
+                    .get_entity::<VMPerformance>("performance", &legacy_key)
+                    .ok()
+                    .flatten()
+            });
+        if let Some(performance) = performance {
             if let Some(latest_metric) = performance.metrics.last() {
                 // Analyze CPU usage
                 if latest_metric.cpu_usage > 90.0 {
@@ -294,8 +314,21 @@ pub async fn get_top_vms_by_resource(
     let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
 
     for vm in vms {
-        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
-        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+        let metrics_key = format!("metrics-vm-{}-1h", vm.name);
+        let legacy_key = format!("metrics/vm/{}/1h", vm.name);
+        let performance = state
+            .store
+            .get_entity::<VMPerformance>("performance", &metrics_key)
+            .ok()
+            .flatten()
+            .or_else(|| {
+                state
+                    .store
+                    .get_entity::<VMPerformance>("performance", &legacy_key)
+                    .ok()
+                    .flatten()
+            });
+        if let Some(performance) = performance {
             if let Some(latest_metric) = performance.metrics.last() {
                 let value = match query.resource.as_str() {
                     "cpu" => latest_metric.cpu_usage,
@@ -336,8 +369,21 @@ pub async fn get_resource_utilization(
     let mut count = 0;
 
     for vm in vms {
-        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
-        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+        let metrics_key = format!("metrics-vm-{}-1h", vm.name);
+        let legacy_key = format!("metrics/vm/{}/1h", vm.name);
+        let performance = state
+            .store
+            .get_entity::<VMPerformance>("performance", &metrics_key)
+            .ok()
+            .flatten()
+            .or_else(|| {
+                state
+                    .store
+                    .get_entity::<VMPerformance>("performance", &legacy_key)
+                    .ok()
+                    .flatten()
+            });
+        if let Some(performance) = performance {
             if let Some(latest_metric) = performance.metrics.last() {
                 total_cpu += latest_metric.cpu_usage;
                 total_memory += latest_metric.memory_usage;
@@ -385,8 +431,21 @@ pub async fn export_performance_report(
     let mut top_cpu_vms = Vec::new();
 
     for vm in &vms {
-        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
-        if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+        let metrics_key = format!("metrics-vm-{}-1h", vm.name);
+        let legacy_key = format!("metrics/vm/{}/1h", vm.name);
+        let performance = state
+            .store
+            .get_entity::<VMPerformance>("performance", &metrics_key)
+            .ok()
+            .flatten()
+            .or_else(|| {
+                state
+                    .store
+                    .get_entity::<VMPerformance>("performance", &legacy_key)
+                    .ok()
+                    .flatten()
+            });
+        if let Some(performance) = performance {
             if let Some(latest_metric) = performance.metrics.last() {
                 total_cpu += latest_metric.cpu_usage;
                 total_memory += latest_metric.memory_usage;
@@ -415,8 +474,21 @@ pub async fn export_performance_report(
             let mut csv_content = String::from("VM Name,CPU Usage (%),Memory Usage (%),Network Traffic (MB/s)\n");
 
             for vm in &vms {
-                let metrics_key = format!("metrics/vm/{}/1h", vm.name);
-                if let Ok(Some(performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
+                let metrics_key = format!("metrics-vm-{}-1h", vm.name);
+                let legacy_key = format!("metrics/vm/{}/1h", vm.name);
+                let performance = state
+                    .store
+                    .get_entity::<VMPerformance>("performance", &metrics_key)
+                    .ok()
+                    .flatten()
+                    .or_else(|| {
+                        state
+                            .store
+                            .get_entity::<VMPerformance>("performance", &legacy_key)
+                            .ok()
+                            .flatten()
+                    });
+                if let Some(performance) = performance {
                     if let Some(latest_metric) = performance.metrics.last() {
                         let net = (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
                         csv_content.push_str(&format!(

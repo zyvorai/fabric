@@ -57,7 +57,7 @@ export default function DiskConverter() {
   const [job, setJob] = useState<JobStatus | null>(null)
   const [polling, setPolling] = useState(false)
 
-  const loadDiskImages = useCallback(() => {
+  const loadDiskImages = useCallback((silent = false) => {
     return run(async () => {
       const res = await apiFetch('/api/images')
       if (!res.ok) {
@@ -65,12 +65,20 @@ export default function DiskConverter() {
         throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
       }
       const data = await res.json()
-      setDiskImages(data.images || data.disk_images || [])
-    })
+      const raw = Array.isArray(data) ? data : data.images || data.disk_images || []
+      setDiskImages(
+        raw.map((img: { name?: string; path?: string; format?: string; size?: number; size_bytes?: number }) => ({
+          name: img.name || '',
+          path: img.path || '',
+          format: img.format || '',
+          size: img.size ?? img.size_bytes ?? 0,
+        })),
+      )
+    }, silent ? { silent: true } : undefined)
   }, [run])
 
   useEffect(() => {
-    void loadDiskImages()
+    void loadDiskImages(false)
   }, [loadDiskImages])
 
   useEffect(() => {

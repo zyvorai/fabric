@@ -18,17 +18,17 @@ export default function ImageBuilder() {
   const { loading, loadError, run } = usePageLoader('Failed to load image builder data')
   const [showBuildDialog, setShowBuildDialog] = useState(false)
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback((silent = false) => {
     return run(async () => {
       const [b, i] = await Promise.all([listBuilds(), listImages()])
       setBuilds(b)
       setImages(i)
-    })
+    }, silent ? { silent: true } : undefined)
   }, [run])
 
   useEffect(() => {
-    void loadData()
-    const interval = setInterval(() => void loadData(), 5000)
+    void loadData(false)
+    const interval = setInterval(() => void loadData(true), 5000)
     return () => clearInterval(interval)
   }, [loadData])
 

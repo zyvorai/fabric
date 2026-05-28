@@ -24,7 +24,9 @@ export function usePageLoader(toastLabel = 'Failed to load data') {
       } catch (err) {
         const msg = formatUserError(err)
         setLoadError(msg)
-        toastFailure(toast, toastLabel, err)
+        if (!options?.silent) {
+          toastFailure(toast, toastLabel, err)
+        }
       } finally {
         if (!options?.silent) {
           setLoading(false)

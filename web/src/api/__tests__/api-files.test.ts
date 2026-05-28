@@ -321,44 +321,44 @@ describe('certificates', () => {
   it('listCertificates calls apiGet without caId', async () => {
     const { listCertificates } = await import('../certificates')
     await listCertificates()
-    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/certs')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates')
   })
 
-  it('listCertificates calls apiGet with caId', async () => {
+  it('listCertificates calls apiGet with caId (ignored)', async () => {
     const { listCertificates } = await import('../certificates')
     await listCertificates('ca1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/certs?ca_id=ca1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates')
   })
 
   it('issueCertificate calls apiPost', async () => {
     const { issueCertificate } = await import('../certificates')
     const req = { ca_id: 'ca1', subject: 'CN=test', cert_type: 'server' as const }
     await issueCertificate(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/certificates/certs', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/certificates/issue', req)
   })
 
   it('revokeCertificate calls apiPostVoid', async () => {
     const { revokeCertificate } = await import('../certificates')
     await revokeCertificate('cert1')
-    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/certificates/certs/cert1/revoke')
+    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/certificates/cert1/revoke')
   })
 
   it('renewCertificate calls apiPost', async () => {
     const { renewCertificate } = await import('../certificates')
     await renewCertificate('cert1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/certificates/certs/cert1/renew')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/certificates/cert1/renew')
   })
 
   it('checkExpiring calls apiGet', async () => {
     const { checkExpiring } = await import('../certificates')
     await checkExpiring(30)
-    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/certs/expiring?days=30')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/expiring?days=30')
   })
 
   it('checkExpiring without days', async () => {
     const { checkExpiring } = await import('../certificates')
     await checkExpiring()
-    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/certs/expiring')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/expiring')
   })
 
   it('listCertRequests calls apiGet', async () => {
@@ -409,13 +409,13 @@ describe('certificates', () => {
   it('checkVmSecurityCompliance calls apiPost', async () => {
     const { checkVmSecurityCompliance } = await import('../certificates')
     await checkVmSecurityCompliance('b1', 'vm1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/certificates/security-baselines/b1/check', { vm_id: 'vm1' })
+    expect(mockApiPost).toHaveBeenCalledWith('/api/certificates/security-baselines/b1/compliance', { vm_id: 'vm1' })
   })
 
   it('getCertHealthDashboard calls apiGet', async () => {
     const { getCertHealthDashboard } = await import('../certificates')
     await getCertHealthDashboard()
-    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/dashboard')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/certificates/health')
   })
 })
 
@@ -854,63 +854,63 @@ describe('encryption', () => {
 describe('faultTolerance', () => {
   it('enableFt calls apiPost', async () => {
     const { enableFt } = await import('../faultTolerance')
-    const req = { vm_id: 'vm1' }
+    const req = { vm_name: 'vm1', primary_host_id: 'h1', secondary_host_id: 'h2' }
     await enableFt(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/fault-tolerance/enable', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/ft/enable', req)
   })
 
-  it('disableFt calls apiPostVoid', async () => {
+  it('disableFt calls apiDelete', async () => {
     const { disableFt } = await import('../faultTolerance')
     await disableFt('vm1')
-    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/fault-tolerance/vm1/disable')
+    expect(mockApiDelete).toHaveBeenCalledWith('/api/ft/vms/vm1')
   })
 
   it('getFtConfig calls apiGet', async () => {
     const { getFtConfig } = await import('../faultTolerance')
     await getFtConfig('vm1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/fault-tolerance/vm1/config')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/ft/vms/vm1')
   })
 
   it('listFtVms calls apiGet', async () => {
     const { listFtVms } = await import('../faultTolerance')
     await listFtVms()
-    expect(mockApiGet).toHaveBeenCalledWith('/api/fault-tolerance/vms')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/ft/vms')
   })
 
   it('checkFtCompatibility calls apiGet', async () => {
     const { checkFtCompatibility } = await import('../faultTolerance')
     await checkFtCompatibility('vm1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/fault-tolerance/vm1/compatibility')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/ft/vms/vm1/compatibility')
   })
 
   it('triggerFailover calls apiPost', async () => {
     const { triggerFailover } = await import('../faultTolerance')
     await triggerFailover('vm1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/fault-tolerance/vm1/failover')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/ft/vms/vm1/failover', {})
   })
 
   it('testFailover calls apiPost', async () => {
     const { testFailover } = await import('../faultTolerance')
     await testFailover('vm1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/fault-tolerance/vm1/test-failover')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/ft/vms/vm1/test-failover', {})
   })
 
   it('getFtMetrics calls apiGet', async () => {
     const { getFtMetrics } = await import('../faultTolerance')
     await getFtMetrics('vm1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/fault-tolerance/vm1/metrics')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/ft/vms/vm1/metrics')
   })
 
   it('getFtEvents calls apiGet with vmId', async () => {
     const { getFtEvents } = await import('../faultTolerance')
     await getFtEvents('vm1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/fault-tolerance/events?vm_id=vm1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/ft/events?vm_name=vm1')
   })
 
   it('getFtEvents calls apiGet without vmId', async () => {
     const { getFtEvents } = await import('../faultTolerance')
     await getFtEvents()
-    expect(mockApiGet).toHaveBeenCalledWith('/api/fault-tolerance/events')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/ft/events')
   })
 })
 

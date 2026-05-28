@@ -59,15 +59,23 @@ export default function ISOImages() {
   const fetchISOs = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
-    try {
-      const resp = await apiFetch('/api/isos')
-      if (!resp.ok) {
-        const body = await resp.text()
-        throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
-      }
-      const data = await resp.json()
-      setISOs(data.isos || [])
-      setVMsWithISOs(data.vms_with_isos || [])
+      try {
+        const resp = await apiFetch('/api/images/iso')
+        if (!resp.ok) {
+          const body = await resp.text()
+          throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
+        }
+        const data = await resp.json()
+        const raw = Array.isArray(data) ? data : data.isos || []
+        setISOs(
+          raw.map((iso: { name: string; path?: string; size_bytes?: number; uploaded?: string }) => ({
+            name: iso.name,
+            path: iso.path || `/var/lib/vmspawnd/iso/${iso.name}.iso`,
+            size_bytes: iso.size_bytes ?? 0,
+            mod_time: iso.uploaded || '',
+          })),
+        )
+        setVMsWithISOs(data.vms_with_isos || [])
     } catch (err) {
       const msg = formatUserError(err)
       setLoadError(msg)

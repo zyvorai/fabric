@@ -264,7 +264,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/capabilities", get(api::capabilities::get_capabilities))
             // VM management routes
             .route("/vms", get(routes::list_vms).post(routes::create_vm))
+            .route("/vms/compare", get(api::ux_extensions::compare_vms))
             .route("/vms/{name}", get(routes::get_vm).delete(routes::delete_vm))
+            .route("/vms/{name}/healthcheck", get(api::ux_extensions::vm_healthcheck))
             .route("/vms/{name}/start", post(routes::start_vm))
             .route("/vms/{name}/stop", post(routes::stop_vm))
             .route("/vms/{name}/restart", post(routes::restart_vm))
@@ -322,6 +324,24 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/system/memory/hugepages", get(api::system::get_hugepage_stats))
             .route("/system/memory/hugepages", post(api::system::allocate_hugepages))
             .route("/system/memory", get(api::system::get_system_memory))
+            .route("/system/processes", get(api::processes::list_processes))
+            .route("/system/process", get(api::processes::get_process))
+            .route("/system/info", get(api::host_insight::get_system_info))
+            .route("/system/metrics", get(api::host_insight::get_system_metrics))
+            .route("/system/kernel", get(api::host_insight::get_kernel_info))
+            .route("/system/containers", get(api::host_insight::get_containers))
+            .route("/system/debug/{tool}", get(api::host_insight::get_debug_output))
+            .route("/system/security", get(api::host_insight::get_security_summary))
+            .route("/system/alerts", get(api::host_insight::get_system_alerts))
+            .route("/system/alerts/rules", get(api::host_insight::get_alert_rules))
+            .route("/system/explain/{metric}", get(api::host_insight::explain_metric))
+            .route("/system/timeseries", get(api::host_insight::get_timeseries))
+            .route("/system/compliance", get(api::host_insight::get_system_compliance))
+            .route("/system/compliance/scan", axum::routing::post(api::host_insight::trigger_compliance_scan))
+            .route("/jobs", get(api::host_insight::list_jobs))
+            .route("/jobs/{id}/logs", get(api::host_insight::get_job_logs))
+            .route("/pipeline/jobs", get(api::host_insight::list_pipeline_jobs))
+            .route("/isos", get(api::host_insight::list_isos_legacy))
             // Firmware routes
             .route("/vms/{name}/firmware/status", get(api::firmware::get_firmware_status))
             .route("/vms/{name}/firmware/uefi", post(api::firmware::enable_uefi))
@@ -380,12 +400,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/templates/{id}", get(api::templates::get_template).put(api::templates::update_template).delete(api::templates::delete_template))
             .route("/templates/{id}/deploy", post(api::templates::deploy_template))
             // Migration routes
+            .route("/migrations/history", get(api::ux_extensions::migration_history))
+            .route("/migrations/readiness", get(api::ux_extensions::migration_readiness))
+            .route("/migrations/report", get(api::ux_extensions::migration_report))
             .route("/migrations", get(api::migration::list_migrations).post(api::migration::start_migration))
             .route("/migrations/{id}", get(api::migration::get_migration))
             .route("/migrations/{id}/cancel", post(api::migration::cancel_migration))
             // Image build routes
             .route("/images/build", post(api::images::build_image))
             .route("/images/builds", get(api::images::list_builds))
+            .route("/images/upload", post(api::ux_extensions::upload_image))
+            .route("/images/convert", post(api::ux_extensions::start_convert))
+            .route("/images/convert/{id}", get(api::ux_extensions::get_convert_job))
             .route("/images", get(api::images::list_images))
             // Cloud image management
             .route("/images/cloud", get(api::images::list_cloud_images))
@@ -553,6 +579,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/encryption/vms", get(api::vm_encryption::list_encrypted_vms))
             .route("/encryption/vms/{name}/rotate-key", post(api::vm_encryption::rotate_vm_key))
             // systemd-networkd VM networking routes
+            .route("/network/topology", get(api::ux_extensions::network_topology))
             .route("/networkd/bridges", get(api::networkd::list_bridges).post(api::networkd::create_bridge))
             .route("/networkd/bridges/{id}", get(api::networkd::get_bridge).put(api::networkd::update_bridge).delete(api::networkd::delete_bridge))
             .route("/networkd/vlans", get(api::networkd::list_vlans).post(api::networkd::create_vlan))
@@ -591,6 +618,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/identities/{id}", get(api::network_policy::get_identity))
             // Service mesh routes
             .route("/services", get(api::service_mesh::list_services).post(api::service_mesh::create_service))
+            .route("/services/map", get(api::ux_extensions::service_map))
             .route("/services/sync", post(api::service_mesh::sync_services))
             .route("/services/status", get(api::service_mesh::get_service_status))
             .route("/services/{id}", get(api::service_mesh::get_service).put(api::service_mesh::update_service).delete(api::service_mesh::delete_service))
@@ -756,6 +784,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             // API key rate limiting
             .route("/system/rate-limits", get(api::vm_power::get_rate_limits).put(api::vm_power::update_rate_limits))
             // Webhook delivery tracking
+            .route("/webhooks", get(api::ux_extensions::list_webhooks).post(api::ux_extensions::create_webhook))
+            .route("/webhooks/test", post(api::ux_extensions::test_webhook))
+            .route("/webhooks/{id}", delete(api::ux_extensions::delete_webhook))
             .route("/webhooks/deliveries", get(api::webhook_retry::list_deliveries))
             // VM export (OVA)
             .route("/vms/{name}/export", post(api::export::export_vm))
@@ -773,6 +804,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/billing/pricing", get(api::billing::get_pricing).put(api::billing::update_pricing))
             .route("/billing/usage", get(api::billing::get_usage))
             .route("/billing/invoice/{tenant_id}", post(api::billing::generate_invoice))
+            .route("/cost/estimate", post(api::ux_extensions::cost_estimate))
+            // Dashboard user management (metadata; login still uses PAM)
+            .route("/users", get(api::ux_extensions::list_users).post(api::ux_extensions::create_user))
+            .route("/users/{id}", put(api::ux_extensions::update_user).delete(api::ux_extensions::delete_user))
             // iSCSI storage routes
             .route("/storage/iscsi/discover", post(api::storage::discover_iscsi_targets))
             .route("/storage/iscsi/login", post(api::storage::login_iscsi_target))
@@ -1164,7 +1199,7 @@ async fn run_metrics_collector(state: Arc<AppState>) {
                     };
 
                     // Load existing metrics and append
-                    let metrics_key = format!("metrics/vm/{}/1h", vm.name);
+                    let metrics_key = format!("metrics-vm-{}-1h", vm.name);
                     let mut existing_metrics = if let Ok(Some(existing)) =
                         state.store.get_entity::<VMPerformance>("performance", &metrics_key)
                     {
@@ -1218,7 +1253,7 @@ async fn run_metrics_collector(state: Arc<AppState>) {
             total_network_tx,
         };
 
-        let sys_key = "metrics/system/1h";
+        let sys_key = "metrics-system-1h";
         let mut sys_entries = if let Ok(Some(existing)) =
             state.store.get_entity::<Vec<SystemPerformance>>("performance", sys_key)
         {
@@ -1884,11 +1919,18 @@ async fn run_autoscaler(state: Arc<AppState>) {
             };
 
             // Get latest metrics (single fetch)
-            let metrics_key = format!("metrics/vm/{}/1h", policy.vm_name);
+            let metrics_key = format!("metrics-vm-{}-1h", policy.vm_name);
+            let legacy_key = format!("metrics/vm/{}/1h", policy.vm_name);
             let perf_data = state.store
                 .get_entity::<VMPerformance>("performance", &metrics_key)
                 .ok()
-                .flatten();
+                .flatten()
+                .or_else(|| {
+                    state.store
+                        .get_entity::<VMPerformance>("performance", &legacy_key)
+                        .ok()
+                        .flatten()
+                });
             let latest_cpu = perf_data.as_ref()
                 .and_then(|p| p.metrics.last().map(|m| m.cpu_usage));
             let latest_memory = perf_data.as_ref()

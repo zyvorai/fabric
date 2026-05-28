@@ -63,7 +63,7 @@ export default function Timeline() {
   const fetchData = useCallback(async () => {
     try {
       const [auditRes, alertsRes] = await Promise.allSettled([
-        apiFetch('/api/audit'),
+        apiFetch('/api/audit/logs'),
         apiFetch('/api/system/alerts'),
       ])
 

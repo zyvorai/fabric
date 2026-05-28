@@ -112,12 +112,10 @@ export interface CertHealthDashboard {
   }>
 }
 
-const API_BASE = '/api'
-
-// Certificate authorities
+const API_BASE = '/api/certificates'
 
 export async function listCas(): Promise<CertificateAuthority[]> {
-  return apiGet<CertificateAuthority[]>(`${API_BASE}/certificates/cas`)
+  return apiGet<CertificateAuthority[]>(`${API_BASE}/cas`)
 }
 
 export async function createCa(req: {
@@ -127,16 +125,11 @@ export async function createCa(req: {
   key_algorithm?: string
   key_size?: number
 }): Promise<CertificateAuthority> {
-  return apiPost<CertificateAuthority>(`${API_BASE}/certificates/cas`, req)
+  return apiPost<CertificateAuthority>(`${API_BASE}/cas`, req)
 }
 
-// Certificates
-
-export async function listCertificates(caId?: string): Promise<Certificate[]> {
-  const url = caId
-    ? `${API_BASE}/certificates/certs?ca_id=${caId}`
-    : `${API_BASE}/certificates/certs`
-  return apiGet<Certificate[]>(url)
+export async function listCertificates(_caId?: string): Promise<Certificate[]> {
+  return apiGet<Certificate[]>(`${API_BASE}`)
 }
 
 export async function issueCertificate(req: {
@@ -147,30 +140,28 @@ export async function issueCertificate(req: {
   san?: string[]
   validity_days?: number
 }): Promise<Certificate> {
-  return apiPost<Certificate>(`${API_BASE}/certificates/certs`, req)
+  return apiPost<Certificate>(`${API_BASE}/issue`, req)
 }
 
 export async function revokeCertificate(id: string): Promise<void> {
-  return apiPostVoid(`${API_BASE}/certificates/certs/${id}/revoke`)
+  return apiPostVoid(`${API_BASE}/${encodeURIComponent(id)}/revoke`)
 }
 
 export async function renewCertificate(id: string): Promise<Certificate> {
-  return apiPost<Certificate>(`${API_BASE}/certificates/certs/${id}/renew`)
+  return apiPost<Certificate>(`${API_BASE}/${encodeURIComponent(id)}/renew`)
 }
 
 export async function checkExpiring(days?: number): Promise<Certificate[]> {
   const url = days
-    ? `${API_BASE}/certificates/certs/expiring?days=${days}`
-    : `${API_BASE}/certificates/certs/expiring`
+    ? `${API_BASE}/expiring?days=${days}`
+    : `${API_BASE}/expiring`
   return apiGet<Certificate[]>(url)
 }
 
-// Certificate requests
-
 export async function listCertRequests(status?: string): Promise<CertificateRequest[]> {
   const url = status
-    ? `${API_BASE}/certificates/requests?status=${status}`
-    : `${API_BASE}/certificates/requests`
+    ? `${API_BASE}/requests?status=${status}`
+    : `${API_BASE}/requests`
   return apiGet<CertificateRequest[]>(url)
 }
 
@@ -181,17 +172,15 @@ export async function submitCertRequest(req: {
   key_size?: number
   san?: string[]
 }): Promise<CertificateRequest> {
-  return apiPost<CertificateRequest>(`${API_BASE}/certificates/requests`, req)
+  return apiPost<CertificateRequest>(`${API_BASE}/requests`, req)
 }
 
 export async function approveCertRequest(id: string): Promise<Certificate> {
-  return apiPost<Certificate>(`${API_BASE}/certificates/requests/${id}/approve`)
+  return apiPost<Certificate>(`${API_BASE}/requests/${encodeURIComponent(id)}/approve`)
 }
 
-// Trust attestations
-
 export async function listAttestations(): Promise<TrustAttestation[]> {
-  return apiGet<TrustAttestation[]>(`${API_BASE}/certificates/attestations`)
+  return apiGet<TrustAttestation[]>(`${API_BASE}/attestations`)
 }
 
 export async function submitAttestation(req: {
@@ -201,13 +190,11 @@ export async function submitAttestation(req: {
   secure_boot_enabled?: boolean
   measured_boot_log?: string
 }): Promise<TrustAttestation> {
-  return apiPost<TrustAttestation>(`${API_BASE}/certificates/attestations`, req)
+  return apiPost<TrustAttestation>(`${API_BASE}/attestations`, req)
 }
 
-// Security baselines
-
 export async function listSecurityBaselines(): Promise<VmSecurityBaseline[]> {
-  return apiGet<VmSecurityBaseline[]>(`${API_BASE}/certificates/security-baselines`)
+  return apiGet<VmSecurityBaseline[]>(`${API_BASE}/security-baselines`)
 }
 
 export async function createSecurityBaseline(req: {
@@ -221,7 +208,7 @@ export async function createSecurityBaseline(req: {
     enabled?: boolean
   }>
 }): Promise<VmSecurityBaseline> {
-  return apiPost<VmSecurityBaseline>(`${API_BASE}/certificates/security-baselines`, req)
+  return apiPost<VmSecurityBaseline>(`${API_BASE}/security-baselines`, req)
 }
 
 export async function checkVmSecurityCompliance(baselineId: string, vmId: string): Promise<{
@@ -243,11 +230,9 @@ export async function checkVmSecurityCompliance(baselineId: string, vmId: string
       details?: string
     }>
     checked_at: string
-  }>(`${API_BASE}/certificates/security-baselines/${baselineId}/check`, { vm_id: vmId })
+  }>(`${API_BASE}/security-baselines/${encodeURIComponent(baselineId)}/compliance`, { vm_id: vmId })
 }
 
-// Dashboard
-
 export async function getCertHealthDashboard(): Promise<CertHealthDashboard> {
-  return apiGet<CertHealthDashboard>(`${API_BASE}/certificates/dashboard`)
+  return apiGet<CertHealthDashboard>(`${API_BASE}/health`)
 }

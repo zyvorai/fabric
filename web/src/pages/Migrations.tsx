@@ -28,22 +28,25 @@ export default function Migrations() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadMigrations()
-    const interval = setInterval(loadMigrations, 5000)
+    void loadMigrations(false)
+    const interval = setInterval(() => void loadMigrations(true), 5000)
     return () => clearInterval(interval)
   }, [])
 
-  const loadMigrations = async () => {
-    setLoadError(null)
+  const loadMigrations = async (silent = false) => {
+    if (!silent) setLoadError(null)
     try {
       const data = await listMigrations()
       setMigrations(data)
+      setLoadError(null)
     } catch (error) {
       const msg = formatUserError(error)
-      setLoadError(msg)
-      toastFailure(toast, 'Failed to load migrations', error)
+      if (!silent || migrations.length === 0) {
+        setLoadError(msg)
+        if (!silent) toastFailure(toast, 'Failed to load migrations', error)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 

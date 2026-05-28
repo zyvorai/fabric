@@ -213,17 +213,41 @@ pub async fn cleanup_metrics(
     let mut deleted = 0usize;
 
     for vm in &vms {
-        let metrics_key = format!("metrics/vm/{}/1h", vm.name);
-        if let Ok(Some(mut vm_perf)) = state.store.get_entity::<crate::api::analytics::VMPerformance>("performance", &metrics_key) {
-            let before = vm_perf.metrics.len();
-            vm_perf.metrics.retain(|m| m.timestamp >= raw_cutoff);
-            let after = vm_perf.metrics.len();
+        let metrics_key = format!("metrics-vm-{}-1h", vm.name);
+        let legacy_key = format!("metrics/vm/{}/1h", vm.name);
+        let mut vm_perf = state
+            .store
+            .get_entity::<crate::api::analytics::VMPerformance>("performance", &metrics_key)
+            .ok()
+            .flatten()
+            .or_else(|| {
+                state
+                    .store
+                    .get_entity::<crate::api::analytics::VMPerformance>("performance", &legacy_key)
+                    .ok()
+                    .flatten()
+            });
+        if let Some(ref mut perf) = vm_perf {
+            let save_key = if state
+                .store
+                .get_entity::<crate::api::analytics::VMPerformance>("performance", &metrics_key)
+                .ok()
+                .flatten()
+                .is_some()
+            {
+                metrics_key
+            } else {
+                legacy_key
+            };
+            let before = perf.metrics.len();
+            perf.metrics.retain(|m| m.timestamp >= raw_cutoff);
+            let after = perf.metrics.len();
             let removed = before - after;
             total_metrics += before;
             deleted += removed;
 
             if removed > 0 {
-                if let Err(e) = state.store.save_entity("performance", &metrics_key, &vm_perf) {
+                if let Err(e) = state.store.save_entity("performance", &save_key, perf) {
                     tracing::error!("Failed to save pruned metrics for VM '{}': {}", vm.name, e);
                 }
             }

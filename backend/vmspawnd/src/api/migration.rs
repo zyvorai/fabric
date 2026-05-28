@@ -28,7 +28,7 @@ pub enum MigrationType {
     Storage,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum MigrationState {
     Pending,

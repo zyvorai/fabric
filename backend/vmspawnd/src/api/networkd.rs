@@ -468,7 +468,10 @@ pub async fn list_links(RequireRead(_claims): RequireRead, State(state): State<A
     let mgr = networkd_manager(&state);
     match mgr.list_links() {
         Ok(links) => Json(links).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            tracing::warn!("networkctl list failed, returning empty links: {}", e);
+            Json(Vec::<networking::models::LinkInfo>::new()).into_response()
+        }
     }
 }
 

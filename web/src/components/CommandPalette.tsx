@@ -8,7 +8,7 @@ import { Search, ArrowRight, Server, Plus, Home, Terminal, RotateCw, Play, Squar
 import { listVMs, startVM, stopVM, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
-import { navGroups } from '../utils/routes'
+import { navGroups, flattenNavGroup } from '../utils/routes'
 import { toastFailure } from '../utils/toastError'
 import { getPageLabel } from '../utils/pageLabels'
 import { getPinnedPages, isPagePinned, togglePinnedPage } from '../utils/pinnedPages'
@@ -154,15 +154,16 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
   }
 
   for (const group of navGroups) {
-    for (const item of group.items) {
+    for (const item of flattenNavGroup(group)) {
+      const Icon = item.icon
       staticCommands.push({
-        id: `nav-${item.to}`,
+        id: `nav-${item.path}`,
         label: item.label,
-        description: group.label,
-        icon: item.icon,
-        action: () => go(item.to),
+        description: group.name,
+        icon: <Icon className="w-4 h-4" />,
+        action: () => go(item.path),
         category: 'Pages',
-        keywords: [group.label.toLowerCase()],
+        keywords: [group.compact.toLowerCase(), group.name.toLowerCase()],
       })
     }
   }

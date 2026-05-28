@@ -56,7 +56,8 @@ export default function PipelineMonitor() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (silent = false) => {
+    if (!silent) setLoadError(null)
     try {
       const response = await apiFetch('/api/pipeline/jobs')
       if (!response.ok) {
@@ -68,16 +69,18 @@ export default function PipelineMonitor() {
       setLoadError(null)
     } catch (err) {
       const msg = formatUserError(err)
-      setLoadError(msg)
-      toastFailure(toast, 'Failed to load pipeline jobs', err)
+      if (!silent || jobs.length === 0) {
+        setLoadError(msg)
+        if (!silent) toastFailure(toast, 'Failed to load pipeline jobs', err)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
-  }, [toast])
+  }, [toast, jobs.length])
 
   useEffect(() => {
-    fetchJobs()
-    const interval = setInterval(fetchJobs, 3000)
+    void fetchJobs(false)
+    const interval = setInterval(() => void fetchJobs(true), 3000)
     return () => clearInterval(interval)
   }, [fetchJobs])
 

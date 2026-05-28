@@ -41,7 +41,7 @@ export default function Alerts() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (silent = false) => {
     try {
       const res = await apiFetch('/api/system/alerts')
       if (!res.ok) {
@@ -65,22 +65,22 @@ export default function Alerts() {
     } catch (err) {
       const msg = formatUserError(err)
       setAlerts((prev) => {
-        if (prev.length === 0) {
+        if (!silent && prev.length === 0) {
           setLoadError(msg)
           toastFailure(toast, 'Failed to load alerts', err)
-        } else {
+        } else if (silent || prev.length > 0) {
           setRefreshError(msg)
         }
         return prev
       })
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [toast])
 
   useEffect(() => {
-    loadAll()
-    const interval = setInterval(loadAll, 5000)
+    void loadAll(false)
+    const interval = setInterval(() => void loadAll(true), 5000)
     return () => clearInterval(interval)
   }, [loadAll])
 

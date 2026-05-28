@@ -40,7 +40,7 @@ export default function ServiceMap() {
   const { loading, loadError, run } = usePageLoader('Failed to load service map')
     const [selectedNode, setSelectedNode] = useState<string | null>(null)
 
-  const fetchMap = useCallback(() => {
+  const fetchMap = useCallback((options?: { silent?: boolean }) => {
     return run(async () => {
       const res = await apiFetch('/api/services/map')
       if (!res.ok) {
@@ -48,10 +48,14 @@ export default function ServiceMap() {
         throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
       }
       setData(await res.json())
-    })
+    }, options)
   }, [run])
 
-  useEffect(() => { fetchMap(); const interval = setInterval(fetchMap, 15000); return () => clearInterval(interval) }, [fetchMap])
+  useEffect(() => {
+    void fetchMap()
+    const interval = setInterval(() => void fetchMap({ silent: true }), 15000)
+    return () => clearInterval(interval)
+  }, [fetchMap])
 
   const nodes = data?.nodes || []
   const links = data?.links || []
