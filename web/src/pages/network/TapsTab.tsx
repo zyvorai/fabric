@@ -2,11 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { TapConfig, CreateTapRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 
 interface TapsTabProps {
   taps: TapConfig[]
@@ -16,6 +17,17 @@ interface TapsTabProps {
 }
 
 function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [showAll, setShowAll] = useState(false)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = [...taps].sort((a, b) => a.name.localeCompare(b.name))
+    if (!q) return list
+    return list.filter(t => [t.name, t.bridge ?? '', t.user ?? ''].join(' ').toLowerCase().includes(q))
+  }, [taps, search])
+  const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -27,7 +39,9 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
       {taps.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No tap devices configured.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search name, bridge, user…" total={taps.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-800">
               <tr>
@@ -40,7 +54,7 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {taps.map(t => (
+              {pageItems.map(t => (
                 <tr key={t.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{t.name}{isHostManaged(t) && <HostBadge />}</td>
                   <td className="p-4 text-slate-400">{t.bridge ?? '-'}</td>
@@ -54,7 +68,9 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
               ))}
             </tbody>
           </table>
-        </div>
+          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No tap devices match your search.</div>}
+          </div>
+        </>
       )}
     </div>
   )

@@ -2,11 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { SriovConfig, CreateSriovRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 
 interface SriovTabProps {
   sriov: SriovConfig[]
@@ -16,6 +17,17 @@ interface SriovTabProps {
 }
 
 function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) {
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [showAll, setShowAll] = useState(false)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = [...sriov].sort((a, b) => a.pf_name.localeCompare(b.pf_name))
+    if (!q) return list
+    return list.filter(s => [s.pf_name, String(s.num_vfs)].join(' ').toLowerCase().includes(q))
+  }, [sriov, search])
+  const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -27,7 +39,9 @@ function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) 
       {sriov.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No SR-IOV configurations.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search PF name…" total={sriov.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-800">
               <tr>
@@ -38,7 +52,7 @@ function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {sriov.map(s => (
+              {pageItems.map(s => (
                 <tr key={s.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">
                     {s.pf_name}
@@ -57,7 +71,9 @@ function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) 
               ))}
             </tbody>
           </table>
-        </div>
+          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No SR-IOV configs match your search.</div>}
+          </div>
+        </>
       )}
     </div>
   )

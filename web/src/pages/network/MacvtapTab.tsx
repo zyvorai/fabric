@@ -2,11 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { MacvtapConfig, CreateMacvtapRequest, MacvtapMode } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 
 interface MacvtapTabProps {
   macvtaps: MacvtapConfig[]
@@ -16,6 +17,17 @@ interface MacvtapTabProps {
 }
 
 function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTabProps) {
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [showAll, setShowAll] = useState(false)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = [...macvtaps].sort((a, b) => a.name.localeCompare(b.name))
+    if (!q) return list
+    return list.filter(m => [m.name, m.parent_interface, m.mode, m.mac_address ?? ''].join(' ').toLowerCase().includes(q))
+  }, [macvtaps, search])
+  const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -27,7 +39,9 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
       {macvtaps.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No macvtap devices configured.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search name, parent, mode…" total={macvtaps.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-800">
               <tr>
@@ -40,7 +54,7 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {macvtaps.map(m => (
+              {pageItems.map(m => (
                 <tr key={m.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{m.name}{isHostManaged(m) && <HostBadge />}</td>
                   <td className="p-4 text-slate-400">{m.parent_interface}</td>
@@ -56,7 +70,9 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
               ))}
             </tbody>
           </table>
-        </div>
+          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No macvtap devices match your search.</div>}
+          </div>
+        </>
       )}
     </div>
   )

@@ -122,7 +122,7 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                   <tr key={i.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-mono text-sm">
                       {i.id}
-                      {isHostManaged(i) && <HostBadge />}
+                      {isHostManaged({ managed: i.managed, id: String(i.id) }) && <HostBadge />}
                       {i.description && <div className="text-xs text-slate-500 font-normal mt-0.5 max-w-xs">{i.description}</div>}
                     </td>
                     <td className="p-4"><LabelTags labels={i.labels} /></td>

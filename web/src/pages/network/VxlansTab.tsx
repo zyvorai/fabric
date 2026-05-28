@@ -2,11 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { VxlanConfig, CreateVxlanRequest, DhcpMode } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 
 interface VxlansTabProps {
   vxlans: VxlanConfig[]
@@ -16,6 +17,17 @@ interface VxlansTabProps {
 }
 
 function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProps) {
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [showAll, setShowAll] = useState(false)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    let list = [...vxlans].sort((a, b) => a.name.localeCompare(b.name))
+    if (!q) return list
+    return list.filter(v => [v.name, String(v.vni), v.remote ?? '', v.parent_interface ?? '', v.addresses.join(' ')].join(' ').toLowerCase().includes(q))
+  }, [vxlans, search])
+  const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -27,7 +39,9 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
       {vxlans.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No VXLAN interfaces configured.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search name, VNI, remote…" total={vxlans.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-800">
               <tr>
@@ -40,7 +54,7 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {vxlans.map(v => (
+              {pageItems.map(v => (
                 <tr key={v.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">
                     {v.name}
@@ -61,7 +75,9 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
               ))}
             </tbody>
           </table>
-        </div>
+          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No VXLAN interfaces match your search.</div>}
+          </div>
+        </>
       )}
     </div>
   )
