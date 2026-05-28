@@ -7,7 +7,7 @@ import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { QoSPolicy, CreateQoSPolicyRequest } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
-import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
+import { LabelSelectorInput, StatusBadge } from './ModalShared'
 
 function formatRate(r: { value: number; unit: string }): string {
   return `${r.value}${r.unit}`

@@ -90,7 +90,9 @@ fn parse_tc_json_qdiscs(json: &serde_json::Value) -> Vec<DiscoveredTcQdisc> {
 }
 
 fn extract_tc_rates(item: &serde_json::Value) -> (Option<u64>, Option<u64>) {
-    let opts = item.get("options")?;
+    let Some(opts) = item.get("options") else {
+        return (None, None);
+    };
     if let Some(rate) = opts.get("rate").and_then(|r| r.as_u64()) {
         // tc JSON rate is typically bytes/s
         let kbit = rate.saturating_mul(8) / 1000;
@@ -127,7 +129,8 @@ fn parse_tc_text_qdiscs(text: &str) -> Vec<DiscoveredTcQdisc> {
             .iter()
             .position(|&p| p == "dev")
             .and_then(|i| parts.get(i + 1))
-            .unwrap_or("unknown");
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
         if dev == "lo" {
             continue;
         }
@@ -140,7 +143,7 @@ fn parse_tc_text_qdiscs(text: &str) -> Vec<DiscoveredTcQdisc> {
         out.push(DiscoveredTcQdisc {
             name: format!("host-tc-{dev}-{kind}"),
             description: format!("Host tc qdisc {kind} on {dev}"),
-            interface: dev.to_string(),
+            interface: dev.clone(),
             kind: kind.to_string(),
             rate_kbit,
             ceil_kbit,

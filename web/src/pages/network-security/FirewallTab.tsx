@@ -73,8 +73,8 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
                       <StatusBadge status={p.default_action} color={p.default_action === 'accept' ? 'green' : 'red'} />
                     </td>
                     <td className="p-4 font-mono text-sm">{p.rules.length}</td>
-                    <td className="p-4">
-                      <StatusBadge status="external" color="gray" />
+                    <td className="p-4 text-xs text-slate-500">
+                      {isHostManaged(p) ? 'host nft' : 'managed'}
                     </td>
                     <td className="p-4">
                       <HostManagedActions

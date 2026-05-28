@@ -383,7 +383,7 @@ export default function NetworkSecurity() {
             <ServicesTab services={services} onDelete={handleDeleteService} onAdopt={handleAdoptService} onCreate={() => setActiveModal('service')} onSync={() => handleSync(api.syncServices)} />
           )}
           {activeTab === 'qos' && (
-            <QosTab policies={qosPolicies} onDelete={handleDeleteQos} onCreate={() => setActiveModal('qos')} onSync={() => handleSync(api.syncQos)} />
+            <QosTab policies={qosPolicies} onDelete={handleDeleteQos} onAdopt={handleAdoptQos} onCreate={() => setActiveModal('qos')} onSync={() => handleSync(api.syncQos)} />
           )}
           {activeTab === 'dns' && (
             <DnsTab
