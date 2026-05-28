@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { VpnTunnel, CreateVpnTunnelRequest, VpnNetwork, CreateVpnNetworkRequest, VpnTopology } from '../../api/network-security'
-import { ModalWrapper, InputField, extractErrorMessage } from '../network/ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
 
 interface VpnTabProps {
@@ -14,11 +14,12 @@ interface VpnTabProps {
   networks: VpnNetwork[]
   onDeleteTunnel: (id: string) => void
   onDeleteNetwork: (id: string) => void
+  onAdoptTunnel?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onCreate, onSync }: VpnTabProps) {
+function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onAdoptTunnel, onCreate, onSync }: VpnTabProps) {
   const [view, setView] = useState<'tunnels' | 'networks'>('tunnels')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -64,22 +65,27 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onC
                 {tunnels.map(t => (
                   <tr key={t.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
-                      <div className="font-medium">{t.name}</div>
+                      <div className="font-medium">{t.name}{isHostManaged(t) && <HostBadge />}</div>
                       {t.description && <div className="text-xs text-slate-500 mt-1">{t.description}</div>}
                     </td>
                     <td className="p-4 font-mono text-sm text-blue-400">{t.interface_name}</td>
                     <td className="p-4 font-mono text-sm">{t.listen_port}</td>
                     <td className="p-4 font-medium text-cyan-400">{t.peers.length}</td>
                     <td className="p-4">
-                      <StatusBadge status={t.private_key_set ? 'set' : 'missing'} color={t.private_key_set ? 'green' : 'red'} />
+                      <StatusBadge
+                        status={(t.private_key_set ?? Boolean(t.private_key_ref)) ? 'set' : 'missing'}
+                        color={(t.private_key_set ?? Boolean(t.private_key_ref)) ? 'green' : 'red'}
+                      />
                     </td>
                     <td className="p-4">
                       <StatusBadge status={t.enabled ? 'active' : 'disabled'} color={t.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <button onClick={() => onDeleteTunnel(t.id)} className="p-2 hover:bg-red-600 rounded transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <HostManagedActions
+                        item={{ id: t.id, managed: t.managed }}
+                        onDelete={() => onDeleteTunnel(t.id)}
+                        onAdopt={onAdoptTunnel ? () => onAdoptTunnel(t.id) : undefined}
+                      />
                     </td>
                   </tr>
                 ))}

@@ -8,6 +8,8 @@ pub mod host_nat;
 pub mod host_nft_filter;
 pub mod host_services;
 pub mod host_tc;
+pub mod host_vxlan_sriov;
+pub mod host_wireguard;
 pub mod models;
 pub mod netlink;
 pub mod nftables;

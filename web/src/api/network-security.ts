@@ -445,9 +445,12 @@ export interface VpnTunnel {
   description?: string
   interface_name: string
   listen_port: number
-  private_key_set: boolean
+  private_key_set?: boolean
+  private_key_ref?: string
+  address?: string
   peers: VpnPeer[]
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -501,6 +504,10 @@ export async function updateVpnTunnel(id: string, req: CreateVpnTunnelRequest): 
 
 export async function deleteVpnTunnel(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/vpn-tunnels/${id}`)
+}
+
+export async function adoptVpnTunnel(hostId: string): Promise<VpnTunnel> {
+  return apiPost<VpnTunnel>(`${API_BASE}/vpn-tunnels/adopt`, { host_id: hostId })
 }
 
 export async function listVpnNetworks(): Promise<VpnNetwork[]> {

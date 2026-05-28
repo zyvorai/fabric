@@ -376,13 +376,29 @@ export default function Network() {
             <LinkfilesTab linkfiles={linkfiles} onDelete={handleDeleteLinkfile} onCreate={() => setActiveModal('linkfile')} />
           )}
           {activeTab === 'portforwards' && (
-            <PortForwardsTab portForwards={portForwards} onDelete={handleDeletePortForward} onCreate={() => setActiveModal('portforward')} onSync={handleSyncPortForwards} />
+            <PortForwardsTab
+              portForwards={portForwards}
+              onDelete={handleDeletePortForward}
+              onAdopt={id => adoptHost('Port forward', id, api.adoptPortForward, setPortForwards)}
+              onCreate={() => setActiveModal('portforward')}
+              onSync={handleSyncPortForwards}
+            />
           )}
           {activeTab === 'vxlan' && (
-            <VxlansTab vxlans={vxlans} onDelete={handleDeleteVxlan} onCreate={() => setActiveModal('vxlan')} />
+            <VxlansTab
+              vxlans={vxlans}
+              onDelete={handleDeleteVxlan}
+              onAdopt={id => adoptHost('VXLAN', id, api.adoptVxlan, setVxlans)}
+              onCreate={() => setActiveModal('vxlan')}
+            />
           )}
           {activeTab === 'sriov' && (
-            <SriovTab sriov={sriov} onDelete={handleDeleteSriov} onCreate={() => setActiveModal('sriov')} />
+            <SriovTab
+              sriov={sriov}
+              onDelete={handleDeleteSriov}
+              onAdopt={id => adoptHost('SR-IOV', id, api.adoptSriov, setSriov)}
+              onCreate={() => setActiveModal('sriov')}
+            />
           )}
           {activeTab === 'status' && <StatusTab links={links} onRefresh={fetchAll} />}
         </>

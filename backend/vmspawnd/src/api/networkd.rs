@@ -1370,6 +1370,55 @@ pub async fn delete_port_forward(
     StatusCode::NO_CONTENT.into_response()
 }
 
+pub async fn adopt_port_forward(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_port_forward));
+    let host = match super::networkd_discover::find_host_port_forward(&req.host_id) {
+        Some(p) if super::networkd_discover::is_host_managed_id(&p.id) => p,
+        _ => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host port forward not found")
+                .into_response();
+        }
+    };
+
+    let stored: Vec<PortForwardConfig> = state
+        .store
+        .list_entities("networkd_port_forwards")
+        .unwrap_or_default();
+    if stored.iter().any(|p| p.name == host.name) {
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("Port forward '{}' is already managed by vmspawnd", host.name),
+        )
+        .into_response();
+    }
+
+    let now = Utc::now().to_rfc3339();
+    let mut cfg = host;
+    cfg.id = Uuid::new_v4().to_string();
+    cfg.managed = true;
+    cfg.created = now.clone();
+    cfg.updated = now;
+
+    if let Err(e) = state
+        .store
+        .save_entity("networkd_port_forwards", &cfg.id, &cfg)
+    {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+
+    let nft = NftManager::new();
+    if let Err(e) = nft.sync_all(&[cfg.clone()]) {
+        tracing::warn!("Post-adopt port forward nft sync failed: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(cfg)).into_response()
+}
+
 pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(sync_port_forwards));
     let configs: Vec<PortForwardConfig> = state
@@ -1396,7 +1445,7 @@ pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state
 pub async fn list_vxlans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vxlans));
     let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_vxlans(&state, items))
 }
 
 pub async fn create_vxlan(
@@ -1433,6 +1482,7 @@ pub async fn create_vxlan(
         dhcp: req.dhcp,
         created: now.clone(),
         updated: now,
+        managed: true,
     };
 
     let mgr = networkd_manager(&state);
@@ -1457,7 +1507,12 @@ pub async fn get_vxlan(
     tracing::debug!("networkd::{}", stringify!(get_vxlan));
     match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "VXLAN not found").into_response(),
+        Ok(None) => {
+            if let Some(v) = super::networkd_discover::find_host_vxlan(&state, &id) {
+                return Json(v).into_response();
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "VXLAN not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VXLAN").into_response(),
     }
 }
@@ -1468,6 +1523,9 @@ pub async fn delete_vxlan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_vxlan));
+    if let Some(resp) = reject_host_delete(&id, "VXLAN") {
+        return resp;
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
@@ -1477,6 +1535,64 @@ pub async fn delete_vxlan(
     StatusCode::NO_CONTENT.into_response()
 }
 
+pub async fn adopt_vxlan(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_vxlan));
+    let host = match super::networkd_discover::find_host_vxlan(&state, &req.host_id) {
+        Some(v) if super::networkd_discover::is_host_managed_id(&v.id) => v,
+        _ => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host VXLAN not found")
+                .into_response();
+        }
+    };
+
+    let stored: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_default();
+    if stored.iter().any(|v| v.name == host.name) {
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("VXLAN '{}' is already managed by vmspawnd", host.name),
+        )
+        .into_response();
+    }
+
+    let now = Utc::now().to_rfc3339();
+    let cfg = VxlanConfig {
+        id: Uuid::new_v4().to_string(),
+        name: host.name,
+        vni: host.vni,
+        remote: host.remote,
+        local: host.local,
+        port: host.port,
+        parent_interface: host.parent_interface,
+        mtu: host.mtu,
+        addresses: host.addresses,
+        gateway: host.gateway,
+        dns: host.dns,
+        dhcp: host.dhcp,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_vxlan(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    if let Err(e) = state.store.save_entity("networkd_vxlans", &cfg.id, &cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    if let Err(e) = mgr.reload() {
+        tracing::warn!("Failed to reload networkd after VXLAN adopt: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(cfg)).into_response()
+}
+
 // ============================================================================
 // SR-IOV handlers
 // ============================================================================
@@ -1484,7 +1600,7 @@ pub async fn delete_vxlan(
 pub async fn list_sriov(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_sriov));
     let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
-    Json(items)
+    Json(super::networkd_discover::merge_sriov(&state, items))
 }
 
 pub async fn create_sriov(
@@ -1508,6 +1624,7 @@ pub async fn create_sriov(
         vf_configs: req.vf_configs,
         created: now.clone(),
         updated: now,
+        managed: true,
     };
 
     let mgr = networkd_manager(&state);
@@ -1529,7 +1646,12 @@ pub async fn get_sriov(
     tracing::debug!("networkd::{}", stringify!(get_sriov));
     match state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "SR-IOV config not found").into_response(),
+        Ok(None) => {
+            if let Some(s) = super::networkd_discover::find_host_sriov(&state, &id) {
+                return Json(s).into_response();
+            }
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "SR-IOV config not found").into_response()
+        }
         Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load SR-IOV config").into_response(),
     }
 }
@@ -1540,12 +1662,62 @@ pub async fn delete_sriov(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_sriov));
+    if let Some(resp) = reject_host_delete(&id, "SR-IOV config") {
+        return resp;
+    }
     if let Ok(Some(cfg)) = state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         let mgr = networkd_manager(&state);
         if let Err(e) = mgr.remove_sriov(&cfg.pf_name) { tracing::warn!("Failed to remove device: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_sriov", &id) { tracing::error!("Failed to delete entity: {}", e); }
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_sriov(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("networkd::{}", stringify!(adopt_sriov));
+    let host = match super::networkd_discover::find_host_sriov(&state, &req.host_id) {
+        Some(s) if super::networkd_discover::is_host_managed_id(&s.id) => s,
+        _ => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host SR-IOV config not found")
+                .into_response();
+        }
+    };
+
+    let stored: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_default();
+    if stored.iter().any(|s| s.pf_name == host.pf_name) {
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("SR-IOV on '{}' is already managed by vmspawnd", host.pf_name),
+        )
+        .into_response();
+    }
+
+    let now = Utc::now().to_rfc3339();
+    let cfg = SriovConfig {
+        id: Uuid::new_v4().to_string(),
+        pf_name: host.pf_name,
+        num_vfs: host.num_vfs,
+        vf_configs: host.vf_configs,
+        created: now.clone(),
+        updated: now,
+        managed: true,
+    };
+
+    let mgr = networkd_manager(&state);
+    if let Err(e) = mgr.apply_sriov(&cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    if let Err(e) = state.store.save_entity("networkd_sriov", &cfg.id, &cfg) {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+
+    (StatusCode::CREATED, Json(cfg)).into_response()
 }
 
 // ============================================================================

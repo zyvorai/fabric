@@ -15,6 +15,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use vpn_mesh::compiler::VMSnapshot;
+use networking::models::AdoptHostRequest;
 use vpn_mesh::models::{
     CreateVpnNetworkRequest, CreateVpnTunnelRequest, VpnNetwork, VpnNetworkStatus, VpnTunnel,
     VpnTunnelStatus,
@@ -70,6 +71,7 @@ pub async fn create_vpn_tunnel(
         private_key_ref: req.private_key_ref,
         peers: req.peers,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -99,9 +101,12 @@ pub async fn list_vpn_tunnels(
     tracing::debug!("vpn_mesh::{}", stringify!(list_vpn_tunnels));
     match state.store.list_entities::<VpnTunnel>(TUNNEL_STORE_KEY) {
         Ok(mut tunnels) => {
+            tunnels = super::net_security_discover::merge_vpn_tunnels(&state, tunnels);
             // Redact sensitive private key references
             for tunnel in &mut tunnels {
-                tunnel.private_key_ref = "**REDACTED**".to_string();
+                if !tunnel.private_key_ref.is_empty() {
+                    tunnel.private_key_ref = "**REDACTED**".to_string();
+                }
             }
             (StatusCode::OK, Json(tunnels)).into_response()
         }
@@ -121,15 +126,21 @@ pub async fn get_vpn_tunnel(
     tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_tunnel));
     match state.store.get_entity::<VpnTunnel>(TUNNEL_STORE_KEY, &id) {
         Ok(Some(mut tunnel)) => {
-            // Redact sensitive private key reference
-            tunnel.private_key_ref = "**REDACTED**".to_string();
+            if !tunnel.private_key_ref.is_empty() {
+                tunnel.private_key_ref = "**REDACTED**".to_string();
+            }
             (StatusCode::OK, Json(tunnel)).into_response()
         }
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "VPN tunnel not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(tunnel) = super::net_security_discover::find_host_vpn_tunnel(&state, &id) {
+                return (StatusCode::OK, Json(tunnel)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "VPN tunnel not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -173,6 +184,7 @@ pub async fn update_vpn_tunnel(
         private_key_ref: req.private_key_ref,
         peers: req.peers,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -198,6 +210,17 @@ pub async fn delete_vpn_tunnel(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(delete_vpn_tunnel));
+    if let Some(host) = super::net_security_discover::find_host_vpn_tunnel(&state, &id) {
+        if super::net_security_discover::is_host_managed_vpn_tunnel(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This WireGuard tunnel exists on the host and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(TUNNEL_STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -211,6 +234,69 @@ pub async fn delete_vpn_tunnel(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_vpn_tunnel(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("vpn_mesh::{}", stringify!(adopt_vpn_tunnel));
+    let host = match super::net_security_discover::find_host_vpn_tunnel(&state, &req.host_id) {
+        Some(t) if super::net_security_discover::is_host_managed_vpn_tunnel(&t) => t,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host WireGuard tunnel not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<VpnTunnel> = state.store.list_entities(TUNNEL_STORE_KEY).unwrap_or_default();
+    if stored.iter().any(|t| t.interface_name == host.interface_name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!(
+                    "WireGuard interface '{}' is already managed by vmspawnd",
+                    host.interface_name
+                )
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let tunnel = VpnTunnel {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        interface_name: host.interface_name,
+        listen_port: host.listen_port,
+        address: host.address,
+        private_key_ref: "host-existing".to_string(),
+        peers: host.peers,
+        enabled: false,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(TUNNEL_STORE_KEY, &tunnel.id.to_string(), &tunnel)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    let mut response = tunnel;
+    response.private_key_ref = "**REDACTED**".to_string();
+    (StatusCode::CREATED, Json(response)).into_response()
 }
 
 // ── VPN Network CRUD ────────────────────────────────────────────────
@@ -234,6 +320,7 @@ pub async fn create_vpn_network(
         topology: req.topology,
         listen_port: req.listen_port,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -332,6 +419,7 @@ pub async fn update_vpn_network(
         topology: req.topology,
         listen_port: req.listen_port,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };

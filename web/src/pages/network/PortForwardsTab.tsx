@@ -11,11 +11,12 @@ import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged,
 interface PortForwardsTabProps {
   portForwards: PortForwardConfig[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function PortForwardsTabContent({ portForwards, onDelete, onCreate, onSync }: PortForwardsTabProps) {
+function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onSync }: PortForwardsTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -63,7 +64,11 @@ function PortForwardsTabContent({ portForwards, onDelete, onCreate, onSync }: Po
                   <td className="p-4 font-mono text-sm text-slate-400">{pf.guest_ip}:{pf.guest_port}</td>
                   <td className="p-4">{pf.enabled ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <HostManagedActions item={pf} onDelete={() => onDelete(pf.id)} />
+                    <HostManagedActions
+                      item={pf}
+                      onDelete={() => onDelete(pf.id)}
+                      onAdopt={onAdopt ? () => onAdopt(pf.id) : undefined}
+                    />
                   </td>
                 </tr>
               ))}

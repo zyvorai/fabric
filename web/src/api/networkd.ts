@@ -428,6 +428,7 @@ export interface VxlanConfig {
   dhcp: DhcpMode
   created: string
   updated: string
+  managed?: boolean
 }
 
 export interface CreateVxlanRequest {
@@ -456,6 +457,10 @@ export async function deleteVxlan(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/vxlans/${id}`)
 }
 
+export async function adoptVxlan(hostId: string): Promise<VxlanConfig> {
+  return apiPost<VxlanConfig>(`${API_BASE}/networkd/vxlans/adopt`, { host_id: hostId })
+}
+
 // ─── SR-IOV ───────────────────────────────────────────────────────────────────
 
 export interface VfConfig {
@@ -474,6 +479,7 @@ export interface SriovConfig {
   vf_configs: VfConfig[]
   created: string
   updated: string
+  managed?: boolean
 }
 
 export interface CreateSriovRequest {
@@ -492,6 +498,10 @@ export async function createSriov(req: CreateSriovRequest): Promise<SriovConfig>
 
 export async function deleteSriov(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/networkd/sriov/${id}`)
+}
+
+export async function adoptSriov(hostId: string): Promise<SriovConfig> {
+  return apiPost<SriovConfig>(`${API_BASE}/networkd/sriov/adopt`, { host_id: hostId })
 }
 
 // ─── Port Forwards ───────────────────────────────────────────────────────────
@@ -542,6 +552,10 @@ export async function deletePortForward(id: string): Promise<void> {
 
 export async function syncPortForwards(): Promise<{ status: string; rules: number }> {
   return apiPost<{ status: string; rules: number }>(`${API_BASE}/networkd/port-forwards/sync`)
+}
+
+export async function adoptPortForward(hostId: string): Promise<PortForwardConfig> {
+  return apiPost<PortForwardConfig>(`${API_BASE}/networkd/port-forwards/adopt`, { host_id: hostId })
 }
 
 // ─── Scan existing configs ────────────────────────────────────────────────────

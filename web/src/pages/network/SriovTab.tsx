@@ -6,15 +6,16 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { SriovConfig, CreateSriovRequest } from '../../api/networkd'
-import { ModalWrapper, InputField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface SriovTabProps {
   sriov: SriovConfig[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
 }
 
-function SriovTabContent({ sriov, onDelete, onCreate }: SriovTabProps) {
+function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -39,16 +40,18 @@ function SriovTabContent({ sriov, onDelete, onCreate }: SriovTabProps) {
             <tbody className="divide-y divide-slate-700/50">
               {sriov.map(s => (
                 <tr key={s.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{s.pf_name}</td>
+                  <td className="p-4 font-medium">
+                    {s.pf_name}
+                    {isHostManaged(s) && <HostBadge />}
+                  </td>
                   <td className="p-4 font-mono text-violet-400">{s.num_vfs}</td>
                   <td className="p-4 text-slate-400 text-sm">{s.vf_configs?.length ?? 0} entries</td>
                   <td className="p-4">
-                    <button
-                      onClick={() => onDelete(s.id)}
-                      className="p-2 hover:bg-red-600 rounded transition text-slate-400 hover:text-white text-sm"
-                    >
-                      Delete
-                    </button>
+                    <HostManagedActions
+                      item={s}
+                      onDelete={() => onDelete(s.id)}
+                      onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}
+                    />
                   </td>
                 </tr>
               ))}

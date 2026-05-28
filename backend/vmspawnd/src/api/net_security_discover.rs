@@ -11,9 +11,11 @@ use networking::host_nat::{self, DiscoveredHostNatRule};
 use networking::host_nft_filter::{self, DiscoveredNftFilterChain};
 use networking::host_services::{self, HostListener};
 use networking::host_tc::{self, DiscoveredTcQdisc};
+use networking::host_wireguard::{self, DiscoveredWireGuard};
 use service_mesh::models::{LoadBalancerAlgorithm, Service, ServicePort, ServiceProtocol};
 use traffic_shaping::models::{BandwidthRate, BandwidthUnit, QoSPolicy, TrafficClass};
 use vm_firewall::models::{FirewallAction, FirewallProfile, FirewallZone};
+use vpn_mesh::models::VpnTunnel;
 use uuid::Uuid;
 
 use crate::server::AppState;
@@ -36,6 +38,10 @@ pub fn is_host_managed_qos(policy: &QoSPolicy) -> bool {
 
 pub fn is_host_managed_profile(profile: &FirewallProfile) -> bool {
     !profile.managed
+}
+
+pub fn is_host_managed_vpn_tunnel(tunnel: &VpnTunnel) -> bool {
+    !tunnel.managed
 }
 
 fn host_nat_uuid(key: &str) -> Uuid {
@@ -70,6 +76,13 @@ fn host_profile_uuid(key: &str) -> Uuid {
     Uuid::new_v5(
         &Uuid::NAMESPACE_DNS,
         format!("vmspawnd:host:fwprof:{key}").as_bytes(),
+    )
+}
+
+fn host_vpn_uuid(interface_name: &str) -> Uuid {
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        format!("vmspawnd:host:vpn:{interface_name}").as_bytes(),
     )
 }
 
@@ -368,4 +381,63 @@ pub fn find_host_firewall_profile(_state: &AppState, id: &str) -> Option<Firewal
     merge_firewall_profiles(_state, vec![])
         .into_iter()
         .find(|p| p.id == uuid)
+}
+
+fn wireguard_to_tunnel(d: DiscoveredWireGuard) -> VpnTunnel {
+    let now = Utc::now();
+    let listen_port = d.listen_port.unwrap_or(51820);
+    let address = d
+        .address
+        .unwrap_or_else(|| "0.0.0.0/32".to_string());
+    VpnTunnel {
+        id: host_vpn_uuid(&d.interface_name),
+        name: d.interface_name.clone(),
+        description: format!(
+            "Host WireGuard interface ({} peer{})",
+            d.peer_count,
+            if d.peer_count == 1 { "" } else { "s" }
+        ),
+        interface_name: d.interface_name,
+        listen_port,
+        address,
+        private_key_ref: String::new(),
+        peers: Vec::new(),
+        enabled: false,
+        managed: false,
+        created: now,
+        updated: now,
+    }
+}
+
+pub fn discover_host_vpn_tunnels() -> Vec<VpnTunnel> {
+    host_wireguard::discover_wireguard_interfaces()
+        .unwrap_or_else(|e| {
+            tracing::warn!("host WireGuard discovery failed: {}", e);
+            Vec::new()
+        })
+        .into_iter()
+        .map(wireguard_to_tunnel)
+        .collect()
+}
+
+pub fn merge_vpn_tunnels(_state: &AppState, mut items: Vec<VpnTunnel>) -> Vec<VpnTunnel> {
+    let mut known_ids: HashSet<Uuid> = items.iter().map(|t| t.id).collect();
+    let mut known_ifaces: HashSet<String> = items.iter().map(|t| t.interface_name.clone()).collect();
+
+    for host in discover_host_vpn_tunnels() {
+        if known_ids.contains(&host.id) || known_ifaces.contains(&host.interface_name) {
+            continue;
+        }
+        known_ids.insert(host.id);
+        known_ifaces.insert(host.interface_name.clone());
+        items.push(host);
+    }
+    items
+}
+
+pub fn find_host_vpn_tunnel(_state: &AppState, id: &str) -> Option<VpnTunnel> {
+    let uuid = Uuid::parse_str(id).ok()?;
+    merge_vpn_tunnels(_state, vec![])
+        .into_iter()
+        .find(|t| t.id == uuid)
 }

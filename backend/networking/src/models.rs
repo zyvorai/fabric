@@ -724,6 +724,8 @@ pub struct VxlanConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -763,6 +765,8 @@ pub struct SriovConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    #[serde(default = "default_true")]
+    pub managed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

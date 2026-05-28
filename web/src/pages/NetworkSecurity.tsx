@@ -188,6 +188,13 @@ export default function NetworkSecurity() {
     } catch (e: unknown) { failAction('Failed to adopt QoS policy', e) }
   }
 
+  const handleAdoptVpnTunnel = async (id: string) => {
+    try {
+      const adopted = await api.adoptVpnTunnel(id)
+      setVpnTunnels(prev => [...prev.filter(t => t.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt WireGuard tunnel', e) }
+  }
+
   const handleDeleteService = async (id: string) => {
     if (!await confirm('Delete Service', 'Delete this service?')) return
     try { await api.deleteService(id); setServices(prev => prev.filter(s => s.id !== id)) }
@@ -396,6 +403,7 @@ export default function NetworkSecurity() {
             <VpnTab
               tunnels={vpnTunnels} networks={vpnNetworks}
               onDeleteTunnel={handleDeleteVpnTunnel} onDeleteNetwork={handleDeleteVpnNetwork}
+              onAdoptTunnel={handleAdoptVpnTunnel}
               onCreate={() => setActiveModal('vpn-tunnel')} onSync={() => handleSync(api.syncVpn)}
             />
           )}

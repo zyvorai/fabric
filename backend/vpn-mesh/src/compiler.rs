@@ -288,6 +288,7 @@ mod tests {
                 persistent_keepalive: 25,
             }],
             enabled,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

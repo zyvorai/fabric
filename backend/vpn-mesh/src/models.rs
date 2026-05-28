@@ -76,6 +76,8 @@ pub struct VpnTunnel {
     pub peers: Vec<VpnPeer>,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -95,6 +97,8 @@ pub struct VpnNetwork {
     pub listen_port: u16,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -234,6 +238,7 @@ mod tests {
                 persistent_keepalive: 25,
             }],
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };

@@ -6,15 +6,16 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { VxlanConfig, CreateVxlanRequest, DhcpMode } from '../../api/networkd'
-import { ModalWrapper, InputField, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 
 interface VxlansTabProps {
   vxlans: VxlanConfig[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
 }
 
-function VxlansTabContent({ vxlans, onDelete, onCreate }: VxlansTabProps) {
+function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -41,18 +42,20 @@ function VxlansTabContent({ vxlans, onDelete, onCreate }: VxlansTabProps) {
             <tbody className="divide-y divide-slate-700/50">
               {vxlans.map(v => (
                 <tr key={v.id} className="hover:bg-white/[0.03] transition">
-                  <td className="p-4 font-medium">{v.name}</td>
+                  <td className="p-4 font-medium">
+                    {v.name}
+                    {isHostManaged(v) && <HostBadge />}
+                  </td>
                   <td className="p-4 font-mono text-indigo-400">{v.vni}</td>
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.remote ?? '-'}</td>
                   <td className="p-4 text-slate-400">{v.parent_interface ?? '-'}</td>
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4">
-                    <button
-                      onClick={() => onDelete(v.id)}
-                      className="p-2 hover:bg-red-600 rounded transition text-slate-400 hover:text-white text-sm"
-                    >
-                      Delete
-                    </button>
+                    <HostManagedActions
+                      item={v}
+                      onDelete={() => onDelete(v.id)}
+                      onAdopt={onAdopt ? () => onAdopt(v.id) : undefined}
+                    />
                   </td>
                 </tr>
               ))}

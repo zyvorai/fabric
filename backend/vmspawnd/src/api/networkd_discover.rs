@@ -7,8 +7,9 @@ use std::collections::HashSet;
 use networking::host_discovery::{self, HostDeviceType, HostNetDevice};
 use networking::models::{
     BondConfig, BondMode, BridgeConfig, DhcpMode, LinkFileConfig, MacvtapConfig, MacvtapMode,
-    NetworkFileConfig, PortForwardConfig, TapConfig, VlanConfig,
+    NetworkFileConfig, PortForwardConfig, SriovConfig, TapConfig, VlanConfig, VxlanConfig,
 };
+use networking::host_vxlan_sriov::{self, DiscoveredSriovPf, DiscoveredVxlan};
 use networking::nftables::NftManager;
 
 use crate::api::networkd::networkd_manager;
@@ -280,6 +281,78 @@ pub fn find_host_port_forward(id: &str) -> Option<PortForwardConfig> {
     let mut all = nft.discover_dnat_rules().unwrap_or_default();
     all.extend(nft.discover_external_dnat_rules().unwrap_or_default());
     all.into_iter().find(|p| p.id == id)
+}
+
+pub fn merge_vxlans(_state: &AppState, mut items: Vec<VxlanConfig>) -> Vec<VxlanConfig> {
+    let mut known_names: HashSet<String> = items.iter().map(|v| v.name.clone()).collect();
+
+    for d in host_vxlan_sriov::discover_host_vxlans().unwrap_or_else(|e| {
+        tracing::warn!("host VXLAN discovery failed: {}", e);
+        Vec::new()
+    }) {
+        if known_names.contains(&d.name) {
+            continue;
+        }
+        known_names.insert(d.name.clone());
+        items.push(vxlan_from_discovered(d));
+    }
+    items
+}
+
+pub fn merge_sriov(_state: &AppState, mut items: Vec<SriovConfig>) -> Vec<SriovConfig> {
+    let mut known_pfs: HashSet<String> = items.iter().map(|s| s.pf_name.clone()).collect();
+
+    for d in host_vxlan_sriov::discover_host_sriov().unwrap_or_else(|e| {
+        tracing::warn!("host SR-IOV discovery failed: {}", e);
+        Vec::new()
+    }) {
+        if known_pfs.contains(&d.pf_name) {
+            continue;
+        }
+        known_pfs.insert(d.pf_name.clone());
+        items.push(sriov_from_discovered(d));
+    }
+    items
+}
+
+fn vxlan_from_discovered(d: DiscoveredVxlan) -> VxlanConfig {
+    VxlanConfig {
+        id: format!("host:{}", d.name),
+        name: d.name,
+        vni: d.vni,
+        remote: d.remote,
+        local: d.local,
+        port: d.port,
+        parent_interface: d.parent_interface,
+        mtu: None,
+        addresses: d.addresses,
+        gateway: None,
+        dns: Vec::new(),
+        dhcp: DhcpMode::default(),
+        created: String::new(),
+        updated: String::new(),
+        managed: false,
+    }
+}
+
+fn sriov_from_discovered(d: DiscoveredSriovPf) -> SriovConfig {
+    SriovConfig {
+        id: format!("host:{}", d.pf_name),
+        pf_name: d.pf_name,
+        num_vfs: d.num_vfs,
+        vf_configs: Vec::new(),
+        created: String::new(),
+        updated: String::new(),
+        managed: false,
+    }
+}
+
+pub fn find_host_vxlan(_state: &AppState, id: &str) -> Option<VxlanConfig> {
+    merge_vxlans(_state, vec![]).into_iter().find(|v| v.id == id)
+}
+
+pub fn find_host_sriov(_state: &AppState, id: &str) -> Option<SriovConfig> {
+    merge_sriov(_state, vec![]).into_iter().find(|s| s.id == id)
 }
 
 pub fn merge_port_forwards(mut items: Vec<PortForwardConfig>) -> Vec<PortForwardConfig> {
