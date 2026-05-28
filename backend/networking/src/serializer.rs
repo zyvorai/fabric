@@ -471,6 +471,8 @@ mod tests {
             dhcp: DhcpMode::No,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         }
     }
 
@@ -507,6 +509,8 @@ mod tests {
             dhcp: DhcpMode::No,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = bridge_netdev(&cfg);
         assert!(out.contains("Name=br-min\n"));

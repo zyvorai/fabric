@@ -203,6 +203,15 @@ pub struct BridgeConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
+    /// False when discovered on the host but not created via vmspawnd.
+    #[serde(default = "default_true")]
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operational_state: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

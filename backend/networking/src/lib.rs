@@ -300,8 +300,15 @@ impl NetworkdManager {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    /// Query `networkctl list --no-pager` and parse basic link info
+    /// List network links via networkctl, falling back to `ip -j link` when networkctl is absent.
     pub fn list_links(&self) -> Result<Vec<LinkInfo>> {
+        match self.list_links_networkctl() {
+            Ok(links) if !links.is_empty() => Ok(links),
+            Ok(_) | Err(_) => self.list_links_ip(),
+        }
+    }
+
+    fn list_links_networkctl(&self) -> Result<Vec<LinkInfo>> {
         let output = Command::new("networkctl")
             .args(["list", "--no-pager", "--no-legend"])
             .output()
@@ -331,6 +338,80 @@ impl NetworkdManager {
         }
 
         Ok(links)
+    }
+
+    /// Parse `ip -j link show` (works without systemd-networkd / networkctl).
+    pub fn list_links_ip(&self) -> Result<Vec<LinkInfo>> {
+        let bridge_names = self.list_bridge_names_ip()?;
+
+        let output = Command::new("ip")
+            .args(["-j", "link", "show"])
+            .output()
+            .context("Failed to execute ip -j link show")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("ip -j link show failed: {}", stderr));
+        }
+
+        let entries: Vec<serde_json::Value> =
+            serde_json::from_slice(&output.stdout).context("Failed to parse ip -j link JSON")?;
+
+        let mut links = Vec::new();
+        for entry in entries {
+            let name = match entry.get("ifname").and_then(|v| v.as_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            let index = entry
+                .get("ifindex")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
+            let operstate = entry
+                .get("operstate")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_lowercase();
+            let link_type = entry
+                .get("link_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let kind = if bridge_names.contains(&name) {
+                "bridge".to_string()
+            } else {
+                link_type
+            };
+            links.push(LinkInfo {
+                index,
+                name,
+                kind,
+                operational_state: operstate,
+                setup_state: "unmanaged".to_string(),
+            });
+        }
+
+        links.sort_by(|a, b| a.index.cmp(&b.index));
+        Ok(links)
+    }
+
+    fn list_bridge_names_ip(&self) -> Result<std::collections::HashSet<String>> {
+        let output = Command::new("ip")
+            .args(["-j", "link", "show", "type", "bridge"])
+            .output();
+
+        let output = match output {
+            Ok(o) if o.status.success() => o,
+            _ => return Ok(std::collections::HashSet::new()),
+        };
+
+        let entries: Vec<serde_json::Value> =
+            serde_json::from_slice(&output.stdout).unwrap_or_default();
+
+        Ok(entries
+            .iter()
+            .filter_map(|e| e.get("ifname").and_then(|v| v.as_str()).map(str::to_string))
+            .collect())
     }
 
     /// Generate a random MAC address with QEMU KVM prefix 52:54:00
@@ -395,6 +476,8 @@ mod tests {
             dhcp: DhcpMode::No,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         mgr.apply_bridge(&cfg).unwrap();
 

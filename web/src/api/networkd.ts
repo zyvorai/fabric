@@ -37,6 +37,9 @@ export interface BridgeConfig {
   dhcp: DhcpMode
   created: string
   updated: string
+  /** False for host bridges (e.g. virbr0) discovered via ip link. */
+  managed?: boolean
+  operational_state?: string
 }
 
 export interface CreateBridgeRequest {

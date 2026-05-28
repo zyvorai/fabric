@@ -36,7 +36,43 @@ fn networkd_manager(state: &AppState) -> NetworkdManager {
 
 pub async fn list_bridges(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bridges));
-    let items: Vec<BridgeConfig> = state.store.list_entities("networkd_bridges").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let mut items: Vec<BridgeConfig> = state
+        .store
+        .list_entities("networkd_bridges")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
+
+    let known: std::collections::HashSet<String> = items.iter().map(|b| b.name.clone()).collect();
+    let mgr = networkd_manager(&state);
+    if let Ok(links) = mgr.list_links() {
+        for link in links.into_iter().filter(|l| l.kind.eq_ignore_ascii_case("bridge")) {
+            if known.contains(&link.name) {
+                continue;
+            }
+            items.push(BridgeConfig {
+                id: format!("host:{}", link.name),
+                name: link.name,
+                stp: None,
+                forward_delay_sec: None,
+                hello_time_sec: None,
+                max_age_sec: None,
+                vlan_filtering: None,
+                mtu: None,
+                mac_address: None,
+                addresses: Vec::new(),
+                gateway: None,
+                dns: Vec::new(),
+                dhcp: networking::models::DhcpMode::default(),
+                created: String::new(),
+                updated: String::new(),
+                managed: false,
+                operational_state: Some(link.operational_state),
+            });
+        }
+    }
+
     Json(items)
 }
 
@@ -66,6 +102,8 @@ pub async fn create_bridge(
         dhcp: req.dhcp,
         created: now.clone(),
         updated: now,
+        managed: true,
+        operational_state: None,
     };
 
     let mgr = networkd_manager(&state);
@@ -134,6 +172,8 @@ pub async fn update_bridge(
         dhcp: req.dhcp,
         created: existing.created,
         updated: Utc::now().to_rfc3339(),
+        managed: existing.managed,
+        operational_state: existing.operational_state,
     };
 
     if let Err(e) = mgr.apply_bridge(&cfg) {
@@ -155,13 +195,20 @@ pub async fn delete_bridge(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(delete_bridge));
+    if id.starts_with("host:") {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "This bridge exists on the host (e.g. libvirt virbr0) and is not managed by vmspawnd",
+        )
+        .into_response();
+    }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
         if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
         if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
     }
     if let Err(e) = state.store.delete_entity("networkd_bridges", &id) { tracing::error!("Failed to delete entity: {}", e); }
-    StatusCode::NO_CONTENT
+    StatusCode::NO_CONTENT.into_response()
 }
 
 // ============================================================================
@@ -469,7 +516,7 @@ pub async fn list_links(RequireRead(_claims): RequireRead, State(state): State<A
     match mgr.list_links() {
         Ok(links) => Json(links).into_response(),
         Err(e) => {
-            tracing::warn!("networkctl list failed, returning empty links: {}", e);
+            tracing::warn!("list_links failed: {}", e);
             Json(Vec::<networking::models::LinkInfo>::new()).into_response()
         }
     }
