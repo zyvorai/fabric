@@ -12,6 +12,7 @@ import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
+import { useSilentPoll } from '../hooks/useSilentPoll'
 
 interface VMInterface {
   type: string
@@ -49,9 +50,11 @@ export default function NetworkTopology() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const fetchTopology = useCallback(async () => {
-    setLoading(true)
-    setLoadError(null)
+  const fetchTopology = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setLoadError(null)
+    }
     try {
       const [topoResp, bridgeList, linkList] = await Promise.all([
         apiFetch('/api/network/topology'),
@@ -68,17 +71,20 @@ export default function NetworkTopology() {
       setBridges(bridgeList)
       setLinks(linkList)
     } catch (err) {
-      const msg = formatUserError(err)
-      setLoadError(msg)
-      toastFailure(toast, 'Failed to load network topology', err)
+      if (!silent) {
+        const msg = formatUserError(err)
+        setLoadError(msg)
+        toastFailure(toast, 'Failed to load network topology', err)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [toast])
 
   useEffect(() => {
-    fetchTopology()
+    void fetchTopology()
   }, [fetchTopology])
+  useSilentPoll(() => fetchTopology(true), 15000)
 
   const hostNodes = useMemo((): HostNode[] => {
     const bridgeNames = new Set(bridges.map(b => b.name))

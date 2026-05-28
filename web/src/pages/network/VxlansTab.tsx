@@ -8,6 +8,7 @@ import * as api from '../../api/networkd'
 import type { VxlanConfig, CreateVxlanRequest, DhcpMode } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface VxlansTabProps {
   vxlans: VxlanConfig[]
@@ -17,6 +18,7 @@ interface VxlansTabProps {
 }
 
 function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -32,9 +34,9 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">VXLAN</h2>
-        <button onClick={onCreate} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create VXLAN
-        </button>
+        </button>}
       </div>
       {vxlans.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No VXLAN interfaces configured.</div>
@@ -65,7 +67,7 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
                   <td className="p-4 text-slate-400">{v.parent_interface ?? '-'}</td>
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4">
-                    <HostManagedActions
+                    <HostManagedActions readOnly={readOnly}
                       item={v}
                       onDelete={() => onDelete(v.id)}
                       onAdopt={onAdopt ? () => onAdopt(v.id) : undefined}

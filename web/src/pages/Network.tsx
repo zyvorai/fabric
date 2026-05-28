@@ -36,12 +36,17 @@ import { toastFailure } from '../utils/toastError'
 import { useToastContext } from '../contexts/ToastContext'
 import { hintsForError } from '../utils/daemonHints'
 import SubsystemBanner from '../components/SubsystemBanner'
+import { useSilentPoll } from '../hooks/useSilentPoll'
+import { usePermissions } from '../hooks/usePermissions'
+import { ReadOnlyProvider } from '../contexts/ReadOnlyContext'
+import ReadOnlyNotice from '../components/ReadOnlyNotice'
 
 type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'floatingips' | 'status'
 type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | 'floatingip' | null
 
 export default function Network() {
   const toast = useToastContext()
+  const { canWrite } = usePermissions()
   const [activeTab, setActiveTab] = useState<Tab>('bridges')
   const [bridges, setBridges] = useState<BridgeConfig[]>([])
   const [bonds, setBonds] = useState<BondConfig[]>([])
@@ -62,9 +67,11 @@ export default function Network() {
   const [activeModal, setActiveModal] = useState<Modal>(null)
   const { confirmState, confirm, cancel } = useConfirm()
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const fetchAll = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const [b, bo, v, m, t, nf, lf, pf, vx, sr, fip, l] = await Promise.all([
         api.listBridges(),
@@ -93,11 +100,13 @@ export default function Network() {
       setFloatingIps(fip)
       setLinks(l)
     } catch (e: unknown) {
-      const msg = formatUserError(e)
-      setError(msg)
-      toastFailure(toast, 'Failed to load network configuration', e)
+      if (!silent) {
+        const msg = formatUserError(e)
+        setError(msg)
+        toastFailure(toast, 'Failed to load network configuration', e)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [toast])
 
@@ -106,7 +115,8 @@ export default function Network() {
     toastFailure(toast, label, e)
   }, [toast])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => { void fetchAll() }, [fetchAll])
+  useSilentPoll(() => fetchAll(true), 15000)
 
   const handleReload = async () => {
     try {
@@ -310,17 +320,21 @@ export default function Network() {
   ]
 
   return (
+    <ReadOnlyProvider readOnly={!canWrite}>
     <div className="space-y-6">
       <SubsystemBanner subsystem="machined" title="Network stack" />
+      {!canWrite && <ReadOnlyNotice />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-3">
           <NetworkIcon className="w-8 h-8" />
           Network Configuration
         </h1>
-        <button onClick={handleReload} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
-          <RefreshCw className="w-4 h-4" />
-          Reload networkd
-        </button>
+        {canWrite && (
+          <button onClick={handleReload} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+            <RefreshCw className="w-4 h-4" />
+            Reload networkd
+          </button>
+        )}
       </div>
 
       {error && (
@@ -464,17 +478,17 @@ export default function Network() {
       )}
 
       {/* Modals */}
-      {activeModal === 'bridge' && <CreateBridgeModal onClose={closeModal} onCreated={(b) => { setBridges(prev => [...prev, b]); closeModal() }} />}
-      {activeModal === 'bond' && <CreateBondModal onClose={closeModal} onCreated={(b) => { setBonds(prev => [...prev, b]); closeModal() }} />}
-      {activeModal === 'vlan' && <CreateVlanModal onClose={closeModal} onCreated={(v) => { setVlans(prev => [...prev, v]); closeModal() }} />}
-      {activeModal === 'macvtap' && <CreateMacvtapModal onClose={closeModal} onCreated={(m) => { setMacvtaps(prev => [...prev, m]); closeModal() }} />}
-      {activeModal === 'tap' && <CreateTapModal onClose={closeModal} onCreated={(t) => { setTaps(prev => [...prev, t]); closeModal() }} />}
-      {activeModal === 'netfile' && <CreateNetfileModal onClose={closeModal} onCreated={(n) => { setNetfiles(prev => [...prev, n]); closeModal() }} />}
-      {activeModal === 'linkfile' && <CreateLinkfileModal onClose={closeModal} onCreated={(l) => { setLinkfiles(prev => [...prev, l]); closeModal() }} />}
-      {activeModal === 'portforward' && <CreatePortForwardModal onClose={closeModal} onCreated={(pf) => { setPortForwards(prev => [...prev, pf]); closeModal() }} />}
-      {activeModal === 'vxlan' && <CreateVxlanModal onClose={closeModal} onCreated={(v) => { setVxlans(prev => [...prev, v]); closeModal() }} />}
-      {activeModal === 'sriov' && <CreateSriovModal onClose={closeModal} onCreated={(s) => { setSriov(prev => [...prev, s]); closeModal() }} />}
-      {activeModal === 'floatingip' && <CreateFloatingIpModal interfaceOptions={interfaceOptions} onClose={closeModal} onCreated={(f) => { setFloatingIps(prev => [...prev, f]); closeModal() }} />}
+      {canWrite && activeModal === 'bridge' && <CreateBridgeModal onClose={closeModal} onCreated={(b) => { setBridges(prev => [...prev, b]); closeModal() }} />}
+      {canWrite && activeModal === 'bond' && <CreateBondModal onClose={closeModal} onCreated={(b) => { setBonds(prev => [...prev, b]); closeModal() }} />}
+      {canWrite && activeModal === 'vlan' && <CreateVlanModal onClose={closeModal} onCreated={(v) => { setVlans(prev => [...prev, v]); closeModal() }} />}
+      {canWrite && activeModal === 'macvtap' && <CreateMacvtapModal onClose={closeModal} onCreated={(m) => { setMacvtaps(prev => [...prev, m]); closeModal() }} />}
+      {canWrite && activeModal === 'tap' && <CreateTapModal onClose={closeModal} onCreated={(t) => { setTaps(prev => [...prev, t]); closeModal() }} />}
+      {canWrite && activeModal === 'netfile' && <CreateNetfileModal onClose={closeModal} onCreated={(n) => { setNetfiles(prev => [...prev, n]); closeModal() }} />}
+      {canWrite && activeModal === 'linkfile' && <CreateLinkfileModal onClose={closeModal} onCreated={(l) => { setLinkfiles(prev => [...prev, l]); closeModal() }} />}
+      {canWrite && activeModal === 'portforward' && <CreatePortForwardModal onClose={closeModal} onCreated={(pf) => { setPortForwards(prev => [...prev, pf]); closeModal() }} />}
+      {canWrite && activeModal === 'vxlan' && <CreateVxlanModal onClose={closeModal} onCreated={(v) => { setVxlans(prev => [...prev, v]); closeModal() }} />}
+      {canWrite && activeModal === 'sriov' && <CreateSriovModal onClose={closeModal} onCreated={(s) => { setSriov(prev => [...prev, s]); closeModal() }} />}
+      {canWrite && activeModal === 'floatingip' && <CreateFloatingIpModal interfaceOptions={interfaceOptions} onClose={closeModal} onCreated={(f) => { setFloatingIps(prev => [...prev, f]); closeModal() }} />}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -486,5 +500,6 @@ export default function Network() {
         />
       )}
     </div>
+    </ReadOnlyProvider>
   )
 }

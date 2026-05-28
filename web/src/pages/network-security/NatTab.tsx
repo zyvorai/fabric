@@ -8,6 +8,7 @@ import * as api from '../../api/network-security'
 import type { NatRule, CreateNatRuleRequest, NatPool, CreateNatPoolRequest, NatGatewayConfig, CreateNatGatewayRequest, NatRuleType } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { StatusBadge } from './ModalShared'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface NatTabProps {
   rules: NatRule[]
@@ -22,6 +23,7 @@ interface NatTabProps {
 }
 
 function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onDeleteGateway, onAdoptRule, onCreate, onSync }: NatTabProps) {
+  const readOnly = useReadOnly()
   const [view, setView] = useState<'rules' | 'pools' | 'gateways'>('rules')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -37,12 +39,12 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add {view === 'rules' ? 'Rule' : view === 'pools' ? 'Pool' : 'Gateway'}
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -85,7 +87,7 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
                       <StatusBadge status={r.enabled ? 'active' : 'disabled'} color={r.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: r.id, managed: r.managed }}
                         onDelete={() => onDeleteRule(r.id)}
                         onAdopt={onAdoptRule ? () => onAdoptRule(r.id) : undefined}

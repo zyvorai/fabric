@@ -8,6 +8,7 @@ import * as api from '../../api/network-security'
 import type { DnsZone, CreateDnsZoneRequest, DnsPolicy, CreateDnsPolicyRequest, DnsRecordType } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface DnsTabProps {
   zones: DnsZone[]
@@ -21,6 +22,7 @@ interface DnsTabProps {
 }
 
 function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZone, onAdoptPolicy, onCreate, onSync }: DnsTabProps) {
+  const readOnly = useReadOnly()
   const [view, setView] = useState<'zones' | 'policies'>('zones')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -36,12 +38,12 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add {view === 'zones' ? 'Zone' : 'Policy'}
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -74,7 +76,7 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
                       <StatusBadge status={z.enabled === false ? 'disabled' : 'active'} color={z.enabled === false ? 'gray' : 'green'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: z.id, managed: z.managed }}
                         onDelete={() => onDeleteZone(z.id)}
                         onAdopt={onAdoptZone ? () => onAdoptZone(z.id) : undefined}
@@ -121,7 +123,7 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
                       <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: p.id, managed: p.managed }}
                         onDelete={() => onDeletePolicy(p.id)}
                         onAdopt={onAdoptPolicy ? () => onAdoptPolicy(p.id) : undefined}

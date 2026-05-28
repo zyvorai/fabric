@@ -8,6 +8,7 @@ import * as api from '../../api/networkd'
 import type { VlanConfig, CreateVlanRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface VlansTabProps {
   vlans: VlanConfig[]
@@ -17,6 +18,7 @@ interface VlansTabProps {
 }
 
 function VlansTabContent({ vlans, onDelete, onAdopt, onCreate }: VlansTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -37,9 +39,9 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate }: VlansTabProps) 
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">VLANs</h2>
-        <button onClick={onCreate} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create VLAN
-        </button>
+        </button>}
       </div>
       {vlans.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No VLANs configured.</div>
@@ -78,7 +80,7 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate }: VlansTabProps) 
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{v.dhcp}</td>
                   <td className="p-4">
-                    <HostManagedActions item={v} onDelete={() => onDelete(v.id)} onAdopt={() => onAdopt(v.id)} />
+                    <HostManagedActions readOnly={readOnly} item={v} onDelete={() => onDelete(v.id)} onAdopt={() => onAdopt(v.id)} />
                   </td>
                 </tr>
               ))}

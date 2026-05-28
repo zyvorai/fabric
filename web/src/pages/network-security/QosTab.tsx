@@ -8,6 +8,7 @@ import * as api from '../../api/network-security'
 import type { QoSPolicy, CreateQoSPolicyRequest } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, StatusBadge } from './ModalShared'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 function formatRate(r: { value: number; unit: string }): string {
   return `${r.value}${r.unit}`
@@ -22,17 +23,18 @@ interface QosTabProps {
 }
 
 function QosTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: QosTabProps) {
+  const readOnly = useReadOnly()
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">QoS / Traffic Shaping</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add QoS Policy
-          </button>
+          </button>}
         </div>
       </div>
       {policies.length === 0 ? (
@@ -72,7 +74,7 @@ function QosTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: QosTab
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
-                    <HostManagedActions
+                    <HostManagedActions readOnly={readOnly}
                       item={{ id: p.id, managed: p.managed }}
                       onDelete={() => onDelete(p.id)}
                       onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}

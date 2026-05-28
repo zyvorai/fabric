@@ -33,6 +33,7 @@ export function countNetfileTypes(netfiles: NetworkFileConfig[]) {
 }
 
 function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<NetfileTypeFilter>('all')
   const [page, setPage] = useState(1)
@@ -78,9 +79,9 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
             <option value="name">Sort by name</option>
             <option value="state">Sort by state</option>
           </select>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Configure Interface
-          </button>
+          </button>}
         </div>
       </div>
       {netfiles.length === 0 ? (
@@ -133,7 +134,7 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
                     <td className="p-4 text-slate-400">{n.bond ?? '-'}</td>
                     <td className="p-4 text-slate-400">{n.mtu ?? '-'}</td>
                     <td className="p-4">
-                      <HostManagedActions item={n} onDelete={() => onDelete(n.id)} onAdopt={() => onAdopt(n.id)} stateLabel={n.operational_state} />
+                      <HostManagedActions readOnly={readOnly} item={n} onDelete={() => onDelete(n.id)} onAdopt={() => onAdopt(n.id)} stateLabel={n.operational_state} />
                     </td>
                   </tr>
                 ))}

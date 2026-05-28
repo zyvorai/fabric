@@ -8,6 +8,7 @@ import * as api from '../../api/network-security'
 import type { MirrorSession, CreateMirrorSessionRequest, MirrorDirection } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { StatusBadge } from './ModalShared'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface MirrorTabProps {
   sessions: MirrorSession[]
@@ -18,17 +19,18 @@ interface MirrorTabProps {
 }
 
 function MirrorTabContent({ sessions, onDelete, onAdopt, onCreate, onSync }: MirrorTabProps) {
+  const readOnly = useReadOnly()
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Packet Mirror</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add Session
-          </button>
+          </button>}
         </div>
       </div>
       {sessions.length === 0 ? (
@@ -77,7 +79,7 @@ function MirrorTabContent({ sessions, onDelete, onAdopt, onCreate, onSync }: Mir
                     <StatusBadge status={s.enabled ? 'active' : 'disabled'} color={s.enabled ? 'green' : 'gray'} />
                   </td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: s.id, managed: s.managed }}
                         onDelete={() => onDelete(s.id)}
                         onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}

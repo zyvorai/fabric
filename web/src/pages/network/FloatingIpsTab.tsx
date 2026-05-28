@@ -10,6 +10,7 @@ import type { VM } from '../../api/vm'
 import { listVMs } from '../../api/vm'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface FloatingIpsTabProps {
   floatingIps: FloatingIp[]
@@ -21,6 +22,7 @@ interface FloatingIpsTabProps {
 }
 
 function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUnassign, onCreate }: FloatingIpsTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -36,9 +38,9 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Floating IPs</h2>
-        <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Add Floating IP
-        </button>
+        </button>}
       </div>
       {floatingIps.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No floating IPs configured. Host secondary addresses appear here when discovered, or create one to assign to a VM.</div>
@@ -66,27 +68,29 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
                   <td className="p-4 text-slate-400">{f.assigned_vm ?? '—'}</td>
                   <td className="p-4">
                     {isHostManaged(f) ? (
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={f}
                         onDelete={() => onDelete(f.id)}
                         onAdopt={onAdopt ? () => onAdopt(f.id) : undefined}
                       />
                     ) : (
                       <div className="flex items-center gap-2">
-                        {f.assigned_vm ? (
+                        {!readOnly && f.assigned_vm ? (
                           onUnassign && (
                             <button type="button" onClick={() => onUnassign(f.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Unassign from VM">
                               <Unlink className="w-3 h-3" /> Unassign
                             </button>
                           )
                         ) : (
-                          onAssign && (
+                          !readOnly && onAssign && (
                             <AssignButton fip={f} onAssign={onAssign} />
                           )
                         )}
+                        {!readOnly && (
                         <button type="button" onClick={() => onDelete(f.id)} className="p-2 hover:bg-red-600/20 rounded transition text-red-400" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        )}
                       </div>
                     )}
                   </td>

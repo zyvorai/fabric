@@ -8,6 +8,7 @@ import * as api from '../../api/network-security'
 import type { FirewallProfile, CreateFirewallProfileRequest, FirewallRule, FirewallAction, FirewallZone, VMFirewallAssignment } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { StatusBadge } from './ModalShared'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface FirewallTabProps {
   profiles: FirewallProfile[]
@@ -23,6 +24,7 @@ interface FirewallTabProps {
 }
 
 function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onDeleteZone, onDeleteAssignment, onAdoptProfile, onAdoptZone, onCreate, onSync }: FirewallTabProps) {
+  const readOnly = useReadOnly()
   const [view, setView] = useState<'profiles' | 'zones' | 'assignments'>('profiles')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -38,12 +40,12 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add Profile
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -77,7 +79,7 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
                       {isHostManaged(p) ? 'host nft' : 'managed'}
                     </td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: p.id, managed: p.managed }}
                         onDelete={() => onDeleteProfile(p.id)}
                         onAdopt={onAdoptProfile ? () => onAdoptProfile(p.id) : undefined}
@@ -113,7 +115,7 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
                     </td>
                     <td className="p-4 font-mono text-sm text-slate-400">{z.default_profile_id ?? '-'}</td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: z.id, managed: z.managed }}
                         onDelete={() => onDeleteZone(z.id)}
                         onAdopt={onAdoptZone ? () => onAdoptZone(z.id) : undefined}
@@ -148,9 +150,11 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
                     <td className="p-4 font-mono text-sm text-slate-400">{a.profile_id}</td>
                     <td className="p-4 font-mono text-sm text-slate-400">{a.zone_id ?? '-'}</td>
                     <td className="p-4">
+                      {!readOnly && (
                       <button onClick={() => onDeleteAssignment(a.vm_name)} className="p-2 hover:bg-red-600 rounded transition">
                         <Trash2 className="w-4 h-4" />
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))}

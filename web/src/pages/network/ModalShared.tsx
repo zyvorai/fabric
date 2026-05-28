@@ -54,13 +54,25 @@ export function HostManagedActions({
   onAdopt,
   stateLabel,
   adoptLabel = 'Adopt',
+  readOnly = false,
 }: {
   item: { id: string; managed?: boolean; operational_state?: string }
   onDelete: () => void
   onAdopt?: () => void
   stateLabel?: string
   adoptLabel?: string
+  readOnly?: boolean
 }) {
+  if (readOnly) {
+    if (isHostManaged(item)) {
+      return (
+        <span className="text-xs text-slate-500" title="Managed outside vmspawnd">
+          {stateLabel ?? item.operational_state ?? 'external'}
+        </span>
+      )
+    }
+    return null
+  }
   if (isHostManaged(item)) {
     return (
       <div className="flex items-center gap-2">

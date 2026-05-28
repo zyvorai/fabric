@@ -32,6 +32,10 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { useToastContext } from '../contexts/ToastContext'
+import { useSilentPoll } from '../hooks/useSilentPoll'
+import { usePermissions } from '../hooks/usePermissions'
+import { ReadOnlyProvider } from '../contexts/ReadOnlyContext'
+import ReadOnlyNotice from '../components/ReadOnlyNotice'
 
 type Tab = 'policies' | 'firewall' | 'services' | 'qos' | 'dns' | 'vpn' | 'mirror' | 'nat' | 'monitor'
 type Modal =
@@ -42,6 +46,7 @@ type Modal =
 
 export default function NetworkSecurity() {
   const toast = useToastContext()
+  const { canWrite } = usePermissions()
   const [activeTab, setActiveTab] = useState<Tab>('policies')
 
   // Data state
@@ -69,9 +74,11 @@ export default function NetworkSecurity() {
   const [activeModal, setActiveModal] = useState<Modal>(null)
   const { confirmState, confirm, cancel } = useConfirm()
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const fetchAll = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const [
         pol, ids, fwp, fwz, fwa, svc, qos, dz, dp,
@@ -115,11 +122,13 @@ export default function NetworkSecurity() {
       setMetrics(met)
       setAlerts(al)
     } catch (e: unknown) {
-      const msg = formatUserError(e)
-      setError(msg)
-      toastFailure(toast, 'Failed to load network security', e)
+      if (!silent) {
+        const msg = formatUserError(e)
+        setError(msg)
+        toastFailure(toast, 'Failed to load network security', e)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [toast])
 
@@ -128,7 +137,8 @@ export default function NetworkSecurity() {
     toastFailure(toast, label, e)
   }, [toast])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => { void fetchAll() }, [fetchAll])
+  useSilentPoll(() => fetchAll(true), 15000)
 
   // ─── Delete handlers ─────────────────────────────────────────────────────
 
@@ -335,7 +345,9 @@ export default function NetworkSecurity() {
   ]
 
   return (
+    <ReadOnlyProvider readOnly={!canWrite}>
     <div className="space-y-6">
+      {!canWrite && <ReadOnlyNotice />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-3">
           <Shield className="w-8 h-8" />
@@ -490,19 +502,19 @@ export default function NetworkSecurity() {
       )}
 
       {/* Modals */}
-      {activeModal === 'policy' && <CreatePolicyModal onClose={closeModal} onCreated={(p) => { setPolicies(prev => [...prev, p]); closeModal() }} />}
-      {activeModal === 'firewall-profile' && <CreateFirewallProfileModal onClose={closeModal} onCreated={(p) => { setFwProfiles(prev => [...prev, p]); closeModal() }} />}
-      {activeModal === 'service' && <CreateServiceModal onClose={closeModal} onCreated={(s) => { setServices(prev => [...prev, s]); closeModal() }} />}
-      {activeModal === 'qos' && <CreateQosModal onClose={closeModal} onCreated={(p) => { setQosPolicies(prev => [...prev, p]); closeModal() }} />}
-      {activeModal === 'dns-zone' && <CreateDnsZoneModal onClose={closeModal} onCreated={(z) => { setDnsZones(prev => [...prev, z]); closeModal() }} />}
-      {activeModal === 'dns-policy' && <CreateDnsPolicyModal zones={dnsZones} onClose={closeModal} onCreated={(p) => { setDnsPolicies(prev => [...prev, p]); closeModal() }} />}
-      {activeModal === 'vpn-tunnel' && <CreateVpnTunnelModal onClose={closeModal} onCreated={(t) => { setVpnTunnels(prev => [...prev, t]); closeModal() }} />}
-      {activeModal === 'vpn-network' && <CreateVpnNetworkModal onClose={closeModal} onCreated={(n) => { setVpnNetworks(prev => [...prev, n]); closeModal() }} />}
-      {activeModal === 'mirror' && <CreateMirrorModal onClose={closeModal} onCreated={(s) => { setMirrorSessions(prev => [...prev, s]); closeModal() }} />}
-      {activeModal === 'nat-rule' && <CreateNatRuleModal onClose={closeModal} onCreated={(r) => { setNatRules(prev => [...prev, r]); closeModal() }} />}
-      {activeModal === 'nat-pool' && <CreateNatPoolModal onClose={closeModal} onCreated={(p) => { setNatPools(prev => [...prev, p]); closeModal() }} />}
-      {activeModal === 'nat-gateway' && <CreateNatGatewayModal onClose={closeModal} onCreated={(g) => { setNatGateways(prev => [...prev, g]); closeModal() }} />}
-      {activeModal === 'monitor' && <CreateMonitorPolicyModal onClose={closeModal} onCreated={(p) => { setMonitorPolicies(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'policy' && <CreatePolicyModal onClose={closeModal} onCreated={(p) => { setPolicies(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'firewall-profile' && <CreateFirewallProfileModal onClose={closeModal} onCreated={(p) => { setFwProfiles(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'service' && <CreateServiceModal onClose={closeModal} onCreated={(s) => { setServices(prev => [...prev, s]); closeModal() }} />}
+      {canWrite && activeModal === 'qos' && <CreateQosModal onClose={closeModal} onCreated={(p) => { setQosPolicies(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'dns-zone' && <CreateDnsZoneModal onClose={closeModal} onCreated={(z) => { setDnsZones(prev => [...prev, z]); closeModal() }} />}
+      {canWrite && activeModal === 'dns-policy' && <CreateDnsPolicyModal zones={dnsZones} onClose={closeModal} onCreated={(p) => { setDnsPolicies(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'vpn-tunnel' && <CreateVpnTunnelModal onClose={closeModal} onCreated={(t) => { setVpnTunnels(prev => [...prev, t]); closeModal() }} />}
+      {canWrite && activeModal === 'vpn-network' && <CreateVpnNetworkModal onClose={closeModal} onCreated={(n) => { setVpnNetworks(prev => [...prev, n]); closeModal() }} />}
+      {canWrite && activeModal === 'mirror' && <CreateMirrorModal onClose={closeModal} onCreated={(s) => { setMirrorSessions(prev => [...prev, s]); closeModal() }} />}
+      {canWrite && activeModal === 'nat-rule' && <CreateNatRuleModal onClose={closeModal} onCreated={(r) => { setNatRules(prev => [...prev, r]); closeModal() }} />}
+      {canWrite && activeModal === 'nat-pool' && <CreateNatPoolModal onClose={closeModal} onCreated={(p) => { setNatPools(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'nat-gateway' && <CreateNatGatewayModal onClose={closeModal} onCreated={(g) => { setNatGateways(prev => [...prev, g]); closeModal() }} />}
+      {canWrite && activeModal === 'monitor' && <CreateMonitorPolicyModal onClose={closeModal} onCreated={(p) => { setMonitorPolicies(prev => [...prev, p]); closeModal() }} />}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -514,5 +526,6 @@ export default function NetworkSecurity() {
         />
       )}
     </div>
+    </ReadOnlyProvider>
   )
 }

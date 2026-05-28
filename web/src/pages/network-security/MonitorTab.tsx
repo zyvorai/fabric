@@ -11,6 +11,7 @@ import type {
 } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface MonitorTabProps {
   policies: MonitorPolicy[]
@@ -31,6 +32,7 @@ function formatBytes(bytes: number): string {
 }
 
 function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAcknowledge, onCreate, onSync }: MonitorTabProps) {
+  const readOnly = useReadOnly()
   const [view, setView] = useState<'policies' | 'metrics' | 'alerts'>('policies')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -49,12 +51,12 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAck
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add Policy
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -88,7 +90,7 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAck
                       <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions
+                      <HostManagedActions readOnly={readOnly}
                         item={{ id: p.id, managed: p.managed }}
                         onDelete={() => onDelete(p.id)}
                         onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
@@ -177,7 +179,7 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAck
                     </td>
                     <td className="p-4 text-xs text-slate-500">{new Date(a.created).toLocaleString()}</td>
                     <td className="p-4">
-                      {!a.acknowledged && (
+                      {!readOnly && !a.acknowledged && (
                         <button onClick={() => onAcknowledge(a.id)} className="p-2 hover:bg-green-600 rounded transition" title="Acknowledge">
                           <Check className="w-4 h-4" />
                         </button>

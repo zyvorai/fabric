@@ -8,6 +8,7 @@ import * as api from '../../api/networkd'
 import type { PortForwardConfig, CreatePortForwardRequest, Protocol } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 type PfOriginFilter = 'all' | 'managed' | 'host' | 'vmspawnd'
 
@@ -27,6 +28,7 @@ interface PortForwardsTabProps {
 }
 
 function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onSync }: PortForwardsTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [originFilter, setOriginFilter] = useState<PfOriginFilter>('all')
   const [page, setPage] = useState(1)
@@ -59,12 +61,12 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Port Forwards (nftables DNAT)</h2>
         <div className="flex gap-2">
-          <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync Rules
-          </button>
-          <button onClick={onCreate} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          </button>}
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add Port Forward
-          </button>
+          </button>}
         </div>
       </div>
       {portForwards.length === 0 ? (
@@ -135,7 +137,7 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
                   <td className="p-4 font-mono text-sm text-slate-400">{pf.guest_ip}:{pf.guest_port}</td>
                   <td className="p-4">{pf.enabled ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <HostManagedActions
+                    <HostManagedActions readOnly={readOnly}
                       item={pf}
                       onDelete={() => onDelete(pf.id)}
                       onAdopt={onAdopt ? () => onAdopt(pf.id) : undefined}

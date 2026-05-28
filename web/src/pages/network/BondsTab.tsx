@@ -8,6 +8,7 @@ import * as api from '../../api/networkd'
 import type { BondConfig, CreateBondRequest, BondMode } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface BondsTabProps {
   bonds: BondConfig[]
@@ -17,6 +18,7 @@ interface BondsTabProps {
 }
 
 function BondsTabContent({ bonds, onDelete, onAdopt, onCreate }: BondsTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -37,9 +39,9 @@ function BondsTabContent({ bonds, onDelete, onAdopt, onCreate }: BondsTabProps) 
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Bonds</h2>
-        <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Bond
-        </button>
+        </button>}
       </div>
       {bonds.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No bonds configured.</div>
@@ -80,7 +82,7 @@ function BondsTabContent({ bonds, onDelete, onAdopt, onCreate }: BondsTabProps) 
                   <td className="p-4 text-slate-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4">
-                    <HostManagedActions item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
+                    <HostManagedActions readOnly={readOnly} item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
                   </td>
                 </tr>
               ))}

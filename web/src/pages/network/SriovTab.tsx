@@ -8,6 +8,7 @@ import * as api from '../../api/networkd'
 import type { SriovConfig, CreateSriovRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface SriovTabProps {
   sriov: SriovConfig[]
@@ -17,6 +18,7 @@ interface SriovTabProps {
 }
 
 function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -32,9 +34,9 @@ function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) 
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">SR-IOV</h2>
-        <button onClick={onCreate} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Configure SR-IOV
-        </button>
+        </button>}
       </div>
       {sriov.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No SR-IOV configurations.</div>
@@ -61,7 +63,7 @@ function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) 
                   <td className="p-4 font-mono text-violet-400">{s.num_vfs}</td>
                   <td className="p-4 text-slate-400 text-sm">{s.vf_configs?.length ?? 0} entries</td>
                   <td className="p-4">
-                    <HostManagedActions
+                    <HostManagedActions readOnly={readOnly}
                       item={s}
                       onDelete={() => onDelete(s.id)}
                       onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}

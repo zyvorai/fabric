@@ -8,6 +8,7 @@ import * as api from '../../api/networkd'
 import type { LinkFileConfig, CreateLinkFileRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface LinkfilesTabProps {
   linkfiles: LinkFileConfig[]
@@ -16,6 +17,7 @@ interface LinkfilesTabProps {
 }
 
 function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProps) {
+  const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
@@ -36,9 +38,9 @@ function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProp
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Link Configuration (.link)</h2>
-        <button onClick={onCreate} className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Link File
-        </button>
+        </button>}
       </div>
       {linkfiles.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No link files configured. Use these to rename interfaces, set MTU, MAC, or Wake-on-LAN.</div>
@@ -69,7 +71,7 @@ function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProp
                   <td className="p-4 text-slate-400 font-mono text-sm">{l.mac_address ?? '-'}</td>
                   <td className="p-4 text-slate-400">{l.wake_on_lan ?? '-'}</td>
                   <td className="p-4">
-                    <HostManagedActions item={l} onDelete={() => onDelete(l.id)} />
+                    <HostManagedActions readOnly={readOnly} item={l} onDelete={() => onDelete(l.id)} />
                   </td>
                 </tr>
               ))}
