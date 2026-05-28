@@ -235,6 +235,12 @@ impl Default for AuthConfig {
 
 impl Config {
     pub fn load() -> Result<Self> {
+        if let Ok(path) = std::env::var("VMSPAWND_CONFIG") {
+            if let Ok(config) = Self::from_file(&path) {
+                return Ok(config);
+            }
+        }
+
         let paths = vec![
             "/etc/vmspawnd/vmspawnd.toml",
             "configs/vmspawnd.toml",
@@ -242,15 +248,7 @@ impl Config {
         ];
 
         for path in paths {
-            if let Ok(content) = fs::read_to_string(path) {
-                let config: Config = toml::from_str(&content)?;
-                tracing::info!("Loaded config from {}", path);
-                // Validate CORS origins at load time
-                for origin in &config.daemon.cors_origins {
-                    if origin.parse::<axum::http::HeaderValue>().is_err() {
-                        tracing::warn!("Invalid CORS origin '{}' in config — will be ignored", origin);
-                    }
-                }
+            if let Ok(config) = Self::from_file(path) {
                 return Ok(config);
             }
         }
@@ -275,5 +273,17 @@ impl Config {
             controller: ControllerConfig::default(),
             auth: AuthConfig::default(),
         })
+    }
+
+    fn from_file(path: &str) -> Result<Self> {
+        let content = fs::read_to_string(path)?;
+        let config: Config = toml::from_str(&content)?;
+        tracing::info!("Loaded config from {}", path);
+        for origin in &config.daemon.cors_origins {
+            if origin.parse::<axum::http::HeaderValue>().is_err() {
+                tracing::warn!("Invalid CORS origin '{}' in config — will be ignored", origin);
+            }
+        }
+        Ok(config)
     }
 }
