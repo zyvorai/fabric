@@ -60,6 +60,7 @@ pub async fn create_profile(
         description: req.description,
         default_action: req.default_action,
         rules: req.rules,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -84,7 +85,10 @@ pub async fn list_profiles(
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(list_profiles));
     match state.store.list_entities::<FirewallProfile>(PROFILES_KEY) {
-        Ok(profiles) => (StatusCode::OK, Json(profiles)).into_response(),
+        Ok(profiles) => {
+            let merged = super::net_security_discover::merge_firewall_profiles(&state, profiles);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -101,11 +105,17 @@ pub async fn get_profile(
     tracing::debug!("vm_firewall::{}", stringify!(get_profile));
     match state.store.get_entity::<FirewallProfile>(PROFILES_KEY, &id) {
         Ok(Some(profile)) => (StatusCode::OK, Json(profile)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "Firewall profile not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(host) = super::net_security_discover::find_host_firewall_profile(&state, &id)
+            {
+                return (StatusCode::OK, Json(host)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Firewall profile not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -158,6 +168,7 @@ pub async fn update_profile(
         description: req.description,
         default_action: req.default_action,
         rules: req.rules,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -183,6 +194,17 @@ pub async fn delete_profile(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("vm_firewall::{}", stringify!(delete_profile));
+    if let Some(host) = super::net_security_discover::find_host_firewall_profile(&state, &id) {
+        if super::net_security_discover::is_host_managed_profile(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This firewall profile reflects host nftables and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(PROFILES_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -196,6 +218,65 @@ pub async fn delete_profile(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_profile(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("vm_firewall::{}", stringify!(adopt_profile));
+    let host = match super::net_security_discover::find_host_firewall_profile(&state, &req.host_id)
+    {
+        Some(p) if super::net_security_discover::is_host_managed_profile(&p) => p,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host firewall profile not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<FirewallProfile> = state.store.list_entities(PROFILES_KEY).unwrap_or_default();
+    if stored.iter().any(|p| p.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("Profile '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let profile = FirewallProfile {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        default_action: host.default_action,
+        rules: host.rules,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(PROFILES_KEY, &profile.id.to_string(), &profile)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_firewall(&state).await {
+        tracing::warn!("Post-adopt firewall reconciliation failed: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(profile)).into_response()
 }
 
 // ── Firewall Zone CRUD ──────────────────────────────────────────────

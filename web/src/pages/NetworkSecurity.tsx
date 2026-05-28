@@ -174,6 +174,20 @@ export default function NetworkSecurity() {
     } catch (e: unknown) { failAction('Failed to adopt firewalld zone', e) }
   }
 
+  const handleAdoptFwProfile = async (id: string) => {
+    try {
+      const adopted = await api.adoptFirewallProfile(id)
+      setFwProfiles(prev => [...prev.filter(p => p.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt firewall profile', e) }
+  }
+
+  const handleAdoptQos = async (id: string) => {
+    try {
+      const adopted = await api.adoptQosPolicy(id)
+      setQosPolicies(prev => [...prev.filter(p => p.id !== id), adopted])
+    } catch (e: unknown) { failAction('Failed to adopt QoS policy', e) }
+  }
+
   const handleDeleteService = async (id: string) => {
     if (!await confirm('Delete Service', 'Delete this service?')) return
     try { await api.deleteService(id); setServices(prev => prev.filter(s => s.id !== id)) }
@@ -360,6 +374,7 @@ export default function NetworkSecurity() {
             <FirewallTab
               profiles={fwProfiles} zones={fwZones} assignments={fwAssignments}
               onDeleteProfile={handleDeleteFwProfile} onDeleteZone={handleDeleteFwZone} onDeleteAssignment={handleDeleteFwAssignment}
+              onAdoptProfile={handleAdoptFwProfile}
               onAdoptZone={handleAdoptFwZone}
               onCreate={() => setActiveModal('firewall-profile')} onSync={() => handleSync(api.syncFirewall)}
             />

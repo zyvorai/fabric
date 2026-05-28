@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use traffic_shaping::classifier::VMSnapshot;
 use traffic_shaping::models::{CreateQoSPolicyRequest, QoSPolicy, QoSStatus};
+use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -44,6 +45,7 @@ pub async fn create_qos_policy(
         selector: req.selector,
         traffic_class: req.traffic_class,
         enabled: req.enabled,
+        managed: true,
         created: now,
         updated: now,
     };
@@ -72,7 +74,10 @@ pub async fn list_qos_policies(
 ) -> impl IntoResponse {
     tracing::debug!("traffic_shaping::{}", stringify!(list_qos_policies));
     match state.store.list_entities::<QoSPolicy>(STORE_KEY) {
-        Ok(policies) => (StatusCode::OK, Json(policies)).into_response(),
+        Ok(policies) => {
+            let merged = super::net_security_discover::merge_qos_policies(&state, policies);
+            (StatusCode::OK, Json(merged)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -89,11 +94,16 @@ pub async fn get_qos_policy(
     tracing::debug!("traffic_shaping::{}", stringify!(get_qos_policy));
     match state.store.get_entity::<QoSPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "QoS policy not found" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            if let Some(host) = super::net_security_discover::find_host_qos_policy(&state, &id) {
+                return (StatusCode::OK, Json(host)).into_response();
+            }
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "QoS policy not found" })),
+            )
+                .into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -135,6 +145,7 @@ pub async fn update_qos_policy(
         selector: req.selector,
         traffic_class: req.traffic_class,
         enabled: req.enabled,
+        managed: existing.managed,
         created: existing.created,
         updated: Utc::now(),
     };
@@ -160,6 +171,17 @@ pub async fn delete_qos_policy(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("traffic_shaping::{}", stringify!(delete_qos_policy));
+    if let Some(host) = super::net_security_discover::find_host_qos_policy(&state, &id) {
+        if super::net_security_discover::is_host_managed_qos(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This QoS policy reflects host traffic control and is not managed by vmspawnd"
+                })),
+            )
+                .into_response();
+        }
+    }
     if let Err(e) = state.store.delete_entity(STORE_KEY, &id) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -173,6 +195,66 @@ pub async fn delete_qos_policy(
     }
 
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn adopt_qos_policy(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdoptHostRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("traffic_shaping::{}", stringify!(adopt_qos_policy));
+    let host = match super::net_security_discover::find_host_qos_policy(&state, &req.host_id) {
+        Some(p) if super::net_security_discover::is_host_managed_qos(&p) => p,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Host QoS policy not found" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stored: Vec<QoSPolicy> = state.store.list_entities(STORE_KEY).unwrap_or_default();
+    if stored.iter().any(|p| p.name == host.name) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("QoS policy '{}' is already managed by vmspawnd", host.name)
+            })),
+        )
+            .into_response();
+    }
+
+    let now = Utc::now();
+    let policy = QoSPolicy {
+        id: Uuid::new_v4(),
+        name: host.name,
+        description: host.description,
+        interface: host.interface,
+        selector: host.selector,
+        traffic_class: host.traffic_class,
+        enabled: host.enabled,
+        managed: true,
+        created: now,
+        updated: now,
+    };
+
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &policy.id.to_string(), &policy)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    if let Err(e) = reconcile_qos(&state).await {
+        tracing::warn!("Post-adopt QoS reconciliation failed: {}", e);
+    }
+
+    (StatusCode::CREATED, Json(policy)).into_response()
 }
 
 // ── Sync and status ─────────────────────────────────────────────────

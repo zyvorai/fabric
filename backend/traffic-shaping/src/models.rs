@@ -89,6 +89,8 @@ pub struct QoSPolicy {
     pub traffic_class: TrafficClass,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }

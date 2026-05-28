@@ -16,12 +16,13 @@ interface FirewallTabProps {
   onDeleteProfile: (id: string) => void
   onDeleteZone: (id: string) => void
   onDeleteAssignment: (vmName: string) => void
+  onAdoptProfile?: (id: string) => void
   onAdoptZone?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onDeleteZone, onDeleteAssignment, onAdoptZone, onCreate, onSync }: FirewallTabProps) {
+function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onDeleteZone, onDeleteAssignment, onAdoptProfile, onAdoptZone, onCreate, onSync }: FirewallTabProps) {
   const [view, setView] = useState<'profiles' | 'zones' | 'assignments'>('profiles')
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -65,20 +66,22 @@ function FirewallTabContent({ profiles, zones, assignments, onDeleteProfile, onD
                 {profiles.map(p => (
                   <tr key={p.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4">
-                      <div className="font-medium">{p.name}</div>
-                      {p.description && <div className="text-xs text-slate-500 mt-1">{p.description}</div>}
+                      <div className="font-medium">{p.name}{isHostManaged(p) && <HostBadge />}</div>
+                      {p.description && <div className="text-xs text-slate-500 mt-1 max-w-md truncate">{p.description}</div>}
                     </td>
                     <td className="p-4">
                       <StatusBadge status={p.default_action} color={p.default_action === 'accept' ? 'green' : 'red'} />
                     </td>
                     <td className="p-4 font-mono text-sm">{p.rules.length}</td>
                     <td className="p-4">
-                      <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
+                      <StatusBadge status="external" color="gray" />
                     </td>
                     <td className="p-4">
-                      <button onClick={() => onDeleteProfile(p.id)} className="p-2 hover:bg-red-600 rounded transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <HostManagedActions
+                        item={{ id: p.id, managed: p.managed }}
+                        onDelete={() => onDeleteProfile(p.id)}
+                        onAdopt={onAdoptProfile ? () => onAdoptProfile(p.id) : undefined}
+                      />
                     </td>
                   </tr>
                 ))}

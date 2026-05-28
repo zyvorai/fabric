@@ -5,7 +5,9 @@
 pub mod host_discovery;
 pub mod host_firewalld;
 pub mod host_nat;
+pub mod host_nft_filter;
 pub mod host_services;
+pub mod host_tc;
 pub mod models;
 pub mod netlink;
 pub mod nftables;

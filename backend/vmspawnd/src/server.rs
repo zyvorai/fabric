@@ -632,6 +632,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/services/{id}/backends", get(api::service_mesh::get_service_backends))
             // Traffic shaping routes
             .route("/qos-policies", get(api::traffic_shaping::list_qos_policies).post(api::traffic_shaping::create_qos_policy))
+            .route("/qos-policies/adopt", post(api::traffic_shaping::adopt_qos_policy))
             .route("/qos-policies/sync", post(api::traffic_shaping::sync_qos_policies))
             .route("/qos-policies/status", get(api::traffic_shaping::get_qos_status))
             .route("/qos-policies/{id}", get(api::traffic_shaping::get_qos_policy).put(api::traffic_shaping::update_qos_policy).delete(api::traffic_shaping::delete_qos_policy))
@@ -644,6 +645,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .route("/dns-records", get(api::dns_policy::list_dns_records))
             // VM firewall routes
             .route("/firewall-profiles", get(api::vm_firewall::list_profiles).post(api::vm_firewall::create_profile))
+            .route("/firewall-profiles/adopt", post(api::vm_firewall::adopt_profile))
             .route("/firewall-profiles/{id}", get(api::vm_firewall::get_profile).put(api::vm_firewall::update_profile).delete(api::vm_firewall::delete_profile))
             .route("/firewall-zones", get(api::vm_firewall::list_zones).post(api::vm_firewall::create_zone))
             .route("/firewall-zones/adopt", post(api::vm_firewall::adopt_zone))

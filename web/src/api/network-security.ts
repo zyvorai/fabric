@@ -89,7 +89,7 @@ export interface FirewallProfile {
   description?: string
   default_action: FirewallAction
   rules: FirewallRule[]
-  enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -148,6 +148,10 @@ export async function updateFirewallProfile(id: string, req: CreateFirewallProfi
 
 export async function deleteFirewallProfile(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/firewall-profiles/${id}`)
+}
+
+export async function adoptFirewallProfile(hostId: string): Promise<FirewallProfile> {
+  return apiPost<FirewallProfile>(`${API_BASE}/firewall-profiles/adopt`, { host_id: hostId })
 }
 
 export async function listFirewallZones(): Promise<FirewallZone[]> {
@@ -263,17 +267,28 @@ export async function serviceMeshStatus(): Promise<{ active_services: number; to
 
 // ─── QoS / Traffic Shaping ───────────────────────────────────────────────────
 
+export interface BandwidthRate {
+  value: number
+  unit: 'kbit' | 'mbit' | 'gbit'
+}
+
+export interface TrafficClass {
+  name: string
+  guaranteed_rate: BandwidthRate
+  max_rate: BandwidthRate
+  burst?: string
+  priority: number
+}
+
 export interface QoSPolicy {
   id: string
   name: string
   description?: string
-  labels: Record<string, string>
-  guaranteed_rate?: string
-  max_rate?: string
-  burst?: string
-  priority: number
-  matched_vms: number
+  interface: string
+  selector?: { match_labels?: Record<string, string> }
+  traffic_class: TrafficClass
   enabled: boolean
+  managed?: boolean
   created: string
   updated: string
 }
@@ -281,11 +296,9 @@ export interface QoSPolicy {
 export interface CreateQoSPolicyRequest {
   name: string
   description?: string
-  labels?: Record<string, string>
-  guaranteed_rate?: string
-  max_rate?: string
-  burst?: string
-  priority?: number
+  interface: string
+  selector?: { match_labels?: Record<string, string> }
+  traffic_class: TrafficClass
   enabled?: boolean
 }
 
@@ -307,6 +320,10 @@ export async function updateQosPolicy(id: string, req: CreateQoSPolicyRequest): 
 
 export async function deleteQosPolicy(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/qos-policies/${id}`)
+}
+
+export async function adoptQosPolicy(hostId: string): Promise<QoSPolicy> {
+  return apiPost<QoSPolicy>(`${API_BASE}/qos-policies/adopt`, { host_id: hostId })
 }
 
 export async function syncQos(): Promise<{ status: string; policies: number }> {

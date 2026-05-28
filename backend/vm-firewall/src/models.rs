@@ -102,6 +102,8 @@ pub struct FirewallProfile {
     pub default_action: FirewallAction,
     #[serde(default)]
     pub rules: Vec<FirewallRule>,
+    #[serde(default = "default_true")]
+    pub managed: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }

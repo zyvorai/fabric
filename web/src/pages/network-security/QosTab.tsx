@@ -6,17 +6,22 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { QoSPolicy, CreateQoSPolicyRequest } from '../../api/network-security'
-import { ModalWrapper, InputField, extractErrorMessage } from '../network/ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
+
+function formatRate(r: { value: number; unit: string }): string {
+  return `${r.value}${r.unit}`
+}
 
 interface QosTabProps {
   policies: QoSPolicy[]
   onDelete: (id: string) => void
+  onAdopt?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function QosTabContent({ policies, onDelete, onCreate, onSync }: QosTabProps) {
+function QosTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: QosTabProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -38,12 +43,11 @@ function QosTabContent({ policies, onDelete, onCreate, onSync }: QosTabProps) {
             <thead className="bg-slate-800">
               <tr>
                 <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">Labels</th>
+                <th className="text-left p-4 font-medium text-slate-300">Interface</th>
+                <th className="text-left p-4 font-medium text-slate-300">Class</th>
                 <th className="text-left p-4 font-medium text-slate-300">Guaranteed</th>
                 <th className="text-left p-4 font-medium text-slate-300">Max Rate</th>
-                <th className="text-left p-4 font-medium text-slate-300">Burst</th>
                 <th className="text-left p-4 font-medium text-slate-300">Priority</th>
-                <th className="text-left p-4 font-medium text-slate-300">VMs</th>
                 <th className="text-left p-4 font-medium text-slate-300">Status</th>
                 <th className="text-left p-4 font-medium text-slate-300">Actions</th>
               </tr>
@@ -52,22 +56,27 @@ function QosTabContent({ policies, onDelete, onCreate, onSync }: QosTabProps) {
               {policies.map(p => (
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
-                    <div className="font-medium">{p.name}</div>
-                    {p.description && <div className="text-xs text-slate-500 mt-1">{p.description}</div>}
+                    <div className="font-medium">{p.name}{isHostManaged(p) && <HostBadge />}</div>
+                    {p.description && <div className="text-xs text-slate-500 mt-1 max-w-xs truncate">{p.description}</div>}
                   </td>
-                  <td className="p-4"><LabelTags labels={p.labels} /></td>
-                  <td className="p-4 font-mono text-sm text-green-400">{p.guaranteed_rate ?? '-'}</td>
-                  <td className="p-4 font-mono text-sm text-yellow-400">{p.max_rate ?? '-'}</td>
-                  <td className="p-4 font-mono text-sm text-slate-400">{p.burst ?? '-'}</td>
-                  <td className="p-4 font-mono text-sm">{p.priority}</td>
-                  <td className="p-4 text-blue-400 font-medium">{p.matched_vms}</td>
+                  <td className="p-4 font-mono text-sm text-cyan-400">{p.interface}</td>
+                  <td className="p-4 font-mono text-sm">{p.traffic_class?.name ?? '-'}</td>
+                  <td className="p-4 font-mono text-sm text-green-400">
+                    {p.traffic_class ? formatRate(p.traffic_class.guaranteed_rate) : '-'}
+                  </td>
+                  <td className="p-4 font-mono text-sm text-yellow-400">
+                    {p.traffic_class ? formatRate(p.traffic_class.max_rate) : '-'}
+                  </td>
+                  <td className="p-4 font-mono text-sm">{p.traffic_class?.priority ?? '-'}</td>
                   <td className="p-4">
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
-                    <button onClick={() => onDelete(p.id)} className="p-2 hover:bg-red-600 rounded transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <HostManagedActions
+                      item={{ id: p.id, managed: p.managed }}
+                      onDelete={() => onDelete(p.id)}
+                      onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
+                    />
                   </td>
                 </tr>
               ))}
@@ -82,27 +91,32 @@ function QosTabContent({ policies, onDelete, onCreate, onSync }: QosTabProps) {
 export function CreateQosModal({ onClose, onCreated }: { onClose: () => void; onCreated: (p: QoSPolicy) => void }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [iface, setIface] = useState('eth0')
   const [labels, setLabels] = useState<Record<string, string>>({})
-  const [guaranteedRate, setGuaranteedRate] = useState('')
-  const [maxRate, setMaxRate] = useState('')
+  const [guaranteedRate, setGuaranteedRate] = useState('100')
+  const [maxRate, setMaxRate] = useState('100')
   const [burst, setBurst] = useState('')
-  const [priority, setPriority] = useState('100')
+  const [priority, setPriority] = useState('4')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
 
   const handleSubmit = async () => {
-    if (!name.trim()) { setErr('Name is required'); return }
+    if (!name.trim() || !iface.trim()) { setErr('Name and interface are required'); return }
     setSubmitting(true)
     setErr('')
     try {
       const req: CreateQoSPolicyRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
-        guaranteed_rate: guaranteedRate.trim() || undefined,
-        max_rate: maxRate.trim() || undefined,
-        burst: burst.trim() || undefined,
-        priority: parseInt(priority) || 100,
+        interface: iface.trim(),
+        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        traffic_class: {
+          name: 'default',
+          guaranteed_rate: { value: parseInt(guaranteedRate) || 100, unit: 'mbit' },
+          max_rate: { value: parseInt(maxRate) || 100, unit: 'mbit' },
+          burst: burst.trim() || undefined,
+          priority: parseInt(priority) || 4,
+        },
       }
       const p = await api.createQosPolicy(req)
       onCreated(p)
@@ -118,10 +132,11 @@ export function CreateQosModal({ onClose, onCreated }: { onClose: () => void; on
       <div className="space-y-4">
         <InputField label="Name" value={name} onChange={setName} placeholder="high-priority" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="High priority traffic shaping" />
+        <InputField label="Interface" value={iface} onChange={setIface} placeholder="eth0" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
         <div className="grid grid-cols-2 gap-2">
-          <InputField label="Guaranteed Rate" value={guaranteedRate} onChange={setGuaranteedRate} placeholder="100mbit" />
-          <InputField label="Max Rate" value={maxRate} onChange={setMaxRate} placeholder="1gbit" />
+          <InputField label="Guaranteed (mbit)" value={guaranteedRate} onChange={setGuaranteedRate} placeholder="100" type="number" />
+          <InputField label="Max (mbit)" value={maxRate} onChange={setMaxRate} placeholder="1000" type="number" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <InputField label="Burst" value={burst} onChange={setBurst} placeholder="32kbit" />
