@@ -9,14 +9,24 @@ use serde::Serialize;
 
 pub mod vms;
 pub mod auth;
+pub mod auth_client;
 pub mod health;
 pub mod logs;
 pub mod events;
 pub mod metrics;
+pub mod storage;
+pub mod network;
+pub mod audit;
+pub mod config_snapshot;
 
 pub use logs::{LogEntry, LogQuery, LogResponse};
 pub use events::{EventStream, VMEvent};
 pub use metrics::VMMetrics;
+pub use auth_client::MeResponse;
+pub use storage::StoragePool;
+pub use network::NetworkPolicySummary;
+pub use audit::AuditLogEntry;
+pub use config_snapshot::{ConfigSnapshot, EventRetentionConfig};
 
 /// Client configuration.
 pub struct ClientConfig {

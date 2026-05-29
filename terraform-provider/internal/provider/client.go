@@ -106,3 +106,99 @@ func (c *Client) DeleteVM(ctx context.Context, name string) error {
 func (c *Client) StartVM(ctx context.Context, name string) error {
 	return c.do(ctx, http.MethodPost, "/api/vms/"+name+"/start", map[string]any{}, nil)
 }
+
+type storagePoolRecord struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Type string `json:"type"`
+}
+
+type createLocalPoolRequest struct {
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	AutoStart bool   `json:"auto_start"`
+}
+
+func (c *Client) GetStoragePool(ctx context.Context, name string) (*storagePoolRecord, error) {
+	var pool storagePoolRecord
+	if err := c.do(ctx, http.MethodGet, "/api/storage/pools/"+name, nil, &pool); err != nil {
+		return nil, err
+	}
+	return &pool, nil
+}
+
+func (c *Client) CreateLocalStoragePool(ctx context.Context, name, path string, autoStart bool) (*storagePoolRecord, error) {
+	var pool storagePoolRecord
+	req := createLocalPoolRequest{Name: name, Path: path, AutoStart: autoStart}
+	if err := c.do(ctx, http.MethodPost, "/api/storage/pools/local", req, &pool); err != nil {
+		return nil, err
+	}
+	return &pool, nil
+}
+
+func (c *Client) DeleteStoragePool(ctx context.Context, name string) error {
+	return c.do(ctx, http.MethodDelete, "/api/storage/pools/"+name, nil, nil)
+}
+
+type networkPolicyRecord struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+}
+
+type createNetworkPolicyRequest struct {
+	Name              string            `json:"name"`
+	Description       string            `json:"description"`
+	EndpointSelector  labelSelector     `json:"endpoint_selector"`
+	Ingress           []any             `json:"ingress"`
+	Egress            []any             `json:"egress"`
+	Enabled           bool              `json:"enabled"`
+}
+
+type labelSelector struct {
+	MatchLabels map[string]string `json:"match_labels"`
+}
+
+func (c *Client) CreateNetworkPolicy(ctx context.Context, name, description string, enabled bool, labels map[string]string) (*networkPolicyRecord, error) {
+	var policy networkPolicyRecord
+	req := createNetworkPolicyRequest{
+		Name:        name,
+		Description: description,
+		Enabled:     enabled,
+		EndpointSelector: labelSelector{MatchLabels: labels},
+		Ingress:     []any{},
+		Egress:      []any{},
+	}
+	if err := c.do(ctx, http.MethodPost, "/api/network-policies", req, &policy); err != nil {
+		return nil, err
+	}
+	return &policy, nil
+}
+
+func (c *Client) DeleteNetworkPolicy(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/api/network-policies/"+id, nil, nil)
+}
+
+type vmSnapshotRecord struct {
+	ID     string `json:"id"`
+	VMName string `json:"vm_name"`
+	Name   string `json:"name"`
+}
+
+type createSnapshotRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+func (c *Client) CreateVMSnapshot(ctx context.Context, vmName, snapshotName, description string) (*vmSnapshotRecord, error) {
+	var snap vmSnapshotRecord
+	req := createSnapshotRequest{Name: snapshotName, Description: description}
+	if err := c.do(ctx, http.MethodPost, "/api/vms/"+vmName+"/snapshots", req, &snap); err != nil {
+		return nil, err
+	}
+	return &snap, nil
+}
+
+func (c *Client) DeleteVMSnapshot(ctx context.Context, vmName, snapshotID string) error {
+	return c.do(ctx, http.MethodDelete, "/api/vms/"+vmName+"/snapshots/"+snapshotID, nil, nil)
+}

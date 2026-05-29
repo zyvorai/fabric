@@ -1,0 +1,25 @@
+name: Operator
+
+on:
+  push:
+    paths:
+      - 'operator/**'
+  pull_request:
+    paths:
+      - 'operator/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cargo test
+        run: cd operator && cargo test
+      - name: Helm template lint
+        run: |
+          helm template test operator/charts/vmspawnd-operator > /tmp/operator.yaml
+          grep -q 'VMSPAWND_URL' /tmp/operator.yaml

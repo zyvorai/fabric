@@ -57,10 +57,33 @@ The provider **type name** stays `vmspawnd` for compatibility. A second registry
 source = "ssahani/zyvor-fabric"  # planned mirror
 ```
 
-## Manual GoReleaser dry-run
+## Troubleshooting releases
+
+### GitHub Actions billing
+
+If workflows show *"recent account payments have failed or your spending limit needs to be increased"*, fix billing at https://github.com/settings/billing then re-run the failed workflow or re-push the tag:
+
+```bash
+git tag -d terraform-provider/v0.1.0
+git push origin :refs/tags/terraform-provider/v0.1.0
+git tag terraform-provider/v0.1.0
+git push origin terraform-provider/v0.1.0
+```
+
+### Local dry-run (no registry upload)
 
 ```bash
 cd terraform-provider
 goreleaser release --snapshot --clean
 ls -la dist/
 ```
+
+### Acceptance smoke (live daemon)
+
+After `scripts/ci-api-audit.sh` or with a running `vmspawnd`:
+
+```bash
+chmod +x scripts/acceptance-smoke.sh
+VMSPAWND_ADMIN_PASSWORD=... ./scripts/acceptance-smoke.sh
+```
+

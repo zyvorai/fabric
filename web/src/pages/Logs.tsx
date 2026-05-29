@@ -132,7 +132,7 @@ export default function Logs() {
         </h1>
         <div className="flex items-center gap-2">
           <button
-            onClick={loadLogs}
+            onClick={() => void loadLogs()}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm"
           >
             <RefreshCw className="w-4 h-4" />

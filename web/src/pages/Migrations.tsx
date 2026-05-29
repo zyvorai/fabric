@@ -93,7 +93,7 @@ export default function Migrations() {
         </h1>
         <div className="flex gap-2">
           <button
-            onClick={loadMigrations}
+            onClick={() => void loadMigrations()}
             className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition"
           >
             <RefreshCw className="w-4 h-4" />

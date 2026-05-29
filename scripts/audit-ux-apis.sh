@@ -97,6 +97,8 @@ ENDPOINTS=(
   /api/profiles
   /api/zones
   /api/floating-ips
+  /api/config/snapshot
+  /api/events/retention
 )
 
 FAIL=0

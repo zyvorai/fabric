@@ -22,3 +22,6 @@ jobs:
       - run: go mod tidy
       - run: go build -v .
       - run: go test ./...
+      - name: Acceptance smoke (optional)
+        if: false
+        run: ./scripts/acceptance-smoke.sh

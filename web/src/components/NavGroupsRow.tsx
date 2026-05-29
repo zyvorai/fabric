@@ -305,7 +305,7 @@ export function MobileNavSections({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <>
-      {navGroups.map((group) => (
+      {allNavGroups.map((group) => (
         <div key={group.name} className="px-0 py-0">
           <div
             className={`text-[10px] font-bold uppercase tracking-wider px-3 mb-1.5 ${

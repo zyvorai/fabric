@@ -4,6 +4,7 @@
 
 mod crd;
 mod controller;
+mod error;
 mod reconcile;
 
 use anyhow::Result;

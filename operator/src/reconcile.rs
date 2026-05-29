@@ -2,29 +2,36 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use anyhow::Result;
 use kube::{
     api::{Api, Patch, PatchParams},
     runtime::controller::Action,
     ResourceExt,
 };
-use reqwest::Client as HttpClient;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{controller::Context, crd::{VirtualMachine, VirtualMachineStatus}};
+use crate::{controller::Context, crd::{VirtualMachine, VirtualMachineStatus}, error::OperatorError};
 
-pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Action> {
+fn with_auth(ctx: &Context, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    if let Some(ref token) = ctx.vmspawnd_token {
+        req.bearer_auth(token)
+    } else {
+        req
+    }
+}
+
+pub async fn reconcile(
+    vm: Arc<VirtualMachine>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
     let name = vm.name_any();
     let namespace = vm.namespace().unwrap_or_default();
 
     tracing::info!("Reconciling VM {}/{}", namespace, name);
 
     let vm_api: Api<VirtualMachine> = Api::namespaced(ctx.client.clone(), &namespace);
-
-    // Create or update VM via vmspawnd API
-    let http_client = HttpClient::new();
+    let http_client = &ctx.http;
     let vm_url = format!("{}/api/vms", ctx.vmspawnd_url);
 
     let create_req = json!({
@@ -34,14 +41,18 @@ pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Act
         "memory": vm.spec.memory,
     });
 
-    // Check if VM exists
     let vm_check_url = format!("{}/api/vms/{}", ctx.vmspawnd_url, name);
-    let exists = http_client.get(&vm_check_url).send().await?.status().is_success();
+    let exists = with_auth(&ctx, http_client.get(&vm_check_url))
+        .send()
+        .await?
+        .status()
+        .is_success();
+
+    let mut observed_state = "unknown".to_string();
+    let mut observed_ip: Option<String> = None;
 
     if !exists {
-        // Create VM
-        let resp = http_client
-            .post(&vm_url)
+        let resp = with_auth(&ctx, http_client.post(&vm_url))
             .json(&create_req)
             .send()
             .await?;
@@ -53,7 +64,6 @@ pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Act
 
         tracing::info!("Created VM {}", name);
 
-        // Configure cloud-init if specified
         if let Some(cloud_init) = &vm.spec.cloud_init {
             let cloud_init_url = format!("{}/api/vms/{}/cloud-init", ctx.vmspawnd_url, name);
             let cloud_init_req = json!({
@@ -63,8 +73,7 @@ pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Act
                 "network_config": cloud_init.network_config,
             });
 
-            if let Err(e) = http_client
-                .post(&cloud_init_url)
+            if let Err(e) = with_auth(&ctx, http_client.post(&cloud_init_url))
                 .json(&cloud_init_req)
                 .send()
                 .await
@@ -73,23 +82,33 @@ pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Act
             }
         }
 
-        // Start VM
         let start_url = format!("{}/api/vms/{}/start", ctx.vmspawnd_url, name);
-        if let Err(e) = http_client.post(&start_url).send().await {
+        if let Err(e) = with_auth(&ctx, http_client.post(&start_url)).send().await {
             tracing::error!("Failed to start VM '{}': {}", name, e);
         }
     }
 
-    // Update status
+    if let Ok(resp) = with_auth(&ctx, http_client.get(&vm_check_url)).send().await {
+        if resp.status().is_success() {
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                if let Some(state) = body.get("state").and_then(|v| v.as_str()) {
+                    observed_state = state.to_string();
+                }
+                observed_ip = body
+                    .get("ip")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string);
+            }
+        }
+    }
+
     let status = VirtualMachineStatus {
-        state: "running".to_string(),
-        ip: None,
+        state: observed_state,
+        ip: observed_ip,
         node: Some(std::env::var("NODE_NAME").unwrap_or_else(|_| "unknown".to_string())),
     };
 
-    let patch = json!({
-        "status": status
-    });
+    let patch = json!({ "status": status });
 
     let ps = PatchParams::default();
     let _patched = vm_api
@@ -99,6 +118,10 @@ pub async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<Context>) -> Result<Act
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
-pub fn error_policy(_vm: Arc<VirtualMachine>, _error: &anyhow::Error, _ctx: Arc<Context>) -> Action {
+pub fn error_policy(
+    _vm: Arc<VirtualMachine>,
+    _error: &OperatorError,
+    _ctx: Arc<Context>,
+) -> Action {
     Action::requeue(Duration::from_secs(60))
 }

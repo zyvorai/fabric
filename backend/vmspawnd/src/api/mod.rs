@@ -66,6 +66,7 @@ pub mod tenant;
 
 // Phase 6 API modules: 2FA, export, secrets, logs
 pub mod export;
+pub mod config_snapshot;
 pub mod logs;
 pub mod secrets;
 pub mod external_auth;

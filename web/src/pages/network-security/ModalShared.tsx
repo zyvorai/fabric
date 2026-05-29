@@ -94,8 +94,8 @@ export function StatusBadge({ status, color }: { status: string; color?: string 
 }
 
 /** Render label tags inline */
-export function LabelTags({ labels }: { labels: Record<string, string> }) {
-  const entries = Object.entries(labels)
+export function LabelTags({ labels }: { labels?: Record<string, string> }) {
+  const entries = Object.entries(labels ?? {})
   if (entries.length === 0) return <span className="text-slate-500 text-sm">none</span>
   return (
     <div className="flex flex-wrap gap-1">

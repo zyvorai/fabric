@@ -74,4 +74,13 @@ fi
 echo "==> Running UX API audit..."
 VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PASS" "$SCRIPT_DIR/audit-ux-apis.sh" "$API_HOST"
 
+echo "==> POST smoke tests..."
+VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PASS" "$SCRIPT_DIR/audit-ux-apis-post.sh" "$API_HOST"
+
+echo "==> API prefix parity (/api vs /api/v1)..."
+VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PASS" "$SCRIPT_DIR/test-api-prefix-parity.sh" "$API_HOST"
+
+echo "==> OpenAPI tier-1 coverage..."
+python3 "$SCRIPT_DIR/check-openapi-coverage.py"
+
 echo "==> CI API audit passed"

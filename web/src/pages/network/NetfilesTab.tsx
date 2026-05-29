@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { NetworkFileConfig, CreateNetworkFileRequest } from '../../api/networkd'
+import { useReadOnly } from '../../contexts/ReadOnlyContext'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import {
   ListControls,

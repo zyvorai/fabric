@@ -14,7 +14,7 @@ use std::convert::Infallible;
 use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::RequireRead;
+use security::{RequireRead, RequireWrite};
 
 // ============================================================================
 // Data Structures
@@ -98,15 +98,53 @@ pub async fn list_events(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<VMEvent>> {
     tracing::debug!("events::{}", stringify!(list_events));
+    let keep = retention_limit(&state);
     let mut events: Vec<VMEvent> = state.store
         .list_entities("vm_events")
         .unwrap_or_default();
 
-    // Sort by timestamp descending and limit to 100
+    // Sort by timestamp descending and limit to retention
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    events.truncate(100);
+    events.truncate(keep.min(100));
 
     Json(events)
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EventRetentionConfig {
+    pub max_events: usize,
+}
+
+fn retention_limit(state: &Arc<AppState>) -> usize {
+    state
+        .store
+        .get_entity::<EventRetentionConfig>("settings", "event_retention")
+        .ok()
+        .flatten()
+        .map(|c| c.max_events)
+        .unwrap_or(1000)
+}
+
+/// GET /api/events/retention
+pub async fn get_retention(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Json<EventRetentionConfig> {
+    Json(EventRetentionConfig {
+        max_events: retention_limit(&state),
+    })
+}
+
+/// PUT /api/events/retention
+pub async fn set_retention(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<EventRetentionConfig>,
+) -> Json<EventRetentionConfig> {
+    let max_events = req.max_events.clamp(100, 100_000);
+    let cfg = EventRetentionConfig { max_events };
+    let _ = state.store.save_entity("settings", "event_retention", &cfg);
+    Json(cfg)
 }
 
 /// Counter for periodic event pruning
@@ -134,7 +172,7 @@ pub fn record_event(state: &Arc<AppState>, event_type: VMEventType, vm_name: &st
     if EVENT_COUNTER.fetch_add(1, Ordering::Relaxed) % 100 == 0 {
         let state_clone = state.clone();
         tokio::spawn(async move {
-            prune_old_events(&state_clone, 1000);
+            prune_old_events(&state_clone, retention_limit(&state_clone));
         });
     }
 }

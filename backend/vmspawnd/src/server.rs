@@ -431,6 +431,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             // Event routes
             .route("/events", get(api::events::list_events))
             .route("/events/stream", get(api::events::event_stream))
+            .route("/events/retention", get(api::events::get_retention).put(api::events::set_retention))
+            // Config snapshot (Time Machine foundation)
+            .route("/config/snapshot", get(api::config_snapshot::export_config_snapshot))
             // Floating IP routes
             .route("/floating-ips", get(api::network_cloud::list_floating_ips).post(api::network_cloud::create_floating_ip))
             .route("/floating-ips/adopt", post(api::network_cloud::adopt_floating_ip))
