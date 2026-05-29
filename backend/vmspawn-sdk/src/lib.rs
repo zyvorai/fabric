@@ -9,6 +9,14 @@ use serde::Serialize;
 
 pub mod vms;
 pub mod auth;
+pub mod health;
+pub mod logs;
+pub mod events;
+pub mod metrics;
+
+pub use logs::{LogEntry, LogQuery, LogResponse};
+pub use events::VMEvent;
+pub use metrics::VMMetrics;
 
 /// Client configuration.
 pub struct ClientConfig {
@@ -85,6 +93,18 @@ impl Client {
             .json(body)
             .send().await?.error_for_status()?
             .json().await?;
+        Ok(resp)
+    }
+
+    /// GET request returning plain text (e.g. /health).
+    pub async fn get_text(&self, path: &str) -> Result<String> {
+        let resp = self
+            .request(reqwest::Method::GET, path)
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
         Ok(resp)
     }
 

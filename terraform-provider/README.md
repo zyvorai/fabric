@@ -134,8 +134,12 @@ resource "vmspawnd_vm" "app" {
 ### Build the Provider
 
 ```bash
-go build -o terraform-provider-vmspawnd
+cd terraform-provider
+make tidy build
+# or: go build -o terraform-provider-vmspawnd .
 ```
+
+Example configuration: [examples/basic/main.tf](examples/basic/main.tf)
 
 ### Install Locally
 

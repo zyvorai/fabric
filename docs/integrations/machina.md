@@ -91,7 +91,29 @@ Fabric remains the source of truth; Machina is the reasoning and visualization l
 
 ---
 
-## See also
+## Rust client (`machina-fabric` CLI)
+
+Prototype CLI for macOS/Linux (v0.1):
+
+```bash
+# Copy cluster profile
+mkdir -p ~/.machina
+cp integrations/machina/clusters.example.yaml ~/.machina/clusters.yaml
+
+# Build
+cd integrations/machina/client && cargo build --release
+
+# Probe cluster
+./target/release/machina-fabric health -c homelab
+ZYVOR_FABRIC_USER=admin ZYVOR_FABRIC_PASSWORD=... \
+  ./target/release/machina-fabric vms -c homelab
+./target/release/machina-fabric events -c homelab
+./target/release/machina-fabric logs --lines 20 -c homelab
+```
+
+Uses `vmspawn-sdk` from this repository. A Tauri/SwiftUI shell will wrap this client in a later milestone.
+
+---
 
 - [POSITIONING.md](../POSITIONING.md)
 - [integrations/README.md](README.md)

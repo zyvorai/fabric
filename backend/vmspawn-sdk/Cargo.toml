@@ -3,7 +3,7 @@ license = "LicenseRef-Zyvor-Proprietary"
 name = "vmspawn-sdk"
 version = "0.1.0"
 edition = "2021"
-description = "Rust SDK for the vmspawn VM management API"
+description = "Rust SDK for the Zyvor Fabric (vmspawnd) REST API"
 
 [dependencies]
 anyhow = { workspace = true }

@@ -13,6 +13,8 @@ paths:
   /health:
     get:
       summary: Health check
+      tags: [Machina v0.1]
+      security: []
       responses:
         '200':
           description: Service is healthy
@@ -21,6 +23,103 @@ paths:
               schema:
                 type: string
                 example: OK
+
+  /api/auth/login:
+    post:
+      summary: Authenticate and obtain JWT
+      tags: [Machina v0.1, Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+
+  /api/auth/me:
+    get:
+      summary: Current authenticated user
+      tags: [Machina v0.1, Auth]
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Unauthorized
+
+  /api/logs:
+    get:
+      summary: System journal logs
+      tags: [Machina v0.1, Observability]
+      parameters:
+        - $ref: '#/components/parameters/LogLines'
+        - $ref: '#/components/parameters/LogPriority'
+        - $ref: '#/components/parameters/LogGrep'
+      responses:
+        '200':
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogResponse'
+
+  /api/vms/{name}/logs:
+    get:
+      summary: VM journal logs
+      tags: [Machina v0.1, Observability]
+      parameters:
+        - $ref: '#/components/parameters/VmName'
+        - $ref: '#/components/parameters/LogLines'
+        - $ref: '#/components/parameters/LogPriority'
+        - $ref: '#/components/parameters/LogGrep'
+      responses:
+        '200':
+          description: VM log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogResponse'
+
+  /api/events:
+    get:
+      summary: Recent VM lifecycle events
+      tags: [Machina v0.1, Observability]
+      responses:
+        '200':
+          description: Event list (newest first, max 100)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VMEvent'
+
+  /api/events/stream:
+    get:
+      summary: Real-time VM events (Server-Sent Events)
+      tags: [Machina v0.1, Observability]
+      description: |
+        SSE stream of VM lifecycle events. Send `Authorization: Bearer <token>` header.
+        Event types include `vm.started`, `vm.stopped`, `vm.error`, etc.
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
 
   /metrics:
     get:
@@ -36,18 +135,29 @@ paths:
   /api/vms:
     get:
       summary: List all VMs
+      tags: [Machina v0.1, VMs]
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
       responses:
         '200':
-          description: List of VMs
+          description: Paginated VM list
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VM'
+                $ref: '#/components/schemas/VMListResponse'
 
     post:
       summary: Create a new VM
+      tags: [VMs]
       requestBody:
         required: true
         content:
@@ -140,6 +250,7 @@ paths:
   /api/vms/{name}/metrics:
     get:
       summary: Get VM metrics
+      tags: [Machina v0.1, Observability]
       parameters:
         - name: name
           in: path
@@ -174,7 +285,141 @@ paths:
           description: cloud-init configured
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    VmName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+    LogLines:
+      name: lines
+      in: query
+      schema:
+        type: integer
+        default: 100
+        maximum: 1000
+    LogPriority:
+      name: priority
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 7
+    LogGrep:
+      name: grep
+      in: query
+      schema:
+        type: string
+
   schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        totp_code:
+          type: string
+          nullable: true
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user_id:
+          type: string
+        role:
+          type: string
+        username:
+          type: string
+
+    MeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        hostname:
+          type: string
+        unit:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+
+    LogResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogEntry'
+        count:
+          type: integer
+
+    VMEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        event_type:
+          type: string
+          enum:
+            - created
+            - started
+            - stopped
+            - paused
+            - resumed
+            - deleted
+            - cloned
+            - migrated
+            - snapshot_created
+            - snapshot_reverted
+            - error
+            - auto_healed
+        vm_name:
+          type: string
+        detail:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    VMListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VM'
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+
     VM:
       type: object
       properties:
@@ -249,3 +494,6 @@ components:
         network_config:
           type: object
           nullable: true
+
+security:
+  - bearerAuth: []
