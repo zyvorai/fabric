@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>vmspawnd Security Audit Report</title>
+  <title>Zyvor Fabric Security Audit Report</title>
   <style>
     html {
       color: #1a1a1a;
@@ -235,11 +235,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">vmspawnd Security Audit Report</h1>
+<h1 class="title">Zyvor Fabric Security Audit Report</h1>
 </header>
-<h1 id="vmspawnd-security-audit-report">vmspawnd Security Audit
+<h1 id="Zyvor Fabric-security-audit-report">Zyvor Fabric Security Audit
 Report</h1>
-<p><strong>Project:</strong> vmspawnd Virtual Machine Management
+<p><strong>Project:</strong> Zyvor Fabric Virtual Machine Management
 Platform <strong>Date:</strong> March 23, 2026 <strong>Auditor:</strong>
 Independent Security Review <strong>Scope:</strong> Full codebase — 190+
 Rust source files, 40 crates, ~87,000 LOC <strong>Verdict:</strong> PASS
@@ -248,7 +248,7 @@ CLEAN (9 consecutive clean rounds — audit complete)</p>
 <hr />
 <h2 id="executive-summary">Executive Summary</h2>
 <p>A comprehensive multi-round security audit was performed on the
-vmspawnd codebase covering all 180 Rust source files across 40 crates.
+Zyvor Fabric codebase covering all 180 Rust source files across 40 crates.
 The audit encompassed command injection, authentication/authorization,
 input validation, cryptographic implementation, state consistency, error
 handling, resource management, and API security.</p>
@@ -426,15 +426,15 @@ store, and core modules.</p>
 <hr />
 <h2 id="audit-scope-methodology">1. Audit Scope &amp; Methodology</h2>
 <h3 id="scope">1.1 Scope</h3>
-<p>The audit covered the entire vmspawnd backend:</p>
+<p>The audit covered the entire Zyvor Fabric backend:</p>
 <ul>
-<li><strong>Core daemon</strong> (<code>vmspawnd</code>) — REST API
+<li><strong>Core daemon</strong> (<code>Zyvor Fabric</code>) — REST API
 server with 480+ endpoints</li>
 <li><strong>VM driver</strong> (<code>vmspawn-driver</code>) —
 systemd-vmspawn/machined integration</li>
 <li><strong>Security</strong> (<code>security</code>) — JWT
 authentication, RBAC, user management</li>
-<li><strong>Storage</strong> (<code>vmspawnd-storage</code>) — LVM, ZFS,
+<li><strong>Storage</strong> (<code>Zyvor Fabric-storage</code>) — LVM, ZFS,
 NFS, Ceph backends</li>
 <li><strong>Networking</strong> (<code>networking</code>,
 <code>network-policy</code>, <code>vm-firewall</code>) — nftables,
@@ -555,7 +555,7 @@ removed from all SSH invocations.</p>
 <h4 id="c3.-admin-password-logged-in-plaintext">C3. Admin Password
 Logged in Plaintext</h4>
 <p><strong>Status:</strong> RESOLVED (Round 1)
-<strong>Location:</strong> <code>vmspawnd/src/config.rs</code></p>
+<strong>Location:</strong> <code>Zyvor Fabric/src/config.rs</code></p>
 <p><strong>Finding:</strong> Auto-generated admin password was written
 to log output via <code>tracing::warn!</code>.</p>
 <p><strong>Remediation:</strong> Password written to
@@ -568,7 +568,7 @@ of silently ignored.</p>
 Endpoints</h4>
 <p><strong>Status:</strong> RESOLVED (Rounds 4-7)
 <strong>Location:</strong> 44 API handler files in
-<code>vmspawnd/src/api/</code></p>
+<code>Zyvor Fabric/src/api/</code></p>
 <p><strong>Finding:</strong> 353+ API handlers across 29+ files lacked
 role-based access control extractors. Any authenticated user (including
 Viewer role) could perform admin operations.</p>
@@ -1866,7 +1866,7 @@ polling</td>
 </table>
 <hr />
 <h2 id="conclusion">9. Conclusion</h2>
-<p>The vmspawnd project has undergone a thorough <strong>30-round
+<p>The Zyvor Fabric project has undergone a thorough <strong>30-round
 security audit</strong> covering all 190+ Rust source files across 40
 crates (~23,000 lines of API code reviewed per round). Every critical,
 high, and medium-severity finding has been identified and remediated

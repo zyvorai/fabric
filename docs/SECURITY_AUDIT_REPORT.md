@@ -1,6 +1,6 @@
-# vmspawnd Security Audit Report
+# Zyvor Fabric Security Audit Report
 
-**Project:** vmspawnd Virtual Machine Management Platform
+**Project:** Zyvor Fabric Virtual Machine Management Platform
 **Date:** April 5, 2026
 **Auditor:** Independent Security Review
 **Scope:** Full codebase — 190+ Rust source files, 40 crates, ~87,000 LOC
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-A comprehensive multi-round security audit was performed on the vmspawnd codebase covering all 180 Rust source files across 40 crates. The audit encompassed command injection, authentication/authorization, input validation, cryptographic implementation, state consistency, error handling, resource management, and API security.
+A comprehensive multi-round security audit was performed on the Zyvor Fabric codebase covering all 180 Rust source files across 40 crates. The audit encompassed command injection, authentication/authorization, input validation, cryptographic implementation, state consistency, error handling, resource management, and API security.
 
 **31 rounds of review and remediation** were conducted, resulting in **6,800+ lines of security-hardened and feature code** across **160+ files**. All critical, high, and medium-severity findings have been resolved. Round 31 performed a deep re-audit that uncovered 36 additional issues across 23 files, including race conditions in VM start locking, TOCTOU vulnerabilities in state store, path traversal in machined copy/bind operations, regex injection in migration cancel, missing input validation on hotplug/backup/checkpoint operations, secret exposure in notification channel responses, and silent error handling in declarative VM specs. Feature additions (cloud images, LDAP/OIDC, multi-tenancy, hibernate, storage migration) were reviewed and secured inline.
 
@@ -65,12 +65,12 @@ A comprehensive multi-round security audit was performed on the vmspawnd codebas
 
 ### 1.1 Scope
 
-The audit covered the entire vmspawnd backend:
+The audit covered the entire Zyvor Fabric backend:
 
-- **Core daemon** (`vmspawnd`) — REST API server with 480+ endpoints
+- **Core daemon** (`Zyvor Fabric`) — REST API server with 480+ endpoints
 - **VM driver** (`vmspawn-driver`) — systemd-vmspawn/machined integration
 - **Security** (`security`) — JWT authentication, RBAC, user management
-- **Storage** (`vmspawnd-storage`) — LVM, ZFS, NFS, Ceph backends
+- **Storage** (`Zyvor Fabric-storage`) — LVM, ZFS, NFS, Ceph backends
 - **Networking** (`networking`, `network-policy`, `vm-firewall`) — nftables, policies
 - **Operations** (`migration`, `backup`, `ha`, `replication`) — enterprise features
 - **Kubernetes operator** (`operator`) — CRD reconciliation
@@ -126,7 +126,7 @@ Each audit round included:
 
 #### C3. Admin Password Logged in Plaintext
 **Status:** RESOLVED (Round 1)
-**Location:** `vmspawnd/src/config.rs`
+**Location:** `Zyvor Fabric/src/config.rs`
 
 **Finding:** Auto-generated admin password was written to log output via `tracing::warn!`.
 
@@ -134,7 +134,7 @@ Each audit round included:
 
 #### C4. Missing RBAC on API Endpoints
 **Status:** RESOLVED (Rounds 4-7)
-**Location:** 44 API handler files in `vmspawnd/src/api/`
+**Location:** 44 API handler files in `Zyvor Fabric/src/api/`
 
 **Finding:** 353+ API handlers across 29+ files lacked role-based access control extractors. Any authenticated user (including Viewer role) could perform admin operations.
 
@@ -490,7 +490,7 @@ All critical, high, medium, and low findings have been resolved across 31 rounds
 
 ## 9. Conclusion
 
-The vmspawnd project has undergone a thorough **31-round security audit** covering all 190+ Rust source files across 40 crates (~23,000 lines of API code reviewed per round). Every critical, high, and medium-severity finding has been identified and remediated with verified fixes. 22 new features were added during the audit period (cloud images, LDAP/OIDC, multi-tenancy, hibernate, storage migration, affinity rules, webhook retry) — each was reviewed and secured inline. Round 31 performed a deep re-audit that uncovered **36 additional issues across 23 files**, including: race conditions in VM start locking (lock transferred via `lock_owned()`), TOCTOU vulnerabilities in state store (exists→read replaced with direct read), path traversal in machined copy/bind operations (new `validate_machine_path()`), regex injection in migration cancel (dot escaping), backup file deletion path confinement, stored checkpoint/snapshot name re-validation before qemu-img commands, hotplug device ID format validation, declarative spec parse functions returning errors instead of silent defaults, notification channel secret redaction on create/update responses, entity ID forward-slash rejection, deploy script SSH hardening (`StrictHostKeyChecking=accept-new`), shell variable quoting, admin password file deletion on chmod failure, and JWT token expiration minimum enforcement.
+The Zyvor Fabric project has undergone a thorough **31-round security audit** covering all 190+ Rust source files across 40 crates (~23,000 lines of API code reviewed per round). Every critical, high, and medium-severity finding has been identified and remediated with verified fixes. 22 new features were added during the audit period (cloud images, LDAP/OIDC, multi-tenancy, hibernate, storage migration, affinity rules, webhook retry) — each was reviewed and secured inline. Round 31 performed a deep re-audit that uncovered **36 additional issues across 23 files**, including: race conditions in VM start locking (lock transferred via `lock_owned()`), TOCTOU vulnerabilities in state store (exists→read replaced with direct read), path traversal in machined copy/bind operations (new `validate_machine_path()`), regex injection in migration cancel (dot escaping), backup file deletion path confinement, stored checkpoint/snapshot name re-validation before qemu-img commands, hotplug device ID format validation, declarative spec parse functions returning errors instead of silent defaults, notification channel secret redaction on create/update responses, entity ID forward-slash rejection, deploy script SSH hardening (`StrictHostKeyChecking=accept-new`), shell variable quoting, admin password file deletion on chmod failure, and JWT token expiration minimum enforcement.
 
 The codebase demonstrates:
 

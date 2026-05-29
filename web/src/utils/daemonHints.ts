@@ -3,6 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { formatUserError } from './apiError'
+import { ZYVOR_FABRIC_DAEMON, ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
+
+const FABRIC = ZYVOR_FABRIC_HELP.name
+const DAEMON = ZYVOR_FABRIC_DAEMON
 
 /** Contextual hints for ErrorBanner based on error text or stable codes. */
 export function hintsForError(err: unknown, domain?: 'vm' | 'storage' | 'network' | 'auth'): string[] {
@@ -16,15 +20,15 @@ export function hintsForError(err: unknown, domain?: 'vm' | 'storage' | 'network
   ) {
     hints.push(
       'Check systemd-machined: systemctl status systemd-machined',
-      'Verify D-Bus access for the vmspawnd user',
-      'Review vmspawnd logs for driver connection errors',
+      `Verify D-Bus access for the ${DAEMON} service user`,
+      `Review ${DAEMON} logs for driver connection errors`,
     )
   }
 
   if (domain === 'storage' || msg.includes('storage') || msg.includes('pool') || msg.includes('volume')) {
     hints.push(
       'List storage pools under Storage or Storage Pools',
-      'Confirm the image path exists and is readable by vmspawnd',
+      `Confirm the image path exists and is readable by ${FABRIC}`,
       'For NFS pools, verify mount and pool health endpoints',
     )
   }
@@ -51,14 +55,14 @@ export function hintsForError(err: unknown, domain?: 'vm' | 'storage' | 'network
 
   if (domain === 'vm' || msg.includes('not found') || msg.includes('vm ')) {
     hints.push(
-      'Refresh the VM list — the guest may have been removed outside vmspawnd',
+      `Refresh the VM list — the guest may have been removed outside ${FABRIC}`,
       'Check machined registration: machinectl list',
     )
   }
 
   if (hints.length === 0) {
     hints.push(
-      'Confirm vmspawnd is running: systemctl status vmspawnd',
+      `Confirm ${FABRIC} is running: systemctl status ${DAEMON}`,
       'Check API reachability at /health',
       'Verify your session has not expired',
     )

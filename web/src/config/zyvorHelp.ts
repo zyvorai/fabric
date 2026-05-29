@@ -25,9 +25,16 @@ export type ProductHelpMeta = {
   productUrl: string
 }
 
-export const VMSPAWN_HELP: ProductHelpMeta = {
-  name: 'vmspawnd',
-  tagline: 'systemd-vmspawn VM control plane for Linux hosts',
+/** Primary product identity — Zyvor Fabric control plane. */
+export const ZYVOR_FABRIC_HELP: ProductHelpMeta = {
+  name: 'Zyvor Fabric',
+  tagline: 'Systemd-native private cloud control plane',
   version: '0.1.0',
   productUrl: 'https://zyvor.dev',
 }
+
+/** Technical daemon name (systemd unit, API host). */
+export const ZYVOR_FABRIC_DAEMON = 'vmspawnd'
+
+/** @deprecated Use ZYVOR_FABRIC_HELP */
+export const VMSPAWN_HELP = ZYVOR_FABRIC_HELP

@@ -7,7 +7,7 @@ import { X, Keyboard, Info } from 'lucide-react'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { helpShortcuts } from './helpShortcuts'
 import ZyvorAbout from './ZyvorAbout'
-// ZyvorAbout is vmspawnd-branded
+// ZyvorAbout — Zyvor Fabric product panel
 
 export type HelpTab = 'shortcuts' | 'about'
 

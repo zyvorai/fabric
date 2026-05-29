@@ -54,7 +54,7 @@ pub fn ui(f: &mut Frame, app: &App) {
 fn render_header_bar(f: &mut Frame, area: Rect, app: &App) {
     let running = app.vms.iter().filter(|v| v.state == "running").count();
     let line = Line::from(vec![
-        Span::styled(" vmspawnd ", Style::default().fg(ORANGE).add_modifier(Modifier::BOLD)),
+        Span::styled(" Zyvor Fabric ", Style::default().fg(ORANGE).add_modifier(Modifier::BOLD)),
         Span::styled(
             format!("  VMs: {}  running: {} ", app.vms.len(), running),
             Style::default().fg(TEXT_COLOR),

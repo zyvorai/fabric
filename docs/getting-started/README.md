@@ -1,4 +1,4 @@
-# Getting Started with vmspawnd
+# Getting Started with Zyvor Fabric
 
 This section covers everything you need to go from a fresh Linux server to a running VM management platform.
 
@@ -10,7 +10,7 @@ Follow these guides in sequence for the best experience:
 
 ### 1. [Installation](01-Installation.md)
 
-Install vmspawnd on your Linux system. Covers system requirements, package installation for Fedora and Ubuntu/Debian, and building from source with the Rust toolchain.
+Install Zyvor Fabric on your Linux system. Covers system requirements, package installation for Fedora and Ubuntu/Debian, and building from source with the Rust toolchain.
 
 **Time:** 5-15 minutes
 
@@ -51,7 +51,7 @@ If you want to skip the detailed guides and get running immediately:
 
 ```bash
 git clone <repository-url>
-cd vmspawn
+cd zyvor-fabric
 
 # One-command deployment (auto-sudo)
 ./vmspawnctl deploy

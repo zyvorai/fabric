@@ -2,11 +2,11 @@
 
 Centralize VM log collection, run automated compliance scans, and manage secrets
 securely. This tutorial covers the full observability and governance workflow
-available through the vmspawn API.
+available through the Zyvor Fabric API.
 
 **Level:** Intermediate
 **Time:** 35 minutes
-**Prerequisites:** Completed [Tutorial 01](01-first-vm.md), vmspawnd running with at least one VM
+**Prerequisites:** Completed [Tutorial 01](01-first-vm.md), Zyvor Fabric running with at least one VM
 
 ---
 
@@ -23,7 +23,7 @@ available through the vmspawn API.
 
 ## Prerequisites
 
-- vmspawnd running on the host
+- Zyvor Fabric running on the host
 - At least one VM created (this tutorial uses `web-01`)
 - Admin credentials for API access
 
@@ -57,7 +57,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms" \
 
 ## Part 1: Log Aggregation
 
-vmspawn provides two log query endpoints that read from the systemd journal.
+Zyvor Fabric provides two log query endpoints that read from the systemd journal.
 Logs are returned as structured JSON entries with timestamps, messages, and
 priority levels.
 
@@ -166,7 +166,7 @@ your SIEM.
 
 ## Part 2: Compliance Scanning
 
-vmspawn includes a built-in compliance scanning framework that checks VMs
+Zyvor Fabric includes a built-in compliance scanning framework that checks VMs
 against security profiles. Each profile contains a set of rules with severity
 levels.
 
@@ -270,7 +270,7 @@ curl -s "$VMSPAWN_HOST/api/compliance/results" \
 
 ## Part 3: Secrets Management
 
-vmspawn provides centralized secret storage with encryption at rest. Secrets
+Zyvor Fabric provides centralized secret storage with encryption at rest. Secrets
 are managed through a dedicated API and can be injected into VMs at boot time
 using systemd credentials.
 

@@ -1,6 +1,6 @@
 # Systemd Service Configuration
 
-This document provides a production-ready systemd unit file for vmspawnd,
+This document provides a production-ready systemd unit file for Zyvor Fabric,
 with socket activation, resource limits, security sandboxing, and journald
 integration.
 
@@ -20,12 +20,12 @@ integration.
 
 ## Unit File
 
-Create `/etc/systemd/system/vmspawnd.service`:
+Create `/etc/systemd/system/Zyvor Fabric.service`:
 
 ```ini
 [Unit]
-Description=vmspawnd - Virtual Machine Management Daemon
-Documentation=https://github.com/example/vmspawn
+Description=Zyvor Fabric - Virtual Machine Management Daemon
+Documentation=https://github.com/example/Zyvor Fabric
 After=network-online.target systemd-machined.service
 Wants=network-online.target
 Requires=systemd-machined.service
@@ -36,7 +36,7 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/vmspawnd
+ExecStart=/usr/local/bin/Zyvor Fabric
 Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=30s
@@ -48,8 +48,8 @@ WatchdogSec=120s
 # -------------------------------------------------------------------
 # Run as root for full KVM/network access, or as a dedicated user
 # with appropriate capabilities.
-# User=vmspawnd
-# Group=vmspawnd
+# User=Zyvor Fabric
+# Group=Zyvor Fabric
 
 # -------------------------------------------------------------------
 # Environment
@@ -132,10 +132,10 @@ LockPersonality=yes
 # -------------------------------------------------------------------
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=vmspawnd
+SyslogIdentifier=Zyvor Fabric
 
 # Structured logging fields
-LogExtraFields=COMPONENT=vmspawnd
+LogExtraFields=COMPONENT=Zyvor Fabric
 
 [Install]
 WantedBy=multi-user.target
@@ -147,31 +147,31 @@ WantedBy=multi-user.target
 
 ```bash
 # Install the unit file
-sudo install -m 644 vmspawnd.service /etc/systemd/system/
+sudo install -m 644 Zyvor Fabric.service /etc/systemd/system/
 
 # Reload systemd to pick up the new unit
 sudo systemctl daemon-reload
 
 # Enable the service to start on boot
-sudo systemctl enable vmspawnd
+sudo systemctl enable Zyvor Fabric
 
 # Start the service
-sudo systemctl start vmspawnd
+sudo systemctl start Zyvor Fabric
 
 # Verify it is running
-sudo systemctl status vmspawnd
+sudo systemctl status Zyvor Fabric
 ```
 
 ---
 
 ## Socket Activation
 
-For environments where vmspawnd should only start when a connection arrives,
-use socket activation. Create `/etc/systemd/system/vmspawnd.socket`:
+For environments where Zyvor Fabric should only start when a connection arrives,
+use socket activation. Create `/etc/systemd/system/Zyvor Fabric.socket`:
 
 ```ini
 [Unit]
-Description=vmspawnd Socket
+Description=Zyvor Fabric Socket
 
 [Socket]
 ListenStream=127.0.0.1:9095
@@ -182,8 +182,8 @@ Backlog=128
 # Accept connections even while the service is starting
 Accept=no
 
-# Trigger vmspawnd.service when a connection arrives
-Service=vmspawnd.service
+# Trigger Zyvor Fabric.service when a connection arrives
+Service=Zyvor Fabric.service
 
 [Install]
 WantedBy=sockets.target
@@ -193,14 +193,14 @@ When using socket activation:
 
 ```bash
 # Enable and start the socket (not the service directly)
-sudo systemctl enable vmspawnd.socket
-sudo systemctl start vmspawnd.socket
+sudo systemctl enable Zyvor Fabric.socket
+sudo systemctl start Zyvor Fabric.socket
 
 # The service will start automatically on first connection
 curl http://127.0.0.1:9095/api/v1/vms
 ```
 
-Note: Socket activation requires vmspawnd to accept the inherited file descriptor.
+Note: Socket activation requires Zyvor Fabric to accept the inherited file descriptor.
 This is currently supported only if the daemon is started with systemd integration.
 
 ---
@@ -222,7 +222,7 @@ LimitNOFILE=131072
 
 The `MemoryMax` and `MemoryHigh` limits apply only to the vmspawnd daemon
 process, not to the VMs it manages. VMs run as separate QEMU processes under
-`systemd-vmspawn` and are not children of the vmspawnd cgroup.
+`systemd-vmspawn` and are not children of the Zyvor Fabric cgroup.
 
 ```ini
 # Daemon process memory limit
@@ -289,28 +289,28 @@ The `SystemCallFilter` restricts which system calls the daemon can make:
 
 ## Journald Integration
 
-vmspawnd logs to stdout/stderr, which systemd captures into the journal.
+Zyvor Fabric logs to stdout/stderr, which systemd captures into the journal.
 
 ### Viewing Logs
 
 ```bash
 # Follow logs in real time
-journalctl -u vmspawnd -f
+journalctl -u Zyvor Fabric -f
 
 # Show logs from the current boot
-journalctl -u vmspawnd -b
+journalctl -u Zyvor Fabric -b
 
 # Show only error-level messages
-journalctl -u vmspawnd -p err
+journalctl -u Zyvor Fabric -p err
 
 # Show logs from the last hour
-journalctl -u vmspawnd --since "1 hour ago"
+journalctl -u Zyvor Fabric --since "1 hour ago"
 
 # Show logs in JSON format for parsing
-journalctl -u vmspawnd -o json-pretty
+journalctl -u Zyvor Fabric -o json-pretty
 
 # Show logs with specific fields
-journalctl COMPONENT=vmspawnd
+journalctl COMPONENT=Zyvor Fabric
 ```
 
 ### Log Rotation
@@ -332,14 +332,14 @@ Compress=yes
 
 ### Forwarding to External Systems
 
-To forward vmspawnd logs to an external logging system:
+To forward Zyvor Fabric logs to an external logging system:
 
 ```bash
 # Forward to syslog
-journalctl -u vmspawnd -f --output=syslog | logger -t vmspawnd &
+journalctl -u Zyvor Fabric -f --output=syslog | logger -t Zyvor Fabric &
 
 # Forward to a file (for log shipping)
-journalctl -u vmspawnd -f --output=short-iso >> /var/log/vmspawnd/vmspawnd.log &
+journalctl -u Zyvor Fabric -f --output=short-iso >> /var/log/Zyvor Fabric/Zyvor Fabric.log &
 ```
 
 ---
@@ -351,17 +351,17 @@ main unit file:
 
 ```bash
 # Create an override directory
-sudo mkdir -p /etc/systemd/system/vmspawnd.service.d/
+sudo mkdir -p /etc/systemd/system/Zyvor Fabric.service.d/
 
 # Add custom environment variables
-sudo tee /etc/systemd/system/vmspawnd.service.d/environment.conf << 'EOF'
+sudo tee /etc/systemd/system/Zyvor Fabric.service.d/environment.conf << 'EOF'
 [Service]
 Environment=VSPAWN_LOG_LEVEL=debug
 Environment=VMSPAWND_JWT_SECRET=my-production-secret
 EOF
 
 # Increase resource limits
-sudo tee /etc/systemd/system/vmspawnd.service.d/limits.conf << 'EOF'
+sudo tee /etc/systemd/system/Zyvor Fabric.service.d/limits.conf << 'EOF'
 [Service]
 LimitNOFILE=131072
 MemoryMax=4G
@@ -369,11 +369,11 @@ EOF
 
 # Reload and restart
 sudo systemctl daemon-reload
-sudo systemctl restart vmspawnd
+sudo systemctl restart Zyvor Fabric
 ```
 
 To view the effective configuration after overrides:
 
 ```bash
-sudo systemctl cat vmspawnd
+sudo systemctl cat Zyvor Fabric
 ```

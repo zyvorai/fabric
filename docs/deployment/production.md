@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-This document provides a comprehensive guide for deploying vmspawn in a production
+This document provides a comprehensive guide for deploying Zyvor Fabric in a production
 environment. It covers system requirements, installation, configuration, security
 hardening, backup strategy, and monitoring setup.
 
@@ -39,7 +39,7 @@ hardening, backup strategy, and monitoring setup.
 | Component           | Minimum Version | Notes                                   |
 |---------------------|-----------------|-----------------------------------------|
 | Linux Kernel        | 5.15+           | 6.x recommended for best KVM support    |
-| systemd             | 254+            | 260+ for full vmspawn feature support    |
+| systemd             | 254+            | 260+ for full Zyvor Fabric feature support    |
 | systemd-vmspawn     | 254+            | Included with systemd                    |
 | QEMU                | 7.0+            | 8.x+ recommended                        |
 | KVM                 | Kernel built-in | Verify with `lsmod | grep kvm`          |
@@ -78,11 +78,11 @@ which systemd-vmspawn
 # 4. Verify systemd-machined is running
 systemctl status systemd-machined
 
-# 5. Create the vmspawnd system user (optional, for non-root operation)
+# 5. Create the Zyvor Fabric system user (optional, for non-root operation)
 sudo useradd --system --home-dir /var/lib/vmspawnd --shell /usr/sbin/nologin vmspawnd
 
 # 6. Ensure the user has access to KVM
-sudo usermod -aG kvm vmspawnd
+sudo usermod -aG kvm Zyvor Fabric
 ```
 
 ---
@@ -102,12 +102,12 @@ sudo apt install -y build-essential libssl-dev libpam0g-dev libsystemd-dev libsq
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/example/vmspawn.git
-cd vmspawn/backend
+git clone https://github.com/example/Zyvor Fabric.git
+cd backend
 cargo build --release
 
 # Install binaries
-sudo install -m 755 target/release/vmspawnd /usr/local/bin/
+sudo install -m 755 target/release/Zyvor Fabric /usr/local/bin/
 sudo install -m 755 target/release/vmctl /usr/local/bin/
 ```
 
@@ -117,11 +117,11 @@ sudo install -m 755 target/release/vmctl /usr/local/bin/
 # Create required directories
 sudo mkdir -p /var/lib/vmspawnd/{images,storage,vms,snapshots,backups,cloud-init,certificates}
 sudo mkdir -p /etc/vmspawnd
-sudo mkdir -p /var/log/vmspawnd
+sudo mkdir -p /var/log/Zyvor Fabric
 
-# Set ownership (if running as vmspawnd user)
+# Set ownership (if running as Zyvor Fabric user)
 sudo chown -R vmspawnd:vmspawnd /var/lib/vmspawnd
-sudo chown -R vmspawnd:vmspawnd /var/log/vmspawnd
+sudo chown -R Zyvor Fabric:Zyvor Fabric /var/log/Zyvor Fabric
 ```
 
 ---
@@ -132,7 +132,7 @@ Create the main configuration file at `/etc/vmspawnd/vmspawnd.toml`:
 
 ```toml
 # =============================================================================
-# vmspawnd Production Configuration
+# Zyvor Fabric Production Configuration
 # =============================================================================
 
 [daemon]
@@ -141,7 +141,7 @@ listen = "127.0.0.1:9095"
 
 # CORS origins allowed for the web UI.
 # In production, restrict to the actual domain(s) serving the UI.
-cors_origins = ["https://vmspawn.example.com"]
+cors_origins = ["https://Zyvor Fabric.example.com"]
 
 [storage]
 # Root directory for all persistent state.
@@ -158,7 +158,7 @@ bridge = "br0"
 networkd_config_dir = "/etc/systemd/network"
 
 # Prefix for generated network config file names.
-networkd_file_prefix = "50-vmspawnd-"
+networkd_file_prefix = "50-Zyvor Fabric-"
 
 [auth]
 # Enable authentication (strongly recommended for production).
@@ -190,7 +190,7 @@ mode = "standalone"
 | `VMSPAWND_JWT_SECRET`     | JWT signing secret                      | Auto-generated       |
 | `VMSPAWND_ADMIN_PASSWORD` | Initial admin user password             | Auto-generated       |
 | `VSPAWN_LOG_LEVEL`        | Log level (trace/debug/info/warn/error) | `info`               |
-| `RUST_LOG`                | Standard Rust log filter (fallback)     | `vmspawnd=info`      |
+| `RUST_LOG`                | Standard Rust log filter (fallback)     | `Zyvor Fabric=info`      |
 
 ---
 
@@ -198,7 +198,7 @@ mode = "standalone"
 
 ### Initial Admin Access
 
-On first startup with authentication enabled, vmspawnd creates an `admin` user:
+On first startup with authentication enabled, Zyvor Fabric creates an `admin` user:
 
 1. If `VMSPAWND_ADMIN_PASSWORD` is set, that password is used
 2. Otherwise, a random password is generated and written to
@@ -234,43 +234,43 @@ curl -s http://127.0.0.1:9095/api/v1/auth/users \
 
 ### PAM Authentication
 
-vmspawnd can authenticate against the system PAM stack. Create a PAM service file:
+Zyvor Fabric can authenticate against the system PAM stack. Create a PAM service file:
 
 ```bash
-sudo tee /etc/pam.d/vmspawnd << 'EOF'
+sudo tee /etc/pam.d/Zyvor Fabric << 'EOF'
 auth    required    pam_unix.so
 account required    pam_unix.so
 EOF
 ```
 
-When this file exists, vmspawnd will use the `vmspawnd` PAM service for
+When this file exists, Zyvor Fabric will use the `Zyvor Fabric` PAM service for
 authentication. Otherwise, it falls back to the `login` PAM service.
 
 ---
 
 ## TLS Configuration
 
-vmspawnd does not terminate TLS directly. Use a reverse proxy for TLS termination.
+Zyvor Fabric does not terminate TLS directly. Use a reverse proxy for TLS termination.
 
 ### nginx Configuration
 
 ```nginx
-upstream vmspawnd {
+upstream Zyvor Fabric {
     server 127.0.0.1:9095;
 }
 
 server {
     listen 443 ssl http2;
-    server_name vmspawn.example.com;
+    server_name Zyvor Fabric.example.com;
 
-    ssl_certificate     /etc/ssl/certs/vmspawn.crt;
-    ssl_certificate_key /etc/ssl/private/vmspawn.key;
+    ssl_certificate     /etc/ssl/certs/Zyvor Fabric.crt;
+    ssl_certificate_key /etc/ssl/private/Zyvor Fabric.key;
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
     # REST API and static web UI
     location / {
-        proxy_pass http://vmspawnd;
+        proxy_pass http://Zyvor Fabric;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -279,7 +279,7 @@ server {
 
     # WebSocket console
     location /api/v1/ws/ {
-        proxy_pass http://vmspawnd;
+        proxy_pass http://Zyvor Fabric;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -290,7 +290,7 @@ server {
 
     # SSE event stream
     location /api/v1/events/stream {
-        proxy_pass http://vmspawnd;
+        proxy_pass http://Zyvor Fabric;
         proxy_set_header Connection '';
         proxy_http_version 1.1;
         proxy_buffering off;
@@ -307,9 +307,9 @@ server {
 See [systemd-service.md](systemd-service.md) for the complete unit file. Quick setup:
 
 ```bash
-sudo install -m 644 docs/deployment/vmspawnd.service /etc/systemd/system/
+sudo install -m 644 docs/deployment/Zyvor Fabric.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now vmspawnd
+sudo systemctl enable --now Zyvor Fabric
 ```
 
 ---
@@ -318,20 +318,20 @@ sudo systemctl enable --now vmspawnd
 
 ### Journald Integration
 
-vmspawnd logs to stdout/stderr, which systemd captures into the journal:
+Zyvor Fabric logs to stdout/stderr, which systemd captures into the journal:
 
 ```bash
 # View live logs
-journalctl -u vmspawnd -f
+journalctl -u Zyvor Fabric -f
 
 # View logs since last boot
-journalctl -u vmspawnd -b
+journalctl -u Zyvor Fabric -b
 
 # View only errors
-journalctl -u vmspawnd -p err
+journalctl -u Zyvor Fabric -p err
 
 # Export logs for analysis
-journalctl -u vmspawnd --since "1 hour ago" -o json > vmspawnd-logs.json
+journalctl -u Zyvor Fabric --since "1 hour ago" -o json > Zyvor Fabric-logs.json
 ```
 
 ### Log Levels
@@ -349,7 +349,7 @@ systemd unit file or on the command line:
 
 ### Audit Logs
 
-vmspawnd writes structured audit log entries for all state-changing operations.
+Zyvor Fabric writes structured audit log entries for all state-changing operations.
 Query audit logs via the API:
 
 ```bash
@@ -373,7 +373,7 @@ curl -s http://127.0.0.1:9095/api/v1/audit/logs/export \
 - [ ] Bind to localhost only (`listen = "127.0.0.1:9095"`)
 - [ ] Use a reverse proxy with TLS for external access
 - [ ] Restrict CORS origins to your actual domain(s)
-- [ ] Create a dedicated system user for vmspawnd
+- [ ] Create a dedicated system user for Zyvor Fabric
 - [ ] Apply the systemd sandboxing options from [systemd-service.md](systemd-service.md)
 - [ ] Set restrictive file permissions on `/var/lib/vmspawnd/` (mode 0700)
 - [ ] Rotate the JWT secret periodically
@@ -423,20 +423,20 @@ sudo nft add rule inet filter input tcp dport 9095 drop
 | `/var/lib/vmspawnd/images/`    | High     | VM disk images (large)            |
 | `/var/lib/vmspawnd/snapshots/` | Medium   | Snapshot metadata                 |
 | `/var/lib/vmspawnd/certificates/` | Medium | TLS certificates and CAs       |
-| `/etc/systemd/network/50-vmspawnd-*` | Low | Generated network configs (recreatable) |
+| `/etc/systemd/network/50-Zyvor Fabric-*` | Low | Generated network configs (recreatable) |
 
 ### Backup Script Example
 
 ```bash
 #!/bin/bash
-# vmspawnd-backup.sh - Daily backup script
+# Zyvor Fabric-backup.sh - Daily backup script
 set -euo pipefail
 
-BACKUP_DIR="/backup/vmspawnd/$(date +%Y-%m-%d)"
+BACKUP_DIR="/backup/Zyvor Fabric/$(date +%Y-%m-%d)"
 mkdir -p "$BACKUP_DIR"
 
 # Stop the daemon briefly for consistent backup (optional)
-# sudo systemctl stop vmspawnd
+# sudo systemctl stop Zyvor Fabric
 
 # Back up configuration and state
 sudo tar czf "$BACKUP_DIR/config.tar.gz" /etc/vmspawnd/
@@ -451,17 +451,17 @@ sudo tar czf "$BACKUP_DIR/state.tar.gz" \
 sudo rsync -a --delete /var/lib/vmspawnd/images/ "$BACKUP_DIR/images/"
 
 # Restart if stopped
-# sudo systemctl start vmspawnd
+# sudo systemctl start Zyvor Fabric
 
 # Retain 30 days of backups
-find /backup/vmspawnd/ -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
+find /backup/Zyvor Fabric/ -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
 
 echo "Backup completed: $BACKUP_DIR"
 ```
 
 ### Automated Backup via API
 
-vmspawnd provides a built-in backup API:
+Zyvor Fabric provides a built-in backup API:
 
 ```bash
 # Create a backup
@@ -483,7 +483,7 @@ curl -s -X POST http://127.0.0.1:9095/api/v1/backups/policies \
 
 ### Prometheus Integration
 
-vmspawnd exposes a Prometheus-compatible metrics endpoint:
+Zyvor Fabric exposes a Prometheus-compatible metrics endpoint:
 
 ```bash
 curl http://127.0.0.1:9095/metrics
@@ -506,7 +506,7 @@ Available metrics:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'vmspawnd'
+  - job_name: 'Zyvor Fabric'
     scrape_interval: 15s
     static_configs:
       - targets: ['127.0.0.1:9095']
@@ -525,17 +525,17 @@ curl -sf http://127.0.0.1:9095/api/v1/vms > /dev/null && echo "OK" || echo "FAIL
 ### Alerting Rules (Prometheus)
 
 ```yaml
-# vmspawnd-alerts.yml
+# Zyvor Fabric-alerts.yml
 groups:
-  - name: vmspawnd
+  - name: Zyvor Fabric
     rules:
       - alert: VMSpawndDown
-        expr: up{job="vmspawnd"} == 0
+        expr: up{job="Zyvor Fabric"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "vmspawnd is unreachable"
+          summary: "Zyvor Fabric is unreachable"
 
       - alert: HighVMCount
         expr: vmspawnd_vms_running > 100
@@ -554,29 +554,29 @@ groups:
 
 ```bash
 # Graceful restart (in-flight requests complete, background tasks shut down)
-sudo systemctl restart vmspawnd
+sudo systemctl restart Zyvor Fabric
 ```
 
 ### Upgrading
 
 ```bash
 # 1. Build new version
-cd vmspawn/backend && cargo build --release
+cd backend && cargo build --release
 
 # 2. Stop the daemon
-sudo systemctl stop vmspawnd
+sudo systemctl stop Zyvor Fabric
 
 # 3. Back up state
 sudo tar czf /tmp/vmspawnd-pre-upgrade.tar.gz /var/lib/vmspawnd/
 
 # 4. Install new binary
-sudo install -m 755 target/release/vmspawnd /usr/local/bin/
+sudo install -m 755 target/release/Zyvor Fabric /usr/local/bin/
 
 # 5. Start the daemon
-sudo systemctl start vmspawnd
+sudo systemctl start Zyvor Fabric
 
 # 6. Verify
-journalctl -u vmspawnd -n 20
+journalctl -u Zyvor Fabric -n 20
 curl -sf http://127.0.0.1:9095/api/v1/vms | jq .total
 ```
 
@@ -585,7 +585,7 @@ curl -sf http://127.0.0.1:9095/api/v1/vms | jq .total
 The SQLite user database requires minimal maintenance. To compact it:
 
 ```bash
-sudo systemctl stop vmspawnd
+sudo systemctl stop Zyvor Fabric
 sudo sqlite3 /var/lib/vmspawnd/auth.db "VACUUM;"
-sudo systemctl start vmspawnd
+sudo systemctl start Zyvor Fabric
 ```

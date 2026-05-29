@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>vmspawnd Product Overview</title>
+  <title>Zyvor Fabric Product Overview</title>
   <style>
     html {
       color: #1a1a1a;
@@ -235,9 +235,9 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">vmspawnd Product Overview</h1>
+<h1 class="title">Zyvor Fabric Product Overview</h1>
 </header>
-<h1 id="vmspawnd-enterprise-vm-management-platform">vmspawnd —
+<h1 id="Zyvor Fabric-enterprise-vm-management-platform">Zyvor Fabric —
 Enterprise VM Management Platform</h1>
 <h2 id="the-problem">The Problem</h2>
 <p>Organizations running Linux infrastructure need a unified way to
@@ -252,12 +252,12 @@ access</li>
 <li><strong>Too locked-in</strong> — Cloud-only solutions (AWS, Azure,
 GCP) create vendor dependency with unpredictable costs</li>
 </ul>
-<p><strong>vmspawnd fills the gap</strong> — a single-binary VM
+<p><strong>Zyvor Fabric fills the gap</strong> — a single-binary VM
 management platform that runs on any Linux server with systemd,
 providing enterprise features without enterprise complexity.</p>
 <hr />
-<h2 id="what-is-vmspawnd">What Is vmspawnd?</h2>
-<p>vmspawnd is a production-grade virtual machine management platform
+<h2 id="what-is-Zyvor Fabric">What Is Zyvor Fabric?</h2>
+<p>Zyvor Fabric is a production-grade virtual machine management platform
 built in Rust. It wraps systemd-vmspawn and systemd-machined with a
 complete management layer:</p>
 <ul>
@@ -276,7 +276,7 @@ migration, GPU passthrough, backup/restore, network policies</li>
 <h2 id="key-differentiators">Key Differentiators</h2>
 <h3 id="built-on-systemd-not-a-custom-hypervisor">1. Built on systemd
 (Not a Custom Hypervisor)</h3>
-<p>vmspawnd leverages systemd-vmspawn and systemd-machined — the VM
+<p>Zyvor Fabric leverages systemd-vmspawn and systemd-machined — the VM
 management tools built into every modern Linux distribution. This
 means:</p>
 <ul>
@@ -297,7 +297,7 @@ Dependencies</h3>
 </colgroup>
 <thead>
 <tr>
-<th>vmspawnd</th>
+<th>Zyvor Fabric</th>
 <th>Proxmox</th>
 <th>OpenStack</th>
 </tr>
@@ -526,7 +526,7 @@ backup, delete.</p>
 <p>Manage VMs as <code>VirtualMachine</code> CRDs with automatic
 reconciliation:</p>
 <div class="sourceCode" id="cb3"><pre
-class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> vmspawnd.io/v1</span></span>
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> Zyvor Fabric.io/v1</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> VirtualMachine</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> web-server</span></span>
@@ -565,17 +565,17 @@ class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="
 <hr />
 <h2 id="deployment-models">Deployment Models</h2>
 <h3 id="single-server">Single Server</h3>
-<p>One Linux server running vmspawnd with local storage. Suitable for
+<p>One Linux server running Zyvor Fabric with local storage. Suitable for
 development, testing, small teams, and edge deployments.</p>
 <p><strong>Requirements:</strong> Linux with systemd 256+, 4GB RAM
 minimum</p>
 <h3 id="multi-node-cluster">Multi-Node Cluster</h3>
-<p>Multiple vmspawnd nodes with etcd-based clustering, shared storage
+<p>Multiple Zyvor Fabric nodes with etcd-based clustering, shared storage
 (NFS/Ceph), live migration, and HA failover.</p>
 <p><strong>Requirements:</strong> 3+ nodes, shared storage, etcd
 cluster</p>
 <h3 id="kubernetes-managed">Kubernetes-Managed</h3>
-<p>vmspawnd nodes managed by the Kubernetes operator. VMs defined as
+<p>Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as
 CRDs alongside containerized workloads.</p>
 <p><strong>Requirements:</strong> Kubernetes cluster with vmspawnd
 operator deployed</p>
@@ -585,7 +585,7 @@ operator deployed</p>
 <thead>
 <tr>
 <th>Feature</th>
-<th style="text-align: center;">vmspawnd</th>
+<th style="text-align: center;">Zyvor Fabric</th>
 <th style="text-align: center;">Proxmox VE</th>
 <th style="text-align: center;">OpenStack</th>
 <th style="text-align: center;">libvirt/virsh</th>
@@ -861,7 +861,7 @@ operator deployed</p>
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Deploy everything (auto-sudo — no manual sudo needed)</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> deploy</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># That&#39;s it. vmspawnd is running.</span></span></code></pre></div>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># That&#39;s it. Zyvor Fabric is running.</span></span></code></pre></div>
 <h3 id="step-by-step">Step-by-Step</h3>
 <div class="sourceCode" id="cb7"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Install dependencies (auto-sudo)</span></span>

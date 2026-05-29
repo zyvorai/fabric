@@ -60,7 +60,7 @@ pub fn render_tabs(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let tabs = Tabs::new(titles)
-        .block(Block::default().borders(Borders::ALL).title(" vmspawnd TUI "))
+        .block(Block::default().borders(Borders::ALL).title(" Zyvor Fabric TUI "))
         .highlight_style(Style::default().fg(Color::Yellow))
         .select(match app.current_view {
             View::VMDetail => 1, // Highlight VMs tab when in detail view
@@ -525,7 +525,7 @@ pub fn render_vm_detail_view(f: &mut Frame, app: &App, area: Rect) {
 pub fn render_help(f: &mut Frame, area: Rect) {
     let help_text = vec![
         Line::from(Span::styled(
-            "vmspawnd TUI - Keyboard Shortcuts",
+            "Zyvor Fabric TUI - Keyboard Shortcuts",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),

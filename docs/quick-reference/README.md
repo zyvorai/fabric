@@ -1,6 +1,6 @@
 # Quick Reference
 
-This section provides quick-reference material for vmspawn operators and
+This section provides quick-reference material for Zyvor Fabric operators and
 developers.
 
 ---
@@ -10,8 +10,8 @@ developers.
 | Document                                      | Description                                    |
 |-----------------------------------------------|------------------------------------------------|
 | [Quick Reference](quick-reference.md)         | One-page cheat sheet with essential API calls, common curl commands, configuration reference, and troubleshooting tips. |
-| [Glossary](glossary.md)                       | Definitions of 100+ terms related to vmspawn, systemd, KVM, QEMU, cloud-init, and virtualization. |
-| [FAQ](faq.md)                                 | Frequently asked questions about vmspawn architecture, capabilities, operations, and troubleshooting. |
+| [Glossary](glossary.md)                       | Definitions of 100+ terms related to Zyvor Fabric, systemd, KVM, QEMU, cloud-init, and virtualization. |
+| [FAQ](faq.md)                                 | Frequently asked questions about Zyvor Fabric architecture, capabilities, operations, and troubleshooting. |
 
 ---
 

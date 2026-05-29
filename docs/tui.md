@@ -11,7 +11,7 @@ A k9s-style interactive terminal dashboard for managing VMs, built with ratatui 
 - Bulk operations on multiple VMs
 - Sparkline graphs for real-time resource metrics
 - Network security management with 9 sub-tabs (Cilium-style)
-- Live data from vmspawnd API -- no mock data
+- Live data from Zyvor Fabric API -- no mock data
 - Auto-refresh with configurable interval
 - 256-color and true-color support
 
@@ -177,7 +177,7 @@ In-app keyboard shortcut reference.
 
 ```
 +----------------------------------------------------+
-| vmspawnd TUI   [Dashboard] VMs Logs ... NetSec     |
+| Zyvor Fabric TUI   [Dashboard] VMs Logs ... NetSec     |
 +----------------------------------------------------+
 | Running: 12  Stopped: 3  Paused: 1   Total: 16    |
 |                                                     |

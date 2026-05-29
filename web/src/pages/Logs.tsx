@@ -40,7 +40,7 @@ export default function Logs() {
         id: entry.id,
         timestamp: entry.timestamp || entry.created || new Date().toISOString(),
         level: (entry.level || entry.severity || 'INFO').toUpperCase(),
-        source: entry.source || entry.user || 'vmspawnd',
+        source: entry.source || entry.user || 'Zyvor Fabric',
         message: entry.detail || entry.message || `${entry.action || ''} ${entry.resource_type || ''}`.trim(),
         action: entry.action,
         resource_type: entry.resource_type,
@@ -90,7 +90,7 @@ export default function Logs() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `vmspawnd-logs-${new Date().toISOString()}.txt`
+    a.download = `zyvor-fabric-logs-${new Date().toISOString()}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }

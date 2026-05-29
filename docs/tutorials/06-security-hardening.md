@@ -1,12 +1,12 @@
 # Tutorial 06: Security Hardening
 
-Secure your vmspawn deployment with PAM authentication, role-based access
+Secure your Zyvor Fabric deployment with PAM authentication, role-based access
 control, JWT token management, firewall profiles, VM encryption, certificate
 management, and audit logging.
 
 **Level:** Advanced
 **Time:** 45 minutes
-**Prerequisites:** vmspawnd running with PAM configured
+**Prerequisites:** Zyvor Fabric running with PAM configured
 
 ---
 
@@ -29,7 +29,7 @@ management, and audit logging.
 
 ## Step 1: Authentication and PAM
 
-vmspawn uses PAM (Pluggable Authentication Modules) for user authentication.
+Zyvor Fabric uses PAM (Pluggable Authentication Modules) for user authentication.
 Any user account on the host system can log in to the API.
 
 ### Log In
@@ -85,7 +85,7 @@ Expected response:
 
 ### Rate Limiting
 
-vmspawn protects against brute-force attacks with two layers of rate limiting:
+Zyvor Fabric protects against brute-force attacks with two layers of rate limiting:
 
 | Layer      | Limit                         | Window   |
 |-----------|-------------------------------|----------|
@@ -106,7 +106,7 @@ Rate limits are automatically cleared on successful login.
 
 ## Step 2: Role-Based Access Control (RBAC)
 
-vmspawn enforces three roles, each with progressively more permissions.
+Zyvor Fabric enforces three roles, each with progressively more permissions.
 
 ### Role Hierarchy
 
@@ -172,7 +172,7 @@ paths or system details. Admin users see full error details for debugging.
 
 ## Step 3: JWT Token Management
 
-vmspawn issues JSON Web Tokens (JWT) on successful authentication. The token
+Zyvor Fabric issues JSON Web Tokens (JWT) on successful authentication. The token
 encodes the user ID, role, and expiration time.
 
 ### Token Structure
@@ -378,7 +378,7 @@ curl -s "$VMSPAWN_HOST/api/firewall/vms/web-server-01/status" \
 
 ## Step 5: VM Encryption
 
-Encrypt VM disk images to protect data at rest. vmspawn supports key providers
+Encrypt VM disk images to protect data at rest. Zyvor Fabric supports key providers
 for managing encryption keys.
 
 ### Register a Key Provider
@@ -470,13 +470,13 @@ curl -s -X POST "$VMSPAWN_HOST/api/certificates/cas" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "vmspawn-internal-ca",
+    "name": "Zyvor Fabric-internal-ca",
     "description": "Internal CA for VM-to-VM TLS",
     "key_type": "ec",
     "key_size": 256,
     "validity_days": 3650,
     "subject": {
-      "common_name": "vmspawn Internal CA",
+      "common_name": "Zyvor Fabric Internal CA",
       "organization": "Example Corp"
     }
   }' | jq .
@@ -487,7 +487,7 @@ Expected response:
 ```json
 {
   "id": "ca-c3d4e5f6-a7b8-9012-cdef-345678901234",
-  "name": "vmspawn-internal-ca",
+  "name": "Zyvor Fabric-internal-ca",
   "description": "Internal CA for VM-to-VM TLS",
   "key_type": "ec",
   "created": "2026-04-12T15:20:00Z",
@@ -683,7 +683,7 @@ one-time passwords (TOTP). Users scan a QR code with an authenticator app
 ```toml
 [auth.totp]
 enabled = true
-issuer = "vmspawnd"
+issuer = "Zyvor Fabric"
 ```
 
 ### Set Up 2FA for a User
@@ -700,7 +700,7 @@ Expected response:
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "provisioning_uri": "otpauth://totp/vmspawnd:admin?secret=JBSWY3DPEHPK3PXP&issuer=vmspawnd",
+  "provisioning_uri": "otpauth://totp/Zyvor Fabric:admin?secret=JBSWY3DPEHPK3PXP&issuer=Zyvor Fabric",
   "qr_code_url": "data:image/png;base64,..."
 }
 ```
@@ -810,7 +810,7 @@ curl -s "$VMSPAWN_HOST/api/v1/auth/token/revoked" \
 
 ## Step 10: Secrets Management
 
-vmspawn provides a built-in secrets manager for storing sensitive credentials
+Zyvor Fabric provides a built-in secrets manager for storing sensitive credentials
 such as database passwords, API keys, and certificates used by VMs.
 
 ### Create a Secret
@@ -1005,7 +1005,7 @@ curl -s "$VMSPAWN_HOST/api/v1/compliance/scans?vm_name=web-server-01" \
 ## Step 12: QMP Command Allowlist
 
 QEMU Machine Protocol (QMP) commands can be sent to running VMs for advanced
-control. vmspawn restricts which QMP commands are allowed to prevent dangerous
+control. Zyvor Fabric restricts which QMP commands are allowed to prevent dangerous
 operations.
 
 ### Default Allowlist
@@ -1055,7 +1055,7 @@ Dangerous commands such as `quit`, `system_reset`, `migrate`, and
 
 ## Security Checklist
 
-Use this checklist to verify your vmspawn deployment is properly hardened:
+Use this checklist to verify your Zyvor Fabric deployment is properly hardened:
 
 - [ ] **HTTPS enabled** -- API served over TLS, not plain HTTP
 - [ ] **Strong passwords** -- All PAM users have strong passwords

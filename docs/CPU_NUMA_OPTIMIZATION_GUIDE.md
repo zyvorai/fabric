@@ -273,7 +273,7 @@ Response:
 }
 ```
 
-vmspawnd selects the node with:
+Zyvor Fabric selects the node with:
 1. Sufficient free memory
 2. Enough available CPUs
 3. Maximum available memory (tie-breaker)

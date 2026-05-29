@@ -1,29 +1,29 @@
-# vmspawnd — Enterprise VM Management Platform
+# Zyvor Fabric — Enterprise Infrastructure Control Plane
 
 ## The Problem
 
-Organizations running Linux infrastructure need a unified way to manage virtual machines. Existing solutions are either:
+Organizations running Linux infrastructure need a unified control plane for virtual machines, networking, storage, and security. Existing solutions are either:
 
 - **Too heavy** — VMware vSphere, Proxmox, and OpenStack require complex multi-server deployments, dedicated storage infrastructure, and specialized operations teams
 - **Too basic** — Manual QEMU/KVM management with shell scripts doesn't scale and lacks security, monitoring, or multi-user access
 - **Too locked-in** — Cloud-only solutions (AWS, Azure, GCP) create vendor dependency with unpredictable costs
 
-**vmspawnd fills the gap** — a single-binary VM management platform that runs on any Linux server with systemd, providing enterprise features without enterprise complexity.
+**Zyvor Fabric fills the gap** — a systemd-native VM operations fabric that runs on any Linux server with systemd, providing enterprise features without enterprise complexity.
 
 ---
 
-## What Is vmspawnd?
+## What Is Zyvor Fabric?
 
-vmspawnd is a production-grade virtual machine management platform built in Rust. It wraps systemd-vmspawn and systemd-machined with a complete management layer:
+Zyvor Fabric is a production-grade private cloud control plane built in Rust. It wraps systemd-vmspawn and systemd-machined with a complete management layer:
 
-- **One binary, one config file, one systemd service** — deploys in under 5 minutes
+- **One binary, one config file, one systemd service** — deploys in under 5 minutes (`Zyvor Fabric`)
 - **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
 - **5 management interfaces** — CLI, terminal UI, web dashboard, Kubernetes operator, Terraform provider
 - **Enterprise features** — HA clustering, live migration, GPU passthrough, backup/restore, network policies
 
 ```
-sudo systemctl enable --now vmspawnd
-# That's it. Platform is running.
+sudo systemctl enable --now Zyvor Fabric
+# That's it. Zyvor Fabric is running.
 ```
 
 ---
@@ -32,7 +32,7 @@ sudo systemctl enable --now vmspawnd
 
 ### 1. Built on systemd (Not a Custom Hypervisor)
 
-vmspawnd leverages systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution. This means:
+Zyvor Fabric leverages systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution. This means:
 
 - No custom kernel modules or hypervisor patches
 - VMs are first-class systemd units with journal logging, socket activation, and watchdog support
@@ -41,7 +41,7 @@ vmspawnd leverages systemd-vmspawn and systemd-machined — the VM management to
 
 ### 2. Single Binary, Zero Dependencies
 
-| vmspawnd | Proxmox | OpenStack |
+| Zyvor Fabric (`Zyvor Fabric`) | Proxmox | OpenStack |
 |----------|---------|-----------|
 | 1 binary (15MB) | 200+ packages | 1000+ packages |
 | 1 config file | 50+ config files | 100+ config files |
@@ -193,7 +193,7 @@ React-based UI with 37+ pages, command palette (Ctrl+K), dark theme, real-time W
 Manage VMs as `VirtualMachine` CRDs with automatic reconciliation:
 
 ```yaml
-apiVersion: vmspawnd.io/v1
+apiVersion: Zyvor Fabric.io/v1
 kind: VirtualMachine
 metadata:
   name: web-server
@@ -247,19 +247,19 @@ resource "vmspawnd_vm" "web" {
 
 ### Single Server
 
-One Linux server running vmspawnd with local storage. Suitable for development, testing, small teams, and edge deployments.
+One Linux server running Zyvor Fabric with local storage. Suitable for development, testing, small teams, and edge deployments.
 
 **Requirements:** Linux with systemd 256+, 4GB RAM minimum
 
 ### Multi-Node Cluster
 
-Multiple vmspawnd nodes with etcd-based clustering, shared storage (NFS/Ceph), live migration, and HA failover.
+Multiple Zyvor Fabric nodes with etcd-based clustering, shared storage (NFS/Ceph), live migration, and HA failover.
 
 **Requirements:** 3+ nodes, shared storage, etcd cluster
 
 ### Kubernetes-Managed
 
-vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside containerized workloads.
+Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs alongside containerized workloads.
 
 **Requirements:** Kubernetes cluster with vmspawnd operator deployed
 
@@ -267,7 +267,7 @@ vmspawnd nodes managed by the Kubernetes operator. VMs defined as CRDs alongside
 
 ## Comparison
 
-| Feature | vmspawnd | Proxmox VE | OpenStack | libvirt/virsh |
+| Feature | Zyvor Fabric | Proxmox VE | OpenStack | libvirt/virsh |
 |---------|:--------:|:----------:|:---------:|:-------------:|
 | Single-binary deployment | Yes | No | No | N/A |
 | REST API | 520+ endpoints | ~50 | ~200 | XML-RPC |
@@ -341,7 +341,7 @@ MIT — free for commercial use, modification, and distribution.
 # Deploy everything (auto-sudo — no manual sudo needed)
 ./vmspawnctl deploy
 
-# That's it. vmspawnd is running.
+# That's it. Zyvor Fabric is running.
 ```
 
 ### Step-by-Step

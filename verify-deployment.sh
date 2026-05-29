@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# verify-deployment.sh — Quick deployment health check for vmspawnd
+# verify-deployment.sh — Quick deployment health check for Zyvor Fabric (vmspawnd)
 # ============================================================================
 # Lightweight check that can be run after deploy-remote.sh or setup.sh
 # to confirm the deployment is healthy.
@@ -34,7 +34,7 @@ _ssh() {
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║     🩺 vmspawnd Deployment Verification          ║"
+echo "  ║     🩺 Zyvor Fabric Deployment Verification       ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo ""
 echo "  Target: ${HOST}"

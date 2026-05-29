@@ -91,7 +91,7 @@ export default function CostEstimator() {
   const handleCopy = () => {
     if (!calculated) return
     const lines = [
-      'vmspawnd Storage Cost Estimate',
+      'Zyvor Fabric Storage Cost Estimate',
       '================================',
       `VMs: ${vmCount}`,
       `Avg Size: ${avgSizeGB} GB`,

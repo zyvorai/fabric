@@ -1,6 +1,6 @@
 # API Reference Overview
 
-The vmspawn REST API provides comprehensive programmatic access to all platform capabilities. This reference documents the API design principles, common patterns, and provides an index to detailed endpoint documentation.
+The Zyvor Fabric REST API provides comprehensive programmatic access to all platform capabilities. This reference documents the API design principles, common patterns, and provides an index to detailed endpoint documentation.
 
 ## API Design Principles
 

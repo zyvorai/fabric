@@ -28,6 +28,9 @@ import {
   StatusTab,
 } from './network/index'
 import type { FloatingIp } from '../api/network-cloud'
+import { ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
+
+const FABRIC = ZYVOR_FABRIC_HELP.name
 import { countNetfileTypes } from './network/NetfilesTab'
 import { extractErrorMessage } from './network/ModalShared'
 import ErrorBanner from '../components/ErrorBanner'
@@ -139,12 +142,12 @@ export default function Network() {
     const name = hostId.replace(/^host:/, '')
     if (!await confirm(
       'Adopt Bridge',
-      `Import "${name}" into vmspawnd? This writes systemd-networkd config files and reloads networkd.`,
+      `Import "${name}" into ${FABRIC}? This writes systemd-networkd config files and reloads networkd.`,
     )) return
     try {
       const adopted = await api.adoptBridge(hostId)
       setBridges(prev => [...prev.filter(b => b.id !== hostId), adopted])
-      toast.success(`Bridge "${adopted.name}" is now managed by vmspawnd`)
+      toast.success(`Bridge "${adopted.name}" is now managed by ${FABRIC}`)
     } catch (e: unknown) { failAction('Failed to adopt bridge', e) }
   }
 
@@ -192,12 +195,12 @@ export default function Network() {
     const name = hostId.replace(/^host:/, '')
     if (!await confirm(
       'Adopt Interface',
-      `Import "${name}" into vmspawnd? This writes a .network file and reloads networkd.`,
+      `Import "${name}" into ${FABRIC}? This writes a .network file and reloads networkd.`,
     )) return
     try {
       const adopted = await api.adoptNetworkFile(hostId)
       setNetfiles(prev => [...prev.filter(n => n.id !== hostId), adopted])
-      toast.success(`Interface "${adopted.match_name}" is now managed by vmspawnd`)
+      toast.success(`Interface "${adopted.match_name}" is now managed by ${FABRIC}`)
     } catch (e: unknown) { failAction('Failed to adopt interface', e) }
   }
 
@@ -208,12 +211,12 @@ export default function Network() {
     setState: Dispatch<SetStateAction<T[]>>,
   ) => {
     const name = hostId.replace(/^host:/, '')
-    if (!await confirm(`Adopt ${label}`, `Import "${name}" into vmspawnd and write systemd-networkd config?`)) return
+    if (!await confirm(`Adopt ${label}`, `Import "${name}" into ${FABRIC} and write systemd-networkd config?`)) return
     try {
       const adopted = await adoptFn(hostId)
       setState(prev => [...prev.filter(x => x.id !== hostId), adopted])
       const display = adopted.match_name ?? adopted.name ?? name
-      toast.success(`${label} "${display}" is now managed by vmspawnd`)
+      toast.success(`${label} "${display}" is now managed by ${FABRIC}`)
     } catch (e: unknown) {
       failAction(`Failed to adopt ${label.toLowerCase()}`, e)
     }
@@ -259,7 +262,7 @@ export default function Network() {
   }
 
   const handleDeleteFloatingIp = async (id: string) => {
-    if (!await confirm('Delete Floating IP', 'Remove this floating IP from vmspawnd?')) return
+    if (!await confirm('Delete Floating IP', `Remove this floating IP from ${FABRIC}?`)) return
     try {
       await cloudApi.deleteFloatingIp(id)
       setFloatingIps(prev => prev.filter(f => f.id !== id))
@@ -267,11 +270,11 @@ export default function Network() {
   }
 
   const handleAdoptFloatingIp = async (hostId: string) => {
-    if (!await confirm('Adopt Floating IP', 'Import this host address into vmspawnd?')) return
+    if (!await confirm('Adopt Floating IP', `Import this host address into ${FABRIC}?`)) return
     try {
       const adopted = await cloudApi.adoptFloatingIp(hostId)
       setFloatingIps(prev => [...prev.filter(f => f.id !== hostId), adopted])
-      toast.success(`Floating IP ${adopted.address} is now managed by vmspawnd`)
+      toast.success(`Floating IP ${adopted.address} is now managed by ${FABRIC}`)
     } catch (e: unknown) { failAction('Failed to adopt floating IP', e) }
   }
 

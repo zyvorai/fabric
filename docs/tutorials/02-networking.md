@@ -6,7 +6,7 @@ DNS configuration.
 
 **Level:** Intermediate
 **Time:** 45 minutes
-**Prerequisites:** Completed [Tutorial 01](01-first-vm.md), vmspawnd running
+**Prerequisites:** Completed [Tutorial 01](01-first-vm.md), Zyvor Fabric running
 
 ---
 
@@ -34,7 +34,7 @@ TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
 
 ## Network Architecture Overview
 
-vmspawn manages networking through systemd-networkd. Every network change
+Zyvor Fabric manages networking through systemd-networkd. Every network change
 generates `.netdev` and `.network` configuration files and triggers a
 `networkctl reload`.
 
@@ -502,7 +502,7 @@ curl -s "$VMSPAWN_HOST/api/network-policies" \
 
 ## Step 6: DNS Configuration
 
-vmspawn supports internal DNS zones for VM name resolution.
+Zyvor Fabric supports internal DNS zones for VM name resolution.
 
 ### Create a DNS Zone
 
@@ -559,7 +559,7 @@ curl -s "$VMSPAWN_HOST/api/dns/zones" \
 
 ## Step 7: DHCP Server Configuration
 
-vmspawn can configure a DHCP server on a bridge interface using systemd-networkd.
+Zyvor Fabric can configure a DHCP server on a bridge interface using systemd-networkd.
 VMs attached to the bridge will receive IP addresses automatically.
 
 ### Configure DHCP on a Bridge
@@ -603,7 +603,7 @@ Expected response:
 
 ### How It Works
 
-1. vmspawn generates a systemd-networkd `.network` file with a `[DHCPServer]` section
+1. Zyvor Fabric generates a systemd-networkd `.network` file with a `[DHCPServer]` section
 2. The configuration is written to `/etc/systemd/network/`
 3. `networkctl reload` is called to apply the changes
 4. VMs on the bridge receive IPs from the configured pool

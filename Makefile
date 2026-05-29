@@ -100,7 +100,7 @@ run-debug:
 	cd backend && VSPAWN_LOG_LEVEL=debug cargo run --bin vmspawnd
 
 dev:
-	@echo "Starting vmspawnd in development mode..."
+	@echo "Starting Zyvor Fabric (vmspawnd) in development mode..."
 	@cd backend && VSPAWN_LOG_LEVEL=debug cargo run --bin vmspawnd &
 	@cd web && npm run dev
 

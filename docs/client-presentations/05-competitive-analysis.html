@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vmspawn - Competitive Analysis</title>
+<title>Zyvor Fabric - Competitive Analysis</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -35,6 +35,9 @@
   .lose { color: #f87171; }
   .tie { color: #fbbf24; }
   @media print { .slide { page-break-after: always; min-height: auto; padding: 40px; } }
+
+  .brand-line { font-size: 1em; color: #f97316; margin-top: 24px; font-weight: 600; }
+  .brand-line a { color: #f97316; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -42,15 +45,15 @@
 <!-- Slide 1: Title -->
 <div class="slide title-slide">
   <h1>Competitive Analysis</h1>
-  <p class="subtitle">vmspawn vs. the Established Alternatives</p>
+  <p class="subtitle">Zyvor Fabric vs. the Established Alternatives</p>
   <p style="font-size: 1.2em; color: #64748b; margin-top: 20px;">
-    How vmspawn compares to libvirt, Proxmox VE, OpenStack, and VMware vSphere
+    How Zyvor Fabric compares to libvirt, Proxmox VE, OpenStack, and VMware vSphere
   </p>
 </div>
 
 <!-- Slide 2: vs libvirt/virt-manager -->
 <div class="slide">
-  <h1>vmspawn vs. libvirt / virt-manager</h1>
+  <h1>Zyvor Fabric vs. libvirt / virt-manager</h1>
   <p class="subtitle">Library vs. Platform</p>
   <div class="two-col">
     <div>
@@ -69,9 +72,9 @@
       </ul>
     </div>
     <div>
-      <h3>vmspawn Advantages</h3>
+      <h3>Zyvor Fabric Advantages</h3>
       <table>
-        <tr><th>Feature</th><th>vmspawn</th><th>libvirt</th></tr>
+        <tr><th>Feature</th><th>Zyvor Fabric</th><th>libvirt</th></tr>
         <tr><td>REST API</td><td class="win">520+ endpoints</td><td class="lose">XML-RPC only</td></tr>
         <tr><td>Web UI</td><td class="win">React dashboard</td><td class="lose">None (desktop only)</td></tr>
         <tr><td>Terminal UI</td><td class="win">k9s-style TUI</td><td class="lose">None</td></tr>
@@ -83,14 +86,14 @@
         <tr><td>Memory Safety</td><td class="win">Rust</td><td class="lose">C</td></tr>
         <tr><td>Audit Logging</td><td class="win">Yes</td><td class="lose">No</td></tr>
       </table>
-      <p style="margin-top: 12px;"><strong>Summary:</strong> libvirt is a library; vmspawn is a complete platform. If you need more than basic VM start/stop, vmspawn provides the management layer that libvirt lacks.</p>
+      <p style="margin-top: 12px;"><strong>Summary:</strong> libvirt is a library; Zyvor Fabric is a complete platform. If you need more than basic VM start/stop, Zyvor Fabric provides the management layer that libvirt lacks.</p>
     </div>
   </div>
 </div>
 
 <!-- Slide 3: vs Proxmox VE -->
 <div class="slide">
-  <h1>vmspawn vs. Proxmox VE</h1>
+  <h1>Zyvor Fabric vs. Proxmox VE</h1>
   <p class="subtitle">Heavyweight appliance vs. lightweight platform</p>
   <div class="two-col">
     <div>
@@ -112,7 +115,7 @@
     <div>
       <h3>Feature Comparison</h3>
       <table>
-        <tr><th>Feature</th><th>vmspawn</th><th>Proxmox</th></tr>
+        <tr><th>Feature</th><th>Zyvor Fabric</th><th>Proxmox</th></tr>
         <tr><td>Deployment</td><td class="win">1 binary, 5 min</td><td class="lose">Full OS, 2 hrs</td></tr>
         <tr><td>Dependencies</td><td class="win">Zero</td><td class="lose">200+ packages</td></tr>
         <tr><td>API Endpoints</td><td class="win">520+</td><td class="lose">~50</td></tr>
@@ -124,14 +127,14 @@
         <tr><td>Network Policies</td><td class="win">Cilium-style</td><td class="tie">Basic firewall</td></tr>
         <tr><td>VPN Mesh</td><td class="win">WireGuard</td><td class="lose">No</td></tr>
       </table>
-      <p style="margin-top: 12px;"><strong>Summary:</strong> Proxmox is a mature product with a large community, but it requires a dedicated Debian installation and lacks modern API-first design. vmspawn runs on your existing Linux servers.</p>
+      <p style="margin-top: 12px;"><strong>Summary:</strong> Proxmox is a mature product with a large community, but it requires a dedicated Debian installation and lacks modern API-first design. Zyvor Fabric runs on your existing Linux servers.</p>
     </div>
   </div>
 </div>
 
 <!-- Slide 4: vs OpenStack -->
 <div class="slide">
-  <h1>vmspawn vs. OpenStack</h1>
+  <h1>Zyvor Fabric vs. OpenStack</h1>
   <p class="subtitle">Enterprise simplicity vs. cloud complexity</p>
   <div class="two-col">
     <div>
@@ -156,7 +159,7 @@
     <div>
       <h3>Feature Comparison</h3>
       <table>
-        <tr><th>Feature</th><th>vmspawn</th><th>OpenStack</th></tr>
+        <tr><th>Feature</th><th>Zyvor Fabric</th><th>OpenStack</th></tr>
         <tr><td>Setup Time</td><td class="win">5 minutes</td><td class="lose">2+ days</td></tr>
         <tr><td>Dependencies</td><td class="win">Zero</td><td class="lose">1000+ packages</td></tr>
         <tr><td>Ops Staff Needed</td><td class="win">0 (self-service)</td><td class="lose">5+ engineers</td></tr>
@@ -168,14 +171,14 @@
         <tr><td>K8s Operator</td><td class="tie">Yes</td><td class="tie">Yes</td></tr>
         <tr><td>Live Migration</td><td class="tie">Yes</td><td class="tie">Yes</td></tr>
       </table>
-      <p style="margin-top: 12px;"><strong>Summary:</strong> OpenStack is designed for massive scale with dedicated teams. vmspawn delivers 90% of the value at 1% of the complexity. Choose vmspawn for 1-100 server deployments.</p>
+      <p style="margin-top: 12px;"><strong>Summary:</strong> OpenStack is designed for massive scale with dedicated teams. Zyvor Fabric delivers 90% of the value at 1% of the complexity. Choose Zyvor Fabric for 1-100 server deployments.</p>
     </div>
   </div>
 </div>
 
 <!-- Slide 5: vs VMware vSphere -->
 <div class="slide">
-  <h1>vmspawn vs. VMware vSphere</h1>
+  <h1>Zyvor Fabric vs. VMware vSphere</h1>
   <p class="subtitle">Open source freedom vs. proprietary lock-in</p>
   <div class="two-col">
     <div>
@@ -192,7 +195,7 @@
       </ul>
       <h3 style="margin-top: 16px;">VMware Migration Path</h3>
       <ul>
-        <li>vmspawn imports VMDK disks directly</li>
+        <li>Zyvor Fabric imports VMDK disks directly</li>
         <li>Auto-conversion to qcow2</li>
         <li>Familiar web UI eases transition</li>
         <li>REST API enables scripted migration</li>
@@ -201,7 +204,7 @@
     <div>
       <h3>Feature Comparison</h3>
       <table>
-        <tr><th>Feature</th><th>vmspawn</th><th>vSphere</th></tr>
+        <tr><th>Feature</th><th>Zyvor Fabric</th><th>vSphere</th></tr>
         <tr><td>License Cost</td><td class="win">Free (MIT)</td><td class="lose">$$$ per socket</td></tr>
         <tr><td>Runs on</td><td class="win">Any Linux</td><td class="lose">ESXi only</td></tr>
         <tr><td>API</td><td class="win">520+ REST</td><td class="tie">Proprietary SDK</td></tr>
@@ -214,7 +217,7 @@
         <tr><td>Live Migration</td><td class="tie">Yes</td><td class="tie">Yes (vMotion)</td></tr>
         <tr><td>GPU Passthrough</td><td class="tie">Yes</td><td class="tie">Yes</td></tr>
       </table>
-      <p style="margin-top: 12px;"><strong>Summary:</strong> VMware delivers mature enterprise features but at significant cost with increasing vendor lock-in. vmspawn offers a viable migration path with zero license fees.</p>
+      <p style="margin-top: 12px;"><strong>Summary:</strong> VMware delivers mature enterprise features but at significant cost with increasing vendor lock-in. Zyvor Fabric offers a viable migration path with zero license fees.</p>
     </div>
   </div>
 </div>
@@ -225,7 +228,7 @@
   <table style="font-size: 0.95em;">
     <tr>
       <th>Feature</th>
-      <th>vmspawn</th>
+      <th>Zyvor Fabric</th>
       <th>libvirt</th>
       <th>Proxmox</th>
       <th>OpenStack</th>
@@ -265,10 +268,10 @@
   <p class="subtitle">What it takes to run each platform</p>
   <div class="two-col">
     <div>
-      <h3>vmspawn</h3>
+      <h3>Zyvor Fabric</h3>
       <div class="card">
         <pre><code>Components:
-  1 binary (vmspawnd, 15MB)
+  1 binary (Zyvor Fabric, 15MB)
   1 config file (vmspawnd.toml)
   1 systemd service
 
@@ -320,7 +323,7 @@ Setup:
   <table>
     <tr>
       <th>Factor</th>
-      <th>vmspawn</th>
+      <th>Zyvor Fabric</th>
       <th>Proxmox</th>
       <th>OpenStack</th>
       <th>VMware</th>
@@ -376,17 +379,17 @@ Setup:
     </tr>
   </table>
   <p style="margin-top: 20px; font-size: 1.1em;">
-    <strong>Bottom line:</strong> vmspawn eliminates the operational overhead that makes VM management expensive. No dedicated team, no complex upgrades, no license negotiations.
+    <strong>Bottom line:</strong> Zyvor Fabric eliminates the operational overhead that makes VM management expensive. No dedicated team, no complex upgrades, no license negotiations.
   </p>
 </div>
 
-<!-- Slide 9: When to Choose vmspawn -->
+<!-- Slide 9: When to Choose Zyvor Fabric -->
 <div class="slide">
-  <h1>When to Choose vmspawn</h1>
+  <h1>When to Choose Zyvor Fabric</h1>
   <div class="two-col">
     <div>
       <div class="card">
-        <h3>vmspawn Is Ideal When</h3>
+        <h3>Zyvor Fabric Is Ideal When</h3>
         <ul>
           <li>You want enterprise VM management without enterprise complexity</li>
           <li>You run Linux servers and want to add VM capabilities</li>
@@ -412,7 +415,7 @@ Setup:
         </ul>
       </div>
       <div class="card">
-        <h3>vmspawn's Unique Strengths</h3>
+        <h3>Zyvor Fabric's Unique Strengths</h3>
         <ul>
           <li>Only platform with both TUI and K8s operator</li>
           <li>Only platform with built-in WireGuard VPN mesh</li>

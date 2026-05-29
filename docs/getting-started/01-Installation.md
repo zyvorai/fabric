@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers installing vmspawnd on a Linux system. vmspawnd requires a modern Linux distribution with systemd 256 or later and QEMU/KVM for virtual machine execution.
+This guide covers installing Zyvor Fabric on a Linux system. Zyvor Fabric requires a modern Linux distribution with systemd 256 or later and QEMU/KVM for virtual machine execution.
 
 ---
 
@@ -40,7 +40,7 @@ This guide covers installing vmspawnd on a Linux system. vmspawnd requires a mod
 
 ## Fedora Installation
 
-Fedora 41 and later ship with systemd 256+ and have full support for vmspawnd.
+Fedora 41 and later ship with systemd 256+ and have full support for Zyvor Fabric.
 
 ### 1. Install Dependencies
 
@@ -80,11 +80,11 @@ sudo modprobe kvm_amd     # AMD processors
 ls -la /dev/kvm
 ```
 
-### 4. Deploy vmspawnd
+### 4. Deploy Zyvor Fabric
 
 ```bash
 git clone <repository-url>
-cd vmspawn
+cd zyvor-fabric
 
 # One-command deployment
 ./vmspawnctl deploy
@@ -93,7 +93,7 @@ cd vmspawn
 This command will:
 - Install any missing system dependencies
 - Build the Rust workspace (40 crates)
-- Install binaries (`vmspawnd`, `vmctl`) to `/usr/local/bin/`
+- Install binaries (`Zyvor Fabric`, `vmctl`) to `/usr/local/bin/`
 - Install the systemd service unit
 - Create configuration directories
 - Start the vmspawnd service
@@ -140,11 +140,11 @@ sudo modprobe kvm_intel   # Intel
 sudo modprobe kvm_amd     # AMD
 ```
 
-### 4. Deploy vmspawnd
+### 4. Deploy Zyvor Fabric
 
 ```bash
 git clone <repository-url>
-cd vmspawn
+cd zyvor-fabric
 ./vmspawnctl deploy
 ```
 
@@ -171,7 +171,7 @@ The minimum supported Rust version is 1.75.
 
 ```bash
 git clone <repository-url>
-cd vmspawn
+cd zyvor-fabric
 ```
 
 ### 3. Build the Workspace
@@ -201,7 +201,7 @@ All tests must pass with zero warnings before deployment.
 
 ```bash
 # Install the daemon
-sudo cp backend/target/release/vmspawnd /usr/local/bin/
+sudo cp backend/target/release/Zyvor Fabric /usr/local/bin/
 
 # Install the CLI
 sudo cp backend/target/release/vmctl /usr/local/bin/
@@ -220,15 +220,15 @@ sudo mkdir -p /var/lib/vmspawnd/cloud-init
 Create the service unit file:
 
 ```bash
-sudo tee /etc/systemd/system/vmspawnd.service > /dev/null << 'EOF'
+sudo tee /etc/systemd/system/Zyvor Fabric.service > /dev/null << 'EOF'
 [Unit]
-Description=vmspawnd VM Management Daemon
+Description=Zyvor Fabric VM Management Daemon
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/vmspawnd
+ExecStart=/usr/local/bin/Zyvor Fabric
 Restart=on-failure
 RestartSec=5
 
@@ -241,7 +241,7 @@ Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now vmspawnd
+sudo systemctl enable --now Zyvor Fabric
 ```
 
 ---
@@ -251,7 +251,7 @@ sudo systemctl enable --now vmspawnd
 ### 1. Check Service Status
 
 ```bash
-sudo systemctl status vmspawnd
+sudo systemctl status Zyvor Fabric
 ```
 
 You should see `active (running)`.
@@ -266,7 +266,7 @@ A successful response returns a JSON object with an empty VM list.
 
 ### 3. Read the Admin Password
 
-On first start, vmspawnd generates a random admin password:
+On first start, Zyvor Fabric generates a random admin password:
 
 ```bash
 # Using vmspawnctl
@@ -334,12 +334,12 @@ sudo tee /etc/vmspawnd/vmspawnd.toml > /dev/null << 'EOF'
 listen = "127.0.0.1:8080"
 EOF
 
-sudo systemctl restart vmspawnd
+sudo systemctl restart Zyvor Fabric
 ```
 
 ### Cannot connect to D-Bus
 
-vmspawnd requires access to the system D-Bus for `systemd-machined` integration. Ensure D-Bus is running:
+Zyvor Fabric requires access to the system D-Bus for `systemd-machined` integration. Ensure D-Bus is running:
 
 ```bash
 sudo systemctl status dbus
@@ -350,5 +350,5 @@ sudo systemctl status dbus
 ## Next Steps
 
 - [Quick Start](02-Quick-Start.md) -- create your first VM
-- [Configuration Reference](03-Configuration.md) -- customize vmspawnd settings
+- [Configuration Reference](03-Configuration.md) -- customize Zyvor Fabric settings
 - [Web UI Guide](04-Web-UI.md) -- access the web dashboard

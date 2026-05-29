@@ -5,6 +5,7 @@
 import { useTheme, type AppTheme } from '../contexts/ThemeContext'
 import { Wifi, WifiOff } from 'lucide-react'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
+import { ZYVOR_FABRIC_DAEMON, ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
 
 function statusClasses(theme: AppTheme, isLive: boolean): string {
   if (theme === 'steel') {
@@ -39,7 +40,7 @@ export default function ConnectionStatus() {
 
   const title = isLive
     ? 'Real-time VM updates connected (/api/events/stream)'
-    : 'Real-time updates unavailable — check vmspawnd and your session'
+    : `Real-time updates unavailable — check ${ZYVOR_FABRIC_HELP.name} (${ZYVOR_FABRIC_DAEMON}) and your session`
 
   const ariaLabel = isLive
     ? 'Live: real-time updates connected'

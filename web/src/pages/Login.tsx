@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { ZyvorBrandLine } from '../components/ZyvorBrand'
+import { ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import { formatUserError } from '../utils/apiError'
 import {
@@ -51,8 +52,8 @@ const features = [
     icon: <Server className="w-5 h-5 text-blue-100" />,
     gradient: 'from-blue-500/95 to-indigo-800/95',
     glow: 'shadow-blue-500/25',
-    title: 'Instant VM spawn',
-    description: 'Launch QEMU/KVM guests from qcow2 images with network, storage, and cloud-init profiles.',
+    title: 'VM lifecycle fabric',
+    description: 'Create, migrate, snapshot, and operate QEMU/KVM guests with clustering, HA, and GPU passthrough.',
     highlight: true,
   },
   {
@@ -199,30 +200,30 @@ export default function Login() {
               </div>
             </div>
             <div>
-              <span className="text-4xl font-bold tracking-tight text-white block">vmspawnd</span>
+              <span className="text-4xl font-bold tracking-tight text-white block">{ZYVOR_FABRIC_HELP.name}</span>
               <span className="text-xs font-medium uppercase tracking-[0.28em] text-sky-300/80 mt-0.5 block">
-                VM spawn &amp; lifecycle
+                {ZYVOR_FABRIC_HELP.tagline}
               </span>
             </div>
           </div>
           <h2 className="login-fade-in login-fade-in-d1 text-4xl xl:text-[2.75rem] font-extrabold text-white leading-[1.08] mb-4 max-w-xl">
-            Spawn and manage
+            Private cloud control plane
             <br />
-            <span className="login-text-gradient">virtual machines at scale</span>
+            <span className="login-text-gradient">for Linux infrastructure</span>
           </h2>
           <p className="login-fade-in login-fade-in-d2 text-lg text-slate-300/90 max-w-lg leading-relaxed">
-            QEMU/KVM provisioning, storage pools, hotplug, autoscale, and lifecycle automation — on the hypervisor
-            host.
+            Clustering, networking, security, storage, operators, Terraform, and monitoring — built on
+            systemd-vmspawn and systemd-machined.
           </p>
           <div className="login-fade-in login-fade-in-d3 flex flex-wrap gap-2 mt-6">
             <span className="login-stat-pill login-stat-pill-glow">
-              <Server className="w-3 h-3" /> QEMU/KVM
+              <Server className="w-3 h-3" /> VMs &amp; HA
             </span>
             <span className="login-stat-pill">
-              <HardDrive className="w-3 h-3" /> qcow2 images
+              <HardDrive className="w-3 h-3" /> Storage fabric
             </span>
-            <span className="login-stat-pill">Hotplug &amp; RBAC</span>
-            <span className="login-stat-pill">PAM + local auth</span>
+            <span className="login-stat-pill">Network &amp; security</span>
+            <span className="login-stat-pill">PAM + RBAC</span>
           </div>
         </div>
 
@@ -447,8 +448,8 @@ function MobileBrand({ hostLabel }: { hostLabel: string }) {
           <BoltLogo className="w-7 h-7 text-white" />
         </div>
       </div>
-      <h1 className="text-2xl font-bold text-white">vmspawnd</h1>
-      <p className="text-sm mt-1 text-slate-400">QEMU/KVM · lifecycle · storage</p>
+      <h1 className="text-2xl font-bold text-white">{ZYVOR_FABRIC_HELP.name}</h1>
+      <p className="text-sm mt-1 text-slate-400">{ZYVOR_FABRIC_HELP.tagline}</p>
       {hostLabel && (
         <p className="text-xs mt-2 font-mono text-slate-500" title="Hypervisor host">
           {hostLabel}
@@ -463,7 +464,7 @@ function DesktopHeading({ hostLabel }: { hostLabel: string }) {
     <div className="hidden lg:block mb-8">
       <h2 className="text-2xl font-bold mb-1 text-white">Welcome back</h2>
       <p className="text-sm text-slate-400">
-        Sign in to spawn and manage VMs
+        Sign in to manage your infrastructure
         {hostLabel ? (
           <>
             {' '}

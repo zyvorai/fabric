@@ -1,6 +1,6 @@
 # High Availability
 
-vmspawnd supports multi-node clustering via etcd for fault-tolerant VM management with automatic leader election and failover.
+Zyvor Fabric supports multi-node clustering via etcd for fault-tolerant VM management with automatic leader election and failover.
 
 ---
 
@@ -11,7 +11,7 @@ vmspawnd supports multi-node clustering via etcd for fault-tolerant VM managemen
 │     Node 1      │     │     Node 2      │     │     Node 3      │
 │    (Leader)     │     │   (Follower)    │     │   (Follower)    │
 │                 │     │                 │     │                 │
-│  vmspawnd       │     │  vmspawnd       │     │  vmspawnd       │
+│  Zyvor Fabric       │     │  Zyvor Fabric       │     │  Zyvor Fabric       │
 │  VMs: A, B      │     │  VMs: C, D      │     │  VMs: E, F      │
 └────────┬────────┘     └────────┬────────┘     └────────┬────────┘
          │                       │                       │
@@ -24,7 +24,7 @@ vmspawnd supports multi-node clustering via etcd for fault-tolerant VM managemen
 ```
 
 **How it works:**
-- Each node runs a vmspawnd instance managing local VMs
+- Each node runs a Zyvor Fabric instance managing local VMs
 - etcd stores cluster state, leader election, and VM placement metadata
 - The leader handles write operations; followers replicate state
 - On leader failure, a new leader is elected automatically
@@ -52,7 +52,7 @@ ETCD_LISTEN_CLIENT_URLS="http://192.168.1.10:2379,http://127.0.0.1:2379"
 ETCD_ADVERTISE_CLIENT_URLS="http://192.168.1.10:2379"
 ETCD_INITIAL_CLUSTER="node1=http://192.168.1.10:2380,node2=http://192.168.1.11:2380,node3=http://192.168.1.12:2380"
 ETCD_INITIAL_CLUSTER_STATE="new"
-ETCD_INITIAL_CLUSTER_TOKEN="vmspawnd-cluster"
+ETCD_INITIAL_CLUSTER_TOKEN="Zyvor Fabric-cluster"
 ```
 
 Start etcd:
@@ -61,7 +61,7 @@ Start etcd:
 sudo systemctl enable --now etcd
 ```
 
-### 2. Configure vmspawnd for HA
+### 2. Configure Zyvor Fabric for HA
 
 On each node, edit `/etc/vmspawnd/vmspawnd.toml`:
 
@@ -82,10 +82,10 @@ heartbeat_interval_seconds = 5
 leader_election = true
 ```
 
-Restart vmspawnd on each node:
+Restart Zyvor Fabric on each node:
 
 ```bash
-sudo systemctl restart vmspawnd
+sudo systemctl restart Zyvor Fabric
 ```
 
 ---
@@ -222,7 +222,7 @@ Key metrics:
 
 ```yaml
 groups:
-  - name: vmspawnd-cluster
+  - name: Zyvor Fabric-cluster
     rules:
       - alert: ClusterLeaderDown
         expr: vmspawnd_cluster_leader == 0
@@ -256,7 +256,7 @@ etcdctl snapshot restore /backup/etcd-20260218.db
 ### Backup VM State
 
 ```bash
-curl http://localhost:9095/api/backup/export > vmspawnd-backup.json
+curl http://localhost:9095/api/backup/export > Zyvor Fabric-backup.json
 ```
 
 ### Restore VM State
@@ -264,7 +264,7 @@ curl http://localhost:9095/api/backup/export > vmspawnd-backup.json
 ```bash
 curl -X POST http://localhost:9095/api/backup/import \
   -H "Content-Type: application/json" \
-  -d @vmspawnd-backup.json
+  -d @Zyvor Fabric-backup.json
 ```
 
 ---

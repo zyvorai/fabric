@@ -1,12 +1,12 @@
 # Configuration Reference
 
-vmspawnd is configured through a TOML configuration file and environment variables. This guide covers all configuration sections and options.
+Zyvor Fabric is configured through a TOML configuration file and environment variables. This guide covers all configuration sections and options.
 
 ---
 
 ## Config File Locations
 
-vmspawnd searches for its configuration file in the following order:
+Zyvor Fabric searches for its configuration file in the following order:
 
 | Priority | Path | Use Case |
 |----------|------|----------|
@@ -14,7 +14,7 @@ vmspawnd searches for its configuration file in the following order:
 | 2 | `configs/vmspawnd.toml` | Development (relative to working directory) |
 | 3 | `vmspawnd.toml` | Development (current directory) |
 
-If no config file is found, vmspawnd uses built-in defaults and logs a warning.
+If no config file is found, Zyvor Fabric uses built-in defaults and logs a warning.
 
 ---
 
@@ -32,7 +32,7 @@ image_path = "/var/lib/vmspawnd/images"
 [network]
 bridge = "br0"
 networkd_config_dir = "/etc/systemd/network"
-networkd_file_prefix = "50-vmspawnd-"
+networkd_file_prefix = "50-Zyvor Fabric-"
 
 [auth]
 enabled = true
@@ -133,16 +133,16 @@ Controls the default network bridge and systemd-networkd integration.
 |-----|------|---------|-------------|
 | `bridge` | String | `"br0"` | Default network bridge for VMs |
 | `networkd_config_dir` | String | `"/etc/systemd/network"` | Directory for generated networkd configs |
-| `networkd_file_prefix` | String | `"50-vmspawnd-"` | Filename prefix for managed networkd files |
+| `networkd_file_prefix` | String | `"50-Zyvor Fabric-"` | Filename prefix for managed networkd files |
 
 ```toml
 [network]
 bridge = "br0"
 networkd_config_dir = "/etc/systemd/network"
-networkd_file_prefix = "50-vmspawnd-"
+networkd_file_prefix = "50-Zyvor Fabric-"
 ```
 
-vmspawnd generates systemd-networkd configuration files (`.netdev`, `.network`) in the specified directory. Files are prefixed with `networkd_file_prefix` so they can be identified and managed separately from manually created network configurations.
+Zyvor Fabric generates systemd-networkd configuration files (`.netdev`, `.network`) in the specified directory. Files are prefixed with `networkd_file_prefix` so they can be identified and managed separately from manually created network configurations.
 
 ---
 
@@ -220,7 +220,7 @@ enabled = false
 
 #### RBAC Roles
 
-vmspawnd enforces three-tier role-based access control on every API endpoint:
+Zyvor Fabric enforces three-tier role-based access control on every API endpoint:
 
 | Role | Permissions | Typical Use |
 |------|-------------|-------------|
@@ -251,7 +251,7 @@ cluster_name = "production"
 datacenter_name = "us-east-1"
 ```
 
-In `standalone` mode (default), vmspawnd runs as a single node. In `controller` mode, it participates in cluster coordination with etcd-based leader election and distributed resource scheduling.
+In `standalone` mode (default), Zyvor Fabric runs as a single node. In `controller` mode, it participates in cluster coordination with etcd-based leader election and distributed resource scheduling.
 
 ---
 
@@ -270,7 +270,7 @@ Environment variables override config file values for sensitive settings.
 Set environment variables in the systemd service unit for production:
 
 ```bash
-sudo systemctl edit vmspawnd
+sudo systemctl edit Zyvor Fabric
 ```
 
 Add:
@@ -285,14 +285,14 @@ Then reload and restart:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart vmspawnd
+sudo systemctl restart Zyvor Fabric
 ```
 
 ---
 
 ## File Permissions
 
-vmspawnd creates several files with restrictive permissions:
+Zyvor Fabric creates several files with restrictive permissions:
 
 | File | Permissions | Contents |
 |------|-------------|----------|
@@ -300,7 +300,7 @@ vmspawnd creates several files with restrictive permissions:
 | `/var/lib/vmspawnd/.admin_password` | `0600` | Admin password |
 | `/var/lib/vmspawnd/auth.db` | `0600` | User database (bcrypt hashes) |
 
-These files should only be readable by the user running the vmspawnd process (typically root).
+These files should only be readable by the user running the Zyvor Fabric process (typically root).
 
 ---
 
@@ -311,14 +311,14 @@ Controls two-factor authentication (2FA) via TOTP (Time-based One-Time Password)
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `enabled` | Bool | `false` | Enable 2FA/TOTP support |
-| `issuer` | String | `"vmspawnd"` | Issuer name shown in authenticator apps |
+| `issuer` | String | `"Zyvor Fabric"` | Issuer name shown in authenticator apps |
 | `digits` | Integer | `6` | Number of digits in the TOTP code |
 | `period` | Integer | `30` | TOTP code validity period in seconds |
 
 ```toml
 [auth.totp]
 enabled = true
-issuer = "vmspawnd"
+issuer = "Zyvor Fabric"
 digits = 6
 period = 30
 ```
@@ -343,9 +343,9 @@ Controls iSCSI storage backend integration.
 ```toml
 [storage.iscsi]
 enabled = true
-initiator_name = "iqn.2026-01.com.example:vmspawnd"
+initiator_name = "iqn.2026-01.com.example:Zyvor Fabric"
 default_port = 3260
-chap_username = "vmspawnd"
+chap_username = "Zyvor Fabric"
 chap_secret = "your-chap-secret"
 discovery_timeout = 10
 ```
@@ -427,7 +427,7 @@ storage_rate = 0.0001
 network_rate = 0.001
 ```
 
-When enabled, vmspawnd meters resource usage per VM and generates invoices on the configured billing cycle. Usage data is accessible via `GET /api/v1/billing/usage` and invoices via `GET /api/v1/billing/invoices`.
+When enabled, Zyvor Fabric meters resource usage per VM and generates invoices on the configured billing cycle. Usage data is accessible via `GET /api/v1/billing/usage` and invoices via `GET /api/v1/billing/invoices`.
 
 ---
 

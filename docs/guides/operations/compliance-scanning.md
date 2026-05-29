@@ -15,7 +15,7 @@ How to scan VMs against security compliance profiles, interpret results, and aut
 
 ## Overview
 
-vmspawn includes a built-in compliance scanning engine that evaluates VMs against industry-standard security benchmarks. Scans connect to the target VM, run a series of configuration checks, and produce a pass/fail report for each rule in the profile.
+Zyvor Fabric includes a built-in compliance scanning engine that evaluates VMs against industry-standard security benchmarks. Scans connect to the target VM, run a series of configuration checks, and produce a pass/fail report for each rule in the profile.
 
 Compliance scanning helps you:
 
@@ -28,7 +28,7 @@ Compliance scanning helps you:
 
 ## Available Profiles
 
-List the compliance profiles available on your vmspawn installation:
+List the compliance profiles available on your Zyvor Fabric installation:
 
 ```bash
 curl -s http://localhost:3000/api/compliance/profiles \
@@ -188,7 +188,7 @@ Add to cron for daily execution:
 
 ```bash
 # Run compliance scan daily at 2:00 AM
-0 2 * * * /usr/local/bin/compliance-scan.sh >> /var/log/vmspawnd/compliance.log 2>&1
+0 2 * * * /usr/local/bin/compliance-scan.sh >> /var/log/Zyvor Fabric/compliance.log 2>&1
 ```
 
 ### Alerting on Failures

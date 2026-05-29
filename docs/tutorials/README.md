@@ -1,6 +1,6 @@
-# vmspawn Tutorials
+# Zyvor Fabric Tutorials
 
-Step-by-step guides for learning the vmspawn VM management platform.
+Step-by-step guides for learning the Zyvor Fabric VM management platform.
 Each tutorial builds on concepts from the previous one, but they can also be
 followed independently.
 
@@ -8,7 +8,7 @@ followed independently.
 
 All tutorials assume:
 
-- vmspawnd is running on a Linux host with systemd v260+
+- Zyvor Fabric is running on a Linux host with systemd v260+
 - You have a valid JWT token (see Tutorial 06 for authentication details)
 - `curl` and `jq` are installed
 - The host has KVM support (`/dev/kvm` exists)
@@ -37,7 +37,7 @@ export TOKEN="your-jwt-token-here"
 
 ## Conventions Used
 
-- **`$VMSPAWN_HOST`** -- Base URL of the vmspawnd API (default `http://localhost:3000`)
+- **`$VMSPAWN_HOST`** -- Base URL of the Zyvor Fabric API (default `http://localhost:3000`)
 - **`$TOKEN`** -- A valid JWT bearer token obtained via `/api/auth/login`
 - All `curl` examples include `-s` (silent) and pipe through `jq` for readability
 - Response bodies show the **essential fields**; actual responses may include additional metadata

@@ -6,10 +6,10 @@ Create your first virtual machine in 5 minutes. This guide assumes you have alre
 
 ## Step 1: Start the Daemon
 
-If vmspawnd is not already running:
+If Zyvor Fabric is not already running:
 
 ```bash
-sudo systemctl start vmspawnd
+sudo systemctl start Zyvor Fabric
 ```
 
 Verify it is listening:
@@ -33,7 +33,7 @@ Expected output:
 
 ## Step 2: Authenticate
 
-vmspawnd uses JWT authentication. First, retrieve the admin password:
+Zyvor Fabric uses JWT authentication. First, retrieve the admin password:
 
 ```bash
 # Using vmspawnctl
@@ -246,7 +246,7 @@ Returns `204 No Content` on success.
 
 ## Next Steps
 
-- [Configuration Reference](03-Configuration.md) -- customize vmspawnd settings
+- [Configuration Reference](03-Configuration.md) -- customize Zyvor Fabric settings
 - [Web UI Guide](04-Web-UI.md) -- explore the full web dashboard
 - [API Reference](../api.md) -- learn the 520+ API endpoints
 - [Networking Guide](../networking.md) -- configure VM networking

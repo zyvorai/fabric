@@ -4,11 +4,18 @@
 
 import { ExternalLink, Server } from 'lucide-react'
 import { ZYVOR_URL, ZYVOR_BRAND, ZYVOR_COPY, ZYVOR_LINE } from './ZyvorBrand'
-import { VMSPAWN_HELP, ZYVOR_HELP } from '../config/zyvorHelp'
+import { ZYVOR_FABRIC_DAEMON, ZYVOR_FABRIC_HELP, ZYVOR_HELP } from '../config/zyvorHelp'
 
-export const VMSPAWN_PRODUCT = VMSPAWN_HELP.name
-export const VMSPAWN_VERSION = VMSPAWN_HELP.version
-export const VMSPAWN_TAGLINE = VMSPAWN_HELP.tagline
+export const ZYVOR_FABRIC_PRODUCT = ZYVOR_FABRIC_HELP.name
+export const ZYVOR_FABRIC_VERSION = ZYVOR_FABRIC_HELP.version
+export const ZYVOR_FABRIC_TAGLINE = ZYVOR_FABRIC_HELP.tagline
+
+/** @deprecated Use ZYVOR_FABRIC_PRODUCT */
+export const VMSPAWN_PRODUCT = ZYVOR_FABRIC_PRODUCT
+/** @deprecated Use ZYVOR_FABRIC_VERSION */
+export const VMSPAWN_VERSION = ZYVOR_FABRIC_VERSION
+/** @deprecated Use ZYVOR_FABRIC_TAGLINE */
+export const VMSPAWN_TAGLINE = ZYVOR_FABRIC_TAGLINE
 
 const ORANGE = '#f97316'
 
@@ -20,15 +27,15 @@ export type HelpDocLink = {
 export const VMSPAWN_HELP_LINKS: HelpDocLink[] = [
   {
     label: 'Documentation',
-    href: 'https://github.com/ssahani/vmspawn/tree/main/docs',
+    href: 'https://github.com/ssahani/zyvor-fabric/tree/main/docs',
   },
   {
     label: 'Web UI guide',
-    href: 'https://github.com/ssahani/vmspawn/blob/main/docs/web-ui.md',
+    href: 'https://github.com/ssahani/zyvor-fabric/blob/main/docs/web-ui.md',
   },
   {
     label: 'Getting started',
-    href: 'https://github.com/ssahani/vmspawn/blob/main/docs/getting-started',
+    href: 'https://github.com/ssahani/zyvor-fabric/blob/main/docs/getting-started',
   },
   {
     label: 'Zyvor documentation',
@@ -48,9 +55,9 @@ export default function ZyvorAbout({ className = '' }: { className?: string }) {
           <Server className="w-8 h-8 text-blue-400" aria-hidden />
         </div>
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-lg font-semibold text-white">{VMSPAWN_PRODUCT}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Version {VMSPAWN_VERSION}</p>
-          <p className="text-sm text-slate-400 mt-2 leading-relaxed">{VMSPAWN_TAGLINE}</p>
+          <h3 className="text-lg font-semibold text-white">{ZYVOR_FABRIC_PRODUCT}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Version {ZYVOR_FABRIC_VERSION}</p>
+          <p className="text-sm text-slate-400 mt-2 leading-relaxed">{ZYVOR_FABRIC_TAGLINE}</p>
         </div>
       </div>
 
@@ -66,8 +73,9 @@ export default function ZyvorAbout({ className = '' }: { className?: string }) {
           >
             {ZYVOR_BRAND}
           </a>{' '}
-          product family — systemd-vmspawn and systemd-machined VM lifecycle, network security,
-          storage, consoles, and JWT-secured APIs.
+          product family — clustering, networking, security, storage, HA, GPU passthrough, and
+          operators on systemd-vmspawn and systemd-machined. Daemon:{' '}
+          <span className="font-mono text-slate-400">{ZYVOR_FABRIC_DAEMON}</span>.
         </p>
         <p className="text-xs text-slate-500 leading-relaxed">
           {ZYVOR_LINE} · {ZYVOR_COPY}

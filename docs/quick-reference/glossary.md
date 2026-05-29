@@ -1,6 +1,6 @@
 # Glossary
 
-Definitions of terms used throughout the vmspawn documentation and codebase.
+Definitions of terms used throughout the Zyvor Fabric documentation and codebase.
 
 ---
 
@@ -12,17 +12,17 @@ on the same host (affinity) or on different hosts (anti-affinity).
 **Anti-Affinity**: A scheduling constraint that ensures two or more VMs are placed
 on different physical hosts, improving fault tolerance.
 
-**AppState**: The central shared state structure in vmspawnd, wrapped in `Arc` and
+**AppState**: The central shared state structure in Zyvor Fabric, wrapped in `Arc` and
 injected into every Axum handler. Contains the state store, config, drivers, and
 all subsystem managers.
 
 **Audit Log**: A structured record of every state-changing operation performed
-through the vmspawn API, including the user, action, resource, and outcome.
+through the Zyvor Fabric API, including the user, action, resource, and outcome.
 
 **Autoscale**: Automatic adjustment of the number of VM instances based on
 resource utilization metrics or custom triggers.
 
-**Axum**: The async Rust web framework used by vmspawnd. Built on top of
+**Axum**: The async Rust web framework used by Zyvor Fabric. Built on top of
 `tower` and `hyper`, running on the Tokio async runtime.
 
 ## B
@@ -52,7 +52,7 @@ hierarchical groups with resource limits (CPU, memory, I/O).
 expiration, and token ID.
 
 **Cloud-Init**: An industry-standard tool for early initialization of cloud
-instances. vmspawn generates cloud-init NoCloud datasource ISOs for VM
+instances. Zyvor Fabric generates cloud-init NoCloud datasource ISOs for VM
 provisioning.
 
 **Clone**: Creating a copy of an existing VM, including its disk image and
@@ -70,9 +70,9 @@ origins can make API requests. Configured via `daemon.cors_origins`.
 ## D
 
 **D-Bus**: A message bus system used for inter-process communication on Linux.
-vmspawn uses D-Bus (via `zbus`) to communicate with `systemd-machined`.
+Zyvor Fabric uses D-Bus (via `zbus`) to communicate with `systemd-machined`.
 
-**Datacenter**: The top level of the vmspawn organizational hierarchy, containing
+**Datacenter**: The top level of the Zyvor Fabric organizational hierarchy, containing
 one or more clusters.
 
 **DHCP Server**: Dynamic Host Configuration Protocol server managed via
@@ -90,7 +90,7 @@ clusters based on capacity and I/O load.
 **DNS Policy**: Per-VM DNS configuration including zone assignments, custom
 records, and resolution policies.
 
-**Driver**: An abstraction layer between vmspawnd and the underlying hypervisor
+**Driver**: An abstraction layer between Zyvor Fabric and the underlying hypervisor
 tooling. The `VMDriver` trait defines lifecycle operations (start, stop, etc.).
 
 ## E
@@ -156,7 +156,7 @@ VM memory access performance.
 ## J
 
 **journald**: The systemd journal daemon that captures and stores log messages.
-vmspawnd logs are available via `journalctl -u vmspawnd`.
+Zyvor Fabric logs are available via `journalctl -u Zyvor Fabric`.
 
 **JSON Web Token (JWT)**: A compact, URL-safe token format used for
 authentication. Contains encoded claims (user, role, expiration).
@@ -189,7 +189,7 @@ minimal downtime.
 concurrent conflicting operations.
 
 **LVM (Logical Volume Manager)**: A Linux storage management system that provides
-flexible disk partitioning. vmspawn supports LVM and LVM-thin storage pools.
+flexible disk partitioning. Zyvor Fabric supports LVM and LVM-thin storage pools.
 
 ## M
 
@@ -214,7 +214,7 @@ from a source to a destination for analysis.
 ## N
 
 **NAT (Network Address Translation)**: Remapping IP addresses in network packets.
-vmspawn supports SNAT, DNAT, and NAT pools.
+Zyvor Fabric supports SNAT, DNAT, and NAT pools.
 
 **Nested Virtualization**: Running a hypervisor inside a VM, enabling VMs to host
 their own VMs.
@@ -226,7 +226,7 @@ userspace processes, used for network configuration.
 network status.
 
 **nftables**: The Linux kernel packet filtering framework that replaced iptables.
-Used by vmspawn for firewall rules and NAT.
+Used by Zyvor Fabric for firewall rules and NAT.
 
 **NoCloud**: A cloud-init datasource that reads configuration from a local
 filesystem or attached ISO, without requiring a metadata service.
@@ -250,11 +250,11 @@ typically using tunneling protocols like VXLAN or WireGuard.
 
 ## P
 
-**Pagination**: Splitting large result sets into pages. vmspawn uses
+**Pagination**: Splitting large result sets into pages. Zyvor Fabric uses
 `offset`/`limit` query parameters with a maximum limit of 1000.
 
 **PAM (Pluggable Authentication Module)**: A Linux framework for authentication.
-vmspawnd uses PAM to authenticate users against the system.
+Zyvor Fabric uses PAM to authenticate users against the system.
 
 **Pause**: Suspending VM execution (freezing all vCPUs) without deallocating
 resources. The VM can be resumed instantly.
@@ -262,7 +262,7 @@ resources. The VM can be resumed instantly.
 **Per-VM Lock**: A mutex acquired before performing state-changing operations on
 a specific VM, preventing race conditions.
 
-**Plugin**: An extension module registered with the vmspawnd plugin registry for
+**Plugin**: An extension module registered with the Zyvor Fabric plugin registry for
 custom functionality.
 
 **Policy Engine**: The `network-policy` component that evaluates network access
@@ -274,7 +274,7 @@ analysis to proactively place VMs before resource contention occurs.
 **Profile**: A predefined set of VM resource specifications (CPU, memory, disk)
 similar to cloud instance types.
 
-**Prometheus**: An open-source monitoring system. vmspawn exposes metrics in
+**Prometheus**: An open-source monitoring system. Zyvor Fabric exposes metrics in
 Prometheus format at the `/metrics` endpoint.
 
 ## Q
@@ -283,7 +283,7 @@ Prometheus format at the `/metrics` endpoint.
 provisioning, snapshots, compression, and encryption.
 
 **QEMU**: Quick Emulator. A generic machine emulator and virtualizer used by
-vmspawn (via KVM) as the hypervisor.
+Zyvor Fabric (via KVM) as the hypervisor.
 
 **QoS (Quality of Service)**: Traffic management policies that prioritize,
 rate-limit, or guarantee bandwidth for VM network traffic.
@@ -300,7 +300,7 @@ assigned to roles (Admin, User, Viewer) rather than individual users.
 actual state and corrects any drift.
 
 **Recovery Point Objective (RPO)**: The maximum acceptable amount of data loss
-measured in time. vmspawn monitors RPO violations for replicated VMs.
+measured in time. Zyvor Fabric monitors RPO violations for replicated VMs.
 
 **Remediation**: The process of bringing a non-compliant host into compliance with
 a defined baseline by applying updates or configuration changes.
@@ -311,7 +311,7 @@ site for disaster recovery.
 **Resource Pool**: A logical partition of cluster resources (CPU, memory) assigned
 to a group of VMs, with admission control to enforce limits.
 
-**Reverse Proxy**: A server (nginx, Caddy) that sits in front of vmspawnd,
+**Reverse Proxy**: A server (nginx, Caddy) that sits in front of Zyvor Fabric,
 handling TLS termination and request routing.
 
 **Rolling Update**: Updating hosts in a cluster one at a time, ensuring continuous
@@ -332,7 +332,7 @@ load balancing, health checking, and traffic management for VM workloads.
 planned migration, disaster failover, and reprotection workflows.
 
 **SMBIOS**: System Management BIOS. Firmware tables that describe hardware
-configuration. vmspawn can inject custom SMBIOS data into VMs.
+configuration. Zyvor Fabric can inject custom SMBIOS data into VMs.
 
 **Snapshot**: A point-in-time capture of a VM's state (disk and optionally memory)
 that can be reverted to later.
@@ -340,7 +340,7 @@ that can be reverted to later.
 **Socket Activation**: A systemd feature where a service is started on-demand when
 a connection arrives on its listening socket.
 
-**spawn_bg!**: A Rust macro defined in vmspawnd that spawns a cancellable
+**spawn_bg!**: A Rust macro defined in Zyvor Fabric that spawns a cancellable
 background task with shared state access.
 
 **Spot Instance**: A VM that can be preempted (evicted) when resources are needed,
@@ -351,7 +351,7 @@ single physical network adapter to present multiple virtual functions to VMs for
 near-native network performance.
 
 **SSE (Server-Sent Events)**: A web technology for pushing real-time updates from
-server to client over HTTP. vmspawn uses SSE for VM state change notifications.
+server to client over HTTP. Zyvor Fabric uses SSE for VM state change notifications.
 
 **State Store**: The `state-store` crate providing persistent JSON file storage
 with an in-memory cache.
@@ -359,7 +359,7 @@ with an in-memory cache.
 **systemd-machined**: See "Machined".
 
 **systemd-networkd**: A systemd service that manages network configuration on
-Linux. vmspawn generates networkd config files for VM networking.
+Linux. Zyvor Fabric generates networkd config files for VM networking.
 
 **systemd-vmspawn**: A systemd tool for spawning and managing virtual machines
 using QEMU/KVM with tight systemd integration.
@@ -372,12 +372,12 @@ using QEMU/KVM with tight systemd integration.
 VMs connect to host networking via TAP devices bridged to a host bridge.
 
 **tc (Traffic Control)**: A Linux kernel subsystem for network traffic management,
-used by vmspawn for QoS and traffic shaping.
+used by Zyvor Fabric for QoS and traffic shaping.
 
 **Template**: A VM configuration blueprint that can be used to quickly deploy new
 VMs with predefined settings.
 
-**Tokio**: The async runtime used by vmspawnd. Provides task scheduling, async
+**Tokio**: The async runtime used by Zyvor Fabric. Provides task scheduling, async
 I/O, timers, and synchronization primitives.
 
 **tower**: A Rust library of modular and reusable components for building robust
@@ -391,7 +391,7 @@ provides cryptographic functions for secure boot, key storage, and attestation.
 **UEFI (Unified Extensible Firmware Interface)**: A modern firmware interface
 replacing legacy BIOS. Supports Secure Boot and larger disk support via GPT.
 
-**User Database**: The SQLite database (`auth.db`) that stores vmspawn user
+**User Database**: The SQLite database (`auth.db`) that stores Zyvor Fabric user
 accounts, password hashes, and roles.
 
 ## V
@@ -400,26 +400,26 @@ accounts, password hashes, and roles.
 the hypervisor.
 
 **VLAN (Virtual LAN)**: A logical network partition at the data link layer
-(IEEE 802.1Q). vmspawn can create VLAN devices via systemd-networkd.
+(IEEE 802.1Q). Zyvor Fabric can create VLAN devices via systemd-networkd.
 
 **VM (Virtual Machine)**: An isolated computing environment with its own virtual
 hardware (CPU, memory, disk, network), running its own operating system.
 
-**vmctl**: The vmspawn command-line client for managing VMs via the REST API.
+**vmctl**: The Zyvor Fabric command-line client for managing VMs via the REST API.
 
-**vmctl-tui**: The vmspawn terminal UI client using ratatui for a full-screen
+**vmctl-tui**: The Zyvor Fabric terminal UI client using ratatui for a full-screen
 interactive management interface.
 
-**VMDriver**: The trait defined in `vmspawnd-driver-core` that abstracts VM
+**VMDriver**: The trait defined in `Zyvor Fabric-driver-core` that abstracts VM
 lifecycle operations (start, stop, reboot, state query).
 
-**vmspawnd**: The main daemon process that hosts the REST API, WebSocket server,
+**Zyvor Fabric**: The main daemon process that hosts the REST API, WebSocket server,
 and background task system.
 
 **VMState**: An enumeration of possible VM states: Running, Stopped, Paused,
 Starting, Stopping, Failed, Unknown.
 
-**VNC (Virtual Network Computing)**: A graphical desktop sharing system. vmspawn
+**VNC (Virtual Network Computing)**: A graphical desktop sharing system. Zyvor Fabric
 provides a VNC proxy for browser-based graphical VM console access.
 
 **VPN Mesh**: A network of WireGuard VPN tunnels connecting VMs across hosts or
@@ -435,17 +435,17 @@ networking.
 ## W
 
 **WebSocket**: A full-duplex communication protocol over a single TCP connection.
-vmspawn uses WebSockets for real-time VM console access.
+Zyvor Fabric uses WebSockets for real-time VM console access.
 
-**Webhook**: An HTTP callback triggered by vmspawn when specific events occur,
+**Webhook**: An HTTP callback triggered by Zyvor Fabric when specific events occur,
 allowing integration with external systems.
 
-**WireGuard**: A modern, high-performance VPN protocol used by vmspawn for VPN
+**WireGuard**: A modern, high-performance VPN protocol used by Zyvor Fabric for VPN
 mesh networking between VMs.
 
 ## Z
 
-**zbus**: A Rust crate for D-Bus communication. vmspawn uses zbus for async
+**zbus**: A Rust crate for D-Bus communication. Zyvor Fabric uses zbus for async
 communication with systemd-machined.
 
 **Zone (Availability)**: A logical or physical grouping of hosts within a
@@ -455,4 +455,4 @@ datacenter, used for fault isolation and placement decisions.
 interfaces, similar to firewalld zones.
 
 **ZFS**: A combined file system and volume manager originally designed by Sun
-Microsystems. vmspawn supports ZFS as a storage pool backend.
+Microsystems. Zyvor Fabric supports ZFS as a storage pool backend.

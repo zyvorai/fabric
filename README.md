@@ -1,8 +1,10 @@
-# vmspawnd
+# Zyvor Fabric
 
-**A production-grade virtual machine management platform built on systemd-vmspawn and systemd-machined.**
+**A systemd-native private cloud control plane — clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support on Linux.**
 
-Manage VMs through a CLI, terminal UI, web dashboard, Kubernetes operator, or Terraform provider -- all backed by a single Rust daemon with 480+ REST API endpoints.
+Part of the [Zyvor](https://zyvor.dev) product family. Manage infrastructure through CLI, terminal UI, web dashboard, Kubernetes operator, or Terraform provider — all backed by the `Zyvor Fabric` Rust daemon with 480+ REST API endpoints.
+
+> **Positioning:** Proxmox + KubeVirt UX, without the heavyweight stack. A VM operations fabric built on systemd-vmspawn and systemd-machined — not another basic VM manager.
 
 ```
                         +-----------+    +-----------+    +----------+
@@ -13,8 +15,8 @@ Manage VMs through a CLI, terminal UI, web dashboard, Kubernetes operator, or Te
                     +---------+----------+     |      +--------+
                     |         |          |     |      |
                +----v----+   |   +------v-----v------v-------+
-               |   K8s   |   |   |       vmspawnd daemon      |
-               |Operator |   |   |   REST API + WebSocket      |
+               |   K8s   |   |   |  Zyvor Fabric (Zyvor Fabric) |
+               |Operator |   |   |   REST API + WebSocket    |
                +---------+   |   +---+----+----+----+----+----+
                               |       |    |    |    |    |
                +-----------+  |       |    |    |    |    |
@@ -152,13 +154,13 @@ sudo make install
 
 ```bash
 # Via systemd (recommended)
-sudo systemctl enable --now vmspawnd
+sudo systemctl enable --now Zyvor Fabric
 
 # Or run directly
-sudo ./backend/target/release/vmspawnd
+sudo ./backend/target/release/Zyvor Fabric
 
 # Check logs
-sudo journalctl -u vmspawnd -f
+sudo journalctl -u Zyvor Fabric -f
 ```
 
 ### Use
@@ -288,6 +290,7 @@ The full API surface covers 480+ REST endpoints. See [docs/api.md](docs/api.md) 
 - [docs/CPU_NUMA_OPTIMIZATION_GUIDE.md](docs/CPU_NUMA_OPTIMIZATION_GUIDE.md) -- CPU pinning and NUMA tuning
 
 ### Integrations
+- [docs/POSITIONING.md](docs/POSITIONING.md) -- Product positioning (Zyvor Fabric vs. Machina)
 - [operator/README.md](operator/README.md) -- Kubernetes operator
 - [terraform-provider/README.md](terraform-provider/README.md) -- Terraform provider
 

@@ -1,6 +1,6 @@
 # Backup Strategy Guide
 
-How to configure, automate, and verify backups for VMs managed by vmspawn.
+How to configure, automate, and verify backups for VMs managed by Zyvor Fabric.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ How to configure, automate, and verify backups for VMs managed by vmspawn.
 
 ## Backup Types
 
-vmspawn supports two backup types:
+Zyvor Fabric supports two backup types:
 
 ### Full Backup
 

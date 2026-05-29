@@ -1,4 +1,4 @@
-# vmspawnd REST API Documentation
+# Zyvor Fabric REST API Documentation
 
 ## Base URL
 
@@ -154,21 +154,21 @@ Content-Type: application/json
 |-------|------|-------------|
 | `scope` | `"system"` \| `"user"` | Manager scope (omitted = auto: system when root, user otherwise) |
 | `directory` | string | Root filesystem directory (alternative to image) |
-| `kvm` | bool? | KVM acceleration (`null` = omitted, uses vmspawn default) |
-| `secure_boot` | bool? | Secure Boot firmware (`null` = omitted, uses vmspawn default) |
-| `vsock` | bool? | VSock networking (`null` = omitted, uses vmspawn default) |
-| `vsock_cid` | u32? | VSock CID (`null` = omitted, uses vmspawn default) |
-| `tpm` | bool? | TPM support (`null` = omitted, uses vmspawn default) |
+| `kvm` | bool? | KVM acceleration (`null` = omitted, uses Zyvor Fabric default) |
+| `secure_boot` | bool? | Secure Boot firmware (`null` = omitted, uses Zyvor Fabric default) |
+| `vsock` | bool? | VSock networking (`null` = omitted, uses Zyvor Fabric default) |
+| `vsock_cid` | u32? | VSock CID (`null` = omitted, uses Zyvor Fabric default) |
+| `tpm` | bool? | TPM support (`null` = omitted, uses Zyvor Fabric default) |
 | `tpm_state` | string | TPM state path, `"auto"`, or `"off"` |
 | `linux` | string | Kernel image path for direct kernel boot |
 | `initrd` | string[] | Initrd paths (multiple are merged) |
 | `network_tap` | bool | Create a TAP device, requires root (default: `false`) |
 | `network_user_mode` | bool | Use user mode networking (default: `false`) |
 | `firmware` | string | Firmware definition file path |
-| `discard_disk` | bool? | Process discard/trim requests (`null` = omitted, vmspawn default: yes) |
+| `discard_disk` | bool? | Process discard/trim requests (`null` = omitted, Zyvor Fabric default: yes) |
 | `grow_image` | string | Grow image to size, e.g. `"50G"`. Validated format: digits + optional size suffix |
 | `smbios11` | string[] | SMBIOS Type #11 vendor strings (must not start with `io.systemd.credential`) |
-| `notify_ready` | bool? | Wait for READY=1 from VM init (`null` = omitted, vmspawn default: yes) |
+| `notify_ready` | bool? | Wait for READY=1 from VM init (`null` = omitted, Zyvor Fabric default: yes) |
 | `uuid` | string | Machine UUID (must be valid UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) |
 | `slice` | string | Systemd slice for scope unit (must end with `.slice`) |
 | `properties` | string[] | Resource-control properties only (e.g. `"MemoryMax=4G"`, `"CPUQuota=200%"`) |
@@ -180,11 +180,11 @@ Content-Type: application/json
 | `bind_user_shell` | string | Shell for bound users: `"yes"`, `"no"`, or an absolute path |
 | `bind_user_groups` | string[] | Auxiliary groups for bound users |
 | `forward_journal` | string | Forward VM journal to host (file or dir) |
-| `pass_ssh_key` | bool? | Generate and pass SSH key (`null` = omitted, vmspawn default: yes) |
+| `pass_ssh_key` | bool? | Generate and pass SSH key (`null` = omitted, Zyvor Fabric default: yes) |
 | `ssh_key_type` | enum | SSH key type: `"ed25519"`, `"ecdsa"`, `"rsa"` |
 | `console` | enum | Console mode: `"interactive"`, `"read-only"`, `"native"`, `"gui"` |
 | `background` | string | Terminal background color (ANSI SGR) |
-| `quiet` | bool | Suppress vmspawn status output (default: `false`) |
+| `quiet` | bool | Suppress Zyvor Fabric status output (default: `false`) |
 | `credentials` | Credential[] | Credentials via `--set-credential` |
 | `load_credentials` | LoadCredential[] | Credentials loaded from file via `--load-credential` |
 | `extra_args` | string[] | Extra kernel command line arguments (must not start with `-`) |

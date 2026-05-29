@@ -1,6 +1,6 @@
-# Ansible Collection for vmspawnd
+# Ansible Collection for Zyvor Fabric
 
-Ansible collection for automating vmspawnd virtual machine management. Provides modules for VM lifecycle, snapshots, networking, and configuration management.
+Ansible collection for automating Zyvor Fabric virtual machine management. Provides modules for VM lifecycle, snapshots, networking, and configuration management.
 
 ## Planned Module Structure
 
@@ -28,7 +28,7 @@ ansible/
 ```yaml
 - hosts: localhost
   collections:
-    - vmspawnd.vmspawnd
+    - Zyvor Fabric.Zyvor Fabric
 
   tasks:
     - name: Create a web server VM
@@ -51,7 +51,7 @@ ansible/
 
 ## Development
 
-This collection targets the vmspawnd REST API. Each module uses the shared
+This collection targets the Zyvor Fabric REST API. Each module uses the shared
 `vmspawnd_api.py` client utility which handles authentication, error handling,
 and request construction against the `/api/v1/` endpoints.
 
@@ -60,7 +60,7 @@ and request construction against the `/api/v1/` endpoints.
 - Python 3.9+
 - Ansible 2.14+
 - `requests` Python library
-- Running vmspawnd instance
+- Running Zyvor Fabric instance
 
 ### Testing
 

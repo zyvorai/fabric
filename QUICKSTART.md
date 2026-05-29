@@ -1,4 +1,4 @@
-# Quick Start Guide
+# Zyvor Fabric — Quick Start Guide
 
 ## Prerequisites
 
@@ -10,8 +10,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/ssahani/vmspawn.git
-cd vmspawn
+git clone https://github.com/ssahani/zyvor-fabric.git
+cd zyvor-fabric
 
 # Build backend (Rust)
 cd backend
@@ -31,7 +31,7 @@ cd ..
 
 ```bash
 cd backend
-cargo run --bin vmspawnd
+cargo run --bin Zyvor Fabric
 ```
 
 ### Terminal 2: Web UI
@@ -83,7 +83,7 @@ Access the web UI at `http://localhost:3000`
 ./scripts/install.sh
 
 # Enable and start daemon
-sudo systemctl enable --now vmspawnd
+sudo systemctl enable --now Zyvor Fabric
 
 # Use CLI
 vmctl list
@@ -92,7 +92,7 @@ vmctl-tui
 
 ## Access Web UI
 
-Once vmspawnd is running, access:
+Once Zyvor Fabric is running, access:
 
 ```
 http://localhost:9095
@@ -100,7 +100,7 @@ http://localhost:9095
 
 ## Authentication
 
-When auth is enabled (default), vmspawnd creates an `admin` user on first startup:
+When auth is enabled (default), Zyvor Fabric creates an `admin` user on first startup:
 
 ```bash
 # Read the auto-generated admin password
@@ -161,9 +161,9 @@ curl -X POST http://localhost:9095/api/vms/test-vm/start \
 ## Directory Structure
 
 ```
-vmspawn/
+Zyvor Fabric/
 ├── backend/              # Rust backend (40 crates: daemon, CLI, TUI, drivers, enterprise features)
-│   ├── vmspawnd/         # Main daemon with REST API + WebSocket
+│   ├── Zyvor Fabric/         # Main daemon with REST API + WebSocket
 │   ├── vmctl/            # CLI tool (JSON/YAML output, 15+ subcommand groups)
 │   ├── vmctl-tui/        # Terminal UI (8 views incl. Net Security)
 │   ├── vmspawn-driver/   # VM driver (systemd-vmspawn integration)
@@ -214,8 +214,8 @@ curl http://localhost:9095/health
 
 ### Permission errors
 
-vmspawnd requires root privileges to manage VMs:
+Zyvor Fabric requires root privileges to manage VMs:
 
 ```bash
-sudo ./backend/target/release/vmspawnd
+sudo ./backend/target/release/Zyvor Fabric
 ```

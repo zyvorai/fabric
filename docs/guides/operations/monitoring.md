@@ -1,6 +1,6 @@
 # Monitoring Guide
 
-How to monitor vmspawn health, collect metrics, subscribe to real-time events, and configure alerting.
+How to monitor Zyvor Fabric health, collect metrics, subscribe to real-time events, and configure alerting.
 
 ## Table of Contents
 
@@ -34,7 +34,7 @@ curl -s http://localhost:3000/health | jq
 
 **systemd watchdog:**
 
-vmspawnd integrates with systemd's watchdog mechanism. If the process becomes unresponsive, systemd will automatically restart it.
+Zyvor Fabric integrates with systemd's watchdog mechanism. If the process becomes unresponsive, systemd will automatically restart it.
 
 **HTTP health probes:**
 
@@ -53,20 +53,20 @@ modules:
 
 # Target
 - targets:
-  - http://vmspawn-host:3000/health
+  - http://Zyvor Fabric-host:3000/health
 ```
 
 **Load balancer health check:**
 
 ```nginx
 # nginx upstream health check
-upstream vmspawn {
+upstream Zyvor Fabric {
     server 127.0.0.1:3000;
     # Check health every 5 seconds
 }
 
 location /health {
-    proxy_pass http://vmspawn;
+    proxy_pass http://Zyvor Fabric;
     proxy_connect_timeout 2s;
     proxy_read_timeout 2s;
 }
@@ -127,12 +127,12 @@ AUTH="Authorization: Bearer $TOKEN"
 
 # Host stats
 curl -s "$HOST/api/system/resource-stats" -H "$AUTH" \
-  >> /var/log/vmspawnd/host-metrics.jsonl
+  >> /var/log/Zyvor Fabric/host-metrics.jsonl
 
 # Per-VM stats
 for vm in $(curl -s "$HOST/api/vms" -H "$AUTH" | jq -r '.items[].name'); do
   echo "{\"timestamp\":\"$(date -Is)\",\"vm\":\"$vm\",\"metrics\":$(curl -s "$HOST/api/vms/$vm/metrics" -H "$AUTH")}" \
-    >> /var/log/vmspawnd/vm-metrics.jsonl
+    >> /var/log/Zyvor Fabric/vm-metrics.jsonl
 done
 ```
 
@@ -225,7 +225,7 @@ with requests.get(url, headers=headers, stream=True) as response:
 
 ## Notification Channels
 
-vmspawn supports four notification channel types for delivering alerts to external systems.
+Zyvor Fabric supports four notification channel types for delivering alerts to external systems.
 
 ### Channel Types
 
@@ -248,9 +248,9 @@ curl -s -X POST http://localhost:3000/api/notifications/channels \
     "type": "email",
     "config": {
       "smtp_server": "smtp.company.com:587",
-      "from": "vmspawn@company.com",
+      "from": "Zyvor Fabric@company.com",
       "to": "ops-team@company.com",
-      "username": "vmspawn",
+      "username": "Zyvor Fabric",
       "password": "smtp-password"
     },
     "enabled": true
@@ -356,7 +356,7 @@ curl -s http://localhost:3000/api/notifications/rules \
 
 ## Webhook Retry Policies
 
-When a webhook delivery fails, vmspawn automatically retries with exponential backoff.
+When a webhook delivery fails, Zyvor Fabric automatically retries with exponential backoff.
 
 ### Retry Behavior
 
@@ -391,14 +391,14 @@ curl -s http://localhost:3000/api/notifications/webhooks/deliveries \
 
 1. Check the `error` field for the failure reason (connection refused, timeout, non-2xx status)
 2. Check the `response_code` field for HTTP status from the remote endpoint
-3. Verify the channel URL is correct and the remote endpoint is accessible from the vmspawn host
+3. Verify the channel URL is correct and the remote endpoint is accessible from the Zyvor Fabric host
 4. Test the channel manually: `POST /api/notifications/channels/:id/test`
 
 ---
 
 ## Log Aggregation
 
-vmspawn provides centralized access to journal logs from individual VMs and from the host system. Logs are retrieved on-demand via the `journalctl` backend, with support for filtering by priority level and text patterns.
+Zyvor Fabric provides centralized access to journal logs from individual VMs and from the host system. Logs are retrieved on-demand via the `journalctl` backend, with support for filtering by priority level and text patterns.
 
 ### Querying VM Logs
 
@@ -455,7 +455,7 @@ curl -s "http://localhost:3000/api/vms/db-server/logs?priority=3&grep=oom" \
 
 ### System-Wide Log Access
 
-The `/api/logs` endpoint provides access to the host system journal. This is useful for monitoring vmspawnd itself, kernel messages, and other system services.
+The `/api/logs` endpoint provides access to the host system journal. This is useful for monitoring Zyvor Fabric itself, kernel messages, and other system services.
 
 ```bash
 # Get recent system logs
@@ -463,7 +463,7 @@ curl -s "http://localhost:3000/api/logs?lines=200" \
   -H "Authorization: Bearer $TOKEN" | jq
 
 # Filter for vmspawnd service messages
-curl -s "http://localhost:3000/api/logs?grep=vmspawnd" \
+curl -s "http://localhost:3000/api/logs?grep=Zyvor Fabric" \
   -H "Authorization: Bearer $TOKEN" | jq
 
 # Get kernel errors

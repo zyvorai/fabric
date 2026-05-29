@@ -1,6 +1,6 @@
 # WebSocket API Reference
 
-Detailed specification for the vmspawn WebSocket console protocol, which provides interactive terminal access to running VMs.
+Detailed specification for the Zyvor Fabric WebSocket console protocol, which provides interactive terminal access to running VMs.
 
 ## Table of Contents
 

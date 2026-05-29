@@ -1,6 +1,6 @@
 [Unit]
 Description=Virtual Machine %i (vmspawnd)
-Documentation=https://github.com/ssahani/vmspawn
+Documentation=https://github.com/ssahani/zyvor-fabric
 After=vmspawnd.service network-online.target
 Wants=network-online.target
 BindsTo=vmspawnd.service

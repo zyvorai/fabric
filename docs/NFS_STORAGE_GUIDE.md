@@ -1,6 +1,6 @@
 # NFS Storage Guide
 
-Store VM disk images and templates on remote NFS servers for centralized storage, simplified backups, and shared access across multiple vmspawnd nodes.
+Store VM disk images and templates on remote NFS servers for centralized storage, simplified backups, and shared access across multiple Zyvor Fabric nodes.
 
 ---
 

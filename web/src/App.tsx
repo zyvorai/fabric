@@ -113,7 +113,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-300 tracking-wide">
-            Loading vmspawnd...
+            Loading Zyvor Fabric...
           </span>
         </div>
       </div>

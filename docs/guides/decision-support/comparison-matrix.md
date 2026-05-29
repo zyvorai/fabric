@@ -1,6 +1,6 @@
 # Comparison Matrix
 
-Feature-by-feature comparison of vmspawn against alternative VM management platforms: libvirt/virsh, Proxmox VE, and other tools.
+Feature-by-feature comparison of Zyvor Fabric against alternative VM management platforms: libvirt/virsh, Proxmox VE, and other tools.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ Feature-by-feature comparison of vmspawn against alternative VM management platf
 
 ## Architecture Comparison
 
-| Aspect | vmspawn | libvirt/virsh | Proxmox VE |
+| Aspect | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |--------|---------|---------------|------------|
 | **Hypervisor** | QEMU/KVM via systemd-vmspawn | QEMU/KVM (+ Xen, LXC) | QEMU/KVM + LXC |
 | **Management layer** | systemd-machined + REST API | libvirtd daemon + XML API | pvemanager + Perl API |
@@ -30,7 +30,7 @@ Feature-by-feature comparison of vmspawn against alternative VM management platf
 
 ### Key Architectural Differences
 
-**vmspawn** delegates VM process management to `systemd-machined` and uses `systemd-vmspawn` for launching VMs. This means VMs are first-class systemd units -- visible in `machinectl list`, their logs appear in `journalctl`, and their resource controls use standard cgroup hierarchies. The Rust backend provides a REST API layer over these systemd primitives.
+**Zyvor Fabric** delegates VM process management to `systemd-machined` and uses `systemd-vmspawn` for launching VMs. This means VMs are first-class systemd units -- visible in `machinectl list`, their logs appear in `journalctl`, and their resource controls use standard cgroup hierarchies. The Rust backend provides a REST API layer over these systemd primitives.
 
 **libvirt** provides its own abstraction layer over hypervisors. It manages VM lifecycle through its own daemon (libvirtd) and stores configuration as XML. It does not integrate with systemd-machined; VMs are tracked internally by libvirt.
 
@@ -40,7 +40,7 @@ Feature-by-feature comparison of vmspawn against alternative VM management platf
 
 ## API and Automation
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **REST API** | 480+ endpoints, JSON | No native REST (XML-RPC) | REST API available |
 | **API authentication** | JWT + PAM | SASL, polkit | Ticket-based + PAM |
@@ -54,7 +54,7 @@ Feature-by-feature comparison of vmspawn against alternative VM management platf
 
 ### API Design Philosophy
 
-vmspawn exposes every capability through a consistent REST API with JSON payloads. This makes it straightforward to integrate with CI/CD pipelines, custom scripts, and infrastructure-as-code tools without installing language-specific client libraries.
+Zyvor Fabric exposes every capability through a consistent REST API with JSON payloads. This makes it straightforward to integrate with CI/CD pipelines, custom scripts, and infrastructure-as-code tools without installing language-specific client libraries.
 
 libvirt requires binding to its C library (or using language-specific wrappers) and working with XML documents. While powerful, this creates a higher integration barrier for teams not already familiar with libvirt.
 
@@ -64,7 +64,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## VM Lifecycle
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **Create VM** | POST endpoint | `virsh define` + XML | Web UI or `qm create` |
 | **Start/stop/restart** | REST endpoints | `virsh start/shutdown/reboot` | Web UI or `qm start/stop` |
@@ -85,7 +85,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## Networking
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **Network backend** | systemd-networkd | libvirt virtual networks | Open vSwitch / Linux bridge |
 | **Bridge management** | REST API (CRUD) | XML network definitions | Web UI + `/etc/network/interfaces` |
@@ -108,7 +108,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## Storage
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **Local directory** | REST API pool | Storage pool XML | Directory storage |
 | **NFS** | REST API pool (NFSv3/v4) | Storage pool | NFS storage |
@@ -125,7 +125,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## Security
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **Authentication** | PAM + JWT | SASL + polkit | PAM + PVE + LDAP/AD |
 | **Authorization** | RBAC (Admin/User/Viewer) | polkit policies | RBAC with path-based ACLs |
@@ -142,7 +142,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## Monitoring and Observability
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **Health endpoint** | `/health` (HTTP) | Not available | `/api2/json/version` |
 | **VM metrics** | REST API (CPU, memory, I/O) | `virsh domstats` | RRD graphs via web UI |
@@ -158,7 +158,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## Operations
 
-| Feature | vmspawn | libvirt/virsh | Proxmox VE |
+| Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
 | **Backup types** | Full + incremental | Not built-in (use external) | Full + incremental (vzdump) |
 | **Backup scheduling** | Policy-based (daily/weekly/monthly) | Not built-in | Scheduled vzdump |
@@ -175,7 +175,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ## Summary
 
-### Choose vmspawn when:
+### Choose Zyvor Fabric when:
 
 - You want **deep systemd integration** where VMs are managed as first-class systemd units via machined, with logs in journald and resources in cgroups.
 - You need a **comprehensive REST API** (480+ endpoints) for automation-first infrastructure management.

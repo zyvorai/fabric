@@ -1,6 +1,6 @@
 # Authentication API Reference
 
-Detailed specification of the vmspawn authentication system, covering the login flow, JWT token structure, token lifecycle, role-based access control, and PAM integration.
+Detailed specification of the Zyvor Fabric authentication system, covering the login flow, JWT token structure, token lifecycle, role-based access control, and PAM integration.
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@ Detailed specification of the vmspawn authentication system, covering the login 
 Authentication is performed by sending system credentials to the login endpoint. The backend authenticates against PAM (Pluggable Authentication Modules) and issues a signed JWT token.
 
 ```
-Client                          vmspawnd                         PAM
+Client                          Zyvor Fabric                         PAM
   |                                |                              |
   |  POST /api/auth/login          |                              |
   |  {"username","password"}       |                              |
@@ -189,18 +189,18 @@ Non-admin users receive sanitized error messages that do not expose internal fil
 
 ## PAM Integration
 
-vmspawn authenticates against the system's PAM stack. This means:
+Zyvor Fabric authenticates against the system's PAM stack. This means:
 
-- **User accounts are system accounts.** There is no separate user database for vmspawn. Users log in with their Linux credentials.
+- **User accounts are system accounts.** There is no separate user database for Zyvor Fabric. Users log in with their Linux credentials.
 - **Password policies are inherited** from PAM modules (pam_pwquality, pam_faillock, etc.).
 - **Account lockouts, password aging, and two-factor authentication** are supported if configured at the PAM level.
-- **Group membership determines the role.** After successful authentication, vmspawn checks the user's Unix groups:
+- **Group membership determines the role.** After successful authentication, Zyvor Fabric checks the user's Unix groups:
   - Members of `wheel`, `sudo`, or `adm` receive the `admin` role.
   - All others receive the `user` role.
 
 ### PAM Service Configuration
 
-The PAM authentication call uses the service name configured in the vmspawnd binary (typically `vmspawnd` or `login`). Ensure the PAM service file exists at `/etc/pam.d/vmspawnd` or that the fallback service (`/etc/pam.d/other`) is permissive enough for your use case.
+The PAM authentication call uses the service name configured in the Zyvor Fabric binary (typically `Zyvor Fabric` or `login`). Ensure the PAM service file exists at `/etc/pam.d/Zyvor Fabric` or that the fallback service (`/etc/pam.d/other`) is permissive enough for your use case.
 
 ### Security Notes
 
@@ -253,7 +253,7 @@ Content-Type: application/json
 
 ## Two-Factor Authentication (TOTP)
 
-vmspawn supports optional TOTP-based two-factor authentication. When 2FA is enabled for a user, the login flow requires an additional `totp_code` field.
+Zyvor Fabric supports optional TOTP-based two-factor authentication. When 2FA is enabled for a user, the login flow requires an additional `totp_code` field.
 
 ### 2FA Setup Flow
 
@@ -263,7 +263,7 @@ Setting up 2FA is a two-step process:
 2. **Verify and enable** -- Scan the QR code or enter the secret into an authenticator app, then call `POST /api/auth/2fa/verify` with a valid TOTP code to confirm the setup.
 
 ```
-User                            vmspawnd
+User                            Zyvor Fabric
   |                                |
   |  POST /api/auth/2fa/setup      |
   |------------------------------->|
@@ -293,7 +293,7 @@ curl -s -X POST http://localhost:3000/api/auth/2fa/setup \
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "provisioning_uri": "otpauth://totp/vmspawn:admin?secret=JBSWY3DPEHPK3PXP&issuer=vmspawn",
+  "provisioning_uri": "otpauth://totp/Zyvor Fabric:admin?secret=JBSWY3DPEHPK3PXP&issuer=Zyvor Fabric",
   "qr_code": "data:image/png;base64,..."
 }
 ```

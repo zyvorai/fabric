@@ -1,6 +1,6 @@
 # VM Migration
 
-vmspawnd supports live (zero-downtime) and offline VM migration between cluster nodes.
+Zyvor Fabric supports live (zero-downtime) and offline VM migration between cluster nodes.
 
 ---
 
@@ -118,7 +118,7 @@ On the NFS server:
 sudo exportfs -ra
 ```
 
-On each vmspawnd node:
+On each Zyvor Fabric node:
 ```bash
 sudo mount node1:/var/lib/vmspawnd/images /var/lib/vmspawnd/images
 
@@ -133,7 +133,7 @@ echo "node1:/var/lib/vmspawnd/images /var/lib/vmspawnd/images nfs defaults 0 0" 
 # /etc/vmspawnd/vmspawnd.toml
 [storage]
 backend = "rbd"
-pool = "vmspawnd"
+pool = "Zyvor Fabric"
 monitors = ["mon1:6789", "mon2:6789", "mon3:6789"]
 ```
 
@@ -148,7 +148,7 @@ monitors = ["mon1:6789", "mon2:6789", "mon3:6789"]
 | **Live migration latency** | < 5ms RTT | < 1ms RTT |
 | **Offline migration latency** | < 100ms RTT | < 10ms RTT |
 
-Required ports: SSH (22) for rsync, vmspawnd API (8080).
+Required ports: SSH (22) for rsync, Zyvor Fabric API (8080).
 
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:9095/api/vms/myvm/migrate/schedule \
 
 | Problem | Solution |
 |---------|----------|
-| Migration fails | Check logs (`journalctl -u vmspawnd`), verify network connectivity and SSH access |
+| Migration fails | Check logs (`journalctl -u Zyvor Fabric`), verify network connectivity and SSH access |
 | High downtime | Reduce memory dirty rate, enable auto-converge, increase bandwidth, enable compression |
 | Incompatible CPUs | Use a lowest-common-denominator CPU model (`--cpu-model Nehalem`) |
 | Insufficient disk space | Check `df -h /var/lib/vmspawnd` on the target node |

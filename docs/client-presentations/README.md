@@ -1,4 +1,4 @@
-# vmspawn Client Presentations
+# Zyvor Fabric Client Presentations
 
 Presentation materials for client meetings, organized by audience and purpose. All HTML presentations use a professional dark-theme slide-deck format optimized for screen display and printing.
 
@@ -59,3 +59,7 @@ For a shorter pitch, use:
 
 1. **Executive Overview** (15 min)
 2. **Live Demo** (15 min)
+
+## Positioning
+
+See [Product Positioning](../POSITIONING.md) for Zyvor Fabric vs. Machina messaging.

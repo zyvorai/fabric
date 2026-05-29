@@ -1,6 +1,6 @@
 # Development Guide
 
-This section covers everything you need to know to contribute to the vmspawn
+This section covers everything you need to know to contribute to the Zyvor Fabric
 project, from setting up your development environment to submitting pull requests.
 
 ---
@@ -18,8 +18,8 @@ project, from setting up your development environment to submitting pull request
 
 ```bash
 # Clone the repository
-git clone https://github.com/example/vmspawn.git
-cd vmspawn
+git clone https://github.com/example/Zyvor Fabric.git
+cd zyvor-fabric
 
 # Build all backend crates
 cd backend && cargo build
@@ -31,7 +31,7 @@ cargo test
 cd ../web && npm install && npm run build
 
 # Run the daemon locally (needs root for KVM/network access)
-sudo ./backend/target/debug/vmspawnd
+sudo ./backend/target/debug/Zyvor Fabric
 ```
 
 ---
@@ -39,10 +39,10 @@ sudo ./backend/target/debug/vmspawnd
 ## Repository Structure
 
 ```
-vmspawn/
+Zyvor Fabric/
   |
   +-- backend/                 # Rust workspace (46 crates)
-  |   +-- vmspawnd/            # Main daemon binary
+  |   +-- Zyvor Fabric/            # Main daemon binary
   |   +-- vmctl/               # CLI client
   |   +-- vmctl-tui/           # Terminal UI client
   |   +-- vm-model/            # Core data structures
@@ -107,7 +107,7 @@ vmspawn/
 
 ### AppState
 
-All shared state is held in `AppState` (defined in `vmspawnd/src/server.rs`),
+All shared state is held in `AppState` (defined in `Zyvor Fabric/src/server.rs`),
 which is wrapped in `Arc` and injected into every Axum handler via the `State`
 extractor. Key fields include the state store, config, driver, all networking
 subsystems, the event broadcast channel, and the shutdown cancellation token.
@@ -127,7 +127,7 @@ launched via the `spawn_bg!` macro and participate in graceful shutdown.
 
 ### Driver Abstraction
 
-The `VMDriver` trait in `vmspawnd-driver-core` defines the interface for VM
+The `VMDriver` trait in `Zyvor Fabric-driver-core` defines the interface for VM
 lifecycle operations. The concrete implementation (`MachinectlDriver`) uses
 D-Bus to communicate with `systemd-machined`. This separation allows testing
 with mock drivers.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vmspawn - Executive Overview</title>
+<title>Zyvor Fabric - Executive Overview</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -33,21 +33,26 @@
   .card h3 { color: #60a5fa; }
   .icon { font-size: 2em; margin-bottom: 12px; }
   @media print { .slide { page-break-after: always; min-height: auto; padding: 40px; } }
+
+  .brand-line { font-size: 1em; color: #f97316; margin-top: 24px; font-weight: 600; }
+  .brand-line a { color: #f97316; text-decoration: none; }
 </style>
 </head>
 <body>
 
 <!-- Slide 1: Title -->
 <div class="slide title-slide">
-  <h1>vmspawn</h1>
-  <p class="subtitle">Next-Generation VM Management Platform</p>
-  <p style="font-size: 1.2em; color: #64748b; margin-top: 20px;">Enterprise virtual machine management, simplified.</p>
+  <h1>Zyvor Fabric</h1>
+  <p class="subtitle">Systemd-Native Private Cloud Control Plane</p>
+  <p style="font-size: 1.2em; color: #64748b; margin-top: 20px;">VM operations fabric — clustering, networking, security, storage, HA, and GPU on Linux.</p>
   <div style="margin-top: 40px;">
     <span class="badge">Built in Rust</span>
     <span class="badge">systemd-Native</span>
     <span class="badge">Single Binary</span>
-    <span class="badge">MIT Licensed</span>
-  </div>
+    <span class="badge">Zyvor Family</span>
+    <span class="badge" style="background:#431407;color:#f97316;">zyvor.dev</span>
+    <p class="brand-line"><a href="https://zyvor.dev" target="_blank" rel="noopener">zyvor.dev</a> · Part of the Zyvor product family · © 2026</p>
+</div>
 </div>
 
 <!-- Slide 2: The Problem -->
@@ -89,9 +94,9 @@
 <!-- Slide 3: The Solution -->
 <div class="slide">
   <h1>The Solution</h1>
-  <p class="subtitle">Enterprise VM management in a single binary</p>
+  <p class="subtitle">Private cloud control plane in a single binary</p>
   <p style="font-size: 1.3em; margin-bottom: 30px;">
-    vmspawn is a production-grade VM management platform built in Rust. It wraps
+    Zyvor Fabric is a production-grade private cloud control plane built in Rust. It wraps
     <span class="highlight">systemd-vmspawn</span> and <span class="highlight">systemd-machined</span>
     with a complete enterprise management layer.
   </p>
@@ -114,7 +119,7 @@
     </div>
   </div>
   <pre style="text-align: center; margin-top: 30px;"><code>sudo systemctl enable --now vmspawnd
-# That's it. Your VM platform is running.</code></pre>
+# That's it. Zyvor Fabric is running.</code></pre>
 </div>
 
 <!-- Slide 4: Key Benefits -->
@@ -248,11 +253,11 @@
 <!-- Slide 7: Competitive Advantage -->
 <div class="slide">
   <h1>Competitive Advantages</h1>
-  <p class="subtitle">Why vmspawn wins</p>
+  <p class="subtitle">Why Zyvor Fabric wins</p>
   <table>
     <tr>
       <th>Dimension</th>
-      <th>vmspawn</th>
+      <th>Zyvor Fabric</th>
       <th>Proxmox VE</th>
       <th>OpenStack</th>
       <th>VMware vSphere</th>
@@ -397,7 +402,8 @@
   <pre style="margin-top: 30px; display: inline-block;"><code>./vmspawnctl deploy
 # Your VM platform is live.</code></pre>
   <div style="margin-top: 40px;">
-    <span class="badge">MIT Licensed</span>
+    <span class="badge">Zyvor Family</span>
+    <span class="badge" style="background:#431407;color:#f97316;">zyvor.dev</span>
     <span class="badge">Production Ready</span>
     <span class="badge">Security Audited</span>
   </div>

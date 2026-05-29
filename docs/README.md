@@ -1,8 +1,10 @@
-# vmspawnd Documentation
+# Zyvor Fabric Documentation
 
-**Enterprise VM management built on systemd. One binary. Five minutes to production.**
+**Systemd-native private cloud control plane — clustering, networking, security, storage, HA, and GPU on Linux.**
 
-vmspawnd is a production-grade virtual machine management platform built in Rust. It wraps `systemd-vmspawn` and `systemd-machined` with a complete management layer -- 520+ REST API endpoints, a React web dashboard, PAM/JWT authentication, and enterprise features including HA clustering, live migration, network policies, and GPU passthrough.
+Zyvor Fabric wraps `systemd-vmspawn` and `systemd-machined` with a complete management layer: 520+ REST API endpoints, React web dashboard, PAM/JWT authentication, Kubernetes operator, and Terraform provider.
+
+See [Product Positioning](POSITIONING.md) for messaging and the Machina macOS companion roadmap.
 
 ---
 
@@ -10,7 +12,7 @@ vmspawnd is a production-grade virtual machine management platform built in Rust
 
 ### System Administrator
 
-You need to deploy, configure, and operate vmspawnd in production.
+You need to deploy, configure, and operate Zyvor Fabric in production.
 
 1. [Installation Guide](getting-started/01-Installation.md) -- system requirements and package installation
 2. [Configuration Reference](getting-started/03-Configuration.md) -- config file, environment variables, auth setup
@@ -19,7 +21,7 @@ You need to deploy, configure, and operate vmspawnd in production.
 
 ### Developer
 
-You need to integrate with the vmspawnd API or contribute to the codebase.
+You need to integrate with the Zyvor Fabric API or contribute to the codebase.
 
 1. [Quick Start](getting-started/02-Quick-Start.md) -- create your first VM in 5 minutes
 2. [API Reference](api.md) -- 520+ REST endpoints, WebSocket console, authentication
@@ -28,7 +30,7 @@ You need to integrate with the vmspawnd API or contribute to the codebase.
 
 ### Enterprise / Decision Maker
 
-You need to evaluate vmspawnd against existing solutions.
+You need to evaluate Zyvor Fabric against existing solutions.
 
 1. [Product Overview](PRODUCT_OVERVIEW.md) -- comparison tables, deployment models, feature matrix
 2. [Security Documentation](security.md) -- audit history, RBAC model, compliance
@@ -40,7 +42,7 @@ You need to evaluate vmspawnd against existing solutions.
 
 | Task | Guide |
 |------|-------|
-| Install vmspawnd | [Installation Guide](getting-started/01-Installation.md) |
+| Install Zyvor Fabric | [Installation Guide](getting-started/01-Installation.md) |
 | Create your first VM | [Quick Start](getting-started/02-Quick-Start.md) |
 | Configure the daemon | [Configuration Reference](getting-started/03-Configuration.md) |
 | Access the web dashboard | [Web UI Guide](getting-started/04-Web-UI.md) |

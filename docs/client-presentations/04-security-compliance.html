@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vmspawn - Security and Compliance</title>
+<title>Zyvor Fabric - Security and Compliance</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -35,6 +35,9 @@
   .warn { color: #f87171; }
   .safe { color: #34d399; }
   @media print { .slide { page-break-after: always; min-height: auto; padding: 40px; } }
+
+  .brand-line { font-size: 1em; color: #f97316; margin-top: 24px; font-weight: 600; }
+  .brand-line a { color: #f97316; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -117,7 +120,7 @@
       <h3>Enterprise SSO</h3>
       <div class="card">
         <h3>LDAP Integration</h3>
-        <p>Connect to Active Directory or OpenLDAP. Map LDAP groups to vmspawn roles. Automatic user provisioning on first login.</p>
+        <p>Connect to Active Directory or OpenLDAP. Map LDAP groups to Zyvor Fabric roles. Automatic user provisioning on first login.</p>
       </div>
       <div class="card">
         <h3>OIDC / OAuth2</h3>
@@ -448,7 +451,7 @@ if !canonical.starts_with(&allowed_base) {
     </div>
     <div>
       <h3>Why Rate Limiting Matters</h3>
-      <p>Without rate limiting, an attacker can attempt thousands of passwords per second. With vmspawn's limits:</p>
+      <p>Without rate limiting, an attacker can attempt thousands of passwords per second. With Zyvor Fabric's limits:</p>
       <table>
         <tr><th>Scenario</th><th>Without Limiting</th><th>With Limiting</th></tr>
         <tr><td>Attempts/hour</td><td>360,000+</td><td>60</td></tr>

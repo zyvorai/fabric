@@ -1,6 +1,6 @@
 # REST API Reference
 
-Complete reference for the vmspawn REST API, organized by functional category. All endpoints require JWT authentication unless noted otherwise.
+Complete reference for the Zyvor Fabric REST API, organized by functional category. All endpoints require JWT authentication unless noted otherwise.
 
 **Base URL:** `http://<host>:3000`
 
@@ -1551,7 +1551,7 @@ List all running machines known to systemd-machined.
   {
     "name": "my-vm",
     "class": "vm",
-    "service": "vmspawn",
+    "service": "Zyvor Fabric",
     "state": "running",
     "leader_pid": 12345
   }
@@ -2273,7 +2273,7 @@ Set up TOTP 2FA for the current user. Returns a TOTP secret and provisioning URI
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "provisioning_uri": "otpauth://totp/vmspawn:admin?secret=JBSWY3DPEHPK3PXP&issuer=vmspawn",
+  "provisioning_uri": "otpauth://totp/Zyvor Fabric:admin?secret=JBSWY3DPEHPK3PXP&issuer=Zyvor Fabric",
   "qr_code": "data:image/png;base64,..."
 }
 ```
@@ -2544,7 +2544,7 @@ Get system-wide journal logs from the host.
     {
       "timestamp": "2026-04-12T10:00:00Z",
       "priority": 6,
-      "unit": "vmspawnd.service",
+      "unit": "Zyvor Fabric.service",
       "message": "Listening on 0.0.0.0:3000"
     }
   ],

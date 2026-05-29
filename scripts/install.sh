@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== vmspawnd installer ==="
+echo "=== Zyvor Fabric installer (vmspawnd) ==="
 echo "Zyvor suite — zyvor.dev · HyperSDK · © 2026"
 echo "No git clone required after you have this tree."
 echo ""

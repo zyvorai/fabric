@@ -15,7 +15,7 @@ How to configure pricing, track resource usage, and generate invoices for multi-
 
 ## Overview
 
-vmspawn includes a built-in billing system that tracks resource consumption per VM and per tenant. The billing engine supports:
+Zyvor Fabric includes a built-in billing system that tracks resource consumption per VM and per tenant. The billing engine supports:
 
 - **Configurable pricing** -- Set per-unit rates for CPU, memory, disk, and network usage.
 - **Automatic usage tracking** -- Resource consumption is metered continuously and aggregated per billing period.
@@ -227,7 +227,7 @@ Add to cron:
 
 ```bash
 # Generate invoices on the 1st of each month at midnight
-0 0 1 * * /usr/local/bin/generate-invoices.sh >> /var/log/vmspawnd/billing.log 2>&1
+0 0 1 * * /usr/local/bin/generate-invoices.sh >> /var/log/Zyvor Fabric/billing.log 2>&1
 ```
 
 ### Cost Monitoring

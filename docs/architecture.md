@@ -1,8 +1,8 @@
-# vmspawnd Architecture
+# Zyvor Fabric Architecture
 
 ## Overview
 
-vmspawnd is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider -- all backed by systemd-vmspawn and systemd-machined.
+Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider -- all backed by systemd-vmspawn and systemd-machined.
 
 ## System Diagram
 
@@ -47,7 +47,7 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 
 | Crate | Purpose |
 |-------|---------|
-| `vmspawnd` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
+| `Zyvor Fabric` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
 | `vmspawn-driver` | systemd-vmspawn integration for VM creation and management |
 | `vm-model` | Core data structures: VM definitions, state enums, request/response types |
 | `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
@@ -58,14 +58,14 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 
 | Crate | Purpose |
 |-------|---------|
-| `vmspawnd-cgroup` | cgroup v2 resource management |
-| `vmspawnd-system` | System integration utilities |
-| `vmspawnd-vm` | VM model and type definitions |
-| `vmspawnd-storage` | Storage backend abstraction |
-| `vmspawnd-driver-core` | Driver core functionality |
-| `vmspawnd-machinectl-driver` | machinectl/systemd-machined integration via D-Bus |
-| `vmspawnd-machined-dbus` | systemd-machined D-Bus bindings (zbus) |
-| `vmspawnd-lock-manager` | Distributed lock management |
+| `Zyvor Fabric-cgroup` | cgroup v2 resource management |
+| `Zyvor Fabric-system` | System integration utilities |
+| `Zyvor Fabric-vm` | VM model and type definitions |
+| `Zyvor Fabric-storage` | Storage backend abstraction |
+| `Zyvor Fabric-driver-core` | Driver core functionality |
+| `Zyvor Fabric-machinectl-driver` | machinectl/systemd-machined integration via D-Bus |
+| `Zyvor Fabric-machined-dbus` | systemd-machined D-Bus bindings (zbus) |
+| `Zyvor Fabric-lock-manager` | Distributed lock management |
 
 ### Networking
 
@@ -162,7 +162,7 @@ User --> CLI / TUI / Web UI / K8s Operator / Terraform Provider
               REST API / WebSocket (Axum + Tokio)
                       |
                       v
-               Core Daemon (vmspawnd)
+               Core Daemon (Zyvor Fabric)
                  /          \
                 v            v
           VM Drivers     State Store (/var/lib/vmspawnd/)
@@ -189,12 +189,12 @@ VM state and artifacts are stored under `/var/lib/vmspawnd/`:
 
 | Unit | Purpose |
 |------|---------|
-| `vmspawnd.service` | Main daemon (Type=notify, WatchdogSec=60s) |
-| `vmspawnd.socket` | Socket activation on 0.0.0.0:8080 |
+| `Zyvor Fabric.service` | Main daemon (Type=notify, WatchdogSec=60s) |
+| `Zyvor Fabric.socket` | Socket activation on 0.0.0.0:8080 |
 | `vm@.service` | Per-VM service template |
-| `vmspawnd.sysusers` | System group creation |
-| `vmspawnd.tmpfiles` | Directory creation |
-| `vmspawnd.preset` | Default enable state |
+| `Zyvor Fabric.sysusers` | System group creation |
+| `Zyvor Fabric.tmpfiles` | Directory creation |
+| `Zyvor Fabric.preset` | Default enable state |
 
 The daemon runs with systemd hardening: `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, and capability bounding.
 

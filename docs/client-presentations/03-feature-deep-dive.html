@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vmspawn - Feature Deep Dive</title>
+<title>Zyvor Fabric - Feature Deep Dive</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -33,6 +33,9 @@
   .card { background: #1e293b; border-radius: 12px; padding: 24px; margin: 8px 0; }
   .card h3 { color: #60a5fa; }
   @media print { .slide { page-break-after: always; min-height: auto; padding: 40px; } }
+
+  .brand-line { font-size: 1em; color: #f97316; margin-top: 24px; font-weight: 600; }
+  .brand-line a { color: #f97316; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -159,7 +162,7 @@ vmctl start webserver</code></pre>
       <h3 style="margin-top: 20px;">How It Works</h3>
       <ol>
         <li>User provides cloud-init config via API or CLI</li>
-        <li>vmspawnd generates a NoCloud datasource ISO</li>
+        <li>Zyvor Fabric generates a NoCloud datasource ISO</li>
         <li>ISO is attached to the VM automatically</li>
         <li>VM boots and cloud-init runs on first start</li>
         <li>Configuration is applied, VM is ready to use</li>
@@ -711,7 +714,7 @@ Authorization: Bearer &lt;token&gt;
 # Response:
 {
   "secret": "BASE32SECRET...",
-  "otpauth_url": "otpauth://totp/vmspawnd:admin?..."
+  "otpauth_url": "otpauth://totp/Zyvor Fabric:admin?..."
 }
 
 # Step 2: Verify setup
@@ -748,7 +751,7 @@ POST /api/auth/login
         <li>Import from VMDK, VDI, and VHD formats</li>
         <li>Automatic conversion to qcow2</li>
         <li>Preserves VM configuration metadata</li>
-        <li>Enables seamless VMware-to-vmspawn migration</li>
+        <li>Enables seamless VMware-to-Zyvor Fabric migration</li>
       </ul>
     </div>
     <div>

@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        Virtual Machine Management Daemon
 
 License:        MIT
-URL:            https://github.com/ssahani/vmspawn
+URL:            https://github.com/ssahani/zyvor-fabric
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  cargo

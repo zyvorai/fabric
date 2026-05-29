@@ -156,7 +156,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 |------------|--------|-------------------------------------------|
 | `console`  | string | `"interactive"`, `"read-only"`, `"native"`, or `"gui"` |
 | `background`| string| Terminal background color (ANSI SGR code) |
-| `quiet`    | bool   | Suppress vmspawn status output            |
+| `quiet`    | bool   | Suppress Zyvor Fabric status output            |
 
 #### Identity
 
@@ -220,7 +220,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 ```
 
 The `tpm_state` field controls where TPM persistent state is stored:
-- `"auto"` -- vmspawn picks a directory automatically
+- `"auto"` -- Zyvor Fabric picks a directory automatically
 - `"off"` -- disable TPM regardless of the `tpm` flag
 - A path (e.g., `"/var/lib/vmspawnd/tpm/my-vm"`) -- explicit directory
 
@@ -424,7 +424,7 @@ xfs_growfs /
 
 ## Step 7: Cloud-Init Customization
 
-Cloud-init runs on first boot and configures the VM automatically. vmspawn
+Cloud-init runs on first boot and configures the VM automatically. Zyvor Fabric
 generates a cloud-init ISO that is attached to the VM.
 
 ### Full Cloud-Init Example
@@ -652,7 +652,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 
 ### Extra Arguments Validation
 
-- Must not start with `-` (prevents flag injection into vmspawn)
+- Must not start with `-` (prevents flag injection into Zyvor Fabric)
 - Must not contain control characters
 
 ---
@@ -814,7 +814,7 @@ The exported OVA file contains:
 
 | Scenario                     | Description                                      |
 |-----------------------------|--------------------------------------------------|
-| VMware migration            | Export from vmspawn, import into vSphere          |
+| VMware migration            | Export from Zyvor Fabric, import into vSphere          |
 | Disaster recovery           | Archive VM images to offline storage              |
 | Template distribution       | Share VM templates across air-gapped sites        |
 | Cross-platform testing      | Run the same VM on different hypervisors          |

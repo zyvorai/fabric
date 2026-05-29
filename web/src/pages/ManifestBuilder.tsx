@@ -44,7 +44,7 @@ export default function ManifestBuilder() {
   const toggleSection = (key: string) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
 
   const generateYAML = (): string => {
-    const lines: string[] = ['# vmspawnd VM manifest', `# Generated: ${new Date().toISOString()}`, '']
+    const lines: string[] = ['# Zyvor Fabric VM manifest', `# Generated: ${new Date().toISOString()}`, '']
     for (const section of SECTIONS) {
       const sectionValues = section.fields.filter(f => config[f.key] !== undefined && config[f.key] !== '' && config[f.key] !== false)
       if (sectionValues.length === 0) continue

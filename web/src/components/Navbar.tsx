@@ -8,6 +8,7 @@ import { Plus, Menu, X, Zap, LogOut, Keyboard, Info } from 'lucide-react'
 import type { HelpTab } from './HelpDialog'
 import NavIconCluster, { MobileNavSections } from './NavGroupsRow'
 import NavUtilityBar from './NavUtilityBar'
+import { ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { getPinnedPages } from '../utils/pinnedPages'
@@ -86,7 +87,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
         <div className="flex items-center w-full min-w-0 gap-2 min-h-[56px] py-2 lg:min-h-[52px]">
           <Link
             to="/"
-            title="vmspawnd — VM spawn & lifecycle"
+            title={`${ZYVOR_FABRIC_HELP.name} — ${ZYVOR_FABRIC_HELP.tagline}`}
             className={`flex items-center gap-2 sm:gap-2.5 group hover:scale-[1.02] transition-transform duration-200 shrink-0 ${
               steel ? 'nav-steel-brand' : aurora ? 'nav-aurora-brand' : ''
             }`}
@@ -115,7 +116,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
                     : 'text-base sm:text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent'
               }
             >
-              vmspawnd
+              {ZYVOR_FABRIC_HELP.name}
             </span>
           </Link>
 

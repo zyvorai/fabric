@@ -1,6 +1,6 @@
 # Storage Management
 
-vmspawnd supports multiple storage backends and provides a unified API for volume management, snapshots, and cloning.
+Zyvor Fabric supports multiple storage backends and provides a unified API for volume management, snapshots, and cloning.
 
 ---
 
@@ -29,13 +29,13 @@ path = "/var/lib/vmspawnd/volumes"
 [storage]
 backend = "nfs"
 server = "nfs.example.com"
-export = "/exports/vmspawnd"
-mount_point = "/mnt/vmspawnd"
+export = "/exports/Zyvor Fabric"
+mount_point = "/mnt/Zyvor Fabric"
 
 # Ceph/RBD
 [storage]
 backend = "rbd"
-pool = "vmspawnd"
+pool = "Zyvor Fabric"
 monitors = ["mon1.example.com", "mon2.example.com"]
 ```
 

@@ -1,6 +1,6 @@
 # Web UI Guide
 
-vmspawnd includes a React-based web dashboard for managing virtual machines through your browser. The dashboard provides real-time VM status, lifecycle management, console access, and bulk operations.
+Zyvor Fabric includes a React-based web dashboard for managing virtual machines through your browser. The dashboard provides real-time VM status, lifecycle management, console access, and bulk operations.
 
 ---
 
@@ -8,7 +8,7 @@ vmspawnd includes a React-based web dashboard for managing virtual machines thro
 
 ### Default URL
 
-After starting vmspawnd, open your browser and navigate to:
+After starting Zyvor Fabric, open your browser and navigate to:
 
 ```
 http://127.0.0.1:9095
@@ -18,7 +18,7 @@ The web UI is served directly by the vmspawnd daemon on the same port as the API
 
 ### Remote Access
 
-If vmspawnd is configured to listen on a non-localhost address:
+If Zyvor Fabric is configured to listen on a non-localhost address:
 
 ```toml
 [daemon]

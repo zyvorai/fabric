@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vmspawn - Technical Architecture</title>
+<title>Zyvor Fabric - Technical Architecture</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -33,6 +33,9 @@
   .card { background: #1e293b; border-radius: 12px; padding: 24px; margin: 8px 0; }
   .card h3 { color: #60a5fa; }
   @media print { .slide { page-break-after: always; min-height: auto; padding: 40px; } }
+
+  .brand-line { font-size: 1em; color: #f97316; margin-top: 24px; font-weight: 600; }
+  .brand-line a { color: #f97316; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -40,7 +43,7 @@
 <!-- Slide 1: Title -->
 <div class="slide title-slide">
   <h1>Technical Architecture</h1>
-  <p class="subtitle">vmspawn Platform Internals</p>
+  <p class="subtitle">Zyvor Fabric Platform Internals</p>
   <p style="font-size: 1.2em; color: #64748b; margin-top: 20px;">
     40+ Rust crates, 87K lines of code, built on systemd and Linux KVM
   </p>
@@ -78,7 +81,7 @@
                          |         |         |         |         |
                        VM Ops   Storage  Networking  Security  Monitoring
                          |         |         |         |         |
-  Driver Layer        vmspawn   qemu-img   nftables    PAM    Prometheus
+  Driver Layer        Zyvor Fabric   qemu-img   nftables    PAM    Prometheus
                       driver    lvm/zfs   wireguard   JWT      metrics
                          |         |         |         |         |
   System Layer        systemd-vmspawn    systemd-machined    Linux KVM
@@ -134,7 +137,7 @@
     <div class="card">
       <h3>Core Platform (6)</h3>
       <ul>
-        <li><code>vmspawnd</code> - Main daemon</li>
+        <li><code>Zyvor Fabric</code> - Main daemon</li>
         <li><code>vmctl</code> - CLI tool</li>
         <li><code>vmctl-tui</code> - Terminal UI</li>
         <li><code>vm-model</code> - Data models</li>
@@ -233,7 +236,7 @@
       </div>
       <div class="card">
         <h3>VNC Console</h3>
-        <p>noVNC proxy for graphical desktop access. Proxied through vmspawnd with token-based authentication.</p>
+        <p>noVNC proxy for graphical desktop access. Proxied through Zyvor Fabric with token-based authentication.</p>
       </div>
       <div class="card">
         <h3>Real-time Events</h3>

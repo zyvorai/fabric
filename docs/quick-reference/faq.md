@@ -4,41 +4,41 @@
 
 ## General
 
-### What is vmspawn?
+### What is Zyvor Fabric?
 
-vmspawn is an open-source virtual machine management platform built in Rust. It
+Zyvor Fabric is an open-source virtual machine management platform built in Rust. It
 provides a REST API, web UI, and CLI for managing the full lifecycle of virtual
 machines on Linux hosts using systemd-vmspawn, systemd-machined, QEMU, and KVM.
 
-### How is vmspawn different from libvirt/virt-manager?
+### How is Zyvor Fabric different from libvirt/virt-manager?
 
-vmspawn is built natively on systemd's machine management infrastructure rather
+Zyvor Fabric is built natively on systemd's machine management infrastructure rather
 than libvirt. It uses `systemd-vmspawn` for VM execution, `systemd-machined` for
 machine registration, and `systemd-networkd` for network configuration. This
 provides tighter systemd integration, journald logging, and cgroup-based resource
 management without the libvirt abstraction layer.
 
-### What hypervisor does vmspawn use?
+### What hypervisor does Zyvor Fabric use?
 
-vmspawn uses QEMU with KVM hardware acceleration. VMs are launched via
+Zyvor Fabric uses QEMU with KVM hardware acceleration. VMs are launched via
 `systemd-vmspawn`, which handles the QEMU process lifecycle, resource allocation,
 and systemd integration.
 
-### What operating systems can vmspawn manage?
+### What operating systems can Zyvor Fabric manage?
 
-vmspawn can run any operating system that QEMU/KVM supports, including Linux,
+Zyvor Fabric can run any operating system that QEMU/KVM supports, including Linux,
 Windows, FreeBSD, and others. The host must be Linux with systemd 254 or later.
 
-### How many VMs can vmspawn manage?
+### How many VMs can Zyvor Fabric manage?
 
 There is no hard-coded limit. The practical limit depends on host hardware
 resources (CPU, memory, disk, network). The per-VM lock map is pruned at 10,000
 entries, and the WebSocket connection limit is 50 concurrent sessions. The
 pagination API supports listing up to 1,000 VMs per request.
 
-### Is vmspawn production-ready?
+### Is Zyvor Fabric production-ready?
 
-vmspawn includes production-grade features: JWT authentication with RBAC, audit
+Zyvor Fabric includes production-grade features: JWT authentication with RBAC, audit
 logging, input validation and sanitization, per-VM locking, graceful shutdown,
 Prometheus metrics, and comprehensive error handling. It has undergone multiple
 rounds of security auditing. See the production deployment guide for recommended
@@ -58,7 +58,7 @@ concurrent VM operations, network configuration, and real-time event streaming.
 ### What is the role of systemd-machined?
 
 `systemd-machined` is a systemd service that maintains a registry of locally
-running virtual machines and containers. vmspawn uses it (via D-Bus) to query
+running virtual machines and containers. Zyvor Fabric uses it (via D-Bus) to query
 VM state, list machines, access properties, and manage machine lifecycle. The
 `MachinectlDriver` crate implements the `VMDriver` trait using this interface.
 
@@ -66,7 +66,7 @@ VM state, list machines, access properties, and manage machine lifecycle. The
 
 `systemd-vmspawn` is a systemd tool that launches QEMU virtual machines with
 proper systemd integration: cgroup placement, journal logging, machine
-registration, and resource management. vmspawn's `vmspawn-driver` crate builds
+registration, and resource management. Zyvor Fabric's `vmspawn-driver` crate builds
 the command-line invocation with all supported options from systemd v260.
 
 ### Why are there 46 crates?
@@ -79,7 +79,7 @@ driver crates abstract the hypervisor interface.
 
 ### How does the background task system work?
 
-vmspawnd uses the `spawn_bg!` macro to launch background tasks. Each task
+Zyvor Fabric uses the `spawn_bg!` macro to launch background tasks. Each task
 receives a cloned `Arc<AppState>` and a `CancellationToken`. Tasks run as
 independent Tokio tasks and are cancelled during graceful shutdown. There are
 20+ background tasks handling reconciliation, monitoring, health checking,
@@ -99,7 +99,7 @@ traversal. Each entity type is stored in its own subdirectory under
 
 ### How does authentication work?
 
-vmspawnd supports multiple authentication methods:
+Zyvor Fabric supports multiple authentication methods:
 1. **Built-in**: Users stored in a SQLite database with bcrypt password hashing
 2. **PAM**: Authentication delegated to the system PAM stack
 3. **LDAP**: Bind authentication against an LDAP directory
@@ -144,7 +144,7 @@ All user-supplied input is validated before use:
 
 ### What networking modes are supported?
 
-vmspawn supports:
+Zyvor Fabric supports:
 - **Bridge mode**: VMs connect to a host bridge (br0) for direct network access
 - **TAP mode**: Individual TAP devices for per-VM network isolation
 - **VLAN**: 802.1Q VLAN tagging for network segmentation
@@ -156,7 +156,7 @@ vmspawn supports:
 
 ### How does the firewall work?
 
-vmspawn provides per-VM firewall management:
+Zyvor Fabric provides per-VM firewall management:
 1. Create firewall profiles with ingress/egress rules
 2. Assign profiles to VMs
 3. Rules are enforced via nftables
@@ -173,7 +173,7 @@ service mesh provides service discovery and load balancing across hosts.
 
 ### What storage backends are supported?
 
-vmspawn supports six storage pool types:
+Zyvor Fabric supports six storage pool types:
 - **Local**: Directory on the host filesystem
 - **NFS**: Network File System mounts
 - **LVM**: Logical Volume Manager
@@ -197,7 +197,7 @@ distributions do).
 
 ### How do snapshots work?
 
-vmspawn snapshots capture the VM's disk state at a point in time. Snapshots are
+Zyvor Fabric snapshots capture the VM's disk state at a point in time. Snapshots are
 stored as metadata in the state store and the actual disk delta is managed by the
 underlying storage backend (e.g., QCOW2 overlay or LVM snapshot). You can revert
 to any snapshot, and snapshot trees are supported.
@@ -225,7 +225,7 @@ Multiple monitoring options:
 
 ### How do backups work?
 
-vmspawn provides an API-driven backup system:
+Zyvor Fabric provides an API-driven backup system:
 - Create on-demand backups via `POST /api/v1/backups`
 - Schedule automated backups with backup policies (cron syntax)
 - Restore from any backup via `POST /api/v1/backups/restore`
@@ -284,11 +284,11 @@ curl -s http://127.0.0.1:9095/api/v1/vms/my-vm/export/ova/download \
 
 The OVA archive includes the VM disk image, an OVF descriptor with hardware
 configuration, and a manifest file. The exported OVA can be imported into
-vmspawn, VMware, or VirtualBox.
+Zyvor Fabric, VMware, or VirtualBox.
 
 ### How do I manage secrets?
 
-vmspawn includes a built-in secrets manager for storing credentials, API keys,
+Zyvor Fabric includes a built-in secrets manager for storing credentials, API keys,
 and certificates. Secrets are encrypted at rest and accessible only to
 authorized users.
 
@@ -309,7 +309,7 @@ Secrets can be injected into VMs via cloud-init or systemd credentials using
 
 ### How do I scan for compliance?
 
-vmspawn supports compliance scanning against security baselines such as CIS
+Zyvor Fabric supports compliance scanning against security baselines such as CIS
 Benchmarks, DISA STIG, and PCI-DSS:
 
 ```bash
@@ -342,13 +342,13 @@ memory_rate = 0.005    # per GB per hour
 storage_rate = 0.0001  # per GB per hour
 ```
 
-Once enabled, vmspawn meters resource usage per VM. View usage with
+Once enabled, Zyvor Fabric meters resource usage per VM. View usage with
 `GET /api/v1/billing/usage`, list invoices with `GET /api/v1/billing/invoices`,
 and configure custom pricing tiers with `POST /api/v1/billing/pricing`.
 
 ### How do I view VM logs?
 
-vmspawn provides centralized log aggregation for all VMs:
+Zyvor Fabric provides centralized log aggregation for all VMs:
 
 ```bash
 # Get logs for a specific VM
@@ -371,7 +371,7 @@ Enable and configure iSCSI in the configuration file:
 ```toml
 [storage.iscsi]
 enabled = true
-initiator_name = "iqn.2026-01.com.example:vmspawnd"
+initiator_name = "iqn.2026-01.com.example:Zyvor Fabric"
 ```
 
 Then discover and connect to iSCSI targets:
@@ -396,7 +396,7 @@ Connected iSCSI LUNs can be used as storage pool backends for VM disks.
 
 Split-brain occurs when cluster nodes lose communication and each partition
 believes it is the sole authority, leading to conflicting state changes.
-vmspawn prevents split-brain using quorum-based fencing:
+Zyvor Fabric prevents split-brain using quorum-based fencing:
 
 - A cluster requires a majority of nodes (quorum) to accept write operations
 - Nodes that lose quorum are automatically fenced and stop serving requests
@@ -417,16 +417,16 @@ fencing_timeout_seconds = 30
 
 ## Configuration
 
-### Where does vmspawnd look for its config file?
+### Where does Zyvor Fabric look for its config file?
 
-vmspawnd checks the following paths in order, using the first one found:
+Zyvor Fabric checks the following paths in order, using the first one found:
 1. `/etc/vmspawnd/vmspawnd.toml`
 2. `configs/vmspawnd.toml` (relative to working directory)
 3. `vmspawnd.toml` (relative to working directory)
 
 If no config file is found, default values are used.
 
-### Can I run vmspawnd without authentication?
+### Can I run Zyvor Fabric without authentication?
 
 Yes, set `auth.enabled = false` in the configuration file. This is acceptable for
 local development but is strongly discouraged for any deployment accessible on a
@@ -447,14 +447,14 @@ For external access, always use a reverse proxy with TLS termination.
 Set `daemon.cors_origins` in `vmspawnd.toml`:
 ```toml
 [daemon]
-cors_origins = ["https://vmspawn.example.com", "http://localhost:5173"]
+cors_origins = ["https://Zyvor Fabric.example.com", "http://localhost:5173"]
 ```
 
 ---
 
 ## Troubleshooting
 
-### vmspawnd fails to start with "Failed to initialize machined D-Bus driver"
+### Zyvor Fabric fails to start with "Failed to initialize machined D-Bus driver"
 
 `systemd-machined` is not running or not installed. Start it:
 ```bash
@@ -463,11 +463,11 @@ sudo systemctl start systemd-machined
 
 ### VMs fail to start with permission errors
 
-Ensure the vmspawnd process has access to `/dev/kvm`:
+Ensure the Zyvor Fabric process has access to `/dev/kvm`:
 ```bash
 sudo chmod 666 /dev/kvm
-# Or add the vmspawnd user to the kvm group:
-sudo usermod -aG kvm vmspawnd
+# Or add the Zyvor Fabric user to the kvm group:
+sudo usermod -aG kvm Zyvor Fabric
 ```
 
 ### "Token expired" errors after daemon restart
@@ -484,12 +484,12 @@ If using the Vite dev server, add `http://localhost:5173`.
 
 ### VM state shows "Unknown"
 
-The VM may have been started outside of vmspawn, or `systemd-machined` may have
+The VM may have been started outside of Zyvor Fabric, or `systemd-machined` may have
 lost track of it. Check with `machinectl list` and verify the VM is registered.
 
-### High memory usage from vmspawnd process
+### High memory usage from Zyvor Fabric process
 
-The vmspawnd process itself should use well under 1 GB. If memory is high:
+The Zyvor Fabric process itself should use well under 1 GB. If memory is high:
 - Check the number of cached entities in the state store
 - Check WebSocket connection count (max 50)
 - Check the broadcast channel for slow consumers

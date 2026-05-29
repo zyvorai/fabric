@@ -2,11 +2,11 @@
 
 Deploy VMs across multiple physical hosts with datacenters, clusters, resource
 pools, live migration, high availability, and Distributed Resource Scheduling
-(DRS). This tutorial covers the enterprise clustering features of vmspawn.
+(DRS). This tutorial covers the enterprise clustering features of Zyvor Fabric.
 
 **Level:** Advanced
 **Time:** 60 minutes
-**Prerequisites:** Two or more hosts running vmspawnd, network connectivity between hosts
+**Prerequisites:** Two or more hosts running Zyvor Fabric, network connectivity between hosts
 
 ---
 
@@ -190,7 +190,7 @@ curl -s "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters" \
 ## Step 3: Register Hosts
 
 Register physical hypervisor hosts into a cluster. Each host runs its own
-vmspawnd instance.
+Zyvor Fabric instance.
 
 ### Register Host 01
 
@@ -388,7 +388,7 @@ Expected response:
 
 ## Step 5: VM Migration
 
-Move VMs between hosts within a cluster. vmspawn supports live migration
+Move VMs between hosts within a cluster. Zyvor Fabric supports live migration
 (minimal downtime), offline migration, and storage migration.
 
 ### Live Migration
@@ -504,7 +504,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/migrations/mig-e5f6a7b8-c9d0-1234-efgh-567890
 
 ## Step 6: High Availability
 
-When HA is enabled on a cluster, vmspawn monitors hosts and automatically
+When HA is enabled on a cluster, Zyvor Fabric monitors hosts and automatically
 restarts VMs on surviving hosts if a host fails.
 
 ### HA Architecture
@@ -512,7 +512,7 @@ restarts VMs on surviving hosts if a host fails.
 ```
                     +------------------+
                     |  HA Controller   |
-                    | (vmspawnd leader)|
+                    | (Zyvor Fabric leader)|
                     +--------+---------+
                              |
               +--------------+--------------+

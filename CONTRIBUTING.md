@@ -1,13 +1,13 @@
-# Contributing to vmspawnd
+# Contributing to Zyvor Fabric
 
-Thank you for your interest in contributing to vmspawnd.
+Thank you for your interest in contributing to Zyvor Fabric.
 
 ## Development Setup
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/ssahani/vmspawn.git
-cd vmspawn
+git clone https://github.com/ssahani/zyvor-fabric.git
+cd zyvor-fabric
 ```
 
 2. Build the backend:
@@ -24,7 +24,7 @@ npm install
 
 ## Project Structure
 
-The backend is a Cargo workspace containing 34 crates. Key crates include `vmspawnd` (the
+The backend is a Cargo workspace containing 34 crates. Key crates include `Zyvor Fabric` (the
 main daemon), `vmctl` (CLI), `vmctl-tui` (terminal UI), and `vmspawn-driver` (systemd-vmspawn
 integration). Shared libraries live under `backend/crates/` (storage, system, vm).
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# vmspawnd One-Shot Setup Script
+# Zyvor Fabric One-Shot Setup Script (vmspawnd)
 #
 # Downloads dependencies, builds, installs, starts daemon, and runs verification.
 # Works on fresh Fedora, RHEL, Ubuntu, and Debian systems.
@@ -83,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             cat <<USAGE
 Usage: sudo $0 [OPTIONS]
 
-One-shot setup for vmspawnd on Fedora/Ubuntu.
+One-shot setup for Zyvor Fabric (vmspawnd) on Fedora/Ubuntu.
 Installs deps, Rust, builds, installs, configures, and starts daemon.
 
 Options:
@@ -163,10 +163,10 @@ install_rust() {
 # 3. Build vmspawnd
 # ---------------------------------------------------------------------------
 build_vmspawnd() {
-    step "Building vmspawnd binaries"
+    step "Building Zyvor Fabric binaries (vmspawnd, vmctl)"
 
     local src_dir="${SCRIPT_DIR}"
-    [[ -f "${src_dir}/backend/Cargo.toml" ]] || die "Cargo.toml not found in ${src_dir}/backend/. Run from vmspawn source directory."
+    [[ -f "${src_dir}/backend/Cargo.toml" ]] || die "Cargo.toml not found in ${src_dir}/backend/. Run from zyvor-fabric source directory."
 
     cd "${src_dir}/backend"
 

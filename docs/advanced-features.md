@@ -84,7 +84,7 @@ runcmd:
 
 ### How It Works
 
-1. vmspawnd generates an ISO with NoCloud datasource (meta-data, user-data, optional network-config)
+1. Zyvor Fabric generates an ISO with NoCloud datasource (meta-data, user-data, optional network-config)
 2. The ISO is attached as a CD-ROM drive to the VM
 3. cloud-init inside the guest reads the config on first boot
 4. Supports both v1 and v2 network configuration formats
@@ -136,7 +136,7 @@ Manage VMs as native Kubernetes resources.
 ### CRD
 
 ```yaml
-apiVersion: vmspawnd.io/v1alpha1
+apiVersion: Zyvor Fabric.io/v1alpha1
 kind: VirtualMachine
 metadata:
   name: ubuntu-vm
@@ -158,7 +158,7 @@ spec:
 
 ```bash
 kubectl apply -f operator/crd.yaml
-helm install vmspawnd-operator operator/charts/vmspawnd-operator
+helm install Zyvor Fabric-operator operator/charts/Zyvor Fabric-operator
 ```
 
 ### Usage
@@ -173,7 +173,7 @@ kubectl delete vm ubuntu-vm
 ### Architecture
 
 ```
-Kubernetes API --> Controller (watches VirtualMachine CRs) --> vmspawnd REST API --> VMs
+Kubernetes API --> Controller (watches VirtualMachine CRs) --> Zyvor Fabric REST API --> VMs
 ```
 
 The operator continuously reconciles desired state with actual VM state, handling creation, updates, deletion, and status reporting.
@@ -187,7 +187,7 @@ See [operator/README.md](../operator/README.md) for full documentation.
 Declarative VM provisioning via HashiCorp Terraform.
 
 ```hcl
-provider "vmspawnd" {
+provider "Zyvor Fabric" {
   url   = "http://localhost:9095"
   token = var.vmspawnd_token
 }
@@ -243,7 +243,7 @@ See [terraform-provider/README.md](../terraform-provider/README.md) for full doc
 
 ```yaml
 scrape_configs:
-  - job_name: vmspawnd
+  - job_name: Zyvor Fabric
     static_configs:
       - targets: ['localhost:9095']
     metrics_path: /metrics
@@ -266,7 +266,7 @@ Import the pre-built dashboard from `monitoring/grafana-dashboard.json` for:
 Multi-node deployment for fault-tolerant operation.
 
 - **etcd-based state store** for consistent, replicated state
-- **Multi-node support** with concurrent vmspawnd instances
+- **Multi-node support** with concurrent Zyvor Fabric instances
 - **Live migration** of running VMs between hosts
 - **Automatic failover** on node failure
 - **Health monitoring** with heartbeats and fencing

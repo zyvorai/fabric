@@ -1,6 +1,6 @@
-# vmspawnd Kubernetes Operator
+# Zyvor Fabric Kubernetes Operator
 
-Manage virtual machines as native Kubernetes resources. The operator watches `VirtualMachine` custom resources and reconciles them against the vmspawnd API, handling creation, updates, deletion, and status reporting automatically.
+Manage virtual machines as native Kubernetes resources. The operator watches `VirtualMachine` custom resources and reconciles them against the Zyvor Fabric API, handling creation, updates, deletion, and status reporting automatically.
 
 ## Features
 
@@ -17,11 +17,11 @@ Manage virtual machines as native Kubernetes resources. The operator watches `Vi
 
 ```bash
 # Install CRD
-kubectl apply -f https://raw.githubusercontent.com/ssahani/vmspawn/main/operator/crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/ssahani/zyvor-fabric/main/operator/crd.yaml
 
 # Install operator via Helm
-helm repo add vmspawnd https://ssahani.github.io/vmspawn
-helm install vmspawnd-operator vmspawnd/vmspawnd-operator
+helm repo add Zyvor Fabric https://ssahani.github.io/Zyvor Fabric
+helm install Zyvor Fabric-operator Zyvor Fabric/Zyvor Fabric-operator
 ```
 
 ### Create a VM
@@ -29,7 +29,7 @@ helm install vmspawnd-operator vmspawnd/vmspawnd-operator
 Define a `VirtualMachine` resource:
 
 ```yaml
-apiVersion: vmspawnd.io/v1alpha1
+apiVersion: Zyvor Fabric.io/v1alpha1
 kind: VirtualMachine
 metadata:
   name: my-vm
@@ -75,7 +75,7 @@ Kubernetes API Server
   (watches VirtualMachine CRs)
         |
         v
-  vmspawnd REST API
+  Zyvor Fabric REST API
         |
         v
   Virtual Machines
@@ -83,7 +83,7 @@ Kubernetes API Server
 
 The operator runs a reconciliation loop that:
 1. Watches for `VirtualMachine` resource changes
-2. Compares desired spec against actual VM state in vmspawnd
+2. Compares desired spec against actual VM state in Zyvor Fabric
 3. Creates, updates, or deletes VMs to match the declared state
 4. Reports VM status back to the Kubernetes status subresource
 
@@ -105,7 +105,7 @@ The operator is configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VMSPAWND_URL` | `http://vmspawnd:8080` | URL of the vmspawnd API |
+| `VMSPAWND_URL` | `http://Zyvor Fabric:8080` | URL of the Zyvor Fabric API |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 
 ## Development
@@ -115,11 +115,11 @@ The operator is configured via environment variables:
 cd operator
 cargo build --release
 
-# Run locally (requires kubeconfig and vmspawnd access)
+# Run locally (requires kubeconfig and Zyvor Fabric access)
 cargo run
 
 # Build Docker image
-docker build -t vmspawnd-operator:latest .
+docker build -t Zyvor Fabric-operator:latest .
 
 # Run tests
 cargo test

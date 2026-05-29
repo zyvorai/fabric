@@ -1,6 +1,6 @@
 # Reference Documentation
 
-This directory contains detailed specifications and reference materials for the vmspawn platform.
+This directory contains detailed specifications and reference materials for the Zyvor Fabric platform.
 
 ## Contents
 

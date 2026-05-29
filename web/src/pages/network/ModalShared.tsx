@@ -4,6 +4,9 @@
 
 import { Trash2, X } from 'lucide-react'
 import { formatUserError } from '../../utils/apiError'
+import { ZYVOR_FABRIC_HELP } from '../../config/zyvorHelp'
+
+const FABRIC = ZYVOR_FABRIC_HELP.name
 
 export function ModalWrapper({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -66,7 +69,7 @@ export function HostManagedActions({
   if (readOnly) {
     if (isHostManaged(item)) {
       return (
-        <span className="text-xs text-slate-500" title="Managed outside vmspawnd">
+        <span className="text-xs text-slate-500" title={`Managed outside ${FABRIC}`}>
           {stateLabel ?? item.operational_state ?? 'external'}
         </span>
       )
@@ -76,7 +79,7 @@ export function HostManagedActions({
   if (isHostManaged(item)) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-500" title="Managed outside vmspawnd">
+        <span className="text-xs text-slate-500" title={`Managed outside ${FABRIC}`}>
           {stateLabel ?? item.operational_state ?? 'external'}
         </span>
         {onAdopt && (
@@ -84,7 +87,7 @@ export function HostManagedActions({
             type="button"
             onClick={onAdopt}
             className="px-2 py-1 text-xs rounded bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/40 transition"
-            title="Import into vmspawnd and write systemd-networkd config"
+            title={`Import into ${FABRIC} and write systemd-networkd config`}
           >
             {adoptLabel}
           </button>

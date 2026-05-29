@@ -1,6 +1,6 @@
 # Security
 
-vmspawnd provides authentication, authorization, TLS, audit logging, and API keys for securing access to the VM management API.
+Zyvor Fabric provides authentication, authorization, TLS, audit logging, and API keys for securing access to the VM management API.
 
 ---
 
@@ -21,7 +21,7 @@ enabled = true                          # Enable/disable authentication
 
 ### First Startup
 
-On first startup with authentication enabled, vmspawnd:
+On first startup with authentication enabled, Zyvor Fabric:
 
 1. **Creates an `admin` user** with a randomly generated password
 2. **Writes the password** to `/var/lib/vmspawnd/.admin_password` (mode `0600`, root-only readable)
@@ -38,7 +38,7 @@ To set a custom admin password before first startup:
 ```bash
 # Option 1: Environment variable
 export VMSPAWND_ADMIN_PASSWORD="your-strong-password"
-sudo systemctl start vmspawnd
+sudo systemctl start Zyvor Fabric
 
 # Option 2: Config file
 # Add to /etc/vmspawnd/vmspawnd.toml:
@@ -147,7 +147,7 @@ curl -X DELETE http://localhost:9095/api/auth/users/<user-id> \
 
 ## Credential Files
 
-vmspawnd stores sensitive credentials in `/var/lib/vmspawnd/` with restricted permissions:
+Zyvor Fabric stores sensitive credentials in `/var/lib/vmspawnd/` with restricted permissions:
 
 | File | Purpose | Permissions |
 |------|---------|-------------|
@@ -176,7 +176,7 @@ openssl req -x509 -newkey rsa:4096 \
   -keyout /etc/vmspawnd/key.pem \
   -out /etc/vmspawnd/cert.pem \
   -days 365 -nodes \
-  -subj "/CN=vmspawnd"
+  -subj "/CN=Zyvor Fabric"
 ```
 
 For production, use certificates from a trusted CA or an ACME provider (Let's Encrypt).
@@ -197,7 +197,7 @@ AUDIT: viewer DELETE vm/test DENIED at 2026-02-18T12:02:00Z
 
 ```bash
 # Via journalctl
-sudo journalctl -u vmspawnd | grep AUDIT
+sudo journalctl -u Zyvor Fabric | grep AUDIT
 
 # Via API (with filtering)
 curl -H "Authorization: Bearer <token>" \
@@ -235,7 +235,7 @@ sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 
 ```bash
 # On your workstation
-ssh -L 8080:localhost:9095 user@vmspawnd-server
+ssh -L 8080:localhost:9095 user@Zyvor Fabric-server
 
 # Then access via localhost
 curl http://localhost:9095/api/vms
@@ -263,13 +263,13 @@ curl http://localhost:9095/api/vms
 6. **Monitor audit logs** -- set up alerts for failed authentication and denied actions
 7. **Enable rate limiting** -- prevent brute-force and denial-of-service attacks
 8. **Use a firewall** -- restrict API access to management networks
-9. **Keep vmspawnd updated** -- apply security patches promptly
+9. **Keep Zyvor Fabric updated** -- apply security patches promptly
 10. **Delete `.admin_password`** after reading it -- avoid leaving credentials on disk
 
 ---
 
 ## Vulnerability Reporting
 
-Report security vulnerabilities to: **security@vmspawnd.io**
+Report security vulnerabilities to: **security@Zyvor Fabric.io**
 
 Do not disclose publicly until a patch is available.

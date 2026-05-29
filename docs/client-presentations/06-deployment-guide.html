@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vmspawn - Deployment Guide</title>
+<title>Zyvor Fabric - Deployment Guide</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -35,6 +35,9 @@
   .step { background: #1e293b; border-left: 4px solid #60a5fa; padding: 16px 24px; margin: 12px 0; border-radius: 0 8px 8px 0; }
   .step h3 { color: #60a5fa; margin-bottom: 8px; }
   @media print { .slide { page-break-after: always; min-height: auto; padding: 40px; } }
+
+  .brand-line { font-size: 1em; color: #f97316; margin-top: 24px; font-weight: 600; }
+  .brand-line a { color: #f97316; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -44,7 +47,7 @@
   <h1>Deployment Guide</h1>
   <p class="subtitle">From Zero to Production in Minutes</p>
   <p style="font-size: 1.2em; color: #64748b; margin-top: 20px;">
-    Planning, deploying, and operating vmspawn in your environment
+    Planning, deploying, and operating Zyvor Fabric in your environment
   </p>
 </div>
 
@@ -100,7 +103,7 @@ systemctl --version</code></pre>
   <div class="three-col">
     <div class="card">
       <h3>Single Server</h3>
-      <p style="margin-bottom: 12px;">One Linux server running vmspawnd with local storage.</p>
+      <p style="margin-bottom: 12px;">One Linux server running Zyvor Fabric with local storage.</p>
       <p><strong>Best for:</strong></p>
       <ul>
         <li>Development and testing</li>
@@ -116,7 +119,7 @@ systemctl --version</code></pre>
     </div>
     <div class="card">
       <h3>Multi-Node Cluster</h3>
-      <p style="margin-bottom: 12px;">Multiple vmspawnd nodes with shared storage and HA.</p>
+      <p style="margin-bottom: 12px;">Multiple Zyvor Fabric nodes with shared storage and HA.</p>
       <p><strong>Best for:</strong></p>
       <ul>
         <li>Production workloads</li>
@@ -133,7 +136,7 @@ systemctl --version</code></pre>
     </div>
     <div class="card">
       <h3>Kubernetes-Managed</h3>
-      <p style="margin-bottom: 12px;">vmspawnd nodes managed via Kubernetes operator.</p>
+      <p style="margin-bottom: 12px;">Zyvor Fabric nodes managed via Kubernetes operator.</p>
       <p><strong>Best for:</strong></p>
       <ul>
         <li>Mixed container + VM workloads</li>
@@ -144,7 +147,7 @@ systemctl --version</code></pre>
       <p style="margin-top: 12px;"><strong>Requirements:</strong></p>
       <ul>
         <li>Kubernetes cluster</li>
-        <li>vmspawn operator deployed</li>
+        <li>Zyvor Fabric operator deployed</li>
         <li>Bare-metal or nested-virt nodes</li>
       </ul>
     </div>
@@ -283,7 +286,7 @@ vmctl list</code></pre>
         <h3>Prometheus Integration</h3>
         <pre><code># Add to prometheus.yml
 scrape_configs:
-  - job_name: vmspawnd
+  - job_name: Zyvor Fabric
     static_configs:
       - targets: ['host:9095']
     metrics_path: /metrics</code></pre>
@@ -311,7 +314,7 @@ scrape_configs:
         <tr><td>Medium</td><td>10-50</td><td>16 cores, 64 GB, 2 TB NVMe</td></tr>
         <tr><td>Large</td><td>50-100</td><td>32 cores, 128 GB, 4 TB NVMe</td></tr>
       </table>
-      <h3 style="margin-top: 20px;">vmspawnd Overhead</h3>
+      <h3 style="margin-top: 20px;">Zyvor Fabric Overhead</h3>
       <ul>
         <li>Daemon: ~20 MB RSS</li>
         <li>Per-VM tracking: minimal (~1 KB state)</li>
@@ -322,7 +325,7 @@ scrape_configs:
     <div>
       <h3>Horizontal Scaling (Cluster)</h3>
       <ul>
-        <li><strong>Add nodes:</strong> Install vmspawnd, join etcd cluster</li>
+        <li><strong>Add nodes:</strong> Install Zyvor Fabric, join etcd cluster</li>
         <li><strong>Shared storage:</strong> NFS for simple, Ceph for HA</li>
         <li><strong>Load distribution:</strong> DRS auto-balances VMs</li>
         <li><strong>Live migration:</strong> Move VMs without downtime</li>
@@ -346,7 +349,7 @@ scrape_configs:
 
 <!-- Slide 8: Summary -->
 <div class="slide title-slide">
-  <h1>Deploying vmspawn Is Simple</h1>
+  <h1>Deploying Zyvor Fabric Is Simple</h1>
   <p class="subtitle">One command. Five minutes. Production ready.</p>
   <div style="margin-top: 30px;">
     <pre style="display: inline-block; text-align: left;"><code># Deploy

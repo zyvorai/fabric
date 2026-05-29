@@ -1,6 +1,6 @@
 # Web UI
 
-A modern React-based web interface for vmspawnd with real-time updates, 37+ pages, and comprehensive VM management.
+A modern React-based web interface for Zyvor Fabric with real-time updates, 37+ pages, and comprehensive VM management.
 
 ---
 
@@ -49,7 +49,7 @@ Access at `http://localhost:3000`. The dev server proxies API requests to `http:
 npm run build
 ```
 
-Output goes to `dist/`. In production, vmspawnd serves these static files directly.
+Output goes to `dist/`. In production, Zyvor Fabric serves these static files directly.
 
 ---
 

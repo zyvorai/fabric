@@ -1,9 +1,9 @@
 apiVersion: v2
 name: vmspawnd-operator
-description: Kubernetes operator for vmspawnd
+description: Kubernetes operator for Zyvor Fabric (vmspawnd)
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
 maintainers:
-  - name: vmspawnd contributors
-home: https://github.com/ssahani/vmspawn
+  - name: Zyvor Fabric contributors
+home: https://github.com/ssahani/zyvor-fabric

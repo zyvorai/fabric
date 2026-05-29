@@ -1,12 +1,12 @@
 # Tutorial 01: Your First VM
 
-Create, start, connect to, and tear down a virtual machine using the vmspawn
+Create, start, connect to, and tear down a virtual machine using the Zyvor Fabric
 REST API. By the end of this tutorial you will understand the core VM lifecycle
 and be ready to explore more advanced features.
 
 **Level:** Beginner
 **Time:** 30 minutes
-**Prerequisites:** vmspawnd running, `curl`, `jq`, KVM-capable host
+**Prerequisites:** Zyvor Fabric running, `curl`, `jq`, KVM-capable host
 
 ---
 
@@ -58,7 +58,7 @@ Expected response (empty list on a fresh install):
 
 ## Step 1: Download a Cloud Image
 
-vmspawn includes a catalog of well-known cloud images. List what is available:
+Zyvor Fabric includes a catalog of well-known cloud images. List what is available:
 
 ```bash
 curl -s "$VMSPAWN_HOST/api/images/cloud" \
@@ -172,7 +172,7 @@ Expected response:
 
 ## Step 2: Create a VM
 
-Create a VM definition. This registers the VM in vmspawnd but does not start it.
+Create a VM definition. This registers the VM in Zyvor Fabric but does not start it.
 
 ```bash
 curl -s -X POST "$VMSPAWN_HOST/api/vms" \
@@ -325,7 +325,7 @@ Expected response:
 
 ## Step 4: Connect via WebSocket Console
 
-vmspawn provides a WebSocket endpoint for interactive console access. You can
+Zyvor Fabric provides a WebSocket endpoint for interactive console access. You can
 connect using any WebSocket client. Here is an example using `websocat`:
 
 ```bash
@@ -385,7 +385,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/cloud-init" \
     "write_files": [
       {
         "path": "/etc/motd",
-        "content": "Welcome to my-first-vm, managed by vmspawn!\n"
+        "content": "Welcome to my-first-vm, managed by Zyvor Fabric!\n"
       }
     ]
   }' | jq .

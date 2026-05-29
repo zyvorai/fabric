@@ -1,6 +1,6 @@
-# vmspawn Quick Reference
+# Zyvor Fabric Quick Reference
 
-One-page cheat sheet for common operations with vmspawn.
+One-page cheat sheet for common operations with Zyvor Fabric.
 
 ---
 
@@ -456,7 +456,7 @@ image_path = "/var/lib/vmspawnd/images"  # VM images
 [network]
 bridge = "br0"                   # Default bridge
 networkd_config_dir = "/etc/systemd/network"
-networkd_file_prefix = "50-vmspawnd-"
+networkd_file_prefix = "50-Zyvor Fabric-"
 
 [auth]
 enabled = true                   # Enable authentication
@@ -488,8 +488,8 @@ mode = "standalone"              # or "controller"
 ss -tlnp | grep 9095
 
 # Check systemd service status
-sudo systemctl status vmspawnd
-journalctl -u vmspawnd -n 50
+sudo systemctl status Zyvor Fabric
+journalctl -u Zyvor Fabric -n 50
 
 # Check config file syntax
 cat /etc/vmspawnd/vmspawnd.toml | toml-lint  # or just try to start
@@ -508,8 +508,8 @@ systemctl status systemd-machined
 curl -s http://127.0.0.1:9095/api/v1/vms/my-vm \
   -H "Authorization: Bearer $TOKEN" | jq '.last_error'
 
-# Check systemd journal for vmspawn errors
-journalctl -u vmspawnd --since "5 min ago" | grep -i error
+# Check systemd journal for Zyvor Fabric errors
+journalctl -u Zyvor Fabric --since "5 min ago" | grep -i error
 ```
 
 ### Authentication failures

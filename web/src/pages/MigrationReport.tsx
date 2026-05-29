@@ -80,7 +80,7 @@ export default function MigrationReport() {
   const handleCopy = async () => {
     if (!report) return
     const lines = [
-      'vmspawnd Migration Report',
+      'Zyvor Fabric Migration Report',
       `Generated: ${new Date(report.timestamp).toLocaleString()}`,
       '',
       `Total: ${report.total}`,

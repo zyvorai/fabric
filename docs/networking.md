@@ -1,6 +1,6 @@
 # Networking
 
-vmspawnd provides comprehensive virtual networking with bridge management, VLANs, port forwarding, and an enterprise-grade network security stack including firewalls, VPN mesh, NAT gateways, traffic shaping, and packet mirroring.
+Zyvor Fabric provides comprehensive virtual networking with bridge management, VLANs, port forwarding, and an enterprise-grade network security stack including firewalls, VPN mesh, NAT gateways, traffic shaping, and packet mirroring.
 
 ---
 
@@ -97,17 +97,17 @@ curl -X DELETE http://localhost:9095/api/vms/myvm/port-forwards/8080
 ```toml
 [network]
 enable_dns = true
-domain = "vmspawnd.local"
+domain = "Zyvor Fabric.local"
 dns_servers = ["8.8.8.8", "8.8.4.4"]
 ```
 
-VMs automatically get DNS names: `myvm.vmspawnd.local`
+VMs automatically get DNS names: `myvm.Zyvor Fabric.local`
 
 ---
 
 ## Network Security Stack
 
-vmspawnd includes a Cilium-style network security stack. All security resources use label selectors to match VMs and run background reconciliation loops to keep the system in the desired state.
+Zyvor Fabric includes a Cilium-style network security stack. All security resources use label selectors to match VMs and run background reconciliation loops to keep the system in the desired state.
 
 ### Network Policies
 

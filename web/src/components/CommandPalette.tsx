@@ -145,7 +145,7 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
       },
       {
         id: 'help-about',
-        label: 'Help: about vmspawnd',
+        label: 'Help: about Zyvor Fabric',
         icon: <Info className="w-4 h-4" />,
         action: () => { close(); onOpenHelp('about') },
         category: 'Help',

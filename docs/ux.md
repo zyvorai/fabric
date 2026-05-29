@@ -1,4 +1,4 @@
-# vmspawnd web UX conventions
+# Zyvor Fabric web UX conventions
 
 Shared patterns for errors, empty lists, and shell chrome in [`web/src/`](../web/src/).
 
@@ -12,7 +12,7 @@ Three dark themes cycle from the navbar palette control:
 | `steel` | `.steel-theme` industrial accents |
 | `aurora` | `.aurora-theme` prismatic accents |
 
-Stored in `localStorage` as `vmspawnd-theme`.
+Stored in `localStorage` as `Zyvor Fabric-theme`.
 
 ## Primitives
 

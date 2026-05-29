@@ -1,12 +1,12 @@
-# vmspawnd Documentation Index
+# Zyvor Fabric Documentation Index
 
-Complete documentation index for the vmspawnd VM management platform.
+Complete documentation index for the Zyvor Fabric infrastructure control plane (`Zyvor Fabric` daemon).
 
 ---
 
 ## Getting Started
 
-Guides for new users to install, configure, and begin using vmspawnd.
+Guides for new users to install, configure, and begin using Zyvor Fabric.
 
 | Document | Description |
 |----------|-------------|
@@ -62,9 +62,9 @@ Step-by-step walkthroughs for common workflows.
 
 | Document | Description |
 |----------|-------------|
-| vmspawnd vs. Proxmox | Feature and architecture comparison |
-| vmspawnd vs. OpenStack | Scope, complexity, and deployment comparison |
-| vmspawnd vs. libvirt | Integration model and management layer comparison |
+| Zyvor Fabric vs. Proxmox | Feature and architecture comparison |
+| Zyvor Fabric vs. OpenStack | Scope, complexity, and deployment comparison |
+| Zyvor Fabric vs. libvirt | Integration model and management layer comparison |
 | Storage Backend Selection | Choosing between Local, NFS, LVM, ZFS, and Ceph |
 | Networking Architecture | Overlay vs. flat networking decisions |
 
@@ -282,7 +282,7 @@ Detailed documentation for each major feature area.
 
 | Item | Description |
 |------|-------------|
-| `vmspawn-sdk` | Typed Rust SDK for the vmspawnd API with async client |
+| `vmspawn-sdk` | Typed Rust SDK for the Zyvor Fabric API with async client |
 | Authentication | Login, token refresh, and 2FA helpers |
 | VM Operations | Create, start, stop, delete, clone, and snapshot VMs |
 | Storage / Networking | Pool, volume, bridge, VLAN, and firewall management |
@@ -398,7 +398,7 @@ The REST API is organized into the following endpoint groups:
 | JWT secret file | `/var/lib/vmspawnd/.jwt_secret` |
 | Admin password file | `/var/lib/vmspawnd/.admin_password` |
 | networkd config dir | `/etc/systemd/network/` |
-| networkd file prefix | `50-vmspawnd-` |
+| networkd file prefix | `50-Zyvor Fabric-` |
 | Network bridge | `br0` |
 
 ### VM Resource Limits
@@ -438,6 +438,13 @@ The REST API is organized into the following endpoint groups:
 | `VMSPAWND_BACKUP_DIR` | Override backup directory |
 | `VMSPAWND_BACKUP_RETAIN` | Override backup retention count |
 | `VMSPAWND_BACKUP_TYPE` | Override backup type |
+
+---
+
+## Product Positioning
+
+- [docs/POSITIONING.md](POSITIONING.md) — Zyvor Fabric vs. Machina, naming model, messaging
+- [client-presentations/](client-presentations/) — Client-facing HTML slide decks
 
 ---
 

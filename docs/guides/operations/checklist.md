@@ -1,6 +1,6 @@
 # Operational Checklist
 
-Step-by-step checklists for deploying, initializing, and maintaining vmspawn in production environments.
+Step-by-step checklists for deploying, initializing, and maintaining Zyvor Fabric in production environments.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ Step-by-step checklists for deploying, initializing, and maintaining vmspawn in 
 
 ## Pre-Deployment Checklist
 
-Complete these items before deploying vmspawnd to production.
+Complete these items before deploying Zyvor Fabric to production.
 
 ### Host Requirements
 
@@ -43,7 +43,7 @@ Complete these items before deploying vmspawnd to production.
 ### Security
 
 - [ ] **JWT secret** -- Strong random secret configured (at least 32 characters)
-- [ ] **TLS termination** -- Reverse proxy (nginx, caddy) with TLS in front of vmspawnd for production use
+- [ ] **TLS termination** -- Reverse proxy (nginx, caddy) with TLS in front of Zyvor Fabric for production use
 - [ ] **System users** -- Administrative user accounts created with appropriate group memberships (wheel/sudo for admin role)
 - [ ] **File permissions** -- `/var/lib/vmspawnd/` owned by the vmspawnd service user with restricted permissions
 
@@ -51,16 +51,16 @@ Complete these items before deploying vmspawnd to production.
 
 ## Day 1 Operations
 
-Initial setup tasks after deploying vmspawnd.
+Initial setup tasks after deploying Zyvor Fabric.
 
 ### 1. Start the Service
 
 ```bash
-# Enable and start vmspawnd
-sudo systemctl enable --now vmspawnd
+# Enable and start Zyvor Fabric
+sudo systemctl enable --now Zyvor Fabric
 
 # Verify it is running
-systemctl status vmspawnd
+systemctl status Zyvor Fabric
 
 # Check API health
 curl -s http://localhost:3000/health | jq
@@ -244,7 +244,7 @@ curl -N http://localhost:3000/api/events/stream \
 
 ## Day 2 Operations
 
-Ongoing operational tasks for a running vmspawn deployment.
+Ongoing operational tasks for a running Zyvor Fabric deployment.
 
 ### Monitoring
 
@@ -268,8 +268,8 @@ See the [Backup Strategy Guide](backup-strategy.md) for detailed procedures.
 
 ### Updates
 
-- [ ] **vmspawnd updates** -- Test new versions in a staging environment before production
-- [ ] **systemd updates** -- Verify compatibility when upgrading systemd (vmspawn requires v260+)
+- [ ] **Zyvor Fabric updates** -- Test new versions in a staging environment before production
+- [ ] **systemd updates** -- Verify compatibility when upgrading systemd (Zyvor Fabric requires v260+)
 - [ ] **Image maintenance** -- Rebuild base images monthly to include OS security patches
 - [ ] **Certificate rotation** -- Rotate TLS certificates on the reverse proxy before expiration
 
@@ -291,28 +291,28 @@ See the [Backup Strategy Guide](backup-strategy.md) for detailed procedures.
 
 ## Disaster Recovery Procedures
 
-### Scenario 1: vmspawnd Service Failure
+### Scenario 1: Zyvor Fabric Service Failure
 
-**Symptoms:** API returns connection refused; systemd reports vmspawnd as failed.
+**Symptoms:** API returns connection refused; systemd reports Zyvor Fabric as failed.
 
 **Recovery:**
 
 ```bash
 # 1. Check service status and logs
-systemctl status vmspawnd
-journalctl -u vmspawnd --since "30 min ago" --no-pager
+systemctl status Zyvor Fabric
+journalctl -u Zyvor Fabric --since "30 min ago" --no-pager
 
 # 2. Restart the service
-sudo systemctl restart vmspawnd
+sudo systemctl restart Zyvor Fabric
 
 # 3. Verify health
 curl -s http://localhost:3000/health | jq
 
-# 4. Check VMs are running (VMs persist independently of vmspawnd)
+# 4. Check VMs are running (VMs persist independently of Zyvor Fabric)
 machinectl list
 ```
 
-VMs continue running even if vmspawnd restarts. The daemon reconstructs state from systemd-machined and the state store on startup.
+VMs continue running even if Zyvor Fabric restarts. The daemon reconstructs state from systemd-machined and the state store on startup.
 
 ---
 
@@ -347,8 +347,8 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/start \
 **Recovery:**
 
 ```bash
-# 1. Ensure vmspawnd starts automatically
-sudo systemctl enable vmspawnd
+# 1. Ensure Zyvor Fabric starts automatically
+sudo systemctl enable Zyvor Fabric
 
 # 2. After reboot, check which machines have auto-start enabled
 machinectl list-images
@@ -451,7 +451,7 @@ ip addr show br0
 # 3. Check nftables rules
 sudo nft list ruleset
 
-# 4. Verify network configurations managed by vmspawn
+# 4. Verify network configurations managed by Zyvor Fabric
 curl -s http://localhost:3000/api/networkd/bridges \
   -H "Authorization: Bearer $TOKEN" | jq
 

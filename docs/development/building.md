@@ -1,6 +1,6 @@
 # Build Guide
 
-This document covers how to build the vmspawn project from source, including
+This document covers how to build the Zyvor Fabric project from source, including
 all backend crates and the React web UI.
 
 ---
@@ -112,7 +112,7 @@ cargo install cargo-watch
 ### Full Build
 
 ```bash
-cd vmspawn/backend
+cd backend
 
 # Debug build (faster compilation, larger binary, debug symbols)
 cargo build
@@ -122,7 +122,7 @@ cargo build --release
 ```
 
 The debug build produces binaries in `target/debug/`:
-- `vmspawnd` -- the main daemon
+- `Zyvor Fabric` -- the main daemon
 - `vmctl` -- the CLI client
 - `vmctl-tui` -- the terminal UI client
 
@@ -156,14 +156,14 @@ cargo build 2>&1 | grep -c "warning"
 Each of the 46 crates can be built and tested independently:
 
 ```bash
-cd vmspawn/backend
+cd backend
 
 # Build a specific crate
 cargo build -p vm-model
 cargo build -p state-store
 cargo build -p security
 cargo build -p vmspawn-driver
-cargo build -p vmspawnd-driver-core
+cargo build -p Zyvor Fabric-driver-core
 cargo build -p networking
 cargo build -p network-policy
 cargo build -p service-mesh
@@ -188,13 +188,13 @@ state-store (depends on vm-model)
 security (standalone)
     |
     v
-vmspawnd-driver-core (depends on vm-model)
+Zyvor Fabric-driver-core (depends on vm-model)
     |
     v
 vmspawn-driver (depends on vm-model)
     |
     v
-vmspawnd (depends on everything)
+Zyvor Fabric (depends on everything)
 ```
 
 ---
@@ -204,7 +204,7 @@ vmspawnd (depends on everything)
 ### Full Test Suite
 
 ```bash
-cd vmspawn/backend
+cd backend
 cargo test
 ```
 
@@ -235,7 +235,7 @@ cargo test test_create_vm
 cargo test test_validate
 
 # Run tests in a specific module
-cargo test -p vmspawnd routes::tests
+cargo test -p Zyvor Fabric routes::tests
 
 # Run tests with stdout output visible
 cargo test -- --nocapture
@@ -248,7 +248,7 @@ cargo test -- --test-threads=1
 
 ```bash
 # Run integration tests for the main daemon
-cargo test -p vmspawnd --test '*'
+cargo test -p Zyvor Fabric --test '*'
 
 # Note: Some integration tests may require root access for
 # KVM, network bridge, and systemd-machined operations.
@@ -261,7 +261,7 @@ cargo test -p vmspawnd --test '*'
 ### Development Build
 
 ```bash
-cd vmspawn/web
+cd zyvor-fabric/web
 
 # Install dependencies
 npm install
@@ -276,19 +276,19 @@ API requests to `http://127.0.0.1:9095`.
 ### Production Build
 
 ```bash
-cd vmspawn/web
+cd zyvor-fabric/web
 
 # Type-check and build for production
 npm run build
 ```
 
-The production build outputs static files to `web/dist/`, which vmspawnd
+The production build outputs static files to `web/dist/`, which Zyvor Fabric
 serves directly via `tower-http::ServeDir`.
 
 ### Linting and Testing
 
 ```bash
-cd vmspawn/web
+cd zyvor-fabric/web
 
 # Run ESLint
 npm run lint
@@ -310,27 +310,27 @@ frontend:
 ### Terminal 1: Backend
 
 ```bash
-cd vmspawn/backend
+cd backend
 
 # Option A: Manual rebuild
-cargo build && sudo ./target/debug/vmspawnd
+cargo build && sudo ./target/debug/Zyvor Fabric
 
 # Option B: Auto-rebuild with cargo-watch
 cargo watch -x build
 # Then in another terminal:
-sudo ./target/debug/vmspawnd
+sudo ./target/debug/Zyvor Fabric
 ```
 
 ### Terminal 2: Frontend
 
 ```bash
-cd vmspawn/web
+cd zyvor-fabric/web
 npm run dev
 ```
 
 ### Configuration for Development
 
-Create `vmspawn/backend/configs/vmspawnd.toml` (the daemon checks this
+Create `backend/configs/vmspawnd.toml` (the daemon checks this
 path before `/etc/vmspawnd/vmspawnd.toml`):
 
 ```toml
@@ -339,8 +339,8 @@ listen = "127.0.0.1:9095"
 cors_origins = ["http://127.0.0.1:9095", "http://localhost:5173"]
 
 [storage]
-path = "/tmp/vmspawnd-dev"
-image_path = "/tmp/vmspawnd-dev/images"
+path = "/tmp/Zyvor Fabric-dev"
+image_path = "/tmp/Zyvor Fabric-dev/images"
 
 [network]
 bridge = "br0"

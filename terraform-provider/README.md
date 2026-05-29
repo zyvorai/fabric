@@ -1,14 +1,14 @@
-# Terraform Provider for vmspawnd
+# Terraform Provider for Zyvor Fabric
 
-Provision and manage vmspawnd virtual machines using HashiCorp Terraform. Supports the full VM lifecycle with plan/apply workflow, cloud-init, TPM, and VNC configuration.
+Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. Supports the full VM lifecycle with plan/apply workflow, cloud-init, TPM, and VNC configuration.
 
 ## Installation
 
 ```hcl
 terraform {
   required_providers {
-    vmspawnd = {
-      source  = "ssahani/vmspawnd"
+    Zyvor Fabric = {
+      source  = "ssahani/zyvor-fabricd"
       version = "~> 0.1"
     }
   }
@@ -18,7 +18,7 @@ terraform {
 ## Provider Configuration
 
 ```hcl
-provider "vmspawnd" {
+provider "Zyvor Fabric" {
   endpoint = "http://localhost:9095"
   # token  = var.vmspawnd_token    # Required when auth is enabled
 }
@@ -26,7 +26,7 @@ provider "vmspawnd" {
 
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `endpoint` | Yes | -- | vmspawnd API URL |
+| `endpoint` | Yes | -- | Zyvor Fabric API URL |
 | `token` | No | -- | JWT or API key for authentication |
 
 ## Resources
@@ -132,14 +132,14 @@ resource "vmspawnd_vm" "app" {
 ### Build the Provider
 
 ```bash
-go build -o terraform-provider-vmspawnd
+go build -o terraform-provider-Zyvor Fabric
 ```
 
 ### Install Locally
 
 ```bash
-mkdir -p ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/linux_amd64
-cp terraform-provider-vmspawnd ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/linux_amd64/
+mkdir -p ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64
+cp terraform-provider-Zyvor Fabric ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64/
 ```
 
 ### Run Tests

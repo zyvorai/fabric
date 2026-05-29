@@ -110,7 +110,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="vmspawnd"
+        title="Zyvor Fabric"
         description="Virtual machine infrastructure overview"
         onRefresh={loadVMs}
         refreshing={loading}

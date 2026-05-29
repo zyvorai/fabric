@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This section covers how to deploy vmspawn in various environments, from development
+This section covers how to deploy Zyvor Fabric in various environments, from development
 workstations to production clusters.
 
 ---
@@ -16,11 +16,11 @@ workstations to production clusters.
 
 ## Deployment Modes
 
-vmspawn supports two deployment modes:
+Zyvor Fabric supports two deployment modes:
 
 ### Standalone Mode
 
-A single vmspawnd instance manages VMs on the local host. This is the default
+A single Zyvor Fabric instance manages VMs on the local host. This is the default
 mode and is suitable for:
 
 - Development and testing
@@ -35,7 +35,7 @@ mode = "standalone"
 
 ### Controller Mode
 
-A vmspawnd instance acts as a cluster controller, managing VMs across multiple
+A Zyvor Fabric instance acts as a cluster controller, managing VMs across multiple
 hosts via the host-agent. This mode enables:
 
 - Multi-host VM placement
@@ -78,7 +78,7 @@ bridge = "br0"
 EOF
 
 # 4. Run
-sudo ./target/release/vmspawnd
+sudo ./target/release/Zyvor Fabric
 ```
 
 The daemon will start listening on `127.0.0.1:9095`. Authentication is enabled

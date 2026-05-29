@@ -1,6 +1,6 @@
 # CLI Guide
 
-This section covers how to interact with the vmspawn REST API from the command line using standard tools like `curl` and `jq`.
+This section covers how to interact with the Zyvor Fabric REST API from the command line using standard tools like `curl` and `jq`.
 
 ## Contents
 
@@ -8,7 +8,7 @@ This section covers how to interact with the vmspawn REST API from the command l
 
 ## Prerequisites
 
-- A running vmspawn daemon (`vmspawnd`)
+- A running Zyvor Fabric daemon (`Zyvor Fabric`)
 - `curl` for HTTP requests
 - `jq` for JSON formatting (optional but recommended)
 - A valid user account (PAM-authenticated system user)

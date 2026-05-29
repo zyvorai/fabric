@@ -1,6 +1,6 @@
-# vmspawn Crate Map
+# Zyvor Fabric Crate Map
 
-This document catalogs all 51 crates in the vmspawn workspace, organized by domain.
+This document catalogs all 51 crates in the Zyvor Fabric workspace, organized by domain.
 Each entry includes the crate name, workspace path, and a brief description of its
 purpose.
 
@@ -23,25 +23,25 @@ purpose.
 
 ## Core
 
-These crates form the foundation of the vmspawn platform.
+These crates form the foundation of the Zyvor Fabric platform.
 
 | Crate          | Path                    | Description                                              |
 |----------------|-------------------------|----------------------------------------------------------|
-| `vmspawnd`     | `backend/vmspawnd`      | Main daemon binary. Axum HTTP server, 480+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
+| `Zyvor Fabric`     | `backend/Zyvor Fabric`      | Main daemon binary. Axum HTTP server, 480+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
 | `vm-model`     | `backend/vm-model`      | Core data structures: `VM`, `VMState`, `CreateVMRequest`, `VMStartOptions`, `VMMetrics`. Shared across all crates. |
 | `state-store`  | `backend/state-store`   | File-based persistent storage. Atomic JSON writes, in-memory VM cache, paginated queries, path traversal protection. |
 | `security`     | `backend/security`      | Authentication and authorization. JWT token management, PAM integration, RBAC (Admin/User/Viewer), user database (SQLite), audit logging, Axum extractors. |
 
 ## Drivers
 
-These crates abstract the interface between vmspawnd and the underlying hypervisor tooling.
+These crates abstract the interface between Zyvor Fabric and the underlying hypervisor tooling.
 
 | Crate                        | Path                              | Description                                              |
 |------------------------------|-----------------------------------|----------------------------------------------------------|
-| `vmspawnd-driver-core`       | `backend/crates/driver-core`      | Trait definitions: `VMDriver` (lifecycle operations), `ResourceStatsDriver` (metrics). Defines `MachineInfo`, `LogEntry`, `LogStream`. |
+| `Zyvor Fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions: `VMDriver` (lifecycle operations), `ResourceStatsDriver` (metrics). Defines `MachineInfo`, `LogEntry`, `LogStream`. |
 | `vmspawn-driver`             | `backend/vmspawn-driver`          | Process-based driver. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
-| `vmspawnd-machinectl-driver` | `backend/crates/machinectl-driver`| D-Bus driver implementing `VMDriver` trait. Communicates with `systemd-machined` via `zbus` for machine lifecycle, properties, and log streaming. |
-| `vmspawnd-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. |
+| `Zyvor Fabric-machinectl-driver` | `backend/crates/machinectl-driver`| D-Bus driver implementing `VMDriver` trait. Communicates with `systemd-machined` via `zbus` for machine lifecycle, properties, and log streaming. |
+| `Zyvor Fabric-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. |
 
 ## Networking
 
@@ -64,17 +64,17 @@ Ten crates provide a full-featured software-defined networking stack.
 
 | Crate                | Path                         | Description                                              |
 |----------------------|------------------------------|----------------------------------------------------------|
-| `vmspawnd-storage`   | `backend/crates/storage`     | Storage pool and volume management. Supports Local, NFS, LVM, LVM-Thin, ZFS, and Ceph backends. Volume attach/detach, online resize. |
+| `Zyvor Fabric-storage`   | `backend/crates/storage`     | Storage pool and volume management. Supports Local, NFS, LVM, LVM-Thin, ZFS, and Ceph backends. Volume attach/detach, online resize. |
 | `distributed-storage`| `backend/distributed-storage`| Distributed storage orchestration. Datastore clusters, storage migration, storage policies, SDRS recommendations, compliance checking. |
 
 ## System Internals
 
 | Crate                 | Path                          | Description                                              |
 |-----------------------|-------------------------------|----------------------------------------------------------|
-| `vmspawnd-system`     | `backend/crates/system`       | System resource management. CPU topology, NUMA placement, memory balloon, hugepages, KSM deduplication, nested virtualization. |
-| `vmspawnd-vm`         | `backend/crates/vm`           | VM-level utilities. Checkpoint/restore, VM forking, hotplug (CPU, memory, disk, NIC), firmware management (UEFI, Secure Boot, TPM). |
-| `vmspawnd-lock-manager`| `backend/crates/lock-manager`| Distributed lock management. Per-resource advisory locks with configurable TTL and automatic renewal. |
-| `vmspawnd-cgroup`     | `backend/crates/cgroup`       | Cgroup v2 integration. Resource accounting, CPU/memory/IO limits for VMs via the cgroup hierarchy. |
+| `Zyvor Fabric-system`     | `backend/crates/system`       | System resource management. CPU topology, NUMA placement, memory balloon, hugepages, KSM deduplication, nested virtualization. |
+| `Zyvor Fabric-vm`         | `backend/crates/vm`           | VM-level utilities. Checkpoint/restore, VM forking, hotplug (CPU, memory, disk, NIC), firmware management (UEFI, Secure Boot, TPM). |
+| `Zyvor Fabric-lock-manager`| `backend/crates/lock-manager`| Distributed lock management. Per-resource advisory locks with configurable TTL and automatic renewal. |
+| `Zyvor Fabric-cgroup`     | `backend/crates/cgroup`       | Cgroup v2 integration. Resource accounting, CPU/memory/IO limits for VMs via the cgroup hierarchy. |
 
 ## Management
 
@@ -117,15 +117,15 @@ Enterprise management features for large-scale VM deployments.
 
 | Crate       | Path                  | Description                                              |
 |-------------|-----------------------|----------------------------------------------------------|
-| `vmctl`     | `backend/vmctl`       | Command-line client. Talks to vmspawnd REST API. VM lifecycle commands, image management, status queries. |
+| `vmctl`     | `backend/vmctl`       | Command-line client. Talks to Zyvor Fabric REST API. VM lifecycle commands, image management, status queries. |
 | `vmctl-tui` | `backend/vmctl-tui`   | Terminal UI client. Full-screen ratatui-based interface for VM management with real-time status display. |
-| `vmspawn-sdk`| `backend/vmspawn-sdk` | Typed Rust SDK for the vmspawnd API. Async client with builder pattern, authentication helpers, VM lifecycle, storage, networking, and streaming support. |
+| `vmspawn-sdk`| `backend/vmspawn-sdk` | Typed Rust SDK for the Zyvor Fabric API. Async client with builder pattern, authentication helpers, VM lifecycle, storage, networking, and streaming support. |
 
 ### Web UI (not a Rust crate)
 
 | Component       | Path         | Description                                              |
 |-----------------|--------------|----------------------------------------------------------|
-| `vmspawnd-web`  | `web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
+| `Zyvor Fabric-web`  | `web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
 
 ---
 
@@ -136,14 +136,14 @@ Enterprise management features for large-scale VM deployments.
 | Dependency             | Version | Used By           | Purpose                          |
 |------------------------|---------|-------------------|----------------------------------|
 | `tokio`                | 1.44    | All async crates  | Async runtime                    |
-| `axum`                 | 0.8     | vmspawnd          | HTTP framework                   |
+| `axum`                 | 0.8     | Zyvor Fabric          | HTTP framework                   |
 | `serde` / `serde_json` | 1.0     | All crates        | Serialization                    |
 | `anyhow` / `thiserror` | 1.0/2.0 | All crates        | Error handling                   |
 | `tracing`              | 0.1     | All crates        | Structured logging               |
 | `zbus`                 | 4       | machined-dbus     | D-Bus client (async)             |
-| `tower-http`           | 0.6     | vmspawnd          | CORS, file serving, tracing      |
-| `reqwest`              | 0.12    | vmspawnd          | HTTP client for webhooks         |
-| `lettre`               | 0.11    | vmspawnd          | SMTP email notifications         |
+| `tower-http`           | 0.6     | Zyvor Fabric          | CORS, file serving, tracing      |
+| `reqwest`              | 0.12    | Zyvor Fabric          | HTTP client for webhooks         |
+| `lettre`               | 0.11    | Zyvor Fabric          | SMTP email notifications         |
 | `rusqlite`             | -       | security          | SQLite user database             |
 | `jsonwebtoken`         | -       | security          | JWT encode/decode                |
 | `pam`                  | -       | security          | PAM authentication               |
@@ -157,24 +157,24 @@ Enterprise management features for large-scale VM deployments.
 | `rand`                 | 0.9     | security, core    | Random number generation         |
 | `tar` / `flate2`       | 0.4/1.1 | content-library   | Archive handling                 |
 | `regex`                | 1.11    | validation        | Input validation patterns        |
-| `toml`                 | 0.8     | vmspawnd          | Configuration file parsing       |
-| `tokio-util`           | 0.7     | vmspawnd          | CancellationToken for shutdown   |
+| `toml`                 | 0.8     | Zyvor Fabric          | Configuration file parsing       |
+| `tokio-util`           | 0.7     | Zyvor Fabric          | CancellationToken for shutdown   |
 
 ### Internal Dependency Flow
 
 ```
-vmspawnd (main binary)
+Zyvor Fabric (main binary)
   |-- vm-model
   |-- state-store --> vm-model
   |-- security
   |-- vmspawn-driver --> vm-model
-  |-- vmspawnd-driver-core --> vm-model
-  |-- vmspawnd-machinectl-driver --> vmspawnd-driver-core, vmspawnd-machined-dbus
-  |-- vmspawnd-storage
-  |-- vmspawnd-system
-  |-- vmspawnd-vm
-  |-- vmspawnd-lock-manager
-  |-- vmspawnd-cgroup
+  |-- Zyvor Fabric-driver-core --> vm-model
+  |-- Zyvor Fabric-machinectl-driver --> Zyvor Fabric-driver-core, Zyvor Fabric-machined-dbus
+  |-- Zyvor Fabric-storage
+  |-- Zyvor Fabric-system
+  |-- Zyvor Fabric-vm
+  |-- Zyvor Fabric-lock-manager
+  |-- Zyvor Fabric-cgroup
   |-- networking
   |-- network-policy
   |-- service-mesh

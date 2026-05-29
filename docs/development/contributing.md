@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to vmspawn. This document covers
+Thank you for your interest in contributing to Zyvor Fabric. This document covers
 the development workflow, code style conventions, testing requirements, and
 pull request process.
 
@@ -34,8 +34,8 @@ pull request process.
 
 ```bash
 # Clone the repository
-git clone https://github.com/example/vmspawn.git
-cd vmspawn
+git clone https://github.com/example/Zyvor Fabric.git
+cd zyvor-fabric
 
 # Install Rust toolchain components
 rustup component add clippy rustfmt
@@ -110,7 +110,7 @@ cargo test test_create_vm
 cargo test -- --nocapture
 
 # Run integration tests only
-cargo test -p vmspawnd --test '*'
+cargo test -p Zyvor Fabric --test '*'
 ```
 
 ### Test Requirements
@@ -126,7 +126,7 @@ cargo test -p vmspawnd --test '*'
 
 ### Rust Conventions
 
-vmspawn follows standard Rust conventions with these specific preferences:
+Zyvor Fabric follows standard Rust conventions with these specific preferences:
 
 **Formatting**: Use `rustfmt` with default settings. Run `cargo fmt` before
 committing.
@@ -188,8 +188,8 @@ When adding new functionality, follow the established pattern:
 2. **Implement business logic** in a domain crate (e.g., `encryption`,
    `network-policy`)
 3. **Add state persistence** via `StateStore::save_entity` / `get_entity`
-4. **Create API handlers** in a new module under `vmspawnd/src/api/`
-5. **Register routes** in `vmspawnd/src/server.rs` `build_router()`
+4. **Create API handlers** in a new module under `Zyvor Fabric/src/api/`
+5. **Register routes** in `Zyvor Fabric/src/server.rs` `build_router()`
 6. **Add auth extractors** (`RequireRead`, `RequireWrite`, `RequireAdmin`)
 7. **Write audit log entries** for state-changing operations
 8. **Emit SSE events** for real-time notifications
@@ -219,7 +219,7 @@ Step-by-step example: adding a `GET /api/v1/vms/{name}/health` endpoint.
 ### 1. Create or update the API module
 
 ```rust
-// vmspawnd/src/api/vm_health.rs
+// Zyvor Fabric/src/api/vm_health.rs
 use axum::{extract::{Path, State}, http::StatusCode, response::IntoResponse, Json};
 use serde_json::json;
 use std::sync::Arc;
@@ -244,21 +244,21 @@ pub async fn get_vm_health(
 ### 2. Register the module
 
 ```rust
-// vmspawnd/src/api/mod.rs
+// Zyvor Fabric/src/api/mod.rs
 pub mod vm_health;
 ```
 
 ### 3. Add the route
 
 ```rust
-// vmspawnd/src/server.rs, inside build_router()
+// Zyvor Fabric/src/server.rs, inside build_router()
 .route("/vms/{name}/health", get(api::vm_health::get_vm_health))
 ```
 
 ### 4. Add tests
 
 ```rust
-// vmspawnd/tests/vm_health_test.rs
+// Zyvor Fabric/tests/vm_health_test.rs
 #[tokio::test]
 async fn test_get_vm_health() {
     // Set up test AppState, make request, assert response
@@ -290,7 +290,7 @@ async fn test_get_vm_health() {
    anyhow.workspace = true
    ```
 
-4. Add it as a dependency to `vmspawnd/Cargo.toml`:
+4. Add it as a dependency to `Zyvor Fabric/Cargo.toml`:
    ```toml
    my-new-crate = { path = "../my-new-crate" }
    ```

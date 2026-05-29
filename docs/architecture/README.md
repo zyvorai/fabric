@@ -1,8 +1,8 @@
-# vmspawn System Architecture
+# Zyvor Fabric System Architecture
 
-This document describes the architecture of vmspawn, a comprehensive virtual machine
+This document describes the architecture of Zyvor Fabric, a comprehensive virtual machine
 management platform built on systemd-vmspawn, systemd-machined, and the Linux KVM
-hypervisor. vmspawn provides a production-grade REST API, web UI, and CLI for
+hypervisor. Zyvor Fabric provides a production-grade REST API, web UI, and CLI for
 managing the full lifecycle of virtual machines.
 
 ---
@@ -40,7 +40,7 @@ managing the full lifecycle of virtual machines.
                          +----------+----------+
                                     |
                          +----------v----------+
-                         |      vmspawnd        |
+                         |      Zyvor Fabric        |
                          |   (Axum + Tokio)     |
                          |                      |
                          |  +----------------+  |
@@ -75,7 +75,7 @@ managing the full lifecycle of virtual machines.
    +----------v----------+  +------v------+  +-----------v-----------+
    |  QEMU / KVM          |  | Filesystem  |  | nftables / tc         |
    |  (Hypervisor)        |  | /var/lib/   |  | (Firewall / QoS)      |
-   +----------------------+  | vmspawnd/   |  +-----------------------+
+   +----------------------+  | Zyvor Fabric/   |  +-----------------------+
                              +-------------+
 ```
 
@@ -114,9 +114,9 @@ Client Request
 
 ## Component Overview
 
-### vmspawnd - The Core Daemon
+### Zyvor Fabric - The Core Daemon
 
-The `vmspawnd` binary is the central daemon that orchestrates all operations. It is
+The `Zyvor Fabric` binary is the central daemon that orchestrates all operations. It is
 structured as an Axum web server running on Tokio with the following subsystems:
 
 | Subsystem         | Description                                                |
@@ -219,7 +219,7 @@ set of options supported by systemd v260.
 Authentication and authorization are handled by the `security` crate:
 
 - **PAM integration**: Authenticates users against the system PAM stack
-  (service: `vmspawnd` or fallback to `login`)
+  (service: `Zyvor Fabric` or fallback to `login`)
 - **JWT tokens**: Issues and validates JSON Web Tokens with configurable expiration
 - **Token revocation**: In-memory revoked token set (JTI-based)
 - **RBAC**: Three roles -- Admin, User, Viewer
@@ -237,7 +237,7 @@ The workspace contains 46 crates organized into the following domains.
 See [crate-map.md](crate-map.md) for the complete listing.
 
 ```
-                                  vmspawnd
+                                  Zyvor Fabric
                                      |
                  +-------------------+-------------------+
                  |                   |                   |
@@ -254,15 +254,15 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 ### Domain Groups
 
-**Core** (5 crates): `vmspawnd`, `vm-model`, `state-store`, `security`, `vmspawnd-vm`
+**Core** (5 crates): `Zyvor Fabric`, `vm-model`, `state-store`, `security`, `Zyvor Fabric-vm`
 
-**Drivers** (4 crates): `vmspawn-driver`, `vmspawnd-driver-core`, `vmspawnd-machinectl-driver`, `vmspawnd-machined-dbus`
+**Drivers** (4 crates): `vmspawn-driver`, `Zyvor Fabric-driver-core`, `Zyvor Fabric-machinectl-driver`, `Zyvor Fabric-machined-dbus`
 
 **Networking** (10 crates): `networking`, `network-policy`, `service-mesh`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`
 
-**Storage** (2 crates): `vmspawnd-storage`, `distributed-storage`
+**Storage** (2 crates): `Zyvor Fabric-storage`, `distributed-storage`
 
-**System** (3 crates): `vmspawnd-system`, `vmspawnd-cgroup`, `vmspawnd-lock-manager`
+**System** (3 crates): `Zyvor Fabric-system`, `Zyvor Fabric-cgroup`, `Zyvor Fabric-lock-manager`
 
 **Management** (8 crates): `lifecycle-manager`, `certificate-manager`, `resource-pools`, `encryption`, `site-recovery`, `replication`, `migration`, `predictive-drs`
 
@@ -439,13 +439,13 @@ State transitions:
   +-- vmspawnd.toml            # Primary configuration file
 
 /etc/systemd/network/
-  +-- 50-vmspawnd-*.network    # Generated networkd configs
-  +-- 50-vmspawnd-*.netdev     # Generated netdev configs
+  +-- 50-Zyvor Fabric-*.network    # Generated networkd configs
+  +-- 50-Zyvor Fabric-*.netdev     # Generated netdev configs
 ```
 
 ### Storage Pools
 
-The `vmspawnd-storage` crate supports multiple storage backends:
+The `Zyvor Fabric-storage` crate supports multiple storage backends:
 
 | Type      | Description                        | Use Case                    |
 |-----------|------------------------------------|-----------------------------|
@@ -468,7 +468,7 @@ The `vmspawnd-storage` crate supports multiple storage backends:
 
 ## Networking Stack
 
-vmspawn includes a comprehensive networking stack spread across 10 crates:
+Zyvor Fabric includes a comprehensive networking stack spread across 10 crates:
 
 ```
 +------------------------------------------------------+
@@ -532,7 +532,7 @@ The `networkd` API module generates and manages systemd-networkd configuration f
 - **Port forwards**: NAT-based port forwarding rules
 
 All configuration files are written to `/etc/systemd/network/` with the
-`50-vmspawnd-` prefix and can be reloaded via `networkctl reload`.
+`50-Zyvor Fabric-` prefix and can be reloaded via `networkctl reload`.
 
 ### Background Reconciliation
 
@@ -559,7 +559,7 @@ to detect and correct configuration drift:
 ### Authentication Flow
 
 ```
-+-- Client ---------+      +-- vmspawnd --------------------+
++-- Client ---------+      +-- Zyvor Fabric --------------------+
 |                    |      |                                 |
 | POST /auth/login  | ---> |  1. Lookup user in SQLite DB    |
 | { username, pass } |      |  2. Verify bcrypt password hash |
@@ -568,7 +568,7 @@ to detect and correct configuration drift:
 | { token: "eyJ..." }|      |  5. Return token + user info    |
 +--------------------+      +---------------------------------+
 
-+-- Client ---------+      +-- vmspawnd --------------------+
++-- Client ---------+      +-- Zyvor Fabric --------------------+
 |                    |      |                                 |
 | GET /api/v1/vms   | ---> |  1. Extract Bearer token        |
 | Authorization:     |      |  2. Validate JWT signature      |
@@ -625,7 +625,7 @@ to detect and correct configuration drift:
 
 ### External Authentication
 
-In addition to built-in PAM + JWT authentication, vmspawn supports:
+In addition to built-in PAM + JWT authentication, Zyvor Fabric supports:
 
 - **LDAP**: Bind to an LDAP directory for user authentication
 - **OIDC**: OpenID Connect with any compliant identity provider
@@ -635,7 +635,7 @@ In addition to built-in PAM + JWT authentication, vmspawn supports:
 
 ## Background Task System
 
-vmspawnd uses a macro-based system to spawn and manage background tasks:
+Zyvor Fabric uses a macro-based system to spawn and manage background tasks:
 
 ### spawn_bg! Macro
 
@@ -743,21 +743,21 @@ web/
 
 ### API Integration
 
-The web UI communicates with vmspawnd via:
+The web UI communicates with Zyvor Fabric via:
 
 - **REST API**: Standard fetch calls with JWT Bearer token
 - **WebSocket**: VM console access (text terminal via xterm.js)
 - **WebSocket**: VNC proxy for graphical console (via noVNC)
 - **SSE**: Real-time event stream for VM state change notifications
 
-The UI is served as static files by vmspawnd itself via `tower-http::ServeDir`,
+The UI is served as static files by Zyvor Fabric itself via `tower-http::ServeDir`,
 so no separate web server is needed for development or production.
 
 ---
 
 ## Enterprise Features
 
-vmspawn includes enterprise-grade features that provide parity with commercial
+Zyvor Fabric includes enterprise-grade features that provide parity with commercial
 hypervisor management platforms:
 
 ### Datacenter Management
