@@ -1,14 +1,16 @@
 # Terraform Provider for Zyvor Fabric
 
-Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. Supports the full VM lifecycle with plan/apply workflow, cloud-init, TPM, and VNC configuration.
+Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. The provider type is **`vmspawnd`** (stable); registry namespace is **`ssahani/vmspawnd`**.
+
+> A future registry alias `ssahani/zyvor-fabric` may be published without breaking existing `vmspawnd` provider blocks.
 
 ## Installation
 
 ```hcl
 terraform {
   required_providers {
-    Zyvor Fabric = {
-      source  = "ssahani/zyvor-fabricd"
+    vmspawnd = {
+      source  = "ssahani/vmspawnd"
       version = "~> 0.1"
     }
   }
@@ -18,7 +20,7 @@ terraform {
 ## Provider Configuration
 
 ```hcl
-provider "Zyvor Fabric" {
+provider "vmspawnd" {
   endpoint = "http://localhost:9095"
   # token  = var.vmspawnd_token    # Required when auth is enabled
 }
@@ -26,7 +28,7 @@ provider "Zyvor Fabric" {
 
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `endpoint` | Yes | -- | Zyvor Fabric API URL |
+| `endpoint` | Yes | -- | Zyvor Fabric API URL (`vmspawnd`) |
 | `token` | No | -- | JWT or API key for authentication |
 
 ## Resources
@@ -132,14 +134,14 @@ resource "vmspawnd_vm" "app" {
 ### Build the Provider
 
 ```bash
-go build -o terraform-provider-Zyvor Fabric
+go build -o terraform-provider-vmspawnd
 ```
 
 ### Install Locally
 
 ```bash
-mkdir -p ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64
-cp terraform-provider-Zyvor Fabric ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64/
+mkdir -p ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/linux_amd64
+cp terraform-provider-vmspawnd ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/linux_amd64/
 ```
 
 ### Run Tests
@@ -147,3 +149,20 @@ cp terraform-provider-Zyvor Fabric ~/.terraform.d/plugins/ssahani/zyvor-fabricd/
 ```bash
 go test ./...
 ```
+
+## Registry migration (planned)
+
+When `ssahani/zyvor-fabric` is published to the Terraform Registry:
+
+```hcl
+terraform {
+  required_providers {
+    vmspawnd = {
+      source  = "ssahani/zyvor-fabric"
+      version = "~> 0.1"
+    }
+  }
+}
+```
+
+Provider type name `vmspawnd` and resource names remain unchanged — only the `source` address changes.

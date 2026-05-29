@@ -276,7 +276,7 @@ fi
 
 HEALTH_URL="${HEALTH_URL/http:\/\/127.0.0.1/http://${HOST}}"
 
-[[ -f "$REPO/backend/Cargo.toml" ]] || die "run from vmspawn repo root"
+[[ -f "$REPO/backend/Cargo.toml" ]] || die "run from zyvor-fabric repo root"
 [[ -n "${SSHPASS:-}" ]] && ! command -v sshpass &>/dev/null && die "install sshpass for password auth"
 command -v rsync &>/dev/null || die "rsync required"
 

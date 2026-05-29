@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-//! vmspawn SDK - Rust client library for the vmspawn VM management API.
+//! Zyvor Fabric SDK — Rust client for the vmspawnd REST API.
 
 use anyhow::Result;
 use serde::Serialize;
@@ -16,7 +16,7 @@ pub struct ClientConfig {
     pub token: Option<String>,
 }
 
-/// vmspawn API client.
+/// Zyvor Fabric (`vmspawnd`) API client.
 pub struct Client {
     http: reqwest::Client,
     base_url: String,

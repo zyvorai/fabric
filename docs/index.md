@@ -441,6 +441,11 @@ The REST API is organized into the following endpoint groups:
 
 ---
 
+## Integrations
+
+- [integrations/README.md](integrations/README.md) — Machina, Terraform, operator, Ansible
+- [MIGRATION-FROM-VMSPAWN.md](MIGRATION-FROM-VMSPAWN.md) — Clone URL and naming migration
+
 ## Product Positioning
 
 - [docs/POSITIONING.md](POSITIONING.md) — Zyvor Fabric vs. Machina, naming model, messaging

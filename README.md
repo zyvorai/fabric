@@ -291,6 +291,9 @@ The full API surface covers 480+ REST endpoints. See [docs/api.md](docs/api.md) 
 
 ### Integrations
 - [docs/POSITIONING.md](docs/POSITIONING.md) -- Product positioning (Zyvor Fabric vs. Machina)
+- [docs/MIGRATION-FROM-VMSPAWN.md](docs/MIGRATION-FROM-VMSPAWN.md) -- Rename and clone URL migration
+- [docs/integrations/](docs/integrations/) -- Machina and third-party integrations
+- [ARCHITECTURE.md](ARCHITECTURE.md) -- Architecture entry point
 - [operator/README.md](operator/README.md) -- Kubernetes operator
 - [terraform-provider/README.md](terraform-provider/README.md) -- Terraform provider
 

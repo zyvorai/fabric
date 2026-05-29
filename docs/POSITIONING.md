@@ -137,5 +137,6 @@ Then use the appropriate name for context (product in prose, `vmspawnd` in comma
 
 - Product: [zyvor.dev](https://zyvor.dev)
 - Repository: [github.com/ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric)
+- Migration: [MIGRATION-FROM-VMSPAWN.md](MIGRATION-FROM-VMSPAWN.md)
 - Documentation: [docs/index.md](index.md)
 - Client decks: [client-presentations/](client-presentations/)
