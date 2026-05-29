@@ -216,7 +216,7 @@ export default function App() {
         <section className="panel copilot">
           <h2>AI Infrastructure Copilot (v0.1)</h2>
           <p className="muted">
-            Rule-based assistant over live Fabric APIs. Local LLM integration planned for v0.4.
+            Rule-based assistant over live Fabric APIs — including per-VM metrics for performance questions. Local LLM integration planned for v0.4.
           </p>
           <div className="chat-log">
             {chat.length === 0 && (

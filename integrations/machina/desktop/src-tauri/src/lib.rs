@@ -117,6 +117,15 @@ fn fabric_stop_events(runtime: State<'_, FabricRuntime>) -> Result<(), String> {
     Ok(())
 }
 
+fn vm_name_in_question(question: &str, names: &[String]) -> Option<String> {
+    let q = question.to_lowercase();
+    names
+        .iter()
+        .filter(|name| q.contains(&name.to_lowercase()))
+        .max_by_key(|name| name.len())
+        .cloned()
+}
+
 #[tauri::command]
 async fn fabric_copilot(req: CopilotRequest) -> Result<String, String> {
     let client = client(&req.endpoint, req.token)?;
@@ -167,10 +176,32 @@ async fn fabric_copilot(req: CopilotRequest) -> Result<String, String> {
         ));
     }
 
-    if q.contains("slow") || q.contains("cpu") || q.contains("performance") {
+    if q.contains("slow") || q.contains("cpu") || q.contains("performance") || q.contains("memory") {
+        let names: Vec<String> = vms.iter().map(|v| v.name.clone()).collect();
+        let target = vm_name_in_question(question, &names).or_else(|| {
+            vms.iter()
+                .find(|v| format!("{:?}", v.state).to_lowercase().contains("running"))
+                .map(|v| v.name.clone())
+        });
+        if let Some(name) = target {
+            match client.vm_metrics(&name).await {
+                Ok(metrics) => {
+                    return Ok(format!(
+                        "Metrics for `{name}`:\n{}",
+                        serde_json::to_string_pretty(&metrics.raw).unwrap_or_else(|_| "{}".into())
+                    ));
+                }
+                Err(e) => {
+                    return Ok(format!(
+                        "Could not load metrics for `{name}`: {e}. \
+                         Ensure the VM is running and metrics are enabled on the Fabric host."
+                    ));
+                }
+            }
+        }
         return Ok(
-            "v0.1 copilot: check per-VM metrics with `machina-fabric vms metrics <name>` or the Metrics API. \
-             Look for CPU throttling, NUMA imbalance, and host pressure in Fabric metrics."
+            "Name a VM in your question (e.g. \"why is web-01 slow?\") or ensure at least one VM is running. \
+             You can also run `machina-fabric vms metrics <name>`."
                 .into(),
         );
     }
