@@ -26,6 +26,49 @@ header h1 {
   margin-top: 0.35rem;
 }
 
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.tab {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #475569;
+  background: transparent;
+  color: #cbd5e1;
+  font-weight: 500;
+  margin-top: 0;
+}
+
+.tab.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+button.secondary {
+  background: #334155;
+}
+
+button.danger {
+  background: #b91c1c;
+}
+
+.connect {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
 .panel {
   margin-top: 1.5rem;
   padding: 1.25rem;
@@ -101,4 +144,68 @@ footer {
 
 footer a {
   color: #f97316;
+}
+
+.event-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.event-list li {
+  display: grid;
+  grid-template-columns: 11rem 8rem 1fr;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #334155;
+  font-size: 0.85rem;
+}
+
+.ev-type {
+  font-family: ui-monospace, monospace;
+  color: #93c5fd;
+}
+
+.ev-detail {
+  grid-column: 1 / -1;
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.copilot .chat-log {
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.chat-bubble {
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+}
+
+.chat-bubble.user {
+  border-color: #2563eb55;
+}
+
+.chat-bubble.assistant {
+  border-color: #f9731655;
+}
+
+.chat-bubble pre {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 200px;
 }

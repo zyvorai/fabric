@@ -16,7 +16,7 @@ npm install
 npm run tauri dev
 ```
 
-Connect to a running `vmspawnd` instance (default `http://127.0.0.1:9095`). Paste a JWT if auth is enabled.
+Connect to a running `vmspawnd` instance. Use **Dashboard**, **Live events** (SSE), or **AI Copilot** (v0.1 rule-based).
 
 ## Build
 
