@@ -124,7 +124,7 @@ export default function Dashboard({ wsConnected }: { wsConnected: boolean }) {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gradient-blue">vmspawnd</h1>
+        <h1 className="text-2xl font-bold text-gradient-blue">Zyvor Fabric</h1>
         <p className="text-sm text-slate-400 mt-1">
           {wsConnected ? 'Real-time monitoring active' : 'Connecting...'}
         </p>

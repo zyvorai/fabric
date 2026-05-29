@@ -57,7 +57,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <Lock className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gradient-blue">
-            vmspawnd
+            Zyvor Fabric
           </h1>
           <p className="text-sm text-slate-400 mt-2">
             Sign in to your account
@@ -155,7 +155,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="mt-5 pt-4 border-t border-slate-700/50 text-center">
             <span className="text-slate-500 text-xs">
-              Virtual Machine Manager &middot; Powered by systemd-vmspawn
+              Systemd-native private cloud control plane &middot; Powered by systemd-vmspawn
             </span>
           </div>
         </form>

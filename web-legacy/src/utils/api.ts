@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 // ---------------------------------------------------------------------------
-// vmspawn API client
+// Zyvor Fabric API client (legacy UI)
 // ---------------------------------------------------------------------------
 // Complete typed API layer for 266+ backend endpoints.
 // All routes live under /api/ and are proxied by Vite in development.

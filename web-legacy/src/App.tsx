@@ -469,7 +469,7 @@ function App() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-300 tracking-wide">
-            Loading vmspawnd...
+            Loading Zyvor Fabric...
           </span>
         </div>
       </div>
@@ -519,7 +519,7 @@ function App() {
               className="flex items-center gap-2 mr-8 flex-shrink-0"
             >
               <h1 className="text-xl font-bold text-gradient-blue">
-                vmspawnd
+                Zyvor Fabric
               </h1>
             </button>
 

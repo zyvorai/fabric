@@ -10,7 +10,7 @@ PARENT="$(cd "${CANONICAL_ROOT}/.." && pwd)"
 
 REPOS=(
   Aether cockpit forge hyper2kvm- hypercluster hypersdk- hypersdk-web
-  IronWolf machina mkosi-kernel nightforge ragnarok v9s VMRogue vmspawn
+  IronWolf machina mkosi-kernel nightforge ragnarok v9s VMRogue zyvor-fabric
 )
 
 FILES=(

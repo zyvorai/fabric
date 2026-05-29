@@ -47,9 +47,9 @@ vmspawn_remote_dir_for_user() {
         return
     fi
     if [[ "$user" == "root" ]]; then
-        echo "/root/vmspawn"
+        echo "/root/zyvor-fabric"
     else
-        echo "/home/${user}/vmspawn"
+        echo "/home/${user}/zyvor-fabric"
     fi
 }
 

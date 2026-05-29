@@ -60,7 +60,7 @@ Prefer: ./scripts/deploy remote USER@HOST [flags]  |  ./scripts/deploy status
 
 deploy-remote.sh check [USER@HOST | USER HOST]
 
-Flow: rsync → ~/vmspawn (or DEPLOY_DIR) → build on server → install → systemd → web.
+Flow: rsync → ~/zyvor-fabric (or DEPLOY_DIR) → build on server → install → systemd → web.
 Full install: system deps + cargo build + systemd + dashboard.
 Quick: skip system deps (rsync + build + install + web).
 Open the UI at http://HOST:9095 (config listens on 0.0.0.0 for remote IPv4 deploys).
