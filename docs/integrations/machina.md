@@ -116,11 +116,15 @@ Uses `vmspawn-sdk` from this repository (including `Client::stream_events()` for
 
 ### Desktop app (Tauri)
 
+Tabs: **Dashboard** (VM inventory), **Live events** (SSE via `fabric_start_events`), **AI Copilot** (v0.1 rule-based Q&A over health, VMs, and event log).
+
 ```bash
 cd integrations/machina/desktop
 npm install
 npm run tauri dev
 ```
+
+Default endpoint: `http://127.0.0.1:9095`. Paste a JWT from `/api/auth/login` when auth is enabled.
 
 ---
 
