@@ -169,7 +169,10 @@ impl ReplicationManager {
 
     /// Register a new replication site.
     pub fn register_site(&self, site: ReplicationSite) -> Result<ReplicationSite> {
-        let mut sites = self.sites.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
+        let mut sites = self
+            .sites
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {}", e))?;
         if sites.contains_key(&site.id) {
             return Err(anyhow!("site already exists: {}", site.id));
         }
@@ -192,8 +195,13 @@ impl ReplicationManager {
 
     /// Update the connection status of a site.
     pub fn update_site_status(&self, id: &str, status: SiteStatus) -> Result<()> {
-        let mut sites = self.sites.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
-        let site = sites.get_mut(id).ok_or_else(|| anyhow!("site not found: {}", id))?;
+        let mut sites = self
+            .sites
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {}", e))?;
+        let site = sites
+            .get_mut(id)
+            .ok_or_else(|| anyhow!("site not found: {}", id))?;
         site.status = status;
         site.updated = Utc::now();
         tracing::info!("Updated site {} status to {:?}", id, site.status);
@@ -202,8 +210,13 @@ impl ReplicationManager {
 
     /// Remove a site by ID.
     pub fn remove_site(&self, id: &str) -> Result<()> {
-        let mut sites = self.sites.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
-        sites.remove(id).ok_or_else(|| anyhow!("site not found: {}", id))?;
+        let mut sites = self
+            .sites
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {}", e))?;
+        sites
+            .remove(id)
+            .ok_or_else(|| anyhow!("site not found: {}", id))?;
         tracing::info!("Removed replication site: {}", id);
         Ok(())
     }
@@ -239,7 +252,10 @@ impl ReplicationManager {
     /// Find the replication config for a given VM name.
     pub fn get_replication_by_vm(&self, vm_name: &str) -> Option<ReplicationConfig> {
         let replications = self.replications.read().ok()?;
-        replications.values().find(|r| r.vm_name == vm_name).cloned()
+        replications
+            .values()
+            .find(|r| r.vm_name == vm_name)
+            .cloned()
     }
 
     /// List replications, optionally filtered by source or target site ID.
@@ -370,7 +386,10 @@ impl ReplicationManager {
 
         // Look up the target site address for rsync destination.
         let target_host = {
-            let sites = self.sites.read().map_err(|e| anyhow!("lock poisoned: {}", e))?;
+            let sites = self
+                .sites
+                .read()
+                .map_err(|e| anyhow!("lock poisoned: {}", e))?;
             sites
                 .get(&target_address)
                 .map(|s| s.address.clone())
@@ -386,7 +405,10 @@ impl ReplicationManager {
         };
 
         {
-            let mut events = self.events.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
+            let mut events = self
+                .events
+                .write()
+                .map_err(|e| anyhow!("lock poisoned: {}", e))?;
             events.push(event.clone());
         }
 
@@ -425,14 +447,17 @@ impl ReplicationManager {
                 Ok(out) if out.status.success() => {
                     tracing::info!(
                         "rsync completed successfully for replication {} (VM '{}')",
-                        replication_id, vm_name
+                        replication_id,
+                        vm_name
                     );
                 }
                 Ok(out) => {
                     let stderr = String::from_utf8_lossy(&out.stderr);
                     tracing::warn!(
                         "rsync returned non-zero for replication {} (VM '{}'): {}",
-                        replication_id, vm_name, stderr
+                        replication_id,
+                        vm_name,
+                        stderr
                     );
                     // Record the data transfer size even on partial failure
                 }
@@ -440,7 +465,9 @@ impl ReplicationManager {
                     tracing::warn!(
                         "Failed to execute rsync for replication {} (VM '{}'): {} \
                          (rsync may not be installed; metadata sync recorded)",
-                        replication_id, vm_name, e
+                        replication_id,
+                        vm_name,
+                        e
                     );
                 }
             }
@@ -458,12 +485,14 @@ impl ReplicationManager {
 
             tracing::info!(
                 "Replication {} source data size: {} bytes",
-                replication_id, source_size
+                replication_id,
+                source_size
             );
         } else {
             tracing::debug!(
                 "Source path '{}' does not exist for VM '{}', recording metadata-only sync",
-                source_path, vm_name
+                source_path,
+                vm_name
             );
         }
 
@@ -500,7 +529,8 @@ impl ReplicationManager {
                 .replications
                 .read()
                 .map_err(|e| anyhow!("lock poisoned: {}", e))?;
-            let repl = replications.get(replication_id)
+            let repl = replications
+                .get(replication_id)
                 .ok_or_else(|| anyhow!("Replication '{}' not found", replication_id))?;
             if repl.quiesce_guest {
                 ConsistencyType::AppConsistent
@@ -587,11 +617,7 @@ impl ReplicationManager {
             Some(error.to_string()),
         )?;
 
-        tracing::warn!(
-            "Sync failed for replication {}: {}",
-            replication_id,
-            error
-        );
+        tracing::warn!("Sync failed for replication {}: {}", replication_id, error);
         Ok(())
     }
 
@@ -760,7 +786,10 @@ impl ReplicationManager {
             details,
             timestamp: Utc::now(),
         };
-        let mut events = self.events.write().map_err(|e| anyhow!("lock poisoned: {}", e))?;
+        let mut events = self
+            .events
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {}", e))?;
         events.push(event);
         Ok(())
     }
@@ -844,8 +873,10 @@ mod tests {
     #[test]
     fn test_list_and_remove_sites() {
         let mgr = ReplicationManager::new();
-        mgr.register_site(make_site("s1", "Site A", SiteType::Primary)).unwrap();
-        mgr.register_site(make_site("s2", "Site B", SiteType::Recovery)).unwrap();
+        mgr.register_site(make_site("s1", "Site A", SiteType::Primary))
+            .unwrap();
+        mgr.register_site(make_site("s2", "Site B", SiteType::Recovery))
+            .unwrap();
 
         assert_eq!(mgr.list_sites().len(), 2);
 
@@ -857,9 +888,11 @@ mod tests {
     #[test]
     fn test_update_site_status() {
         let mgr = ReplicationManager::new();
-        mgr.register_site(make_site("s1", "Site A", SiteType::Primary)).unwrap();
+        mgr.register_site(make_site("s1", "Site A", SiteType::Primary))
+            .unwrap();
 
-        mgr.update_site_status("s1", SiteStatus::Disconnected).unwrap();
+        mgr.update_site_status("s1", SiteStatus::Disconnected)
+            .unwrap();
         let site = mgr.get_site("s1").unwrap();
         assert_eq!(site.status, SiteStatus::Disconnected);
     }
@@ -881,9 +914,12 @@ mod tests {
     #[test]
     fn test_list_replications_with_site_filter() {
         let mgr = ReplicationManager::new();
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
-        mgr.configure_replication(make_replication("r2", "vm2", "s1", "s3", 60)).unwrap();
-        mgr.configure_replication(make_replication("r3", "vm3", "s2", "s3", 5)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
+        mgr.configure_replication(make_replication("r2", "vm2", "s1", "s3", 60))
+            .unwrap();
+        mgr.configure_replication(make_replication("r3", "vm3", "s2", "s3", 5))
+            .unwrap();
 
         let all = mgr.list_replications(None);
         assert_eq!(all.len(), 3);
@@ -898,7 +934,8 @@ mod tests {
     #[test]
     fn test_pause_and_resume_replication() {
         let mgr = ReplicationManager::new();
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         mgr.pause_replication("r1").unwrap();
         assert_eq!(
@@ -922,7 +959,8 @@ mod tests {
     #[test]
     fn test_sync_lifecycle() {
         let mgr = ReplicationManager::new();
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         // Start sync
         let event = mgr.start_sync("r1").unwrap();
@@ -949,7 +987,8 @@ mod tests {
     #[test]
     fn test_fail_sync_sets_error_status() {
         let mgr = ReplicationManager::new();
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         mgr.fail_sync("r1", "network timeout").unwrap();
 
@@ -965,7 +1004,8 @@ mod tests {
     #[test]
     fn test_recovery_instances_and_expiry() {
         let mgr = ReplicationManager::new();
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         // Create multiple recovery instances via complete_sync
         mgr.complete_sync("r1", 100).unwrap();
@@ -999,7 +1039,8 @@ mod tests {
     fn test_rpo_violation_detection() {
         let mgr = ReplicationManager::new();
         // Active replication with no last_sync -> RPO violation
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         // Active replication with recent sync -> no violation
         let mut recent = make_replication("r2", "vm2", "s1", "s2", 60);
@@ -1019,7 +1060,8 @@ mod tests {
     #[test]
     fn test_metrics_tracking() {
         let mgr = ReplicationManager::new();
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         // Metrics are created on first complete_sync
         mgr.complete_sync("r1", 1000).unwrap();
@@ -1057,7 +1099,8 @@ mod tests {
         let mgr = ReplicationManager::new();
 
         // Active with no sync (RPO violation)
-        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15)).unwrap();
+        mgr.configure_replication(make_replication("r1", "vm1", "s1", "s2", 15))
+            .unwrap();
 
         // Active with recent sync (no violation)
         let mut recent = make_replication("r2", "vm2", "s1", "s2", 60);

@@ -13,19 +13,28 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
 use replication::{
     ReplicationConfig, ReplicationHealthSummary, ReplicationInstance, ReplicationMetrics,
     ReplicationSite, ReplicationStatus,
 };
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Site handlers
 // ============================================================================
 
-pub async fn list_sites(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_sites(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_sites));
-    let items: Vec<ReplicationSite> = state.store.list_entities("replication_sites").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<ReplicationSite> = state
+        .store
+        .list_entities("replication_sites")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(items)
 }
 
@@ -38,13 +47,22 @@ pub async fn register_site(
     if let Err((status, msg)) = crate::validation::validate_entity_name(&site.name) {
         return (status, Json(serde_json::json!({"error": msg}))).into_response();
     }
-    if site.id.is_empty() { site.id = Uuid::new_v4().to_string(); }
+    if site.id.is_empty() {
+        site.id = Uuid::new_v4().to_string();
+    }
     let now = Utc::now();
     site.created = now;
     site.updated = now;
-    match state.store.save_entity("replication_sites", &site.id, &site) {
+    match state
+        .store
+        .save_entity("replication_sites", &site.id, &site)
+    {
         Ok(_) => (StatusCode::CREATED, Json(site)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -56,18 +74,36 @@ pub async fn remove_site(
     tracing::debug!("replication_api::{}", stringify!(remove_site));
     if let Err(e) = state.store.delete_entity("replication_sites", &id) {
         tracing::error!("Failed to delete entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
+    (
+        StatusCode::NO_CONTENT,
+        Json(serde_json::json!({"status": "deleted"})),
+    )
+        .into_response()
 }
 
 // ============================================================================
 // Replication configuration handlers
 // ============================================================================
 
-pub async fn list_replications(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_replications(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_replications));
-    let items: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<ReplicationConfig> =
+        state
+            .store
+            .list_entities("replications")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     Json(items)
 }
 
@@ -77,13 +113,19 @@ pub async fn configure_replication(
     Json(mut config): Json<ReplicationConfig>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(configure_replication));
-    if config.id.is_empty() { config.id = Uuid::new_v4().to_string(); }
+    if config.id.is_empty() {
+        config.id = Uuid::new_v4().to_string();
+    }
     let now = Utc::now();
     config.created = now;
     config.updated = now;
     match state.store.save_entity("replications", &config.id, &config) {
         Ok(_) => (StatusCode::CREATED, Json(config)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -93,10 +135,21 @@ pub async fn get_replication(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(get_replication));
-    match state.store.get_entity::<ReplicationConfig>("replications", &id) {
+    match state
+        .store
+        .get_entity::<ReplicationConfig>("replications", &id)
+    {
         Ok(Some(r)) => Json(r).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Replication not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal server error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -106,18 +159,41 @@ pub async fn pause_replication(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(pause_replication));
-    let mut repl = match state.store.get_entity::<ReplicationConfig>("replications", &id) {
+    let mut repl = match state
+        .store
+        .get_entity::<ReplicationConfig>("replications", &id)
+    {
         Ok(Some(r)) => r,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Replication not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     repl.status = ReplicationStatus::Paused;
     repl.updated = Utc::now();
     if let Err(e) = state.store.save_entity("replications", &repl.id, &repl) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::OK, Json(serde_json::json!({"status": "replication paused"}))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"status": "replication paused"})),
+    )
+        .into_response()
 }
 
 pub async fn resume_replication(
@@ -126,18 +202,41 @@ pub async fn resume_replication(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(resume_replication));
-    let mut repl = match state.store.get_entity::<ReplicationConfig>("replications", &id) {
+    let mut repl = match state
+        .store
+        .get_entity::<ReplicationConfig>("replications", &id)
+    {
         Ok(Some(r)) => r,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Replication not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     repl.status = ReplicationStatus::Active;
     repl.updated = Utc::now();
     if let Err(e) = state.store.save_entity("replications", &repl.id, &repl) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::OK, Json(serde_json::json!({"status": "replication resumed"}))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"status": "replication resumed"})),
+    )
+        .into_response()
 }
 
 pub async fn remove_replication(
@@ -148,9 +247,17 @@ pub async fn remove_replication(
     tracing::debug!("replication_api::{}", stringify!(remove_replication));
     if let Err(e) = state.store.delete_entity("replications", &id) {
         tracing::error!("Failed to delete entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
+    (
+        StatusCode::NO_CONTENT,
+        Json(serde_json::json!({"status": "deleted"})),
+    )
+        .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -164,19 +271,39 @@ pub async fn start_sync(
     Json(req): Json<StartSyncRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(start_sync));
-    let repl = match state.store.get_entity::<ReplicationConfig>("replications", &req.replication_id) {
+    let repl = match state
+        .store
+        .get_entity::<ReplicationConfig>("replications", &req.replication_id)
+    {
         Ok(Some(r)) => r,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Replication not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     if repl.status != ReplicationStatus::Active {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-            "error": format!("Cannot sync replication in {:?} state", repl.status)
-        }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Cannot sync replication in {:?} state", repl.status)
+            })),
+        )
+            .into_response();
     }
 
     // Resolve the target site address for rsync
-    let target_address = state.store
+    let target_address = state
+        .store
         .get_entity::<ReplicationSite>("replication_sites", &repl.target_site_id)
         .ok()
         .flatten()
@@ -219,11 +346,21 @@ pub async fn start_sync(
                 format!("{}/", source_path)
             };
             rsync_args.push(source_with_slash);
-            rsync_args.push(format!("{}:/var/lib/vmspawnd/images/{}/", target_address, vm_name));
+            rsync_args.push(format!(
+                "{}:/var/lib/vmspawnd/images/{}/",
+                target_address, vm_name
+            ));
 
-            match std::process::Command::new("rsync").args(&rsync_args).output() {
+            match std::process::Command::new("rsync")
+                .args(&rsync_args)
+                .output()
+            {
                 Ok(out) if out.status.success() => {
-                    tracing::info!("rsync completed for replication {} (VM '{}')", repl_id, vm_name);
+                    tracing::info!(
+                        "rsync completed for replication {} (VM '{}')",
+                        repl_id,
+                        vm_name
+                    );
                 }
                 Ok(out) => {
                     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -236,7 +373,8 @@ pub async fn start_sync(
         } else {
             tracing::debug!(
                 "Source path '{}' not found for VM '{}', metadata-only sync",
-                source_path, vm_name
+                source_path,
+                vm_name
             );
         }
 
@@ -271,30 +409,61 @@ pub async fn get_replication_metrics(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(get_replication_metrics));
-    match state.store.get_entity::<ReplicationMetrics>("replication_metrics", &id) {
+    match state
+        .store
+        .get_entity::<ReplicationMetrics>("replication_metrics", &id)
+    {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Replication metrics not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Replication metrics not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal server error"})),
+        )
+            .into_response(),
     }
 }
 
-pub async fn check_rpo_violations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn check_rpo_violations(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(check_rpo_violations));
-    let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let replications: Vec<ReplicationConfig> = state
+        .store
+        .list_entities("replications")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     let now = Utc::now();
     let violations: Vec<_> = replications
         .into_iter()
         .filter(|r| {
             r.status == ReplicationStatus::Active
-                && r.last_sync.map_or(true, |last| (now - last).num_minutes() as u32 > r.rpo_minutes)
+                && r.last_sync.map_or(true, |last| {
+                    (now - last).num_minutes() as u32 > r.rpo_minutes
+                })
         })
         .collect();
     Json(violations)
 }
 
-pub async fn get_replication_health(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_replication_health(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(get_replication_health));
-    let replications: Vec<ReplicationConfig> = state.store.list_entities("replications").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let replications: Vec<ReplicationConfig> = state
+        .store
+        .list_entities("replications")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     let now = Utc::now();
     let mut summary = ReplicationHealthSummary {
         total: replications.len() as u32,
@@ -307,7 +476,9 @@ pub async fn get_replication_health(RequireRead(_claims): RequireRead, State(sta
         match r.status {
             ReplicationStatus::Active => {
                 summary.active += 1;
-                if r.last_sync.map_or(true, |last| (now - last).num_minutes() as u32 > r.rpo_minutes) {
+                if r.last_sync.map_or(true, |last| {
+                    (now - last).num_minutes() as u32 > r.rpo_minutes
+                }) {
                     summary.rpo_violations += 1;
                 }
             }
@@ -319,8 +490,17 @@ pub async fn get_replication_health(RequireRead(_claims): RequireRead, State(sta
     Json(summary)
 }
 
-pub async fn list_recovery_instances(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_recovery_instances(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("replication_api::{}", stringify!(list_recovery_instances));
-    let items: Vec<ReplicationInstance> = state.store.list_entities("recovery_instances").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<ReplicationInstance> = state
+        .store
+        .list_entities("recovery_instances")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(items)
 }

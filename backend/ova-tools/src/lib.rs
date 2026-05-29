@@ -27,13 +27,7 @@ pub fn export_ova(
     let vmdk_path = format!("{}.vmdk", output_path.trim_end_matches(".ova"));
     let output = std::process::Command::new("qemu-img")
         .args([
-            "convert",
-            "-f",
-            "qcow2",
-            "-O",
-            "vmdk",
-            disk_path,
-            &vmdk_path,
+            "convert", "-f", "qcow2", "-O", "vmdk", disk_path, &vmdk_path,
         ])
         .output()?;
     if !output.status.success() {

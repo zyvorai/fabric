@@ -2,11 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
@@ -53,7 +49,9 @@ pub struct ResourceSpec {
     pub disk: String,
 }
 
-fn default_disk() -> String { "20G".to_string() }
+fn default_disk() -> String {
+    "20G".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkSpec {
@@ -78,7 +76,9 @@ pub struct VolumeMount {
     pub readonly: bool,
 }
 
-fn default_mount_type() -> String { "virtiofs".to_string() }
+fn default_mount_type() -> String {
+    "virtiofs".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredentialSpec {
@@ -164,7 +164,9 @@ pub struct AutoScaleSpec {
     pub cooldown_secs: u64,
 }
 
-fn default_cooldown() -> u64 { 300 }
+fn default_cooldown() -> u64 {
+    300
+}
 
 #[derive(Debug, Serialize)]
 pub struct ApplyResult {
@@ -180,13 +182,31 @@ pub struct ApplyResult {
 /// Returns an error on invalid input instead of silently defaulting.
 fn parse_memory_mb(s: &str) -> Result<u64, String> {
     let s = s.trim();
-    if let Some(gb) = s.strip_suffix('G').or_else(|| s.strip_suffix("GB")).or_else(|| s.strip_suffix("g")) {
-        let val = gb.trim().parse::<u64>().map_err(|_| format!("Invalid memory value: '{}'", s))?;
+    if let Some(gb) = s
+        .strip_suffix('G')
+        .or_else(|| s.strip_suffix("GB"))
+        .or_else(|| s.strip_suffix("g"))
+    {
+        let val = gb
+            .trim()
+            .parse::<u64>()
+            .map_err(|_| format!("Invalid memory value: '{}'", s))?;
         Ok(val * 1024)
-    } else if let Some(mb) = s.strip_suffix('M').or_else(|| s.strip_suffix("MB")).or_else(|| s.strip_suffix("m")) {
-        mb.trim().parse::<u64>().map_err(|_| format!("Invalid memory value: '{}'", s))
+    } else if let Some(mb) = s
+        .strip_suffix('M')
+        .or_else(|| s.strip_suffix("MB"))
+        .or_else(|| s.strip_suffix("m"))
+    {
+        mb.trim()
+            .parse::<u64>()
+            .map_err(|_| format!("Invalid memory value: '{}'", s))
     } else {
-        s.parse::<u64>().map_err(|_| format!("Invalid memory value: '{}'. Use format like '2G', '512M', or raw MB", s))
+        s.parse::<u64>().map_err(|_| {
+            format!(
+                "Invalid memory value: '{}'. Use format like '2G', '512M', or raw MB",
+                s
+            )
+        })
     }
 }
 
@@ -194,13 +214,31 @@ fn parse_memory_mb(s: &str) -> Result<u64, String> {
 /// Returns an error on invalid input instead of silently defaulting.
 fn parse_disk_gb(s: &str) -> Result<u64, String> {
     let s = s.trim();
-    if let Some(gb) = s.strip_suffix('G').or_else(|| s.strip_suffix("GB")).or_else(|| s.strip_suffix("g")) {
-        gb.trim().parse::<u64>().map_err(|_| format!("Invalid disk size: '{}'", s))
-    } else if let Some(tb) = s.strip_suffix('T').or_else(|| s.strip_suffix("TB")).or_else(|| s.strip_suffix("t")) {
-        let val = tb.trim().parse::<u64>().map_err(|_| format!("Invalid disk size: '{}'", s))?;
+    if let Some(gb) = s
+        .strip_suffix('G')
+        .or_else(|| s.strip_suffix("GB"))
+        .or_else(|| s.strip_suffix("g"))
+    {
+        gb.trim()
+            .parse::<u64>()
+            .map_err(|_| format!("Invalid disk size: '{}'", s))
+    } else if let Some(tb) = s
+        .strip_suffix('T')
+        .or_else(|| s.strip_suffix("TB"))
+        .or_else(|| s.strip_suffix("t"))
+    {
+        let val = tb
+            .trim()
+            .parse::<u64>()
+            .map_err(|_| format!("Invalid disk size: '{}'", s))?;
         Ok(val * 1024)
     } else {
-        s.parse::<u64>().map_err(|_| format!("Invalid disk size: '{}'. Use format like '20G', '1T', or raw GB", s))
+        s.parse::<u64>().map_err(|_| {
+            format!(
+                "Invalid disk size: '{}'. Use format like '20G', '1T', or raw GB",
+                s
+            )
+        })
     }
 }
 
@@ -219,28 +257,49 @@ pub async fn apply_vm_spec(
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
 
     if spec.credentials.len() > 100 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "credentials count must not exceed 100"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "credentials count must not exceed 100"})),
+        ));
     }
     if spec.tags.len() > 100 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "tags count must not exceed 100"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "tags count must not exceed 100"})),
+        ));
     }
     if spec.resources.cpus < 1 || spec.resources.cpus > 1024 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "cpus must be between 1 and 1024"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "cpus must be between 1 and 1024"})),
+        ));
     }
 
     // Validate volume host and guest paths
     for vol in &spec.volumes {
-        crate::validation::validate_host_path(&vol.host)
-            .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid volume host path: {}", m)}))))?;
-        crate::validation::validate_machine_path(&vol.guest)
-            .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid volume guest path: {}", m)}))))?;
+        crate::validation::validate_host_path(&vol.host).map_err(|(s, m)| {
+            (
+                s,
+                Json(json!({"error": format!("Invalid volume host path: {}", m)})),
+            )
+        })?;
+        crate::validation::validate_machine_path(&vol.guest).map_err(|(s, m)| {
+            (
+                s,
+                Json(json!({"error": format!("Invalid volume guest path: {}", m)})),
+            )
+        })?;
     }
 
     // Validate credential file paths
     for cred in &spec.credentials {
         if let Some(file_path) = cred.value.strip_prefix('@') {
-            crate::validation::validate_host_path(file_path)
-                .map_err(|(s, m)| (s, Json(json!({"error": format!("Invalid credential file path: {}", m)}))))?;
+            crate::validation::validate_host_path(file_path).map_err(|(s, m)| {
+                (
+                    s,
+                    Json(json!({"error": format!("Invalid credential file path: {}", m)})),
+                )
+            })?;
         }
     }
 
@@ -263,31 +322,53 @@ pub async fn apply_vm_spec(
             memory: memory_mb,
             disk: disk_gb,
             hostname: spec.hostname.clone(),
-            tags: if spec.tags.is_empty() { None } else { Some(spec.tags.clone()) },
+            tags: if spec.tags.is_empty() {
+                None
+            } else {
+                Some(spec.tags.clone())
+            },
             labels: None,
         };
 
         let vm = vmspawn_driver::create_vm(&req).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
         })?;
 
         state.store.save_vm(&vm).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
         })?;
     }
 
     // Store volume mount config
     if !spec.volumes.is_empty() {
-        state.store.save_entity("vm_volumes", &spec.name, &spec.volumes).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-        })?;
+        state
+            .store
+            .save_entity("vm_volumes", &spec.name, &spec.volumes)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })?;
     }
 
     // Store autoscale policy
     let autoscale_enabled = if let Some(ref policy) = spec.autoscale {
-        state.store.save_entity("autoscale_policies", &spec.name, policy).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-        })?;
+        state
+            .store
+            .save_entity("autoscale_policies", &spec.name, policy)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })?;
         true
     } else {
         false
@@ -308,9 +389,15 @@ pub async fn apply_vm_spec(
         || spec.start_options.forward_journal.is_some()
         || spec.start_options.pass_ssh_key.is_some();
     if has_non_default_opts {
-        state.store.save_entity("vm_start_options", &spec.name, &spec.start_options).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-        })?;
+        state
+            .store
+            .save_entity("vm_start_options", &spec.name, &spec.start_options)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })?;
     } else {
         // Clear stale options when re-applying with all defaults
         let _ = state.store.delete_entity("vm_start_options", &spec.name);
@@ -340,14 +427,26 @@ pub async fn apply_vm_spec(
         if let Err(validation_errors) = start_opts.validate() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                Json(json!({"error": format!("Invalid start options: {}", validation_errors.join("; "))})),
+                Json(
+                    json!({"error": format!("Invalid start options: {}", validation_errors.join("; "))}),
+                ),
             ));
         }
 
         let vm = match state.store.get_vm(&spec.name) {
             Ok(Some(vm)) => vm,
-            Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({"error": "VM not found after creation"})))),
-            Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))),
+            Ok(None) => {
+                return Err((
+                    StatusCode::NOT_FOUND,
+                    Json(json!({"error": "VM not found after creation"})),
+                ))
+            }
+            Err(e) => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": e.to_string()})),
+                ))
+            }
         };
 
         match vmspawn_driver::start_vm_with_options(&vm, &start_opts) {
@@ -374,14 +473,17 @@ pub async fn apply_vm_spec(
         Some("Created via declarative spec".to_string()),
     );
 
-    Ok((StatusCode::OK, Json(ApplyResult {
-        vm_name: spec.name,
-        created: !vm_exists,
-        started,
-        volumes_configured: spec.volumes.len(),
-        autoscale_enabled,
-        warnings,
-    })))
+    Ok((
+        StatusCode::OK,
+        Json(ApplyResult {
+            vm_name: spec.name,
+            created: !vm_exists,
+            started,
+            volumes_configured: spec.volumes.len(),
+            autoscale_enabled,
+            warnings,
+        }),
+    ))
 }
 
 /// GET /api/vms/:name/spec - Export VM as declarative spec
@@ -391,21 +493,32 @@ pub async fn export_vm_spec(
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> Result<Json<VMSpec>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("declarative::{}", stringify!(export_vm_spec));
-    crate::validation::validate_vm_name(&name)
-        .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
+    crate::validation::validate_vm_name(&name).map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let vm = match state.store.get_vm(&name) {
         Ok(Some(vm)) => vm,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "VM not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "VM not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
-    let volumes: Vec<VolumeMount> = state.store
+    let volumes: Vec<VolumeMount> = state
+        .store
         .get_entity("vm_volumes", &name)
         .ok()
         .flatten()
         .unwrap_or_default();
 
-    let autoscale: Option<AutoScaleSpec> = state.store
+    let autoscale: Option<AutoScaleSpec> = state
+        .store
         .get_entity("autoscale_policies", &name)
         .ok()
         .flatten();
@@ -416,7 +529,8 @@ pub async fn export_vm_spec(
         format!("{}M", vm.memory)
     };
 
-    let start_options: StartOptionsSpec = state.store
+    let start_options: StartOptionsSpec = state
+        .store
         .get_entity("vm_start_options", &name)
         .ok()
         .flatten()

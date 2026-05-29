@@ -22,7 +22,10 @@ pub fn error_code_for_status(status: StatusCode) -> &'static str {
 }
 
 /// Standard JSON error response with stable `error_code`.
-pub fn json_error(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
+pub fn json_error(
+    status: StatusCode,
+    msg: impl Into<String>,
+) -> (StatusCode, Json<serde_json::Value>) {
     let code = error_code_for_status(status);
     (status, Json(api_error_json(code, msg.into())))
 }

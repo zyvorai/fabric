@@ -8,10 +8,10 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
 use security::RequireRead;
@@ -143,11 +143,25 @@ pub async fn get_vm_performance(
     // Try to load real metrics from state store
     let metrics_key = format!("metrics-vm-{}-{}", vm_name, query.range);
     let legacy_key = format!("metrics/vm/{}/{}", vm_name, query.range);
-    let metrics = if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &metrics_key) {
-        tracing::debug!("Loaded {} stored metrics for VM {}", stored_performance.metrics.len(), vm_name);
+    let metrics = if let Ok(Some(stored_performance)) = state
+        .store
+        .get_entity::<VMPerformance>("performance", &metrics_key)
+    {
+        tracing::debug!(
+            "Loaded {} stored metrics for VM {}",
+            stored_performance.metrics.len(),
+            vm_name
+        );
         stored_performance.metrics
-    } else if let Ok(Some(stored_performance)) = state.store.get_entity::<VMPerformance>("performance", &legacy_key) {
-        tracing::debug!("Loaded {} legacy stored metrics for VM {}", stored_performance.metrics.len(), vm_name);
+    } else if let Ok(Some(stored_performance)) = state
+        .store
+        .get_entity::<VMPerformance>("performance", &legacy_key)
+    {
+        tracing::debug!(
+            "Loaded {} legacy stored metrics for VM {}",
+            stored_performance.metrics.len(),
+            vm_name
+        );
         stored_performance.metrics
     } else {
         // No metrics available — return empty set
@@ -155,10 +169,7 @@ pub async fn get_vm_performance(
         Vec::new()
     };
 
-    let performance = VMPerformance {
-        vm_name,
-        metrics,
-    };
+    let performance = VMPerformance { vm_name, metrics };
 
     Ok(Json(performance))
 }
@@ -171,12 +182,24 @@ pub async fn get_system_performance(
     // Try to load real system metrics from state store
     let metrics_key = format!("metrics-system-{}", query.range);
     let legacy_key = format!("metrics/system/{}", query.range);
-    if let Ok(Some(stored_performance)) = state.store.get_entity::<Vec<SystemPerformance>>("performance", &metrics_key) {
-        tracing::debug!("Loaded {} stored system performance entries", stored_performance.len());
+    if let Ok(Some(stored_performance)) = state
+        .store
+        .get_entity::<Vec<SystemPerformance>>("performance", &metrics_key)
+    {
+        tracing::debug!(
+            "Loaded {} stored system performance entries",
+            stored_performance.len()
+        );
         return Ok(Json(stored_performance));
     }
-    if let Ok(Some(stored_performance)) = state.store.get_entity::<Vec<SystemPerformance>>("performance", &legacy_key) {
-        tracing::debug!("Loaded {} legacy stored system performance entries", stored_performance.len());
+    if let Ok(Some(stored_performance)) = state
+        .store
+        .get_entity::<Vec<SystemPerformance>>("performance", &legacy_key)
+    {
+        tracing::debug!(
+            "Loaded {} legacy stored system performance entries",
+            stored_performance.len()
+        );
         return Ok(Json(stored_performance));
     }
 
@@ -192,7 +215,12 @@ pub async fn get_performance_insights(
     let mut insights = Vec::new();
 
     // Try to load all VMs to analyze their metrics
-    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
+    let vms = state.store.list_vms().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to list VMs"})),
+        )
+    })?;
 
     for vm in vms {
         // Try to load recent metrics for this VM
@@ -231,7 +259,8 @@ pub async fn get_performance_insights(
                         value: latest_metric.cpu_usage,
                         threshold: 80.0,
                         severity: Severity::Warning,
-                        recommendation: "CPU usage is high. Monitor closely and consider scaling".to_string(),
+                        recommendation: "CPU usage is high. Monitor closely and consider scaling"
+                            .to_string(),
                     });
                 } else if latest_metric.cpu_usage < 15.0 {
                     insights.push(PerformanceInsight {
@@ -264,12 +293,16 @@ pub async fn get_performance_insights(
                         value: latest_metric.memory_usage,
                         threshold: 85.0,
                         severity: Severity::Warning,
-                        recommendation: "Memory usage is high. Consider increasing memory allocation".to_string(),
+                        recommendation:
+                            "Memory usage is high. Consider increasing memory allocation"
+                                .to_string(),
                     });
                 }
 
                 // Analyze Disk I/O (convert bytes to MB/s for comparison)
-                let disk_io_total = (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64 / (1024.0 * 1024.0);
+                let disk_io_total = (latest_metric.disk_io_read + latest_metric.disk_io_write)
+                    as f64
+                    / (1024.0 * 1024.0);
                 if disk_io_total > 500.0 {
                     insights.push(PerformanceInsight {
                         insight_type: InsightType::HighDiskIo,
@@ -283,7 +316,8 @@ pub async fn get_performance_insights(
                 }
 
                 // Analyze Network usage (convert bytes to MB/s for comparison)
-                let network_total = (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                let network_total = (latest_metric.network_rx + latest_metric.network_tx) as f64
+                    / (1024.0 * 1024.0);
                 if network_total > 1000.0 {
                     insights.push(PerformanceInsight {
                         insight_type: InsightType::HighNetwork,
@@ -311,7 +345,12 @@ pub async fn get_top_vms_by_resource(
     let mut vm_resources = Vec::new();
 
     // Load all VMs and their latest metrics
-    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
+    let vms = state.store.list_vms().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to list VMs"})),
+        )
+    })?;
 
     for vm in vms {
         let metrics_key = format!("metrics-vm-{}-1h", vm.name);
@@ -333,8 +372,14 @@ pub async fn get_top_vms_by_resource(
                 let value = match query.resource.as_str() {
                     "cpu" => latest_metric.cpu_usage,
                     "memory" => latest_metric.memory_usage,
-                    "network" => (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0),
-                    "disk" => (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64 / (1024.0 * 1024.0),
+                    "network" => {
+                        (latest_metric.network_rx + latest_metric.network_tx) as f64
+                            / (1024.0 * 1024.0)
+                    }
+                    "disk" => {
+                        (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64
+                            / (1024.0 * 1024.0)
+                    }
                     _ => 0.0,
                 };
 
@@ -347,7 +392,11 @@ pub async fn get_top_vms_by_resource(
     }
 
     // Sort by value descending
-    vm_resources.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
+    vm_resources.sort_by(|a, b| {
+        b.value
+            .partial_cmp(&a.value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Apply limit
     vm_resources.truncate(query.limit);
@@ -360,7 +409,12 @@ pub async fn get_resource_utilization(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ResourceUtilization>, (StatusCode, Json<serde_json::Value>)> {
     // Calculate from real metrics
-    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
+    let vms = state.store.list_vms().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to list VMs"})),
+        )
+    })?;
 
     let mut total_cpu = 0.0;
     let mut total_memory = 0.0;
@@ -387,8 +441,10 @@ pub async fn get_resource_utilization(
             if let Some(latest_metric) = performance.metrics.last() {
                 total_cpu += latest_metric.cpu_usage;
                 total_memory += latest_metric.memory_usage;
-                total_disk += (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64 / (1024.0 * 1024.0);
-                total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                total_disk += (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64
+                    / (1024.0 * 1024.0);
+                total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64
+                    / (1024.0 * 1024.0);
                 count += 1;
             }
         }
@@ -419,9 +475,17 @@ pub async fn export_performance_report(
     Query(query): Query<ExportQuery>,
 ) -> Result<axum::response::Response, (StatusCode, Json<serde_json::Value>)> {
     // Generate real report from metrics
-    let vms = state.store.list_vms().map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to list VMs"}))))?;
+    let vms = state.store.list_vms().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to list VMs"})),
+        )
+    })?;
     let total_vms = vms.len();
-    let running_vms = vms.iter().filter(|vm| matches!(vm.state, vm_model::VMState::Running)).count();
+    let running_vms = vms
+        .iter()
+        .filter(|vm| matches!(vm.state, vm_model::VMState::Running))
+        .count();
 
     // Calculate averages
     let mut total_cpu = 0.0;
@@ -449,7 +513,8 @@ pub async fn export_performance_report(
             if let Some(latest_metric) = performance.metrics.last() {
                 total_cpu += latest_metric.cpu_usage;
                 total_memory += latest_metric.memory_usage;
-                total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64
+                    / (1024.0 * 1024.0);
                 count += 1;
 
                 top_cpu_vms.push((vm.name.clone(), latest_metric.cpu_usage));
@@ -461,9 +526,21 @@ pub async fn export_performance_report(
     top_cpu_vms.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     top_cpu_vms.truncate(5);
 
-    let avg_cpu = if count > 0 { total_cpu / count as f64 } else { 0.0 };
-    let avg_memory = if count > 0 { total_memory / count as f64 } else { 0.0 };
-    let avg_network = if count > 0 { total_network / count as f64 } else { 0.0 };
+    let avg_cpu = if count > 0 {
+        total_cpu / count as f64
+    } else {
+        0.0
+    };
+    let avg_memory = if count > 0 {
+        total_memory / count as f64
+    } else {
+        0.0
+    };
+    let avg_network = if count > 0 {
+        total_network / count as f64
+    } else {
+        0.0
+    };
 
     let now = Utc::now();
 
@@ -471,7 +548,8 @@ pub async fn export_performance_report(
         "csv" => {
             use crate::validation::escape_csv_field;
 
-            let mut csv_content = String::from("VM Name,CPU Usage (%),Memory Usage (%),Network Traffic (MB/s)\n");
+            let mut csv_content =
+                String::from("VM Name,CPU Usage (%),Memory Usage (%),Network Traffic (MB/s)\n");
 
             for vm in &vms {
                 let metrics_key = format!("metrics-vm-{}-1h", vm.name);
@@ -490,7 +568,8 @@ pub async fn export_performance_report(
                     });
                 if let Some(performance) = performance {
                     if let Some(latest_metric) = performance.metrics.last() {
-                        let net = (latest_metric.network_rx + latest_metric.network_tx) as f64 / (1024.0 * 1024.0);
+                        let net = (latest_metric.network_rx + latest_metric.network_tx) as f64
+                            / (1024.0 * 1024.0);
                         csv_content.push_str(&format!(
                             "{},{},{},{}\n",
                             escape_csv_field(&vm.name),
@@ -504,10 +583,18 @@ pub async fn export_performance_report(
 
             axum::response::Response::builder()
                 .header(header::CONTENT_TYPE, "text/csv")
-                .header(header::CONTENT_DISPOSITION, "attachment; filename=\"performance-report.csv\"")
+                .header(
+                    header::CONTENT_DISPOSITION,
+                    "attachment; filename=\"performance-report.csv\"",
+                )
                 .body(axum::body::Body::from(csv_content))
                 .map(|r| Ok(r.into_response()))
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to build CSV response"}))))?
+                .map_err(|_| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": "Failed to build CSV response"})),
+                    )
+                })?
         }
         "json" => {
             #[derive(Serialize)]
@@ -530,25 +617,37 @@ pub async fn export_performance_report(
                 avg_cpu_usage: avg_cpu,
                 avg_memory_usage: avg_memory,
                 avg_network_traffic: avg_network,
-                top_cpu_vms: top_cpu_vms.into_iter().map(|(name, value)| TopVMResource {
-                    vm_name: name,
-                    value,
-                }).collect(),
+                top_cpu_vms: top_cpu_vms
+                    .into_iter()
+                    .map(|(name, value)| TopVMResource {
+                        vm_name: name,
+                        value,
+                    })
+                    .collect(),
             };
 
-            let json_body = serde_json::to_string(&report)
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to serialize report"}))))?;
+            let json_body = serde_json::to_string(&report).map_err(|_| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Failed to serialize report"})),
+                )
+            })?;
 
             axum::response::Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(axum::body::Body::from(json_body))
                 .map(|r| Ok(r.into_response()))
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to build JSON response"}))))?
+                .map_err(|_| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": "Failed to build JSON response"})),
+                    )
+                })?
         }
         _ => {
             // Default: plain text report (covers "pdf" and any other value)
             let report = format!(
-r#"Performance Analytics Report
+                r#"Performance Analytics Report
 ============================
 
 Generated: {}
@@ -573,7 +672,8 @@ Time Range: {}
                 avg_memory,
                 avg_network,
                 if !top_cpu_vms.is_empty() {
-                    top_cpu_vms.iter()
+                    top_cpu_vms
+                        .iter()
                         .enumerate()
                         .map(|(i, (name, cpu))| format!("{}. {}: {:.1}%", i + 1, name, cpu))
                         .collect::<Vec<_>>()
@@ -587,7 +687,12 @@ Time Range: {}
                 .header(header::CONTENT_TYPE, "text/plain")
                 .body(axum::body::Body::from(report))
                 .map(|r| Ok(r.into_response()))
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to build report response"}))))?
+                .map_err(|_| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": "Failed to build report response"})),
+                    )
+                })?
         }
     }
 }

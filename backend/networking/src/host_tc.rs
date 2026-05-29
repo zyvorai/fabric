@@ -44,7 +44,9 @@ pub fn discover_host_tc_qdiscs() -> Result<Vec<DiscoveredTcQdisc>> {
         }
         return Err(anyhow::anyhow!("tc qdisc show failed: {stderr}"));
     }
-    Ok(parse_tc_text_qdiscs(&String::from_utf8_lossy(&text_out.stdout)))
+    Ok(parse_tc_text_qdiscs(&String::from_utf8_lossy(
+        &text_out.stdout,
+    )))
 }
 
 fn parse_tc_json_qdiscs(json: &serde_json::Value) -> Vec<DiscoveredTcQdisc> {
@@ -55,7 +57,10 @@ fn parse_tc_json_qdiscs(json: &serde_json::Value) -> Vec<DiscoveredTcQdisc> {
     let mut seen = std::collections::HashSet::new();
 
     for item in items {
-        let kind = item.get("kind").and_then(|k| k.as_str()).unwrap_or("unknown");
+        let kind = item
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or("unknown");
         if kind == "noqueue" {
             continue;
         }
@@ -67,10 +72,7 @@ fn parse_tc_json_qdiscs(json: &serde_json::Value) -> Vec<DiscoveredTcQdisc> {
         if dev == "lo" {
             continue;
         }
-        let handle = item
-            .get("handle")
-            .and_then(|h| h.as_str())
-            .unwrap_or("0:");
+        let handle = item.get("handle").and_then(|h| h.as_str()).unwrap_or("0:");
         let key = format!("{dev}:{handle}:{kind}");
         if !seen.insert(key.clone()) {
             continue;

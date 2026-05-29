@@ -8,7 +8,7 @@ pub mod qemu;
 use anyhow::{anyhow, Result};
 use std::fs;
 use std::process::Command;
-use vm_model::{CreateVMRequest, ManagerScope, VM, VMMetrics, VMStartOptions, VMState};
+use vm_model::{CreateVMRequest, ManagerScope, VMMetrics, VMStartOptions, VMState, VM};
 
 pub fn create_vm(req: &CreateVMRequest) -> Result<VM> {
     let vm = VM::from_request(req);
@@ -24,16 +24,19 @@ pub fn create_vm(req: &CreateVMRequest) -> Result<VM> {
 /// the call in `tokio::task::spawn_blocking`.
 pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
     // Validate all options before building the command
-    opts.validate().map_err(|errors| {
-        anyhow!("Invalid start options: {}", errors.join("; "))
-    })?;
+    opts.validate()
+        .map_err(|errors| anyhow!("Invalid start options: {}", errors.join("; ")))?;
 
     let mut cmd = Command::new("systemd-vmspawn");
 
     // -- Manager Scope --
     match opts.scope {
-        Some(ManagerScope::System) => { cmd.arg("--system"); }
-        Some(ManagerScope::User) => { cmd.arg("--user"); }
+        Some(ManagerScope::System) => {
+            cmd.arg("--system");
+        }
+        Some(ManagerScope::User) => {
+            cmd.arg("--user");
+        }
         None => {}
     }
 
@@ -101,7 +104,10 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
     }
 
     if let Some(discard) = opts.discard_disk {
-        cmd.arg(format!("--discard-disk={}", if discard { "yes" } else { "no" }));
+        cmd.arg(format!(
+            "--discard-disk={}",
+            if discard { "yes" } else { "no" }
+        ));
     }
 
     if let Some(ref grow) = opts.grow_image {
@@ -113,7 +119,10 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
     }
 
     if let Some(ready) = opts.notify_ready {
-        cmd.arg(format!("--notify-ready={}", if ready { "yes" } else { "no" }));
+        cmd.arg(format!(
+            "--notify-ready={}",
+            if ready { "yes" } else { "no" }
+        ));
     }
 
     // -- System Identity Options --
@@ -131,7 +140,10 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
         cmd.arg(format!("--property={}", prop));
     }
     if let Some(register) = opts.register {
-        cmd.arg(format!("--register={}", if register { "yes" } else { "no" }));
+        cmd.arg(format!(
+            "--register={}",
+            if register { "yes" } else { "no" }
+        ));
     }
 
     // -- User Namespacing Options --
@@ -169,7 +181,10 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
         cmd.arg(format!("--forward-journal={}", fj));
     }
     if let Some(pass_key) = opts.pass_ssh_key {
-        cmd.arg(format!("--pass-ssh-key={}", if pass_key { "yes" } else { "no" }));
+        cmd.arg(format!(
+            "--pass-ssh-key={}",
+            if pass_key { "yes" } else { "no" }
+        ));
     }
     if let Some(ref key_type) = opts.ssh_key_type {
         cmd.arg(format!("--ssh-key-type={}", key_type));
@@ -230,7 +245,8 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
             match child.try_wait() {
                 Ok(Some(status)) if !status.success() => {
                     return Err(anyhow!(
-                        "systemd-vmspawn exited immediately with {}", status
+                        "systemd-vmspawn exited immediately with {}",
+                        status
                     ));
                 }
                 Ok(Some(_)) => {
@@ -240,27 +256,34 @@ pub fn start_vm_with_options(vm: &VM, opts: &VMStartOptions) -> Result<()> {
                 Ok(None) => {
                     // Still running — spawn reaper to avoid zombies and log later exits
                     let vm_name = vm.name.clone();
-                    std::thread::spawn(move || {
-                        match child.wait() {
-                            Ok(status) if !status.success() => {
-                                tracing::error!("VM '{}': systemd-vmspawn exited with {}", vm_name, status);
-                            }
-                            Err(e) => {
-                                tracing::error!("VM '{}': failed to wait on systemd-vmspawn: {}", vm_name, e);
-                            }
-                            _ => {}
+                    std::thread::spawn(move || match child.wait() {
+                        Ok(status) if !status.success() => {
+                            tracing::error!(
+                                "VM '{}': systemd-vmspawn exited with {}",
+                                vm_name,
+                                status
+                            );
                         }
+                        Err(e) => {
+                            tracing::error!(
+                                "VM '{}': failed to wait on systemd-vmspawn: {}",
+                                vm_name,
+                                e
+                            );
+                        }
+                        _ => {}
                     });
                     Ok(())
                 }
-                Err(e) => {
-                    Err(anyhow!("Failed to check vmspawn process status: {}", e))
-                }
+                Err(e) => Err(anyhow!("Failed to check vmspawn process status: {}", e)),
             }
         }
         Err(e) => {
             // Fallback: try machinectl if systemd-vmspawn is not available
-            tracing::warn!("systemd-vmspawn not available, falling back to machinectl: {}", e);
+            tracing::warn!(
+                "systemd-vmspawn not available, falling back to machinectl: {}",
+                e
+            );
             let fallback = Command::new("machinectl")
                 .arg("start")
                 .arg(&vm.name)
@@ -380,10 +403,7 @@ fn resolve_image_path(image: &str, name: &str) -> String {
 }
 
 pub fn stop_vm(name: &str) -> Result<()> {
-    let output = Command::new("machinectl")
-        .arg("stop")
-        .arg(name)
-        .output()?;
+    let output = Command::new("machinectl").arg("stop").arg(name).output()?;
 
     if output.status.success() {
         Ok(())
@@ -404,7 +424,6 @@ pub fn restart_vm(name: &str) -> Result<()> {
     Ok(())
 }
 
-
 /// Get the leader PID for a VM via machinectl
 pub fn get_vm_pid(name: &str) -> Result<u32> {
     let output = Command::new("machinectl")
@@ -420,7 +439,9 @@ pub fn get_vm_pid(name: &str) -> Result<u32> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     for line in stdout.lines() {
         if let Some(pid_str) = line.strip_prefix("Leader=") {
-            let pid: u32 = pid_str.trim().parse()
+            let pid: u32 = pid_str
+                .trim()
+                .parse()
                 .map_err(|_| anyhow!("Invalid PID: {}", pid_str))?;
             return Ok(pid);
         }
@@ -436,7 +457,9 @@ pub fn pause_vm(name: &str) -> Result<()> {
     let cgroup = vmspawnd_cgroup::CgroupPath::for_machine(name);
     if cgroup.exists() {
         let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
-        freezer.freeze().map_err(|e| anyhow!("Failed to freeze VM '{}': {}", name, e))?;
+        freezer
+            .freeze()
+            .map_err(|e| anyhow!("Failed to freeze VM '{}': {}", name, e))?;
         tracing::info!("Froze VM '{}' via cgroup freezer", name);
         return Ok(());
     }
@@ -463,7 +486,9 @@ pub fn resume_vm(name: &str) -> Result<()> {
     let cgroup = vmspawnd_cgroup::CgroupPath::for_machine(name);
     if cgroup.exists() {
         let freezer = vmspawnd_cgroup::FreezerController::new(cgroup.path().to_path_buf());
-        freezer.thaw().map_err(|e| anyhow!("Failed to thaw VM '{}': {}", name, e))?;
+        freezer
+            .thaw()
+            .map_err(|e| anyhow!("Failed to thaw VM '{}': {}", name, e))?;
         tracing::info!("Thawed VM '{}' via cgroup freezer", name);
         return Ok(());
     }
@@ -587,10 +612,7 @@ fn read_network_stats(vm_name: &str) -> Result<(u64, u64)> {
 }
 
 pub fn get_vm_state(name: &str) -> Result<VMState> {
-    let output = Command::new("machinectl")
-        .arg("show")
-        .arg(name)
-        .output();
+    let output = Command::new("machinectl").arg("show").arg(name).output();
 
     match output {
         Ok(out) => {
@@ -610,10 +632,7 @@ pub fn get_vm_state(name: &str) -> Result<VMState> {
 /// mkosi builds OS images from a configuration. Usage:
 ///   mkosi -d <distribution> -p <packages> --autologin -o <output> build
 pub fn build_image_mkosi(config: &MkosiConfig) -> Result<String> {
-    let output_path = format!(
-        "/var/lib/vmspawnd/images/{}.raw",
-        config.name
-    );
+    let output_path = format!("/var/lib/vmspawnd/images/{}.raw", config.name);
 
     let mut cmd = Command::new("mkosi");
 
@@ -641,7 +660,8 @@ pub fn build_image_mkosi(config: &MkosiConfig) -> Result<String> {
 
     tracing::info!("Building image '{}' with mkosi: {:?}", config.name, cmd);
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .map_err(|e| anyhow!("Failed to run mkosi: {}", e))?;
 
     if !output.status.success() {
@@ -649,7 +669,11 @@ pub fn build_image_mkosi(config: &MkosiConfig) -> Result<String> {
         return Err(anyhow!("mkosi build failed: {}", stderr));
     }
 
-    tracing::info!("Image '{}' built successfully at {}", config.name, output_path);
+    tracing::info!(
+        "Image '{}' built successfully at {}",
+        config.name,
+        output_path
+    );
     Ok(output_path)
 }
 

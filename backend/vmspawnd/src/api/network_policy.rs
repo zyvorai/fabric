@@ -8,16 +8,14 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use chrono::Utc;
+use security::{RequireRead, RequireWrite};
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::Utc;
-use security::{RequireRead, RequireWrite};
 
 use network_policy::compiler::VMSnapshot;
-use network_policy::models::{
-    CreateNetworkPolicyRequest, NetworkPolicy, PolicyStatus,
-};
+use network_policy::models::{CreateNetworkPolicyRequest, NetworkPolicy, PolicyStatus};
 use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
@@ -40,7 +38,11 @@ pub async fn create_policy(
         for peer in &rule.from {
             if let network_policy::models::PeerSelector::Cidr(ref cidr) = peer {
                 if let Err(e) = crate::validation::validate_cidr(cidr) {
-                    return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid ingress CIDR: {}", e)}))).into_response();
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"error": format!("Invalid ingress CIDR: {}", e)})),
+                    )
+                        .into_response();
                 }
             }
         }
@@ -50,7 +52,11 @@ pub async fn create_policy(
         for peer in &rule.to {
             if let network_policy::models::PeerSelector::Cidr(ref cidr) = peer {
                 if let Err(e) = crate::validation::validate_cidr(cidr) {
-                    return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid egress CIDR: {}", e)}))).into_response();
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"error": format!("Invalid egress CIDR: {}", e)})),
+                    )
+                        .into_response();
                 }
             }
         }
@@ -69,7 +75,10 @@ pub async fn create_policy(
         updated: now,
     };
 
-    if let Err(e) = state.store.save_entity(STORE_KEY, &policy.id.to_string(), &policy) {
+    if let Err(e) = state
+        .store
+        .save_entity(STORE_KEY, &policy.id.to_string(), &policy)
+    {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -112,7 +121,8 @@ pub async fn get_policy(
     match state.store.get_entity::<NetworkPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
         Ok(None) => {
-            if let Some(policy) = super::net_security_discover::find_host_network_policy(&state, &id)
+            if let Some(policy) =
+                super::net_security_discover::find_host_network_policy(&state, &id)
             {
                 return (StatusCode::OK, Json(policy)).into_response();
             }
@@ -467,7 +477,11 @@ pub async fn reconcile_policies(state: &AppState) -> anyhow::Result<()> {
     // Re-register all identities (idempotent)
     for vm in &vms {
         if !vm.labels.is_empty() {
-            if let Ok(id) = state.policy_engine.allocator.allocate_or_get(&vm.labels, &vm.name) {
+            if let Ok(id) = state
+                .policy_engine
+                .allocator
+                .allocate_or_get(&vm.labels, &vm.name)
+            {
                 if let Some(ref ip) = vm.ip {
                     if let Err(e) = state.policy_engine.allocator.update_ip_mapping(ip, id) {
                         tracing::error!("Failed to update IP mapping for VM '{}': {}", vm.name, e);

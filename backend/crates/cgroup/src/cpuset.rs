@@ -72,16 +72,22 @@ pub fn parse_set(path: &Path, content: &str) -> Result<Vec<u32>> {
             continue;
         }
         if let Some((start_str, end_str)) = part.split_once('-') {
-            let start: u32 = start_str.trim().parse().map_err(|_| CgroupError::ParseError {
-                path: path.to_path_buf(),
-                content: content.to_string(),
-                detail: format!("invalid range start: {start_str:?}"),
-            })?;
-            let end: u32 = end_str.trim().parse().map_err(|_| CgroupError::ParseError {
-                path: path.to_path_buf(),
-                content: content.to_string(),
-                detail: format!("invalid range end: {end_str:?}"),
-            })?;
+            let start: u32 = start_str
+                .trim()
+                .parse()
+                .map_err(|_| CgroupError::ParseError {
+                    path: path.to_path_buf(),
+                    content: content.to_string(),
+                    detail: format!("invalid range start: {start_str:?}"),
+                })?;
+            let end: u32 = end_str
+                .trim()
+                .parse()
+                .map_err(|_| CgroupError::ParseError {
+                    path: path.to_path_buf(),
+                    content: content.to_string(),
+                    detail: format!("invalid range end: {end_str:?}"),
+                })?;
             for id in start..=end {
                 result.push(id);
             }
@@ -181,10 +187,7 @@ mod tests {
 
     #[test]
     fn test_format_set_mixed() {
-        assert_eq!(
-            format_set(&[0, 1, 2, 3, 8, 10, 11, 12]),
-            "0-3,8,10-12"
-        );
+        assert_eq!(format_set(&[0, 1, 2, 3, 8, 10, 11, 12]), "0-3,8,10-12");
     }
 
     #[test]

@@ -107,7 +107,12 @@ fn parse_meminfo() -> serde_json::Value {
     let mut kv = std::collections::HashMap::new();
     for line in content.lines() {
         if let Some((k, v)) = line.split_once(':') {
-            let val: u64 = v.split_whitespace().next().unwrap_or("0").parse().unwrap_or(0);
+            let val: u64 = v
+                .split_whitespace()
+                .next()
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0);
             kv.insert(k.trim().to_string(), val * 1024);
         }
     }
@@ -200,7 +205,10 @@ fn parse_net_dev() -> serde_json::Value {
         if name == "lo" {
             continue;
         }
-        let nums: Vec<u64> = rest.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+        let nums: Vec<u64> = rest
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
         if nums.len() < 16 {
             continue;
         }
@@ -433,7 +441,17 @@ pub async fn get_security_summary(
         .collect();
     let failed_logins: Vec<serde_json::Value> = run_command_lines(
         "journalctl",
-        &["-u", "ssh", "-u", "sshd", "--no-pager", "-n", "50", "-o", "short-iso"],
+        &[
+            "-u",
+            "ssh",
+            "-u",
+            "sshd",
+            "--no-pager",
+            "-n",
+            "50",
+            "-o",
+            "short-iso",
+        ],
         50,
     )
     .await
@@ -560,7 +578,10 @@ pub async fn explain_metric(
         }
         "memory" => {
             let mem = parse_meminfo();
-            let pct = mem.get("usage_percent").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let pct = mem
+                .get("usage_percent")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             (pct, "%", if pct > 85.0 { "warning" } else { "ok" })
         }
         "disk" => {
@@ -605,7 +626,13 @@ pub async fn get_timeseries(
         .get_entity("performance", &key)
         .ok()
         .flatten()
-        .or_else(|| state.store.get_entity("performance", &legacy).ok().flatten())
+        .or_else(|| {
+            state
+                .store
+                .get_entity("performance", &legacy)
+                .ok()
+                .flatten()
+        })
         .unwrap_or_default();
 
     let field = match query.metric.as_str() {
@@ -725,9 +752,12 @@ pub async fn trigger_compliance_scan(
     let profile = compliance::default_security_profile();
     let mut scanned = Vec::new();
     for vm in &vms {
-        let vm_json = serde_json::to_value(vm).unwrap_or_else(|_| serde_json::json!({ "name": vm.name }));
+        let vm_json =
+            serde_json::to_value(vm).unwrap_or_else(|_| serde_json::json!({ "name": vm.name }));
         let result = compliance::scan_vm(&vm_json, &profile);
-        let _ = state.store.save_entity("compliance_results", &result.id, &result);
+        let _ = state
+            .store
+            .save_entity("compliance_results", &result.id, &result);
         scanned.push(vm.name.clone());
     }
     Ok(Json(serde_json::json!({
@@ -743,7 +773,10 @@ pub async fn list_jobs(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
     let mut jobs = Vec::new();
-    if let Ok(builds) = state.store.list_entities::<images::ImageBuildStatus>("image_builds") {
+    if let Ok(builds) = state
+        .store
+        .list_entities::<images::ImageBuildStatus>("image_builds")
+    {
         for b in builds {
             let progress = match b.state {
                 images::BuildState::Completed => 100,
@@ -765,7 +798,10 @@ pub async fn list_jobs(
             }));
         }
     }
-    if let Ok(backup_jobs) = state.store.list_entities::<backups::BackupJob>("backup_jobs") {
+    if let Ok(backup_jobs) = state
+        .store
+        .list_entities::<backups::BackupJob>("backup_jobs")
+    {
         for job in backup_jobs {
             jobs.push(serde_json::json!({
                 "id": job.id,
@@ -816,7 +852,10 @@ pub async fn list_pipeline_jobs(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
     let mut jobs = Vec::new();
-    if let Ok(builds) = state.store.list_entities::<images::ImageBuildStatus>("image_builds") {
+    if let Ok(builds) = state
+        .store
+        .list_entities::<images::ImageBuildStatus>("image_builds")
+    {
         for b in builds {
             let progress = match b.state {
                 images::BuildState::Completed => 100,

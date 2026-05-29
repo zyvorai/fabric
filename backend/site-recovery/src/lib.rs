@@ -790,10 +790,7 @@ impl SiteRecoveryManager {
         step.status = StepStatus::Running;
         step.started = Some(Utc::now());
 
-        let target = step
-            .vm_name
-            .as_deref()
-            .unwrap_or("unknown");
+        let target = step.vm_name.as_deref().unwrap_or("unknown");
 
         let result = match step.step_type {
             StepType::PowerOff => {
@@ -807,7 +804,10 @@ impl SiteRecoveryManager {
                     Ok(())
                 } else {
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    Err(anyhow::anyhow!("machinectl poweroff failed: {}", stderr.trim()))
+                    Err(anyhow::anyhow!(
+                        "machinectl poweroff failed: {}",
+                        stderr.trim()
+                    ))
                 }
             }
             StepType::PowerOn => {
@@ -852,11 +852,7 @@ impl SiteRecoveryManager {
                     .as_deref()
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(5);
-                tracing::info!(
-                    "step {}: waiting {} seconds",
-                    step.step_number,
-                    secs
-                );
+                tracing::info!("step {}: waiting {} seconds", step.step_number, secs);
                 std::thread::sleep(std::time::Duration::from_secs(secs));
                 Ok(())
             }
@@ -868,11 +864,7 @@ impl SiteRecoveryManager {
                     // are permitted.
                     validate_script_path(script)?;
 
-                    tracing::info!(
-                        "step {}: running script: {}",
-                        step.step_number,
-                        script
-                    );
+                    tracing::info!("step {}: running script: {}", step.step_number, script);
                     let output = std::process::Command::new("/bin/sh")
                         .args(["-c", script])
                         .output()
@@ -903,9 +895,7 @@ impl SiteRecoveryManager {
                 if std::path::Path::new(&image_path).exists() {
                     Ok(())
                 } else {
-                    Err(anyhow::anyhow!(
-                        "VM image not found at {image_path}"
-                    ))
+                    Err(anyhow::anyhow!("VM image not found at {image_path}"))
                 }
             }
             StepType::NetworkConfig => {
@@ -961,11 +951,9 @@ impl SiteRecoveryManager {
             // Extract the step, execute it, then put it back.
             let mut step = {
                 let executions = self.executions.read().unwrap_or_else(|e| e.into_inner());
-                let exec = executions
-                    .get(execution_id)
-                    .ok_or_else(|| {
-                        SiteRecoveryError::ExecutionNotFound(execution_id.to_string())
-                    })?;
+                let exec = executions.get(execution_id).ok_or_else(|| {
+                    SiteRecoveryError::ExecutionNotFound(execution_id.to_string())
+                })?;
                 exec.steps
                     .iter()
                     .find(|s| s.step_number == step_num)
@@ -979,8 +967,7 @@ impl SiteRecoveryManager {
 
             // Write the step result back.
             {
-                let mut executions =
-                    self.executions.write().unwrap_or_else(|e| e.into_inner());
+                let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
                 let exec = executions.get_mut(execution_id).ok_or_else(|| {
                     SiteRecoveryError::ExecutionNotFound(execution_id.to_string())
                 })?;
@@ -1005,8 +992,7 @@ impl SiteRecoveryManager {
             if exec_result.is_err() {
                 all_ok = false;
                 // Skip remaining steps.
-                let mut executions =
-                    self.executions.write().unwrap_or_else(|e| e.into_inner());
+                let mut executions = self.executions.write().unwrap_or_else(|e| e.into_inner());
                 if let Some(exec) = executions.get_mut(execution_id) {
                     for s in &mut exec.steps {
                         if s.status == StepStatus::Pending {
@@ -1529,14 +1515,12 @@ mod tests {
         assert_eq!(dash.ready_plans, 1);
         assert_eq!(dash.failed_plans, 0);
         assert_eq!(dash.protected_vms, 4); // db-1, db-2, app-1, app-2
-        // Plan has never been tested or executed: RPO violation.
+                                           // Plan has never been tested or executed: RPO violation.
         assert_eq!(dash.rpo_violations, 1);
         assert_eq!(dash.overall_health, DrHealth::Warning);
 
         // Simulate a failed plan.
-        let exec = mgr
-            .execute_disaster_recovery(&plan.id, "admin")
-            .unwrap();
+        let exec = mgr.execute_disaster_recovery(&plan.id, "admin").unwrap();
         mgr.complete_execution(&exec.id, false).unwrap();
 
         let dash = mgr.get_dashboard();
@@ -1551,9 +1535,7 @@ mod tests {
         let mgr = SiteRecoveryManager::new();
         let plan = mgr.create_plan(sample_plan()).unwrap();
 
-        let exec = mgr
-            .execute_planned_migration(&plan.id, "admin")
-            .unwrap();
+        let exec = mgr.execute_planned_migration(&plan.id, "admin").unwrap();
 
         // Update first step to running.
         mgr.update_step_status(&exec.id, 1, StepStatus::Running, None)
@@ -1581,9 +1563,7 @@ mod tests {
         let mgr = SiteRecoveryManager::new();
         let plan = mgr.create_plan(sample_plan()).unwrap();
 
-        let exec = mgr
-            .execute_planned_migration(&plan.id, "admin")
-            .unwrap();
+        let exec = mgr.execute_planned_migration(&plan.id, "admin").unwrap();
 
         // Cancel it.
         mgr.cancel_execution(&exec.id).unwrap();
@@ -1617,12 +1597,8 @@ mod tests {
         plan_b_data.name = "secondary-failover".to_string();
         let plan_b = mgr.create_plan(plan_b_data).unwrap();
 
-        let _exec_a = mgr
-            .execute_planned_migration(&plan_a.id, "admin")
-            .unwrap();
-        let _exec_b = mgr
-            .execute_test_failover(&plan_b.id, "admin")
-            .unwrap();
+        let _exec_a = mgr.execute_planned_migration(&plan_a.id, "admin").unwrap();
+        let _exec_b = mgr.execute_test_failover(&plan_b.id, "admin").unwrap();
 
         // All executions.
         assert_eq!(mgr.list_executions(None).len(), 2);
@@ -1640,9 +1616,7 @@ mod tests {
         let mgr = SiteRecoveryManager::new();
         let plan = mgr.create_plan(sample_plan()).unwrap();
 
-        let exec = mgr
-            .execute_reprotect(&plan.id, "admin")
-            .unwrap();
+        let exec = mgr.execute_reprotect(&plan.id, "admin").unwrap();
         assert_eq!(exec.execution_type, ExecutionType::Reprotect);
         assert_eq!(exec.status, ExecutionStatus::Running);
 
@@ -1659,9 +1633,7 @@ mod tests {
         let plan = mgr.create_plan(sample_plan()).unwrap();
 
         // Start first execution (plan becomes InProgress).
-        let _exec = mgr
-            .execute_planned_migration(&plan.id, "admin")
-            .unwrap();
+        let _exec = mgr.execute_planned_migration(&plan.id, "admin").unwrap();
 
         // Second execution should fail because plan is InProgress.
         let result = mgr.execute_disaster_recovery(&plan.id, "admin");

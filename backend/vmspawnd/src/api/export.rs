@@ -61,14 +61,16 @@ pub async fn export_vm(
         })?;
 
     // Determine disk path — validate against allowed prefixes
-    let disk_path = req.disk_path.unwrap_or_else(|| {
-        format!("/var/lib/machines/{}.qcow2", vm_name)
-    });
+    let disk_path = req
+        .disk_path
+        .unwrap_or_else(|| format!("/var/lib/machines/{}.qcow2", vm_name));
     crate::validation::validate_host_path(&disk_path)
         .map_err(|(s, m)| (s, Json(serde_json::json!({"error": m}))))?;
 
     // Determine output directory — restrict to safe prefix
-    let output_dir = req.output_dir.unwrap_or_else(|| "/var/lib/vmspawnd/exports".to_string());
+    let output_dir = req
+        .output_dir
+        .unwrap_or_else(|| "/var/lib/vmspawnd/exports".to_string());
     crate::validation::validate_host_path(&output_dir)
         .map_err(|(s, m)| (s, Json(serde_json::json!({"error": m}))))?;
 

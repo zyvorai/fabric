@@ -104,9 +104,7 @@ pub struct ZfsPool {
 impl ZfsPool {
     /// Create a new ZFS pool handle, validating the pool exists
     pub fn new(zpool: &str, dataset: Option<String>) -> Result<Self, ZfsError> {
-        let output = Command::new("zpool")
-            .args(["status", zpool])
-            .output()?;
+        let output = Command::new("zpool").args(["status", zpool]).output()?;
 
         if !output.status.success() {
             return Err(ZfsError::PoolNotFound(zpool.to_string()));
@@ -140,7 +138,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs create zvol failed: {}", stderr
+                "zfs create zvol failed: {}",
+                stderr
             )));
         }
 
@@ -151,14 +150,13 @@ impl ZfsPool {
     /// Create a ZFS dataset (filesystem)
     pub fn create_dataset(&self, name: &str) -> Result<(), ZfsError> {
         let full_path = format!("{}/{}", self.base_path(), name);
-        let output = Command::new("zfs")
-            .args(["create", &full_path])
-            .output()?;
+        let output = Command::new("zfs").args(["create", &full_path]).output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs create dataset failed: {}", stderr
+                "zfs create dataset failed: {}",
+                stderr
             )));
         }
 
@@ -169,14 +167,13 @@ impl ZfsPool {
     /// Delete a ZFS volume or dataset
     pub fn delete_volume(&self, name: &str) -> Result<(), ZfsError> {
         let full_path = format!("{}/{}", self.base_path(), name);
-        let output = Command::new("zfs")
-            .args(["destroy", &full_path])
-            .output()?;
+        let output = Command::new("zfs").args(["destroy", &full_path]).output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs destroy failed: {}", stderr
+                "zfs destroy failed: {}",
+                stderr
             )));
         }
 
@@ -195,7 +192,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs set volsize failed: {}", stderr
+                "zfs set volsize failed: {}",
+                stderr
             )));
         }
 
@@ -213,7 +211,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs list failed: {}", stderr
+                "zfs list failed: {}",
+                stderr
             )));
         }
 
@@ -244,7 +243,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zpool list failed: {}", stderr
+                "zpool list failed: {}",
+                stderr
             )));
         }
 
@@ -252,7 +252,9 @@ impl ZfsPool {
         let parts: Vec<&str> = stdout.trim().split('\t').collect();
 
         if parts.len() < 3 {
-            return Err(ZfsError::ParseError("Unexpected zpool list output".to_string()));
+            return Err(ZfsError::ParseError(
+                "Unexpected zpool list output".to_string(),
+            ));
         }
 
         Ok(ZfsStats {
@@ -272,7 +274,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs snapshot failed: {}", stderr
+                "zfs snapshot failed: {}",
+                stderr
             )));
         }
 
@@ -293,7 +296,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs rollback failed: {}", stderr
+                "zfs rollback failed: {}",
+                stderr
             )));
         }
 
@@ -309,16 +313,22 @@ impl ZfsPool {
         let base = self.base_path();
         let output = Command::new("zfs")
             .args([
-                "list", "-t", "snapshot", "-H",
-                "-o", "name,creation,used",
-                "-r", &base,
+                "list",
+                "-t",
+                "snapshot",
+                "-H",
+                "-o",
+                "name,creation,used",
+                "-r",
+                &base,
             ])
             .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CommandFailed(format!(
-                "zfs list snapshots failed: {}", stderr
+                "zfs list snapshots failed: {}",
+                stderr
             )));
         }
 
@@ -350,11 +360,18 @@ impl ZfsPool {
     /// ZFS names may contain alphanumeric, hyphens, underscores, dots, colons, and slashes.
     pub(crate) fn validate_zfs_name(name: &str, label: &str) -> Result<(), ZfsError> {
         if name.is_empty() || name.len() > 256 {
-            return Err(ZfsError::CommandFailed(format!("{} must be 1-256 characters", label)));
-        }
-        if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':' | '/' | '@')) {
             return Err(ZfsError::CommandFailed(format!(
-                "{} '{}' contains invalid characters", label, name
+                "{} must be 1-256 characters",
+                label
+            )));
+        }
+        if !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':' | '/' | '@'))
+        {
+            return Err(ZfsError::CommandFailed(format!(
+                "{} '{}' contains invalid characters",
+                label, name
             )));
         }
         Ok(())
@@ -363,12 +380,28 @@ impl ZfsPool {
     /// Validate a replication target's fields to prevent command injection.
     pub(crate) fn validate_target(target: &ZfsReplicationTarget) -> Result<(), ZfsError> {
         // Validate hostname — only allow safe characters
-        if target.host.is_empty() || !target.host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':')) {
-            return Err(ZfsError::SshError(target.host.clone(), "Invalid hostname".to_string()));
+        if target.host.is_empty()
+            || !target
+                .host
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
+        {
+            return Err(ZfsError::SshError(
+                target.host.clone(),
+                "Invalid hostname".to_string(),
+            ));
         }
         // Validate SSH user — only allow safe characters
-        if target.ssh_user.is_empty() || !target.ssh_user.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
-            return Err(ZfsError::SshError(target.host.clone(), format!("Invalid SSH user: {}", target.ssh_user)));
+        if target.ssh_user.is_empty()
+            || !target
+                .ssh_user
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(ZfsError::SshError(
+                target.host.clone(),
+                format!("Invalid SSH user: {}", target.ssh_user),
+            ));
         }
         Self::validate_zfs_name(&target.target_pool, "Target pool")?;
         if let Some(ref ds) = target.target_dataset {
@@ -411,8 +444,9 @@ impl ZfsPool {
             .stderr(Stdio::piped())
             .spawn()?;
 
-        let send_stdout = send_child.stdout
-            .ok_or_else(|| ZfsError::CommandFailed("Failed to capture stdout for zfs send".to_string()))?;
+        let send_stdout = send_child.stdout.ok_or_else(|| {
+            ZfsError::CommandFailed("Failed to capture stdout for zfs send".to_string())
+        })?;
 
         let ssh_args = Self::ssh_args(target);
         let output = Command::new(&ssh_args[0])
@@ -445,7 +479,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::ReplicationError(format!(
-                "zfs send full failed: {}", stderr
+                "zfs send full failed: {}",
+                stderr
             )));
         }
 
@@ -492,7 +527,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::ReplicationError(format!(
-                "zfs send incremental failed: {}", stderr
+                "zfs send incremental failed: {}",
+                stderr
             )));
         }
 
@@ -539,9 +575,7 @@ impl ZfsPool {
         }
         args.push(&to_path);
 
-        let output = Command::new("zfs")
-            .args(&args)
-            .output()?;
+        let output = Command::new("zfs").args(&args).output()?;
 
         // zfs send -nv outputs to stderr
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -582,7 +616,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CloneError(format!(
-                "zfs clone failed: {}", stderr
+                "zfs clone failed: {}",
+                stderr
             )));
         }
 
@@ -606,7 +641,8 @@ impl ZfsPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZfsError::CloneError(format!(
-                "zfs promote failed: {}", stderr
+                "zfs promote failed: {}",
+                stderr
             )));
         }
 
@@ -633,9 +669,7 @@ impl ZfsPool {
                 break; // Stop once we reach the snap to keep
             }
 
-            let output = Command::new("zfs")
-                .args(["destroy", &snap.name])
-                .output()?;
+            let output = Command::new("zfs").args(["destroy", &snap.name]).output()?;
 
             if output.status.success() {
                 destroyed += 1;
@@ -676,7 +710,9 @@ impl ZfsPool {
 
         let output = Command::new(&ssh_args[0])
             .args(&ssh_args[1..])
-            .args(["zfs", "list", "-t", "snapshot", "-H", "-o", "name", "-r", &target_ds])
+            .args([
+                "zfs", "list", "-t", "snapshot", "-H", "-o", "name", "-r", &target_ds,
+            ])
             .output()?;
 
         if !output.status.success() {
@@ -747,6 +783,9 @@ mod tests {
         assert_eq!(parse_zfs_size("1M"), 1024 * 1024);
         assert_eq!(parse_zfs_size("1G"), 1024 * 1024 * 1024);
         assert_eq!(parse_zfs_size("1T"), 1024u64 * 1024 * 1024 * 1024);
-        assert_eq!(parse_zfs_size("1.5G"), (1.5 * 1024.0 * 1024.0 * 1024.0) as u64);
+        assert_eq!(
+            parse_zfs_size("1.5G"),
+            (1.5 * 1024.0 * 1024.0 * 1024.0) as u64
+        );
     }
 }

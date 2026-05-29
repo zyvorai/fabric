@@ -13,7 +13,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 use site_recovery::{
     DrDashboard, DrHealth, ExecutionStatus, ExecutionType, PlanStatus, RecoveryExecution,
     RecoveryPlan, SiteRecoveryManager,
@@ -23,9 +23,19 @@ use site_recovery::{
 // Recovery plan handlers
 // ============================================================================
 
-pub async fn list_plans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_plans(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_plans));
-    let items: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<RecoveryPlan> =
+        state
+            .store
+            .list_entities("recovery_plans")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     Json(items)
 }
 
@@ -45,7 +55,11 @@ pub async fn create_plan(
     plan.priority_groups.sort_by_key(|g| g.priority);
     match state.store.save_entity("recovery_plans", &plan.id, &plan) {
         Ok(_) => (StatusCode::CREATED, Json(plan)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -55,10 +69,21 @@ pub async fn get_plan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(get_plan));
-    match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
+    match state
+        .store
+        .get_entity::<RecoveryPlan>("recovery_plans", &id)
+    {
         Ok(Some(p)) => Json(p).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery plan not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Recovery plan not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal server error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -69,10 +94,25 @@ pub async fn update_plan(
     Json(mut plan): Json<RecoveryPlan>,
 ) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(update_plan));
-    let existing = match state.store.get_entity::<RecoveryPlan>("recovery_plans", &id) {
+    let existing = match state
+        .store
+        .get_entity::<RecoveryPlan>("recovery_plans", &id)
+    {
         Ok(Some(p)) => p,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery plan not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Recovery plan not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     plan.id = existing.id;
     plan.created = existing.created;
@@ -80,7 +120,11 @@ pub async fn update_plan(
     plan.priority_groups.sort_by_key(|g| g.priority);
     if let Err(e) = state.store.save_entity("recovery_plans", &id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     Json(plan).into_response()
 }
@@ -93,9 +137,17 @@ pub async fn delete_plan(
     tracing::debug!("site_recovery_api::{}", stringify!(delete_plan));
     if let Err(e) = state.store.delete_entity("recovery_plans", &id) {
         tracing::error!("Failed to delete entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
+    (
+        StatusCode::NO_CONTENT,
+        Json(serde_json::json!({"status": "deleted"})),
+    )
+        .into_response()
 }
 
 // ============================================================================
@@ -110,8 +162,18 @@ fn start_execution(
     let plan = state
         .store
         .get_entity::<RecoveryPlan>("recovery_plans", plan_id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery plan not found"}))))?;
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Recovery plan not found"})),
+            )
+        })?;
 
     let steps = SiteRecoveryManager::generate_recovery_steps(&plan, exec_type.clone());
     let execution = RecoveryExecution {
@@ -132,7 +194,12 @@ fn start_execution(
     state
         .store
         .save_entity("recovery_executions", &execution.id, &execution)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))))?;
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+        })?;
     Ok(execution)
 }
 
@@ -141,7 +208,10 @@ pub async fn execute_planned_migration(
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
-    tracing::debug!("site_recovery_api::{}", stringify!(execute_planned_migration));
+    tracing::debug!(
+        "site_recovery_api::{}",
+        stringify!(execute_planned_migration)
+    );
     match start_execution(&state, &plan_id, ExecutionType::PlannedMigration) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err((sc, body)) => (sc, body).into_response(),
@@ -153,7 +223,10 @@ pub async fn execute_disaster_recovery(
     State(state): State<Arc<AppState>>,
     Path(plan_id): Path<String>,
 ) -> impl IntoResponse {
-    tracing::debug!("site_recovery_api::{}", stringify!(execute_disaster_recovery));
+    tracing::debug!(
+        "site_recovery_api::{}",
+        stringify!(execute_disaster_recovery)
+    );
     match start_execution(&state, &plan_id, ExecutionType::DisasterRecovery) {
         Ok(exec) => (StatusCode::CREATED, Json(exec)).into_response(),
         Err((sc, body)) => (sc, body).into_response(),
@@ -184,9 +257,18 @@ pub async fn execute_reprotect(
     }
 }
 
-pub async fn list_executions(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_executions(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(list_executions));
-    let items: Vec<RecoveryExecution> = state.store.list_entities("recovery_executions").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<RecoveryExecution> = state
+        .store
+        .list_entities("recovery_executions")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(items)
 }
 
@@ -196,10 +278,21 @@ pub async fn get_execution(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(get_execution));
-    match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
+    match state
+        .store
+        .get_entity::<RecoveryExecution>("recovery_executions", &id)
+    {
         Ok(Some(e)) => Json(e).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery execution not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Recovery execution not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal server error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -209,30 +302,72 @@ pub async fn cancel_execution(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(cancel_execution));
-    let mut exec = match state.store.get_entity::<RecoveryExecution>("recovery_executions", &id) {
+    let mut exec = match state
+        .store
+        .get_entity::<RecoveryExecution>("recovery_executions", &id)
+    {
         Ok(Some(e)) => e,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Recovery execution not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Recovery execution not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     exec.status = ExecutionStatus::Cancelled;
     exec.completed = Some(Utc::now());
-    if let Err(e) = state.store.save_entity("recovery_executions", &exec.id, &exec) {
+    if let Err(e) = state
+        .store
+        .save_entity("recovery_executions", &exec.id, &exec)
+    {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::OK, Json(serde_json::json!({"status": "execution cancelled"}))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"status": "execution cancelled"})),
+    )
+        .into_response()
 }
 
 // ============================================================================
 // Dashboard
 // ============================================================================
 
-pub async fn get_dr_dashboard(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_dr_dashboard(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("site_recovery_api::{}", stringify!(get_dr_dashboard));
-    let plans: Vec<RecoveryPlan> = state.store.list_entities("recovery_plans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let plans: Vec<RecoveryPlan> =
+        state
+            .store
+            .list_entities("recovery_plans")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     let total_plans = plans.len() as u32;
-    let ready_plans = plans.iter().filter(|p| p.status == PlanStatus::Ready).count() as u32;
-    let failed_plans = plans.iter().filter(|p| p.status == PlanStatus::Failed).count() as u32;
+    let ready_plans = plans
+        .iter()
+        .filter(|p| p.status == PlanStatus::Ready)
+        .count() as u32;
+    let failed_plans = plans
+        .iter()
+        .filter(|p| p.status == PlanStatus::Failed)
+        .count() as u32;
     let mut protected_vms = std::collections::HashSet::new();
     for plan in &plans {
         for group in &plan.priority_groups {
@@ -241,7 +376,10 @@ pub async fn get_dr_dashboard(RequireRead(_claims): RequireRead, State(state): S
             }
         }
     }
-    let rpo_violations = plans.iter().filter(|p| p.last_tested.is_none() && p.last_executed.is_none()).count() as u32;
+    let rpo_violations = plans
+        .iter()
+        .filter(|p| p.last_tested.is_none() && p.last_executed.is_none())
+        .count() as u32;
     let overall_health = if failed_plans > 0 {
         DrHealth::Critical
     } else if rpo_violations > 0 {

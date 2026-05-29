@@ -22,7 +22,12 @@ impl StateStore {
     /// Save any serializable entity to a subdirectory (atomic write)
     /// Validate that an entity ID does not contain path traversal characters.
     fn validate_entity_id(id: &str) -> Result<()> {
-        if id.is_empty() || id.contains('\\') || id.contains('/') || id.contains("..") || id.contains('\0') {
+        if id.is_empty()
+            || id.contains('\\')
+            || id.contains('/')
+            || id.contains("..")
+            || id.contains('\0')
+        {
             anyhow::bail!("Invalid entity ID: must not contain path separators, traversal sequences, null bytes, or be empty");
         }
         Ok(())
@@ -43,7 +48,11 @@ impl StateStore {
     }
 
     /// Load a specific entity by ID
-    pub fn get_entity<T: for<'de> Deserialize<'de>>(&self, subdir: &str, id: &str) -> Result<Option<T>> {
+    pub fn get_entity<T: for<'de> Deserialize<'de>>(
+        &self,
+        subdir: &str,
+        id: &str,
+    ) -> Result<Option<T>> {
         Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
@@ -76,7 +85,11 @@ impl StateStore {
                     Ok(content) => match serde_json::from_str::<T>(&content) {
                         Ok(entity) => entities.push(entity),
                         Err(e) => {
-                            warn!("Failed to deserialize entity from {}: {}", path.display(), e);
+                            warn!(
+                                "Failed to deserialize entity from {}: {}",
+                                path.display(),
+                                e
+                            );
                         }
                     },
                     Err(e) => {
@@ -121,7 +134,11 @@ impl StateStore {
                             }
                         }
                         Err(e) => {
-                            warn!("Failed to deserialize entity from {}: {}", path.display(), e);
+                            warn!(
+                                "Failed to deserialize entity from {}: {}",
+                                path.display(),
+                                e
+                            );
                         }
                     },
                     Err(e) => {
@@ -215,7 +232,8 @@ impl StateStore {
         let total = vms.len();
         let mut sorted: Vec<&VM> = vms.values().collect();
         sorted.sort_by(|a, b| a.name.cmp(&b.name));
-        let items: Vec<VM> = sorted.into_iter()
+        let items: Vec<VM> = sorted
+            .into_iter()
             .skip(offset)
             .take(limit)
             .cloned()
@@ -243,7 +261,10 @@ impl StateStore {
         }
 
         // Only update in-memory state after file deletion succeeds
-        let mut vms = self.vms.write().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        let mut vms = self
+            .vms
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         vms.remove(name);
 
         Ok(())
@@ -278,8 +299,12 @@ mod tests {
     #[test]
     fn test_list_vms() {
         let (store, _dir) = test_store();
-        store.save_vm(&VM::new("vm1".to_string(), "img".to_string(), 1, 512)).unwrap();
-        store.save_vm(&VM::new("vm2".to_string(), "img".to_string(), 2, 1024)).unwrap();
+        store
+            .save_vm(&VM::new("vm1".to_string(), "img".to_string(), 1, 512))
+            .unwrap();
+        store
+            .save_vm(&VM::new("vm2".to_string(), "img".to_string(), 2, 1024))
+            .unwrap();
 
         let vms = store.list_vms().unwrap();
         assert_eq!(vms.len(), 2);
@@ -288,7 +313,9 @@ mod tests {
     #[test]
     fn test_delete_vm() {
         let (store, _dir) = test_store();
-        store.save_vm(&VM::new("to-delete".to_string(), "img".to_string(), 1, 512)).unwrap();
+        store
+            .save_vm(&VM::new("to-delete".to_string(), "img".to_string(), 1, 512))
+            .unwrap();
         assert!(store.get_vm("to-delete").unwrap().is_some());
 
         store.delete_vm("to-delete").unwrap();
@@ -329,7 +356,9 @@ mod tests {
             value: 42,
         };
 
-        store.save_entity("test_entities", "test-1", &entity).unwrap();
+        store
+            .save_entity("test_entities", "test-1", &entity)
+            .unwrap();
         let loaded: Option<TestEntity> = store.get_entity("test_entities", "test-1").unwrap();
         assert!(loaded.is_some());
         assert_eq!(loaded.unwrap().value, 42);
@@ -340,10 +369,28 @@ mod tests {
         let (store, _dir) = test_store();
 
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        struct Item { name: String }
+        struct Item {
+            name: String,
+        }
 
-        store.save_entity("items", "a", &Item { name: "alpha".to_string() }).unwrap();
-        store.save_entity("items", "b", &Item { name: "beta".to_string() }).unwrap();
+        store
+            .save_entity(
+                "items",
+                "a",
+                &Item {
+                    name: "alpha".to_string(),
+                },
+            )
+            .unwrap();
+        store
+            .save_entity(
+                "items",
+                "b",
+                &Item {
+                    name: "beta".to_string(),
+                },
+            )
+            .unwrap();
 
         let items: Vec<Item> = store.list_entities("items").unwrap();
         assert_eq!(items.len(), 2);
@@ -354,9 +401,19 @@ mod tests {
         let (store, _dir) = test_store();
 
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        struct Item { name: String }
+        struct Item {
+            name: String,
+        }
 
-        store.save_entity("items", "x", &Item { name: "x".to_string() }).unwrap();
+        store
+            .save_entity(
+                "items",
+                "x",
+                &Item {
+                    name: "x".to_string(),
+                },
+            )
+            .unwrap();
         store.delete_entity("items", "x").unwrap();
 
         let loaded: Option<Item> = store.get_entity("items", "x").unwrap();
@@ -368,7 +425,9 @@ mod tests {
         let (store, dir) = test_store();
 
         // Write a valid entity
-        store.save_entity("test", "good", &serde_json::json!({"id": "good"})).unwrap();
+        store
+            .save_entity("test", "good", &serde_json::json!({"id": "good"}))
+            .unwrap();
 
         // Write a corrupted file directly
         let bad_path = dir.path().join("test").join("bad.json");
@@ -409,7 +468,14 @@ mod tests {
         // First instance writes
         {
             let store = StateStore::new(dir.path()).unwrap();
-            store.save_vm(&VM::new("persistent".to_string(), "img".to_string(), 4, 2048)).unwrap();
+            store
+                .save_vm(&VM::new(
+                    "persistent".to_string(),
+                    "img".to_string(),
+                    4,
+                    2048,
+                ))
+                .unwrap();
         }
 
         // Second instance reads

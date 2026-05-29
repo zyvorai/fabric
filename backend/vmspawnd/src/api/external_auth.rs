@@ -2,18 +2,14 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // OIDC State Tracking
@@ -102,7 +98,9 @@ pub struct CreateAuthProviderRequest {
     pub default_role: String,
 }
 
-fn default_viewer() -> String { "viewer".into() }
+fn default_viewer() -> String {
+    "viewer".into()
+}
 
 #[derive(Debug, Serialize)]
 pub struct OidcLoginUrl {
@@ -125,8 +123,15 @@ pub async fn list_providers(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<AuthProvider>>, (StatusCode, Json<serde_json::Value>)> {
-    let providers = state.store.list_entities::<AuthProvider>("auth_providers")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let providers = state
+        .store
+        .list_entities::<AuthProvider>("auth_providers")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
     Ok(Json(providers))
 }
 
@@ -138,14 +143,22 @@ pub async fn create_provider(
 ) -> Result<(StatusCode, Json<AuthProvider>), (StatusCode, Json<serde_json::Value>)> {
     // Validate OIDC issuer URL against SSRF
     if let AuthProviderConfig::Oidc(ref oidc) = req.config {
-        crate::api::notifications::validate_external_url_public(&oidc.issuer_url)
-            .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid issuer URL: {}", e)}))))?;
+        crate::api::notifications::validate_external_url_public(&oidc.issuer_url).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid issuer URL: {}", e)})),
+            )
+        })?;
     }
 
     // Validate LDAP server URL against SSRF
     if let AuthProviderConfig::Ldap(ref ldap) = req.config {
-        crate::api::notifications::validate_external_url_public(&ldap.server_url)
-            .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid LDAP server URL: {}", e)}))))?;
+        crate::api::notifications::validate_external_url_public(&ldap.server_url).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid LDAP server URL: {}", e)})),
+            )
+        })?;
     }
 
     let now = Utc::now();
@@ -160,8 +173,15 @@ pub async fn create_provider(
         updated: now,
     };
 
-    state.store.save_entity("auth_providers", &provider.id, &provider)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .save_entity("auth_providers", &provider.id, &provider)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     tracing::info!("Created auth provider '{}'", provider.name);
     Ok((StatusCode::CREATED, Json(provider)))
@@ -173,8 +193,15 @@ pub async fn delete_provider(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    state.store.delete_entity("auth_providers", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .delete_entity("auth_providers", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -184,9 +211,21 @@ pub async fn test_provider(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let provider = state.store.get_entity::<AuthProvider>("auth_providers", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Provider not found"}))))?;
+    let provider = state
+        .store
+        .get_entity::<AuthProvider>("auth_providers", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Provider not found"})),
+            )
+        })?;
 
     match &provider.config {
         AuthProviderConfig::Ldap(config) => {
@@ -203,28 +242,31 @@ pub async fn test_provider(
         AuthProviderConfig::Oidc(config) => {
             // Test OIDC by fetching the discovery document
             tracing::info!("Testing OIDC connectivity to {}", config.issuer_url);
-            let discovery_url = format!("{}/.well-known/openid-configuration", config.issuer_url.trim_end_matches('/'));
+            let discovery_url = format!(
+                "{}/.well-known/openid-configuration",
+                config.issuer_url.trim_end_matches('/')
+            );
 
             match state.http_client.get(&discovery_url).send().await {
-                Ok(resp) if resp.status().is_success() => {
-                    Ok(Json(json!({
-                        "status": "ok",
-                        "provider": provider.name,
-                        "type": "oidc",
-                        "issuer": config.issuer_url,
-                        "message": "OIDC discovery endpoint reachable"
-                    })))
-                }
-                Ok(resp) => {
-                    Err((StatusCode::BAD_GATEWAY, Json(json!({
+                Ok(resp) if resp.status().is_success() => Ok(Json(json!({
+                    "status": "ok",
+                    "provider": provider.name,
+                    "type": "oidc",
+                    "issuer": config.issuer_url,
+                    "message": "OIDC discovery endpoint reachable"
+                }))),
+                Ok(resp) => Err((
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({
                         "error": format!("OIDC discovery returned {}", resp.status())
-                    }))))
-                }
-                Err(e) => {
-                    Err((StatusCode::BAD_GATEWAY, Json(json!({
+                    })),
+                )),
+                Err(e) => Err((
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({
                         "error": format!("OIDC discovery failed: {}", e)
-                    }))))
-                }
+                    })),
+                )),
             }
         }
     }
@@ -235,13 +277,30 @@ pub async fn oidc_login_url(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(provider_id): axum::extract::Path<String>,
 ) -> Result<Json<OidcLoginUrl>, (StatusCode, Json<serde_json::Value>)> {
-    let provider = state.store.get_entity::<AuthProvider>("auth_providers", &provider_id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Provider not found"}))))?;
+    let provider = state
+        .store
+        .get_entity::<AuthProvider>("auth_providers", &provider_id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Provider not found"})),
+            )
+        })?;
 
     let oidc_config = match &provider.config {
         AuthProviderConfig::Oidc(c) => c,
-        _ => return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Provider is not OIDC"})))),
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Provider is not OIDC"})),
+            ))
+        }
     };
 
     let state_param = uuid::Uuid::new_v4().to_string();
@@ -252,8 +311,15 @@ pub async fn oidc_login_url(
         provider_id: provider_id.clone(),
         created: Utc::now(),
     };
-    state.store.save_entity("oidc_pending_states", &state_param, &pending)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .save_entity("oidc_pending_states", &state_param, &pending)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     // Fetch OIDC discovery to get the real authorization endpoint
     let (auth_endpoint, _token_endpoint) =
@@ -274,7 +340,10 @@ pub async fn oidc_login_url(
         state_param,
     );
 
-    Ok(Json(OidcLoginUrl { url, state: state_param }))
+    Ok(Json(OidcLoginUrl {
+        url,
+        state: state_param,
+    }))
 }
 
 /// Fetch the OIDC discovery document and extract the authorization and token endpoints.
@@ -347,38 +416,74 @@ pub async fn oidc_callback(
     Json(req): Json<OidcCallbackRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     // 1. Look up and consume the pending state to find the provider
-    let pending = state.store.get_entity::<OidcPendingState>("oidc_pending_states", &req.state)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, Json(json!({"error": "Invalid or expired state parameter"}))))?;
+    let pending = state
+        .store
+        .get_entity::<OidcPendingState>("oidc_pending_states", &req.state)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Invalid or expired state parameter"})),
+            )
+        })?;
 
     // Reject state tokens older than 10 minutes to prevent replay
     if (Utc::now() - pending.created).num_seconds() > 600 {
         let _ = state.store.delete_entity("oidc_pending_states", &req.state);
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "State parameter expired"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "State parameter expired"})),
+        ));
     }
 
     // Consume the state so it cannot be reused
     let _ = state.store.delete_entity("oidc_pending_states", &req.state);
 
     // 2. Load the OIDC provider configuration
-    let provider = state.store.get_entity::<AuthProvider>("auth_providers", &pending.provider_id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Auth provider not found"}))))?;
+    let provider = state
+        .store
+        .get_entity::<AuthProvider>("auth_providers", &pending.provider_id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Auth provider not found"})),
+            )
+        })?;
 
     let oidc_config = match &provider.config {
         AuthProviderConfig::Oidc(c) => c,
-        _ => return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Provider is not OIDC"})))),
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Provider is not OIDC"})),
+            ))
+        }
     };
 
     if !provider.enabled {
-        return Err((StatusCode::FORBIDDEN, Json(json!({"error": "Auth provider is disabled"}))));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "Auth provider is disabled"})),
+        ));
     }
 
     // 3. Exchange the authorization code for tokens at the provider's token endpoint
     let (_auth_endpoint, token_url) =
         discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
 
-    let token_response = state.http_client
+    let token_response = state
+        .http_client
         .post(&token_url)
         .form(&[
             ("grant_type", "authorization_code"),
@@ -389,40 +494,69 @@ pub async fn oidc_callback(
         ])
         .send()
         .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, Json(json!({"error": format!("Token exchange failed: {}", e)}))))?;
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({"error": format!("Token exchange failed: {}", e)})),
+            )
+        })?;
 
     if !token_response.status().is_success() {
         let status = token_response.status();
         let body = token_response.text().await.unwrap_or_default();
         tracing::error!("OIDC token exchange failed ({}): {}", status, body);
-        return Err((StatusCode::BAD_GATEWAY, Json(json!({
-            "error": format!("Token endpoint returned {}", status)
-        }))));
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(json!({
+                "error": format!("Token endpoint returned {}", status)
+            })),
+        ));
     }
 
-    let token_data: serde_json::Value = token_response.json().await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, Json(json!({"error": format!("Invalid token response: {}", e)}))))?;
+    let token_data: serde_json::Value = token_response.json().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({"error": format!("Invalid token response: {}", e)})),
+        )
+    })?;
 
-    let id_token = token_data.get("id_token")
+    let id_token = token_data
+        .get("id_token")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| (StatusCode::BAD_GATEWAY, Json(json!({"error": "No id_token in token response"}))))?;
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({"error": "No id_token in token response"})),
+            )
+        })?;
 
     // 4. Decode the ID token payload (the provider's signature was validated by the TLS
     //    connection to the token endpoint — the token came directly from the provider)
-    let claims = decode_id_token_claims(id_token)
-        .map_err(|e| (StatusCode::BAD_GATEWAY, Json(json!({"error": format!("Invalid ID token: {}", e)}))))?;
+    let claims = decode_id_token_claims(id_token).map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({"error": format!("Invalid ID token: {}", e)})),
+        )
+    })?;
 
     // 5. Extract the username from the configured claim
-    let username = claims.get(&oidc_config.username_claim)
+    let username = claims
+        .get(&oidc_config.username_claim)
         .and_then(|v| v.as_str())
-        .ok_or_else(|| (StatusCode::BAD_GATEWAY, Json(json!({
-            "error": format!("ID token missing '{}' claim", oidc_config.username_claim)
-        }))))?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": format!("ID token missing '{}' claim", oidc_config.username_claim)
+                })),
+            )
+        })?
         .to_string();
 
     // 6. Determine the local role via role mapping
     let role = if let Some(ref role_claim) = oidc_config.role_claim {
-        let role_value = claims.get(role_claim)
+        let role_value = claims
+            .get(role_claim)
             .and_then(|v| v.as_str())
             .unwrap_or("");
         match oidc_config.role_mapping.get(role_value) {
@@ -434,13 +568,28 @@ pub async fn oidc_callback(
     };
 
     // 7. Issue a local JWT
-    let jwt_config = state.jwt_config.as_ref()
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Authentication not configured"}))))?;
+    let jwt_config = state.jwt_config.as_ref().ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Authentication not configured"})),
+        )
+    })?;
 
-    let token = jwt_config.generate_token(&username, role.clone())
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Token generation failed: {}", e)}))))?;
+    let token = jwt_config
+        .generate_token(&username, role.clone())
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Token generation failed: {}", e)})),
+            )
+        })?;
 
-    tracing::info!("OIDC login successful for user '{}' via provider '{}' (role: {:?})", username, provider.name, role);
+    tracing::info!(
+        "OIDC login successful for user '{}' via provider '{}' (role: {:?})",
+        username,
+        provider.name,
+        role
+    );
 
     Ok(Json(json!({
         "token": token,
@@ -456,7 +605,9 @@ pub async fn oidc_callback(
 /// endpoint over TLS (authorization code flow), as the transport layer guarantees
 /// authenticity. We must NOT skip verification for tokens received from untrusted
 /// sources (e.g. implicit flow).
-fn decode_id_token_claims(id_token: &str) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+fn decode_id_token_claims(
+    id_token: &str,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
     let parts: Vec<&str> = id_token.split('.').collect();
     if parts.len() != 3 {
         return Err("ID token does not have 3 parts".to_string());
@@ -475,10 +626,12 @@ fn decode_id_token_claims(id_token: &str) -> Result<serde_json::Map<String, serd
         .decode(&padded)
         .map_err(|e| format!("Base64 decode failed: {}", e))?;
 
-    let value: serde_json::Value = serde_json::from_slice(&bytes)
-        .map_err(|e| format!("JSON parse failed: {}", e))?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|e| format!("JSON parse failed: {}", e))?;
 
-    value.as_object().cloned()
+    value
+        .as_object()
+        .cloned()
         .ok_or_else(|| "ID token payload is not a JSON object".to_string())
 }
 

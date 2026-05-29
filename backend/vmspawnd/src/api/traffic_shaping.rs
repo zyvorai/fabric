@@ -14,9 +14,9 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use networking::models::AdoptHostRequest;
 use traffic_shaping::classifier::VMSnapshot;
 use traffic_shaping::models::{CreateQoSPolicyRequest, QoSPolicy, QoSStatus};
-use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -34,7 +34,11 @@ pub async fn create_qos_policy(
         return (status, Json(json!({"error": msg}))).into_response();
     }
     if let Err(msg) = crate::validation::validate_hostname(&req.interface) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid interface: {}", msg)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid interface: {}", msg)})),
+        )
+            .into_response();
     }
     let now = Utc::now();
     let policy = QoSPolicy {
@@ -320,10 +324,7 @@ pub async fn reconcile_qos(state: &AppState) -> anyhow::Result<()> {
     let vms = build_vm_snapshots(state);
 
     let enabled: Vec<QoSPolicy> = policies.into_iter().filter(|p| p.enabled).collect();
-    let rules = state
-        .traffic_shaper
-        .classifier
-        .classify_all(&enabled, &vms);
+    let rules = state.traffic_shaper.classifier.classify_all(&enabled, &vms);
 
     state.traffic_shaper.enforcer.sync_all(&rules)?;
 
@@ -343,12 +344,10 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .map(|vm| {
-            VMSnapshot {
-                name: vm.name,
-                labels: vm.labels.clone().unwrap_or_default(),
-                ip: vm.ip,
-            }
+        .map(|vm| VMSnapshot {
+            name: vm.name,
+            labels: vm.labels.clone().unwrap_or_default(),
+            ip: vm.ip,
         })
         .collect()
 }

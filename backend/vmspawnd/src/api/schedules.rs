@@ -7,13 +7,13 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use chrono::{DateTime, Utc, Timelike, Datelike, Duration};
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Data Structures
@@ -128,7 +128,9 @@ fn validate_schedule(req: &CreateScheduleRequest) -> Result<(), String> {
             }
             for day in days {
                 if *day > 6 {
-                    return Err("Day of week must be between 0 (Sunday) and 6 (Saturday)".to_string());
+                    return Err(
+                        "Day of week must be between 0 (Sunday) and 6 (Saturday)".to_string()
+                    );
                 }
             }
         } else {
@@ -246,8 +248,16 @@ pub async fn list_schedules(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Schedule>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(list_schedules));
-    let schedules = state.store.list_entities::<Schedule>("schedules")
-        .map_err(|e| { tracing::error!("Failed to load schedules: {}", e); crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedules") })?;
+    let schedules = state
+        .store
+        .list_entities::<Schedule>("schedules")
+        .map_err(|e| {
+            tracing::error!("Failed to load schedules: {}", e);
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load schedules",
+            )
+        })?;
 
     Ok(Json(schedules))
 }
@@ -259,8 +269,15 @@ pub async fn get_schedule(
 ) -> Result<Json<Schedule>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(get_schedule));
     // Load from state store
-    let schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+    let schedule = state
+        .store
+        .get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load schedule",
+            )
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     Ok(Json(schedule))
@@ -299,9 +316,15 @@ pub async fn create_schedule(
     };
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+    if let Err(e) = state
+        .store
+        .save_entity("schedules", &schedule.id, &schedule)
+    {
         tracing::error!("Failed to save schedule: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save schedule"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to save schedule",
+        ));
     }
 
     Ok((StatusCode::CREATED, Json(schedule)))
@@ -315,8 +338,15 @@ pub async fn update_schedule(
 ) -> Result<Json<Schedule>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(update_schedule));
     // Load existing schedule from state store
-    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+    let mut schedule = state
+        .store
+        .get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load schedule",
+            )
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     let mut recalculate_next_run = false;
@@ -324,13 +354,19 @@ pub async fn update_schedule(
     // Update fields if provided
     if let Some(name) = req.name {
         if name.trim().is_empty() {
-            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Schedule name cannot be empty"));
+            return Err(crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                "Schedule name cannot be empty",
+            ));
         }
         schedule.name = name;
     }
     if let Some(vm_name) = req.vm_name {
         if vm_name.trim().is_empty() {
-            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "VM name cannot be empty"));
+            return Err(crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                "VM name cannot be empty",
+            ));
         }
         schedule.vm_name = vm_name;
     }
@@ -345,7 +381,10 @@ pub async fn update_schedule(
         // Validate time format
         let parts: Vec<&str> = time.split(':').collect();
         if parts.len() != 2 {
-            return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Time must be in HH:MM format"));
+            return Err(crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                "Time must be in HH:MM format",
+            ));
         }
         schedule.time = time;
         recalculate_next_run = true;
@@ -362,16 +401,26 @@ pub async fn update_schedule(
     // Recalculate next_run if time/schedule_type changed
     if recalculate_next_run {
         schedule.next_run = if schedule.enabled {
-            calculate_next_run(&schedule.schedule_type, &schedule.time, &schedule.days_of_week)
+            calculate_next_run(
+                &schedule.schedule_type,
+                &schedule.time,
+                &schedule.days_of_week,
+            )
         } else {
             None
         };
     }
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+    if let Err(e) = state
+        .store
+        .save_entity("schedules", &schedule.id, &schedule)
+    {
         tracing::error!("Failed to update schedule: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update schedule"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to update schedule",
+        ));
     }
 
     Ok(Json(schedule))
@@ -386,7 +435,10 @@ pub async fn delete_schedule(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("schedules", &id) {
         tracing::error!("Failed to delete schedule: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete schedule"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to delete schedule",
+        ));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -399,20 +451,37 @@ pub async fn enable_schedule(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(enable_schedule));
     // Load schedule from state store
-    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+    let mut schedule = state
+        .store
+        .get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load schedule",
+            )
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     // Set enabled = true
     schedule.enabled = true;
 
     // Calculate next_run
-    schedule.next_run = calculate_next_run(&schedule.schedule_type, &schedule.time, &schedule.days_of_week);
+    schedule.next_run = calculate_next_run(
+        &schedule.schedule_type,
+        &schedule.time,
+        &schedule.days_of_week,
+    );
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+    if let Err(e) = state
+        .store
+        .save_entity("schedules", &schedule.id, &schedule)
+    {
         tracing::error!("Failed to enable schedule: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to enable schedule"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to enable schedule",
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -425,8 +494,15 @@ pub async fn disable_schedule(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(disable_schedule));
     // Load schedule from state store
-    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+    let mut schedule = state
+        .store
+        .get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load schedule",
+            )
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     // Set enabled = false
@@ -436,9 +512,15 @@ pub async fn disable_schedule(
     schedule.next_run = None;
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+    if let Err(e) = state
+        .store
+        .save_entity("schedules", &schedule.id, &schedule)
+    {
         tracing::error!("Failed to disable schedule: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to disable schedule"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to disable schedule",
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -451,41 +533,58 @@ pub async fn run_schedule_now(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(run_schedule_now));
     // Load schedule from state store
-    let mut schedule = state.store.get_entity::<Schedule>("schedules", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load schedule"))?
+    let mut schedule = state
+        .store
+        .get_entity::<Schedule>("schedules", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load schedule",
+            )
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Schedule not found"))?;
 
     // Execute the scheduled action immediately (call VM API)
-    tracing::info!("Executing schedule {} immediately: {:?} on VM {}",
-                   schedule.name, schedule.action, schedule.vm_name);
+    tracing::info!(
+        "Executing schedule {} immediately: {:?} on VM {}",
+        schedule.name,
+        schedule.action,
+        schedule.vm_name
+    );
 
     // Execute the VM action via spawn_blocking to avoid blocking async runtime
     let vm_name_clone = schedule.vm_name.clone();
     let action = schedule.action.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        match action {
-            VMAction::Start => vmspawn_driver::start_vm(&vm_name_clone),
-            VMAction::Stop => vmspawn_driver::stop_vm(&vm_name_clone),
-            VMAction::Restart => vmspawn_driver::restart_vm(&vm_name_clone),
-            VMAction::Snapshot => {
-                let snap_name = format!("scheduled-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
-                let image_path = crate::validation::find_vm_image(&vm_name_clone);
-                match image_path {
-                    Some(ref path) => {
-                        let output = std::process::Command::new("qemu-img")
-                            .args(["snapshot", "-c", &snap_name, path])
-                            .output();
-                        match output {
-                            Ok(o) if o.status.success() => Ok(()),
-                            Ok(o) => Err(anyhow::anyhow!("qemu-img snapshot failed: {}", String::from_utf8_lossy(&o.stderr))),
-                            Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
-                        }
+    let result = tokio::task::spawn_blocking(move || match action {
+        VMAction::Start => vmspawn_driver::start_vm(&vm_name_clone),
+        VMAction::Stop => vmspawn_driver::stop_vm(&vm_name_clone),
+        VMAction::Restart => vmspawn_driver::restart_vm(&vm_name_clone),
+        VMAction::Snapshot => {
+            let snap_name = format!("scheduled-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
+            let image_path = crate::validation::find_vm_image(&vm_name_clone);
+            match image_path {
+                Some(ref path) => {
+                    let output = std::process::Command::new("qemu-img")
+                        .args(["snapshot", "-c", &snap_name, path])
+                        .output();
+                    match output {
+                        Ok(o) if o.status.success() => Ok(()),
+                        Ok(o) => Err(anyhow::anyhow!(
+                            "qemu-img snapshot failed: {}",
+                            String::from_utf8_lossy(&o.stderr)
+                        )),
+                        Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
                     }
-                    None => Err(anyhow::anyhow!("No disk image found for VM '{}'", vm_name_clone)),
                 }
+                None => Err(anyhow::anyhow!(
+                    "No disk image found for VM '{}'",
+                    vm_name_clone
+                )),
             }
         }
-    }).await.unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+    })
+    .await
+    .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
 
     // Check if execution was successful
     let (success, error) = match result {
@@ -503,9 +602,15 @@ pub async fn run_schedule_now(
     schedule.last_run = Some(executed_at);
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("schedules", &schedule.id, &schedule) {
+    if let Err(e) = state
+        .store
+        .save_entity("schedules", &schedule.id, &schedule)
+    {
         tracing::error!("Failed to update schedule last_run: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update schedule"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to update schedule",
+        ));
     }
 
     // Add entry to history
@@ -522,12 +627,19 @@ pub async fn run_schedule_now(
         vm_name: schedule.vm_name.clone(),
         action: action_str.to_string(),
         executed_at,
-        status: if success { ExecutionStatus::Success } else { ExecutionStatus::Failed },
+        status: if success {
+            ExecutionStatus::Success
+        } else {
+            ExecutionStatus::Failed
+        },
         error: error.clone(),
     };
 
     let history_id = Uuid::new_v4().to_string();
-    if let Err(e) = state.store.save_entity("schedule_history", &history_id, &history_entry) {
+    if let Err(e) = state
+        .store
+        .save_entity("schedule_history", &history_id, &history_entry)
+    {
         tracing::error!("Failed to save schedule history: {}", e);
         // Don't fail the request if history fails
     }
@@ -546,7 +658,9 @@ pub async fn get_schedule_history(
 ) -> Result<Json<Vec<ScheduleHistory>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(get_schedule_history));
     // Load history for specific schedule from state store
-    let all_history = state.store.list_entities::<ScheduleHistory>("schedule_history")
+    let all_history = state
+        .store
+        .list_entities::<ScheduleHistory>("schedule_history")
         .unwrap_or_default();
 
     // Filter by schedule_id and sort by execution time (most recent first)
@@ -569,7 +683,9 @@ pub async fn get_all_schedule_history(
 ) -> Result<Json<Vec<ScheduleHistory>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("schedules::{}", stringify!(get_all_schedule_history));
     // Load all history from state store
-    let mut history = state.store.list_entities::<ScheduleHistory>("schedule_history")
+    let mut history = state
+        .store
+        .list_entities::<ScheduleHistory>("schedule_history")
         .unwrap_or_default();
 
     // Sort by execution time (most recent first)
@@ -585,7 +701,14 @@ pub async fn get_all_schedule_history(
 mod tests {
     use super::*;
 
-    fn make_req(name: &str, vm: &str, action: VMAction, stype: ScheduleType, time: &str, days: Option<Vec<u8>>) -> CreateScheduleRequest {
+    fn make_req(
+        name: &str,
+        vm: &str,
+        action: VMAction,
+        stype: ScheduleType,
+        time: &str,
+        days: Option<Vec<u8>>,
+    ) -> CreateScheduleRequest {
         CreateScheduleRequest {
             name: name.to_string(),
             vm_name: vm.to_string(),
@@ -599,13 +722,27 @@ mod tests {
 
     #[test]
     fn test_validate_valid_daily() {
-        let req = make_req("backup", "web-01", VMAction::Stop, ScheduleType::Daily, "23:30", None);
+        let req = make_req(
+            "backup",
+            "web-01",
+            VMAction::Stop,
+            ScheduleType::Daily,
+            "23:30",
+            None,
+        );
         assert!(validate_schedule(&req).is_ok());
     }
 
     #[test]
     fn test_validate_invalid_time() {
-        let req = make_req("x", "vm", VMAction::Start, ScheduleType::Daily, "25:00", None);
+        let req = make_req(
+            "x",
+            "vm",
+            VMAction::Start,
+            ScheduleType::Daily,
+            "25:00",
+            None,
+        );
         assert!(validate_schedule(&req).is_err());
         let req2 = make_req("x", "vm", VMAction::Start, ScheduleType::Daily, "abc", None);
         assert!(validate_schedule(&req2).is_err());
@@ -613,19 +750,40 @@ mod tests {
 
     #[test]
     fn test_validate_weekly_no_days() {
-        let req = make_req("x", "vm", VMAction::Start, ScheduleType::Weekly, "10:00", None);
+        let req = make_req(
+            "x",
+            "vm",
+            VMAction::Start,
+            ScheduleType::Weekly,
+            "10:00",
+            None,
+        );
         assert!(validate_schedule(&req).is_err());
     }
 
     #[test]
     fn test_validate_weekly_invalid_day() {
-        let req = make_req("x", "vm", VMAction::Start, ScheduleType::Weekly, "10:00", Some(vec![7]));
+        let req = make_req(
+            "x",
+            "vm",
+            VMAction::Start,
+            ScheduleType::Weekly,
+            "10:00",
+            Some(vec![7]),
+        );
         assert!(validate_schedule(&req).is_err());
     }
 
     #[test]
     fn test_validate_empty_vm_name() {
-        let req = make_req("sched", " ", VMAction::Stop, ScheduleType::Daily, "10:00", None);
+        let req = make_req(
+            "sched",
+            " ",
+            VMAction::Stop,
+            ScheduleType::Daily,
+            "10:00",
+            None,
+        );
         assert!(validate_schedule(&req).is_err());
     }
 

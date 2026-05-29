@@ -271,7 +271,10 @@ impl DistributedStorageManager {
             updated: now,
         };
 
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         tracing::info!(id = %pool.id, name = %pool.name, "created distributed storage pool");
         store.pools.insert(pool.id.clone(), pool.clone());
         Ok(pool)
@@ -299,7 +302,10 @@ impl DistributedStorageManager {
 
     /// Delete a pool by ID.
     pub fn delete_pool(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         store
             .pools
             .remove(id)
@@ -310,7 +316,10 @@ impl DistributedStorageManager {
 
     /// Add a host to an existing pool and recalculate capacity.
     pub fn add_host_to_pool(&self, pool_id: &str, host: StorageHost) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let pool = store
             .pools
             .get_mut(pool_id)
@@ -328,7 +337,10 @@ impl DistributedStorageManager {
 
     /// Remove a host from a pool and recalculate capacity.
     pub fn remove_host_from_pool(&self, pool_id: &str, host_id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let pool = store
             .pools
             .get_mut(pool_id)
@@ -351,13 +363,11 @@ impl DistributedStorageManager {
     }
 
     /// Report a disk failure within a pool, updating the disk status and pool health.
-    pub fn report_disk_failure(
-        &self,
-        pool_id: &str,
-        host_id: &str,
-        disk_id: &str,
-    ) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+    pub fn report_disk_failure(&self, pool_id: &str, host_id: &str, disk_id: &str) -> Result<()> {
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let pool = store
             .pools
             .get_mut(pool_id)
@@ -402,7 +412,10 @@ impl DistributedStorageManager {
 
     /// Get a health report for a pool.
     pub fn get_pool_health(&self, pool_id: &str) -> Result<PoolHealthReport> {
-        let store = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let pool = store
             .pools
             .get(pool_id)
@@ -443,7 +456,10 @@ impl DistributedStorageManager {
         target_pool: &str,
         disk_size_gb: u64,
     ) -> Result<StorageMigration> {
-        let store_read = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store_read = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         if !store_read.pools.contains_key(source_pool) {
             return Err(anyhow!("source pool not found: {source_pool}"));
         }
@@ -476,7 +492,10 @@ impl DistributedStorageManager {
         };
 
         {
-            let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            let mut store = self
+                .store
+                .write()
+                .map_err(|e| anyhow!("lock poisoned: {e}"))?;
             tracing::info!(
                 id = %migration.id,
                 vm = %vm_name,
@@ -523,8 +542,10 @@ impl DistributedStorageManager {
             let output = std::process::Command::new("qemu-img")
                 .args([
                     "convert",
-                    "-f", "qcow2",
-                    "-O", "qcow2",
+                    "-f",
+                    "qcow2",
+                    "-O",
+                    "qcow2",
                     "-p",
                     &source_path,
                     &dest_path,
@@ -594,7 +615,10 @@ impl DistributedStorageManager {
 
     /// Update migration progress with the number of bytes transferred so far.
     pub fn update_migration_progress(&self, id: &str, bytes_transferred: u64) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let migration = store
             .migrations
             .get_mut(id)
@@ -625,7 +649,10 @@ impl DistributedStorageManager {
 
     /// Mark a migration as completed and update pool capacities.
     pub fn complete_migration(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let migration = store
             .migrations
             .get_mut(id)
@@ -658,7 +685,9 @@ impl DistributedStorageManager {
         // Update target pool: consume space.
         if let Some(target) = store.pools.get_mut(&target_id) {
             target.used_capacity_gb += disk_size;
-            target.free_capacity_gb = target.total_capacity_gb.saturating_sub(target.used_capacity_gb);
+            target.free_capacity_gb = target
+                .total_capacity_gb
+                .saturating_sub(target.used_capacity_gb);
             target.updated = Utc::now();
         }
 
@@ -668,7 +697,10 @@ impl DistributedStorageManager {
 
     /// Cancel an in-progress migration.
     pub fn cancel_migration(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let migration = store
             .migrations
             .get_mut(id)
@@ -714,7 +746,10 @@ impl DistributedStorageManager {
 
     /// Create a new storage policy.
     pub fn create_policy(&self, policy: StoragePolicy) -> Result<StoragePolicy> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         if store.policies.values().any(|p| p.name == policy.name) {
             return Err(anyhow!("policy with name '{}' already exists", policy.name));
@@ -739,7 +774,10 @@ impl DistributedStorageManager {
 
     /// Update an existing storage policy.
     pub fn update_policy(&self, id: &str, policy: StoragePolicy) -> Result<StoragePolicy> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         if !store.policies.contains_key(id) {
             return Err(anyhow!("policy not found: {id}"));
         }
@@ -751,7 +789,10 @@ impl DistributedStorageManager {
 
     /// Delete a storage policy by ID.
     pub fn delete_policy(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         store
             .policies
             .remove(id)
@@ -888,7 +929,10 @@ impl DistributedStorageManager {
             updated: now,
         };
 
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         tracing::info!(id = %ds_cluster.id, name = %ds_cluster.name, "created datastore cluster");
         store
             .datastore_clusters
@@ -918,7 +962,10 @@ impl DistributedStorageManager {
 
     /// Delete a datastore cluster by ID.
     pub fn delete_datastore_cluster(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         store
             .datastore_clusters
             .remove(id)
@@ -931,7 +978,10 @@ impl DistributedStorageManager {
     /// workload size. Returns the pool_id of the pool with the most free space that
     /// can accommodate the requested size.
     pub fn recommend_datastore(&self, ds_cluster_id: &str, size_gb: u64) -> Result<String> {
-        let store = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let ds_cluster = store
             .datastore_clusters
             .get(ds_cluster_id)
@@ -942,9 +992,7 @@ impl DistributedStorageManager {
             .datastore_ids
             .iter()
             .filter_map(|pid| store.pools.get(pid))
-            .filter(|pool| {
-                pool.status != PoolStatus::Offline && pool.free_capacity_gb >= size_gb
-            })
+            .filter(|pool| pool.status != PoolStatus::Offline && pool.free_capacity_gb >= size_gb)
             .collect();
 
         if candidates.is_empty() {
@@ -1073,7 +1121,9 @@ mod tests {
 
     fn setup_manager_with_pool() -> (DistributedStorageManager, DistributedStoragePool) {
         let mgr = DistributedStorageManager::new();
-        let pool = mgr.create_pool(make_pool_request("vsan-pool", "cluster-1")).unwrap();
+        let pool = mgr
+            .create_pool(make_pool_request("vsan-pool", "cluster-1"))
+            .unwrap();
         (mgr, pool)
     }
 
@@ -1111,8 +1161,10 @@ mod tests {
     #[test]
     fn test_list_pools_with_filter() {
         let mgr = DistributedStorageManager::new();
-        mgr.create_pool(make_pool_request("pool-a", "cluster-1")).unwrap();
-        mgr.create_pool(make_pool_request("pool-b", "cluster-2")).unwrap();
+        mgr.create_pool(make_pool_request("pool-a", "cluster-1"))
+            .unwrap();
+        mgr.create_pool(make_pool_request("pool-b", "cluster-2"))
+            .unwrap();
 
         assert_eq!(mgr.list_pools(None).len(), 2);
         assert_eq!(mgr.list_pools(Some("cluster-1")).len(), 1);
@@ -1156,7 +1208,8 @@ mod tests {
         let (mgr, pool) = setup_manager_with_pool();
 
         // Report a disk failure.
-        mgr.report_disk_failure(&pool.id, "host-1", "ssd-1").unwrap();
+        mgr.report_disk_failure(&pool.id, "host-1", "ssd-1")
+            .unwrap();
 
         let health = mgr.get_pool_health(&pool.id).unwrap();
         assert_eq!(health.failed_disks, 1);
@@ -1164,8 +1217,10 @@ mod tests {
         assert_eq!(health.health, PoolHealth::Warning);
 
         // Report more failures to push to critical.
-        mgr.report_disk_failure(&pool.id, "host-1", "ssd-2").unwrap();
-        mgr.report_disk_failure(&pool.id, "host-2", "ssd-3").unwrap();
+        mgr.report_disk_failure(&pool.id, "host-1", "ssd-2")
+            .unwrap();
+        mgr.report_disk_failure(&pool.id, "host-2", "ssd-3")
+            .unwrap();
 
         let health = mgr.get_pool_health(&pool.id).unwrap();
         assert_eq!(health.failed_disks, 3);
@@ -1205,7 +1260,8 @@ mod tests {
 
         // Update progress (50 GB out of 100 GB).
         let half_bytes = 50 * 1024 * 1024 * 1024;
-        mgr.update_migration_progress(&migration.id, half_bytes).unwrap();
+        mgr.update_migration_progress(&migration.id, half_bytes)
+            .unwrap();
         let m = mgr.get_migration(&migration.id).unwrap();
         assert!((m.progress_pct - 50.0).abs() < 0.1);
 
@@ -1251,8 +1307,10 @@ mod tests {
         let p1 = mgr.create_pool(make_pool_request("p1", "c1")).unwrap();
         let p2 = mgr.create_pool(make_pool_request("p2", "c1")).unwrap();
 
-        mgr.start_storage_migration("vm-a", &p1.id, &p2.id, 10).unwrap();
-        mgr.start_storage_migration("vm-b", &p1.id, &p2.id, 20).unwrap();
+        mgr.start_storage_migration("vm-a", &p1.id, &p2.id, 10)
+            .unwrap();
+        mgr.start_storage_migration("vm-b", &p1.id, &p2.id, 20)
+            .unwrap();
 
         assert_eq!(mgr.list_migrations(None).len(), 2);
         assert_eq!(mgr.list_migrations(Some("vm-a")).len(), 1);
@@ -1295,8 +1353,11 @@ mod tests {
     #[test]
     fn test_duplicate_policy_name_rejected() {
         let mgr = DistributedStorageManager::new();
-        mgr.create_policy(make_policy("pol-1", "unique-name")).unwrap();
-        assert!(mgr.create_policy(make_policy("pol-2", "unique-name")).is_err());
+        mgr.create_policy(make_policy("pol-1", "unique-name"))
+            .unwrap();
+        assert!(mgr
+            .create_policy(make_policy("pol-2", "unique-name"))
+            .is_err());
     }
 
     #[test]
@@ -1348,7 +1409,8 @@ mod tests {
         let mgr = DistributedStorageManager::new();
 
         // Create an SSD pool with replication 2.
-        mgr.create_pool(make_pool_request("ssd-pool", "cluster-1")).unwrap();
+        mgr.create_pool(make_pool_request("ssd-pool", "cluster-1"))
+            .unwrap();
 
         // Create an HDD pool with replication 1.
         mgr.create_pool(CreatePoolRequest {

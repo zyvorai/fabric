@@ -2,12 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -115,40 +110,64 @@ pub async fn login(
     tracing::debug!("auth::{}", stringify!(login));
 
     // Validate username format
-    if req.username.is_empty() || req.username.len() > 64
-        || !req.username.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    if req.username.is_empty()
+        || req.username.len() > 64
+        || !req
+            .username
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
     {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid username format"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid username format",
+        ));
     }
 
     // Rate limit check (per-user)
     if LOGIN_LIMITER.is_limited(&req.username) {
         tracing::warn!("Login rate limited for user '{}'", req.username);
-        return Err(crate::api_error::json_error(StatusCode::TOO_MANY_REQUESTS, "Too many login attempts, try again later"));
+        return Err(crate::api_error::json_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many login attempts, try again later",
+        ));
     }
 
     // Global rate limit check (across all users)
     if GLOBAL_LOGIN_LIMITER.is_limited("__global__") {
         tracing::warn!("Global login rate limit exceeded");
-        return Err(crate::api_error::json_error(StatusCode::TOO_MANY_REQUESTS, "Too many login attempts, try again later"));
+        return Err(crate::api_error::json_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many login attempts, try again later",
+        ));
     }
 
-    let jwt_config = state.jwt_config.as_ref().ok_or_else(|| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+    let jwt_config = state.jwt_config.as_ref().ok_or_else(|| {
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+    })?;
 
     enum AuthSource {
-        Database { user_id: String, role: security::Role },
+        Database {
+            user_id: String,
+            role: security::Role,
+        },
         Pam,
     }
 
     let auth_source = if let Some(ref user_db) = state.user_db {
         if let Ok(Some(db_user)) = user_db.get_by_username(&req.username) {
-            let password_ok = db_user
-                .verify_password(&req.password)
-                .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+            let password_ok = db_user.verify_password(&req.password).map_err(|_| {
+                crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error",
+                )
+            })?;
             if !password_ok {
                 LOGIN_LIMITER.record_failure(&req.username);
                 GLOBAL_LOGIN_LIMITER.record_failure("__global__");
-                return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+                return Err(crate::api_error::json_error(
+                    StatusCode::UNAUTHORIZED,
+                    "Invalid credentials",
+                ));
             }
 
             let totp_enabled = user_db.is_totp_enabled(&db_user.id).unwrap_or(false);
@@ -163,12 +182,20 @@ pub async fn login(
                         ));
                     }
                     Some(code) => {
-                        let secret = user_db
-                            .get_totp_secret(&db_user.id)
-                            .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+                        let secret = user_db.get_totp_secret(&db_user.id).map_err(|_| {
+                            crate::api_error::json_error(
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "Internal server error",
+                            )
+                        })?;
                         if let Some(secret) = secret {
-                            let valid = security::totp::verify_code(&secret, code)
-                                .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+                            let valid =
+                                security::totp::verify_code(&secret, code).map_err(|_| {
+                                    crate::api_error::json_error(
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        "Internal server error",
+                                    )
+                                })?;
                             if !valid {
                                 return Err(crate::api_error::json_error(
                                     StatusCode::UNAUTHORIZED,
@@ -191,13 +218,21 @@ pub async fn login(
                 move || security::pam_auth::authenticate(&username, &password)
             })
             .await
-            .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+            .map_err(|_| {
+                crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error",
+                )
+            })?;
 
             if pam_result.is_err() {
                 tracing::warn!("PAM authentication failed for '{}'", req.username);
                 LOGIN_LIMITER.record_failure(&req.username);
                 GLOBAL_LOGIN_LIMITER.record_failure("__global__");
-                return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+                return Err(crate::api_error::json_error(
+                    StatusCode::UNAUTHORIZED,
+                    "Invalid credentials",
+                ));
             }
 
             AuthSource::Pam
@@ -209,13 +244,18 @@ pub async fn login(
             move || security::pam_auth::authenticate(&username, &password)
         })
         .await
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+        })?;
 
         if pam_result.is_err() {
             tracing::warn!("PAM authentication failed for '{}'", req.username);
             LOGIN_LIMITER.record_failure(&req.username);
             GLOBAL_LOGIN_LIMITER.record_failure("__global__");
-            return Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid credentials"));
+            return Err(crate::api_error::json_error(
+                StatusCode::UNAUTHORIZED,
+                "Invalid credentials",
+            ));
         }
 
         AuthSource::Pam
@@ -239,12 +279,20 @@ pub async fn login(
                             ));
                         }
                         Some(code) => {
-                            let secret = user_db
-                                .get_totp_secret(&db_user.id)
-                                .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+                            let secret = user_db.get_totp_secret(&db_user.id).map_err(|_| {
+                                crate::api_error::json_error(
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    "Internal server error",
+                                )
+                            })?;
                             if let Some(secret) = secret {
-                                let valid = security::totp::verify_code(&secret, code)
-                                    .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+                                let valid =
+                                    security::totp::verify_code(&secret, code).map_err(|_| {
+                                        crate::api_error::json_error(
+                                            StatusCode::INTERNAL_SERVER_ERROR,
+                                            "Internal server error",
+                                        )
+                                    })?;
                                 if !valid {
                                     return Err(crate::api_error::json_error(
                                         StatusCode::UNAUTHORIZED,
@@ -273,13 +321,16 @@ pub async fn login(
 
     let token = jwt_config
         .generate_token(&user_id, role.clone())
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+        })?;
 
     let role_str = match role {
         security::Role::Admin => "admin",
         security::Role::User => "user",
         security::Role::Viewer => "viewer",
-    }.to_string();
+    }
+    .to_string();
 
     Ok(Json(LoginResponse {
         token,
@@ -298,7 +349,8 @@ async fn is_admin_user(username: &str) -> bool {
         .await
     {
         if let Ok(groups) = String::from_utf8(output.stdout) {
-            return groups.split_whitespace()
+            return groups
+                .split_whitespace()
                 .any(|g| g == "wheel" || g == "sudo" || g == "adm");
         }
     }
@@ -313,7 +365,9 @@ pub async fn me(
     let claims = req
         .extensions()
         .get::<security::Claims>()
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required"))?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required")
+        })?
         .clone();
 
     let role_str = match claims.role {
@@ -384,7 +438,9 @@ pub async fn setup_2fa(
     let claims = req
         .extensions()
         .get::<security::Claims>()
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required"))?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required")
+        })?
         .clone();
 
     let user_db = state.user_db.as_ref().ok_or_else(|| {
@@ -392,20 +448,31 @@ pub async fn setup_2fa(
     })?;
 
     // Check if already enabled
-    let already_enabled = user_db
-        .is_totp_enabled(&claims.sub)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?;
+    let already_enabled = user_db.is_totp_enabled(&claims.sub).map_err(|_| {
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+    })?;
     if already_enabled {
-        return Err(crate::api_error::json_error(StatusCode::CONFLICT, "2FA is already enabled"));
+        return Err(crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            "2FA is already enabled",
+        ));
     }
 
-    let (secret, otpauth_url) = security::totp::generate_secret(&claims.sub, "vmspawnd")
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to generate TOTP secret"))?;
+    let (secret, otpauth_url) =
+        security::totp::generate_secret(&claims.sub, "vmspawnd").map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to generate TOTP secret",
+            )
+        })?;
 
     // Store the secret (but don't enable yet until verified)
-    user_db
-        .enable_totp(&claims.sub, &secret)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save TOTP secret"))?;
+    user_db.enable_totp(&claims.sub, &secret).map_err(|_| {
+        crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to save TOTP secret",
+        )
+    })?;
 
     Ok(Json(TotpSetupResponse {
         secret,
@@ -422,12 +489,16 @@ pub async fn verify_2fa(
     let claims = req
         .extensions()
         .get::<security::Claims>()
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required"))?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required")
+        })?
         .clone();
 
     let body = axum::body::to_bytes(req.into_body(), 1024)
         .await
-        .map_err(|_| crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid request body"))?;
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid request body")
+        })?;
     let verify_req: TotpVerifyRequest = serde_json::from_slice(&body)
         .map_err(|_| crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid JSON"))?;
 
@@ -437,16 +508,24 @@ pub async fn verify_2fa(
 
     let secret = user_db
         .get_totp_secret(&claims.sub)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"))?
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "2FA not set up"))?;
 
-    let valid = security::totp::verify_code(&secret, &verify_req.code)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Verification failed"))?;
+    let valid = security::totp::verify_code(&secret, &verify_req.code).map_err(|_| {
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Verification failed")
+    })?;
 
     if valid {
-        Ok(Json(serde_json::json!({"verified": true, "message": "2FA is now active"})))
+        Ok(Json(
+            serde_json::json!({"verified": true, "message": "2FA is now active"}),
+        ))
     } else {
-        Err(crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Invalid TOTP code"))
+        Err(crate::api_error::json_error(
+            StatusCode::UNAUTHORIZED,
+            "Invalid TOTP code",
+        ))
     }
 }
 
@@ -458,16 +537,20 @@ pub async fn disable_2fa(
     let claims = req
         .extensions()
         .get::<security::Claims>()
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required"))?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::UNAUTHORIZED, "Authentication required")
+        })?
         .clone();
 
     let user_db = state.user_db.as_ref().ok_or_else(|| {
         crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Auth not configured")
     })?;
 
-    user_db
-        .disable_totp(&claims.sub)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to disable 2FA"))?;
+    user_db.disable_totp(&claims.sub).map_err(|_| {
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to disable 2FA")
+    })?;
 
-    Ok(Json(serde_json::json!({"message": "2FA disabled successfully"})))
+    Ok(Json(
+        serde_json::json!({"message": "2FA disabled successfully"}),
+    ))
 }

@@ -7,14 +7,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // Data Structures
@@ -75,14 +75,12 @@ pub async fn start_migration(
 ) -> Result<(StatusCode, Json<MigrationStatus>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("migration::{}", stringify!(start_migration));
     // Validate VM name
-    validate_vm_name(&req.vm_name).map_err(|(_status, msg)| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
-    })?;
+    validate_vm_name(&req.vm_name)
+        .map_err(|(_status, msg)| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
 
     // Validate target host (must be a hostname or IP, no shell metacharacters)
-    crate::validation::validate_hostname(&req.target_host).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
-    })?;
+    crate::validation::validate_hostname(&req.target_host)
+        .map_err(|msg| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
 
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
@@ -118,12 +116,15 @@ pub async fn start_migration(
     };
 
     // Save initial status
-    state.store.save_entity("migrations", &migration_id, &status).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    state
+        .store
+        .save_entity("migrations", &migration_id, &status)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     // Spawn background migration task
     let state_clone = state.clone();
@@ -141,11 +142,18 @@ pub async fn start_migration(
         if let Err(e) = handle.await {
             tracing::error!("Migration task '{}' panicked: {}", migration_id_monitor, e);
             // Update migration status to Failed on panic
-            if let Ok(Some(mut status)) = state_monitor.store.get_entity::<MigrationStatus>("migrations", &migration_id_monitor) {
+            if let Ok(Some(mut status)) = state_monitor
+                .store
+                .get_entity::<MigrationStatus>("migrations", &migration_id_monitor)
+            {
                 status.state = MigrationState::Failed;
                 status.error = Some("Internal error: migration task panicked".to_string());
                 status.completed = Some(Utc::now());
-                if let Err(save_err) = state_monitor.store.save_entity("migrations", &migration_id_monitor, &status) {
+                if let Err(save_err) =
+                    state_monitor
+                        .store
+                        .save_entity("migrations", &migration_id_monitor, &status)
+                {
                     tracing::error!("Failed to save migration panic status: {}", save_err);
                 }
             }
@@ -161,12 +169,15 @@ pub async fn list_migrations(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<MigrationStatus>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("migration::{}", stringify!(list_migrations));
-    let migrations = state.store.list_entities::<MigrationStatus>("migrations").map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    let migrations = state
+        .store
+        .list_entities::<MigrationStatus>("migrations")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(migrations))
 }
@@ -228,7 +239,10 @@ pub async fn cancel_migration(
     // Kill any rsync processes for this VM.
     // Validate the VM name to prevent regex injection in pkill's -f pattern.
     if crate::validation::validate_vm_name(&status.vm_name).is_err() {
-        tracing::error!("Migration cancel: invalid VM name '{}', skipping pkill", status.vm_name);
+        tracing::error!(
+            "Migration cancel: invalid VM name '{}', skipping pkill",
+            status.vm_name
+        );
     } else {
         // VM name is validated to only contain [a-zA-Z0-9._-].
         // Escape dots for regex safety since '.' matches any character.
@@ -245,12 +259,15 @@ pub async fn cancel_migration(
     status.state = MigrationState::Cancelled;
     status.completed = Some(Utc::now());
 
-    state.store.save_entity("migrations", &id, &status).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    state
+        .store
+        .save_entity("migrations", &id, &status)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(status))
 }
@@ -260,7 +277,12 @@ pub async fn cancel_migration(
 // ============================================================================
 
 async fn run_migration(state: Arc<AppState>, migration_id: String, req: MigrationRequest) {
-    let update_status = |state: &Arc<AppState>, id: &str, mig_state: MigrationState, progress: u32, bytes: u64, error: Option<String>| {
+    let update_status = |state: &Arc<AppState>,
+                         id: &str,
+                         mig_state: MigrationState,
+                         progress: u32,
+                         bytes: u64,
+                         error: Option<String>| {
         if let Ok(Some(mut status)) = state.store.get_entity::<MigrationStatus>("migrations", id) {
             status.state = mig_state;
             status.progress_percent = progress;
@@ -279,17 +301,37 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
     update_status(&state, &migration_id, MigrationState::PreCheck, 5, 0, None);
 
     let ssh_check = tokio::process::Command::new("ssh")
-        .args(["-o", "ConnectTimeout=5", "-o", "BatchMode=yes", &req.target_host, "echo ok"])
+        .args([
+            "-o",
+            "ConnectTimeout=5",
+            "-o",
+            "BatchMode=yes",
+            &req.target_host,
+            "echo ok",
+        ])
         .output()
         .await;
 
     match ssh_check {
         Ok(output) if output.status.success() => {
-            tracing::info!("Migration {}: target host {} is reachable", migration_id, req.target_host);
+            tracing::info!(
+                "Migration {}: target host {} is reachable",
+                migration_id,
+                req.target_host
+            );
         }
         _ => {
-            update_status(&state, &migration_id, MigrationState::Failed, 5, 0,
-                Some(format!("Target host '{}' is not reachable via SSH", req.target_host)));
+            update_status(
+                &state,
+                &migration_id,
+                MigrationState::Failed,
+                5,
+                0,
+                Some(format!(
+                    "Target host '{}' is not reachable via SSH",
+                    req.target_host
+                )),
+            );
             return;
         }
     }
@@ -308,8 +350,14 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
     let manager = match migration::MigrationManager::new(workspace) {
         Ok(m) => m,
         Err(e) => {
-            update_status(&state, &migration_id, MigrationState::Failed, 5, 0,
-                Some(format!("Failed to initialize migration: {}", e)));
+            update_status(
+                &state,
+                &migration_id,
+                MigrationState::Failed,
+                5,
+                0,
+                Some(format!("Failed to initialize migration: {}", e)),
+            );
             return;
         }
     };
@@ -323,19 +371,56 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
                 migration::MigrationState::Failed => MigrationState::Failed,
                 _ => MigrationState::Completed,
             };
-            update_status(&state, &migration_id, final_state.clone(), 100, 0, result.error);
+            update_status(
+                &state,
+                &migration_id,
+                final_state.clone(),
+                100,
+                0,
+                result.error,
+            );
             if matches!(final_state, MigrationState::Completed) {
-                crate::api::events::record_event(&state, crate::api::events::VMEventType::Migrated, &req.vm_name, Some(format!("Migrated to {}", req.target_host)));
+                crate::api::events::record_event(
+                    &state,
+                    crate::api::events::VMEventType::Migrated,
+                    &req.vm_name,
+                    Some(format!("Migrated to {}", req.target_host)),
+                );
             } else {
-                crate::api::events::record_event(&state, crate::api::events::VMEventType::Error, &req.vm_name, Some("Migration completed with failed status".to_string()));
+                crate::api::events::record_event(
+                    &state,
+                    crate::api::events::VMEventType::Error,
+                    &req.vm_name,
+                    Some("Migration completed with failed status".to_string()),
+                );
             }
-            tracing::info!("Migration {} completed for VM '{}'", migration_id, req.vm_name);
+            tracing::info!(
+                "Migration {} completed for VM '{}'",
+                migration_id,
+                req.vm_name
+            );
         }
         Err(e) => {
-            update_status(&state, &migration_id, MigrationState::Failed, 0, 0,
-                Some(e.to_string()));
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Error, &req.vm_name, Some(format!("Migration failed: {}", e)));
-            tracing::error!("Migration {} failed for VM '{}': {}", migration_id, req.vm_name, e);
+            update_status(
+                &state,
+                &migration_id,
+                MigrationState::Failed,
+                0,
+                0,
+                Some(e.to_string()),
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Error,
+                &req.vm_name,
+                Some(format!("Migration failed: {}", e)),
+            );
+            tracing::error!(
+                "Migration {} failed for VM '{}': {}",
+                migration_id,
+                req.vm_name,
+                e
+            );
         }
     }
 }

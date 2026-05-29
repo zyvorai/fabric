@@ -2,10 +2,10 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -50,9 +50,7 @@ impl CpuTopology {
         let cpu_path = PathBuf::from("/sys/devices/system/cpu");
 
         if !cpu_path.exists() {
-            return Err(CpuError::TopologyRead(
-                "CPU sysfs not found".to_string()
-            ));
+            return Err(CpuError::TopologyRead("CPU sysfs not found".to_string()));
         }
 
         // Count total CPUs
@@ -135,15 +133,14 @@ impl CpuTopology {
         // Read topology info
         let topology_path = cpu_path.join("topology");
 
-        let physical_package_id = Self::read_u32(&topology_path.join("physical_package_id"))
-            .unwrap_or(0);
+        let physical_package_id =
+            Self::read_u32(&topology_path.join("physical_package_id")).unwrap_or(0);
 
-        let core_id = Self::read_u32(&topology_path.join("core_id"))
-            .unwrap_or(0);
+        let core_id = Self::read_u32(&topology_path.join("core_id")).unwrap_or(0);
 
         // Determine thread ID (simple heuristic)
-        let thread_siblings_list = Self::read_file(&topology_path.join("thread_siblings_list"))
-            .unwrap_or_default();
+        let thread_siblings_list =
+            Self::read_file(&topology_path.join("thread_siblings_list")).unwrap_or_default();
         let siblings: Vec<u32> = Self::parse_cpu_list_string(&thread_siblings_list);
         let thread_id = siblings.iter().position(|&id| id == cpu_id).unwrap_or(0) as u32;
 
@@ -157,7 +154,10 @@ impl CpuTopology {
 
         // Read NUMA node
         let numa_node = if let Ok(node_str) = Self::read_file(&cpu_path.join("node")) {
-            node_str.trim().strip_prefix("node").and_then(|s| s.parse().ok())
+            node_str
+                .trim()
+                .strip_prefix("node")
+                .and_then(|s| s.parse().ok())
         } else {
             None
         };
@@ -188,7 +188,8 @@ impl CpuTopology {
             if part.contains('-') {
                 let range: Vec<&str> = part.split('-').collect();
                 if range.len() == 2 {
-                    if let (Ok(start), Ok(end)) = (range[0].parse::<u32>(), range[1].parse::<u32>()) {
+                    if let (Ok(start), Ok(end)) = (range[0].parse::<u32>(), range[1].parse::<u32>())
+                    {
                         for cpu in start..=end {
                             cpus.push(cpu);
                         }
@@ -206,7 +207,8 @@ impl CpuTopology {
 
     fn read_u32(path: &PathBuf) -> Result<u32, CpuError> {
         let content = fs::read_to_string(path)?;
-        content.trim()
+        content
+            .trim()
             .parse()
             .map_err(|e| CpuError::ParseError(format!("{}: {}", path.display(), e)))
     }

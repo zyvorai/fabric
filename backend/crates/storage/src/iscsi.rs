@@ -90,11 +90,7 @@ pub fn list_sessions() -> Result<Vec<IscsiTarget>> {
                 .unwrap_or("")
                 .to_string();
         } else if trimmed.starts_with("Target:") {
-            current_iqn = trimmed
-                .split_whitespace()
-                .nth(1)
-                .unwrap_or("")
-                .to_string();
+            current_iqn = trimmed.split_whitespace().nth(1).unwrap_or("").to_string();
         } else if trimmed.starts_with("Attached scsi disk") {
             let device = trimmed.split_whitespace().nth(3).unwrap_or("");
             targets.push(IscsiTarget {

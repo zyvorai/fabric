@@ -149,10 +149,7 @@ impl HealthChecker {
     /// Get all backends for a given service.
     pub async fn get_all_backends(&self, service_name: &str) -> Vec<Backend> {
         let backends = self.backends.read().await;
-        backends
-            .get(service_name)
-            .cloned()
-            .unwrap_or_default()
+        backends.get(service_name).cloned().unwrap_or_default()
     }
 
     /// Replace the backend list for a service.

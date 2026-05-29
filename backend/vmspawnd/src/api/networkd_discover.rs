@@ -5,11 +5,11 @@
 use std::collections::HashSet;
 
 use networking::host_discovery::{self, HostDeviceType, HostNetDevice};
+use networking::host_vxlan_sriov::{self, DiscoveredSriovPf, DiscoveredVxlan};
 use networking::models::{
     BondConfig, BondMode, BridgeConfig, DhcpMode, LinkFileConfig, MacvtapConfig, MacvtapMode,
     NetworkFileConfig, PortForwardConfig, SriovConfig, TapConfig, VlanConfig, VxlanConfig,
 };
-use networking::host_vxlan_sriov::{self, DiscoveredSriovPf, DiscoveredVxlan};
 use networking::nftables::NftManager;
 
 use crate::api::networkd::networkd_manager;
@@ -178,7 +178,10 @@ pub fn merge_taps(state: &AppState, mut items: Vec<TapConfig>) -> Vec<TapConfig>
     items
 }
 
-pub fn merge_netfiles(state: &AppState, mut items: Vec<NetworkFileConfig>) -> Vec<NetworkFileConfig> {
+pub fn merge_netfiles(
+    state: &AppState,
+    mut items: Vec<NetworkFileConfig>,
+) -> Vec<NetworkFileConfig> {
     let known: HashSet<String> = items.iter().map(|n| n.match_name.clone()).collect();
     for d in discover_host(state).into_iter().filter(|d| {
         matches!(
@@ -215,14 +218,8 @@ pub fn merge_netfiles(state: &AppState, mut items: Vec<NetworkFileConfig>) -> Ve
     items
 }
 
-pub fn merge_link_files(
-    state: &AppState,
-    mut items: Vec<LinkFileConfig>,
-) -> Vec<LinkFileConfig> {
-    let known_files: HashSet<String> = items
-        .iter()
-        .filter_map(|l| l.source_file.clone())
-        .collect();
+pub fn merge_link_files(state: &AppState, mut items: Vec<LinkFileConfig>) -> Vec<LinkFileConfig> {
+    let known_files: HashSet<String> = items.iter().filter_map(|l| l.source_file.clone()).collect();
     let dir = &state.config.network.networkd_config_dir;
     for filename in host_discovery::list_systemd_network_files(dir) {
         if known_files.contains(&filename) {
@@ -249,7 +246,9 @@ pub fn merge_link_files(
 }
 
 pub fn find_host_bridge(state: &AppState, id: &str) -> Option<BridgeConfig> {
-    merge_bridges(state, vec![]).into_iter().find(|b| b.id == id)
+    merge_bridges(state, vec![])
+        .into_iter()
+        .find(|b| b.id == id)
 }
 
 pub fn find_host_bond(state: &AppState, id: &str) -> Option<BondConfig> {
@@ -261,7 +260,9 @@ pub fn find_host_vlan(state: &AppState, id: &str) -> Option<VlanConfig> {
 }
 
 pub fn find_host_macvtap(state: &AppState, id: &str) -> Option<MacvtapConfig> {
-    merge_macvtaps(state, vec![]).into_iter().find(|m| m.id == id)
+    merge_macvtaps(state, vec![])
+        .into_iter()
+        .find(|m| m.id == id)
 }
 
 pub fn find_host_tap(state: &AppState, id: &str) -> Option<TapConfig> {
@@ -269,11 +270,15 @@ pub fn find_host_tap(state: &AppState, id: &str) -> Option<TapConfig> {
 }
 
 pub fn find_host_netfile(state: &AppState, id: &str) -> Option<NetworkFileConfig> {
-    merge_netfiles(state, vec![]).into_iter().find(|n| n.id == id)
+    merge_netfiles(state, vec![])
+        .into_iter()
+        .find(|n| n.id == id)
 }
 
 pub fn find_host_link_file(state: &AppState, id: &str) -> Option<LinkFileConfig> {
-    merge_link_files(state, vec![]).into_iter().find(|l| l.id == id)
+    merge_link_files(state, vec![])
+        .into_iter()
+        .find(|l| l.id == id)
 }
 
 pub fn find_host_port_forward(id: &str) -> Option<PortForwardConfig> {
@@ -348,7 +353,9 @@ fn sriov_from_discovered(d: DiscoveredSriovPf) -> SriovConfig {
 }
 
 pub fn find_host_vxlan(_state: &AppState, id: &str) -> Option<VxlanConfig> {
-    merge_vxlans(_state, vec![]).into_iter().find(|v| v.id == id)
+    merge_vxlans(_state, vec![])
+        .into_iter()
+        .find(|v| v.id == id)
 }
 
 pub fn find_host_sriov(_state: &AppState, id: &str) -> Option<SriovConfig> {

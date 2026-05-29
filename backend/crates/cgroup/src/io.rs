@@ -75,9 +75,7 @@ impl IoController {
         let file = self.path.join("io.weight");
         let content = read_cgroup_file(&file)?;
         // io.weight may contain "default <value>" or just "<value>"
-        let value_str = content
-            .strip_prefix("default ")
-            .unwrap_or(&content);
+        let value_str = content.strip_prefix("default ").unwrap_or(&content);
         value_str
             .parse::<u64>()
             .map_err(|_| CgroupError::ParseError {
@@ -114,9 +112,7 @@ impl IoController {
         let wbps = format_limit(limits.wbps);
         let riops = format_limit(limits.riops);
         let wiops = format_limit(limits.wiops);
-        let line = format!(
-            "{device} rbps={rbps} wbps={wbps} riops={riops} wiops={wiops}"
-        );
+        let line = format!("{device} rbps={rbps} wbps={wbps} riops={riops} wiops={wiops}");
         write_cgroup_file(&file, &line)
     }
 
@@ -140,11 +136,7 @@ fn format_limit(limit: Option<u64>) -> String {
     }
 }
 
-fn parse_io_max_for_device(
-    path: &Path,
-    content: &str,
-    target: DeviceId,
-) -> Result<Option<IoMax>> {
+fn parse_io_max_for_device(path: &Path, content: &str, target: DeviceId) -> Result<Option<IoMax>> {
     for line in content.lines() {
         let line = line.trim();
         if line.is_empty() {
@@ -182,7 +174,12 @@ fn parse_io_max_for_device(
             }
         }
 
-        return Ok(Some(IoMax { rbps, wbps, riops, wiops }));
+        return Ok(Some(IoMax {
+            rbps,
+            wbps,
+            riops,
+            wiops,
+        }));
     }
     Ok(None)
 }
@@ -282,7 +279,13 @@ mod tests {
         assert_eq!(stats[0].rios, 10);
         assert_eq!(stats[0].wios, 20);
 
-        assert_eq!(stats[1].device, DeviceId { major: 259, minor: 0 });
+        assert_eq!(
+            stats[1].device,
+            DeviceId {
+                major: 259,
+                minor: 0
+            }
+        );
         assert_eq!(stats[1].rbytes, 4096);
         assert_eq!(stats[1].dbytes, 512);
         assert_eq!(stats[1].dios, 1);
@@ -293,9 +296,7 @@ mod tests {
         let p = PathBuf::from("/test/io.max");
         let content = "8:0 rbps=1048576 wbps=max riops=100 wiops=max\n";
         let dev = DeviceId { major: 8, minor: 0 };
-        let max = parse_io_max_for_device(&p, content, dev)
-            .unwrap()
-            .unwrap();
+        let max = parse_io_max_for_device(&p, content, dev).unwrap().unwrap();
         assert_eq!(max.rbps, Some(1048576));
         assert!(max.wbps.is_none());
         assert_eq!(max.riops, Some(100));
@@ -306,7 +307,10 @@ mod tests {
     fn test_parse_io_max_device_not_found() {
         let p = PathBuf::from("/test/io.max");
         let content = "8:0 rbps=max wbps=max riops=max wiops=max\n";
-        let dev = DeviceId { major: 259, minor: 0 };
+        let dev = DeviceId {
+            major: 259,
+            minor: 0,
+        };
         let result = parse_io_max_for_device(&p, content, dev).unwrap();
         assert!(result.is_none());
     }

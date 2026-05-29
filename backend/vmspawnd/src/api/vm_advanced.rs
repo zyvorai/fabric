@@ -7,15 +7,15 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
 use crate::validation::validate_vm_name;
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // KSM (Kernel Same-page Merging) Memory Deduplication
@@ -76,26 +76,42 @@ pub async fn configure_ksm(
     tracing::debug!("vm_advanced::{}", stringify!(configure_ksm));
     if let Some(sleep_ms) = req.sleep_ms {
         if sleep_ms == 0 || sleep_ms > 60000 {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "sleep_ms must be between 1 and 60000"}))));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "sleep_ms must be between 1 and 60000"})),
+            ));
         }
     }
     if let Some(pages) = req.pages_to_scan {
         if pages == 0 || pages > 10_000_000 {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "pages_to_scan must be between 1 and 10000000"}))));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "pages_to_scan must be between 1 and 10000000"})),
+            ));
         }
     }
     let run_value = if req.enabled { "1" } else { "0" };
-    tokio::fs::write("/sys/kernel/mm/ksm/run", run_value).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to set KSM: {}", e)}))))?;
+    tokio::fs::write("/sys/kernel/mm/ksm/run", run_value)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to set KSM: {}", e)})),
+            )
+        })?;
 
     if let Some(sleep_ms) = req.sleep_ms {
-        if let Err(e) = tokio::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string()).await {
+        if let Err(e) =
+            tokio::fs::write("/sys/kernel/mm/ksm/sleep_millisecs", sleep_ms.to_string()).await
+        {
             tracing::warn!("Failed to write: {}", e);
         }
     }
 
     if let Some(pages) = req.pages_to_scan {
-        if let Err(e) = tokio::fs::write("/sys/kernel/mm/ksm/pages_to_scan", pages.to_string()).await {
+        if let Err(e) =
+            tokio::fs::write("/sys/kernel/mm/ksm/pages_to_scan", pages.to_string()).await
+        {
             tracing::warn!("Failed to write: {}", e);
         }
     }
@@ -115,9 +131,7 @@ pub struct NestedVirtStatus {
 }
 
 /// GET /api/system/nested-virt - Get nested virtualization status
-pub async fn get_nested_virt_status(
-    RequireAdmin(_claims): RequireAdmin,
-) -> Json<NestedVirtStatus> {
+pub async fn get_nested_virt_status(RequireAdmin(_claims): RequireAdmin) -> Json<NestedVirtStatus> {
     tracing::debug!("vm_advanced::{}", stringify!(get_nested_virt_status));
     // Check for Intel (kvm_intel) or AMD (kvm_amd)
     let (hypervisor, path) = if std::path::Path::new("/sys/module/kvm_intel").exists() {
@@ -132,7 +146,8 @@ pub async fn get_nested_virt_status(
         });
     };
 
-    let enabled = tokio::fs::read_to_string(path).await
+    let enabled = tokio::fs::read_to_string(path)
+        .await
         .map(|v| {
             let v = v.trim();
             v == "1" || v == "Y"
@@ -162,12 +177,19 @@ pub async fn set_nested_virt(
     } else if std::path::Path::new("/sys/module/kvm_amd").exists() {
         "/sys/module/kvm_amd/parameters/nested"
     } else {
-        return Err((StatusCode::NOT_FOUND, Json(json!({"error": "KVM module not loaded"}))));
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "KVM module not loaded"})),
+        ));
     };
 
     let value = if req.enabled { "1" } else { "0" };
-    tokio::fs::write(path, value).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to set nested virt: {}", e)}))))?;
+    tokio::fs::write(path, value).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Failed to set nested virt: {}", e)})),
+        )
+    })?;
 
     Ok(Json(json!({"status": "nested virtualization configured"})))
 }
@@ -215,14 +237,25 @@ pub async fn create_checkpoint(
         .args(["snapshot", "-c", &req.name, &image_path])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("qemu-img failed: {}", e) }))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("qemu-img failed: {}", e) })),
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Checkpoint failed: {}", stderr) }))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Checkpoint failed: {}", stderr) })),
+        ));
     }
 
-    let size = tokio::fs::metadata(&image_path).await.map(|m| m.len()).unwrap_or(0);
+    let size = tokio::fs::metadata(&image_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
 
     let checkpoint = VMCheckpoint {
         id: uuid::Uuid::new_v4().to_string(),
@@ -234,9 +267,15 @@ pub async fn create_checkpoint(
     };
 
     let store_key = format!("checkpoints_{}", vm_name);
-    state.store.save_entity(&store_key, &checkpoint.id, &checkpoint).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity(&store_key, &checkpoint.id, &checkpoint)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(checkpoint)))
 }
@@ -251,8 +290,11 @@ pub async fn list_checkpoints(
     validate_vm_name(&vm_name).map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
 
     let store_key = format!("checkpoints_{}", vm_name);
-    let checkpoints: Vec<VMCheckpoint> = state.store.list_entities(&store_key)
-        .unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let checkpoints: Vec<VMCheckpoint> =
+        state.store.list_entities(&store_key).unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
 
     Ok(Json(checkpoints))
 }
@@ -269,13 +311,26 @@ pub async fn restore_checkpoint(
     let store_key = format!("checkpoints_{}", vm_name);
     let checkpoint = match state.store.get_entity::<VMCheckpoint>(&store_key, &id) {
         Ok(Some(c)) => c,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Checkpoint not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Checkpoint not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
     // Validate stored checkpoint name before passing to command
     if let Err((status, msg)) = crate::validation::validate_snapshot_name(&checkpoint.name) {
-        return Err((status, Json(json!({ "error": format!("Corrupted checkpoint data: {}", msg) }))));
+        return Err((
+            status,
+            Json(json!({ "error": format!("Corrupted checkpoint data: {}", msg) })),
+        ));
     }
 
     let image_path = crate::validation::find_vm_image_or_default(&vm_name);
@@ -285,11 +340,19 @@ pub async fn restore_checkpoint(
         .args(["snapshot", "-a", &checkpoint.name, &image_path])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("qemu-img failed: {}", e) }))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("qemu-img failed: {}", e) })),
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Restore failed: {}", stderr) }))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Restore failed: {}", stderr) })),
+        ));
     }
 
     Ok(Json(json!({"status": "checkpoint restored"})))
@@ -308,7 +371,10 @@ pub async fn delete_checkpoint(
     if let Ok(Some(checkpoint)) = state.store.get_entity::<VMCheckpoint>(&store_key, &id) {
         // Validate stored name before using in command
         if crate::validation::validate_snapshot_name(&checkpoint.name).is_err() {
-            tracing::error!("Corrupted checkpoint name '{}', skipping qemu-img delete", checkpoint.name);
+            tracing::error!(
+                "Corrupted checkpoint name '{}', skipping qemu-img delete",
+                checkpoint.name
+            );
         } else {
             let image_path = crate::validation::find_vm_image_or_default(&vm_name);
             if let Err(e) = Command::new("qemu-img")
@@ -322,7 +388,10 @@ pub async fn delete_checkpoint(
     }
 
     state.store.delete_entity(&store_key, &id).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
     })?;
 
     Ok(Json(json!({"status": "deleted"})))
@@ -361,12 +430,25 @@ pub async fn fork_vm(
 
     let source_vm = match state.store.get_vm(&source_name) {
         Ok(Some(vm)) => vm,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Source VM not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Source VM not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
     if let Ok(Some(_)) = state.store.get_vm(&req.new_name) {
-        return Err((StatusCode::CONFLICT, Json(json!({ "error": "Target VM name already exists" }))));
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Target VM name already exists" })),
+        ));
     }
 
     // Create CoW disk using qemu-img with backing file
@@ -380,14 +462,31 @@ pub async fn fork_vm(
     }
 
     let output = Command::new("qemu-img")
-        .args(["create", "-f", "qcow2", "-b", &source_image, "-F", "qcow2", &fork_image])
+        .args([
+            "create",
+            "-f",
+            "qcow2",
+            "-b",
+            &source_image,
+            "-F",
+            "qcow2",
+            &fork_image,
+        ])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("qemu-img create failed: {}", e) }))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("qemu-img create failed: {}", e) })),
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Fork failed: {}", stderr) }))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Fork failed: {}", stderr) })),
+        ));
     }
 
     // Create new VM entry copying source config
@@ -401,7 +500,10 @@ pub async fn fork_vm(
     forked.updated = Some(Utc::now());
 
     state.store.save_vm(&forked).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
     })?;
 
     // Record event
@@ -414,4 +516,3 @@ pub async fn fork_vm(
 
     Ok((StatusCode::CREATED, Json(forked)))
 }
-

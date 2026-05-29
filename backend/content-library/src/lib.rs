@@ -526,10 +526,7 @@ impl ContentLibraryManager {
     }
 
     pub fn list_subscriptions(&self, library_id: Option<&str>) -> Vec<Subscription> {
-        let subs = self
-            .subscriptions
-            .read()
-            .unwrap_or_else(|e| e.into_inner());
+        let subs = self.subscriptions.read().unwrap_or_else(|e| e.into_inner());
         match library_id {
             Some(lid) => subs
                 .values()
@@ -612,8 +609,14 @@ impl ContentLibraryManager {
 
         let mut ovf_properties = Vec::new();
         for (k, v) in &properties {
-            if !["cpus", "memory_mb", "disk_capacity_gb", "disk_format", "network"]
-                .contains(&k.as_str())
+            if ![
+                "cpus",
+                "memory_mb",
+                "disk_capacity_gb",
+                "disk_format",
+                "network",
+            ]
+            .contains(&k.as_str())
             {
                 ovf_properties.push(OvfProperty {
                     key: k.clone(),
@@ -648,7 +651,11 @@ impl ContentLibraryManager {
     }
 
     pub fn import_ovf(&self, library_id: &str, ovf: OvfPackage) -> Result<LibraryItem> {
-        let total_size: u64 = ovf.disks.iter().map(|d| d.capacity_gb * 1024 * 1024 * 1024).sum();
+        let total_size: u64 = ovf
+            .disks
+            .iter()
+            .map(|d| d.capacity_gb * 1024 * 1024 * 1024)
+            .sum();
 
         let mut properties = HashMap::new();
         properties.insert(
@@ -733,7 +740,9 @@ impl ContentLibraryManager {
 
         // Validate name to prevent path traversal
         if name.contains('/') || name.contains('\\') || name.contains("..") {
-            return Err(anyhow!("Item name must not contain path separators or '..'"));
+            return Err(anyhow!(
+                "Item name must not contain path separators or '..'"
+            ));
         }
 
         // Determine file extension from URL
@@ -814,13 +823,12 @@ impl ContentLibraryManager {
 
         // Validate name to prevent path traversal
         if name.contains('/') || name.contains('\\') || name.contains("..") {
-            return Err(anyhow!("Item name must not contain path separators or '..'"));
+            return Err(anyhow!(
+                "Item name must not contain path separators or '..'"
+            ));
         }
 
-        let extension = source
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("img");
+        let extension = source.extension().and_then(|e| e.to_str()).unwrap_or("img");
         let filename = format!("{}.{}", name, extension);
         let dest_path = format!("{}/{}", storage_path, filename);
 
@@ -953,10 +961,7 @@ impl ContentLibraryManager {
     }
 
     pub fn list_host_profiles(&self) -> Vec<HostProfile> {
-        let profiles = self
-            .host_profiles
-            .read()
-            .unwrap_or_else(|e| e.into_inner());
+        let profiles = self.host_profiles.read().unwrap_or_else(|e| e.into_inner());
         profiles.values().cloned().collect()
     }
 
@@ -978,10 +983,7 @@ impl ContentLibraryManager {
         profile_id: &str,
         current_config: &serde_json::Value,
     ) -> ComplianceResult {
-        let profiles = self
-            .host_profiles
-            .read()
-            .unwrap_or_else(|e| e.into_inner());
+        let profiles = self.host_profiles.read().unwrap_or_else(|e| e.into_inner());
 
         let mut deviations = Vec::new();
 
@@ -1257,10 +1259,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(updated.name, "ubuntu-22.04-updated");
-        assert_eq!(
-            updated.description,
-            Some("Updated description".to_string())
-        );
+        assert_eq!(updated.description, Some("Updated description".to_string()));
 
         // Library counter should reflect the item
         let lib_state = mgr.get_library(&lib.id).unwrap();
@@ -1439,7 +1438,10 @@ mod tests {
         let fetched = mgr.get_customization_spec(&created.id).unwrap();
         assert_eq!(fetched.hostname, Some("web01".to_string()));
         assert_eq!(fetched.dns_servers.len(), 2);
-        assert_eq!(fetched.network_configs[0].ip_address, Some("10.0.1.100".to_string()));
+        assert_eq!(
+            fetched.network_configs[0].ip_address,
+            Some("10.0.1.100".to_string())
+        );
 
         let all = mgr.list_customization_specs();
         assert_eq!(all.len(), 1);
@@ -1474,9 +1476,7 @@ mod tests {
                 "selinux": "enforcing",
                 "firewall": "enabled"
             }),
-            kernel_params: HashMap::from([
-                ("vm.swappiness".to_string(), "10".to_string()),
-            ]),
+            kernel_params: HashMap::from([("vm.swappiness".to_string(), "10".to_string())]),
             created: Utc::now(),
             updated: Utc::now(),
         };

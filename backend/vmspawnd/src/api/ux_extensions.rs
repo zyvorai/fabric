@@ -81,10 +81,8 @@ pub async fn list_users(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<serde_json::Value>>, (StatusCode, Json<serde_json::Value>)> {
-    let users: Vec<DashboardUserRecord> = state
-        .store
-        .list_entities(USERS_STORE)
-        .map_err(store_err)?;
+    let users: Vec<DashboardUserRecord> =
+        state.store.list_entities(USERS_STORE).map_err(store_err)?;
     Ok(Json(users.iter().map(user_response).collect()))
 }
 
@@ -93,7 +91,11 @@ pub async fn create_user(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
-    if !req.username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+    if !req
+        .username
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(bad_request("Invalid username"));
     }
     if req.password.len() < 8 {
@@ -103,7 +105,8 @@ pub async fn create_user(
     if !matches!(role.as_str(), "admin" | "operator" | "viewer") {
         return Err(bad_request("Role must be admin, operator, or viewer"));
     }
-    let existing: Vec<DashboardUserRecord> = state.store.list_entities(USERS_STORE).unwrap_or_default();
+    let existing: Vec<DashboardUserRecord> =
+        state.store.list_entities(USERS_STORE).unwrap_or_default();
     if existing.iter().any(|u| u.username == req.username) {
         return Err(bad_request("Username already exists"));
     }
@@ -150,7 +153,10 @@ pub async fn update_user(
         }
         user.password_hash = hash_password(&password);
     }
-    state.store.save_entity(USERS_STORE, &id, &user).map_err(store_err)?;
+    state
+        .store
+        .save_entity(USERS_STORE, &id, &user)
+        .map_err(store_err)?;
     Ok(Json(user_response(&user)))
 }
 
@@ -167,7 +173,10 @@ pub async fn delete_user(
     {
         return Err(not_found("User not found"));
     }
-    state.store.delete_entity(USERS_STORE, &id).map_err(store_err)?;
+    state
+        .store
+        .delete_entity(USERS_STORE, &id)
+        .map_err(store_err)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -208,7 +217,10 @@ pub async fn list_webhooks(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<WebhookConfig>>, (StatusCode, Json<serde_json::Value>)> {
-    let hooks: Vec<WebhookConfig> = state.store.list_entities(WEBHOOKS_STORE).map_err(store_err)?;
+    let hooks: Vec<WebhookConfig> = state
+        .store
+        .list_entities(WEBHOOKS_STORE)
+        .map_err(store_err)?;
     Ok(Json(hooks))
 }
 
@@ -242,7 +254,10 @@ pub async fn delete_webhook(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    state.store.delete_entity(WEBHOOKS_STORE, &id).map_err(store_err)?;
+    state
+        .store
+        .delete_entity(WEBHOOKS_STORE, &id)
+        .map_err(store_err)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -306,15 +321,29 @@ pub async fn compare_vms(
     Query(q): Query<CompareQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     if q.source.is_empty() || q.target.is_empty() {
-        return Err(bad_request("source and target query parameters are required"));
+        return Err(bad_request(
+            "source and target query parameters are required",
+        ));
     }
     let source = load_vm(&state, &q.source)?;
     let target = load_vm(&state, &q.target)?;
     let fields = vec![
-        vm_field("State", &format!("{:?}", source.state), &format!("{:?}", target.state)),
+        vm_field(
+            "State",
+            &format!("{:?}", source.state),
+            &format!("{:?}", target.state),
+        ),
         vm_field("CPUs", &source.cpus.to_string(), &target.cpus.to_string()),
-        vm_field("Memory (MB)", &source.memory.to_string(), &target.memory.to_string()),
-        vm_field("Disk (GB)", &source.disk.to_string(), &target.disk.to_string()),
+        vm_field(
+            "Memory (MB)",
+            &source.memory.to_string(),
+            &target.memory.to_string(),
+        ),
+        vm_field(
+            "Disk (GB)",
+            &source.disk.to_string(),
+            &target.disk.to_string(),
+        ),
         vm_field("Image", &source.image, &target.image),
         vm_field(
             "IP",
@@ -436,7 +465,8 @@ pub async fn migration_history(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let migrations: Vec<MigrationStatus> = state.store.list_entities("migrations").map_err(store_err)?;
+    let migrations: Vec<MigrationStatus> =
+        state.store.list_entities("migrations").map_err(store_err)?;
     let history: Vec<serde_json::Value> = migrations.iter().map(migration_entry).collect();
     Ok(Json(json!({ "history": history })))
 }
@@ -501,7 +531,8 @@ pub async fn migration_report(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let migrations: Vec<MigrationStatus> = state.store.list_entities("migrations").map_err(store_err)?;
+    let migrations: Vec<MigrationStatus> =
+        state.store.list_entities("migrations").map_err(store_err)?;
     let successful = migrations
         .iter()
         .filter(|m| m.state == MigrationState::Completed)
@@ -671,12 +702,18 @@ pub async fn start_convert(
         run_convert_job(state_clone, job_id, req).await;
     });
 
-    Ok((StatusCode::ACCEPTED, Json(json!({ "job_id": job.id, "id": job.id }))))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({ "job_id": job.id, "id": job.id })),
+    ))
 }
 
 async fn run_convert_job(state: Arc<AppState>, job_id: String, req: ConvertRequest) {
     let update = |status: &str, progress: u32, error: Option<String>| {
-        if let Ok(Some(mut job)) = state.store.get_entity::<ConvertJob>(CONVERT_JOBS_STORE, &job_id) {
+        if let Ok(Some(mut job)) = state
+            .store
+            .get_entity::<ConvertJob>(CONVERT_JOBS_STORE, &job_id)
+        {
             job.status = status.into();
             job.progress = progress;
             job.error = error;
@@ -696,7 +733,15 @@ async fn run_convert_job(state: Arc<AppState>, job_id: String, req: ConvertReque
         }
     };
     let output = tokio::process::Command::new("qemu-img")
-        .args(["convert", "-f", "auto", "-O", fmt, &req.source_path, &req.output_path])
+        .args([
+            "convert",
+            "-f",
+            "auto",
+            "-O",
+            fmt,
+            &req.source_path,
+            &req.output_path,
+        ])
         .output()
         .await;
     match output {
@@ -838,9 +883,8 @@ pub async fn network_topology(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let vms = state.store.list_vms().map_err(store_err)?;
-    let networks: Vec<serde_json::Value> = vec![
-        json!({ "name": "default", "state": "active", "autostart": "yes" }),
-    ];
+    let networks: Vec<serde_json::Value> =
+        vec![json!({ "name": "default", "state": "active", "autostart": "yes" })];
     let mut vm_nodes = Vec::new();
 
     for vm in vms {
@@ -875,7 +919,10 @@ fn store_err(e: impl std::fmt::Display) -> (StatusCode, Json<serde_json::Value>)
 }
 
 fn bad_request(msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
-    (StatusCode::BAD_REQUEST, Json(json!({ "error": msg.into() })))
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": msg.into() })),
+    )
 }
 
 fn not_found(msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
@@ -883,5 +930,8 @@ fn not_found(msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
 }
 
 fn internal_err(msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
-    (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": msg.into() })))
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "error": msg.into() })),
+    )
 }

@@ -51,14 +51,23 @@ pub fn validate_vm_name(name: &str) -> Result<(), (StatusCode, String)> {
 /// Must start with an alphanumeric character. 1-128 characters.
 pub fn validate_entity_name(name: &str) -> Result<(), (StatusCode, String)> {
     if name.is_empty() || name.len() > 128 {
-        return Err((StatusCode::BAD_REQUEST, "Entity name must be between 1 and 128 characters".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Entity name must be between 1 and 128 characters".to_string(),
+        ));
     }
     if let Some(c) = name.chars().next() {
         if !c.is_ascii_alphanumeric() {
-            return Err((StatusCode::BAD_REQUEST, "Entity name must start with an alphanumeric character".to_string()));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Entity name must start with an alphanumeric character".to_string(),
+            ));
         }
     }
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ' ')) {
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ' '))
+    {
         return Err((StatusCode::BAD_REQUEST, "Entity name may only contain alphanumeric characters, hyphens, underscores, dots, and spaces".to_string()));
     }
     Ok(())
@@ -67,15 +76,28 @@ pub fn validate_entity_name(name: &str) -> Result<(), (StatusCode, String)> {
 /// Validate a network device name (Linux IFNAMSIZ max 15 chars, no dots).
 pub fn validate_device_name(name: &str) -> Result<(), (StatusCode, String)> {
     if name.is_empty() || name.len() > 15 {
-        return Err((StatusCode::BAD_REQUEST, "Device name must be between 1 and 15 characters".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Device name must be between 1 and 15 characters".to_string(),
+        ));
     }
     if let Some(c) = name.chars().next() {
         if !c.is_ascii_alphanumeric() {
-            return Err((StatusCode::BAD_REQUEST, "Device name must start with an alphanumeric character".to_string()));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Device name must start with an alphanumeric character".to_string(),
+            ));
         }
     }
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')) {
-        return Err((StatusCode::BAD_REQUEST, "Device name may only contain alphanumeric characters, hyphens, and underscores".to_string()));
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Device name may only contain alphanumeric characters, hyphens, and underscores"
+                .to_string(),
+        ));
     }
     Ok(())
 }
@@ -95,10 +117,7 @@ pub fn default_retention() -> u32 {
 // === VM image path helpers ===
 
 /// Allowed base directories for VM images.
-const IMAGE_ALLOWED_PREFIXES: &[&str] = &[
-    "/var/lib/machines",
-    "/var/lib/vmspawnd/images",
-];
+const IMAGE_ALLOWED_PREFIXES: &[&str] = &["/var/lib/machines", "/var/lib/vmspawnd/images"];
 
 /// Find the disk image path for a VM by checking common locations.
 /// Returns the path if found, or None if not.
@@ -122,7 +141,10 @@ pub fn find_vm_image(name: &str) -> Option<String> {
                 Err(_) => continue,
             };
             let resolved_str = resolved.to_string_lossy();
-            if IMAGE_ALLOWED_PREFIXES.iter().any(|prefix| resolved_str.starts_with(prefix)) {
+            if IMAGE_ALLOWED_PREFIXES
+                .iter()
+                .any(|prefix| resolved_str.starts_with(prefix))
+            {
                 return Some(resolved_str.to_string());
             }
         }
@@ -133,8 +155,7 @@ pub fn find_vm_image(name: &str) -> Option<String> {
 
 /// Find the disk image path for a VM, returning a default path if not found.
 pub fn find_vm_image_or_default(name: &str) -> String {
-    find_vm_image(name)
-        .unwrap_or_else(|| format!("/var/lib/vmspawnd/images/{}.qcow2", name))
+    find_vm_image(name).unwrap_or_else(|| format!("/var/lib/vmspawnd/images/{}.qcow2", name))
 }
 
 // === Input validation helpers ===
@@ -146,9 +167,9 @@ pub fn validate_hostname(host: &str) -> Result<(), String> {
         return Err("Hostname must be between 1 and 253 characters".to_string());
     }
 
-    let valid = host.chars().all(|c| {
-        c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == ':' || c == '_'
-    });
+    let valid = host
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == ':' || c == '_');
 
     if !valid {
         return Err(format!(
@@ -187,10 +208,7 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
         }
     }
 
-    let allowed_prefixes = [
-        "/var/lib/machines",
-        "/var/lib/vmspawnd",
-    ];
+    let allowed_prefixes = ["/var/lib/machines", "/var/lib/vmspawnd"];
 
     // Try to canonicalize to resolve symlinks. If the file doesn't exist yet,
     // canonicalize the parent directory to prevent symlink-based traversal.
@@ -199,8 +217,12 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
         Err(_) => {
             // File doesn't exist yet -- canonicalize parent directory
             if let Some(parent) = raw.parent() {
-                let resolved_parent = std::fs::canonicalize(parent)
-                    .map_err(|_| (StatusCode::BAD_REQUEST, "Parent directory does not exist".to_string()))?;
+                let resolved_parent = std::fs::canonicalize(parent).map_err(|_| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        "Parent directory does not exist".to_string(),
+                    )
+                })?;
                 resolved_parent.join(raw.file_name().unwrap_or_default())
             } else {
                 raw.to_path_buf()
@@ -209,7 +231,10 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
     };
     let resolved_str = resolved.to_string_lossy();
 
-    if !allowed_prefixes.iter().any(|prefix| resolved_str.starts_with(prefix)) {
+    if !allowed_prefixes
+        .iter()
+        .any(|prefix| resolved_str.starts_with(prefix))
+    {
         return Err((
             StatusCode::FORBIDDEN,
             format!(
@@ -226,18 +251,30 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
 /// Must be absolute and must not contain path traversal sequences.
 pub fn validate_machine_path(path: &str) -> Result<(), (StatusCode, String)> {
     if path.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "Machine path must not be empty".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Machine path must not be empty".to_string(),
+        ));
     }
     if !path.starts_with('/') {
-        return Err((StatusCode::BAD_REQUEST, "Machine path must be absolute".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Machine path must be absolute".to_string(),
+        ));
     }
     for component in std::path::Path::new(path).components() {
         if let std::path::Component::ParentDir = component {
-            return Err((StatusCode::BAD_REQUEST, "Machine path must not contain '..' components".to_string()));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Machine path must not contain '..' components".to_string(),
+            ));
         }
     }
     if path.contains('\0') {
-        return Err((StatusCode::BAD_REQUEST, "Machine path must not contain null bytes".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Machine path must not contain null bytes".to_string(),
+        ));
     }
     Ok(())
 }
@@ -245,7 +282,10 @@ pub fn validate_machine_path(path: &str) -> Result<(), (StatusCode, String)> {
 /// Escape a string for safe CSV output. Prevents CSV injection.
 pub fn escape_csv_field(field: &str) -> String {
     let needs_quoting = field.contains(',') || field.contains('\n') || field.contains('"');
-    let is_formula = field.starts_with('=') || field.starts_with('+') || field.starts_with('-') || field.starts_with('@');
+    let is_formula = field.starts_with('=')
+        || field.starts_with('+')
+        || field.starts_with('-')
+        || field.starts_with('@');
 
     let mut escaped = if is_formula {
         format!("'{}", field)
@@ -276,7 +316,10 @@ pub fn validate_snapshot_name(name: &str) -> Result<(), (StatusCode, String)> {
             "Snapshot name must not start with a hyphen".to_string(),
         ));
     }
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
         return Err((
             StatusCode::BAD_REQUEST,
             "Snapshot name may only contain alphanumeric characters, hyphens, underscores, and dots".to_string(),
@@ -291,9 +334,11 @@ pub fn validate_cidr(cidr: &str) -> Result<(), String> {
     if parts.len() != 2 {
         return Err("CIDR must be in format IP/prefix".to_string());
     }
-    parts[0].parse::<std::net::IpAddr>()
+    parts[0]
+        .parse::<std::net::IpAddr>()
         .map_err(|_| format!("Invalid IP address in CIDR: '{}'", parts[0]))?;
-    let prefix: u8 = parts[1].parse()
+    let prefix: u8 = parts[1]
+        .parse()
         .map_err(|_| format!("Invalid prefix length: '{}'", parts[1]))?;
     let is_v4 = parts[0].parse::<std::net::Ipv4Addr>().is_ok();
     if is_v4 && prefix > 32 {
@@ -311,7 +356,10 @@ pub fn validate_log_prefix(prefix: &str) -> Result<(), String> {
     if prefix.is_empty() || prefix.len() > 64 {
         return Err("Log prefix must be between 1 and 64 characters".to_string());
     }
-    if !prefix.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.' | ' ')) {
+    if !prefix
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.' | ' '))
+    {
         return Err("Log prefix may only contain alphanumeric characters, hyphens, underscores, colons, dots, and spaces".to_string());
     }
     Ok(())
@@ -323,9 +371,12 @@ pub const ALLOWED_IMAGE_FORMATS: &[&str] = &["qcow2", "raw", "vmdk", "vdi", "vhd
 /// Validate a disk image format against the allowlist.
 pub fn validate_image_format(format: &str) -> Result<(), (StatusCode, serde_json::Value)> {
     if !ALLOWED_IMAGE_FORMATS.contains(&format) {
-        return Err((StatusCode::BAD_REQUEST, serde_json::json!({
-            "error": std::format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
-        })));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            serde_json::json!({
+                "error": std::format!("Invalid image format '{}'. Allowed: {}", format, ALLOWED_IMAGE_FORMATS.join(", "))
+            }),
+        ));
     }
     Ok(())
 }
@@ -343,13 +394,15 @@ pub fn sanitize_error(msg: &str) -> String {
             let start = i;
             let mut j = i + 1;
             let bytes = result.as_bytes();
-            while j < bytes.len() && (bytes[j].is_ascii_alphanumeric()
-                || matches!(bytes[j], b'/' | b'.' | b'-' | b'_'))
+            while j < bytes.len()
+                && (bytes[j].is_ascii_alphanumeric()
+                    || matches!(bytes[j], b'/' | b'.' | b'-' | b'_'))
             {
                 j += 1;
             }
             // Only redact if it looks like a real path (has at least one /)
-            if j - start > 2 && result[start..j].contains('/') && result[start + 1..j].contains('/') {
+            if j - start > 2 && result[start..j].contains('/') && result[start + 1..j].contains('/')
+            {
                 result.replace_range(start..j, "<path>");
                 i = start + 6; // length of "<path>"
                 continue;

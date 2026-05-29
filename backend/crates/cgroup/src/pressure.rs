@@ -43,11 +43,13 @@ fn parse_pressure_line<'a>(path: &Path, line: &'a str) -> Result<(&'a str, Press
     let mut total = 0u64;
 
     for token in parts {
-        let (key, value) = token.split_once('=').ok_or_else(|| CgroupError::ParseError {
-            path: path.to_path_buf(),
-            content: line.to_string(),
-            detail: format!("invalid key=value token: {token:?}"),
-        })?;
+        let (key, value) = token
+            .split_once('=')
+            .ok_or_else(|| CgroupError::ParseError {
+                path: path.to_path_buf(),
+                content: line.to_string(),
+                detail: format!("invalid key=value token: {token:?}"),
+            })?;
         match key {
             "avg10" => {
                 avg10 = value.parse().map_err(|_| CgroupError::ParseError {
@@ -81,7 +83,15 @@ fn parse_pressure_line<'a>(path: &Path, line: &'a str) -> Result<(&'a str, Press
         }
     }
 
-    Ok((kind, PressureRecord { avg10, avg60, avg300, total }))
+    Ok((
+        kind,
+        PressureRecord {
+            avg10,
+            avg60,
+            avg300,
+            total,
+        },
+    ))
 }
 
 /// Parse full PSI pressure content from a pressure file.

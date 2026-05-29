@@ -3,10 +3,10 @@ name: Terraform Provider
 on:
   push:
     paths:
-      - 'terraform-provider/**'
+      - "terraform-provider/**"
   pull_request:
     paths:
-      - 'terraform-provider/**'
+      - "terraform-provider/**"
 
 jobs:
   build:
@@ -18,10 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: "1.22"
       - run: go mod tidy
       - run: go build -v .
+      - run: go vet ./...
       - run: go test ./...
-      - name: Acceptance smoke (optional)
-        if: false
-        run: ./scripts/acceptance-smoke.sh

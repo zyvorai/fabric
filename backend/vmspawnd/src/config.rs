@@ -135,14 +135,18 @@ fn default_jwt_secret() -> String {
                     "Could not persist JWT secret to {}: {}. \
                      Tokens will be invalidated on restart. \
                      Set VMSPAWND_JWT_SECRET or fix file permissions.",
-                    secret_path, e
+                    secret_path,
+                    e
                 );
             } else {
                 // Set restrictive permissions on the secret file
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    if let Err(e) = std::fs::set_permissions(secret_path, std::fs::Permissions::from_mode(0o600)) {
+                    if let Err(e) = std::fs::set_permissions(
+                        secret_path,
+                        std::fs::Permissions::from_mode(0o600),
+                    ) {
                         tracing::warn!("Failed to set permissions on JWT secret file: {}", e);
                     }
                 }
@@ -281,7 +285,10 @@ impl Config {
         tracing::info!("Loaded config from {}", path);
         for origin in &config.daemon.cors_origins {
             if origin.parse::<axum::http::HeaderValue>().is_err() {
-                tracing::warn!("Invalid CORS origin '{}' in config — will be ignored", origin);
+                tracing::warn!(
+                    "Invalid CORS origin '{}' in config — will be ignored",
+                    origin
+                );
             }
         }
         Ok(config)

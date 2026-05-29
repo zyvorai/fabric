@@ -11,9 +11,15 @@ const API_ERROR_LABELS: &[(&str, &str)] = &[
     ("not_found", "The requested resource was not found"),
     ("invalid_request", "The request was invalid"),
     ("forbidden", "You do not have permission for this action"),
-    ("machined_connection", "Could not connect to systemd-machined on the host"),
+    (
+        "machined_connection",
+        "Could not connect to systemd-machined on the host",
+    ),
     ("internal_error", "An internal server error occurred"),
-    ("unauthorized", "Authentication required or your session expired"),
+    (
+        "unauthorized",
+        "Authentication required or your session expired",
+    ),
 ];
 
 /// Human label for a stable API `error_code`.
@@ -34,10 +40,7 @@ pub fn sanitize_error_text(text: &str) -> String {
     }
 
     let lower = t.to_ascii_lowercase();
-    if lower.contains("<!doctype html")
-        || lower.contains("<html")
-        || t.contains("</html>")
-    {
+    if lower.contains("<!doctype html") || lower.contains("<html") || t.contains("</html>") {
         return "The API returned an HTML error page instead of JSON. \
             This usually means a reverse proxy failure or vmspawnd is unreachable."
             .to_string();
@@ -97,11 +100,7 @@ pub fn format_http_error_body(status: u16, status_text: &str, text: &str) -> Str
 
     if let Ok(j) = serde_json::from_str::<ApiErrorJson>(raw) {
         let code = j.error_code.as_deref();
-        let raw_msg = j
-            .error
-            .as_deref()
-            .or(j.message.as_deref())
-            .unwrap_or("");
+        let raw_msg = j.error.as_deref().or(j.message.as_deref()).unwrap_or("");
         let clean = sanitize_error_text(raw_msg);
 
         if !clean.is_empty() {

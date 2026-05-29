@@ -2,16 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -57,14 +53,30 @@ pub struct AppSettings {
     pub notify_on_error: bool,
 }
 
-fn default_daemon_name() -> String { "vmspawnd-01".to_string() }
-fn default_log_level() -> String { "info".to_string() }
-fn default_refresh_interval() -> u32 { 5 }
-fn default_bridge() -> String { "br0".to_string() }
-fn default_dns() -> String { "8.8.8.8, 8.8.4.4".to_string() }
-fn default_pool() -> String { "default".to_string() }
-fn default_format() -> String { "qcow2".to_string() }
-fn default_session_timeout() -> u32 { 3600 }
+fn default_daemon_name() -> String {
+    "vmspawnd-01".to_string()
+}
+fn default_log_level() -> String {
+    "info".to_string()
+}
+fn default_refresh_interval() -> u32 {
+    5
+}
+fn default_bridge() -> String {
+    "br0".to_string()
+}
+fn default_dns() -> String {
+    "8.8.8.8, 8.8.4.4".to_string()
+}
+fn default_pool() -> String {
+    "default".to_string()
+}
+fn default_format() -> String {
+    "qcow2".to_string()
+}
+fn default_session_timeout() -> u32 {
+    3600
+}
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -99,8 +111,15 @@ pub async fn get_settings(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AppSettings>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("settings::{}", stringify!(get_settings));
-    let settings = state.store.get_entity::<AppSettings>("config", "settings")
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load settings"))?
+    let settings = state
+        .store
+        .get_entity::<AppSettings>("config", "settings")
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load settings",
+            )
+        })?
         .unwrap_or_default();
 
     Ok(Json(settings))
@@ -115,21 +134,36 @@ pub async fn update_settings(
     tracing::debug!("settings::{}", stringify!(update_settings));
     // Validate
     if settings.refresh_interval == 0 {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Refresh interval must be greater than 0"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Refresh interval must be greater than 0",
+        ));
     }
     if settings.session_timeout == 0 {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Session timeout must be greater than 0"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Session timeout must be greater than 0",
+        ));
     }
 
     // Validate webhook URL against SSRF if provided
     if !settings.webhook_url.is_empty() {
-        crate::api::notifications::validate_external_url_public(&settings.webhook_url)
-            .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, format!("Invalid webhook URL: {}", e)))?;
+        crate::api::notifications::validate_external_url_public(&settings.webhook_url).map_err(
+            |e| {
+                crate::api_error::json_error(
+                    StatusCode::BAD_REQUEST,
+                    format!("Invalid webhook URL: {}", e),
+                )
+            },
+        )?;
     }
 
     if let Err(e) = state.store.save_entity("config", "settings", &settings) {
         tracing::error!("Failed to save settings: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save settings"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to save settings",
+        ));
     }
 
     tracing::info!("Settings updated successfully");

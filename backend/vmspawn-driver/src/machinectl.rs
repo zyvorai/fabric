@@ -316,6 +316,10 @@ fn run_machinectl(args: &[&str]) -> Result<()> {
         Ok(())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(anyhow!("machinectl {} failed: {}", args.join(" "), stderr.trim()))
+        Err(anyhow!(
+            "machinectl {} failed: {}",
+            args.join(" "),
+            stderr.trim()
+        ))
     }
 }

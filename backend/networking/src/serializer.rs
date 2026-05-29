@@ -41,7 +41,10 @@ pub fn bridge_netdev(cfg: &BridgeConfig) -> String {
             out.push_str(&format!("MaxAgeSec={}\n", ma));
         }
         if let Some(vf) = cfg.vlan_filtering {
-            out.push_str(&format!("VLANFiltering={}\n", if vf { "yes" } else { "no" }));
+            out.push_str(&format!(
+                "VLANFiltering={}\n",
+                if vf { "yes" } else { "no" }
+            ));
         }
     }
 
@@ -842,14 +845,12 @@ mod tests {
             gateway: Some("10.0.0.254".into()),
             dns: vec!["8.8.8.8".into()],
             dhcp: DhcpMode::No,
-            routes: vec![
-                RouteEntry {
-                    destination: "172.16.0.0/12".into(),
-                    gateway: Some("10.0.0.1".into()),
-                    metric: Some(100),
-                    scope: None,
-                },
-            ],
+            routes: vec![RouteEntry {
+                destination: "172.16.0.0/12".into(),
+                gateway: Some("10.0.0.1".into()),
+                metric: Some(100),
+                scope: None,
+            }],
             created: String::new(),
             updated: String::new(),
         };
@@ -909,14 +910,12 @@ mod tests {
             bridge: None,
             bond: None,
             mtu: Some(9000),
-            routes: vec![
-                RouteEntry {
-                    destination: "10.0.0.0/8".into(),
-                    gateway: Some("192.168.1.1".into()),
-                    metric: None,
-                    scope: Some("global".into()),
-                },
-            ],
+            routes: vec![RouteEntry {
+                destination: "10.0.0.0/8".into(),
+                gateway: Some("192.168.1.1".into()),
+                metric: None,
+                scope: Some("global".into()),
+            }],
             description: None,
             created: String::new(),
             updated: String::new(),

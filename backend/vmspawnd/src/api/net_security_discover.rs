@@ -5,31 +5,31 @@
 use std::collections::HashSet;
 
 use chrono::Utc;
-use nat_gateway::models::{NatProtocol, NatRule, NatRuleType};
 use dns_policy::models::{DnsPolicy, DnsRecordType, DnsZone};
+use nat_gateway::models::{NatProtocol, NatRule, NatRuleType};
 use net_monitor::models::{
     AlertAction, AlertSeverity, BandwidthThreshold, MonitorPolicy, ThresholdUnit, TrafficDirection,
 };
+use network_policy::identity::IdentityAllocator;
+use network_policy::models::{NetworkPolicy, SecurityIdentity};
 use networking::host_dns::{self, DiscoveredDnsZone};
-use networking::host_resolv::{self, DiscoveredDnsUpstream};
 use networking::host_firewalld::{self, DiscoveredFirewalldZone};
 use networking::host_identities::{self, DiscoveredHostIdentity};
 use networking::host_monitor_tc::{self, DiscoveredHostMonitor};
 use networking::host_nat::{self, DiscoveredHostNatRule};
 use networking::host_nft_filter::{self, DiscoveredNftFilterChain};
 use networking::host_nft_policy::{self, DiscoveredNftPolicyChain};
+use networking::host_resolv::{self, DiscoveredDnsUpstream};
 use networking::host_services::{self, HostListener};
 use networking::host_tc::{self, DiscoveredTcQdisc};
 use networking::host_tc_mirror::{self, DiscoveredTcMirror};
 use networking::host_wireguard::{self, DiscoveredWireGuard};
 use packet_mirror::models::{CollectorType, MirrorDirection, MirrorSession};
-use network_policy::models::{NetworkPolicy, SecurityIdentity};
-use network_policy::identity::IdentityAllocator;
 use service_mesh::models::{LoadBalancerAlgorithm, Service, ServicePort, ServiceProtocol};
 use traffic_shaping::models::{BandwidthRate, BandwidthUnit, QoSPolicy, TrafficClass};
+use uuid::Uuid;
 use vm_firewall::models::{FirewallAction, FirewallProfile, FirewallZone};
 use vpn_mesh::models::VpnTunnel;
-use uuid::Uuid;
 
 use crate::server::AppState;
 
@@ -138,10 +138,7 @@ fn host_dns_policy_uuid(key: &str) -> Uuid {
 }
 
 fn host_dns_upstream_zone_id() -> Uuid {
-    Uuid::new_v5(
-        &Uuid::NAMESPACE_DNS,
-        b"vmspawnd:host:dns:upstream-zone",
-    )
+    Uuid::new_v5(&Uuid::NAMESPACE_DNS, b"vmspawnd:host:dns:upstream-zone")
 }
 
 fn host_mirror_uuid(key: &str) -> Uuid {
@@ -465,9 +462,7 @@ pub fn find_host_firewall_profile(_state: &AppState, id: &str) -> Option<Firewal
 fn wireguard_to_tunnel(d: DiscoveredWireGuard) -> VpnTunnel {
     let now = Utc::now();
     let listen_port = d.listen_port.unwrap_or(51820);
-    let address = d
-        .address
-        .unwrap_or_else(|| "0.0.0.0/32".to_string());
+    let address = d.address.unwrap_or_else(|| "0.0.0.0/32".to_string());
     VpnTunnel {
         id: host_vpn_uuid(&d.interface_name),
         name: d.interface_name.clone(),
@@ -501,7 +496,8 @@ pub fn discover_host_vpn_tunnels() -> Vec<VpnTunnel> {
 
 pub fn merge_vpn_tunnels(_state: &AppState, mut items: Vec<VpnTunnel>) -> Vec<VpnTunnel> {
     let mut known_ids: HashSet<Uuid> = items.iter().map(|t| t.id).collect();
-    let mut known_ifaces: HashSet<String> = items.iter().map(|t| t.interface_name.clone()).collect();
+    let mut known_ifaces: HashSet<String> =
+        items.iter().map(|t| t.interface_name.clone()).collect();
 
     for host in discover_host_vpn_tunnels() {
         if known_ids.contains(&host.id) || known_ifaces.contains(&host.interface_name) {
@@ -654,7 +650,10 @@ pub fn discover_host_mirror_sessions() -> Vec<MirrorSession> {
         .collect()
 }
 
-pub fn merge_mirror_sessions(_state: &AppState, mut items: Vec<MirrorSession>) -> Vec<MirrorSession> {
+pub fn merge_mirror_sessions(
+    _state: &AppState,
+    mut items: Vec<MirrorSession>,
+) -> Vec<MirrorSession> {
     let mut known_ids: HashSet<Uuid> = items.iter().map(|s| s.id).collect();
     let mut known_keys: HashSet<String> = items
         .iter()
@@ -710,7 +709,10 @@ pub fn discover_host_monitor_policies() -> Vec<MonitorPolicy> {
         .collect()
 }
 
-pub fn merge_monitor_policies(_state: &AppState, mut items: Vec<MonitorPolicy>) -> Vec<MonitorPolicy> {
+pub fn merge_monitor_policies(
+    _state: &AppState,
+    mut items: Vec<MonitorPolicy>,
+) -> Vec<MonitorPolicy> {
     let mut known_ids: HashSet<Uuid> = items.iter().map(|p| p.id).collect();
     let mut known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
 
@@ -759,7 +761,10 @@ pub fn discover_host_network_policies() -> Vec<NetworkPolicy> {
         .collect()
 }
 
-pub fn merge_network_policies(_state: &AppState, mut items: Vec<NetworkPolicy>) -> Vec<NetworkPolicy> {
+pub fn merge_network_policies(
+    _state: &AppState,
+    mut items: Vec<NetworkPolicy>,
+) -> Vec<NetworkPolicy> {
     let mut known_ids: HashSet<Uuid> = items.iter().map(|p| p.id).collect();
     let mut known_names: HashSet<String> = items.iter().map(|p| p.name.clone()).collect();
 
@@ -822,8 +827,11 @@ pub fn merge_identities(mut items: Vec<SecurityIdentity>) -> Vec<SecurityIdentit
     let mut known_keys: HashSet<String> = items
         .iter()
         .map(|i| {
-            let map: std::collections::HashMap<String, String> =
-                i.labels.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            let map: std::collections::HashMap<String, String> = i
+                .labels
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
             IdentityAllocator::canonical_key(&map)
         })
         .collect();
@@ -848,7 +856,5 @@ pub fn merge_identities(mut items: Vec<SecurityIdentity>) -> Vec<SecurityIdentit
 }
 
 pub fn find_host_identity(id: u32) -> Option<SecurityIdentity> {
-    merge_identities(vec![])
-        .into_iter()
-        .find(|i| i.id == id)
+    merge_identities(vec![]).into_iter().find(|i| i.id == id)
 }

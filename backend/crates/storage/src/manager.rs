@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use thiserror::Error;
+use tokio::sync::RwLock;
 
 use crate::ceph::{CephError, CephPool};
 use crate::lvm::{LvmError, LvmPool};
@@ -175,10 +175,7 @@ impl StorageManager {
 
         // Get NFS stats
         if let Ok(stats) = nfs_pool.get_stats() {
-            pool.update_stats(
-                stats.total_kb * 1024,
-                stats.available_kb * 1024,
-            );
+            pool.update_stats(stats.total_kb * 1024, stats.available_kb * 1024);
         }
 
         pools.insert(name.clone(), pool.clone());
@@ -349,7 +346,8 @@ impl StorageManager {
         let mut pools = self.pools.write().await;
         let mut nfs_pools = self.nfs_pools.write().await;
 
-        let pool = pools.get(name)
+        let pool = pools
+            .get(name)
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
 
         // If it's an NFS pool, unmount it first
@@ -370,7 +368,8 @@ impl StorageManager {
         let mut pools = self.pools.write().await;
         let mut nfs_pools = self.nfs_pools.write().await;
 
-        let pool = pools.get_mut(name)
+        let pool = pools
+            .get_mut(name)
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
 
         if pool.state == PoolState::Active {
@@ -386,10 +385,7 @@ impl StorageManager {
 
                 // Update stats
                 if let Ok(stats) = nfs_pool.get_stats() {
-                    pool.update_stats(
-                        stats.total_kb * 1024,
-                        stats.available_kb * 1024,
-                    );
+                    pool.update_stats(stats.total_kb * 1024, stats.available_kb * 1024);
                 }
             }
         }
@@ -405,7 +401,8 @@ impl StorageManager {
         let mut pools = self.pools.write().await;
         let mut nfs_pools = self.nfs_pools.write().await;
 
-        let pool = pools.get_mut(name)
+        let pool = pools
+            .get_mut(name)
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
 
         if pool.state == PoolState::Inactive {
@@ -430,7 +427,8 @@ impl StorageManager {
     /// Get a storage pool
     pub async fn get_pool(&self, name: &str) -> Result<StoragePool, StorageError> {
         let pools = self.pools.read().await;
-        pools.get(name)
+        pools
+            .get(name)
             .cloned()
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))
     }
@@ -444,7 +442,8 @@ impl StorageManager {
     /// Get NFS pool health
     pub async fn get_nfs_health(&self, name: &str) -> Result<NfsHealth, StorageError> {
         let nfs_pools = self.nfs_pools.read().await;
-        let nfs_pool = nfs_pools.get(name)
+        let nfs_pool = nfs_pools
+            .get(name)
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
 
         Ok(nfs_pool.health_check()?)
@@ -453,7 +452,8 @@ impl StorageManager {
     /// Get NFS pool stats
     pub async fn get_nfs_stats(&self, name: &str) -> Result<NfsStats, StorageError> {
         let nfs_pools = self.nfs_pools.read().await;
-        let nfs_pool = nfs_pools.get(name)
+        let nfs_pool = nfs_pools
+            .get(name)
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
 
         Ok(nfs_pool.get_stats()?)
@@ -464,16 +464,14 @@ impl StorageManager {
         let mut pools = self.pools.write().await;
         let nfs_pools = self.nfs_pools.read().await;
 
-        let pool = pools.get_mut(name)
+        let pool = pools
+            .get_mut(name)
             .ok_or_else(|| StorageError::PoolNotFound(name.to_string()))?;
 
         if pool.is_nfs() {
             if let Some(nfs_pool) = nfs_pools.get(name) {
                 if let Ok(stats) = nfs_pool.get_stats() {
-                    pool.update_stats(
-                        stats.total_kb * 1024,
-                        stats.available_kb * 1024,
-                    );
+                    pool.update_stats(stats.total_kb * 1024, stats.available_kb * 1024);
                 }
             }
         } else {
@@ -519,7 +517,11 @@ impl StorageManager {
             tracing::info!("Restoring storage pool: {}", name);
 
             match &pool.pool_type {
-                StoragePoolType::NFS { server, export_path, mount_options } => {
+                StoragePoolType::NFS {
+                    server,
+                    export_path,
+                    mount_options,
+                } => {
                     // Create NfsConfig from saved pool data
                     let nfs_config = NfsConfig {
                         server: server.clone(),
@@ -535,10 +537,17 @@ impl StorageManager {
                             // Attempt to mount the NFS pool
                             match nfs_pool.mount() {
                                 Ok(_) => {
-                                    tracing::info!("NFS pool '{}' mounted successfully on startup", name);
+                                    tracing::info!(
+                                        "NFS pool '{}' mounted successfully on startup",
+                                        name
+                                    );
                                 }
                                 Err(e) => {
-                                    tracing::warn!("Failed to mount NFS pool '{}' on startup: {}", name, e);
+                                    tracing::warn!(
+                                        "Failed to mount NFS pool '{}' on startup: {}",
+                                        name,
+                                        e
+                                    );
                                     // Continue loading other pools even if one fails
                                 }
                             }
@@ -551,17 +560,45 @@ impl StorageManager {
                 StoragePoolType::Local | StoragePoolType::Directory { .. } => {
                     tracing::info!("Local storage pool '{}' restored", name);
                 }
-                StoragePoolType::Ceph { ref monitors, ref pool_name } => {
-                    tracing::info!("Ceph storage pool '{}' restored (monitors: {}, pool: {})", name, monitors.join(","), pool_name);
+                StoragePoolType::Ceph {
+                    ref monitors,
+                    ref pool_name,
+                } => {
+                    tracing::info!(
+                        "Ceph storage pool '{}' restored (monitors: {}, pool: {})",
+                        name,
+                        monitors.join(","),
+                        pool_name
+                    );
                 }
                 StoragePoolType::LVM { ref volume_group } => {
-                    tracing::info!("LVM storage pool '{}' restored (VG: {})", name, volume_group);
+                    tracing::info!(
+                        "LVM storage pool '{}' restored (VG: {})",
+                        name,
+                        volume_group
+                    );
                 }
-                StoragePoolType::LVMThin { ref volume_group, ref thin_pool } => {
-                    tracing::info!("LVM thin storage pool '{}' restored (VG: {}, thin: {})", name, volume_group, thin_pool);
+                StoragePoolType::LVMThin {
+                    ref volume_group,
+                    ref thin_pool,
+                } => {
+                    tracing::info!(
+                        "LVM thin storage pool '{}' restored (VG: {}, thin: {})",
+                        name,
+                        volume_group,
+                        thin_pool
+                    );
                 }
-                StoragePoolType::ZFS { ref zpool, ref dataset } => {
-                    tracing::info!("ZFS storage pool '{}' restored (zpool: {}, dataset: {:?})", name, zpool, dataset);
+                StoragePoolType::ZFS {
+                    ref zpool,
+                    ref dataset,
+                } => {
+                    tracing::info!(
+                        "ZFS storage pool '{}' restored (zpool: {}, dataset: {:?})",
+                        name,
+                        zpool,
+                        dataset
+                    );
                 }
             }
         }
@@ -583,11 +620,9 @@ mod tests {
 
         let manager = StorageManager::new(&state_dir).unwrap();
 
-        let result = manager.create_local_pool(
-            "test-pool".to_string(),
-            pool_path.clone(),
-            true,
-        ).await;
+        let result = manager
+            .create_local_pool("test-pool".to_string(), pool_path.clone(), true)
+            .await;
 
         assert!(result.is_ok());
         let pool = result.unwrap();
@@ -604,17 +639,14 @@ mod tests {
 
         let manager = StorageManager::new(&state_dir).unwrap();
 
-        manager.create_local_pool(
-            "test-pool".to_string(),
-            pool_path.clone(),
-            true,
-        ).await.unwrap();
+        manager
+            .create_local_pool("test-pool".to_string(), pool_path.clone(), true)
+            .await
+            .unwrap();
 
-        let result = manager.create_local_pool(
-            "test-pool".to_string(),
-            pool_path,
-            true,
-        ).await;
+        let result = manager
+            .create_local_pool("test-pool".to_string(), pool_path, true)
+            .await;
 
         assert!(result.is_err());
     }
@@ -626,17 +658,15 @@ mod tests {
 
         let manager = StorageManager::new(&state_dir).unwrap();
 
-        manager.create_local_pool(
-            "pool1".to_string(),
-            state_dir.join("pool1"),
-            true,
-        ).await.unwrap();
+        manager
+            .create_local_pool("pool1".to_string(), state_dir.join("pool1"), true)
+            .await
+            .unwrap();
 
-        manager.create_directory_pool(
-            "pool2".to_string(),
-            state_dir.join("pool2"),
-            true,
-        ).await.unwrap();
+        manager
+            .create_directory_pool("pool2".to_string(), state_dir.join("pool2"), true)
+            .await
+            .unwrap();
 
         let pools = manager.list_pools().await;
         assert_eq!(pools.len(), 2);

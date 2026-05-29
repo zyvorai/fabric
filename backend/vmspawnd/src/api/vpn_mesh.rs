@@ -14,8 +14,8 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use vpn_mesh::compiler::VMSnapshot;
 use networking::models::AdoptHostRequest;
+use vpn_mesh::compiler::VMSnapshot;
 use vpn_mesh::models::{
     CreateVpnNetworkRequest, CreateVpnTunnelRequest, VpnNetwork, VpnNetworkStatus, VpnTunnel,
     VpnTunnelStatus,
@@ -38,15 +38,27 @@ pub async fn create_vpn_tunnel(
         return (status, Json(json!({"error": msg}))).into_response();
     }
     if let Err(msg) = crate::validation::validate_hostname(&req.interface_name) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid interface_name: {}", msg)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid interface_name: {}", msg)})),
+        )
+            .into_response();
     }
     if let Err(e) = crate::validation::validate_cidr(&req.address) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid address: {}", e)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid address: {}", e)})),
+        )
+            .into_response();
     }
     for peer in &req.peers {
         for allowed_ip in &peer.allowed_ips {
             if let Err(e) = crate::validation::validate_cidr(allowed_ip) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid peer allowed_ip: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid peer allowed_ip: {}", e)})),
+                )
+                    .into_response();
             }
         }
         if let Some(ref endpoint) = peer.endpoint {
@@ -54,7 +66,11 @@ pub async fn create_vpn_tunnel(
             if let Some(host) = endpoint.rsplit_once(':').map(|(h, _)| h) {
                 if let Err(msg) = crate::validation::validate_hostname(host) {
                     if crate::validation::validate_ip_address(host).is_err() {
-                        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid peer endpoint: {}", msg)}))).into_response();
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(json!({"error": format!("Invalid peer endpoint: {}", msg)})),
+                        )
+                            .into_response();
                     }
                 }
             }
@@ -253,8 +269,14 @@ pub async fn adopt_vpn_tunnel(
         }
     };
 
-    let stored: Vec<VpnTunnel> = state.store.list_entities(TUNNEL_STORE_KEY).unwrap_or_default();
-    if stored.iter().any(|t| t.interface_name == host.interface_name) {
+    let stored: Vec<VpnTunnel> = state
+        .store
+        .list_entities(TUNNEL_STORE_KEY)
+        .unwrap_or_default();
+    if stored
+        .iter()
+        .any(|t| t.interface_name == host.interface_name)
+    {
         return (
             StatusCode::CONFLICT,
             Json(json!({
@@ -308,7 +330,11 @@ pub async fn create_vpn_network(
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(create_vpn_network));
     if let Err(e) = crate::validation::validate_cidr(&req.subnet) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid subnet: {}", e)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid subnet: {}", e)})),
+        )
+            .into_response();
     }
     let now = Utc::now();
     let network = VpnNetwork {
@@ -364,10 +390,7 @@ pub async fn get_vpn_network(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(get_vpn_network));
-    match state
-        .store
-        .get_entity::<VpnNetwork>(NETWORK_STORE_KEY, &id)
-    {
+    match state.store.get_entity::<VpnNetwork>(NETWORK_STORE_KEY, &id) {
         Ok(Some(network)) => (StatusCode::OK, Json(network)).into_response(),
         Ok(None) => (
             StatusCode::NOT_FOUND,
@@ -389,10 +412,7 @@ pub async fn update_vpn_network(
     Json(req): Json<CreateVpnNetworkRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("vpn_mesh::{}", stringify!(update_vpn_network));
-    let existing = match state
-        .store
-        .get_entity::<VpnNetwork>(NETWORK_STORE_KEY, &id)
-    {
+    let existing = match state.store.get_entity::<VpnNetwork>(NETWORK_STORE_KEY, &id) {
         Ok(Some(n)) => n,
         Ok(None) => {
             return (
@@ -531,10 +551,7 @@ pub async fn get_vpn_network_status(
                 .iter()
                 .filter(|vm| net.selector.matches(&vm.labels))
                 .count();
-            let interfaces = state
-                .vpn_mesh
-                .compiler
-                .compile_network(net, &vms);
+            let interfaces = state.vpn_mesh.compiler.compile_network(net, &vms);
 
             VpnNetworkStatus {
                 network_id: net.id,
@@ -585,12 +602,10 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .map(|vm| {
-            VMSnapshot {
-                name: vm.name,
-                labels: vm.labels.clone().unwrap_or_default(),
-                ip: vm.ip,
-            }
+        .map(|vm| VMSnapshot {
+            name: vm.name,
+            labels: vm.labels.clone().unwrap_or_default(),
+            ip: vm.ip,
         })
         .collect()
 }

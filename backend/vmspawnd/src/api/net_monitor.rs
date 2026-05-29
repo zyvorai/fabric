@@ -35,7 +35,11 @@ pub async fn create_monitor_policy(
     }
     if let Some(ref url) = req.webhook_url {
         if let Err(e) = crate::api::notifications::validate_external_url_public(url) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid webhook_url: {}", e)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid webhook_url: {}", e)})),
+            )
+                .into_response();
         }
     }
     let now = Utc::now();
@@ -99,7 +103,8 @@ pub async fn get_monitor_policy(
     match state.store.get_entity::<MonitorPolicy>(STORE_KEY, &id) {
         Ok(Some(policy)) => (StatusCode::OK, Json(policy)).into_response(),
         Ok(None) => {
-            if let Some(policy) = super::net_security_discover::find_host_monitor_policy(&state, &id)
+            if let Some(policy) =
+                super::net_security_discover::find_host_monitor_policy(&state, &id)
             {
                 return (StatusCode::OK, Json(policy)).into_response();
             }

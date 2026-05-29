@@ -1,19 +1,15 @@
 // Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
 // Infrastructure Time Machine foundation — versioned config export.
 
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, response::IntoResponse, Json};
 use chrono::Utc;
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
-use security::RequireRead;
 use network_policy::models::NetworkPolicy;
+use security::RequireRead;
 
 #[derive(Debug, Serialize)]
 pub struct ConfigSnapshot {
@@ -39,10 +35,8 @@ pub async fn export_config_snapshot(
         let manager = state.storage_manager.read().await;
         manager.list_pools().await
     };
-    let events: Vec<crate::api::events::VMEvent> = state
-        .store
-        .list_entities("vm_events")
-        .unwrap_or_default();
+    let events: Vec<crate::api::events::VMEvent> =
+        state.store.list_entities("vm_events").unwrap_or_default();
 
     let snapshot = ConfigSnapshot {
         version: "1".into(),

@@ -21,8 +21,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
-use crate::validation::{validate_vm_name, validate_machine_path};
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use crate::validation::{validate_machine_path, validate_vm_name};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 use vmspawn_driver::machinectl;
 use vmspawnd_driver_core::{MachineInfo, VMDriver};
 
@@ -36,19 +36,14 @@ pub async fn list_machines(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<MachineInfo>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(list_machines));
-    state
-        .driver
-        .list_machines()
-        .await
-        .map(Json)
-        .map_err(|e| {
-            tracing::error!("machined list_machines failed: {}", e);
-            crate::api_error::json_error_code(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
-                "Machine service operation failed",
-            )
-        })
+    state.driver.list_machines().await.map(Json).map_err(|e| {
+        tracing::error!("machined list_machines failed: {}", e);
+        crate::api_error::json_error_code(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "machined_connection",
+            "Machine service operation failed",
+        )
+    })
 }
 
 /// GET /api/machines/:name/properties - Show machine properties
@@ -56,9 +51,11 @@ pub async fn show_machine(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
-) -> Result<Json<std::collections::HashMap<String, String>>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<std::collections::HashMap<String, String>>, (StatusCode, Json<serde_json::Value>)>
+{
     tracing::debug!("machined::{}", stringify!(show_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .get_properties(&name)
@@ -81,7 +78,8 @@ pub async fn poweroff_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(poweroff_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .poweroff(&name)
@@ -104,7 +102,8 @@ pub async fn reboot_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(reboot_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .reboot(&name)
@@ -127,7 +126,8 @@ pub async fn terminate_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(terminate_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .terminate(&name)
@@ -150,7 +150,8 @@ pub async fn enable_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(enable_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .enable(&name)
@@ -173,7 +174,8 @@ pub async fn disable_machine(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(disable_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
         .driver
         .disable(&name)
@@ -205,20 +207,27 @@ pub async fn shell_machine(
     Json(req): Json<ShellRequest>,
 ) -> Result<Json<machinectl::ShellOutput>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(shell_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
 
     // Reject shell metacharacters at the handler level for defense in depth
     const SHELL_METACHARACTERS: &[char] = &[
         ';', '|', '&', '$', '`', '>', '<', '(', ')', '{', '}', '\n', '\r', '\0', '!',
     ];
     if req.command.is_empty() {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Shell command must not be empty"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Shell command must not be empty",
+        ));
     }
     for ch in SHELL_METACHARACTERS {
         if req.command.contains(*ch) {
             return Err(crate::api_error::json_error(
                 StatusCode::BAD_REQUEST,
-                format!("Shell command contains forbidden character '{}'", ch.escape_default()),
+                format!(
+                    "Shell command contains forbidden character '{}'",
+                    ch.escape_default()
+                ),
             ));
         }
     }
@@ -248,25 +257,24 @@ pub async fn ssh_info(
     Path(name): Path<String>,
 ) -> Result<Json<SshInfo>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(ssh_info));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    let address = machinectl::ssh_address(&name)
-        .map_err(|e| {
-            tracing::error!("machined ssh_address failed: {}", e);
-            crate::api_error::json_error_code(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
-                "Machine service operation failed",
-            )
-        })?;
-    let key_path = machinectl::ssh_key_path(&name)
-        .map_err(|e| {
-            tracing::error!("machined ssh_key_path failed: {}", e);
-            crate::api_error::json_error_code(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
-                "Machine service operation failed",
-            )
-        })?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    let address = machinectl::ssh_address(&name).map_err(|e| {
+        tracing::error!("machined ssh_address failed: {}", e);
+        crate::api_error::json_error_code(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "machined_connection",
+            "Machine service operation failed",
+        )
+    })?;
+    let key_path = machinectl::ssh_key_path(&name).map_err(|e| {
+        tracing::error!("machined ssh_key_path failed: {}", e);
+        crate::api_error::json_error_code(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "machined_connection",
+            "Machine service operation failed",
+        )
+    })?;
 
     let ssh_command = match (&address, &key_path) {
         (Some(addr), Some(key)) => Some(format!("ssh -i {} {}", key, addr)),
@@ -297,9 +305,12 @@ pub async fn copy_to_machine(
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(copy_to_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.host_path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_machine_path(&req.machine_path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.host_path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_machine_path(&req.machine_path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::copy_to(&name, &req.host_path, &req.machine_path)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
@@ -319,9 +330,12 @@ pub async fn copy_from_machine(
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(copy_from_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.host_path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_machine_path(&req.machine_path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.host_path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_machine_path(&req.machine_path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::copy_from(&name, &req.machine_path, &req.host_path)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
@@ -349,9 +363,12 @@ pub async fn bind_machine(
     Json(req): Json<BindRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(bind_machine));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.host_path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_machine_path(&req.machine_path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.host_path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_machine_path(&req.machine_path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::bind(&name, &req.host_path, &req.machine_path, req.read_only)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
@@ -373,16 +390,14 @@ pub async fn list_machine_images(
     RequireRead(_claims): RequireRead,
 ) -> Result<Json<Vec<machinectl::ImageInfo>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(list_machine_images));
-    machinectl::list_images()
-        .map(Json)
-        .map_err(|e| {
-            tracing::error!("machined list_images failed: {}", e);
-            crate::api_error::json_error_code(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
-                "Machine service operation failed",
-            )
-        })
+    machinectl::list_images().map(Json).map_err(|e| {
+        tracing::error!("machined list_images failed: {}", e);
+        crate::api_error::json_error_code(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "machined_connection",
+            "Machine service operation failed",
+        )
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -397,8 +412,10 @@ pub async fn clone_machine_image(
     Json(req): Json<CloneImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(clone_machine_image));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_vm_name(&req.target_name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.target_name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::clone_image(&name, &req.target_name)
         .map(|_| StatusCode::CREATED)
         .map_err(|e| {
@@ -423,8 +440,10 @@ pub async fn rename_machine_image(
     Json(req): Json<RenameImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(rename_machine_image));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_vm_name(&req.new_name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.new_name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::rename_image(&name, &req.new_name)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
@@ -443,7 +462,8 @@ pub async fn remove_machine_image(
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(remove_machine_image));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::remove_image(&name)
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| {
@@ -468,7 +488,8 @@ pub async fn set_image_read_only(
     Json(req): Json<SetReadOnlyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(set_image_read_only));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::set_read_only(&name, req.read_only)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
@@ -499,7 +520,8 @@ pub async fn pull_raw_image(
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(pull_raw_image));
-    validate_vm_name(&req.name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     machinectl::pull_raw(&req.url, &req.name, req.verify)
@@ -520,7 +542,8 @@ pub async fn pull_tar_image(
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(pull_tar_image));
-    validate_vm_name(&req.name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     machinectl::pull_tar(&req.url, &req.name, req.verify)
@@ -547,8 +570,10 @@ pub async fn import_raw_image(
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(import_raw_image));
-    validate_vm_name(&req.name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::import_raw(&req.path, &req.name)
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| {
@@ -567,8 +592,10 @@ pub async fn import_tar_image(
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(import_tar_image));
-    validate_vm_name(&req.name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&req.name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::import_tar(&req.path, &req.name)
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| {
@@ -593,8 +620,10 @@ pub async fn export_raw_image(
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(export_raw_image));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::export_raw(&name, &req.path)
         .map(|_| StatusCode::OK)
         .map_err(|e| {
@@ -614,8 +643,10 @@ pub async fn export_tar_image(
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(export_tar_image));
-    validate_vm_name(&name).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.path).map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_vm_name(&name)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+    validate_host_path(&req.path)
+        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     machinectl::export_tar(&name, &req.path)
         .map(|_| StatusCode::OK)
         .map_err(|e| {

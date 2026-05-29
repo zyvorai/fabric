@@ -175,7 +175,10 @@ impl FaultToleranceManager {
         primary_host: &str,
         secondary_host: &str,
     ) -> Result<FtConfig> {
-        let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut configs = self
+            .configs
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         if configs.contains_key(vm_name) {
             return Err(FtError::AlreadyEnabled(vm_name.to_string()).into());
@@ -226,7 +229,10 @@ impl FaultToleranceManager {
 
     /// Disable fault tolerance for a VM.
     pub fn disable_ft(&self, vm_name: &str) -> Result<()> {
-        let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut configs = self
+            .configs
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let config = configs
             .remove(vm_name)
@@ -299,7 +305,10 @@ impl FaultToleranceManager {
     /// Trigger a real failover: fence the old primary, promote the secondary
     /// host to primary, and start the VM on the new primary.
     pub fn trigger_failover(&self, vm_name: &str) -> Result<FailoverResult> {
-        let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut configs = self
+            .configs
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let config = configs
             .get_mut(vm_name)
@@ -438,7 +447,11 @@ impl FaultToleranceManager {
             target_host_id: None,
             details: Some(format!(
                 "Failover {}: downtime={}ms",
-                if result.success { "succeeded" } else { "failed" },
+                if result.success {
+                    "succeeded"
+                } else {
+                    "failed"
+                },
                 downtime_ms
             )),
             timestamp: now,
@@ -449,7 +462,10 @@ impl FaultToleranceManager {
 
     /// Suspend replication for a VM (e.g. during maintenance).
     pub fn suspend_replication(&self, vm_name: &str) -> Result<()> {
-        let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut configs = self
+            .configs
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let config = configs
             .get_mut(vm_name)
@@ -468,7 +484,10 @@ impl FaultToleranceManager {
 
     /// Resume replication for a VM after suspension.
     pub fn resume_replication(&self, vm_name: &str) -> Result<()> {
-        let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut configs = self
+            .configs
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let config = configs
             .get_mut(vm_name)
@@ -500,7 +519,10 @@ impl FaultToleranceManager {
 
     /// Update the synchronisation state of a VM's replication link.
     pub fn update_sync_state(&self, vm_name: &str, state: ReplicationState) -> Result<()> {
-        let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut configs = self
+            .configs
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let config = configs
             .get_mut(vm_name)
@@ -528,13 +550,19 @@ impl FaultToleranceManager {
     pub fn update_ft_metrics(&self, vm_name: &str, metrics: FtMetrics) -> Result<()> {
         // Ensure the VM actually has FT enabled.
         {
-            let configs = self.configs.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            let configs = self
+                .configs
+                .read()
+                .map_err(|e| anyhow!("lock poisoned: {e}"))?;
             if !configs.contains_key(vm_name) {
                 return Err(FtError::VmNotFound(vm_name.to_string()).into());
             }
         }
 
-        let mut store = self.metrics.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .metrics
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         store.insert(vm_name.to_string(), metrics);
         Ok(())
     }
@@ -544,14 +572,21 @@ impl FaultToleranceManager {
         let events = self.events.read().unwrap_or_else(|e| e.into_inner());
 
         match vm_name {
-            Some(name) => events.iter().filter(|e| e.vm_name == name).cloned().collect(),
+            Some(name) => events
+                .iter()
+                .filter(|e| e.vm_name == name)
+                .cloned()
+                .collect(),
             None => events.clone(),
         }
     }
 
     /// Record an FT lifecycle event.
     pub fn record_event(&self, event: FtEvent) -> Result<()> {
-        let mut events = self.events.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut events = self
+            .events
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         tracing::debug!(
             vm = %event.vm_name,
             event_type = ?event.event_type,
@@ -565,7 +600,10 @@ impl FaultToleranceManager {
     /// exists on the secondary host so the VM *could* be started there.
     /// Does not actually swap the primary and secondary hosts.
     pub fn test_failover(&self, vm_name: &str) -> Result<FailoverResult> {
-        let configs = self.configs.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let configs = self
+            .configs
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let config = configs
             .get(vm_name)
@@ -633,7 +671,10 @@ impl FaultToleranceManager {
             return Err(FtError::NoSecondaryHost(vm_name.to_string()).into());
         }
 
-        let configs = self.configs.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let configs = self
+            .configs
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         // If the VM already has a config, exclude its current primary.
         let primary = configs.get(vm_name).map(|c| c.primary_host_id.as_str());
@@ -826,7 +867,8 @@ mod tests {
         assert!(cfg.last_sync.is_none());
 
         // Transition to InSync — should set last_sync.
-        mgr.update_sync_state("vm-1", ReplicationState::InSync).unwrap();
+        mgr.update_sync_state("vm-1", ReplicationState::InSync)
+            .unwrap();
         let cfg = mgr.get_ft_config("vm-1").unwrap();
         assert_eq!(cfg.replication_state, ReplicationState::InSync);
         assert!(cfg.last_sync.is_some());

@@ -40,11 +40,10 @@ fn parse_forward_chains(json: &serde_json::Value) -> Vec<DiscoveredNftPolicyChai
         std::collections::HashMap::new();
 
     for item in items {
-        let Some(chain) = item.get("chain") else { continue };
-        let family = chain
-            .get("family")
-            .and_then(|f| f.as_str())
-            .unwrap_or("ip");
+        let Some(chain) = item.get("chain") else {
+            continue;
+        };
+        let family = chain.get("family").and_then(|f| f.as_str()).unwrap_or("ip");
         if family != "ip" && family != "ip6" {
             continue;
         }
@@ -69,7 +68,9 @@ fn parse_forward_chains(json: &serde_json::Value) -> Vec<DiscoveredNftPolicyChai
     }
 
     for item in items {
-        let Some(rule) = item.get("rule") else { continue };
+        let Some(rule) = item.get("rule") else {
+            continue;
+        };
         let table = rule
             .get("table")
             .and_then(|t| t.as_str())

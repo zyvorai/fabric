@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-pub mod models;
 pub mod collector;
 pub mod enforcement;
+pub mod models;
 
 use collector::MetricsCollector;
 use enforcement::AlertEvaluator;

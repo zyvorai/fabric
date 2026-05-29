@@ -2,11 +2,11 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use chrono::{DateTime, Utc};
 use axum::{http::StatusCode, Json};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 
 use crate::server::AppState;
 
@@ -98,7 +98,11 @@ pub async fn send_webhook_with_retry(
 
     // Truncate stored payload to limit storage usage
     let stored_payload = if payload.len() > MAX_STORED_PAYLOAD_SIZE {
-        format!("{}... (truncated, {} bytes total)", &payload[..MAX_STORED_PAYLOAD_SIZE], payload.len())
+        format!(
+            "{}... (truncated, {} bytes total)",
+            &payload[..MAX_STORED_PAYLOAD_SIZE],
+            payload.len()
+        )
     } else {
         payload.to_string()
     };
@@ -123,9 +127,15 @@ pub async fn send_webhook_with_retry(
     for attempt in 0..max_attempts {
         delivery.attempt = attempt + 1;
         delivery.status = DeliveryStatus::Sending;
-        if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
+        if let Err(e) = state
+            .store
+            .save_entity("webhook_deliveries", &delivery_id, &delivery)
+        {
+            tracing::error!("Store error: {}", e);
+        }
 
-        match state.http_client
+        match state
+            .http_client
             .post(url)
             .header("Content-Type", "application/json")
             .header("User-Agent", "vmspawnd-webhook/1.0")
@@ -141,7 +151,13 @@ pub async fn send_webhook_with_retry(
                 if response.status().is_success() {
                     delivery.status = DeliveryStatus::Delivered;
                     delivery.completed = Some(Utc::now());
-                    if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
+                    if let Err(e) =
+                        state
+                            .store
+                            .save_entity("webhook_deliveries", &delivery_id, &delivery)
+                    {
+                        tracing::error!("Store error: {}", e);
+                    }
                     tracing::info!("Webhook delivered to {} (attempt {})", url, attempt + 1);
                     return;
                 }
@@ -151,11 +167,24 @@ pub async fn send_webhook_with_retry(
                     let delay = backoff_delay(attempt, 5, 300);
                     delivery.status = DeliveryStatus::Retrying;
                     delivery.error = Some(format!("HTTP {}", status_code));
-                    delivery.next_retry = Some(Utc::now() + chrono::Duration::seconds(delay as i64));
-                    if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
+                    delivery.next_retry =
+                        Some(Utc::now() + chrono::Duration::seconds(delay as i64));
+                    if let Err(e) =
+                        state
+                            .store
+                            .save_entity("webhook_deliveries", &delivery_id, &delivery)
+                    {
+                        tracing::error!("Store error: {}", e);
+                    }
 
-                    tracing::warn!("Webhook {} returned {}, retrying in {}s (attempt {}/{})",
-                        url, status_code, delay, attempt + 1, max_attempts);
+                    tracing::warn!(
+                        "Webhook {} returned {}, retrying in {}s (attempt {}/{})",
+                        url,
+                        status_code,
+                        delay,
+                        attempt + 1,
+                        max_attempts
+                    );
                     tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
                     continue;
                 }
@@ -164,7 +193,13 @@ pub async fn send_webhook_with_retry(
                 delivery.status = DeliveryStatus::Failed;
                 delivery.error = Some(format!("HTTP {} (not retryable)", status_code));
                 delivery.completed = Some(Utc::now());
-                if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
+                if let Err(e) =
+                    state
+                        .store
+                        .save_entity("webhook_deliveries", &delivery_id, &delivery)
+                {
+                    tracing::error!("Store error: {}", e);
+                }
                 tracing::warn!("Webhook {} returned {} (not retryable)", url, status_code);
                 return;
             }
@@ -173,10 +208,22 @@ pub async fn send_webhook_with_retry(
                 delivery.status = DeliveryStatus::Retrying;
                 delivery.error = Some(e.to_string());
                 delivery.next_retry = Some(Utc::now() + chrono::Duration::seconds(delay as i64));
-                if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
+                if let Err(e) =
+                    state
+                        .store
+                        .save_entity("webhook_deliveries", &delivery_id, &delivery)
+                {
+                    tracing::error!("Store error: {}", e);
+                }
 
-                tracing::warn!("Webhook {} failed: {}, retrying in {}s (attempt {}/{})",
-                    url, e, delay, attempt + 1, max_attempts);
+                tracing::warn!(
+                    "Webhook {} failed: {}, retrying in {}s (attempt {}/{})",
+                    url,
+                    e,
+                    delay,
+                    attempt + 1,
+                    max_attempts
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
             }
         }
@@ -186,8 +233,17 @@ pub async fn send_webhook_with_retry(
     delivery.status = DeliveryStatus::Failed;
     delivery.error = Some(format!("All {} attempts failed", max_attempts));
     delivery.completed = Some(Utc::now());
-    if let Err(e) = state.store.save_entity("webhook_deliveries", &delivery_id, &delivery) { tracing::error!("Store error: {}", e); }
-    tracing::error!("Webhook delivery to {} failed after {} attempts", url, max_attempts);
+    if let Err(e) = state
+        .store
+        .save_entity("webhook_deliveries", &delivery_id, &delivery)
+    {
+        tracing::error!("Store error: {}", e);
+    }
+    tracing::error!(
+        "Webhook delivery to {} failed after {} attempts",
+        url,
+        max_attempts
+    );
 }
 
 /// GET /api/webhooks/deliveries - List recent webhook deliveries (payload omitted)
@@ -195,8 +251,15 @@ pub async fn list_deliveries(
     security::RequireRead(_claims): security::RequireRead,
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
 ) -> Result<Json<Vec<WebhookDeliverySummary>>, (StatusCode, Json<serde_json::Value>)> {
-    let deliveries = state.store.list_entities::<WebhookDelivery>("webhook_deliveries")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Storage error: {}", e)}))))?;
+    let deliveries = state
+        .store
+        .list_entities::<WebhookDelivery>("webhook_deliveries")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Storage error: {}", e)})),
+            )
+        })?;
     let summaries: Vec<WebhookDeliverySummary> = deliveries.into_iter().map(Into::into).collect();
     Ok(Json(summaries))
 }

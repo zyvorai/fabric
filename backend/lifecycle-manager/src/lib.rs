@@ -345,7 +345,10 @@ impl LifecycleManager {
 
     /// Create a new baseline group.
     pub fn create_baseline_group(&self, mut group: BaselineGroup) -> Result<BaselineGroup> {
-        let mut store = self.baseline_groups.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .baseline_groups
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
 
         if group.id.is_empty() {
             group.id = Uuid::new_v4().to_string();
@@ -360,7 +363,10 @@ impl LifecycleManager {
 
     /// List all baseline groups.
     pub fn list_baseline_groups(&self) -> Vec<BaselineGroup> {
-        let store = self.baseline_groups.read().unwrap_or_else(|e| e.into_inner());
+        let store = self
+            .baseline_groups
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         store.values().cloned().collect()
     }
 
@@ -696,7 +702,10 @@ impl LifecycleManager {
 
     /// Create a new rolling update plan.
     pub fn create_rolling_update(&self, mut plan: RollingUpdatePlan) -> Result<RollingUpdatePlan> {
-        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .rolling_updates
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
 
         if plan.id.is_empty() {
             plan.id = Uuid::new_v4().to_string();
@@ -717,13 +726,19 @@ impl LifecycleManager {
 
     /// Retrieve a rolling update plan by ID.
     pub fn get_rolling_update(&self, id: &str) -> Option<RollingUpdatePlan> {
-        let store = self.rolling_updates.read().unwrap_or_else(|e| e.into_inner());
+        let store = self
+            .rolling_updates
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         store.get(id).cloned()
     }
 
     /// List rolling update plans, optionally filtered by cluster ID.
     pub fn list_rolling_updates(&self, cluster_id: Option<&str>) -> Vec<RollingUpdatePlan> {
-        let store = self.rolling_updates.read().unwrap_or_else(|e| e.into_inner());
+        let store = self
+            .rolling_updates
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         store
             .values()
             .filter(|p| match cluster_id {
@@ -736,7 +751,10 @@ impl LifecycleManager {
 
     /// Start a planned rolling update.
     pub fn start_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .rolling_updates
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -757,7 +775,10 @@ impl LifecycleManager {
 
     /// Pause a running rolling update.
     pub fn pause_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .rolling_updates
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -777,7 +798,10 @@ impl LifecycleManager {
 
     /// Resume a paused rolling update.
     pub fn resume_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .rolling_updates
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -800,7 +824,10 @@ impl LifecycleManager {
     /// Returns the host ID of the next host to update, or `None` if all
     /// hosts have been processed.
     pub fn advance_rolling_update(&self, id: &str) -> Result<Option<String>> {
-        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .rolling_updates
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -835,7 +862,10 @@ impl LifecycleManager {
 
     /// Mark a rolling update as completed.
     pub fn complete_rolling_update(&self, id: &str) -> Result<()> {
-        let mut store = self.rolling_updates.write().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .rolling_updates
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let plan = store
             .get_mut(id)
             .ok_or_else(|| LifecycleError::RollingUpdateNotFound(id.to_string()))?;
@@ -1090,10 +1120,7 @@ mod tests {
             .find(|p| p.package_name == "kernel")
             .unwrap();
         assert!(kernel_missing.current_version.is_none());
-        assert_eq!(
-            kernel_missing.severity,
-            Some(PatchSeverity::Important)
-        );
+        assert_eq!(kernel_missing.severity, Some(PatchSeverity::Important));
 
         let openssl_missing = status
             .missing_patches
@@ -1192,10 +1219,7 @@ mod tests {
 
         let t = mgr.get_remediation(&task.id).unwrap();
         assert_eq!(t.status, RemediationStatus::Failed);
-        assert_eq!(
-            t.error.as_deref(),
-            Some("disk full during patch install")
-        );
+        assert_eq!(t.error.as_deref(), Some("disk full during patch install"));
     }
 
     // -- 10. Rolling update advancement --------------------------------------
@@ -1278,13 +1302,11 @@ mod tests {
             host_id: "h1".to_string(),
             os_version: "Fedora 40".to_string(),
             kernel_version: "6.8.10-300.fc40".to_string(),
-            installed_packages: vec![
-                InstalledPatch {
-                    package_name: "openssl".to_string(),
-                    version: "3.0.12".to_string(),
-                    installed_at: Some(Utc::now()),
-                },
-            ],
+            installed_packages: vec![InstalledPatch {
+                package_name: "openssl".to_string(),
+                version: "3.0.12".to_string(),
+                installed_at: Some(Utc::now()),
+            }],
             last_updated: Utc::now(),
         };
 

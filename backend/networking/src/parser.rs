@@ -154,7 +154,10 @@ ForwardDelaySec=15
         assert_eq!(sections[0].entries.len(), 3);
         assert_eq!(sections[1].name, "Bridge");
         assert_eq!(get_value(&sections, "NetDev", "Name"), Some("br0".into()));
-        assert_eq!(get_value(&sections, "NetDev", "Kind"), Some("bridge".into()));
+        assert_eq!(
+            get_value(&sections, "NetDev", "Kind"),
+            Some("bridge".into())
+        );
         assert_eq!(get_value(&sections, "Bridge", "STP"), Some("yes".into()));
     }
 
@@ -183,7 +186,10 @@ Metric=100
         assert_eq!(addrs, vec!["10.0.0.1/24", "10.0.0.2/24"]);
         let dns = get_values(&sections, "Network", "DNS");
         assert_eq!(dns, vec!["8.8.8.8", "1.1.1.1"]);
-        assert_eq!(get_value(&sections, "Route", "Destination"), Some("172.16.0.0/12".into()));
+        assert_eq!(
+            get_value(&sections, "Route", "Destination"),
+            Some("172.16.0.0/12".into())
+        );
     }
 
     #[test]
@@ -199,9 +205,15 @@ WakeOnLan=magic
 "#;
         let sections = parse_config(content);
         assert_eq!(sections.len(), 2);
-        assert_eq!(get_value(&sections, "Match", "MACAddress"), Some("00:11:22:33:44:55".into()));
+        assert_eq!(
+            get_value(&sections, "Match", "MACAddress"),
+            Some("00:11:22:33:44:55".into())
+        );
         assert_eq!(get_value(&sections, "Link", "Name"), Some("lan0".into()));
-        assert_eq!(get_value(&sections, "Link", "WakeOnLan"), Some("magic".into()));
+        assert_eq!(
+            get_value(&sections, "Link", "WakeOnLan"),
+            Some("magic".into())
+        );
     }
 
     #[test]
@@ -237,7 +249,10 @@ TransmitHashPolicy=layer3+4
         let sections = parse_config(content);
         assert_eq!(sections.len(), 2);
         assert_eq!(get_value(&sections, "Bond", "Mode"), Some("802.3ad".into()));
-        assert_eq!(get_value(&sections, "Bond", "LACPTransmitRate"), Some("fast".into()));
+        assert_eq!(
+            get_value(&sections, "Bond", "LACPTransmitRate"),
+            Some("fast".into())
+        );
     }
 
     #[test]

@@ -2,10 +2,10 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -88,24 +88,37 @@ impl NfsPool {
         if config.server.is_empty() {
             return Err(NfsError::InvalidPath("Server cannot be empty".to_string()));
         }
-        if !config.server.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '_')) {
+        if !config
+            .server
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '_'))
+        {
             return Err(NfsError::InvalidPath(format!(
-                "Server '{}' contains invalid characters", config.server
+                "Server '{}' contains invalid characters",
+                config.server
             )));
         }
 
         if config.export_path.is_empty() {
-            return Err(NfsError::InvalidPath("Export path cannot be empty".to_string()));
+            return Err(NfsError::InvalidPath(
+                "Export path cannot be empty".to_string(),
+            ));
         }
         if !config.export_path.starts_with('/') {
-            return Err(NfsError::InvalidPath("Export path must be absolute".to_string()));
+            return Err(NfsError::InvalidPath(
+                "Export path must be absolute".to_string(),
+            ));
         }
 
         // Validate mount options — reject shell metacharacters
         for opt in &config.mount_options {
-            if opt.chars().any(|c| matches!(c, ';' | '|' | '&' | '$' | '`' | '\'' | '"' | '\\' | '\n')) {
+            if opt
+                .chars()
+                .any(|c| matches!(c, ';' | '|' | '&' | '$' | '`' | '\'' | '"' | '\\' | '\n'))
+            {
                 return Err(NfsError::InvalidPath(format!(
-                    "Mount option '{}' contains invalid characters", opt
+                    "Mount option '{}' contains invalid characters",
+                    opt
                 )));
             }
         }
@@ -152,7 +165,7 @@ impl NfsPool {
             fs::create_dir_all(&self.config.mount_path)?;
         } else if self.is_mounted()? {
             return Err(NfsError::MountPointExists(
-                self.config.mount_path.display().to_string()
+                self.config.mount_path.display().to_string(),
             ));
         }
 
@@ -165,8 +178,10 @@ impl NfsPool {
 
         let output = Command::new("mount")
             .args(&[
-                "-t", "nfs",
-                "-o", &options,
+                "-t",
+                "nfs",
+                "-o",
+                &options,
                 &source,
                 self.config.mount_path.to_str().unwrap(),
             ])
@@ -221,7 +236,12 @@ impl NfsPool {
     /// Check if mount point is currently mounted
     pub fn is_mounted(&self) -> Result<bool, NfsError> {
         let output = Command::new("findmnt")
-            .args(&["-n", "-o", "SOURCE", self.config.mount_path.to_str().unwrap()])
+            .args(&[
+                "-n",
+                "-o",
+                "SOURCE",
+                self.config.mount_path.to_str().unwrap(),
+            ])
             .output()
             .map_err(|e| NfsError::Io(e))?;
 
@@ -253,7 +273,9 @@ impl NfsPool {
 
         let parts: Vec<&str> = lines[1].split_whitespace().collect();
         if parts.len() < 6 {
-            return Err(NfsError::InvalidPath("Invalid df output format".to_string()));
+            return Err(NfsError::InvalidPath(
+                "Invalid df output format".to_string(),
+            ));
         }
 
         Ok(NfsStats {

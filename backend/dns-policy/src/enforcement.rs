@@ -24,9 +24,8 @@ impl DnsEnforcer {
     /// Sync DNS records grouped by zone.
     pub fn sync_records(&self, records: &[DnsRecord], zones: &[DnsZone]) -> Result<()> {
         // Ensure DNS directory exists
-        std::fs::create_dir_all(DNS_DIR).map_err(|e| {
-            anyhow::anyhow!("Failed to create DNS directory {}: {}", DNS_DIR, e)
-        })?;
+        std::fs::create_dir_all(DNS_DIR)
+            .map_err(|e| anyhow::anyhow!("Failed to create DNS directory {}: {}", DNS_DIR, e))?;
 
         // Group records by zone (matching by FQDN suffix)
         let mut zone_records: std::collections::HashMap<String, Vec<&DnsRecord>> =
@@ -80,11 +79,7 @@ impl DnsEnforcer {
         std::fs::write(&file_path, &content)
             .map_err(|e| anyhow::anyhow!("Failed to write zone file {}: {}", file_path, e))?;
 
-        tracing::debug!(
-            "Wrote {} records to {}",
-            records.len(),
-            file_path
-        );
+        tracing::debug!("Wrote {} records to {}", records.len(), file_path);
         Ok(())
     }
 

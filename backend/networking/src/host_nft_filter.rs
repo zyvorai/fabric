@@ -34,11 +34,10 @@ fn parse_filter_chains(json: &serde_json::Value) -> Vec<DiscoveredNftFilterChain
         std::collections::HashMap::new();
 
     for item in items {
-        let Some(chain) = item.get("chain") else { continue };
-        let family = chain
-            .get("family")
-            .and_then(|f| f.as_str())
-            .unwrap_or("ip");
+        let Some(chain) = item.get("chain") else {
+            continue;
+        };
+        let family = chain.get("family").and_then(|f| f.as_str()).unwrap_or("ip");
         if family != "ip" && family != "ip6" {
             continue;
         }
@@ -64,13 +63,13 @@ fn parse_filter_chains(json: &serde_json::Value) -> Vec<DiscoveredNftFilterChain
             .and_then(|p| p.as_str())
             .unwrap_or("drop")
             .to_string();
-        filter_chains
-            .entry((table, name))
-            .or_insert((0, policy));
+        filter_chains.entry((table, name)).or_insert((0, policy));
     }
 
     for item in items {
-        let Some(rule) = item.get("rule") else { continue };
+        let Some(rule) = item.get("rule") else {
+            continue;
+        };
         let table = rule
             .get("table")
             .and_then(|t| t.as_str())

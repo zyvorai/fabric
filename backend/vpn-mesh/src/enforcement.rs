@@ -69,7 +69,10 @@ impl WireguardEnforcer {
         // Reload systemd-networkd to apply
         self.reload()?;
 
-        tracing::info!("Synced {} WireGuard interfaces via networkd", interfaces.len());
+        tracing::info!(
+            "Synced {} WireGuard interfaces via networkd",
+            interfaces.len()
+        );
         Ok(())
     }
 
@@ -176,7 +179,10 @@ impl WireguardEnforcer {
         }
 
         if peer.persistent_keepalive > 0 {
-            out.push_str(&format!("PersistentKeepalive={}\n", peer.persistent_keepalive));
+            out.push_str(&format!(
+                "PersistentKeepalive={}\n",
+                peer.persistent_keepalive
+            ));
         }
 
         out
@@ -212,16 +218,24 @@ impl WireguardEnforcer {
     }
 
     fn write_file(&self, device_name: &str, ext: &str, content: &str) -> Result<()> {
-        std::fs::create_dir_all(&self.config_dir)
-            .with_context(|| format!("Failed to create config dir {}", self.config_dir.display()))?;
+        std::fs::create_dir_all(&self.config_dir).with_context(|| {
+            format!("Failed to create config dir {}", self.config_dir.display())
+        })?;
 
         let path = self.file_path(device_name, ext);
-        let tmp_path = self.config_dir.join(format!("{}{}.{}.tmp", self.file_prefix, device_name, ext));
+        let tmp_path = self
+            .config_dir
+            .join(format!("{}{}.{}.tmp", self.file_prefix, device_name, ext));
 
         std::fs::write(&tmp_path, content)
             .with_context(|| format!("Failed to write {}", tmp_path.display()))?;
-        std::fs::rename(&tmp_path, &path)
-            .with_context(|| format!("Failed to rename {} to {}", tmp_path.display(), path.display()))?;
+        std::fs::rename(&tmp_path, &path).with_context(|| {
+            format!(
+                "Failed to rename {} to {}",
+                tmp_path.display(),
+                path.display()
+            )
+        })?;
 
         tracing::debug!("Wrote {}", path.display());
         Ok(())

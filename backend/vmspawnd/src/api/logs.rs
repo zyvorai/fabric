@@ -80,7 +80,10 @@ pub async fn get_vm_logs(
     if let Some(ref pattern) = query.grep {
         // Sanitize grep pattern: only allow alphanumeric, spaces, hyphens, underscores, dots
         if pattern.len() <= 256
-            && pattern.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.' | ':' | '/' | '=' | '[' | ']'))
+            && pattern.chars().all(|c| {
+                c.is_ascii_alphanumeric()
+                    || matches!(c, ' ' | '-' | '_' | '.' | ':' | '/' | '=' | '[' | ']')
+            })
         {
             args.push(format!("--grep={}", pattern));
         }
@@ -129,7 +132,10 @@ pub async fn get_system_logs(
     if let Some(ref pattern) = query.grep {
         // Sanitize grep pattern: only allow alphanumeric, spaces, hyphens, underscores, dots
         if pattern.len() <= 256
-            && pattern.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.' | ':' | '/' | '=' | '[' | ']'))
+            && pattern.chars().all(|c| {
+                c.is_ascii_alphanumeric()
+                    || matches!(c, ' ' | '-' | '_' | '.' | ':' | '/' | '=' | '[' | ']')
+            })
         {
             args.push(format!("--grep={}", pattern));
         }
@@ -164,7 +170,10 @@ fn parse_journal_json(raw: &str) -> Vec<LogEntry> {
                 .and_then(|v| v.as_str())
                 .and_then(|ts| ts.parse::<i64>().ok())
                 .map(|us| {
-                    let dt = chrono::DateTime::from_timestamp(us / 1_000_000, ((us % 1_000_000) * 1000) as u32);
+                    let dt = chrono::DateTime::from_timestamp(
+                        us / 1_000_000,
+                        ((us % 1_000_000) * 1000) as u32,
+                    );
                     dt.map(|d| d.to_rfc3339()).unwrap_or_default()
                 })
                 .unwrap_or_default();

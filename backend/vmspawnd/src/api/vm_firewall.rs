@@ -15,12 +15,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use networking::models::AdoptHostRequest;
 use vm_firewall::compiler::VMSnapshot;
 use vm_firewall::models::{
     AssignFirewallRequest, CreateFirewallProfileRequest, CreateFirewallZoneRequest,
     FirewallProfile, FirewallStatus, FirewallZone, VMFirewallAssignment,
 };
-use networking::models::AdoptHostRequest;
 
 use crate::server::AppState;
 
@@ -44,12 +44,20 @@ pub async fn create_profile(
     for rule in &req.rules {
         if let Some(ref cidr) = rule.source_cidr {
             if let Err(e) = crate::validation::validate_cidr(cidr) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid source_cidr: {}", e)})),
+                )
+                    .into_response();
             }
         }
         if let Some(ref prefix) = rule.log_prefix {
             if let Err(e) = crate::validation::validate_log_prefix(prefix) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid log_prefix: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid log_prefix: {}", e)})),
+                )
+                    .into_response();
             }
         }
     }
@@ -106,7 +114,8 @@ pub async fn get_profile(
     match state.store.get_entity::<FirewallProfile>(PROFILES_KEY, &id) {
         Ok(Some(profile)) => (StatusCode::OK, Json(profile)).into_response(),
         Ok(None) => {
-            if let Some(host) = super::net_security_discover::find_host_firewall_profile(&state, &id)
+            if let Some(host) =
+                super::net_security_discover::find_host_firewall_profile(&state, &id)
             {
                 return (StatusCode::OK, Json(host)).into_response();
             }
@@ -135,12 +144,20 @@ pub async fn update_profile(
     for rule in &req.rules {
         if let Some(ref cidr) = rule.source_cidr {
             if let Err(e) = crate::validation::validate_cidr(cidr) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid source_cidr: {}", e)})),
+                )
+                    .into_response();
             }
         }
         if let Some(ref prefix) = rule.log_prefix {
             if let Err(e) = crate::validation::validate_log_prefix(prefix) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid log_prefix: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid log_prefix: {}", e)})),
+                )
+                    .into_response();
             }
         }
     }
@@ -494,10 +511,7 @@ pub async fn assign_vm_firewall(
         zone_id: req.zone_id,
     };
 
-    if let Err(e) = state
-        .store
-        .save_entity(ASSIGNMENTS_KEY, &name, &assignment)
-    {
+    if let Err(e) = state.store.save_entity(ASSIGNMENTS_KEY, &name, &assignment) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),

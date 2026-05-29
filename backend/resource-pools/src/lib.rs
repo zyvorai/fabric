@@ -533,7 +533,9 @@ impl ResourcePoolManager {
         // fit within the pool's own reservation if expandable is off.
         if !pool.cpu_expandable_reservation {
             let child_cpu_reservations = Self::sum_child_reservations_cpu(&pools, pool);
-            let remaining = pool.cpu_reservation_mhz.saturating_sub(child_cpu_reservations);
+            let remaining = pool
+                .cpu_reservation_mhz
+                .saturating_sub(child_cpu_reservations);
             if cpu_mhz > remaining {
                 return AdmissionControlResult {
                     allowed: false,
@@ -549,7 +551,9 @@ impl ResourcePoolManager {
 
         if !pool.memory_expandable_reservation {
             let child_mem_reservations = Self::sum_child_reservations_mem(&pools, pool);
-            let remaining = pool.memory_reservation_mb.saturating_sub(child_mem_reservations);
+            let remaining = pool
+                .memory_reservation_mb
+                .saturating_sub(child_mem_reservations);
             if memory_mb > remaining {
                 return AdmissionControlResult {
                     allowed: false,
@@ -611,7 +615,10 @@ impl ResourcePoolManager {
         Self::effective_reservation_inner(&pools, pool_id)
     }
 
-    fn effective_reservation_inner(pools: &HashMap<String, ResourcePool>, pool_id: &str) -> (u64, u64) {
+    fn effective_reservation_inner(
+        pools: &HashMap<String, ResourcePool>,
+        pool_id: &str,
+    ) -> (u64, u64) {
         let pool = match pools.get(pool_id) {
             Some(p) => p,
             None => return (0, 0),
@@ -632,7 +639,8 @@ impl ResourcePoolManager {
                 }
                 if pool.memory_expandable_reservation {
                     let siblings_mem = Self::sum_child_reservations_mem(pools, parent);
-                    let parent_unreserved = parent.memory_reservation_mb.saturating_sub(siblings_mem);
+                    let parent_unreserved =
+                        parent.memory_reservation_mb.saturating_sub(siblings_mem);
                     eff_mem += parent_unreserved;
                 }
             }
@@ -656,7 +664,10 @@ impl ResourcePoolManager {
     // -- Internal helpers ---------------------------------------------------
 
     /// Sum CPU reservations of all direct children of `pool`.
-    fn sum_child_reservations_cpu(pools: &HashMap<String, ResourcePool>, pool: &ResourcePool) -> u64 {
+    fn sum_child_reservations_cpu(
+        pools: &HashMap<String, ResourcePool>,
+        pool: &ResourcePool,
+    ) -> u64 {
         pool.children
             .iter()
             .filter_map(|cid| pools.get(cid))
@@ -665,7 +676,10 @@ impl ResourcePoolManager {
     }
 
     /// Sum memory reservations of all direct children of `pool`.
-    fn sum_child_reservations_mem(pools: &HashMap<String, ResourcePool>, pool: &ResourcePool) -> u64 {
+    fn sum_child_reservations_mem(
+        pools: &HashMap<String, ResourcePool>,
+        pool: &ResourcePool,
+    ) -> u64 {
         pool.children
             .iter()
             .filter_map(|cid| pools.get(cid))
@@ -720,19 +734,12 @@ impl ResourcePoolManager {
     }
 
     /// Compute available (remaining) resources for a pool.
-    fn compute_available(
-        pools: &HashMap<String, ResourcePool>,
-        pool: &ResourcePool,
-    ) -> (u64, u64) {
+    fn compute_available(pools: &HashMap<String, ResourcePool>, pool: &ResourcePool) -> (u64, u64) {
         let child_cpu = Self::sum_child_reservations_cpu(pools, pool);
         let child_mem = Self::sum_child_reservations_mem(pools, pool);
 
-        let base_cpu = pool
-            .cpu_limit_mhz
-            .unwrap_or(pool.cpu_reservation_mhz);
-        let base_mem = pool
-            .memory_limit_mb
-            .unwrap_or(pool.memory_reservation_mb);
+        let base_cpu = pool.cpu_limit_mhz.unwrap_or(pool.cpu_reservation_mhz);
+        let base_mem = pool.memory_limit_mb.unwrap_or(pool.memory_reservation_mb);
 
         let avail_cpu = base_cpu.saturating_sub(child_cpu);
         let avail_mem = base_mem.saturating_sub(child_mem);
@@ -772,11 +779,7 @@ mod tests {
         }
     }
 
-    fn child_pool_request(
-        name: &str,
-        parent_id: &str,
-        cluster: &str,
-    ) -> CreateResourcePoolRequest {
+    fn child_pool_request(name: &str, parent_id: &str, cluster: &str) -> CreateResourcePoolRequest {
         CreateResourcePoolRequest {
             name: name.to_string(),
             parent_id: Some(parent_id.to_string()),

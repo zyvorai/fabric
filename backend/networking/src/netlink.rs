@@ -4,13 +4,11 @@
 
 use anyhow::Result;
 use futures::TryStreamExt;
+use netlink_packet_route::address::{AddressAttribute, AddressScope};
+use netlink_packet_route::link::{InfoKind, LinkAttribute, LinkFlags, LinkInfo, LinkLayerType};
+use netlink_packet_route::AddressFamily;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use netlink_packet_route::link::{
-    LinkAttribute, LinkFlags, LinkInfo, InfoKind, LinkLayerType,
-};
-use netlink_packet_route::address::{AddressAttribute, AddressScope};
-use netlink_packet_route::AddressFamily;
 
 /// Network interface information retrieved via netlink.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +49,11 @@ pub async fn list_interfaces() -> Result<Vec<NetlinkInterface>> {
         let header = &msg.header;
         let index = header.index;
         let lf = header.flags;
-        let state = if lf.contains(LinkFlags::Up) { "up" } else { "down" };
+        let state = if lf.contains(LinkFlags::Up) {
+            "up"
+        } else {
+            "down"
+        };
 
         let mut name = String::new();
         let mut mac = String::new();
@@ -63,7 +65,11 @@ pub async fn list_interfaces() -> Result<Vec<NetlinkInterface>> {
             match attr {
                 LinkAttribute::IfName(n) => name = n.clone(),
                 LinkAttribute::Address(bytes) => {
-                    mac = bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(":");
+                    mac = bytes
+                        .iter()
+                        .map(|b| format!("{:02x}", b))
+                        .collect::<Vec<_>>()
+                        .join(":");
                 }
                 LinkAttribute::Mtu(m) => mtu = *m,
                 LinkAttribute::Controller(m) => master_index = Some(*m),
@@ -97,13 +103,27 @@ pub async fn list_interfaces() -> Result<Vec<NetlinkInterface>> {
         };
 
         let mut flag_names = Vec::new();
-        if lf.contains(LinkFlags::Up) { flag_names.push("UP".to_string()); }
-        if lf.contains(LinkFlags::Broadcast) { flag_names.push("BROADCAST".to_string()); }
-        if lf.contains(LinkFlags::Loopback) { flag_names.push("LOOPBACK".to_string()); }
-        if lf.contains(LinkFlags::Pointopoint) { flag_names.push("POINTOPOINT".to_string()); }
-        if lf.contains(LinkFlags::Multicast) { flag_names.push("MULTICAST".to_string()); }
-        if lf.contains(LinkFlags::Running) { flag_names.push("RUNNING".to_string()); }
-        if lf.contains(LinkFlags::LowerUp) { flag_names.push("LOWER_UP".to_string()); }
+        if lf.contains(LinkFlags::Up) {
+            flag_names.push("UP".to_string());
+        }
+        if lf.contains(LinkFlags::Broadcast) {
+            flag_names.push("BROADCAST".to_string());
+        }
+        if lf.contains(LinkFlags::Loopback) {
+            flag_names.push("LOOPBACK".to_string());
+        }
+        if lf.contains(LinkFlags::Pointopoint) {
+            flag_names.push("POINTOPOINT".to_string());
+        }
+        if lf.contains(LinkFlags::Multicast) {
+            flag_names.push("MULTICAST".to_string());
+        }
+        if lf.contains(LinkFlags::Running) {
+            flag_names.push("RUNNING".to_string());
+        }
+        if lf.contains(LinkFlags::LowerUp) {
+            flag_names.push("LOWER_UP".to_string());
+        }
 
         index_to_name.insert(index, name.clone());
 
@@ -170,7 +190,9 @@ pub async fn list_interfaces() -> Result<Vec<NetlinkInterface>> {
     // Get link speeds from sysfs
     for iface in &mut ifaces {
         if iface.link_type == "ether" {
-            if let Ok(speed) = std::fs::read_to_string(format!("/sys/class/net/{}/speed", iface.name)) {
+            if let Ok(speed) =
+                std::fs::read_to_string(format!("/sys/class/net/{}/speed", iface.name))
+            {
                 if let Ok(s) = speed.trim().parse::<i32>() {
                     if s > 0 {
                         iface.speed_mbps = Some(s as u32);
@@ -192,7 +214,8 @@ pub async fn list_physical_interfaces() -> Result<Vec<NetlinkInterface>> {
 /// List all non-loopback interfaces that are not already enslaved.
 pub async fn list_available_interfaces() -> Result<Vec<NetlinkInterface>> {
     let all = list_interfaces().await?;
-    Ok(all.into_iter().filter(|i| {
-        i.name != "lo" && i.master_index.is_none()
-    }).collect())
+    Ok(all
+        .into_iter()
+        .filter(|i| i.name != "lo" && i.master_index.is_none())
+        .collect())
 }

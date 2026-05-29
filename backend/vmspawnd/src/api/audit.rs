@@ -7,15 +7,15 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // Data Structures
@@ -106,51 +106,67 @@ pub async fn list_audit_logs(
     let limit = filters.limit.min(MAX_AUDIT_LIMIT);
 
     // Filter at storage layer — only loads and deserializes entries that match
-    let logs = state.store.list_entities_filtered::<AuditLog, _>(
-        "audit_logs",
-        |log| {
-            if let Some(ref a) = action {
-                if !log.action.to_lowercase().contains(&a.to_lowercase()) {
-                    return false;
+    let logs = state
+        .store
+        .list_entities_filtered::<AuditLog, _>(
+            "audit_logs",
+            |log| {
+                if let Some(ref a) = action {
+                    if !log.action.to_lowercase().contains(&a.to_lowercase()) {
+                        return false;
+                    }
                 }
-            }
-            if let Some(ref u) = user {
-                if !log.user.to_lowercase().contains(&u.to_lowercase()) {
-                    return false;
+                if let Some(ref u) = user {
+                    if !log.user.to_lowercase().contains(&u.to_lowercase()) {
+                        return false;
+                    }
                 }
-            }
-            if let Some(ref rt) = resource_type {
-                if !log.resource_type.to_lowercase().contains(&rt.to_lowercase()) {
-                    return false;
+                if let Some(ref rt) = resource_type {
+                    if !log
+                        .resource_type
+                        .to_lowercase()
+                        .contains(&rt.to_lowercase())
+                    {
+                        return false;
+                    }
                 }
-            }
-            if let Some(ref rn) = resource_name {
-                if !log.resource_name.to_lowercase().contains(&rn.to_lowercase()) {
-                    return false;
+                if let Some(ref rn) = resource_name {
+                    if !log
+                        .resource_name
+                        .to_lowercase()
+                        .contains(&rn.to_lowercase())
+                    {
+                        return false;
+                    }
                 }
-            }
-            if let Some(ref s) = status {
-                let matches = match s.as_str() {
-                    "success" => matches!(log.status, AuditStatus::Success),
-                    "failed" => matches!(log.status, AuditStatus::Failed),
-                    _ => true,
-                };
-                if !matches {
-                    return false;
+                if let Some(ref s) = status {
+                    let matches = match s.as_str() {
+                        "success" => matches!(log.status, AuditStatus::Success),
+                        "failed" => matches!(log.status, AuditStatus::Failed),
+                        _ => true,
+                    };
+                    if !matches {
+                        return false;
+                    }
                 }
-            }
-            if let Some(ref s) = search {
-                if !log.action.to_lowercase().contains(s)
-                    && !log.resource_name.to_lowercase().contains(s)
-                    && !log.user.to_lowercase().contains(s)
-                {
-                    return false;
+                if let Some(ref s) = search {
+                    if !log.action.to_lowercase().contains(s)
+                        && !log.resource_name.to_lowercase().contains(s)
+                        && !log.user.to_lowercase().contains(s)
+                    {
+                        return false;
+                    }
                 }
-            }
-            true
-        },
-        limit,
-    ).map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit logs"}))))?;
+                true
+            },
+            limit,
+        )
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to load audit logs"})),
+            )
+        })?;
 
     Ok(Json(logs))
 }
@@ -162,9 +178,19 @@ pub async fn get_audit_log(
 ) -> Result<Json<AuditLog>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("audit::{}", stringify!(get_audit_log));
     // Load from state store
-    let log = state.store.get_entity::<AuditLog>("audit_logs", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit log"}))))?
-        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "Audit log not found"}))))?;
+    let log = state
+        .store
+        .get_entity::<AuditLog>("audit_logs", &id)
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to load audit log"})),
+            )
+        })?
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Audit log not found"})),
+        ))?;
 
     Ok(Json(log))
 }
@@ -183,21 +209,59 @@ pub async fn export_audit_logs(
     let status = query.filters.status.clone();
     let search = query.filters.search.as_ref().map(|s| s.to_lowercase());
 
-    let logs: Vec<AuditLog> = state.store.list_entities("audit_logs")
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit logs"}))))?
+    let logs: Vec<AuditLog> = state
+        .store
+        .list_entities("audit_logs")
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to load audit logs"})),
+            )
+        })?
         .into_iter()
         .filter(|log: &AuditLog| {
-            if let Some(ref a) = action { if log.action != *a { return false; } }
-            if let Some(ref u) = user { if log.user != *u { return false; } }
-            if let Some(ref rt) = resource_type { if log.resource_type != *rt { return false; } }
-            if let Some(ref rn) = resource_name { if log.resource_name != *rn { return false; } }
+            if let Some(ref a) = action {
+                if log.action != *a {
+                    return false;
+                }
+            }
+            if let Some(ref u) = user {
+                if log.user != *u {
+                    return false;
+                }
+            }
+            if let Some(ref rt) = resource_type {
+                if log.resource_type != *rt {
+                    return false;
+                }
+            }
+            if let Some(ref rn) = resource_name {
+                if log.resource_name != *rn {
+                    return false;
+                }
+            }
             if let Some(ref s) = status {
-                let log_status = match log.status { AuditStatus::Success => "success", AuditStatus::Failed => "failed" };
-                if log_status != s { return false; }
+                let log_status = match log.status {
+                    AuditStatus::Success => "success",
+                    AuditStatus::Failed => "failed",
+                };
+                if log_status != s {
+                    return false;
+                }
             }
             if let Some(ref q) = search {
-                let haystack = format!("{} {} {} {} {}", log.user, log.action, log.resource_type, log.resource_name, log.details.as_deref().unwrap_or("")).to_lowercase();
-                if !haystack.contains(q) { return false; }
+                let haystack = format!(
+                    "{} {} {} {} {}",
+                    log.user,
+                    log.action,
+                    log.resource_type,
+                    log.resource_name,
+                    log.details.as_deref().unwrap_or("")
+                )
+                .to_lowercase();
+                if !haystack.contains(q) {
+                    return false;
+                }
             }
             true
         })
@@ -205,8 +269,12 @@ pub async fn export_audit_logs(
 
     match query.format.as_str() {
         "json" => {
-            let json_str = serde_json::to_string_pretty(&logs)
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to serialize audit logs"}))))?;
+            let json_str = serde_json::to_string_pretty(&logs).map_err(|_| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Failed to serialize audit logs"})),
+                )
+            })?;
             Ok((StatusCode::OK, json_str))
         }
         "csv" => {
@@ -233,7 +301,10 @@ pub async fn export_audit_logs(
 
             Ok((StatusCode::OK, csv))
         }
-        _ => Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Unsupported export format. Use 'json' or 'csv'"})))),
+        _ => Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Unsupported export format. Use 'json' or 'csv'"})),
+        )),
     }
 }
 
@@ -243,8 +314,15 @@ pub async fn get_audit_stats(
 ) -> Result<Json<AuditStats>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("audit::{}", stringify!(get_audit_stats));
     // Calculate from state store
-    let logs = state.store.list_entities::<AuditLog>("audit_logs")
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to load audit logs"}))))?;
+    let logs = state
+        .store
+        .list_entities::<AuditLog>("audit_logs")
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to load audit logs"})),
+            )
+        })?;
 
     let total_logs = logs.len() as u64;
 
@@ -322,13 +400,23 @@ pub async fn log_audit_event(
     // Also log to system logger for important events
     match status {
         AuditStatus::Failed => {
-            tracing::warn!("AUDIT: {} - {} on {} {} - FAILED: {}",
-                user, action, resource_type, resource_name,
-                error.unwrap_or("Unknown error"));
+            tracing::warn!(
+                "AUDIT: {} - {} on {} {} - FAILED: {}",
+                user,
+                action,
+                resource_type,
+                resource_name,
+                error.unwrap_or("Unknown error")
+            );
         }
         AuditStatus::Success => {
-            tracing::info!("AUDIT: {} - {} on {} {} - SUCCESS",
-                user, action, resource_type, resource_name);
+            tracing::info!(
+                "AUDIT: {} - {} on {} {} - SUCCESS",
+                user,
+                action,
+                resource_type,
+                resource_name
+            );
         }
     }
 

@@ -246,9 +246,8 @@ mod tests {
 
     #[test]
     fn test_direction_default() {
-        let threshold: BandwidthThreshold = serde_json::from_str(
-            r#"{"value":100,"unit":"mbps","severity":"warning"}"#,
-        ).unwrap();
+        let threshold: BandwidthThreshold =
+            serde_json::from_str(r#"{"value":100,"unit":"mbps","severity":"warning"}"#).unwrap();
         assert_eq!(threshold.direction, TrafficDirection::Both);
     }
 

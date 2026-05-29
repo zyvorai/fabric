@@ -48,10 +48,7 @@ impl ServiceEnforcer {
         // Add each DNAT rule
         for rule in rules {
             let rule_str = self.build_dnat_rule(rule);
-            run_nft(&format!(
-                "add rule ip {} svc_dnat {}",
-                TABLE_NAME, rule_str
-            ))?;
+            run_nft(&format!("add rule ip {} svc_dnat {}", TABLE_NAME, rule_str))?;
         }
 
         tracing::info!("Synced {} service DNAT rules", rules.len());
@@ -82,34 +79,32 @@ impl ServiceEnforcer {
         } else {
             // Multiple backends: use numgen for load balancing
             let map_entries: String = match rule.algorithm {
-                LoadBalancerAlgorithm::RoundRobin | LoadBalancerAlgorithm::Random => {
-                    rule.backend_ips
-                        .iter()
-                        .enumerate()
-                        .map(|(i, ip)| {
-                            if rule.target_port == rule.port {
-                                format!("{}: {}", i, ip)
-                            } else {
-                                format!("{}: {}:{}", i, ip, rule.target_port)
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                }
-                LoadBalancerAlgorithm::IpHash => {
-                    rule.backend_ips
-                        .iter()
-                        .enumerate()
-                        .map(|(i, ip)| {
-                            if rule.target_port == rule.port {
-                                format!("{}: {}", i, ip)
-                            } else {
-                                format!("{}: {}:{}", i, ip, rule.target_port)
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                }
+                LoadBalancerAlgorithm::RoundRobin | LoadBalancerAlgorithm::Random => rule
+                    .backend_ips
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ip)| {
+                        if rule.target_port == rule.port {
+                            format!("{}: {}", i, ip)
+                        } else {
+                            format!("{}: {}:{}", i, ip, rule.target_port)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                LoadBalancerAlgorithm::IpHash => rule
+                    .backend_ips
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ip)| {
+                        if rule.target_port == rule.port {
+                            format!("{}: {}", i, ip)
+                        } else {
+                            format!("{}: {}:{}", i, ip, rule.target_port)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", "),
             };
 
             let numgen = match rule.algorithm {
@@ -120,10 +115,7 @@ impl ServiceEnforcer {
                     format!("numgen random mod {}", rule.backend_ips.len())
                 }
                 LoadBalancerAlgorithm::IpHash => {
-                    format!(
-                        "jhash ip saddr mod {}",
-                        rule.backend_ips.len()
-                    )
+                    format!("jhash ip saddr mod {}", rule.backend_ips.len())
                 }
             };
 

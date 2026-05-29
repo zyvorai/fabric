@@ -64,7 +64,12 @@ impl NetworkdManager {
         self.write_file(&format!("{}-parent", cfg.name), "network", &parent_network)?;
         self.write_file(&cfg.name, "network", &vlan_network)?;
 
-        tracing::info!("Applied VLAN config: {} (id={}, parent={})", cfg.name, cfg.vlan_id, cfg.parent_interface);
+        tracing::info!(
+            "Applied VLAN config: {} (id={}, parent={})",
+            cfg.name,
+            cfg.vlan_id,
+            cfg.parent_interface
+        );
         Ok(())
     }
 
@@ -78,7 +83,12 @@ impl NetworkdManager {
         self.write_file(&format!("{}-parent", cfg.name), "network", &parent_network)?;
         self.write_file(&cfg.name, "network", &macvtap_network)?;
 
-        tracing::info!("Applied macvtap config: {} (parent={}, mode={:?})", cfg.name, cfg.parent_interface, cfg.mode);
+        tracing::info!(
+            "Applied macvtap config: {} (parent={}, mode={:?})",
+            cfg.name,
+            cfg.parent_interface,
+            cfg.mode
+        );
         Ok(())
     }
 
@@ -105,10 +115,19 @@ impl NetworkdManager {
         // Write slave .network files for each interface
         for slave in &cfg.slave_interfaces {
             let slave_network = serializer::bond_slave_network(slave, &cfg.name);
-            self.write_file(&format!("{}-slave-{}", cfg.name, slave), "network", &slave_network)?;
+            self.write_file(
+                &format!("{}-slave-{}", cfg.name, slave),
+                "network",
+                &slave_network,
+            )?;
         }
 
-        tracing::info!("Applied bond config: {} (mode={}, slaves={:?})", cfg.name, cfg.mode.as_str(), cfg.slave_interfaces);
+        tracing::info!(
+            "Applied bond config: {} (mode={}, slaves={:?})",
+            cfg.name,
+            cfg.mode.as_str(),
+            cfg.slave_interfaces
+        );
         Ok(())
     }
 
@@ -124,7 +143,9 @@ impl NetworkdManager {
     /// Write a .link file for interface configuration
     pub fn apply_link_file(&self, cfg: &LinkFileConfig) -> Result<()> {
         let content = serializer::link_file(cfg);
-        let file_id = cfg.name.as_deref()
+        let file_id = cfg
+            .name
+            .as_deref()
             .or(cfg.match_original_name.as_deref())
             .unwrap_or(&cfg.id);
         self.write_file(&format!("link-{}", file_id), "link", &content)?;
@@ -206,7 +227,9 @@ impl NetworkdManager {
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     return Err(anyhow::anyhow!(
-                        "ip link set vf {} failed: {}", vf.vf_index, stderr
+                        "ip link set vf {} failed: {}",
+                        vf.vf_index,
+                        stderr
                     ));
                 }
 
@@ -309,7 +332,11 @@ impl NetworkdManager {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("networkctl status {} failed: {}", name, stderr));
+            return Err(anyhow::anyhow!(
+                "networkctl status {} failed: {}",
+                name,
+                stderr
+            ));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -378,10 +405,7 @@ impl NetworkdManager {
                 Some(n) => n.to_string(),
                 None => continue,
             };
-            let index = entry
-                .get("ifindex")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as u32;
+            let index = entry.get("ifindex").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let operstate = entry
                 .get("operstate")
                 .and_then(|v| v.as_str())
@@ -449,8 +473,9 @@ impl NetworkdManager {
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     fn write_file(&self, device_name: &str, ext: &str, content: &str) -> Result<()> {
-        fs::create_dir_all(&self.config_dir)
-            .with_context(|| format!("Failed to create config dir {}", self.config_dir.display()))?;
+        fs::create_dir_all(&self.config_dir).with_context(|| {
+            format!("Failed to create config dir {}", self.config_dir.display())
+        })?;
 
         let filename = format!("{}{}.{}", self.file_prefix, device_name, ext);
         let path = self.config_dir.join(&filename);
@@ -458,8 +483,13 @@ impl NetworkdManager {
 
         fs::write(&tmp_path, content)
             .with_context(|| format!("Failed to write {}", tmp_path.display()))?;
-        fs::rename(&tmp_path, &path)
-            .with_context(|| format!("Failed to rename {} to {}", tmp_path.display(), path.display()))?;
+        fs::rename(&tmp_path, &path).with_context(|| {
+            format!(
+                "Failed to rename {} to {}",
+                tmp_path.display(),
+                path.display()
+            )
+        })?;
 
         tracing::debug!("Wrote {}", path.display());
         Ok(())
@@ -600,10 +630,17 @@ mod tests {
 
         assert!(dir.path().join("50-vmspawnd-bond0.netdev").exists());
         assert!(dir.path().join("50-vmspawnd-bond0.network").exists());
-        assert!(dir.path().join("50-vmspawnd-bond0-slave-eth0.network").exists());
-        assert!(dir.path().join("50-vmspawnd-bond0-slave-eth1.network").exists());
+        assert!(dir
+            .path()
+            .join("50-vmspawnd-bond0-slave-eth0.network")
+            .exists());
+        assert!(dir
+            .path()
+            .join("50-vmspawnd-bond0-slave-eth1.network")
+            .exists());
 
-        let slave = fs::read_to_string(dir.path().join("50-vmspawnd-bond0-slave-eth0.network")).unwrap();
+        let slave =
+            fs::read_to_string(dir.path().join("50-vmspawnd-bond0-slave-eth0.network")).unwrap();
         assert!(slave.contains("Name=eth0"));
         assert!(slave.contains("Bond=bond0"));
     }
@@ -613,15 +650,29 @@ mod tests {
         let (mgr, dir) = tmp_manager();
         fs::write(dir.path().join("50-vmspawnd-bond0.netdev"), "test").unwrap();
         fs::write(dir.path().join("50-vmspawnd-bond0.network"), "test").unwrap();
-        fs::write(dir.path().join("50-vmspawnd-bond0-slave-eth0.network"), "test").unwrap();
-        fs::write(dir.path().join("50-vmspawnd-bond0-slave-eth1.network"), "test").unwrap();
+        fs::write(
+            dir.path().join("50-vmspawnd-bond0-slave-eth0.network"),
+            "test",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("50-vmspawnd-bond0-slave-eth1.network"),
+            "test",
+        )
+        .unwrap();
 
         mgr.remove_device("bond0").unwrap();
 
         assert!(!dir.path().join("50-vmspawnd-bond0.netdev").exists());
         assert!(!dir.path().join("50-vmspawnd-bond0.network").exists());
-        assert!(!dir.path().join("50-vmspawnd-bond0-slave-eth0.network").exists());
-        assert!(!dir.path().join("50-vmspawnd-bond0-slave-eth1.network").exists());
+        assert!(!dir
+            .path()
+            .join("50-vmspawnd-bond0-slave-eth0.network")
+            .exists());
+        assert!(!dir
+            .path()
+            .join("50-vmspawnd-bond0-slave-eth1.network")
+            .exists());
     }
 
     #[test]

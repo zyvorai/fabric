@@ -14,7 +14,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Volume {
@@ -53,7 +53,8 @@ pub async fn create_volume(
     tracing::debug!("volumes::{}", stringify!(create_volume));
     // Validate pool name to prevent path traversal in store subdirectory
     if let Err((s, m)) = crate::validation::validate_vm_name(&pool_name) {
-        return crate::api_error::json_error(s, format!("Invalid pool name: {}", m)).into_response();
+        return crate::api_error::json_error(s, format!("Invalid pool name: {}", m))
+            .into_response();
     }
     // Verify pool exists — scope the lock so it's released before save_entity
     {
@@ -94,10 +95,14 @@ pub async fn list_volumes(
 ) -> impl IntoResponse {
     tracing::debug!("volumes::{}", stringify!(list_volumes));
     if let Err((s, m)) = crate::validation::validate_vm_name(&pool_name) {
-        return crate::api_error::json_error(s, format!("Invalid pool name: {}", m)).into_response();
+        return crate::api_error::json_error(s, format!("Invalid pool name: {}", m))
+            .into_response();
     }
     let store_key = format!("volumes_{}", pool_name);
-    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading {}: {}", store_key, e); Vec::new() });
+    let items: Vec<Volume> = state.store.list_entities(&store_key).unwrap_or_else(|e| {
+        tracing::error!("Storage error loading {}: {}", store_key, e);
+        Vec::new()
+    });
     Json(items).into_response()
 }
 
@@ -111,8 +116,13 @@ pub async fn get_volume(
     let store_key = format!("volumes_{}", pool_name);
     match state.store.get_entity::<Volume>(&store_key, &id) {
         Ok(Some(v)) => Json(v).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response(),
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume").into_response(),
+        Ok(None) => {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response()
+        }
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume")
+                .into_response()
+        }
     }
 }
 
@@ -145,12 +155,19 @@ pub async fn resize_volume(
             v.updated = Utc::now().to_rfc3339();
             match state.store.save_entity(&store_key, &v.id, &v) {
                 Ok(_) => Json(v).into_response(),
-                Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                    .into_response(),
+                Err(e) => {
+                    crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                        .into_response()
+                }
             }
         }
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response(),
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume").into_response(),
+        Ok(None) => {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response()
+        }
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume")
+                .into_response()
+        }
     }
 }
 
@@ -176,12 +193,19 @@ pub async fn attach_volume(
             v.updated = Utc::now().to_rfc3339();
             match state.store.save_entity(&store_key, &v.id, &v) {
                 Ok(_) => Json(v).into_response(),
-                Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                    .into_response(),
+                Err(e) => {
+                    crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                        .into_response()
+                }
             }
         }
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response(),
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume").into_response(),
+        Ok(None) => {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response()
+        }
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume")
+                .into_response()
+        }
     }
 }
 
@@ -199,11 +223,18 @@ pub async fn detach_volume(
             v.updated = Utc::now().to_rfc3339();
             match state.store.save_entity(&store_key, &v.id, &v) {
                 Ok(_) => Json(v).into_response(),
-                Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                    .into_response(),
+                Err(e) => {
+                    crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                        .into_response()
+                }
             }
         }
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response(),
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume").into_response(),
+        Ok(None) => {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Volume not found").into_response()
+        }
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load volume")
+                .into_response()
+        }
     }
 }

@@ -337,7 +337,11 @@ impl DrsManager {
 
         let best = eligible
             .iter()
-            .max_by(|a, b| a.total_score.partial_cmp(&b.total_score).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.total_score
+                    .partial_cmp(&b.total_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .unwrap();
 
         let mut reasons = Vec::new();
@@ -366,7 +370,10 @@ impl DrsManager {
             .cloned()
             .unwrap_or(PlacementStrategy::Spread);
 
-        let rules = self.affinity_rules.read().unwrap_or_else(|e| e.into_inner());
+        let rules = self
+            .affinity_rules
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         let relevant_rules: Vec<&AffinityRule> = request
             .affinity_rules
             .iter()
@@ -425,19 +432,15 @@ impl DrsManager {
                         }
                         AffinityRuleType::VmToVmAffinity => {
                             // Prefer hosts that already run VMs named in the rule.
-                            let colocated = rule
-                                .vm_names
-                                .iter()
-                                .any(|vm| host.vm_names.contains(vm));
+                            let colocated =
+                                rule.vm_names.iter().any(|vm| host.vm_names.contains(vm));
                             if colocated {
                                 aff_raw += 0.5;
                             }
                         }
                         AffinityRuleType::VmToVmAntiAffinity => {
-                            let colocated = rule
-                                .vm_names
-                                .iter()
-                                .any(|vm| host.vm_names.contains(vm));
+                            let colocated =
+                                rule.vm_names.iter().any(|vm| host.vm_names.contains(vm));
                             if colocated {
                                 aff_raw -= 0.5;
                             }
@@ -512,22 +515,20 @@ impl DrsManager {
         let mut recs = Vec::new();
 
         // Find most-loaded and least-loaded hosts.
-        let most_loaded = balance
-            .host_loads
-            .iter()
-            .max_by(|a, b| {
-                let a_total = a.cpu_usage_pct + a.memory_usage_pct;
-                let b_total = b.cpu_usage_pct + b.memory_usage_pct;
-                a_total.partial_cmp(&b_total).unwrap_or(std::cmp::Ordering::Equal)
-            });
-        let least_loaded = balance
-            .host_loads
-            .iter()
-            .min_by(|a, b| {
-                let a_total = a.cpu_usage_pct + a.memory_usage_pct;
-                let b_total = b.cpu_usage_pct + b.memory_usage_pct;
-                a_total.partial_cmp(&b_total).unwrap_or(std::cmp::Ordering::Equal)
-            });
+        let most_loaded = balance.host_loads.iter().max_by(|a, b| {
+            let a_total = a.cpu_usage_pct + a.memory_usage_pct;
+            let b_total = b.cpu_usage_pct + b.memory_usage_pct;
+            a_total
+                .partial_cmp(&b_total)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let least_loaded = balance.host_loads.iter().min_by(|a, b| {
+            let a_total = a.cpu_usage_pct + a.memory_usage_pct;
+            let b_total = b.cpu_usage_pct + b.memory_usage_pct;
+            a_total
+                .partial_cmp(&b_total)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let (Some(src), Some(dst)) = (most_loaded, least_loaded) {
             if src.host_id == dst.host_id {
@@ -535,10 +536,8 @@ impl DrsManager {
             }
 
             // Recommend migrating VMs from the most-loaded host.
-            let movable: Vec<&VmSnapshot> = vms
-                .iter()
-                .filter(|v| v.host_id == src.host_id)
-                .collect();
+            let movable: Vec<&VmSnapshot> =
+                vms.iter().filter(|v| v.host_id == src.host_id).collect();
 
             if let Some(vm) = movable.first() {
                 let benefit = (src.cpu_usage_pct + src.memory_usage_pct)
@@ -771,8 +770,7 @@ impl DrsManager {
                                 .map(|v| v.host_id.clone())
                         })
                         .collect();
-                    let unique: std::collections::HashSet<&String> =
-                        host_ids.iter().collect();
+                    let unique: std::collections::HashSet<&String> = host_ids.iter().collect();
                     if unique.len() > 1 {
                         violations.push(AffinityViolation {
                             rule_id: rule.id.clone(),
@@ -871,11 +869,7 @@ impl DrsManager {
 
     /// Predict future load for a host using simple moving average + linear
     /// trend extrapolation.
-    pub fn predict_load(
-        &self,
-        host_id: &str,
-        horizon_minutes: u64,
-    ) -> Option<PredictiveInsight> {
+    pub fn predict_load(&self, host_id: &str, horizon_minutes: u64) -> Option<PredictiveInsight> {
         let store = self.historical_metrics.read().ok()?;
         let buffer = store.get(host_id)?;
         if buffer.len() < 3 {
@@ -890,16 +884,30 @@ impl DrsManager {
 
         // Linear trend: difference between last half average and first half average.
         let half = buffer.len() / 2;
-        let first_half_cpu: f64 =
-            buffer.iter().take(half).map(|m| m.cpu_usage_pct).sum::<f64>() / half as f64;
-        let second_half_cpu: f64 =
-            buffer.iter().skip(half).map(|m| m.cpu_usage_pct).sum::<f64>()
-                / (buffer.len() - half) as f64;
-        let first_half_mem: f64 =
-            buffer.iter().take(half).map(|m| m.memory_usage_pct).sum::<f64>() / half as f64;
-        let second_half_mem: f64 =
-            buffer.iter().skip(half).map(|m| m.memory_usage_pct).sum::<f64>()
-                / (buffer.len() - half) as f64;
+        let first_half_cpu: f64 = buffer
+            .iter()
+            .take(half)
+            .map(|m| m.cpu_usage_pct)
+            .sum::<f64>()
+            / half as f64;
+        let second_half_cpu: f64 = buffer
+            .iter()
+            .skip(half)
+            .map(|m| m.cpu_usage_pct)
+            .sum::<f64>()
+            / (buffer.len() - half) as f64;
+        let first_half_mem: f64 = buffer
+            .iter()
+            .take(half)
+            .map(|m| m.memory_usage_pct)
+            .sum::<f64>()
+            / half as f64;
+        let second_half_mem: f64 = buffer
+            .iter()
+            .skip(half)
+            .map(|m| m.memory_usage_pct)
+            .sum::<f64>()
+            / (buffer.len() - half) as f64;
 
         let cpu_trend = second_half_cpu - first_half_cpu;
         let mem_trend = second_half_mem - first_half_mem;
@@ -949,14 +957,13 @@ impl DrsManager {
                     let target = hosts
                         .iter()
                         .filter(|h| h.host_id != host.host_id)
-                        .filter_map(|h| {
-                            self.predict_load(&h.host_id, 30)
-                                .map(|ins| (h, ins))
-                        })
+                        .filter_map(|h| self.predict_load(&h.host_id, 30).map(|ins| (h, ins)))
                         .min_by(|a, b| {
                             let a_load = a.1.predicted_cpu_pct + a.1.predicted_memory_pct;
                             let b_load = b.1.predicted_cpu_pct + b.1.predicted_memory_pct;
-                            a_load.partial_cmp(&b_load).unwrap_or(std::cmp::Ordering::Equal)
+                            a_load
+                                .partial_cmp(&b_load)
+                                .unwrap_or(std::cmp::Ordering::Equal)
                         });
 
                     if let Some((target_host, _)) = target {
@@ -1016,7 +1023,13 @@ fn std_deviation(values: impl Iterator<Item = f64> + Clone) -> f64 {
 mod tests {
     use super::*;
 
-    fn make_host(id: &str, total_cpu: u64, used_cpu: u64, total_mem: u64, used_mem: u64) -> HostSnapshot {
+    fn make_host(
+        id: &str,
+        total_cpu: u64,
+        used_cpu: u64,
+        total_mem: u64,
+        used_mem: u64,
+    ) -> HostSnapshot {
         HostSnapshot {
             host_id: id.to_string(),
             hostname: format!("{}.local", id),
@@ -1090,7 +1103,10 @@ mod tests {
         let req = make_placement_request(PlacementStrategy::Spread);
 
         let result = mgr.compute_placement(&hosts, &req).unwrap();
-        assert_eq!(result.host_id, "host-a", "Spread should pick the least loaded host");
+        assert_eq!(
+            result.host_id, "host-a",
+            "Spread should pick the least loaded host"
+        );
         assert!(result.score > 0.0);
     }
 
@@ -1105,7 +1121,10 @@ mod tests {
         let req = make_placement_request(PlacementStrategy::BinPack);
 
         let result = mgr.compute_placement(&hosts, &req).unwrap();
-        assert_eq!(result.host_id, "host-b", "BinPack should pick the more loaded host");
+        assert_eq!(
+            result.host_id, "host-b",
+            "BinPack should pick the more loaded host"
+        );
     }
 
     #[test]
@@ -1194,7 +1213,10 @@ mod tests {
             make_host("c", 10000, 4800, 16384, 7800),
         ];
         let balance = mgr.analyze_cluster_balance(&hosts);
-        assert!(balance.is_balanced, "Cluster should be balanced when loads are similar");
+        assert!(
+            balance.is_balanced,
+            "Cluster should be balanced when loads are similar"
+        );
         assert!(balance.cpu_std_deviation < 25.0);
     }
 
@@ -1206,7 +1228,10 @@ mod tests {
             make_host("b", 10000, 9500, 16384, 15000),
         ];
         let balance = mgr.analyze_cluster_balance(&hosts);
-        assert!(!balance.is_balanced, "Cluster should be imbalanced with wildly different loads");
+        assert!(
+            !balance.is_balanced,
+            "Cluster should be imbalanced with wildly different loads"
+        );
         assert!(balance.cpu_std_deviation > 25.0);
     }
 
@@ -1254,12 +1279,26 @@ mod tests {
             make_host_with_vms("host-b", 10000, 2000, 16384, 4096, vec!["vm-2"]),
         ];
         let vms = vec![
-            VmSnapshot { vm_name: "vm-1".into(), host_id: "host-a".into(), cpu_mhz: 1000, memory_mb: 2048 },
-            VmSnapshot { vm_name: "vm-2".into(), host_id: "host-b".into(), cpu_mhz: 1000, memory_mb: 2048 },
+            VmSnapshot {
+                vm_name: "vm-1".into(),
+                host_id: "host-a".into(),
+                cpu_mhz: 1000,
+                memory_mb: 2048,
+            },
+            VmSnapshot {
+                vm_name: "vm-2".into(),
+                host_id: "host-b".into(),
+                cpu_mhz: 1000,
+                memory_mb: 2048,
+            },
         ];
 
         let violations = mgr.check_affinity_violations(&hosts, &vms);
-        assert_eq!(violations.len(), 1, "Should detect VMs on different hosts violating affinity");
+        assert_eq!(
+            violations.len(),
+            1,
+            "Should detect VMs on different hosts violating affinity"
+        );
         assert!(violations[0].description.contains("co-located"));
     }
 
@@ -1270,12 +1309,27 @@ mod tests {
         mgr.create_affinity_rule(rule).unwrap();
 
         // Both VMs on the same host -- violates anti-affinity.
-        let hosts = vec![
-            make_host_with_vms("host-a", 10000, 4000, 16384, 8000, vec!["vm-1", "vm-2"]),
-        ];
+        let hosts = vec![make_host_with_vms(
+            "host-a",
+            10000,
+            4000,
+            16384,
+            8000,
+            vec!["vm-1", "vm-2"],
+        )];
         let vms = vec![
-            VmSnapshot { vm_name: "vm-1".into(), host_id: "host-a".into(), cpu_mhz: 1000, memory_mb: 2048 },
-            VmSnapshot { vm_name: "vm-2".into(), host_id: "host-a".into(), cpu_mhz: 1000, memory_mb: 2048 },
+            VmSnapshot {
+                vm_name: "vm-1".into(),
+                host_id: "host-a".into(),
+                cpu_mhz: 1000,
+                memory_mb: 2048,
+            },
+            VmSnapshot {
+                vm_name: "vm-2".into(),
+                host_id: "host-a".into(),
+                cpu_mhz: 1000,
+                memory_mb: 2048,
+            },
         ];
 
         let violations = mgr.check_affinity_violations(&hosts, &vms);
@@ -1293,8 +1347,18 @@ mod tests {
             make_host_with_vms("b", 10000, 5200, 16384, 8200, vec!["vm-2"]),
         ];
         let vms = vec![
-            VmSnapshot { vm_name: "vm-1".into(), host_id: "a".into(), cpu_mhz: 2000, memory_mb: 4096 },
-            VmSnapshot { vm_name: "vm-2".into(), host_id: "b".into(), cpu_mhz: 2000, memory_mb: 4096 },
+            VmSnapshot {
+                vm_name: "vm-1".into(),
+                host_id: "a".into(),
+                cpu_mhz: 2000,
+                memory_mb: 4096,
+            },
+            VmSnapshot {
+                vm_name: "vm-2".into(),
+                host_id: "b".into(),
+                cpu_mhz: 2000,
+                memory_mb: 4096,
+            },
         ];
         let recs = mgr.generate_recommendations("cluster-1", &hosts, &vms);
         assert!(recs.is_empty(), "No recommendations for a balanced cluster");
@@ -1304,15 +1368,35 @@ mod tests {
     fn test_generate_recommendations_imbalanced() {
         let mgr = DrsManager::new();
         let hosts = vec![
-            make_host_with_vms("overloaded", 10000, 9500, 16384, 15000, vec!["vm-1", "vm-2"]),
+            make_host_with_vms(
+                "overloaded",
+                10000,
+                9500,
+                16384,
+                15000,
+                vec!["vm-1", "vm-2"],
+            ),
             make_host_with_vms("idle", 10000, 500, 16384, 1000, vec![]),
         ];
         let vms = vec![
-            VmSnapshot { vm_name: "vm-1".into(), host_id: "overloaded".into(), cpu_mhz: 3000, memory_mb: 4096 },
-            VmSnapshot { vm_name: "vm-2".into(), host_id: "overloaded".into(), cpu_mhz: 3000, memory_mb: 4096 },
+            VmSnapshot {
+                vm_name: "vm-1".into(),
+                host_id: "overloaded".into(),
+                cpu_mhz: 3000,
+                memory_mb: 4096,
+            },
+            VmSnapshot {
+                vm_name: "vm-2".into(),
+                host_id: "overloaded".into(),
+                cpu_mhz: 3000,
+                memory_mb: 4096,
+            },
         ];
         let recs = mgr.generate_recommendations("cluster-1", &hosts, &vms);
-        assert!(!recs.is_empty(), "Should generate recommendations for imbalanced cluster");
+        assert!(
+            !recs.is_empty(),
+            "Should generate recommendations for imbalanced cluster"
+        );
         assert_eq!(recs[0].reason, MigrationReason::LoadBalance);
         assert_eq!(recs[0].source_host_id, "overloaded");
         assert_eq!(recs[0].target_host_id, "idle");
@@ -1325,9 +1409,12 @@ mod tests {
             make_host_with_vms("hot", 10000, 9500, 16384, 15000, vec!["vm-a"]),
             make_host_with_vms("cold", 10000, 500, 16384, 1000, vec![]),
         ];
-        let vms = vec![
-            VmSnapshot { vm_name: "vm-a".into(), host_id: "hot".into(), cpu_mhz: 2000, memory_mb: 4096 },
-        ];
+        let vms = vec![VmSnapshot {
+            vm_name: "vm-a".into(),
+            host_id: "hot".into(),
+            cpu_mhz: 2000,
+            memory_mb: 4096,
+        }];
         let recs = mgr.generate_recommendations("c1", &hosts, &vms);
         assert!(!recs.is_empty());
 
@@ -1348,9 +1435,12 @@ mod tests {
             make_host_with_vms("hot", 10000, 9500, 16384, 15000, vec!["vm-x"]),
             make_host_with_vms("cold", 10000, 500, 16384, 1000, vec![]),
         ];
-        let vms = vec![
-            VmSnapshot { vm_name: "vm-x".into(), host_id: "hot".into(), cpu_mhz: 2000, memory_mb: 4096 },
-        ];
+        let vms = vec![VmSnapshot {
+            vm_name: "vm-x".into(),
+            host_id: "hot".into(),
+            cpu_mhz: 2000,
+            memory_mb: 4096,
+        }];
         let recs = mgr.generate_recommendations("c1", &hosts, &vms);
         assert!(!recs.is_empty());
 
@@ -1393,11 +1483,21 @@ mod tests {
         // Only 2 samples -- not enough.
         mgr.record_metrics(
             "host-1",
-            HostLoad { host_id: "host-1".into(), cpu_usage_pct: 10.0, memory_usage_pct: 20.0, vm_count: 1 },
+            HostLoad {
+                host_id: "host-1".into(),
+                cpu_usage_pct: 10.0,
+                memory_usage_pct: 20.0,
+                vm_count: 1,
+            },
         );
         mgr.record_metrics(
             "host-1",
-            HostLoad { host_id: "host-1".into(), cpu_usage_pct: 15.0, memory_usage_pct: 25.0, vm_count: 1 },
+            HostLoad {
+                host_id: "host-1".into(),
+                cpu_usage_pct: 15.0,
+                memory_usage_pct: 25.0,
+                vm_count: 1,
+            },
         );
         assert!(mgr.predict_load("host-1", 30).is_none());
     }

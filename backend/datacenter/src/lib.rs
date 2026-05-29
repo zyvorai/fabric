@@ -222,7 +222,10 @@ impl DatacenterManager {
             status: DatacenterStatus::Active,
         };
 
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         tracing::info!(id = %dc.id, name = %dc.name, "created datacenter");
         store.datacenters.insert(dc.id.clone(), dc.clone());
         Ok(dc)
@@ -230,7 +233,10 @@ impl DatacenterManager {
 
     /// Retrieve a datacenter by ID.
     pub fn get_datacenter(&self, id: &str) -> Result<Option<Datacenter>> {
-        let store = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         Ok(store.datacenters.get(id).cloned())
     }
 
@@ -242,7 +248,10 @@ impl DatacenterManager {
 
     /// Update an existing datacenter.
     pub fn update_datacenter(&self, id: &str, req: UpdateDatacenterRequest) -> Result<Datacenter> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let dc = store
             .datacenters
             .get_mut(id)
@@ -265,7 +274,10 @@ impl DatacenterManager {
 
     /// Delete a datacenter and all its clusters and hosts.
     pub fn delete_datacenter(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let dc = store
             .datacenters
@@ -289,7 +301,10 @@ impl DatacenterManager {
 
     /// Produce an aggregate summary for a datacenter.
     pub fn get_datacenter_summary(&self, id: &str) -> Result<DatacenterSummary> {
-        let store = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let dc = store
             .datacenters
             .get(id)
@@ -326,7 +341,10 @@ impl DatacenterManager {
 
     /// Create a new cluster within a datacenter.
     pub fn create_cluster(&self, req: CreateClusterRequest) -> Result<Cluster> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         // Verify that the parent datacenter exists.
         let dc = store
@@ -360,7 +378,10 @@ impl DatacenterManager {
 
     /// Retrieve a cluster by ID.
     pub fn get_cluster(&self, id: &str) -> Result<Option<Cluster>> {
-        let store = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         Ok(store.clusters.get(id).cloned())
     }
 
@@ -380,7 +401,10 @@ impl DatacenterManager {
 
     /// Update an existing cluster.
     pub fn update_cluster(&self, id: &str, req: UpdateClusterRequest) -> Result<Cluster> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let cluster = store
             .clusters
             .get_mut(id)
@@ -415,7 +439,10 @@ impl DatacenterManager {
 
     /// Delete a cluster and all its hosts.
     pub fn delete_cluster(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let cluster = store
             .clusters
@@ -441,7 +468,10 @@ impl DatacenterManager {
 
     /// Register a new host within a cluster.
     pub fn register_host(&self, req: RegisterHostRequest) -> Result<HostInfo> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         // Verify the parent cluster exists and resolve the datacenter ID.
         let cluster = store
@@ -479,7 +509,10 @@ impl DatacenterManager {
 
     /// Retrieve a host by ID.
     pub fn get_host(&self, id: &str) -> Result<Option<HostInfo>> {
-        let store = self.store.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let store = self
+            .store
+            .read()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         Ok(store.hosts.get(id).cloned())
     }
 
@@ -499,7 +532,10 @@ impl DatacenterManager {
 
     /// Update an existing host's configuration.
     pub fn update_host(&self, id: &str, req: UpdateHostRequest) -> Result<HostInfo> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let host = store
             .hosts
             .get_mut(id)
@@ -531,7 +567,10 @@ impl DatacenterManager {
 
     /// Remove a host from its cluster and from the store.
     pub fn remove_host(&self, id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
 
         let host = store
             .hosts
@@ -550,7 +589,10 @@ impl DatacenterManager {
 
     /// Process a heartbeat from a host, updating its metrics and timestamp.
     pub fn update_host_heartbeat(&self, id: &str, metrics: HostHeartbeat) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let host = store
             .hosts
             .get_mut(id)
@@ -573,7 +615,10 @@ impl DatacenterManager {
 
     /// Put a host into maintenance mode.
     pub fn enter_maintenance_mode(&self, host_id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let host = store
             .hosts
             .get_mut(host_id)
@@ -588,7 +633,10 @@ impl DatacenterManager {
 
     /// Take a host out of maintenance mode (returns it to Connected status).
     pub fn exit_maintenance_mode(&self, host_id: &str) -> Result<()> {
-        let mut store = self.store.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
         let host = store
             .hosts
             .get_mut(host_id)

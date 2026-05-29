@@ -3,14 +3,16 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use anyhow::Result;
-use vm_model::{VM, CreateVMRequest};
+use vm_model::{CreateVMRequest, VM};
 
 impl super::Client {
     /// List all VMs.
     pub async fn list_vms(&self) -> Result<Vec<VM>> {
         let resp: serde_json::Value = self.get("/api/vms").await?;
         let vms: Vec<VM> = serde_json::from_value(
-            resp.get("items").cloned().unwrap_or(serde_json::Value::Array(vec![]))
+            resp.get("items")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
         )?;
         Ok(vms)
     }
@@ -27,12 +29,14 @@ impl super::Client {
 
     /// Start a VM.
     pub async fn start_vm(&self, name: &str) -> Result<serde_json::Value> {
-        self.post(&format!("/api/vms/{}/start", name), &serde_json::json!({})).await
+        self.post(&format!("/api/vms/{}/start", name), &serde_json::json!({}))
+            .await
     }
 
     /// Stop a VM.
     pub async fn stop_vm(&self, name: &str) -> Result<serde_json::Value> {
-        self.post(&format!("/api/vms/{}/stop", name), &serde_json::json!({})).await
+        self.post(&format!("/api/vms/{}/stop", name), &serde_json::json!({}))
+            .await
     }
 
     /// Delete a VM.
@@ -42,9 +46,13 @@ impl super::Client {
 
     /// Clone a VM.
     pub async fn clone_vm(&self, name: &str, target: &str, linked: bool) -> Result<VM> {
-        self.post(&format!("/api/vms/{}/clone", name), &serde_json::json!({
-            "target_name": target,
-            "linked_clone": linked,
-        })).await
+        self.post(
+            &format!("/api/vms/{}/clone", name),
+            &serde_json::json!({
+                "target_name": target,
+                "linked_clone": linked,
+            }),
+        )
+        .await
     }
 }

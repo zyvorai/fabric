@@ -95,14 +95,13 @@ impl MetricsCollector {
             };
 
             let mut prev_map = self.previous.write().await;
-            let (rx_bps, tx_bps, rx_pps, tx_pps) = if let Some((prev, prev_time)) =
-                prev_map.get(iface.as_str())
-            {
-                let elapsed = (now - *prev_time).num_milliseconds() as f64 / 1000.0;
-                Self::compute_rate(prev, &counters, elapsed)
-            } else {
-                (0.0, 0.0, 0.0, 0.0)
-            };
+            let (rx_bps, tx_bps, rx_pps, tx_pps) =
+                if let Some((prev, prev_time)) = prev_map.get(iface.as_str()) {
+                    let elapsed = (now - *prev_time).num_milliseconds() as f64 / 1000.0;
+                    Self::compute_rate(prev, &counters, elapsed)
+                } else {
+                    (0.0, 0.0, 0.0, 0.0)
+                };
 
             prev_map.insert(iface.clone(), (counters.clone(), now));
 
@@ -230,8 +229,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (rx_bps, tx_bps, _rx_pps, _tx_pps) =
-            MetricsCollector::compute_rate(&prev, &curr, 1.0);
+        let (rx_bps, tx_bps, _rx_pps, _tx_pps) = MetricsCollector::compute_rate(&prev, &curr, 1.0);
         // wrapping_sub should handle this
         assert!(rx_bps > 0.0);
         assert!(tx_bps > 0.0);
@@ -270,8 +268,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (rx_bps, tx_bps, rx_pps, tx_pps) =
-            MetricsCollector::compute_rate(&prev, &curr, 10.0);
+        let (rx_bps, tx_bps, rx_pps, tx_pps) = MetricsCollector::compute_rate(&prev, &curr, 10.0);
         assert_eq!(rx_bps, 1_000_000.0); // ~1 MB/s
         assert_eq!(tx_bps, 500_000.0);
         assert_eq!(rx_pps, 1_000.0);

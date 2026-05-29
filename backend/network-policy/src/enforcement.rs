@@ -54,7 +54,8 @@ impl PolicyEnforcer {
         let ip_map = self.allocator.get_ip_map();
 
         // Build reverse map: identity_id → [ips]
-        let mut id_ips: std::collections::HashMap<u32, Vec<String>> = std::collections::HashMap::new();
+        let mut id_ips: std::collections::HashMap<u32, Vec<String>> =
+            std::collections::HashMap::new();
         for (ip, id) in &ip_map {
             id_ips.entry(*id).or_default().push(ip.clone());
         }
@@ -69,10 +70,7 @@ impl PolicyEnforcer {
             ))?;
 
             // Flush existing elements
-            run_nft(&format!(
-                "flush set ip {} {}",
-                TABLE_NAME, set_name
-            ))?;
+            run_nft(&format!("flush set ip {} {}", TABLE_NAME, set_name))?;
 
             // Add current IPs
             if let Some(ips) = id_ips.get(&identity.id) {
@@ -221,9 +219,7 @@ impl PolicyEnforcer {
 /// Uses `nft` with the full string as a single argument (not split on whitespace)
 /// to correctly handle nftables syntax containing braces and commas.
 fn run_nft(cmd: &str) -> Result<()> {
-    let output = std::process::Command::new("nft")
-        .arg(cmd)
-        .output();
+    let output = std::process::Command::new("nft").arg(cmd).output();
 
     match output {
         Ok(out) if out.status.success() => Ok(()),

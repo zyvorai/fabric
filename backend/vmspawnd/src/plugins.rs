@@ -17,8 +17,12 @@ pub trait Plugin: Send + Sync {
     fn version(&self) -> &str;
     fn description(&self) -> &str;
     fn plugin_type(&self) -> PluginType;
-    fn on_load(&self) -> Result<()> { Ok(()) }
-    fn on_unload(&self) -> Result<()> { Ok(()) }
+    fn on_load(&self) -> Result<()> {
+        Ok(())
+    }
+    fn on_unload(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Storage backend plugin trait
@@ -100,11 +104,15 @@ impl PluginRegistry {
     }
 
     /// Register a storage backend plugin
-    pub fn register_storage_backend(&mut self, plugin: Arc<dyn StorageBackendPlugin>) -> Result<()> {
+    pub fn register_storage_backend(
+        &mut self,
+        plugin: Arc<dyn StorageBackendPlugin>,
+    ) -> Result<()> {
         let name = plugin.name().to_string();
         plugin.on_load()?;
         self.plugins.insert(name.clone(), plugin.clone());
-        self.storage_backends.insert(plugin.storage_type().to_string(), plugin);
+        self.storage_backends
+            .insert(plugin.storage_type().to_string(), plugin);
         tracing::info!("Registered storage backend plugin: {}", name);
         Ok(())
     }
@@ -114,7 +122,8 @@ impl PluginRegistry {
         let name = plugin.name().to_string();
         plugin.on_load()?;
         self.plugins.insert(name.clone(), plugin.clone());
-        self.vm_drivers.insert(plugin.driver_type().to_string(), plugin);
+        self.vm_drivers
+            .insert(plugin.driver_type().to_string(), plugin);
         tracing::info!("Registered VM driver plugin: {}", name);
         Ok(())
     }
@@ -124,7 +133,8 @@ impl PluginRegistry {
         let name = plugin.name().to_string();
         plugin.on_load()?;
         self.plugins.insert(name.clone(), plugin.clone());
-        self.schedulers.insert(plugin.scheduler_type().to_string(), plugin);
+        self.schedulers
+            .insert(plugin.scheduler_type().to_string(), plugin);
         tracing::info!("Registered scheduler plugin: {}", name);
         Ok(())
     }
@@ -154,7 +164,10 @@ impl PluginRegistry {
     }
 
     /// Get a storage backend by type
-    pub fn get_storage_backend(&self, storage_type: &str) -> Option<&Arc<dyn StorageBackendPlugin>> {
+    pub fn get_storage_backend(
+        &self,
+        storage_type: &str,
+    ) -> Option<&Arc<dyn StorageBackendPlugin>> {
         self.storage_backends.get(storage_type)
     }
 
@@ -170,22 +183,34 @@ impl PluginRegistry {
 
     /// List all registered plugins
     pub fn list_plugins(&self) -> Vec<PluginInfo> {
-        self.plugins.values().map(|p| PluginInfo {
-            name: p.name().to_string(),
-            version: p.version().to_string(),
-            description: p.description().to_string(),
-            plugin_type: p.plugin_type(),
-            enabled: true,
-            loaded: true,
-        }).collect()
+        self.plugins
+            .values()
+            .map(|p| PluginInfo {
+                name: p.name().to_string(),
+                version: p.version().to_string(),
+                description: p.description().to_string(),
+                plugin_type: p.plugin_type(),
+                enabled: true,
+                loaded: true,
+            })
+            .collect()
     }
 
     /// Fire an event to all subscribed hooks
     pub fn fire_event(&self, event_type: &str, payload: &serde_json::Value) {
         for (_, hook) in &self.event_hooks {
-            if hook.subscribed_events().iter().any(|e| e == event_type || e == "*") {
+            if hook
+                .subscribed_events()
+                .iter()
+                .any(|e| e == event_type || e == "*")
+            {
                 if let Err(e) = hook.on_event(event_type, payload) {
-                    tracing::error!("Event hook '{}' failed for event '{}': {}", hook.name(), event_type, e);
+                    tracing::error!(
+                        "Event hook '{}' failed for event '{}': {}",
+                        hook.name(),
+                        event_type,
+                        e
+                    );
                 }
             }
         }
@@ -196,10 +221,7 @@ impl PluginRegistry {
 // Plugin API Handlers
 // ============================================================================
 
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{extract::State, Json};
 use security::RequireRead;
 
 use crate::server::AppState;

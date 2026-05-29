@@ -8,9 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{CgroupError, Result};
 use crate::pressure::PressureStats;
-use crate::util::{
-    lookup_key, read_cgroup_file, read_flat_keyed, write_cgroup_file,
-};
+use crate::util::{lookup_key, read_cgroup_file, read_flat_keyed, write_cgroup_file};
 
 /// CPU bandwidth limit from cpu.max.
 ///
@@ -83,13 +81,11 @@ impl CpuController {
     pub fn get_weight(&self) -> Result<u64> {
         let file = self.path.join("cpu.weight");
         let content = read_cgroup_file(&file)?;
-        content
-            .parse::<u64>()
-            .map_err(|_| CgroupError::ParseError {
-                path: file,
-                content,
-                detail: "expected u64".to_string(),
-            })
+        content.parse::<u64>().map_err(|_| CgroupError::ParseError {
+            path: file,
+            content,
+            detail: "expected u64".to_string(),
+        })
     }
 
     /// Set cpu.weight (1-10000).
@@ -137,18 +133,24 @@ fn parse_cpu_max(path: &Path, content: &str) -> Result<CpuMax> {
     let quota_usec = if quota_str == "max" {
         None
     } else {
-        Some(quota_str.parse::<u64>().map_err(|_| CgroupError::ParseError {
-            path: path.to_path_buf(),
-            content: content.to_string(),
-            detail: format!("invalid quota: {quota_str:?}"),
-        })?)
+        Some(
+            quota_str
+                .parse::<u64>()
+                .map_err(|_| CgroupError::ParseError {
+                    path: path.to_path_buf(),
+                    content: content.to_string(),
+                    detail: format!("invalid quota: {quota_str:?}"),
+                })?,
+        )
     };
 
-    let period_usec = period_str.parse::<u64>().map_err(|_| CgroupError::ParseError {
-        path: path.to_path_buf(),
-        content: content.to_string(),
-        detail: format!("invalid period: {period_str:?}"),
-    })?;
+    let period_usec = period_str
+        .parse::<u64>()
+        .map_err(|_| CgroupError::ParseError {
+            path: path.to_path_buf(),
+            content: content.to_string(),
+            detail: format!("invalid period: {period_str:?}"),
+        })?;
 
     Ok(CpuMax {
         quota_usec,

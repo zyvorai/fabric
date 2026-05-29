@@ -11,12 +11,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use vmspawnd_storage::{
-    NfsConfig, NfsVersion, StoragePool,
-};
+use vmspawnd_storage::{NfsConfig, NfsVersion, StoragePool};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // Request/Response types
 #[derive(Debug, Deserialize)]
@@ -154,12 +152,17 @@ pub async fn create_local_pool(
     let path = std::path::PathBuf::from(&req.path);
     let result = {
         let manager = state.storage_manager.read().await;
-        manager.create_local_pool(req.name, path, req.auto_start).await
+        manager
+            .create_local_pool(req.name, path, req.auto_start)
+            .await
     };
 
     match result {
         Ok(pool) => Ok(Json(pool)),
-        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to create pool: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create pool: {}", e),
+        )),
     }
 }
 
@@ -176,8 +179,12 @@ pub async fn create_nfs_pool(
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
 
     // Validate NFS server hostname
-    crate::validation::validate_hostname(&req.config.server)
-        .map_err(|msg| (StatusCode::BAD_REQUEST, format!("Invalid NFS server: {}", msg)))?;
+    crate::validation::validate_hostname(&req.config.server).map_err(|msg| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid NFS server: {}", msg),
+        )
+    })?;
 
     // Validate mount path
     crate::validation::validate_host_path(&req.config.mount_path)
@@ -189,14 +196,34 @@ pub async fn create_nfs_pool(
 
     // Validate mount options against allowlist
     const ALLOWED_NFS_OPTIONS: &[&str] = &[
-        "ro", "rw", "sync", "async", "noatime", "nodiratime", "soft", "hard",
-        "intr", "nointr", "tcp", "udp", "nolock", "lock",
-        "vers=3", "vers=4", "vers=4.1", "nfsvers=3", "nfsvers=4", "nfsvers=4.1",
+        "ro",
+        "rw",
+        "sync",
+        "async",
+        "noatime",
+        "nodiratime",
+        "soft",
+        "hard",
+        "intr",
+        "nointr",
+        "tcp",
+        "udp",
+        "nolock",
+        "lock",
+        "vers=3",
+        "vers=4",
+        "vers=4.1",
+        "nfsvers=3",
+        "nfsvers=4",
+        "nfsvers=4.1",
         "actimeo=0",
     ];
     for opt in &req.config.mount_options {
         if !ALLOWED_NFS_OPTIONS.contains(&opt.as_str()) {
-            return Err((StatusCode::BAD_REQUEST, format!("Invalid NFS mount option: '{}'", opt)));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Invalid NFS mount option: '{}'", opt),
+            ));
         }
     }
 
@@ -216,7 +243,10 @@ pub async fn create_nfs_pool(
 
     match result {
         Ok(pool) => Ok(Json(pool)),
-        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to create NFS pool: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to create NFS pool: {}", e),
+        )),
     }
 }
 
@@ -234,7 +264,10 @@ pub async fn delete_pool(
 
     match result {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
-        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to delete pool: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to delete pool: {}", e),
+        )),
     }
 }
 
@@ -251,7 +284,10 @@ pub async fn start_pool(
     };
     match result {
         Ok(_) => Ok(StatusCode::OK),
-        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to start pool: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to start pool: {}", e),
+        )),
     }
 }
 
@@ -268,7 +304,10 @@ pub async fn stop_pool(
     };
     match result {
         Ok(_) => Ok(StatusCode::OK),
-        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to stop pool: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to stop pool: {}", e),
+        )),
     }
 }
 
@@ -285,7 +324,10 @@ pub async fn get_pool_health(
     };
     match result {
         Ok(health) => Ok(Json(health)),
-        Err(e) => Err((StatusCode::NOT_FOUND, format!("Failed to get health: {}", e))),
+        Err(e) => Err((
+            StatusCode::NOT_FOUND,
+            format!("Failed to get health: {}", e),
+        )),
     }
 }
 
@@ -319,7 +361,10 @@ pub async fn refresh_pool_stats(
     };
     match result {
         Ok(_) => Ok(StatusCode::OK),
-        Err(e) => Err((StatusCode::BAD_REQUEST, format!("Failed to refresh stats: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Failed to refresh stats: {}", e),
+        )),
     }
 }
 
@@ -332,14 +377,19 @@ pub async fn create_lvm_pool(
     tracing::debug!("storage::{}", stringify!(create_lvm_pool));
     crate::validation::validate_entity_name(&req.name)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
-    crate::validation::validate_hostname(&req.volume_group)
-        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid volume group name: {}", m)))?;
+    crate::validation::validate_hostname(&req.volume_group).map_err(|m| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid volume group name: {}", m),
+        )
+    })?;
     let result = {
         let manager = state.storage_manager.read().await;
-        manager.create_lvm_pool(req.name, req.volume_group, req.auto_start).await
+        manager
+            .create_lvm_pool(req.name, req.volume_group, req.auto_start)
+            .await
     };
-    match result
-    {
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
             StatusCode::BAD_REQUEST,
@@ -357,16 +407,25 @@ pub async fn create_lvm_thin_pool(
     tracing::debug!("storage::{}", stringify!(create_lvm_thin_pool));
     crate::validation::validate_entity_name(&req.name)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
-    crate::validation::validate_hostname(&req.volume_group)
-        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid volume group name: {}", m)))?;
-    crate::validation::validate_hostname(&req.thin_pool)
-        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid thin pool name: {}", m)))?;
+    crate::validation::validate_hostname(&req.volume_group).map_err(|m| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid volume group name: {}", m),
+        )
+    })?;
+    crate::validation::validate_hostname(&req.thin_pool).map_err(|m| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid thin pool name: {}", m),
+        )
+    })?;
     let result = {
         let manager = state.storage_manager.read().await;
-        manager.create_lvm_thin_pool(req.name, req.volume_group, req.thin_pool, req.auto_start).await
+        manager
+            .create_lvm_thin_pool(req.name, req.volume_group, req.thin_pool, req.auto_start)
+            .await
     };
-    match result
-    {
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
             StatusCode::BAD_REQUEST,
@@ -384,14 +443,19 @@ pub async fn create_zfs_pool(
     tracing::debug!("storage::{}", stringify!(create_zfs_pool));
     crate::validation::validate_entity_name(&req.name)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
-    crate::validation::validate_hostname(&req.zpool)
-        .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid zpool name: {}", m)))?;
+    crate::validation::validate_hostname(&req.zpool).map_err(|m| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid zpool name: {}", m),
+        )
+    })?;
     let result = {
         let manager = state.storage_manager.read().await;
-        manager.create_zfs_pool(req.name, req.zpool, req.dataset, req.auto_start).await
+        manager
+            .create_zfs_pool(req.name, req.zpool, req.dataset, req.auto_start)
+            .await
     };
-    match result
-    {
+    match result {
         Ok(pool) => Ok(Json(pool)),
         Err(e) => Err((
             StatusCode::BAD_REQUEST,
@@ -420,14 +484,25 @@ pub async fn create_ceph_pool(
     crate::validation::validate_entity_name(&req.name)
         .map_err(|(_, msg)| (StatusCode::BAD_REQUEST, msg))?;
     for monitor in &req.monitors {
-        crate::validation::validate_hostname(monitor)
-            .map_err(|m| (StatusCode::BAD_REQUEST, format!("Invalid Ceph monitor: {}", m)))?;
+        crate::validation::validate_hostname(monitor).map_err(|m| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid Ceph monitor: {}", m),
+            )
+        })?;
     }
     let result = {
         let manager = state.storage_manager.read().await;
         manager
-        .create_ceph_pool(req.name, req.monitors, req.pool_name, req.user, req.keyring, req.auto_start)
-        .await
+            .create_ceph_pool(
+                req.name,
+                req.monitors,
+                req.pool_name,
+                req.user,
+                req.keyring,
+                req.auto_start,
+            )
+            .await
     };
     match result {
         Ok(pool) => Ok(Json(pool)),
@@ -469,7 +544,12 @@ pub async fn discover_iscsi_targets(
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
     vmspawnd_storage::iscsi::discover_targets(&req.portal)
         .map(Json)
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Discovery failed: {}", e)))
+        .map_err(|e| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Discovery failed: {}", e),
+            )
+        })
 }
 
 /// POST /api/storage/iscsi/login - Login to an iSCSI target

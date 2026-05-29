@@ -14,9 +14,7 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use dns_policy::models::{
-    CreateDnsPolicyRequest, CreateDnsZoneRequest, DnsPolicy, DnsZone,
-};
+use dns_policy::models::{CreateDnsPolicyRequest, CreateDnsZoneRequest, DnsPolicy, DnsZone};
 use dns_policy::resolver::VMSnapshot;
 use networking::models::AdoptHostRequest;
 
@@ -34,7 +32,11 @@ pub async fn create_zone(
 ) -> impl IntoResponse {
     tracing::debug!("dns_policy::{}", stringify!(create_zone));
     if let Err(msg) = crate::validation::validate_hostname(&req.name) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid zone name: {}", msg)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid zone name: {}", msg)})),
+        )
+            .into_response();
     }
     let now = Utc::now();
     let zone = DnsZone {
@@ -170,7 +172,10 @@ pub async fn adopt_zone(
         updated: now,
     };
 
-    if let Err(e) = state.store.save_entity(ZONES_KEY, &zone.id.to_string(), &zone) {
+    if let Err(e) = state
+        .store
+        .save_entity(ZONES_KEY, &zone.id.to_string(), &zone)
+    {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -370,10 +375,7 @@ pub async fn adopt_policy(
     };
 
     let zones: Vec<DnsZone> = state.store.list_entities(ZONES_KEY).unwrap_or_default();
-    let zone_id = zones
-        .first()
-        .map(|z| z.id)
-        .unwrap_or(host.zone_id);
+    let zone_id = zones.first().map(|z| z.id).unwrap_or(host.zone_id);
 
     let stored: Vec<DnsPolicy> = state.store.list_entities(POLICIES_KEY).unwrap_or_default();
     if stored.iter().any(|p| p.name == host.name) {
@@ -501,12 +503,10 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .map(|vm| {
-            VMSnapshot {
-                name: vm.name,
-                labels: vm.labels.clone().unwrap_or_default(),
-                ip: vm.ip,
-            }
+        .map(|vm| VMSnapshot {
+            name: vm.name,
+            labels: vm.labels.clone().unwrap_or_default(),
+            ip: vm.ip,
         })
         .collect()
 }

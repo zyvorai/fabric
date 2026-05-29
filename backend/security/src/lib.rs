@@ -66,7 +66,10 @@ impl JwtConfig {
 
     pub fn generate_token(&self, user_id: &str, role: Role) -> Result<String> {
         let hours = if self.expiration_hours < 1 {
-            tracing::warn!("Token expiration_hours ({}) is too low, using minimum of 1 hour", self.expiration_hours);
+            tracing::warn!(
+                "Token expiration_hours ({}) is too low, using minimum of 1 hour",
+                self.expiration_hours
+            );
             1
         } else {
             self.expiration_hours
@@ -139,7 +142,9 @@ pub async fn auth_middleware(
         .and_then(|value| value.to_str().ok());
 
     let token = match auth_header {
-        Some(header) => header.strip_prefix("Bearer ").ok_or(StatusCode::UNAUTHORIZED)?,
+        Some(header) => header
+            .strip_prefix("Bearer ")
+            .ok_or(StatusCode::UNAUTHORIZED)?,
         _ => return Err(StatusCode::UNAUTHORIZED),
     };
 
@@ -184,7 +189,10 @@ where
         parts: &mut axum::http::request::Parts,
         _state: &S,
     ) -> Result<Self, Self::Rejection> {
-        let claims = parts.extensions.get::<Claims>().cloned()
+        let claims = parts
+            .extensions
+            .get::<Claims>()
+            .cloned()
             .unwrap_or_else(unauthenticated_claims);
         Ok(RequireRead(claims))
     }
@@ -206,12 +214,16 @@ where
         parts: &mut axum::http::request::Parts,
         _state: &S,
     ) -> Result<Self, Self::Rejection> {
-        let claims = parts.extensions.get::<Claims>().cloned()
+        let claims = parts
+            .extensions
+            .get::<Claims>()
+            .cloned()
             .unwrap_or_else(unauthenticated_claims);
         if !claims.role.can_write() {
             tracing::warn!(
                 "Authorization denied: user '{}' with role {:?} attempted a write operation",
-                claims.sub, claims.role
+                claims.sub,
+                claims.role
             );
             return Err(StatusCode::FORBIDDEN);
         }
@@ -235,12 +247,16 @@ where
         parts: &mut axum::http::request::Parts,
         _state: &S,
     ) -> Result<Self, Self::Rejection> {
-        let claims = parts.extensions.get::<Claims>().cloned()
+        let claims = parts
+            .extensions
+            .get::<Claims>()
+            .cloned()
             .unwrap_or_else(unauthenticated_claims);
         if !claims.role.can_manage() {
             tracing::warn!(
                 "Authorization denied: user '{}' with role {:?} attempted an admin operation",
-                claims.sub, claims.role
+                claims.sub,
+                claims.role
             );
             return Err(StatusCode::FORBIDDEN);
         }
@@ -406,7 +422,8 @@ mod tests {
             &jsonwebtoken::Header::default(),
             &claims,
             &jsonwebtoken::EncodingKey::from_secret(jwt.secret.as_bytes()),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(jwt.validate_token(&token).is_err());
     }
 
@@ -414,7 +431,7 @@ mod tests {
     fn test_revoked_tokens_eviction() {
         let jwt = test_jwt();
         let past_exp = 1usize; // long expired
-        // Insert enough entries to trigger eviction
+                               // Insert enough entries to trigger eviction
         for i in 0..100_001 {
             jwt.revoke_token_with_exp(&format!("jti-{}", i), past_exp);
         }
@@ -422,6 +439,9 @@ mod tests {
         let revoked = jwt.revoked_tokens.lock().unwrap();
         // After eviction of expired entries, the map should be much smaller
         // (only entries with exp=0 or exp>now survive — our entries are all past_exp=1 which is expired)
-        assert!(revoked.len() < 100_001, "Eviction should have removed expired entries");
+        assert!(
+            revoked.len() < 100_001,
+            "Eviction should have removed expired entries"
+        );
     }
 }

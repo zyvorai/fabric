@@ -60,7 +60,11 @@ pub fn render_tabs(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let tabs = Tabs::new(titles)
-        .block(Block::default().borders(Borders::ALL).title(" Zyvor Fabric TUI "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Zyvor Fabric TUI "),
+        )
         .highlight_style(Style::default().fg(Color::Yellow))
         .select(match app.current_view {
             View::VMDetail => 1, // Highlight VMs tab when in detail view
@@ -75,21 +79,34 @@ pub fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     if let Some(ref action) = app.pending_action {
         let (prompt, detail) = match action {
             PendingAction::DeleteVM(name) => (String::from("Delete VM?"), name.clone()),
-            PendingAction::BulkDelete(names) => (
-                format!("Delete {} VMs?", names.len()),
-                names.join(", "),
-            ),
+            PendingAction::BulkDelete(names) => {
+                (format!("Delete {} VMs?", names.len()), names.join(", "))
+            }
         };
         let paragraph = Paragraph::new(Line::from(vec![
-            Span::styled(" CONFIRM ", Style::default().fg(Color::Black).bg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " CONFIRM ",
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Red)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" "),
             Span::styled(prompt, Style::default().fg(Color::Yellow)),
             Span::raw(" "),
             Span::styled(detail, Style::default().fg(Color::White)),
             Span::raw("  "),
-            Span::styled("[y]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[y]",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" yes  "),
-            Span::styled("[n]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[n]",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" no"),
         ]));
         f.render_widget(paragraph, area);
@@ -138,13 +155,39 @@ pub fn render_dashboard(f: &mut Frame, app: &App, area: Rect) {
         ])
         .split(chunks[0]);
 
-    render_stat_box(f, "Total VMs", &app.vms.len().to_string(), Color::Cyan, stats_chunks[0]);
+    render_stat_box(
+        f,
+        "Total VMs",
+        &app.vms.len().to_string(),
+        Color::Cyan,
+        stats_chunks[0],
+    );
 
-    let running = app.vms.iter().filter(|v| v.state == vm_model::VMState::Running).count();
-    render_stat_box(f, "Running", &running.to_string(), Color::Green, stats_chunks[1]);
+    let running = app
+        .vms
+        .iter()
+        .filter(|v| v.state == vm_model::VMState::Running)
+        .count();
+    render_stat_box(
+        f,
+        "Running",
+        &running.to_string(),
+        Color::Green,
+        stats_chunks[1],
+    );
 
-    let stopped = app.vms.iter().filter(|v| v.state == vm_model::VMState::Stopped).count();
-    render_stat_box(f, "Stopped", &stopped.to_string(), Color::Red, stats_chunks[2]);
+    let stopped = app
+        .vms
+        .iter()
+        .filter(|v| v.state == vm_model::VMState::Stopped)
+        .count();
+    render_stat_box(
+        f,
+        "Stopped",
+        &stopped.to_string(),
+        Color::Red,
+        stats_chunks[2],
+    );
 
     let cpu = if !app.cpu_history.is_empty() {
         format!("{:.0}%", app.cpu_history.last().unwrap_or(&0.0))
@@ -165,9 +208,7 @@ fn render_stat_box(f: &mut Frame, title: &str, value: &str, color: Color, area: 
         Line::from(Span::styled(title, Style::default().fg(Color::Gray))),
         Line::from(Span::styled(
             value,
-            Style::default()
-                .fg(color)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
         )),
     ];
 
@@ -204,7 +245,9 @@ fn render_vm_list_compact(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled(
                     format!("{:<20}", vm.name),
                     if i == app.selected {
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default()
                     },
@@ -230,47 +273,71 @@ fn render_vm_list_compact(f: &mut Frame, app: &App, area: Rect) {
 
 fn render_activity_log(f: &mut Frame, app: &App, area: Rect) {
     let logs: Vec<Line> = if app.log_entries.is_empty() {
-        vec![Line::from(Span::styled("  No recent activity", Style::default().fg(Color::DarkGray)))]
+        vec![Line::from(Span::styled(
+            "  No recent activity",
+            Style::default().fg(Color::DarkGray),
+        ))]
     } else {
-        app.log_entries.iter().rev().take(5).map(|entry| {
-            let ts = entry.get("timestamp")
-                .or_else(|| entry.get("created"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let ts_short = if ts.len() >= 19 { &ts[11..19] } else { ts };
+        app.log_entries
+            .iter()
+            .rev()
+            .take(5)
+            .map(|entry| {
+                let ts = entry
+                    .get("timestamp")
+                    .or_else(|| entry.get("created"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let ts_short = if ts.len() >= 19 { &ts[11..19] } else { ts };
 
-            let level = entry.get("level")
-                .or_else(|| entry.get("severity"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("INFO");
-            let level_color = match level.to_uppercase().as_str() {
-                "ERROR" | "CRITICAL" => Color::Red,
-                "WARN" | "WARNING" => Color::Yellow,
-                _ => Color::Cyan,
-            };
+                let level = entry
+                    .get("level")
+                    .or_else(|| entry.get("severity"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("INFO");
+                let level_color = match level.to_uppercase().as_str() {
+                    "ERROR" | "CRITICAL" => Color::Red,
+                    "WARN" | "WARNING" => Color::Yellow,
+                    _ => Color::Cyan,
+                };
 
-            let action = entry.get("action").and_then(|v| v.as_str()).unwrap_or("");
-            let resource = entry.get("resource_type").and_then(|v| v.as_str()).unwrap_or("");
-            let detail = entry.get("detail")
-                .or_else(|| entry.get("message"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let message = if !action.is_empty() {
-                format!("{} {} {}", action, resource, detail)
-            } else {
-                detail.to_string()
-            };
+                let action = entry.get("action").and_then(|v| v.as_str()).unwrap_or("");
+                let resource = entry
+                    .get("resource_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let detail = entry
+                    .get("detail")
+                    .or_else(|| entry.get("message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let message = if !action.is_empty() {
+                    format!("{} {} {}", action, resource, detail)
+                } else {
+                    detail.to_string()
+                };
 
-            Line::from(vec![
-                Span::styled(format!("[{}] ", ts_short), Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("{:<6}", level.to_uppercase()), Style::default().fg(level_color)),
-                Span::raw(message),
-            ])
-        }).collect()
+                Line::from(vec![
+                    Span::styled(
+                        format!("[{}] ", ts_short),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled(
+                        format!("{:<6}", level.to_uppercase()),
+                        Style::default().fg(level_color),
+                    ),
+                    Span::raw(message),
+                ])
+            })
+            .collect()
     };
 
     let paragraph = Paragraph::new(logs)
-        .block(Block::default().borders(Borders::ALL).title(" Activity Log "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Activity Log "),
+        )
         .style(Style::default());
 
     f.render_widget(paragraph, area);
@@ -281,8 +348,8 @@ pub fn render_vms_view(f: &mut Frame, app: &App, area: Rect) {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Search bar
-                Constraint::Min(0),     // Content
+                Constraint::Length(3), // Search bar
+                Constraint::Min(0),    // Content
             ])
             .split(area)
     } else {
@@ -297,11 +364,18 @@ pub fn render_vms_view(f: &mut Frame, app: &App, area: Rect) {
         let search_text = if app.search_mode {
             format!("Search: {}█", app.search_query)
         } else {
-            format!("Filter: {} (Press / to search, Esc to clear)", app.search_query)
+            format!(
+                "Filter: {} (Press / to search, Esc to clear)",
+                app.search_query
+            )
         };
 
         let search_bar = Paragraph::new(search_text)
-            .style(Style::default().fg(if app.search_mode { Color::Yellow } else { Color::Cyan }))
+            .style(Style::default().fg(if app.search_mode {
+                Color::Yellow
+            } else {
+                Color::Cyan
+            }))
             .block(Block::default().borders(Borders::ALL));
 
         f.render_widget(search_bar, chunks[0]);
@@ -334,7 +408,7 @@ fn render_vm_list_detailed(f: &mut Frame, app: &App, area: Rect) {
 
     let header = ListItem::new(Line::from(Span::styled(
         header_text,
-        Style::default().add_modifier(Modifier::BOLD)
+        Style::default().add_modifier(Modifier::BOLD),
     )));
 
     let mut items = vec![header];
@@ -355,14 +429,20 @@ fn render_vm_list_detailed(f: &mut Frame, app: &App, area: Rect) {
                 "☐ "
             }
         } else {
-            if i == app.selected { "► " } else { "  " }
+            if i == app.selected {
+                "► "
+            } else {
+                "  "
+            }
         };
 
         let content = vec![Line::from(vec![
             Span::styled(
                 selection_marker,
                 if app.bulk_mode && app.selected_vms.contains(&i) {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 },
@@ -370,7 +450,9 @@ fn render_vm_list_detailed(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(
                 format!("{:<20}", vm.name),
                 if i == app.selected {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 },
@@ -431,7 +513,10 @@ fn render_vm_details(f: &mut Frame, vm: &vm_model::VM, area: Rect) {
             Span::raw(&vm.image),
         ]),
         Line::from(""),
-        Line::from(Span::styled("Actions:", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            "Actions:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from("  [s] Start    [t] Stop"),
         Line::from("  [r] Restart  [d] Delete"),
         Line::from("  [m] Metrics  [Enter] Detail"),
@@ -458,10 +543,7 @@ pub fn render_vm_detail_view(f: &mut Frame, app: &App, area: Rect) {
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(10),
-            Constraint::Min(5),
-        ])
+        .constraints([Constraint::Length(10), Constraint::Min(5)])
         .split(area);
 
     // VM Info
@@ -503,22 +585,33 @@ pub fn render_vm_detail_view(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled("Tags:       ", Style::default().fg(Color::Cyan)),
-            Span::raw(vm.tags.as_ref().map(|t| t.join(", ")).unwrap_or_else(|| "none".to_string())),
+            Span::raw(
+                vm.tags
+                    .as_ref()
+                    .map(|t| t.join(", "))
+                    .unwrap_or_else(|| "none".to_string()),
+            ),
         ]),
     ];
 
-    let paragraph = Paragraph::new(info)
-        .block(Block::default().borders(Borders::ALL).title(format!(" VM: {} ", vm.name)));
+    let paragraph = Paragraph::new(info).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" VM: {} ", vm.name)),
+    );
     f.render_widget(paragraph, chunks[0]);
 
     // Actions footer
     let actions = vec![
-        Line::from(Span::styled("Actions:", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            "Actions:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from("  [s] Start    [t] Stop    [r] Restart    [d] Delete"),
         Line::from("  [Esc] Back to VM list"),
     ];
-    let actions_p = Paragraph::new(actions)
-        .block(Block::default().borders(Borders::ALL).title(" Actions "));
+    let actions_p =
+        Paragraph::new(actions).block(Block::default().borders(Borders::ALL).title(" Actions "));
     f.render_widget(actions_p, chunks[1]);
 }
 

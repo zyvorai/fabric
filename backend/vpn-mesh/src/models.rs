@@ -215,9 +215,9 @@ mod tests {
 
     #[test]
     fn test_default_keepalive() {
-        let peer: VpnPeer = serde_json::from_str(
-            r#"{"public_key":"abc123","allowed_ips":["10.0.0.0/24"]}"#,
-        ).unwrap();
+        let peer: VpnPeer =
+            serde_json::from_str(r#"{"public_key":"abc123","allowed_ips":["10.0.0.0/24"]}"#)
+                .unwrap();
         assert_eq!(peer.persistent_keepalive, 25);
     }
 

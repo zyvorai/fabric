@@ -12,8 +12,8 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
@@ -44,7 +44,11 @@ pub async fn console_handler(
     // Check concurrent WebSocket connection limit
     let current = ACTIVE_WS_CONNECTIONS.load(Ordering::Relaxed);
     if current >= MAX_WS_CONNECTIONS {
-        tracing::warn!("WebSocket connection limit reached ({}/{})", current, MAX_WS_CONNECTIONS);
+        tracing::warn!(
+            "WebSocket connection limit reached ({}/{})",
+            current,
+            MAX_WS_CONNECTIONS
+        );
         return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
 
@@ -117,7 +121,11 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
             tracing::error!("Failed to capture stdin for machinectl shell");
             let _ = child.kill().await;
             let (mut sender, _) = socket.split();
-            let _ = sender.send(Message::Text("\r\n[Error: failed to open console]\r\n".into())).await;
+            let _ = sender
+                .send(Message::Text(
+                    "\r\n[Error: failed to open console]\r\n".into(),
+                ))
+                .await;
             let _ = sender.send(Message::Close(None)).await;
             ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
             return;
@@ -129,7 +137,11 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
             tracing::error!("Failed to capture stdout for machinectl shell");
             let _ = child.kill().await;
             let (mut sender, _) = socket.split();
-            let _ = sender.send(Message::Text("\r\n[Error: failed to open console]\r\n".into())).await;
+            let _ = sender
+                .send(Message::Text(
+                    "\r\n[Error: failed to open console]\r\n".into(),
+                ))
+                .await;
             let _ = sender.send(Message::Close(None)).await;
             ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
             return;
@@ -146,7 +158,11 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
             match timeout(IDLE_TIMEOUT, stdout.read(&mut buf)).await {
                 Ok(Ok(0)) => break,
                 Ok(Ok(n)) => {
-                    if ws_sender.send(Message::Binary(buf[..n].to_vec().into())).await.is_err() {
+                    if ws_sender
+                        .send(Message::Binary(buf[..n].to_vec().into()))
+                        .await
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -155,10 +171,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                     break;
                 }
                 Err(_) => {
-                    tracing::info!(
-                        "Console idle timeout reached for VM: {}",
-                        vm_name_clone
-                    );
+                    tracing::info!("Console idle timeout reached for VM: {}", vm_name_clone);
                     let _ = ws_sender
                         .send(Message::Text(
                             "\r\n[Session timed out due to inactivity]\r\n".into(),
@@ -196,10 +209,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                 },
                 Ok(None) => break,
                 Err(_) => {
-                    tracing::info!(
-                        "Console input idle timeout for VM: {}",
-                        vm_name_clone
-                    );
+                    tracing::info!("Console input idle timeout for VM: {}", vm_name_clone);
                     break;
                 }
             }

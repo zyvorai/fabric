@@ -3,20 +3,20 @@ name: Operator
 on:
   push:
     paths:
-      - 'operator/**'
+      - "operator/**"
   pull_request:
     paths:
-      - 'operator/**'
+      - "operator/**"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: azure/setup-helm@v4
         with:
-          toolchain: stable
-          override: true
+          version: "3.14.4"
       - name: Cargo test
         run: cd operator && cargo test
       - name: Helm template lint

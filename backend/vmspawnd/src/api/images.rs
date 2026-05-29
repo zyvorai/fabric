@@ -2,22 +2,17 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 fn validate_image_format(format: &str) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
-    crate::validation::validate_image_format(format)
-        .map_err(|(s, v)| (s, Json(v)))
+    crate::validation::validate_image_format(format).map_err(|(s, v)| (s, Json(v)))
 }
 
 // ============================================================================
@@ -74,9 +69,12 @@ pub async fn build_image(
 
     // Validate distribution name against allowlist
     if !ALLOWED_DISTRIBUTIONS.contains(&req.distribution.to_lowercase().as_str()) {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({
-            "error": format!("Invalid distribution '{}'. Allowed: {}", req.distribution, ALLOWED_DISTRIBUTIONS.join(", "))
-        }))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": format!("Invalid distribution '{}'. Allowed: {}", req.distribution, ALLOWED_DISTRIBUTIONS.join(", "))
+            })),
+        ));
     }
 
     // Validate image name
@@ -85,13 +83,24 @@ pub async fn build_image(
 
     // Validate package names
     if req.packages.len() > 100 {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Maximum 100 packages allowed"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Maximum 100 packages allowed",
+        ));
     }
     for pkg in &req.packages {
-        if pkg.is_empty() || pkg.len() > 128 || !pkg.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+')) {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({
-                "error": format!("Invalid package name '{}'. Only alphanumeric, hyphens, underscores, dots, and plus signs allowed.", pkg)
-            }))));
+        if pkg.is_empty()
+            || pkg.len() > 128
+            || !pkg
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+'))
+        {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": format!("Invalid package name '{}'. Only alphanumeric, hyphens, underscores, dots, and plus signs allowed.", pkg)
+                })),
+            ));
         }
     }
 
@@ -109,9 +118,15 @@ pub async fn build_image(
         completed: None,
     };
 
-    state.store.save_entity("image_builds", &build_id, &status).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("image_builds", &build_id, &status)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     // Spawn background build task
     let state_clone = state.clone();
@@ -123,13 +138,22 @@ pub async fn build_image(
     let handle = tokio::spawn(async move {
         // Check if shutdown was requested before starting the build
         if shutdown.is_cancelled() {
-            tracing::debug!("Image build '{}' cancelled: shutdown in progress", build_id_clone);
+            tracing::debug!(
+                "Image build '{}' cancelled: shutdown in progress",
+                build_id_clone
+            );
             return;
         }
         // Update state to building
-        if let Ok(Some(mut s)) = state_clone.store.get_entity::<ImageBuildStatus>("image_builds", &build_id_clone) {
+        if let Ok(Some(mut s)) = state_clone
+            .store
+            .get_entity::<ImageBuildStatus>("image_builds", &build_id_clone)
+        {
             s.state = BuildState::Building;
-            if let Err(e) = state_clone.store.save_entity("image_builds", &build_id_clone, &s) {
+            if let Err(e) = state_clone
+                .store
+                .save_entity("image_builds", &build_id_clone, &s)
+            {
                 tracing::error!("Failed to save: {}", e);
             }
         }
@@ -141,11 +165,13 @@ pub async fn build_image(
             autologin: req_clone.autologin,
         };
 
-        let result = tokio::task::spawn_blocking(move || {
-            vmspawn_driver::build_image_mkosi(&config)
-        }).await;
+        let result =
+            tokio::task::spawn_blocking(move || vmspawn_driver::build_image_mkosi(&config)).await;
 
-        if let Ok(Some(mut s)) = state_clone.store.get_entity::<ImageBuildStatus>("image_builds", &build_id_clone) {
+        if let Ok(Some(mut s)) = state_clone
+            .store
+            .get_entity::<ImageBuildStatus>("image_builds", &build_id_clone)
+        {
             match result {
                 Ok(Ok(path)) => {
                     s.state = BuildState::Completed;
@@ -163,14 +189,21 @@ pub async fn build_image(
                 }
             }
             s.completed = Some(Utc::now());
-            if let Err(e) = state_clone.store.save_entity("image_builds", &build_id_clone, &s) {
+            if let Err(e) = state_clone
+                .store
+                .save_entity("image_builds", &build_id_clone, &s)
+            {
                 tracing::error!("Failed to save image build: {}", e);
             }
         }
     });
     tokio::spawn(async move {
         if let Err(e) = handle.await {
-            tracing::error!("Background image build task '{}' panicked: {}", build_id_log, e);
+            tracing::error!(
+                "Background image build task '{}' panicked: {}",
+                build_id_log,
+                e
+            );
         }
     });
 
@@ -183,9 +216,15 @@ pub async fn list_builds(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ImageBuildStatus>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(list_builds));
-    let builds = state.store.list_entities::<ImageBuildStatus>("image_builds").map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    let builds = state
+        .store
+        .list_entities::<ImageBuildStatus>("image_builds")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(builds))
 }
@@ -211,7 +250,11 @@ pub async fn list_images(RequireRead(claims): RequireRead) -> Json<Vec<ImageInfo
                     let size = entry.metadata().await.map(|m| m.len()).unwrap_or(0);
                     images.push(ImageInfo {
                         name: name.trim_end_matches(&format!(".{}", ext)).to_string(),
-                        path: if show_path { path.display().to_string() } else { String::new() },
+                        path: if show_path {
+                            path.display().to_string()
+                        } else {
+                            String::new()
+                        },
                         format: ext.to_string(),
                         size_bytes: size,
                     });
@@ -292,9 +335,7 @@ fn cloud_image_catalog() -> Vec<CloudImage> {
 }
 
 /// GET /api/images/cloud - List available cloud images for download
-pub async fn list_cloud_images(
-    RequireRead(_claims): RequireRead,
-) -> Json<Vec<CloudImage>> {
+pub async fn list_cloud_images(RequireRead(_claims): RequireRead) -> Json<Vec<CloudImage>> {
     tracing::debug!("images::{}", stringify!(list_cloud_images));
     Json(cloud_image_catalog())
 }
@@ -327,7 +368,8 @@ async fn stream_response_to_file(
 ) -> Result<u64, String> {
     use tokio::io::AsyncWriteExt;
 
-    let mut file = tokio::fs::File::create(dest_path).await
+    let mut file = tokio::fs::File::create(dest_path)
+        .await
         .map_err(|e| format!("Failed to create file: {}", e))?;
 
     let mut written: u64 = 0;
@@ -336,17 +378,23 @@ async fn stream_response_to_file(
     use futures::StreamExt;
     while let Some(chunk_result) = stream.next().await {
         let chunk = chunk_result.map_err(|e| format!("Download stream error: {}", e))?;
-        file.write_all(&chunk).await
+        file.write_all(&chunk)
+            .await
             .map_err(|e| format!("Failed to write chunk: {}", e))?;
         written += chunk.len() as u64;
         if written > MAX_DOWNLOAD_BYTES {
             drop(file);
             let _ = tokio::fs::remove_file(dest_path).await;
-            return Err(format!("Download exceeds maximum size of {} bytes", MAX_DOWNLOAD_BYTES));
+            return Err(format!(
+                "Download exceeds maximum size of {} bytes",
+                MAX_DOWNLOAD_BYTES
+            ));
         }
     }
 
-    file.flush().await.map_err(|e| format!("Failed to flush file: {}", e))?;
+    file.flush()
+        .await
+        .map_err(|e| format!("Failed to flush file: {}", e))?;
     Ok(written)
 }
 
@@ -385,10 +433,16 @@ pub async fn download_cloud_image(
             .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
         custom_url.clone()
     } else {
-        catalog.iter()
+        catalog
+            .iter()
             .find(|img| img.name == req.name)
             .map(|img| img.url.clone())
-            .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, format!("Cloud image '{}' not found in catalog", req.name)))?
+            .ok_or_else(|| {
+                crate::api_error::json_error(
+                    StatusCode::NOT_FOUND,
+                    format!("Cloud image '{}' not found in catalog", req.name),
+                )
+            })?
     };
 
     let download_id = uuid::Uuid::new_v4().to_string();
@@ -402,9 +456,12 @@ pub async fn download_cloud_image(
         completed: None,
     };
 
-    state.store.save_entity("image_downloads", &download_id, &status).map_err(|e| {
-        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    state
+        .store
+        .save_entity("image_downloads", &download_id, &status)
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
 
     // Spawn background download
     let state_clone = state.clone();
@@ -414,19 +471,33 @@ pub async fn download_cloud_image(
     let dl_id_log = download_id.clone();
     let handle = tokio::spawn(async move {
         // Update state
-        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+        if let Ok(Some(mut s)) = state_clone
+            .store
+            .get_entity::<DownloadStatus>("image_downloads", &dl_id)
+        {
             s.state = BuildState::Building;
-            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
+            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) {
+                tracing::error!("Failed to save download state: {}", e);
+            }
         }
 
         let dest_dir = "/var/lib/vmspawnd/images";
-        if let Err(e) = tokio::fs::create_dir_all(dest_dir).await { tracing::error!("Failed to create dir: {}", e); return; }
+        if let Err(e) = tokio::fs::create_dir_all(dest_dir).await {
+            tracing::error!("Failed to create dir: {}", e);
+            return;
+        }
 
         // Determine extension from URL (strip query params, validate against allowlist)
-        let raw_ext = url.rsplit('.').next()
+        let raw_ext = url
+            .rsplit('.')
+            .next()
             .and_then(|e| e.split('?').next())
             .unwrap_or("qcow2");
-        let ext = if crate::validation::ALLOWED_IMAGE_FORMATS.contains(&raw_ext) { raw_ext } else { "qcow2" };
+        let ext = if crate::validation::ALLOWED_IMAGE_FORMATS.contains(&raw_ext) {
+            raw_ext
+        } else {
+            "qcow2"
+        };
         let dest_path = format!("{}/{}.{}", dest_dir, image_name, ext);
 
         // Download using streaming to avoid loading entire image into memory
@@ -434,37 +505,56 @@ pub async fn download_cloud_image(
             Ok(response) => {
                 if !response.status().is_success() {
                     let status_code = response.status();
-                    mark_download_failed(&state_clone.store, "image_downloads", &dl_id, format!("HTTP {}", status_code)).await;
+                    mark_download_failed(
+                        &state_clone.store,
+                        "image_downloads",
+                        &dl_id,
+                        format!("HTTP {}", status_code),
+                    )
+                    .await;
                     return;
                 }
 
                 match stream_response_to_file(response, &dest_path).await {
                     Ok(_) => {
                         tracing::info!("Downloaded cloud image '{}' to {}", image_name, dest_path);
-                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("image_downloads", &dl_id) {
+                        if let Ok(Some(mut s)) = state_clone
+                            .store
+                            .get_entity::<DownloadStatus>("image_downloads", &dl_id)
+                        {
                             s.state = BuildState::Completed;
                             s.output_path = Some(dest_path);
                             s.completed = Some(Utc::now());
-                            if let Err(e) = state_clone.store.save_entity("image_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
+                            if let Err(e) =
+                                state_clone.store.save_entity("image_downloads", &dl_id, &s)
+                            {
+                                tracing::error!("Failed to save download state: {}", e);
+                            }
                         }
                     }
                     Err(e) => {
                         tracing::error!("Failed to download image: {}", e);
                         // Clean up partial file
                         let _ = tokio::fs::remove_file(&dest_path).await;
-                        mark_download_failed(&state_clone.store, "image_downloads", &dl_id, e).await;
+                        mark_download_failed(&state_clone.store, "image_downloads", &dl_id, e)
+                            .await;
                     }
                 }
             }
             Err(e) => {
                 tracing::error!("Failed to start download: {}", e);
-                mark_download_failed(&state_clone.store, "image_downloads", &dl_id, e.to_string()).await;
+                mark_download_failed(&state_clone.store, "image_downloads", &dl_id, e.to_string())
+                    .await;
             }
         }
     });
     tokio::spawn(async move {
         if let Err(e) = handle.await {
-            tracing::error!("Background cloud image download task '{}' panicked: {}", dl_id_log, e);
+            tracing::error!(
+                "Background cloud image download task '{}' panicked: {}",
+                dl_id_log,
+                e
+            );
         }
     });
 
@@ -477,9 +567,12 @@ pub async fn list_downloads(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<DownloadStatus>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("images::{}", stringify!(list_downloads));
-    let downloads = state.store.list_entities::<DownloadStatus>("image_downloads").map_err(|e| {
-        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    let downloads = state
+        .store
+        .list_entities::<DownloadStatus>("image_downloads")
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
     Ok(Json(downloads))
 }
 
@@ -504,9 +597,7 @@ fn stable_id_from_path(path: &str) -> String {
 }
 
 /// GET /api/images/iso - List available ISO images
-pub async fn list_iso_images(
-    RequireRead(_claims): RequireRead,
-) -> Json<Vec<IsoImage>> {
+pub async fn list_iso_images(RequireRead(_claims): RequireRead) -> Json<Vec<IsoImage>> {
     tracing::debug!("images::{}", stringify!(list_iso_images));
     let mut isos = Vec::new();
     let iso_dir = "/var/lib/vmspawnd/iso";
@@ -574,9 +665,12 @@ pub async fn download_iso(
         completed: None,
     };
 
-    state.store.save_entity("iso_downloads", &download_id, &status).map_err(|e| {
-        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    state
+        .store
+        .save_entity("iso_downloads", &download_id, &status)
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
 
     let state_clone = state.clone();
     let dl_id = download_id.clone();
@@ -586,7 +680,10 @@ pub async fn download_iso(
     let dl_id_log = download_id.clone();
     let handle = tokio::spawn(async move {
         let iso_dir = "/var/lib/vmspawnd/iso";
-        if let Err(e) = tokio::fs::create_dir_all(iso_dir).await { tracing::error!("Failed to create ISO dir: {}", e); return; }
+        if let Err(e) = tokio::fs::create_dir_all(iso_dir).await {
+            tracing::error!("Failed to create ISO dir: {}", e);
+            return;
+        }
         let dest_path = format!("{}/{}.iso", iso_dir, iso_name);
 
         match state_clone.http_client.get(&url).send().await {
@@ -595,11 +692,18 @@ pub async fn download_iso(
                 match stream_response_to_file(response, &dest_path).await {
                     Ok(_) => {
                         tracing::info!("Downloaded ISO '{}' to {}", iso_name, dest_path);
-                        if let Ok(Some(mut s)) = state_clone.store.get_entity::<DownloadStatus>("iso_downloads", &dl_id) {
+                        if let Ok(Some(mut s)) = state_clone
+                            .store
+                            .get_entity::<DownloadStatus>("iso_downloads", &dl_id)
+                        {
                             s.state = BuildState::Completed;
                             s.output_path = Some(dest_path);
                             s.completed = Some(Utc::now());
-                            if let Err(e) = state_clone.store.save_entity("iso_downloads", &dl_id, &s) { tracing::error!("Failed to save download state: {}", e); }
+                            if let Err(e) =
+                                state_clone.store.save_entity("iso_downloads", &dl_id, &s)
+                            {
+                                tracing::error!("Failed to save download state: {}", e);
+                            }
                         }
                     }
                     Err(e) => {
@@ -610,16 +714,27 @@ pub async fn download_iso(
                 }
             }
             Ok(response) => {
-                mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, format!("HTTP {}", response.status())).await;
+                mark_download_failed(
+                    &state_clone.store,
+                    "iso_downloads",
+                    &dl_id,
+                    format!("HTTP {}", response.status()),
+                )
+                .await;
             }
             Err(e) => {
-                mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, e.to_string()).await;
+                mark_download_failed(&state_clone.store, "iso_downloads", &dl_id, e.to_string())
+                    .await;
             }
         }
     });
     tokio::spawn(async move {
         if let Err(e) = handle.await {
-            tracing::error!("Background ISO download task '{}' panicked: {}", dl_id_log, e);
+            tracing::error!(
+                "Background ISO download task '{}' panicked: {}",
+                dl_id_log,
+                e
+            );
         }
     });
 
@@ -637,7 +752,10 @@ pub async fn delete_iso(
     let path = format!("/var/lib/vmspawnd/iso/{}.iso", name);
     if let Err(e) = tokio::fs::remove_file(&path).await {
         if e.kind() != std::io::ErrorKind::NotFound {
-            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+            return Err(crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                e.to_string(),
+            ));
         }
     }
     Ok(StatusCode::NO_CONTENT)
@@ -671,28 +789,44 @@ pub async fn resize_disk(
     let size_valid = {
         let s = req.size.trim();
         if let Some(num_str) = s.strip_suffix(|c: char| "GMTKgmtk".contains(c)) {
-            num_str.trim().parse::<u64>().map(|n| n > 0).unwrap_or(false)
+            num_str
+                .trim()
+                .parse::<u64>()
+                .map(|n| n > 0)
+                .unwrap_or(false)
         } else {
             s.parse::<u64>().map(|n| n > 0).unwrap_or(false)
         }
     };
     if !size_valid {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Size must be a positive number with optional unit suffix (e.g. '50G', '100M')"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Size must be a positive number with optional unit suffix (e.g. '50G', '100M')",
+        ));
     }
 
-    let image_path = crate::validation::find_vm_image(&vm_name)
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, format!("No disk image found for VM '{}'", vm_name)))?;
+    let image_path = crate::validation::find_vm_image(&vm_name).ok_or_else(|| {
+        crate::api_error::json_error(
+            StatusCode::NOT_FOUND,
+            format!("No disk image found for VM '{}'", vm_name),
+        )
+    })?;
 
     // Resize with qemu-img
     let output = tokio::process::Command::new("qemu-img")
         .args(["resize", &image_path, &req.size])
         .output()
         .await
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img resize failed: {}", stderr)));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("qemu-img resize failed: {}", stderr),
+        ));
     }
 
     // If online and VM is running, also resize the block device via QMP
@@ -706,11 +840,19 @@ pub async fn resize_disk(
                         Ok(b) => b,
                         Err(e) => {
                             tracing::warn!("Failed to parse size for QMP resize: {}", e);
-                            return Ok(Json(json!({"status": "resized", "vm": vm_name, "new_size": req.size, "warning": "Offline resize succeeded but online resize skipped due to size parse error"})));
+                            return Ok(Json(
+                                json!({"status": "resized", "vm": vm_name, "new_size": req.size, "warning": "Offline resize succeeded but online resize skipped due to size parse error"}),
+                            ));
                         }
                     };
-                    if let Err(e) = qmp.execute("block_resize", json!({"device": "virtio0", "size": size_bytes})) {
-                        tracing::warn!("Online resize via QMP failed (offline resize succeeded): {}", e);
+                    if let Err(e) = qmp.execute(
+                        "block_resize",
+                        json!({"device": "virtio0", "size": size_bytes}),
+                    ) {
+                        tracing::warn!(
+                            "Online resize via QMP failed (offline resize succeeded): {}",
+                            e
+                        );
                     }
                 }
             }
@@ -718,22 +860,43 @@ pub async fn resize_disk(
     }
 
     tracing::info!("Resized disk for VM '{}' to {}", vm_name, req.size);
-    Ok(Json(json!({"status": "resized", "vm": vm_name, "new_size": req.size})))
+    Ok(Json(
+        json!({"status": "resized", "vm": vm_name, "new_size": req.size}),
+    ))
 }
 
 fn parse_size_to_bytes(size: &str) -> Result<u64, String> {
     let s = size.trim();
     let s_upper = s.to_uppercase();
     let result = if let Some(n) = s_upper.strip_suffix('T') {
-        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024 * 1024 * 1024 * 1024
+        n.trim()
+            .parse::<u64>()
+            .map_err(|e| format!("Invalid size number: {}", e))?
+            * 1024
+            * 1024
+            * 1024
+            * 1024
     } else if let Some(n) = s_upper.strip_suffix('G') {
-        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024 * 1024 * 1024
+        n.trim()
+            .parse::<u64>()
+            .map_err(|e| format!("Invalid size number: {}", e))?
+            * 1024
+            * 1024
+            * 1024
     } else if let Some(n) = s_upper.strip_suffix('M') {
-        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024 * 1024
+        n.trim()
+            .parse::<u64>()
+            .map_err(|e| format!("Invalid size number: {}", e))?
+            * 1024
+            * 1024
     } else if let Some(n) = s_upper.strip_suffix('K') {
-        n.trim().parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))? * 1024
+        n.trim()
+            .parse::<u64>()
+            .map_err(|e| format!("Invalid size number: {}", e))?
+            * 1024
     } else {
-        s.parse::<u64>().map_err(|e| format!("Invalid size number: {}", e))?
+        s.parse::<u64>()
+            .map_err(|e| format!("Invalid size number: {}", e))?
     };
     if result == 0 {
         return Err("Size must be greater than zero".to_string());
@@ -762,9 +925,15 @@ pub struct ImportVMRequest {
     pub memory: u64,
 }
 
-fn default_qcow2() -> String { "qcow2".into() }
-fn default_cpus() -> u32 { 2 }
-fn default_memory() -> u64 { 2048 }
+fn default_qcow2() -> String {
+    "qcow2".into()
+}
+fn default_cpus() -> u32 {
+    2
+}
+fn default_memory() -> u64 {
+    2048
+}
 
 #[derive(Debug, Serialize)]
 pub struct ImportResult {
@@ -796,7 +965,10 @@ pub async fn import_vm_image(
 
     // Check for duplicate VM name
     if let Ok(Some(_)) = state.store.get_vm(&req.name) {
-        return Err(crate::api_error::json_error(StatusCode::CONFLICT, "VM with this name already exists"));
+        return Err(crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            "VM with this name already exists",
+        ));
     }
 
     // Detect source format from extension
@@ -807,23 +979,46 @@ pub async fn import_vm_image(
         .to_string();
 
     let dest_dir = "/var/lib/vmspawnd/images";
-    tokio::fs::create_dir_all(dest_dir).await
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)))?;
+    tokio::fs::create_dir_all(dest_dir).await.map_err(|e| {
+        crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create directory: {}", e),
+        )
+    })?;
     let dest_path = format!("{}/{}.{}", dest_dir, req.name, req.target_format);
 
     // Convert using qemu-img convert
     let output = tokio::process::Command::new("qemu-img")
-        .args(["convert", "-f", &source_format, "-O", &req.target_format, &req.source_path, &dest_path])
+        .args([
+            "convert",
+            "-f",
+            &source_format,
+            "-O",
+            &req.target_format,
+            &req.source_path,
+            &dest_path,
+        ])
         .output()
         .await
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("qemu-img convert failed: {}", e)))?;
+        .map_err(|e| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("qemu-img convert failed: {}", e),
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Image conversion failed: {}", stderr)));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Image conversion failed: {}", stderr),
+        ));
     }
 
-    let size = tokio::fs::metadata(&dest_path).await.map(|m| m.len()).unwrap_or(0);
+    let size = tokio::fs::metadata(&dest_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
 
     // Create VM entry
     let vm = vm_model::VM::new(req.name.clone(), dest_path.clone(), req.cpus, req.memory);
@@ -831,13 +1026,22 @@ pub async fn import_vm_image(
         crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
 
-    tracing::info!("Imported VM '{}' from {} ({} -> {})", req.name, req.source_path, source_format, req.target_format);
-
-    Ok((StatusCode::CREATED, Json(ImportResult {
-        vm_name: req.name,
-        image_path: dest_path,
+    tracing::info!(
+        "Imported VM '{}' from {} ({} -> {})",
+        req.name,
+        req.source_path,
         source_format,
-        target_format: req.target_format,
-        size_bytes: size,
-    })))
+        req.target_format
+    );
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ImportResult {
+            vm_name: req.name,
+            image_path: dest_path,
+            source_format,
+            target_format: req.target_format,
+            size_bytes: size,
+        }),
+    ))
 }

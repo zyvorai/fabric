@@ -37,12 +37,20 @@ pub async fn create_mirror_session(
     match req.collector_type {
         packet_mirror::models::CollectorType::RemoteIp => {
             if let Err(e) = crate::validation::validate_ip_address(&req.collector_target) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid collector_target IP: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid collector_target IP: {}", e)})),
+                )
+                    .into_response();
             }
         }
         packet_mirror::models::CollectorType::Interface => {
             if let Err(msg) = crate::validation::validate_hostname(&req.collector_target) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid collector_target interface: {}", msg)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid collector_target interface: {}", msg)})),
+                )
+                    .into_response();
             }
         }
     }
@@ -50,12 +58,20 @@ pub async fn create_mirror_session(
     if let Some(ref filter) = req.filter {
         if let Some(ref cidr) = filter.src_cidr {
             if let Err(e) = crate::validation::validate_cidr(cidr) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid filter src_cidr: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid filter src_cidr: {}", e)})),
+                )
+                    .into_response();
             }
         }
         if let Some(ref cidr) = filter.dst_cidr {
             if let Err(e) = crate::validation::validate_cidr(cidr) {
-                return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid filter dst_cidr: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("Invalid filter dst_cidr: {}", e)})),
+                )
+                    .into_response();
             }
         }
     }
@@ -120,7 +136,8 @@ pub async fn get_mirror_session(
     match state.store.get_entity::<MirrorSession>(STORE_KEY, &id) {
         Ok(Some(session)) => (StatusCode::OK, Json(session)).into_response(),
         Ok(None) => {
-            if let Some(session) = super::net_security_discover::find_host_mirror_session(&state, &id)
+            if let Some(session) =
+                super::net_security_discover::find_host_mirror_session(&state, &id)
             {
                 return (StatusCode::OK, Json(session)).into_response();
             }
@@ -320,10 +337,7 @@ pub async fn get_mirror_status(
     let statuses: Vec<MirrorStatus> = sessions
         .iter()
         .map(|session| {
-            let rules = state
-                .packet_mirror
-                .compiler
-                .compile_session(session, &vms);
+            let rules = state.packet_mirror.compiler.compile_session(session, &vms);
 
             MirrorStatus {
                 session_id: session.id,
@@ -347,10 +361,7 @@ pub async fn reconcile_mirrors(state: &AppState) -> anyhow::Result<()> {
     let vms = build_vm_snapshots(state);
 
     let enabled: Vec<MirrorSession> = sessions.into_iter().filter(|s| s.enabled).collect();
-    let rules = state
-        .packet_mirror
-        .compiler
-        .compile_all(&enabled, &vms);
+    let rules = state.packet_mirror.compiler.compile_all(&enabled, &vms);
 
     state.packet_mirror.enforcer.sync_all(&rules)?;
 

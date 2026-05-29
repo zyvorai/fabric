@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-pub mod models;
 pub mod compiler;
 pub mod enforcement;
+pub mod models;
 
 use compiler::NatCompiler;
 use enforcement::NatEnforcer;
@@ -18,9 +18,6 @@ impl NatGateway {
     pub fn new() -> Self {
         let compiler = NatCompiler::new();
         let enforcer = NatEnforcer::new();
-        Self {
-            compiler,
-            enforcer,
-        }
+        Self { compiler, enforcer }
     }
 }

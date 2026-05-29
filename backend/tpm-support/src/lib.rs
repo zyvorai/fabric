@@ -82,9 +82,7 @@ impl TPMManager {
 
     /// Stop swtpm daemon
     pub async fn stop_swtpm(&self, pid: u32) -> Result<()> {
-        let output = Command::new("kill")
-            .arg(pid.to_string())
-            .output()?;
+        let output = Command::new("kill").arg(pid.to_string()).output()?;
 
         if output.status.success() {
             Ok(())
@@ -96,16 +94,13 @@ impl TPMManager {
     /// Initialize TPM state
     async fn init_swtpm(&self, tpm_dir: &Path, version: TPMVersion) -> Result<()> {
         let mut cmd = Command::new("swtpm_setup");
-        cmd.arg("--tpm-state")
-            .arg(tpm_dir)
-            .arg("--tpm2");
+        cmd.arg("--tpm-state").arg(tpm_dir).arg("--tpm2");
 
         if matches!(version, TPMVersion::TPM12) {
             cmd.arg("--tpm");
         }
 
-        cmd.arg("--create-ek-cert")
-            .arg("--create-platform-cert");
+        cmd.arg("--create-ek-cert").arg("--create-platform-cert");
 
         let output = cmd.output()?;
 

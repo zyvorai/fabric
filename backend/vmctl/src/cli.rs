@@ -492,17 +492,17 @@ fn parse_label(s: &str) -> Result<(String, String), String> {
 
 fn load_config_file(path: &str) -> Result<serde_json::Value> {
     tracing::debug!("Loading config file: {}", path);
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to read file: {}", path))?;
+    let content =
+        std::fs::read_to_string(path).with_context(|| format!("Failed to read file: {}", path))?;
     if path.ends_with(".yaml") || path.ends_with(".yml") {
         tracing::debug!("Parsing as YAML");
-        let val: serde_json::Value = serde_yaml::from_str(&content)
-            .with_context(|| "Failed to parse YAML")?;
+        let val: serde_json::Value =
+            serde_yaml::from_str(&content).with_context(|| "Failed to parse YAML")?;
         Ok(val)
     } else {
         tracing::debug!("Parsing as JSON");
-        let val: serde_json::Value = serde_json::from_str(&content)
-            .with_context(|| "Failed to parse JSON")?;
+        let val: serde_json::Value =
+            serde_json::from_str(&content).with_context(|| "Failed to parse JSON")?;
         Ok(val)
     }
 }
@@ -519,7 +519,9 @@ fn print_value(val: &serde_json::Value, fmt: OutputFormat) {
     match fmt {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(val).unwrap_or_default()),
         OutputFormat::Yaml => println!("{}", serde_yaml::to_string(val).unwrap_or_default()),
-        OutputFormat::Table => println!("{}", serde_json::to_string_pretty(val).unwrap_or_default()),
+        OutputFormat::Table => {
+            println!("{}", serde_json::to_string_pretty(val).unwrap_or_default())
+        }
     }
 }
 
@@ -530,19 +532,39 @@ fn print_resources(items: &[serde_json::Value], fmt: OutputFormat) {
                 println!("No resources found");
                 return;
             }
-            let rows: Vec<ResourceRow> = items.iter().map(|v| {
-                ResourceRow {
-                    id: v.get("id").and_then(|v| v.as_str()).unwrap_or("-").to_string(),
-                    name: v.get("name").and_then(|v| v.as_str()).unwrap_or("-").to_string(),
-                    status: v.get("enabled").map(|e| {
-                        if e.as_bool().unwrap_or(false) { "active" } else { "disabled" }
-                    }).unwrap_or("active").to_string(),
+            let rows: Vec<ResourceRow> = items
+                .iter()
+                .map(|v| ResourceRow {
+                    id: v
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("-")
+                        .to_string(),
+                    name: v
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("-")
+                        .to_string(),
+                    status: v
+                        .get("enabled")
+                        .map(|e| {
+                            if e.as_bool().unwrap_or(false) {
+                                "active"
+                            } else {
+                                "disabled"
+                            }
+                        })
+                        .unwrap_or("active")
+                        .to_string(),
                     info: extract_info(v),
-                }
-            }).collect();
+                })
+                .collect();
             println!("{}", Table::new(rows));
         }
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(items).unwrap_or_default()),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(items).unwrap_or_default()
+        ),
         OutputFormat::Yaml => println!("{}", serde_yaml::to_string(items).unwrap_or_default()),
     }
 }
@@ -550,19 +572,44 @@ fn print_resources(items: &[serde_json::Value], fmt: OutputFormat) {
 fn extract_info(v: &serde_json::Value) -> String {
     // Try to build a short info string from common fields
     let mut parts = Vec::new();
-    if let Some(t) = v.get("nat_type").and_then(|v| v.as_str()) { parts.push(format!("type={}", t)); }
-    if let Some(t) = v.get("topology").and_then(|v| v.as_str()) { parts.push(format!("topo={}", t)); }
-    if let Some(t) = v.get("algorithm").and_then(|v| v.as_str()) { parts.push(format!("algo={}", t)); }
-    if let Some(t) = v.get("direction").and_then(|v| v.as_str()) { parts.push(format!("dir={}", t)); }
-    if let Some(t) = v.get("domain").and_then(|v| v.as_str()) { parts.push(format!("domain={}", t)); }
-    if let Some(t) = v.get("priority").and_then(|v| v.as_u64()) { parts.push(format!("pri={}", t)); }
-    if let Some(t) = v.get("default_action").and_then(|v| v.as_str()) { parts.push(format!("default={}", t)); }
-    if let Some(a) = v.get("rules").and_then(|v| v.as_array()) { parts.push(format!("rules={}", a.len())); }
-    if let Some(a) = v.get("backends").and_then(|v| v.as_array()) { parts.push(format!("backends={}", a.len())); }
-    if let Some(a) = v.get("peers").and_then(|v| v.as_array()) { parts.push(format!("peers={}", a.len())); }
-    if let Some(a) = v.get("thresholds").and_then(|v| v.as_array()) { parts.push(format!("thresholds={}", a.len())); }
+    if let Some(t) = v.get("nat_type").and_then(|v| v.as_str()) {
+        parts.push(format!("type={}", t));
+    }
+    if let Some(t) = v.get("topology").and_then(|v| v.as_str()) {
+        parts.push(format!("topo={}", t));
+    }
+    if let Some(t) = v.get("algorithm").and_then(|v| v.as_str()) {
+        parts.push(format!("algo={}", t));
+    }
+    if let Some(t) = v.get("direction").and_then(|v| v.as_str()) {
+        parts.push(format!("dir={}", t));
+    }
+    if let Some(t) = v.get("domain").and_then(|v| v.as_str()) {
+        parts.push(format!("domain={}", t));
+    }
+    if let Some(t) = v.get("priority").and_then(|v| v.as_u64()) {
+        parts.push(format!("pri={}", t));
+    }
+    if let Some(t) = v.get("default_action").and_then(|v| v.as_str()) {
+        parts.push(format!("default={}", t));
+    }
+    if let Some(a) = v.get("rules").and_then(|v| v.as_array()) {
+        parts.push(format!("rules={}", a.len()));
+    }
+    if let Some(a) = v.get("backends").and_then(|v| v.as_array()) {
+        parts.push(format!("backends={}", a.len()));
+    }
+    if let Some(a) = v.get("peers").and_then(|v| v.as_array()) {
+        parts.push(format!("peers={}", a.len()));
+    }
+    if let Some(a) = v.get("thresholds").and_then(|v| v.as_array()) {
+        parts.push(format!("thresholds={}", a.len()));
+    }
     if parts.is_empty() {
-        v.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string()
+        v.get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
     } else {
         parts.join(", ")
     }
@@ -570,10 +617,7 @@ fn extract_info(v: &serde_json::Value) -> String {
 
 async fn api_get(client: &Client, path: &str) -> Result<serde_json::Value> {
     tracing::debug!("GET {}{}", API_BASE, path);
-    let res = client
-        .get(format!("{}{}", API_BASE, path))
-        .send()
-        .await?;
+    let res = client.get(format!("{}{}", API_BASE, path)).send().await?;
     tracing::debug!("Response: {}", res.status());
     if !res.status().is_success() {
         let status = res.status();
@@ -583,7 +627,11 @@ async fn api_get(client: &Client, path: &str) -> Result<serde_json::Value> {
     Ok(res.json().await?)
 }
 
-async fn api_post(client: &Client, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
+async fn api_post(
+    client: &Client,
+    path: &str,
+    body: &serde_json::Value,
+) -> Result<serde_json::Value> {
     tracing::debug!("POST {}{}", API_BASE, path);
     let res = client
         .post(format!("{}{}", API_BASE, path))
@@ -601,19 +649,23 @@ async fn api_post(client: &Client, path: &str, body: &serde_json::Value) -> Resu
 
 async fn api_post_empty(client: &Client, path: &str) -> Result<serde_json::Value> {
     tracing::debug!("POST {}{} (empty body)", API_BASE, path);
-    let res = client
-        .post(format!("{}{}", API_BASE, path))
-        .send()
-        .await?;
+    let res = client.post(format!("{}{}", API_BASE, path)).send().await?;
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
         anyhow::bail!("{}: {}", status, body);
     }
-    Ok(res.json().await.unwrap_or(serde_json::json!({"status": "ok"})))
+    Ok(res
+        .json()
+        .await
+        .unwrap_or(serde_json::json!({"status": "ok"})))
 }
 
-async fn api_put(client: &Client, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
+async fn api_put(
+    client: &Client,
+    path: &str,
+    body: &serde_json::Value,
+) -> Result<serde_json::Value> {
     tracing::debug!("PUT {}{}", API_BASE, path);
     let res = client
         .put(format!("{}{}", API_BASE, path))
@@ -644,10 +696,7 @@ async fn api_delete(client: &Client, path: &str) -> Result<()> {
 
 async fn api_post_void(client: &Client, path: &str) -> Result<()> {
     tracing::debug!("POST {}{} (void)", API_BASE, path);
-    let res = client
-        .post(format!("{}{}", API_BASE, path))
-        .send()
-        .await?;
+    let res = client.post(format!("{}{}", API_BASE, path)).send().await?;
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -713,11 +762,18 @@ impl Cli {
                         println!("Memory:   {}MB", vm.memory);
                         println!("Disk:     {}GB", vm.disk);
                         println!("Image:    {}", vm.image);
-                        if let Some(ip) = &vm.ip { println!("IP:       {}", ip); }
-                        if let Some(host) = &vm.hostname { println!("Hostname: {}", host); }
-                        if let Some(tags) = &vm.tags { println!("Tags:     {}", tags.join(", ")); }
+                        if let Some(ip) = &vm.ip {
+                            println!("IP:       {}", ip);
+                        }
+                        if let Some(host) = &vm.hostname {
+                            println!("Hostname: {}", host);
+                        }
+                        if let Some(tags) = &vm.tags {
+                            println!("Tags:     {}", tags.join(", "));
+                        }
                         if let Some(labels) = &vm.labels {
-                            let l: Vec<String> = labels.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
+                            let l: Vec<String> =
+                                labels.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
                             println!("Labels:   {}", l.join(", "));
                         }
                     }
@@ -726,11 +782,17 @@ impl Cli {
             }
 
             Commands::Create {
-                name, image, cpus, memory, disk, hostname, tags, label,
+                name,
+                image,
+                cpus,
+                memory,
+                disk,
+                hostname,
+                tags,
+                label,
             } => {
-                let labels = label.map(|pairs| {
-                    pairs.into_iter().collect::<HashMap<String, String>>()
-                });
+                let labels =
+                    label.map(|pairs| pairs.into_iter().collect::<HashMap<String, String>>());
                 let req = CreateVMRequest {
                     name: name.clone(),
                     image,
@@ -755,22 +817,34 @@ impl Cli {
             }
 
             Commands::Start { name } => {
-                client.post(format!("{}/vms/{}/start", API_BASE, name)).send().await?;
+                client
+                    .post(format!("{}/vms/{}/start", API_BASE, name))
+                    .send()
+                    .await?;
                 println!("VM '{}' started", name);
             }
 
             Commands::Stop { name } => {
-                client.post(format!("{}/vms/{}/stop", API_BASE, name)).send().await?;
+                client
+                    .post(format!("{}/vms/{}/stop", API_BASE, name))
+                    .send()
+                    .await?;
                 println!("VM '{}' stopped", name);
             }
 
             Commands::Restart { name } => {
-                client.post(format!("{}/vms/{}/restart", API_BASE, name)).send().await?;
+                client
+                    .post(format!("{}/vms/{}/restart", API_BASE, name))
+                    .send()
+                    .await?;
                 println!("VM '{}' restarted", name);
             }
 
             Commands::Delete { name } => {
-                client.delete(format!("{}/vms/{}", API_BASE, name)).send().await?;
+                client
+                    .delete(format!("{}/vms/{}", API_BASE, name))
+                    .send()
+                    .await?;
                 println!("VM '{}' deleted", name);
             }
 
@@ -862,7 +936,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/network-policies", &body).await?;
                     println!("Network policy created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 PolicyCmd::Delete { id } => {
                     api_delete(&client, &format!("/network-policies/{}", id)).await?;
@@ -892,7 +968,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/firewall-profiles", &body).await?;
                     println!("Firewall profile created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 FirewallCmd::Delete { id } => {
                     api_delete(&client, &format!("/firewall-profiles/{}", id)).await?;
@@ -935,7 +1013,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/services", &body).await?;
                     println!("Service created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 ServiceCmd::Delete { id } => {
                     api_delete(&client, &format!("/services/{}", id)).await?;
@@ -969,7 +1049,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/qos-policies", &body).await?;
                     println!("QoS policy created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 QosCmd::Delete { id } => {
                     api_delete(&client, &format!("/qos-policies/{}", id)).await?;
@@ -1003,7 +1085,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/dns-zones", &body).await?;
                     println!("DNS zone created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 DnsCmd::DeleteZone { id } => {
                     api_delete(&client, &format!("/dns-zones/{}", id)).await?;
@@ -1013,7 +1097,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/dns-policies", &body).await?;
                     println!("DNS policy created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 DnsCmd::DeletePolicy { id } => {
                     api_delete(&client, &format!("/dns-policies/{}", id)).await?;
@@ -1047,7 +1133,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/vpn-tunnels", &body).await?;
                     println!("VPN tunnel created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 VpnCmd::DeleteTunnel { id } => {
                     api_delete(&client, &format!("/vpn-tunnels/{}", id)).await?;
@@ -1057,7 +1145,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/vpn-networks", &body).await?;
                     println!("VPN network created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 VpnCmd::DeleteNetwork { id } => {
                     api_delete(&client, &format!("/vpn-networks/{}", id)).await?;
@@ -1087,7 +1177,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/mirror-sessions", &body).await?;
                     println!("Mirror session created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 MirrorCmd::Delete { id } => {
                     api_delete(&client, &format!("/mirror-sessions/{}", id)).await?;
@@ -1125,7 +1217,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/nat-rules", &body).await?;
                     println!("NAT rule created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NatCmd::DeleteRule { id } => {
                     api_delete(&client, &format!("/nat-rules/{}", id)).await?;
@@ -1135,7 +1229,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/nat-pools", &body).await?;
                     println!("NAT pool created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NatCmd::DeletePool { id } => {
                     api_delete(&client, &format!("/nat-pools/{}", id)).await?;
@@ -1145,7 +1241,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/nat-gateways", &body).await?;
                     println!("NAT gateway created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NatCmd::DeleteGateway { id } => {
                     api_delete(&client, &format!("/nat-gateways/{}", id)).await?;
@@ -1175,7 +1273,9 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/monitor-policies", &body).await?;
                     println!("Monitor policy created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 MonitorCmd::Delete { id } => {
                     api_delete(&client, &format!("/monitor-policies/{}", id)).await?;
@@ -1205,7 +1305,14 @@ impl Cli {
 
             // ── Ceph ──────────────────────────────────────────────────────
             Commands::Ceph(cmd) => match cmd {
-                CephCmd::Create { name, monitors, pool, user, keyring, auto_start } => {
+                CephCmd::Create {
+                    name,
+                    monitors,
+                    pool,
+                    user,
+                    keyring,
+                    auto_start,
+                } => {
                     let body = serde_json::json!({
                         "name": name,
                         "monitors": monitors.split(',').map(|s| s.trim()).collect::<Vec<_>>(),
@@ -1216,7 +1323,9 @@ impl Cli {
                     });
                     let val = api_post(&client, "/storage/pools/ceph", &body).await?;
                     println!("Ceph pool '{}' created", name);
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 CephCmd::Pools => {
                     let val = api_get(&client, "/storage/pools").await?;
@@ -1237,10 +1346,14 @@ impl Cli {
                 CephCmd::CreateImage { pool, name, size } => {
                     let body = serde_json::json!({ "name": name, "size_mb": size });
                     api_post(&client, &format!("/storage/pools/{}/images", pool), &body).await?;
-                    println!("RBD image '{}' created in pool '{}' ({}MB)", name, pool, size);
+                    println!(
+                        "RBD image '{}' created in pool '{}' ({}MB)",
+                        name, pool, size
+                    );
                 }
                 CephCmd::DeleteImage { pool, name } => {
-                    api_delete(&client, &format!("/storage/pools/{}/images/{}", pool, name)).await?;
+                    api_delete(&client, &format!("/storage/pools/{}/images/{}", pool, name))
+                        .await?;
                     println!("RBD image '{}' deleted from pool '{}'", name, pool);
                 }
                 CephCmd::Delete { name } => {
@@ -1275,25 +1388,33 @@ impl Cli {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/networkd/bridges", &body).await?;
                     println!("Bridge created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NetCmd::CreateVlan { file } => {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/networkd/vlans", &body).await?;
                     println!("VLAN created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NetCmd::CreateBond { file } => {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/networkd/bonds", &body).await?;
                     println!("Bond created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NetCmd::CreateForward { file } => {
                     let body = load_config_file(&file)?;
                     let val = api_post(&client, "/networkd/port-forwards", &body).await?;
                     println!("Port forward created");
-                    if !matches!(fmt, OutputFormat::Table) { print_value(&val, fmt); }
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
                 }
                 NetCmd::SyncForwards => {
                     let val = api_post_empty(&client, "/networkd/port-forwards/sync").await?;

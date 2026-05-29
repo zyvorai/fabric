@@ -10,16 +10,36 @@ use std::time::Duration;
 
 /// Commands allowed through the QMP interface.
 const ALLOWED_QMP_COMMANDS: &[&str] = &[
-    "query-status", "query-block", "query-blockstats", "query-cpus-fast",
+    "query-status",
+    "query-block",
+    "query-blockstats",
+    "query-cpus-fast",
     "query-hotpluggable-cpus",
-    "query-memory-size-summary", "query-vnc", "query-spice",
-    "system_powerdown", "system_reset", "stop", "cont",
-    "balloon", "block_resize", "blockdev-snapshot-sync",
-    "blockdev-add", "blockdev-del",
-    "device_add", "device_del", "netdev_add", "netdev_del",
-    "object-add", "object-del", "chardev-add", "chardev-remove",
-    "savevm", "loadvm", "delvm",
-    "cpu-add", "drive-backup",
+    "query-memory-size-summary",
+    "query-vnc",
+    "query-spice",
+    "system_powerdown",
+    "system_reset",
+    "stop",
+    "cont",
+    "balloon",
+    "block_resize",
+    "blockdev-snapshot-sync",
+    "blockdev-add",
+    "blockdev-del",
+    "device_add",
+    "device_del",
+    "netdev_add",
+    "netdev_del",
+    "object-add",
+    "object-del",
+    "chardev-add",
+    "chardev-remove",
+    "savevm",
+    "loadvm",
+    "delvm",
+    "cpu-add",
+    "drive-backup",
 ];
 
 /// Check whether a QMP command is in the allowed list.
@@ -50,7 +70,10 @@ impl QmpClient {
     /// Execute a QMP command and return the response
     pub fn execute(&self, command: &str, args: Value) -> Result<Value> {
         if !is_command_allowed(command) {
-            return Err(anyhow::anyhow!("QMP command '{}' is not in the allowed list", command));
+            return Err(anyhow::anyhow!(
+                "QMP command '{}' is not in the allowed list",
+                command
+            ));
         }
 
         let mut stream = UnixStream::connect(&self.socket_path)
@@ -94,7 +117,10 @@ impl QmpClient {
         if let Some(error) = response.get("error") {
             return Err(anyhow::anyhow!(
                 "QMP error: {}",
-                error.get("desc").and_then(|d| d.as_str()).unwrap_or("unknown")
+                error
+                    .get("desc")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("unknown")
             ));
         }
 
@@ -117,7 +143,11 @@ mod tests {
     #[test]
     fn test_allowed_commands_pass() {
         for cmd in ALLOWED_QMP_COMMANDS {
-            assert!(is_command_allowed(cmd), "Command '{}' should be allowed", cmd);
+            assert!(
+                is_command_allowed(cmd),
+                "Command '{}' should be allowed",
+                cmd
+            );
         }
         // Verify specific commands critical for hotplug
         assert!(is_command_allowed("blockdev-add"));

@@ -7,26 +7,26 @@
 use anyhow::Result;
 use serde::Serialize;
 
-pub mod vms;
+pub mod audit;
 pub mod auth;
 pub mod auth_client;
+pub mod config_snapshot;
+pub mod events;
 pub mod health;
 pub mod logs;
-pub mod events;
 pub mod metrics;
-pub mod storage;
 pub mod network;
-pub mod audit;
-pub mod config_snapshot;
+pub mod storage;
+pub mod vms;
 
-pub use logs::{LogEntry, LogQuery, LogResponse};
-pub use events::{EventStream, VMEvent};
-pub use metrics::VMMetrics;
-pub use auth_client::MeResponse;
-pub use storage::StoragePool;
-pub use network::NetworkPolicySummary;
 pub use audit::AuditLogEntry;
+pub use auth_client::MeResponse;
 pub use config_snapshot::{ConfigSnapshot, EventRetentionConfig};
+pub use events::{EventStream, VMEvent};
+pub use logs::{LogEntry, LogQuery, LogResponse};
+pub use metrics::VMMetrics;
+pub use network::NetworkPolicySummary;
+pub use storage::StoragePool;
 
 /// Client configuration.
 pub struct ClientConfig {
@@ -56,7 +56,8 @@ impl Client {
 
     /// Authenticate and set the token.
     pub async fn login(&mut self, username: &str, password: &str) -> Result<String> {
-        let resp: serde_json::Value = self.http
+        let resp: serde_json::Value = self
+            .http
             .post(format!("{}/api/auth/login", self.base_url))
             .json(&serde_json::json!({"username": username, "password": password}))
             .send()
@@ -64,7 +65,8 @@ impl Client {
             .error_for_status()?
             .json()
             .await?;
-        let token = resp["token"].as_str()
+        let token = resp["token"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("No token in response"))?
             .to_string();
         self.token = Some(token.clone());
@@ -73,7 +75,9 @@ impl Client {
 
     /// Build an authenticated request.
     fn request(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
-        let mut req = self.http.request(method, format!("{}{}", self.base_url, path));
+        let mut req = self
+            .http
+            .request(method, format!("{}{}", self.base_url, path));
         if let Some(ref token) = self.token {
             req = req.bearer_auth(token);
         }
@@ -82,27 +86,47 @@ impl Client {
 
     /// GET request returning JSON.
     pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let resp = self.request(reqwest::Method::GET, path)
-            .send().await?.error_for_status()?
-            .json().await?;
+        let resp = self
+            .request(reqwest::Method::GET, path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         Ok(resp)
     }
 
     /// POST request with JSON body.
-    pub async fn post<T: serde::de::DeserializeOwned, B: Serialize>(&self, path: &str, body: &B) -> Result<T> {
-        let resp = self.request(reqwest::Method::POST, path)
+    pub async fn post<T: serde::de::DeserializeOwned, B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let resp = self
+            .request(reqwest::Method::POST, path)
             .json(body)
-            .send().await?.error_for_status()?
-            .json().await?;
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         Ok(resp)
     }
 
     /// PUT request with JSON body.
-    pub async fn put<T: serde::de::DeserializeOwned, B: Serialize>(&self, path: &str, body: &B) -> Result<T> {
-        let resp = self.request(reqwest::Method::PUT, path)
+    pub async fn put<T: serde::de::DeserializeOwned, B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let resp = self
+            .request(reqwest::Method::PUT, path)
             .json(body)
-            .send().await?.error_for_status()?
-            .json().await?;
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         Ok(resp)
     }
 
@@ -121,7 +145,9 @@ impl Client {
     /// DELETE request.
     pub async fn delete(&self, path: &str) -> Result<()> {
         self.request(reqwest::Method::DELETE, path)
-            .send().await?.error_for_status()?;
+            .send()
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }

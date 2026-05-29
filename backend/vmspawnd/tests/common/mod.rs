@@ -102,14 +102,17 @@ pub async fn create_test_app() -> Router {
         shutdown: tokio_util::sync::CancellationToken::new(),
     });
 
-    vmspawnd::server::build_router(state)
-        .layer(middleware::from_fn(inject_admin_claims))
+    vmspawnd::server::build_router(state).layer(middleware::from_fn(inject_admin_claims))
 }
 
 /// Create a test app with a specific role injected into all requests.
 /// Use this to test role-based access control.
 pub async fn create_test_app_with_role(role: security::Role) -> Router {
-    let tmp_dir = std::env::temp_dir().join(format!("vmspawnd-test-rbac-{}-{:?}", std::process::id(), role));
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "vmspawnd-test-rbac-{}-{:?}",
+        std::process::id(),
+        role
+    ));
     let store_dir = tmp_dir.join("store");
     let storage_dir = tmp_dir.join("storage");
 
@@ -197,6 +200,5 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         }
     };
 
-    vmspawnd::server::build_router(state)
-        .layer(middleware::from_fn(inject_role))
+    vmspawnd::server::build_router(state).layer(middleware::from_fn(inject_role))
 }

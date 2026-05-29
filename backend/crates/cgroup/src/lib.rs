@@ -28,7 +28,7 @@ pub mod pids;
 pub mod pressure;
 
 pub use cpu::{CpuController, CpuMax, CpuStat};
-pub use cpuset::{CpusetController, format_set, parse_set};
+pub use cpuset::{format_set, parse_set, CpusetController};
 pub use error::{CgroupError, Result};
 pub use freezer::FreezerController;
 pub use io::{DeviceId, IoController, IoMax, IoStat};

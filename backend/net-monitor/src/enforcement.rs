@@ -215,10 +215,7 @@ mod tests {
         }
     }
 
-    fn make_policy(
-        name: &str,
-        thresholds: Vec<BandwidthThreshold>,
-    ) -> MonitorPolicy {
+    fn make_policy(name: &str, thresholds: Vec<BandwidthThreshold>) -> MonitorPolicy {
         MonitorPolicy {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -255,7 +252,12 @@ mod tests {
         let metric = make_metric("web-1", 1_000.0, 500.0);
         let policy = make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Rx, AlertSeverity::Warning)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Rx,
+                AlertSeverity::Warning,
+            )],
         );
 
         let alerts = evaluator.check_thresholds(&policy, &metric);
@@ -268,7 +270,12 @@ mod tests {
         let metric = make_metric("web-1", 2_000_000.0, 500.0);
         let policy = make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Rx, AlertSeverity::Warning)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Rx,
+                AlertSeverity::Warning,
+            )],
         );
 
         let alerts = evaluator.check_thresholds(&policy, &metric);
@@ -283,7 +290,12 @@ mod tests {
         let metric = make_metric("web-1", 500.0, 2_000_000.0);
         let policy = make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Tx, AlertSeverity::Critical)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Tx,
+                AlertSeverity::Critical,
+            )],
         );
 
         let alerts = evaluator.check_thresholds(&policy, &metric);
@@ -298,7 +310,12 @@ mod tests {
         let metric = make_metric("web-1", 2_000_000.0, 2_000_000.0);
         let policy = make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Both, AlertSeverity::Warning)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Both,
+                AlertSeverity::Warning,
+            )],
         );
 
         let alerts = evaluator.check_thresholds(&policy, &metric);
@@ -311,7 +328,12 @@ mod tests {
         let metric = make_metric("web-1", 2_000_000.0, 500.0);
         let policy = make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Rx, AlertSeverity::Critical)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Rx,
+                AlertSeverity::Critical,
+            )],
         );
 
         let alerts = evaluator.check_thresholds(&policy, &metric);
@@ -325,7 +347,12 @@ mod tests {
         let metrics = vec![make_metric("web-1", 2_000_000.0, 500.0)];
         let policies = vec![make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Rx, AlertSeverity::Warning)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Rx,
+                AlertSeverity::Warning,
+            )],
         )];
         let vms: Vec<VMSnapshot> = vec![];
 
@@ -342,7 +369,12 @@ mod tests {
         let metrics = vec![make_metric("web-1", 2_000_000.0, 500.0)];
         let policies = vec![make_policy(
             "test",
-            vec![make_threshold(1, ThresholdUnit::Mbps, TrafficDirection::Rx, AlertSeverity::Warning)],
+            vec![make_threshold(
+                1,
+                ThresholdUnit::Mbps,
+                TrafficDirection::Rx,
+                AlertSeverity::Warning,
+            )],
         )];
         let vms: Vec<VMSnapshot> = vec![];
 

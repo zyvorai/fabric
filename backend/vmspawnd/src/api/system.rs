@@ -11,13 +11,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::process::Command;
 
-use vmspawnd_system::{
-    CpuTopology, HugepageManager, HugepageSize, MemoryController, NumaTopology,
-};
+use vmspawnd_system::{CpuTopology, HugepageManager, HugepageSize, MemoryController, NumaTopology};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite};
 use crate::validation::validate_vm_name;
+use security::{RequireRead, RequireWrite};
 
 // Request/Response types
 #[derive(Debug, Deserialize)]
@@ -87,7 +85,9 @@ pub struct HugepageQuery {
 // API Handlers
 
 /// GET /api/system/cpu/topology - Get CPU topology
-pub async fn get_cpu_topology(RequireRead(_claims): RequireRead) -> Result<Json<CpuTopology>, (StatusCode, String)> {
+pub async fn get_cpu_topology(
+    RequireRead(_claims): RequireRead,
+) -> Result<Json<CpuTopology>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_cpu_topology));
     match CpuTopology::detect() {
         Ok(topology) => Ok(Json(topology)),
@@ -99,7 +99,9 @@ pub async fn get_cpu_topology(RequireRead(_claims): RequireRead) -> Result<Json<
 }
 
 /// GET /api/system/numa/topology - Get NUMA topology
-pub async fn get_numa_topology(RequireRead(_claims): RequireRead) -> Result<Json<NumaTopology>, (StatusCode, String)> {
+pub async fn get_numa_topology(
+    RequireRead(_claims): RequireRead,
+) -> Result<Json<NumaTopology>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_numa_topology));
     match NumaTopology::detect() {
         Ok(topology) => Ok(Json(topology)),
@@ -185,13 +187,11 @@ pub async fn set_cpu_pinning(
             // Would need to read socket topology
             format!("{}", value) // Simplified for now
         }
-        CpuPinningDto::Explicit { value } => {
-            value
-                .iter()
-                .map(|pin| pin.physical_cpu.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        }
+        CpuPinningDto::Explicit { value } => value
+            .iter()
+            .map(|pin| pin.physical_cpu.to_string())
+            .collect::<Vec<_>>()
+            .join(","),
     };
 
     // Set CPUAffinity via systemctl set-property
@@ -510,7 +510,10 @@ pub async fn get_optimization_recommendations(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<OptimizationRecommendation>>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_optimization_recommendations));
-    let vms = state.store.list_vms().unwrap_or_else(|e| { tracing::warn!("Failed to list VMs: {}", e); Vec::new() });
+    let vms = state.store.list_vms().unwrap_or_else(|e| {
+        tracing::warn!("Failed to list VMs: {}", e);
+        Vec::new()
+    });
 
     let numa_topology = NumaTopology::detect().ok();
     let cpu_topology = CpuTopology::detect().ok();
@@ -546,7 +549,9 @@ pub async fn get_optimization_recommendations(
         if let Some(ref cpu) = cpu_topology {
             if vm.cpus <= cpu.total_cpus && cpu.total_cpus > 4 {
                 // Recommend pinning for VMs with dedicated cores
-                let available_cores: Vec<u32> = cpu.cpus.iter()
+                let available_cores: Vec<u32> = cpu
+                    .cpus
+                    .iter()
                     .filter(|c| c.online)
                     .map(|c| c.id)
                     .take(vm.cpus as usize)
@@ -557,8 +562,10 @@ pub async fn get_optimization_recommendations(
                         resource: "CPU Pinning".to_string(),
                         current_value: "unpinned".to_string(),
                         recommended_value: format!("cores {:?}", available_cores),
-                        reason: "CPU pinning reduces context switching and cache misses".to_string(),
-                        impact: "5-15% CPU performance improvement for compute-intensive workloads".to_string(),
+                        reason: "CPU pinning reduces context switching and cache misses"
+                            .to_string(),
+                        impact: "5-15% CPU performance improvement for compute-intensive workloads"
+                            .to_string(),
                     });
                 }
             }
@@ -584,7 +591,8 @@ pub async fn get_optimization_recommendations(
                 resource: "Memory Ballooning".to_string(),
                 current_value: "disabled".to_string(),
                 recommended_value: "enabled".to_string(),
-                reason: "Enables dynamic memory reclamation for better host utilization".to_string(),
+                reason: "Enables dynamic memory reclamation for better host utilization"
+                    .to_string(),
                 impact: "Allows host to reclaim unused VM memory during pressure".to_string(),
             });
         }
@@ -626,7 +634,9 @@ pub async fn optimize_vm(
     if let Ok(numa) = NumaTopology::detect() {
         if numa.nodes.len() > 1 {
             if let Some(placement) = numa.recommend_placement(vm.memory, vm.cpus) {
-                let cpu_list = placement.cpu_affinity.iter()
+                let cpu_list = placement
+                    .cpu_affinity
+                    .iter()
                     .map(|c| c.to_string())
                     .collect::<Vec<_>>()
                     .join(",");
@@ -641,7 +651,10 @@ pub async fn optimize_vm(
 
                 match output {
                     Ok(o) if o.status.success() => {
-                        applied.push(format!("CPU pinning to NUMA node {} (cores: {})", placement.numa_node, cpu_list));
+                        applied.push(format!(
+                            "CPU pinning to NUMA node {} (cores: {})",
+                            placement.numa_node, cpu_list
+                        ));
                     }
                     _ => {
                         skipped.push("CPU pinning: failed to apply via systemctl".to_string());

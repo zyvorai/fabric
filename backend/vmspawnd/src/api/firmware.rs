@@ -2,15 +2,11 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::Path,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::Path, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::validation::validate_vm_name;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 use vmspawnd_vm::{is_ovmf_available, is_secureboot_available, FirmwareStatus, TpmVersion};
 
 // Request/Response types
@@ -57,8 +53,8 @@ pub async fn get_firmware_status(
 
     tracing::info!("Getting firmware status for VM '{}'", vm_name);
 
-    let config_dir = std::env::var("VM_CONFIG_DIR")
-        .unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
+    let config_dir =
+        std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
@@ -71,7 +67,8 @@ pub async fn get_firmware_status(
     }
 
     // Read VM configuration
-    let config_str = tokio::fs::read_to_string(&config_path).await
+    let config_str = tokio::fs::read_to_string(&config_path)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -127,8 +124,8 @@ pub async fn enable_uefi(
         req.tpm_version
     );
 
-    let config_dir = std::env::var("VM_CONFIG_DIR")
-        .unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
+    let config_dir =
+        std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
@@ -141,7 +138,8 @@ pub async fn enable_uefi(
     }
 
     // 1. Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path).await
+    let config_str = tokio::fs::read_to_string(&config_path)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -149,7 +147,8 @@ pub async fn enable_uefi(
 
     // 2. Create OvmfConfig with specified settings
     let vm_dir = std::path::Path::new(&config_dir).join(&vm_name);
-    tokio::fs::create_dir_all(&vm_dir).await
+    tokio::fs::create_dir_all(&vm_dir)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let ovmf_config = vmspawnd_vm::OvmfConfig::new(&vm_name, &vm_dir, req.secure_boot)
@@ -175,7 +174,8 @@ pub async fn enable_uefi(
     let updated_config = serde_json::to_string_pretty(&vm_config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    tokio::fs::write(&config_path, updated_config).await
+    tokio::fs::write(&config_path, updated_config)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!("UEFI enabled for VM '{}'", vm_name);
@@ -201,8 +201,8 @@ pub async fn enable_secureboot(
     }
 
     // Update VM configuration to enable Secure Boot
-    let config_dir = std::env::var("VM_CONFIG_DIR")
-        .unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
+    let config_dir =
+        std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
@@ -215,16 +215,15 @@ pub async fn enable_secureboot(
     }
 
     // Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path).await
+    let config_str = tokio::fs::read_to_string(&config_path)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Update to UEFI with Secure Boot
-    vm_config.firmware = vmspawnd_vm::Firmware::UEFI {
-        secure_boot: true,
-    };
+    vm_config.firmware = vmspawnd_vm::Firmware::UEFI { secure_boot: true };
 
     // Recreate OVMF config with Secure Boot
     let vm_dir = std::path::Path::new(&config_dir).join(&vm_name);
@@ -235,7 +234,8 @@ pub async fn enable_secureboot(
     let updated_config = serde_json::to_string_pretty(&vm_config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    tokio::fs::write(&config_path, updated_config).await
+    tokio::fs::write(&config_path, updated_config)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!("Secure Boot enabled for VM '{}'", vm_name);
@@ -253,8 +253,8 @@ pub async fn disable_secureboot(
     tracing::info!("Disabling Secure Boot for VM '{}'", vm_name);
 
     // Update VM configuration to disable Secure Boot
-    let config_dir = std::env::var("VM_CONFIG_DIR")
-        .unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
+    let config_dir =
+        std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
@@ -267,16 +267,15 @@ pub async fn disable_secureboot(
     }
 
     // Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path).await
+    let config_str = tokio::fs::read_to_string(&config_path)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Update to UEFI without Secure Boot
-    vm_config.firmware = vmspawnd_vm::Firmware::UEFI {
-        secure_boot: false,
-    };
+    vm_config.firmware = vmspawnd_vm::Firmware::UEFI { secure_boot: false };
 
     // Recreate OVMF config without Secure Boot
     let vm_dir = std::path::Path::new(&config_dir).join(&vm_name);
@@ -287,7 +286,8 @@ pub async fn disable_secureboot(
     let updated_config = serde_json::to_string_pretty(&vm_config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    tokio::fs::write(&config_path, updated_config).await
+    tokio::fs::write(&config_path, updated_config)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!("Secure Boot disabled for VM '{}'", vm_name);
@@ -305,8 +305,8 @@ pub async fn reset_nvram(
     tracing::info!("Resetting NVRAM for VM '{}'", vm_name);
 
     // Reset OVMF NVRAM variables to template defaults
-    let config_dir = std::env::var("VM_CONFIG_DIR")
-        .unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
+    let config_dir =
+        std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd/vms".to_string());
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
@@ -319,7 +319,8 @@ pub async fn reset_nvram(
     }
 
     // 1. Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path).await
+    let config_str = tokio::fs::read_to_string(&config_path)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let vm_config: vmspawnd_vm::VmConfig = serde_json::from_str(&config_str)
@@ -333,7 +334,8 @@ pub async fn reset_nvram(
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
             // 3. Call ovmf_config.reset_nvram()
-            ovmf_config.reset_nvram()
+            ovmf_config
+                .reset_nvram()
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
             tracing::info!("NVRAM reset successfully for VM '{}'", vm_name);

@@ -116,22 +116,13 @@ pub trait ResourceControlDriver: Send + Sync {
     ) -> impl std::future::Future<Output = Result<()>> + Send;
 
     /// Freeze (pause) all processes in the machine's cgroup.
-    fn freeze(
-        &self,
-        name: &str,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn freeze(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
 
     /// Thaw (resume) all processes in the machine's cgroup.
-    fn thaw(
-        &self,
-        name: &str,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn thaw(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
 
     /// Check if the machine's cgroup is frozen.
-    fn is_frozen(
-        &self,
-        name: &str,
-    ) -> impl std::future::Future<Output = Result<bool>> + Send;
+    fn is_frozen(&self, name: &str) -> impl std::future::Future<Output = Result<bool>> + Send;
 
     /// Set the maximum number of PIDs in the machine's cgroup.
     fn set_pids_max(

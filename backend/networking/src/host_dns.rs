@@ -85,14 +85,10 @@ fn discover_bind_zones() -> Result<Vec<(String, String)>> {
         if !p.exists() {
             continue;
         }
-        let content = fs::read_to_string(p)
-            .with_context(|| format!("read {}", p.display()))?;
+        let content = fs::read_to_string(p).with_context(|| format!("read {}", p.display()))?;
         for zone in parse_bind_zone_names(&content) {
             if seen.insert(zone.clone()) {
-                zones.push((
-                    zone,
-                    format!("BIND zone in {}", p.display()),
-                ));
+                zones.push((zone, format!("BIND zone in {}", p.display())));
             }
         }
     }

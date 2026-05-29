@@ -46,15 +46,19 @@ mod tests {
     #[test]
     fn test_parse_frozen_state() {
         let content = "populated 1\nfrozen 1\n";
-        let frozen = content
-            .lines()
-            .any(|l| l.trim().strip_prefix("frozen ").map_or(false, |v| v.trim() == "1"));
+        let frozen = content.lines().any(|l| {
+            l.trim()
+                .strip_prefix("frozen ")
+                .map_or(false, |v| v.trim() == "1")
+        });
         assert!(frozen);
 
         let content2 = "populated 1\nfrozen 0\n";
-        let frozen2 = content2
-            .lines()
-            .any(|l| l.trim().strip_prefix("frozen ").map_or(false, |v| v.trim() == "1"));
+        let frozen2 = content2.lines().any(|l| {
+            l.trim()
+                .strip_prefix("frozen ")
+                .map_or(false, |v| v.trim() == "1")
+        });
         assert!(!frozen2);
     }
 }

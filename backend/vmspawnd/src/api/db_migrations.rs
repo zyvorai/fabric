@@ -2,15 +2,11 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
 use security::RequireAdmin;
@@ -42,8 +38,15 @@ pub async fn list_migrations(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Migration>>, (StatusCode, Json<serde_json::Value>)> {
-    let migrations = state.store.list_entities::<Migration>("db_migrations")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let migrations = state
+        .store
+        .list_entities::<Migration>("db_migrations")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
     Ok(Json(migrations))
 }
 
@@ -52,14 +55,26 @@ pub async fn apply_migrations(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let applied = state.store.list_entities::<Migration>("db_migrations")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let applied = state
+        .store
+        .list_entities::<Migration>("db_migrations")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
-    let applied_versions: std::collections::HashSet<u32> = applied.iter().map(|m| m.version).collect();
+    let applied_versions: std::collections::HashSet<u32> =
+        applied.iter().map(|m| m.version).collect();
     let mut newly_applied = Vec::new();
 
-    let _user_db = state.user_db.as_ref()
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Database not available"}))))?;
+    let _user_db = state.user_db.as_ref().ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Database not available"})),
+        )
+    })?;
 
     for (version, name, sql) in all_migrations() {
         if applied_versions.contains(&version) {
@@ -69,8 +84,12 @@ pub async fn apply_migrations(
         // Execute migration SQL against the database
         tracing::info!("Applying migration v{}: {}", version, name);
 
-        _user_db.run_migration(sql)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Migration v{} failed: {}", version, e)}))))?;
+        _user_db.run_migration(sql).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Migration v{} failed: {}", version, e)})),
+            )
+        })?;
 
         // Record migration as applied
         let migration = Migration {
@@ -79,8 +98,15 @@ pub async fn apply_migrations(
             applied_at: Utc::now(),
         };
 
-        state.store.save_entity("db_migrations", &version.to_string(), &migration)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        state
+            .store
+            .save_entity("db_migrations", &version.to_string(), &migration)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": e.to_string()})),
+                )
+            })?;
 
         newly_applied.push(name.to_string());
     }
@@ -97,8 +123,15 @@ pub async fn migration_status(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let applied = state.store.list_entities::<Migration>("db_migrations")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let applied = state
+        .store
+        .list_entities::<Migration>("db_migrations")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     let total = all_migrations().len();
     let applied_count = applied.len();

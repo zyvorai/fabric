@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use tracing;
 
 use crate::models::{CompiledNatRule, NatChain, NatProtocol};
@@ -30,18 +30,17 @@ fn validate_nat_action(action: &str) -> Result<()> {
             // Target may be "ip:port" or just "ip"
             let ip_part = if let Some((ip, port)) = target.rsplit_once(':') {
                 // Validate port
-                port.parse::<u16>().map_err(|_| {
-                    anyhow!("Invalid port in NAT action: '{}'", port)
-                })?;
+                port.parse::<u16>()
+                    .map_err(|_| anyhow!("Invalid port in NAT action: '{}'", port))?;
                 ip
             } else {
                 target
             };
 
             // Validate IP address
-            ip_part.parse::<std::net::IpAddr>().map_err(|_| {
-                anyhow!("Invalid IP address in NAT action: '{}'", ip_part)
-            })?;
+            ip_part
+                .parse::<std::net::IpAddr>()
+                .map_err(|_| anyhow!("Invalid IP address in NAT action: '{}'", ip_part))?;
 
             return Ok(());
         }
@@ -97,14 +96,8 @@ impl NatEnforcer {
     /// Sync all NAT rules by flushing and reapplying.
     pub fn sync_rules(&self, rules: &[CompiledNatRule]) -> Result<()> {
         // Flush existing rules
-        let _ = run_nft(&format!(
-            "flush chain ip {} nat_prerouting",
-            TABLE_NAME
-        ));
-        let _ = run_nft(&format!(
-            "flush chain ip {} nat_postrouting",
-            TABLE_NAME
-        ));
+        let _ = run_nft(&format!("flush chain ip {} nat_prerouting", TABLE_NAME));
+        let _ = run_nft(&format!("flush chain ip {} nat_postrouting", TABLE_NAME));
 
         for rule in rules {
             let rule_str = self.build_nat_rule_string(rule)?;

@@ -22,7 +22,9 @@ pub trait MachineManager {
     ///
     /// Returns an array of (name, class, service_id, object_path).
     #[zbus(name = "ListMachines")]
-    fn list_machines(&self) -> zbus::Result<Vec<(String, String, String, zbus::zvariant::OwnedObjectPath)>>;
+    fn list_machines(
+        &self,
+    ) -> zbus::Result<Vec<(String, String, String, zbus::zvariant::OwnedObjectPath)>>;
 
     /// Get the object path for a machine by name.
     #[zbus(name = "GetMachine")]
@@ -100,7 +102,17 @@ pub trait ImageManager {
     #[zbus(name = "ListImages")]
     fn list_images(
         &self,
-    ) -> zbus::Result<Vec<(String, String, bool, u64, u64, u64, zbus::zvariant::OwnedObjectPath)>>;
+    ) -> zbus::Result<
+        Vec<(
+            String,
+            String,
+            bool,
+            u64,
+            u64,
+            u64,
+            zbus::zvariant::OwnedObjectPath,
+        )>,
+    >;
 
     /// Clone an image.
     #[zbus(name = "CloneImage")]

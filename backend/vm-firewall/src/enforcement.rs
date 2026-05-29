@@ -52,10 +52,7 @@ impl FirewallEnforcer {
         // Create per-VM chains
         for chain in chains {
             // Create the VM chain
-            run_nft(&format!(
-                "add chain ip {} {}",
-                TABLE_NAME, chain.chain_name
-            ))?;
+            run_nft(&format!("add chain ip {} {}", TABLE_NAME, chain.chain_name))?;
 
             // Always allow established/related connections first
             run_nft(&format!(
@@ -185,9 +182,9 @@ impl FirewallEnforcer {
     /// only alphanumeric characters and underscores, to prevent nft command injection.
     pub fn build_jump_rule(&self, vm_ip: &str, chain_name: &str) -> Result<String> {
         // Validate vm_ip is a valid IP address
-        vm_ip.parse::<std::net::IpAddr>().map_err(|_| {
-            anyhow::anyhow!("Invalid VM IP address for jump rule: '{}'", vm_ip)
-        })?;
+        vm_ip
+            .parse::<std::net::IpAddr>()
+            .map_err(|_| anyhow::anyhow!("Invalid VM IP address for jump rule: '{}'", vm_ip))?;
 
         // Validate chain_name is alphanumeric + underscores only
         if chain_name.is_empty()

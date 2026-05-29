@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageRecord {
@@ -71,10 +71,30 @@ pub fn calculate_cost(usage: &UsageRecord, pricing: &PricingRule) -> Invoice {
     let network_cost = (usage.network_bytes as f64 / 1_073_741_824.0) * pricing.network_per_gb;
 
     let items = vec![
-        InvoiceLineItem { description: "CPU Hours".into(), quantity: usage.cpu_hours, unit_price: pricing.cpu_per_hour, amount: cpu_cost },
-        InvoiceLineItem { description: "Memory (GB-Hours)".into(), quantity: usage.memory_gb_hours, unit_price: pricing.memory_gb_per_hour, amount: mem_cost },
-        InvoiceLineItem { description: "Storage (GB-Hours)".into(), quantity: usage.storage_gb_hours, unit_price: pricing.storage_gb_per_hour, amount: storage_cost },
-        InvoiceLineItem { description: "Network Transfer (GB)".into(), quantity: usage.network_bytes as f64 / 1_073_741_824.0, unit_price: pricing.network_per_gb, amount: network_cost },
+        InvoiceLineItem {
+            description: "CPU Hours".into(),
+            quantity: usage.cpu_hours,
+            unit_price: pricing.cpu_per_hour,
+            amount: cpu_cost,
+        },
+        InvoiceLineItem {
+            description: "Memory (GB-Hours)".into(),
+            quantity: usage.memory_gb_hours,
+            unit_price: pricing.memory_gb_per_hour,
+            amount: mem_cost,
+        },
+        InvoiceLineItem {
+            description: "Storage (GB-Hours)".into(),
+            quantity: usage.storage_gb_hours,
+            unit_price: pricing.storage_gb_per_hour,
+            amount: storage_cost,
+        },
+        InvoiceLineItem {
+            description: "Network Transfer (GB)".into(),
+            quantity: usage.network_bytes as f64 / 1_073_741_824.0,
+            unit_price: pricing.network_per_gb,
+            amount: network_cost,
+        },
     ];
 
     let total = cpu_cost + mem_cost + storage_cost + network_cost;
@@ -92,7 +112,14 @@ pub fn calculate_cost(usage: &UsageRecord, pricing: &PricingRule) -> Invoice {
 }
 
 /// Collect usage from running VMs for a given period.
-pub fn collect_vm_usage(vm_name: &str, tenant_id: &str, cpus: u32, memory_mb: u64, disk_gb: u64, hours: f64) -> UsageRecord {
+pub fn collect_vm_usage(
+    vm_name: &str,
+    tenant_id: &str,
+    cpus: u32,
+    memory_mb: u64,
+    disk_gb: u64,
+    hours: f64,
+) -> UsageRecord {
     UsageRecord {
         id: uuid::Uuid::new_v4().to_string(),
         tenant_id: tenant_id.to_string(),

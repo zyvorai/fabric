@@ -51,14 +51,24 @@ pub struct LvmPool {
 /// LVM names may contain alphanumeric, hyphens, underscores, dots, and plus signs.
 fn validate_lvm_name(name: &str, label: &str) -> Result<(), LvmError> {
     if name.is_empty() || name.len() > 128 {
-        return Err(LvmError::CommandFailed(format!("{} must be 1-128 characters", label)));
+        return Err(LvmError::CommandFailed(format!(
+            "{} must be 1-128 characters",
+            label
+        )));
     }
     if name.starts_with('-') {
-        return Err(LvmError::CommandFailed(format!("{} must not start with a hyphen", label)));
-    }
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+')) {
         return Err(LvmError::CommandFailed(format!(
-            "{} '{}' contains invalid characters", label, name
+            "{} must not start with a hyphen",
+            label
+        )));
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+'))
+    {
+        return Err(LvmError::CommandFailed(format!(
+            "{} '{}' contains invalid characters",
+            label, name
         )));
     }
     Ok(())
@@ -69,8 +79,14 @@ fn validate_lvm_size(size: &str) -> Result<(), LvmError> {
     if size.is_empty() || size.len() > 20 {
         return Err(LvmError::CommandFailed("Invalid size string".to_string()));
     }
-    if !size.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '+' || c == '-') {
-        return Err(LvmError::CommandFailed(format!("Size '{}' contains invalid characters", size)));
+    if !size
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '+' || c == '-')
+    {
+        return Err(LvmError::CommandFailed(format!(
+            "Size '{}' contains invalid characters",
+            size
+        )));
     }
     Ok(())
 }
@@ -80,7 +96,15 @@ impl LvmPool {
     pub fn new(vg_name: &str) -> Result<Self, LvmError> {
         validate_lvm_name(vg_name, "VG name")?;
         let output = Command::new("vgs")
-            .args(["--noheadings", "--nosuffix", "--units", "b", "-o", "vg_name", vg_name])
+            .args([
+                "--noheadings",
+                "--nosuffix",
+                "--units",
+                "b",
+                "-o",
+                "vg_name",
+                vg_name,
+            ])
             .output()?;
 
         if !output.status.success() {
@@ -112,7 +136,8 @@ impl LvmPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(LvmError::CommandFailed(format!(
-                "lvcreate failed: {}", stderr
+                "lvcreate failed: {}",
+                stderr
             )));
         }
 
@@ -138,7 +163,8 @@ impl LvmPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(LvmError::CommandFailed(format!(
-                "lvcreate thin failed: {}", stderr
+                "lvcreate thin failed: {}",
+                stderr
             )));
         }
 
@@ -153,14 +179,13 @@ impl LvmPool {
     pub fn delete_volume(&self, name: &str) -> Result<(), LvmError> {
         validate_lvm_name(name, "LV name")?;
         let lv_path = format!("{}/{}", self.vg_name, name);
-        let output = Command::new("lvremove")
-            .args(["-f", &lv_path])
-            .output()?;
+        let output = Command::new("lvremove").args(["-f", &lv_path]).output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(LvmError::CommandFailed(format!(
-                "lvremove failed: {}", stderr
+                "lvremove failed: {}",
+                stderr
             )));
         }
 
@@ -180,7 +205,8 @@ impl LvmPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(LvmError::CommandFailed(format!(
-                "lvresize failed: {}", stderr
+                "lvresize failed: {}",
+                stderr
             )));
         }
 
@@ -192,17 +218,19 @@ impl LvmPool {
     pub fn list_volumes(&self) -> Result<Vec<LvmVolume>, LvmError> {
         let output = Command::new("lvs")
             .args([
-                "--noheadings", "--nosuffix", "--units", "b",
-                "-o", "lv_name,lv_size,lv_attr",
+                "--noheadings",
+                "--nosuffix",
+                "--units",
+                "b",
+                "-o",
+                "lv_name,lv_size,lv_attr",
                 &self.vg_name,
             ])
             .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(LvmError::CommandFailed(format!(
-                "lvs failed: {}", stderr
-            )));
+            return Err(LvmError::CommandFailed(format!("lvs failed: {}", stderr)));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -230,17 +258,19 @@ impl LvmPool {
     pub fn get_stats(&self) -> Result<LvmStats, LvmError> {
         let output = Command::new("vgs")
             .args([
-                "--noheadings", "--nosuffix", "--units", "b",
-                "-o", "vg_size,vg_free",
+                "--noheadings",
+                "--nosuffix",
+                "--units",
+                "b",
+                "-o",
+                "vg_size,vg_free",
                 &self.vg_name,
             ])
             .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(LvmError::CommandFailed(format!(
-                "vgs failed: {}", stderr
-            )));
+            return Err(LvmError::CommandFailed(format!("vgs failed: {}", stderr)));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -276,7 +306,8 @@ impl LvmPool {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(LvmError::CommandFailed(format!(
-                "lvcreate snapshot failed: {}", stderr
+                "lvcreate snapshot failed: {}",
+                stderr
             )));
         }
 

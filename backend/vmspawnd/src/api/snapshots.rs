@@ -15,7 +15,7 @@ use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SnapshotType {
@@ -88,7 +88,11 @@ pub async fn create_snapshot(
     // Validate description length
     if let Some(ref desc) = req.description {
         if desc.len() > 1024 {
-            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "Description must be at most 1024 characters").into_response();
+            return crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                "Description must be at most 1024 characters",
+            )
+            .into_response();
         }
     }
 
@@ -131,7 +135,12 @@ pub async fn create_snapshot(
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.save_entity(&store_key, &snapshot.id, &snapshot) {
         Ok(_) => {
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::SnapshotCreated, &vm_name, Some(format!("Snapshot: {}", snapshot.name)));
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::SnapshotCreated,
+                &vm_name,
+                Some(format!("Snapshot: {}", snapshot.name)),
+            );
             (StatusCode::CREATED, Json(snapshot)).into_response()
         }
         Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -150,7 +159,10 @@ pub async fn list_snapshots(
         return crate::api_error::json_error(status, msg).into_response();
     }
     let store_key = format!("snapshots_{}", vm_name);
-    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading {}: {}", store_key, e); Vec::new() });
+    let items: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| {
+        tracing::error!("Storage error loading {}: {}", store_key, e);
+        Vec::new()
+    });
     Json(items).into_response()
 }
 
@@ -167,8 +179,13 @@ pub async fn get_snapshot(
     let store_key = format!("snapshots_{}", vm_name);
     match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         Ok(Some(s)) => Json(s).into_response(),
-        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Snapshot not found").into_response(),
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load snapshot").into_response(),
+        Ok(None) => crate::api_error::json_error(StatusCode::NOT_FOUND, "Snapshot not found")
+            .into_response(),
+        Err(_) => crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load snapshot",
+        )
+        .into_response(),
     }
 }
 
@@ -229,14 +246,27 @@ pub async fn revert_snapshot(
 
     let snapshot = match state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         Ok(Some(s)) => s,
-        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Snapshot not found").into_response(),
-        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load snapshot").into_response(),
+        Ok(None) => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Snapshot not found")
+                .into_response()
+        }
+        Err(_) => {
+            return crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load snapshot",
+            )
+            .into_response()
+        }
     };
 
     // Check that the VM is stopped before reverting
     if let Ok(Some(vm)) = state.store.get_vm(&vm_name) {
         if vm.state == vm_model::VMState::Running || vm.state == vm_model::VMState::Starting {
-            return crate::api_error::json_error(StatusCode::CONFLICT, "VM must be stopped before reverting a snapshot").into_response();
+            return crate::api_error::json_error(
+                StatusCode::CONFLICT,
+                "VM must be stopped before reverting a snapshot",
+            )
+            .into_response();
         }
     }
 
@@ -267,7 +297,12 @@ pub async fn revert_snapshot(
         }
     }
 
-    crate::api::events::record_event(&state, crate::api::events::VMEventType::SnapshotReverted, &vm_name, Some(format!("Reverted to: {}", snapshot.name)));
+    crate::api::events::record_event(
+        &state,
+        crate::api::events::VMEventType::SnapshotReverted,
+        &vm_name,
+        Some(format!("Reverted to: {}", snapshot.name)),
+    );
     Json(serde_json::json!({"status": "reverted", "snapshot": snapshot.name})).into_response()
 }
 
@@ -282,7 +317,10 @@ pub async fn snapshot_tree(
         return crate::api_error::json_error(status, msg).into_response();
     }
     let store_key = format!("snapshots_{}", vm_name);
-    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| { tracing::error!("Storage error loading {}: {}", store_key, e); Vec::new() });
+    let snapshots: Vec<VMSnapshot> = state.store.list_entities(&store_key).unwrap_or_else(|e| {
+        tracing::error!("Storage error loading {}: {}", store_key, e);
+        Vec::new()
+    });
 
     // Build tree from parent_id relationships
     let roots: Vec<SnapshotTreeNode> = build_snapshot_tree(&snapshots);
@@ -295,15 +333,27 @@ fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {
     // Build parent_id -> children index for O(n) tree construction
     let mut children_map: HashMap<Option<&str>, Vec<&VMSnapshot>> = HashMap::new();
     for snap in snapshots {
-        children_map.entry(snap.parent_id.as_deref()).or_default().push(snap);
+        children_map
+            .entry(snap.parent_id.as_deref())
+            .or_default()
+            .push(snap);
     }
 
-    fn build_node(snap: &VMSnapshot, children_map: &HashMap<Option<&str>, Vec<&VMSnapshot>>, depth: usize) -> SnapshotTreeNode {
+    fn build_node(
+        snap: &VMSnapshot,
+        children_map: &HashMap<Option<&str>, Vec<&VMSnapshot>>,
+        depth: usize,
+    ) -> SnapshotTreeNode {
         let children = if depth >= 100 {
             vec![] // Prevent infinite recursion on circular parent references
         } else {
-            children_map.get(&Some(snap.id.as_str()))
-                .map(|kids| kids.iter().map(|s| build_node(s, children_map, depth + 1)).collect())
+            children_map
+                .get(&Some(snap.id.as_str()))
+                .map(|kids| {
+                    kids.iter()
+                        .map(|s| build_node(s, children_map, depth + 1))
+                        .collect()
+                })
                 .unwrap_or_default()
         };
         SnapshotTreeNode {
@@ -312,8 +362,14 @@ fn build_snapshot_tree(snapshots: &[VMSnapshot]) -> Vec<SnapshotTreeNode> {
         }
     }
 
-    children_map.get(&None)
-        .map(|roots| roots.iter().map(|s| build_node(s, &children_map, 0)).collect())
+    children_map
+        .get(&None)
+        .map(|roots| {
+            roots
+                .iter()
+                .map(|s| build_node(s, &children_map, 0))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -378,4 +434,3 @@ mod tests {
         assert!(depth <= 100, "Tree should stop at depth 100, got {}", depth);
     }
 }
-

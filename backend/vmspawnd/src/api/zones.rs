@@ -7,13 +7,13 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Availability Zones
@@ -49,7 +49,9 @@ pub struct CreateZoneRequest {
     pub hosts: Vec<String>,
 }
 
-fn default_region() -> String { "default".to_string() }
+fn default_region() -> String {
+    "default".to_string()
+}
 
 /// POST /api/zones - Create an availability zone
 pub async fn create_zone(
@@ -62,7 +64,10 @@ pub async fn create_zone(
         return Err((status, Json(json!({"error": msg}))));
     }
     if req.hosts.len() > 1000 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "hosts count must not exceed 1000"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "hosts count must not exceed 1000"})),
+        ));
     }
     let zone = AvailabilityZone {
         id: uuid::Uuid::new_v4().to_string(),
@@ -74,9 +79,15 @@ pub async fn create_zone(
         created: Utc::now(),
     };
 
-    state.store.save_entity("zones", &zone.id, &zone).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("zones", &zone.id, &zone)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(zone)))
 }
@@ -87,7 +98,10 @@ pub async fn list_zones(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<AvailabilityZone>> {
     tracing::debug!("zones::{}", stringify!(list_zones));
-    let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let zones: Vec<AvailabilityZone> = state.store.list_entities("zones").unwrap_or_else(|e| {
+        tracing::error!("Storage error: {}", e);
+        Vec::new()
+    });
     Json(zones)
 }
 
@@ -100,8 +114,14 @@ pub async fn get_zone(
     tracing::debug!("zones::{}", stringify!(get_zone));
     match state.store.get_entity::<AvailabilityZone>("zones", &id) {
         Ok(Some(zone)) => Ok(Json(zone)),
-        Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Zone not found" })))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Zone not found" })),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -113,7 +133,10 @@ pub async fn delete_zone(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("zones::{}", stringify!(delete_zone));
     state.store.delete_entity("zones", &id).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
     })?;
 
     Ok(StatusCode::NO_CONTENT)
@@ -171,8 +194,12 @@ pub struct CreateSpotRequest {
     pub eviction_policy: Option<EvictionPolicy>,
 }
 
-fn default_max_price() -> f64 { 0.10 }
-fn default_eviction_policy() -> Option<EvictionPolicy> { Some(EvictionPolicy::Stop) }
+fn default_max_price() -> f64 {
+    0.10
+}
+fn default_eviction_policy() -> Option<EvictionPolicy> {
+    Some(EvictionPolicy::Stop)
+}
 
 /// POST /api/spot-instances - Create a spot instance request
 pub async fn create_spot_instance(
@@ -184,13 +211,26 @@ pub async fn create_spot_instance(
     crate::validation::validate_vm_name(&req.vm_name)
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     if !req.max_price_per_hour.is_finite() || req.max_price_per_hour <= 0.0 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "max_price_per_hour must be a positive finite number"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "max_price_per_hour must be a positive finite number"})),
+        ));
     }
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
-        Ok(Some(_)) => {},
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "VM not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "VM not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     }
 
     let spot = SpotInstance {
@@ -205,9 +245,15 @@ pub async fn create_spot_instance(
         evicted_at: None,
     };
 
-    state.store.save_entity("spot_instances", &spot.id, &spot).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("spot_instances", &spot.id, &spot)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(spot)))
 }
@@ -218,7 +264,14 @@ pub async fn list_spot_instances(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<SpotInstance>> {
     tracing::debug!("zones::{}", stringify!(list_spot_instances));
-    let spots: Vec<SpotInstance> = state.store.list_entities("spot_instances").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let spots: Vec<SpotInstance> =
+        state
+            .store
+            .list_entities("spot_instances")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     Json(spots)
 }
 
@@ -229,10 +282,23 @@ pub async fn evict_spot_instance(
     Path(id): Path<String>,
 ) -> Result<Json<SpotInstance>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("zones::{}", stringify!(evict_spot_instance));
-    let mut spot = match state.store.get_entity::<SpotInstance>("spot_instances", &id) {
+    let mut spot = match state
+        .store
+        .get_entity::<SpotInstance>("spot_instances", &id)
+    {
         Ok(Some(s)) => s,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Spot instance not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Spot instance not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
     // Apply eviction policy
@@ -272,9 +338,15 @@ pub async fn evict_spot_instance(
     spot.status = SpotStatus::Evicted;
     spot.evicted_at = Some(Utc::now());
 
-    state.store.save_entity("spot_instances", &id, &spot).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("spot_instances", &id, &spot)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(spot))
 }
@@ -286,9 +358,15 @@ pub async fn delete_spot_instance(
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("zones::{}", stringify!(delete_spot_instance));
-    state.store.delete_entity("spot_instances", &id).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .delete_entity("spot_instances", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -7,14 +7,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 /// Backup directory, read once from the BACKUP_DIR environment variable (or default).
 static BACKUP_DIR: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
@@ -165,7 +165,9 @@ pub async fn list_backups(
 ) -> Result<Json<Vec<Backup>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(list_backups));
     // Load from state store
-    let mut backups = state.store.list_entities::<Backup>("backups")
+    let mut backups = state
+        .store
+        .list_entities::<Backup>("backups")
         .unwrap_or_default();
 
     // Filter by VM if specified
@@ -183,8 +185,12 @@ pub async fn get_backup(
 ) -> Result<Json<Backup>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(get_backup));
     // Load from state store
-    let backup = state.store.get_entity::<Backup>("backups", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup"))?
+    let backup = state
+        .store
+        .get_entity::<Backup>("backups", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup")
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup not found"))?;
 
     Ok(Json(backup))
@@ -210,7 +216,10 @@ pub async fn create_backup(
         }
         Err(e) => {
             tracing::error!("Failed to check VM existence: {}", e);
-            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to check VM existence"));
+            return Err(crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to check VM existence",
+            ));
         }
     }
 
@@ -230,7 +239,10 @@ pub async fn create_backup(
     // Save job to state store
     if let Err(e) = state.store.save_entity("backup_jobs", &job.id, &job) {
         tracing::error!("Failed to save backup job: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save backup job"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to save backup job",
+        ));
     }
 
     // Start backup process in supervised background worker
@@ -239,12 +251,19 @@ pub async fn create_backup(
     let state_clone = state.clone();
 
     let handle = tokio::spawn(async move {
-        tracing::info!("Starting backup job {} for VM {} in background", job_id, vm_name);
+        tracing::info!(
+            "Starting backup job {} for VM {} in background",
+            job_id,
+            vm_name
+        );
 
         let state_ref = state_clone.clone();
         if let Err(e) = process_backup_job(state_clone, job_id.clone(), vm_name).await {
             tracing::error!("Backup job {} failed: {}", job_id, e);
-            if let Ok(Some(mut job)) = state_ref.store.get_entity::<BackupJob>("backup_jobs", &job_id) {
+            if let Ok(Some(mut job)) = state_ref
+                .store
+                .get_entity::<BackupJob>("backup_jobs", &job_id)
+            {
                 job.status = JobStatus::Failed;
                 job.error = Some(e.to_string());
                 job.completed_at = Some(Utc::now());
@@ -261,11 +280,18 @@ pub async fn create_backup(
     tokio::spawn(async move {
         if let Err(e) = handle.await {
             tracing::error!("Backup worker for job {} panicked: {}", job_id_monitor, e);
-            if let Ok(Some(mut job)) = state_monitor.store.get_entity::<BackupJob>("backup_jobs", &job_id_monitor) {
+            if let Ok(Some(mut job)) = state_monitor
+                .store
+                .get_entity::<BackupJob>("backup_jobs", &job_id_monitor)
+            {
                 job.status = JobStatus::Failed;
                 job.error = Some("Internal error: worker panicked".to_string());
                 job.completed_at = Some(Utc::now());
-                if let Err(e) = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job) {
+                if let Err(e) =
+                    state_monitor
+                        .store
+                        .save_entity("backup_jobs", &job_id_monitor, &job)
+                {
                     tracing::error!("Failed to save: {}", e);
                 }
             }
@@ -288,27 +314,45 @@ pub async fn delete_backup(
         Ok(Some(b)) => b,
         Ok(None) => {
             tracing::warn!("Backup {} not found", id);
-            return Err(crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup not found"));
+            return Err(crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                "Backup not found",
+            ));
         }
         Err(e) => {
             tracing::error!("Failed to load backup: {}", e);
-            return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup"));
+            return Err(crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load backup",
+            ));
         }
     };
 
     // Validate that the backup file is under the expected backup directory
     let backup_dir_prefix = format!("{}/", BACKUP_DIR.trim_end_matches('/'));
     let storage_path = std::path::Path::new(&backup.storage_location);
-    let resolved = storage_path.canonicalize().unwrap_or_else(|_| storage_path.to_path_buf());
+    let resolved = storage_path
+        .canonicalize()
+        .unwrap_or_else(|_| storage_path.to_path_buf());
     if !resolved.to_string_lossy().starts_with(&backup_dir_prefix) {
-        tracing::error!("Refusing to delete backup outside allowed directory: {}", backup.storage_location);
-        return Err(crate::api_error::json_error(StatusCode::FORBIDDEN, "Backup file is outside allowed directory"));
+        tracing::error!(
+            "Refusing to delete backup outside allowed directory: {}",
+            backup.storage_location
+        );
+        return Err(crate::api_error::json_error(
+            StatusCode::FORBIDDEN,
+            "Backup file is outside allowed directory",
+        ));
     }
 
     if resolved.exists() {
         // Use the canonicalized path for deletion to prevent TOCTOU symlink attacks
         if let Err(e) = tokio::fs::remove_file(&resolved).await {
-            tracing::error!("Failed to delete backup file {}: {}", backup.storage_location, e);
+            tracing::error!(
+                "Failed to delete backup file {}: {}",
+                backup.storage_location,
+                e
+            );
             // Don't fail the request if file deletion fails - continue to remove from state store
         } else {
             tracing::info!("Deleted backup file: {}", backup.storage_location);
@@ -320,7 +364,10 @@ pub async fn delete_backup(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("backups", &id) {
         tracing::error!("Failed to delete backup from state store: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete backup from state store"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to delete backup from state store",
+        ));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -333,11 +380,17 @@ pub async fn restore_backup(
 ) -> Result<(StatusCode, Json<BackupJob>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(restore_backup));
     // Validate backup exists
-    let backup = state.store.get_entity::<Backup>("backups", &req.backup_id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup"))?
+    let backup = state
+        .store
+        .get_entity::<Backup>("backups", &req.backup_id)
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup")
+        })?
         .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup not found"))?;
 
-    let target_vm = req.target_vm_name.clone()
+    let target_vm = req
+        .target_vm_name
+        .clone()
         .unwrap_or_else(|| backup.vm_name.clone());
 
     // Create restore job
@@ -356,7 +409,10 @@ pub async fn restore_backup(
     // Save job to state store
     if let Err(e) = state.store.save_entity("backup_jobs", &job.id, &job) {
         tracing::error!("Failed to save restore job: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save restore job"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to save restore job",
+        ));
     }
 
     // Start restore process in supervised background worker
@@ -366,12 +422,21 @@ pub async fn restore_backup(
     let state_clone = state.clone();
 
     let handle = tokio::spawn(async move {
-        tracing::info!("Starting restore job {} from backup {} in background", job_id, backup_id);
+        tracing::info!(
+            "Starting restore job {} from backup {} in background",
+            job_id,
+            backup_id
+        );
 
         let state_ref = state_clone.clone();
-        if let Err(e) = process_restore_job(state_clone, job_id.clone(), backup_id, target_vm_clone).await {
+        if let Err(e) =
+            process_restore_job(state_clone, job_id.clone(), backup_id, target_vm_clone).await
+        {
             tracing::error!("Restore job {} failed: {}", job_id, e);
-            if let Ok(Some(mut job)) = state_ref.store.get_entity::<BackupJob>("backup_jobs", &job_id) {
+            if let Ok(Some(mut job)) = state_ref
+                .store
+                .get_entity::<BackupJob>("backup_jobs", &job_id)
+            {
                 job.status = JobStatus::Failed;
                 job.error = Some(e.to_string());
                 job.completed_at = Some(Utc::now());
@@ -388,19 +453,30 @@ pub async fn restore_backup(
     tokio::spawn(async move {
         if let Err(e) = handle.await {
             tracing::error!("Restore worker for job {} panicked: {}", job_id_monitor, e);
-            if let Ok(Some(mut job)) = state_monitor.store.get_entity::<BackupJob>("backup_jobs", &job_id_monitor) {
+            if let Ok(Some(mut job)) = state_monitor
+                .store
+                .get_entity::<BackupJob>("backup_jobs", &job_id_monitor)
+            {
                 job.status = JobStatus::Failed;
                 job.error = Some("Internal error: worker panicked".to_string());
                 job.completed_at = Some(Utc::now());
-                if let Err(e) = state_monitor.store.save_entity("backup_jobs", &job_id_monitor, &job) {
+                if let Err(e) =
+                    state_monitor
+                        .store
+                        .save_entity("backup_jobs", &job_id_monitor, &job)
+                {
                     tracing::error!("Failed to save: {}", e);
                 }
             }
         }
     });
 
-    tracing::info!("Created restore job {} from backup {} to VM {}",
-                   job.id, req.backup_id, target_vm);
+    tracing::info!(
+        "Created restore job {} from backup {} to VM {}",
+        job.id,
+        req.backup_id,
+        target_vm
+    );
 
     Ok((StatusCode::CREATED, Json(job)))
 }
@@ -415,7 +491,9 @@ pub async fn get_backup_jobs(
 ) -> Result<Json<Vec<BackupJob>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(get_backup_jobs));
     // Load from state store
-    let jobs = state.store.list_entities::<BackupJob>("backup_jobs")
+    let jobs = state
+        .store
+        .list_entities::<BackupJob>("backup_jobs")
         .unwrap_or_default();
 
     Ok(Json(jobs))
@@ -428,9 +506,18 @@ pub async fn get_backup_job(
 ) -> Result<Json<BackupJob>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(get_backup_job));
     // Load from state store
-    let job = state.store.get_entity::<BackupJob>("backup_jobs", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup job"))?
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup job not found"))?;
+    let job = state
+        .store
+        .get_entity::<BackupJob>("backup_jobs", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load backup job",
+            )
+        })?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup job not found")
+        })?;
 
     Ok(Json(job))
 }
@@ -444,8 +531,16 @@ pub async fn list_backup_policies(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BackupPolicy>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(list_backup_policies));
-    let policies = state.store.list_entities::<BackupPolicy>("backup_policies")
-        .map_err(|e| { tracing::error!("Failed to load backup policies: {}", e); crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup policies") })?;
+    let policies = state
+        .store
+        .list_entities::<BackupPolicy>("backup_policies")
+        .map_err(|e| {
+            tracing::error!("Failed to load backup policies: {}", e);
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load backup policies",
+            )
+        })?;
 
     Ok(Json(policies))
 }
@@ -471,9 +566,15 @@ pub async fn create_backup_policy(
     };
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
+    if let Err(e) = state
+        .store
+        .save_entity("backup_policies", &policy.id, &policy)
+    {
         tracing::error!("Failed to save backup policy: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            e.to_string(),
+        ));
     }
 
     Ok((StatusCode::CREATED, Json(policy)))
@@ -488,7 +589,10 @@ pub async fn delete_backup_policy(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("backup_policies", &id) {
         tracing::error!("Failed to delete backup policy: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete backup policy"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to delete backup policy",
+        ));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -501,9 +605,18 @@ pub async fn enable_backup_policy(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(enable_backup_policy));
     // Load policy from state store
-    let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup policy"))?
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup policy not found"))?;
+    let mut policy = state
+        .store
+        .get_entity::<BackupPolicy>("backup_policies", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load backup policy",
+            )
+        })?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup policy not found")
+        })?;
 
     // Set enabled = true
     policy.enabled = true;
@@ -512,9 +625,15 @@ pub async fn enable_backup_policy(
     policy.next_run = Some(Utc::now() + Duration::days(1));
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
+    if let Err(e) = state
+        .store
+        .save_entity("backup_policies", &policy.id, &policy)
+    {
         tracing::error!("Failed to enable backup policy: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to enable backup policy"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to enable backup policy",
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -527,9 +646,18 @@ pub async fn disable_backup_policy(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(disable_backup_policy));
     // Load policy from state store
-    let mut policy = state.store.get_entity::<BackupPolicy>("backup_policies", &id)
-        .map_err(|_| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load backup policy"))?
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup policy not found"))?;
+    let mut policy = state
+        .store
+        .get_entity::<BackupPolicy>("backup_policies", &id)
+        .map_err(|_| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load backup policy",
+            )
+        })?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Backup policy not found")
+        })?;
 
     // Set enabled = false
     policy.enabled = false;
@@ -538,9 +666,15 @@ pub async fn disable_backup_policy(
     policy.next_run = None;
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("backup_policies", &policy.id, &policy) {
+    if let Err(e) = state
+        .store
+        .save_entity("backup_policies", &policy.id, &policy)
+    {
         tracing::error!("Failed to disable backup policy: {}", e);
-        return Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to disable backup policy"));
+        return Err(crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to disable backup policy",
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -556,7 +690,9 @@ pub async fn get_backup_stats(
 ) -> Result<Json<BackupStats>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("backups::{}", stringify!(get_backup_stats));
     // Calculate from state store
-    let backups = state.store.list_entities::<Backup>("backups")
+    let backups = state
+        .store
+        .list_entities::<Backup>("backups")
         .unwrap_or_default();
 
     let total_backups = backups.len() as u64;
@@ -611,13 +747,17 @@ async fn process_backup_job(
     vm_name: String,
 ) -> Result<(), String> {
     // Update job status to running
-    let mut job = state.store.get_entity::<BackupJob>("backup_jobs", &job_id)
+    let mut job = state
+        .store
+        .get_entity::<BackupJob>("backup_jobs", &job_id)
         .map_err(|e| format!("Failed to load job: {}", e))?
         .ok_or("Job not found")?;
 
     job.status = JobStatus::Running;
     job.started_at = Some(Utc::now());
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to update job: {}", e))?;
 
     tracing::info!("Processing backup job {} for VM {}", job_id, vm_name);
@@ -627,13 +767,16 @@ async fn process_backup_job(
         .map_err(|(_, msg)| format!("Invalid VM name: {}", msg))?;
 
     // Validate VM exists
-    let vm = state.store.get_vm(&vm_name)
+    let vm = state
+        .store
+        .get_vm(&vm_name)
         .map_err(|e| format!("Failed to get VM: {}", e))?
         .ok_or_else(|| format!("VM '{}' not found", vm_name))?;
 
     // Create backup storage directory
     let backup_dir = &*BACKUP_DIR;
-    tokio::fs::create_dir_all(backup_dir).await
+    tokio::fs::create_dir_all(backup_dir)
+        .await
         .map_err(|e| format!("Failed to create backup directory: {}", e))?;
 
     // Generate backup file path
@@ -666,13 +809,17 @@ async fn process_backup_job(
 
     // Update progress: starting copy
     job.progress = 10.0;
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to update progress: {}", e))?;
 
     // Use qemu-img convert for a consistent copy (handles snapshots, compresses output)
     let dest_str = backup_path.display().to_string();
     let output = tokio::process::Command::new("qemu-img")
-        .args(["convert", "-f", "qcow2", "-O", "qcow2", "-c", &src_path, &dest_str])
+        .args([
+            "convert", "-f", "qcow2", "-O", "qcow2", "-c", &src_path, &dest_str,
+        ])
         .output()
         .await
         .map_err(|e| format!("Failed to run qemu-img: {}", e))?;
@@ -686,7 +833,9 @@ async fn process_backup_job(
 
     // Update progress: copy finished
     job.progress = 90.0;
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to update progress: {}", e))?;
 
     // Get the actual file size of the backup
@@ -701,10 +850,7 @@ async fn process_backup_job(
         "description".to_string(),
         serde_json::json!(format!("Backup of VM {}", vm_name)),
     );
-    metadata.insert(
-        "source_image".to_string(),
-        serde_json::json!(src_path),
-    );
+    metadata.insert("source_image".to_string(), serde_json::json!(src_path));
 
     let backup = Backup {
         id: job_id.clone(),
@@ -721,17 +867,25 @@ async fn process_backup_job(
     };
 
     // Save backup metadata
-    state.store.save_entity("backups", &backup.id, &backup)
+    state
+        .store
+        .save_entity("backups", &backup.id, &backup)
         .map_err(|e| format!("Failed to save backup metadata: {}", e))?;
 
     // Update job to completed
     job.status = JobStatus::Completed;
     job.progress = 100.0;
     job.completed_at = Some(Utc::now());
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to complete job: {}", e))?;
 
-    tracing::info!("Backup job {} completed successfully ({} bytes)", job_id, size_bytes);
+    tracing::info!(
+        "Backup job {} completed successfully ({} bytes)",
+        job_id,
+        size_bytes
+    );
     Ok(())
 }
 
@@ -743,27 +897,40 @@ async fn process_restore_job(
     target_vm: String,
 ) -> Result<(), String> {
     // Update job status to running
-    let mut job = state.store.get_entity::<BackupJob>("backup_jobs", &job_id)
+    let mut job = state
+        .store
+        .get_entity::<BackupJob>("backup_jobs", &job_id)
         .map_err(|e| format!("Failed to load job: {}", e))?
         .ok_or("Job not found")?;
 
     job.status = JobStatus::Running;
     job.started_at = Some(Utc::now());
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to update job: {}", e))?;
 
-    tracing::info!("Processing restore job {} from backup {} to VM {}",
-                   job_id, backup_id, target_vm);
+    tracing::info!(
+        "Processing restore job {} from backup {} to VM {}",
+        job_id,
+        backup_id,
+        target_vm
+    );
 
     // Validate backup exists
-    let backup = state.store.get_entity::<Backup>("backups", &backup_id)
+    let backup = state
+        .store
+        .get_entity::<Backup>("backups", &backup_id)
         .map_err(|e| format!("Failed to get backup: {}", e))?
         .ok_or_else(|| format!("Backup '{}' not found", backup_id))?;
 
     // Check if backup file exists
     let backup_path = std::path::Path::new(&backup.storage_location);
     if !backup_path.exists() {
-        return Err(format!("Backup file not found: {}", backup.storage_location));
+        return Err(format!(
+            "Backup file not found: {}",
+            backup.storage_location
+        ));
     }
 
     tracing::info!("Restoring from backup at: {}", backup_path.display());
@@ -777,42 +944,64 @@ async fn process_restore_job(
 
     // Ensure the parent directory exists
     if let Some(parent) = std::path::Path::new(&dest_path).parent() {
-        tokio::fs::create_dir_all(parent).await
+        tokio::fs::create_dir_all(parent)
+            .await
             .map_err(|e| format!("Failed to create image directory: {}", e))?;
     }
 
     // Update progress: starting restore
     job.progress = 10.0;
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to update progress: {}", e))?;
 
     // Use qemu-img convert to restore the backup to the VM's disk location
     let output = tokio::process::Command::new("qemu-img")
-        .args(["convert", "-f", "qcow2", "-O", "qcow2", &backup.storage_location, &dest_path])
+        .args([
+            "convert",
+            "-f",
+            "qcow2",
+            "-O",
+            "qcow2",
+            &backup.storage_location,
+            &dest_path,
+        ])
         .output()
         .await
         .map_err(|e| format!("Failed to run qemu-img: {}", e))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let msg = format!("qemu-img convert failed for restore to VM '{}': {}", target_vm, stderr);
+        let msg = format!(
+            "qemu-img convert failed for restore to VM '{}': {}",
+            target_vm, stderr
+        );
         tracing::error!("{}", msg);
         return Err(msg);
     }
 
     // Update progress: restore finished
     job.progress = 90.0;
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to update progress: {}", e))?;
 
-    tracing::info!("Restore completed for VM '{}' from backup '{}' to '{}'",
-                   target_vm, backup_id, dest_path);
+    tracing::info!(
+        "Restore completed for VM '{}' from backup '{}' to '{}'",
+        target_vm,
+        backup_id,
+        dest_path
+    );
 
     // Update job to completed
     job.status = JobStatus::Completed;
     job.progress = 100.0;
     job.completed_at = Some(Utc::now());
-    state.store.save_entity("backup_jobs", &job_id, &job)
+    state
+        .store
+        .save_entity("backup_jobs", &job_id, &job)
         .map_err(|e| format!("Failed to complete job: {}", e))?;
 
     tracing::info!("Restore job {} completed successfully", job_id);

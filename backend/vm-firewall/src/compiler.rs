@@ -72,7 +72,11 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    fn make_profile(name: &str, rules: Vec<FirewallRule>, default: FirewallAction) -> FirewallProfile {
+    fn make_profile(
+        name: &str,
+        rules: Vec<FirewallRule>,
+        default: FirewallAction,
+    ) -> FirewallProfile {
         FirewallProfile {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -108,7 +112,12 @@ mod tests {
         let compiler = FirewallCompiler::new();
         let profile = make_profile(
             "web",
-            vec![make_rule(10, FirewallAction::Accept, FirewallProtocol::Tcp, Some(80))],
+            vec![make_rule(
+                10,
+                FirewallAction::Accept,
+                FirewallProtocol::Tcp,
+                Some(80),
+            )],
             FirewallAction::Drop,
         );
 
@@ -185,10 +194,7 @@ mod tests {
         let profile = make_profile("logged", vec![rule], FirewallAction::Drop);
 
         let chain = compiler.compile_vm("vm-1", "10.0.0.5", &profile);
-        assert_eq!(
-            chain.rules[0].log_prefix.as_deref(),
-            Some("vm-drop: ")
-        );
+        assert_eq!(chain.rules[0].log_prefix.as_deref(), Some("vm-drop: "));
     }
 
     #[test]
@@ -207,7 +213,12 @@ mod tests {
         let compiler = FirewallCompiler::new();
         let profile = make_profile(
             "web",
-            vec![make_rule(10, FirewallAction::Accept, FirewallProtocol::Tcp, Some(80))],
+            vec![make_rule(
+                10,
+                FirewallAction::Accept,
+                FirewallProtocol::Tcp,
+                Some(80),
+            )],
             FirewallAction::Drop,
         );
 

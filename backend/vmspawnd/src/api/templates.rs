@@ -7,14 +7,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Data Structures
@@ -106,7 +106,13 @@ pub async fn create_template(
             }
         }
     } else {
-        (req.cpus, req.memory, req.disk, req.image.clone(), req.tags.clone())
+        (
+            req.cpus,
+            req.memory,
+            req.disk,
+            req.image.clone(),
+            req.tags.clone(),
+        )
     };
 
     let template = VMTemplate {
@@ -123,12 +129,15 @@ pub async fn create_template(
         updated: now,
     };
 
-    state.store.save_entity("templates", &template.id, &template).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    state
+        .store
+        .save_entity("templates", &template.id, &template)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(template)))
 }
@@ -139,12 +148,15 @@ pub async fn list_templates(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<VMTemplate>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("templates::{}", stringify!(list_templates));
-    let templates = state.store.list_entities::<VMTemplate>("templates").map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    let templates = state
+        .store
+        .list_entities::<VMTemplate>("templates")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(templates))
 }
@@ -223,12 +235,15 @@ pub async fn update_template(
     }
     template.updated = Utc::now();
 
-    state.store.save_entity("templates", &template.id, &template).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    state
+        .store
+        .save_entity("templates", &template.id, &template)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(template))
 }

@@ -12,7 +12,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Data Structures
@@ -24,8 +24,8 @@ pub struct VMProfile {
     pub name: String,
     pub description: String,
     pub cpus: u32,
-    pub memory: u64,   // MB
-    pub disk: u64,      // GB
+    pub memory: u64, // MB
+    pub disk: u64,   // GB
     pub category: ProfileCategory,
     pub network_bandwidth: Option<String>,
     pub builtin: bool,
@@ -62,7 +62,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "small".to_string(),
             description: "Small general purpose".to_string(),
-            cpus: 1, memory: 1024, disk: 20,
+            cpus: 1,
+            memory: 1024,
+            disk: 20,
             category: ProfileCategory::General,
             network_bandwidth: Some("1 Gbps".to_string()),
             builtin: true,
@@ -70,7 +72,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "medium".to_string(),
             description: "Medium general purpose".to_string(),
-            cpus: 2, memory: 4096, disk: 40,
+            cpus: 2,
+            memory: 4096,
+            disk: 40,
             category: ProfileCategory::General,
             network_bandwidth: Some("5 Gbps".to_string()),
             builtin: true,
@@ -78,7 +82,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "large".to_string(),
             description: "Large general purpose".to_string(),
-            cpus: 4, memory: 8192, disk: 80,
+            cpus: 4,
+            memory: 8192,
+            disk: 80,
             category: ProfileCategory::General,
             network_bandwidth: Some("10 Gbps".to_string()),
             builtin: true,
@@ -86,7 +92,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "xlarge".to_string(),
             description: "Extra large general purpose".to_string(),
-            cpus: 8, memory: 16384, disk: 160,
+            cpus: 8,
+            memory: 16384,
+            disk: 160,
             category: ProfileCategory::General,
             network_bandwidth: Some("10 Gbps".to_string()),
             builtin: true,
@@ -95,7 +103,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "c.large".to_string(),
             description: "Compute optimized large".to_string(),
-            cpus: 8, memory: 8192, disk: 40,
+            cpus: 8,
+            memory: 8192,
+            disk: 40,
             category: ProfileCategory::Compute,
             network_bandwidth: Some("10 Gbps".to_string()),
             builtin: true,
@@ -103,7 +113,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "c.xlarge".to_string(),
             description: "Compute optimized extra large".to_string(),
-            cpus: 16, memory: 16384, disk: 80,
+            cpus: 16,
+            memory: 16384,
+            disk: 80,
             category: ProfileCategory::Compute,
             network_bandwidth: Some("25 Gbps".to_string()),
             builtin: true,
@@ -112,7 +124,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "m.large".to_string(),
             description: "Memory optimized large".to_string(),
-            cpus: 4, memory: 32768, disk: 80,
+            cpus: 4,
+            memory: 32768,
+            disk: 80,
             category: ProfileCategory::Memory,
             network_bandwidth: Some("10 Gbps".to_string()),
             builtin: true,
@@ -120,7 +134,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "m.xlarge".to_string(),
             description: "Memory optimized extra large".to_string(),
-            cpus: 8, memory: 65536, disk: 160,
+            cpus: 8,
+            memory: 65536,
+            disk: 160,
             category: ProfileCategory::Memory,
             network_bandwidth: Some("25 Gbps".to_string()),
             builtin: true,
@@ -129,7 +145,9 @@ fn builtin_profiles() -> Vec<VMProfile> {
         VMProfile {
             name: "s.large".to_string(),
             description: "Storage optimized large".to_string(),
-            cpus: 4, memory: 8192, disk: 500,
+            cpus: 4,
+            memory: 8192,
+            disk: 500,
             category: ProfileCategory::Storage,
             network_bandwidth: Some("10 Gbps".to_string()),
             builtin: true,
@@ -172,8 +190,14 @@ pub async fn get_profile(
     // Check custom profiles
     match state.store.get_entity::<VMProfile>("profiles", &name) {
         Ok(Some(profile)) => Ok(Json(profile)),
-        Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Profile not found" })))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Profile not found" })),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -186,7 +210,10 @@ pub async fn create_profile(
     tracing::debug!("profiles::{}", stringify!(create_profile));
     // Don't allow overriding built-in profiles
     if builtin_profiles().iter().any(|p| p.name == req.name) {
-        return Err((StatusCode::CONFLICT, Json(json!({ "error": "Cannot override built-in profile" }))));
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Cannot override built-in profile" })),
+        ));
     }
 
     let profile = VMProfile {
@@ -200,9 +227,15 @@ pub async fn create_profile(
         builtin: false,
     };
 
-    state.store.save_entity("profiles", &profile.name, &profile).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("profiles", &profile.name, &profile)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(profile)))
 }
@@ -215,11 +248,17 @@ pub async fn delete_profile(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("profiles::{}", stringify!(delete_profile));
     if builtin_profiles().iter().any(|p| p.name == name) {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Cannot delete built-in profile" }))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Cannot delete built-in profile" })),
+        ));
     }
 
     state.store.delete_entity("profiles", &name).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
     })?;
 
     Ok(StatusCode::NO_CONTENT)

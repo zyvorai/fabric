@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -135,7 +135,8 @@ impl NumaTopology {
             if part.contains('-') {
                 let range: Vec<&str> = part.split('-').collect();
                 if range.len() == 2 {
-                    if let (Ok(start), Ok(end)) = (range[0].parse::<u32>(), range[1].parse::<u32>()) {
+                    if let (Ok(start), Ok(end)) = (range[0].parse::<u32>(), range[1].parse::<u32>())
+                    {
                         for cpu in start..=end {
                             cpus.push(cpu);
                         }
@@ -202,7 +203,8 @@ impl NumaTopology {
         }
 
         let content = fs::read_to_string(path)?;
-        content.trim()
+        content
+            .trim()
             .parse()
             .map_err(|e| NumaError::ParseError(format!("{}: {}", path.display(), e)))
     }
@@ -244,10 +246,7 @@ impl NumaTopology {
     pub fn find_best_node(&self, memory_mb: u64, cpus: u32) -> Option<u32> {
         self.nodes
             .iter()
-            .filter(|n| {
-                n.memory_free_mb >= memory_mb &&
-                n.cpus.len() >= cpus as usize
-            })
+            .filter(|n| n.memory_free_mb >= memory_mb && n.cpus.len() >= cpus as usize)
             .max_by_key(|n| n.memory_free_mb)
             .map(|n| n.id)
     }

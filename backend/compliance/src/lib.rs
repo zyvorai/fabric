@@ -130,10 +130,7 @@ pub fn scan_vm(vm: &serde_json::Value, profile: &ComplianceProfile) -> Complianc
     }
 }
 
-fn evaluate_rule(
-    vm: &serde_json::Value,
-    rule: &ComplianceRule,
-) -> (bool, Option<String>, String) {
+fn evaluate_rule(vm: &serde_json::Value, rule: &ComplianceRule) -> (bool, Option<String>, String) {
     match rule.check_type {
         CheckType::DiskEncrypted => {
             let encrypted = vm
@@ -219,10 +216,7 @@ fn evaluate_rule(
             )
         }
         CheckType::NetworkPolicyAssigned => {
-            let has_np = vm
-                .get("network_policy")
-                .and_then(|v| v.as_str())
-                .is_some();
+            let has_np = vm.get("network_policy").and_then(|v| v.as_str()).is_some();
             (
                 has_np,
                 Some(has_np.to_string()),

@@ -108,13 +108,18 @@ pub fn validate_cidr(s: &str) -> std::result::Result<(), String> {
     if parts.len() != 2 {
         return Err(format!("Invalid CIDR '{}': missing /prefix", s));
     }
-    parts[0].parse::<std::net::IpAddr>()
+    parts[0]
+        .parse::<std::net::IpAddr>()
         .map_err(|_| format!("Invalid CIDR '{}': bad IP address", s))?;
-    let prefix: u8 = parts[1].parse()
+    let prefix: u8 = parts[1]
+        .parse()
         .map_err(|_| format!("Invalid CIDR '{}': bad prefix length", s))?;
     let max_prefix = if parts[0].contains(':') { 128 } else { 32 };
     if prefix > max_prefix {
-        return Err(format!("Invalid CIDR '{}': prefix length {} exceeds maximum {}", s, prefix, max_prefix));
+        return Err(format!(
+            "Invalid CIDR '{}': prefix length {} exceeds maximum {}",
+            s, prefix, max_prefix
+        ));
     }
     Ok(())
 }

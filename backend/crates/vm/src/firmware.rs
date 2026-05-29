@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -28,9 +28,7 @@ pub enum FirmwareError {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Firmware {
     BIOS,
-    UEFI {
-        secure_boot: bool,
-    },
+    UEFI { secure_boot: bool },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

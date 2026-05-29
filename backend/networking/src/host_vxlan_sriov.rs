@@ -37,8 +37,7 @@ pub fn discover_host_vxlans() -> Result<Vec<DiscoveredVxlan>> {
         return Ok(Vec::new());
     }
 
-    let links: Vec<serde_json::Value> =
-        serde_json::from_slice(&output.stdout).unwrap_or_default();
+    let links: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap_or_default();
 
     let addr_map = load_addr_map()?;
     let mut out = Vec::new();

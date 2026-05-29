@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-pub mod models;
 pub mod classifier;
 pub mod enforcement;
+pub mod models;
 
 use classifier::TrafficClassifier;
 use enforcement::QoSEnforcer;

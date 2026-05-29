@@ -7,15 +7,15 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 use tokio::process::Command;
 
 use crate::server::AppState;
 use networking::models::AdoptHostRequest;
-use security::{RequireRead, RequireWrite, RequireAdmin};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Floating IP
@@ -55,12 +55,14 @@ pub async fn create_floating_ip(
 ) -> Result<(StatusCode, Json<FloatingIp>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(create_floating_ip));
     // Validate IP address format
-    crate::validation::validate_ip_address(&req.address).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
-    })?;
+    crate::validation::validate_ip_address(&req.address)
+        .map_err(|msg| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
     // Validate interface name
     crate::validation::validate_hostname(&req.interface).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid interface name: {}", msg) })))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid interface name: {}", msg) })),
+        )
     })?;
     let fip = FloatingIp {
         id: uuid::Uuid::new_v4().to_string(),
@@ -71,9 +73,15 @@ pub async fn create_floating_ip(
         created: Utc::now(),
     };
 
-    state.store.save_entity("floating_ips", &fip.id, &fip).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("floating_ips", &fip.id, &fip)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(fip)))
 }
@@ -91,7 +99,9 @@ pub async fn list_floating_ips(
             tracing::error!("Storage error: {}", e);
             Vec::new()
         });
-    Json(super::network_cloud_discover::merge_floating_ips(&state, ips))
+    Json(super::network_cloud_discover::merge_floating_ips(
+        &state, ips,
+    ))
 }
 
 /// POST /api/floating-ips/:id/assign - Assign floating IP to a VM (Admin only)
@@ -106,14 +116,30 @@ pub async fn assign_floating_ip(
         .map_err(|(s, m)| (s, Json(json!({"error": m}))))?;
     let mut fip = match state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         Ok(Some(f)) => f,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Floating IP not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Floating IP not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
     // Remove from previous VM if assigned
     if let Some(ref _old_vm) = fip.assigned_vm {
         if let Err(e) = Command::new("ip")
-            .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
+            .args([
+                "addr",
+                "del",
+                &format!("{}/32", fip.address),
+                "dev",
+                &fip.interface,
+            ])
             .output()
             .await
         {
@@ -123,23 +149,43 @@ pub async fn assign_floating_ip(
 
     // Add IP to the interface associated with the new VM
     let output = Command::new("ip")
-        .args(["addr", "add", &format!("{}/32", fip.address), "dev", &fip.interface])
+        .args([
+            "addr",
+            "add",
+            &format!("{}/32", fip.address),
+            "dev",
+            &fip.interface,
+        ])
         .output()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         // Ignore "already exists" errors
         if !stderr.contains("RTNETLINK answers: File exists") {
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to add IP: {}", stderr) }))));
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Failed to add IP: {}", stderr) })),
+            ));
         }
     }
 
     fip.assigned_vm = Some(req.vm_name);
-    state.store.save_entity("floating_ips", &id, &fip).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("floating_ips", &id, &fip)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(fip))
 }
@@ -153,12 +199,28 @@ pub async fn unassign_floating_ip(
     tracing::debug!("network_cloud::{}", stringify!(unassign_floating_ip));
     let mut fip = match state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         Ok(Some(f)) => f,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Floating IP not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Floating IP not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
     if let Err(e) = Command::new("ip")
-        .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
+        .args([
+            "addr",
+            "del",
+            &format!("{}/32", fip.address),
+            "dev",
+            &fip.interface,
+        ])
         .output()
         .await
     {
@@ -166,9 +228,15 @@ pub async fn unassign_floating_ip(
     }
 
     fip.assigned_vm = None;
-    state.store.save_entity("floating_ips", &id, &fip).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("floating_ips", &id, &fip)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(fip))
 }
@@ -192,7 +260,13 @@ pub async fn delete_floating_ip(
     }
     if let Ok(Some(fip)) = state.store.get_entity::<FloatingIp>("floating_ips", &id) {
         if let Err(e) = Command::new("ip")
-            .args(["addr", "del", &format!("{}/32", fip.address), "dev", &fip.interface])
+            .args([
+                "addr",
+                "del",
+                &format!("{}/32", fip.address),
+                "dev",
+                &fip.interface,
+            ])
             .output()
             .await
         {
@@ -200,9 +274,15 @@ pub async fn delete_floating_ip(
         }
     }
 
-    state.store.delete_entity("floating_ips", &id).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .delete_entity("floating_ips", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -224,7 +304,10 @@ pub async fn adopt_floating_ip(
         }
     };
 
-    let stored: Vec<FloatingIp> = state.store.list_entities("floating_ips").unwrap_or_default();
+    let stored: Vec<FloatingIp> = state
+        .store
+        .list_entities("floating_ips")
+        .unwrap_or_default();
     if stored
         .iter()
         .any(|f| f.address == host.address && f.interface == host.interface)
@@ -298,10 +381,18 @@ pub struct CreateDhcpServerRequest {
     pub domain: Option<String>,
 }
 
-fn default_pool_offset() -> u32 { 100 }
-fn default_pool_size() -> u32 { 100 }
-fn default_lease_time() -> u32 { 3600 }
-fn default_max_lease_time() -> u32 { 7200 }
+fn default_pool_offset() -> u32 {
+    100
+}
+fn default_pool_size() -> u32 {
+    100
+}
+fn default_lease_time() -> u32 {
+    3600
+}
+fn default_max_lease_time() -> u32 {
+    7200
+}
 
 /// POST /api/dhcp-servers - Enable DHCP server on a bridge via systemd-networkd (Admin only)
 pub async fn create_dhcp_server(
@@ -312,20 +403,29 @@ pub async fn create_dhcp_server(
     tracing::debug!("network_cloud::{}", stringify!(create_dhcp_server));
     // Validate bridge name to prevent path traversal
     crate::validation::validate_hostname(&req.bridge).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid bridge name: {}", msg) })))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid bridge name: {}", msg) })),
+        )
     })?;
 
     // Validate DNS servers
     for dns in &req.dns_servers {
         crate::validation::validate_ip_address(dns).map_err(|msg| {
-            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid DNS server: {}", msg) })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid DNS server: {}", msg) })),
+            )
         })?;
     }
 
     // Validate gateway if provided
     if let Some(ref gw) = req.gateway {
         crate::validation::validate_ip_address(gw).map_err(|msg| {
-            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid gateway: {}", msg) })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid gateway: {}", msg) })),
+            )
         })?;
     }
 
@@ -349,18 +449,29 @@ pub async fn create_dhcp_server(
     let prefix = &state.config.network.networkd_file_prefix;
     let file_path = format!("{}/{}{}-dhcp.network", config_dir, prefix, req.bridge);
 
-    tokio::fs::write(&file_path, &network_content).await.map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to write config: {}", e) })))
-    })?;
+    tokio::fs::write(&file_path, &network_content)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Failed to write config: {}", e) })),
+            )
+        })?;
 
     // Reload networkd
     if let Err(e) = Command::new("networkctl").arg("reload").output().await {
         tracing::warn!("Command failed: {}", e);
     }
 
-    state.store.save_entity("dhcp_servers", &config.id, &config).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("dhcp_servers", &config.id, &config)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(config)))
 }
@@ -371,7 +482,14 @@ pub async fn list_dhcp_servers(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DhcpServerConfig>> {
     tracing::debug!("network_cloud::{}", stringify!(list_dhcp_servers));
-    let configs: Vec<DhcpServerConfig> = state.store.list_entities("dhcp_servers").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let configs: Vec<DhcpServerConfig> =
+        state
+            .store
+            .list_entities("dhcp_servers")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     Json(configs)
 }
 
@@ -382,7 +500,10 @@ pub async fn delete_dhcp_server(
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(delete_dhcp_server));
-    if let Ok(Some(config)) = state.store.get_entity::<DhcpServerConfig>("dhcp_servers", &id) {
+    if let Ok(Some(config)) = state
+        .store
+        .get_entity::<DhcpServerConfig>("dhcp_servers", &id)
+    {
         let config_dir = &state.config.network.networkd_config_dir;
         let prefix = &state.config.network.networkd_file_prefix;
         let file_path = format!("{}/{}{}-dhcp.network", config_dir, prefix, config.bridge);
@@ -394,9 +515,15 @@ pub async fn delete_dhcp_server(
         }
     }
 
-    state.store.delete_entity("dhcp_servers", &id).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .delete_entity("dhcp_servers", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -424,12 +551,22 @@ fn generate_dhcp_network_file(config: &DhcpServerConfig) -> String {
 
     content.push_str(&format!(
         "\n[DHCPServer]\nPoolOffset={}\nPoolSize={}\nDefaultLeaseTimeSec={}\nMaxLeaseTimeSec={}\n",
-        config.pool_offset, config.pool_size,
-        config.default_lease_time_sec, config.max_lease_time_sec,
+        config.pool_offset,
+        config.pool_size,
+        config.default_lease_time_sec,
+        config.max_lease_time_sec,
     ));
 
     if !config.dns_servers.is_empty() {
-        content.push_str(&format!("DNS={}\n", config.dns_servers.iter().map(|s| sanitize(s)).collect::<Vec<_>>().join(" ")));
+        content.push_str(&format!(
+            "DNS={}\n",
+            config
+                .dns_servers
+                .iter()
+                .map(|s| sanitize(s))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ));
     }
 
     if let Some(ref domain) = config.domain {
@@ -486,18 +623,27 @@ pub async fn create_dns_config(
     tracing::debug!("network_cloud::{}", stringify!(create_dns_config));
     // Validate domain name
     crate::validation::validate_hostname(&req.domain).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid domain: {}", msg) })))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid domain: {}", msg) })),
+        )
     })?;
     // Validate upstream servers
     for server in &req.upstream_servers {
         crate::validation::validate_hostname(server).map_err(|msg| {
-            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid upstream server: {}", msg) })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid upstream server: {}", msg) })),
+            )
         })?;
     }
     // Validate search domains
     for domain in &req.search_domains {
         crate::validation::validate_hostname(domain).map_err(|msg| {
-            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid search domain: {}", msg) })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid search domain: {}", msg) })),
+            )
         })?;
     }
 
@@ -536,9 +682,15 @@ pub async fn create_dns_config(
         }
     }
 
-    state.store.save_entity("dns_configs", &config.id, &config).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("dns_configs", &config.id, &config)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(config)))
 }
@@ -549,7 +701,13 @@ pub async fn list_dns_configs(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<DnsConfig>> {
     tracing::debug!("network_cloud::{}", stringify!(list_dns_configs));
-    let configs: Vec<DnsConfig> = state.store.list_entities("dns_configs").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let configs: Vec<DnsConfig> = state
+        .store
+        .list_entities("dns_configs")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(configs)
 }
 
@@ -563,26 +721,52 @@ pub async fn add_dns_record(
     tracing::debug!("network_cloud::{}", stringify!(add_dns_record));
     let mut config = match state.store.get_entity::<DnsConfig>("dns_configs", &id) {
         Ok(Some(c)) => c,
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "DNS config not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "DNS config not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     };
 
     // Validate DNS record fields
     crate::validation::validate_hostname(&req.name).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record name: {}", msg) })))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid record name: {}", msg) })),
+        )
     })?;
     crate::validation::validate_hostname(&req.value).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record value: {}", msg) })))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid record value: {}", msg) })),
+        )
     })?;
     // Validate record type against allowlist
     let allowed_types = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "PTR"];
     if !allowed_types.contains(&req.record_type.as_str()) {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid record type '{}'. Allowed: {}", req.record_type, allowed_types.join(", ")) }))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({ "error": format!("Invalid record type '{}'. Allowed: {}", req.record_type, allowed_types.join(", ")) }),
+            ),
+        ));
     }
 
     // Limit total records to prevent unbounded growth
     if config.records.len() >= 10000 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "DNS configuration has reached the maximum number of records (10000)" }))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({ "error": "DNS configuration has reached the maximum number of records (10000)" }),
+            ),
+        ));
     }
 
     config.records.push(DnsRecord {
@@ -594,9 +778,15 @@ pub async fn add_dns_record(
     // Write /etc/hosts-style entries for A records
     update_hosts_file(&config).await;
 
-    state.store.save_entity("dns_configs", &id, &config).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("dns_configs", &id, &config)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(config))
 }
@@ -609,7 +799,10 @@ pub async fn delete_dns_config(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("network_cloud::{}", stringify!(delete_dns_config));
     state.store.delete_entity("dns_configs", &id).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
     })?;
 
     Ok(StatusCode::NO_CONTENT)

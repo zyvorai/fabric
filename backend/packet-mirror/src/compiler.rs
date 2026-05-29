@@ -68,7 +68,10 @@ mod tests {
     fn make_vm(name: &str, labels: &[(&str, &str)], tap: Option<&str>) -> VMSnapshot {
         VMSnapshot {
             name: name.to_string(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             tap_interface: tap.map(|s| s.to_string()),
         }
     }
@@ -86,7 +89,10 @@ mod tests {
             name: name.to_string(),
             description: String::new(),
             selector: LabelSelector {
-                match_labels: selector.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                match_labels: selector
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
             },
             collector_type: CollectorType::Interface,
             collector_target: target.to_string(),
@@ -103,7 +109,14 @@ mod tests {
     fn test_basic_compilation() {
         let compiler = MirrorCompiler::new();
         let vms = vec![make_vm("web-1", &[("env", "debug")], Some("tap-web-1"))];
-        let session = make_session("debug", &[("env", "debug")], "mon0", MirrorDirection::Both, None, true);
+        let session = make_session(
+            "debug",
+            &[("env", "debug")],
+            "mon0",
+            MirrorDirection::Both,
+            None,
+            true,
+        );
 
         let rules = compiler.compile_session(&session, &vms);
         assert_eq!(rules.len(), 1);
@@ -116,7 +129,14 @@ mod tests {
     fn test_no_matches() {
         let compiler = MirrorCompiler::new();
         let vms = vec![make_vm("web-1", &[("env", "prod")], Some("tap-web-1"))];
-        let session = make_session("debug", &[("env", "debug")], "mon0", MirrorDirection::Both, None, true);
+        let session = make_session(
+            "debug",
+            &[("env", "debug")],
+            "mon0",
+            MirrorDirection::Both,
+            None,
+            true,
+        );
 
         let rules = compiler.compile_session(&session, &vms);
         assert!(rules.is_empty());
@@ -130,7 +150,14 @@ mod tests {
             make_vm("web-2", &[("env", "debug")], Some("tap-web-2")),
             make_vm("db-1", &[("env", "prod")], Some("tap-db-1")),
         ];
-        let session = make_session("debug", &[("env", "debug")], "mon0", MirrorDirection::Ingress, None, true);
+        let session = make_session(
+            "debug",
+            &[("env", "debug")],
+            "mon0",
+            MirrorDirection::Ingress,
+            None,
+            true,
+        );
 
         let rules = compiler.compile_session(&session, &vms);
         assert_eq!(rules.len(), 2);
@@ -140,7 +167,14 @@ mod tests {
     fn test_disabled_session() {
         let compiler = MirrorCompiler::new();
         let vms = vec![make_vm("web-1", &[("env", "debug")], Some("tap-web-1"))];
-        let session = make_session("debug", &[("env", "debug")], "mon0", MirrorDirection::Both, None, false);
+        let session = make_session(
+            "debug",
+            &[("env", "debug")],
+            "mon0",
+            MirrorDirection::Both,
+            None,
+            false,
+        );
 
         let rules = compiler.compile_session(&session, &vms);
         assert!(rules.is_empty());
@@ -177,7 +211,14 @@ mod tests {
     fn test_direction_propagation() {
         let compiler = MirrorCompiler::new();
         let vms = vec![make_vm("web-1", &[("env", "debug")], Some("tap-web-1"))];
-        let session = make_session("egress-only", &[("env", "debug")], "mon0", MirrorDirection::Egress, None, true);
+        let session = make_session(
+            "egress-only",
+            &[("env", "debug")],
+            "mon0",
+            MirrorDirection::Egress,
+            None,
+            true,
+        );
 
         let rules = compiler.compile_session(&session, &vms);
         assert_eq!(rules.len(), 1);
@@ -192,8 +233,22 @@ mod tests {
             make_vm("db-1", &[("role", "db")], Some("tap-db-1")),
         ];
         let sessions = vec![
-            make_session("debug", &[("env", "debug")], "mon0", MirrorDirection::Both, None, true),
-            make_session("db-mirror", &[("role", "db")], "mon1", MirrorDirection::Ingress, None, true),
+            make_session(
+                "debug",
+                &[("env", "debug")],
+                "mon0",
+                MirrorDirection::Both,
+                None,
+                true,
+            ),
+            make_session(
+                "db-mirror",
+                &[("role", "db")],
+                "mon1",
+                MirrorDirection::Ingress,
+                None,
+                true,
+            ),
         ];
 
         let rules = compiler.compile_all(&sessions, &vms);

@@ -2,14 +2,14 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-pub mod models;
-pub mod identity;
 pub mod compiler;
 pub mod enforcement;
+pub mod identity;
+pub mod models;
 
-use identity::IdentityAllocator;
 use compiler::PolicyCompiler;
 use enforcement::PolicyEnforcer;
+use identity::IdentityAllocator;
 
 pub struct PolicyEngine {
     pub allocator: IdentityAllocator,

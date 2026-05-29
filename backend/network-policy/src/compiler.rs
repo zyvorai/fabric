@@ -149,11 +149,7 @@ impl PolicyCompiler {
     }
 
     /// Resolve peer selectors to identity IDs.
-    fn resolve_peers(
-        &self,
-        peers: &[PeerSelector],
-        all_vms: &[VMSnapshot],
-    ) -> HashSet<u32> {
+    fn resolve_peers(&self, peers: &[PeerSelector], all_vms: &[VMSnapshot]) -> HashSet<u32> {
         let mut ids = HashSet::new();
 
         if peers.is_empty() {
@@ -190,24 +186,35 @@ impl PolicyCompiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn make_vm(name: &str, labels: &[(&str, &str)], ip: Option<&str>) -> VMSnapshot {
         VMSnapshot {
             name: name.to_string(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             ip: ip.map(|s| s.to_string()),
         }
     }
 
-    fn make_policy(name: &str, selector: &[(&str, &str)], ingress: Vec<IngressRule>, egress: Vec<EgressRule>) -> NetworkPolicy {
+    fn make_policy(
+        name: &str,
+        selector: &[(&str, &str)],
+        ingress: Vec<IngressRule>,
+        egress: Vec<EgressRule>,
+    ) -> NetworkPolicy {
         NetworkPolicy {
             id: Uuid::new_v4(),
             name: name.to_string(),
             description: String::new(),
             endpoint_selector: LabelSelector {
-                match_labels: selector.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                match_labels: selector
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
             },
             ingress,
             egress,
@@ -220,7 +227,10 @@ mod tests {
 
     fn label_selector(pairs: &[(&str, &str)]) -> LabelSelector {
         LabelSelector {
-            match_labels: pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            match_labels: pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
         }
     }
 
@@ -348,8 +358,16 @@ mod tests {
             vec![IngressRule {
                 from: vec![PeerSelector::Endpoint(label_selector(&[("app", "client")]))],
                 to_ports: vec![
-                    PortRule { protocol: PolicyProtocol::Tcp, port: 80, end_port: None },
-                    PortRule { protocol: PolicyProtocol::Tcp, port: 443, end_port: None },
+                    PortRule {
+                        protocol: PolicyProtocol::Tcp,
+                        port: 80,
+                        end_port: None,
+                    },
+                    PortRule {
+                        protocol: PolicyProtocol::Tcp,
+                        port: 443,
+                        end_port: None,
+                    },
                 ],
             }],
             vec![],
@@ -371,7 +389,11 @@ mod tests {
 
         let ingress = vec![IngressRule {
             from: vec![PeerSelector::Endpoint(label_selector(&[("app", "api")]))],
-            to_ports: vec![PortRule { protocol: PolicyProtocol::Tcp, port: 80, end_port: None }],
+            to_ports: vec![PortRule {
+                protocol: PolicyProtocol::Tcp,
+                port: 80,
+                end_port: None,
+            }],
         }];
 
         let policy1 = make_policy("policy-a", &[("app", "web")], ingress.clone(), vec![]);

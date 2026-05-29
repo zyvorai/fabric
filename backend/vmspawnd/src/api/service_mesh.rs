@@ -14,11 +14,9 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use service_mesh::compiler::VMSnapshot;
-use service_mesh::models::{
-    BackendHealth, CreateServiceRequest, Service, ServiceStatus,
-};
 use networking::models::AdoptHostRequest;
+use service_mesh::compiler::VMSnapshot;
+use service_mesh::models::{BackendHealth, CreateServiceRequest, Service, ServiceStatus};
 
 use crate::server::AppState;
 
@@ -36,7 +34,11 @@ pub async fn create_service(
         return (status, Json(json!({"error": msg}))).into_response();
     }
     if let Err(e) = crate::validation::validate_ip_address(&req.virtual_ip) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid virtual_ip: {}", e)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid virtual_ip: {}", e)})),
+        )
+            .into_response();
     }
     let now = Utc::now();
     let service = Service {
@@ -392,12 +394,10 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .map(|vm| {
-            VMSnapshot {
-                name: vm.name,
-                labels: vm.labels.clone().unwrap_or_default(),
-                ip: vm.ip,
-            }
+        .map(|vm| VMSnapshot {
+            name: vm.name,
+            labels: vm.labels.clone().unwrap_or_default(),
+            ip: vm.ip,
         })
         .collect()
 }

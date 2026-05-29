@@ -11,10 +11,7 @@ pub enum CgroupError {
     NotFound(PathBuf),
 
     #[error("controller {controller:?} not available at {path}")]
-    ControllerNotAvailable {
-        controller: String,
-        path: PathBuf,
-    },
+    ControllerNotAvailable { controller: String, path: PathBuf },
 
     #[error("failed to read {path}: {source}")]
     ReadFailed {

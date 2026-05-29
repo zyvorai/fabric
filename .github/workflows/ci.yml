@@ -2,72 +2,66 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Check formatting
-      run: cd backend && cargo fmt -- --check
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev
 
-    - name: Lint
-      run: cd backend && cargo clippy -- -D warnings
+      - name: Check formatting
+        run: cd backend && cargo fmt -- --check
 
-    - name: Test
-      run: cd backend && cargo test
+      - name: Lint
+        run: cd backend && cargo clippy -- -D warnings
 
-    - name: Build
-      run: cd backend && cargo build --release
+      - name: Test
+        run: cd backend && cargo test
+
+      - name: Build
+        run: cd backend && cargo build --release
 
   api-audit:
     runs-on: ubuntu-latest
     needs: [test]
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      - uses: dtolnay/rust-toolchain@stable
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libpam0g-dev
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev
 
-    - name: UX API audit smoke test
-      run: ./scripts/ci-api-audit.sh
+      - name: UX API audit smoke test
+        run: ./scripts/ci-api-audit.sh
 
   web:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-    - name: Install dependencies
-      run: cd web && npm install
+      - name: Install dependencies
+        run: cd web && npm install
 
-    - name: Typecheck
-      run: cd web && npm run typecheck
+      - name: Typecheck
+        run: cd web && npm run typecheck
 
-    - name: Test
-      run: cd web && npm test
+      - name: Test
+        run: cd web && npm test
 
-    - name: Build
-      run: cd web && npm run build
+      - name: Build
+        run: cd web && npm run build

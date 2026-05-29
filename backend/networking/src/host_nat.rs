@@ -142,15 +142,11 @@ fn parse_nat_rules_from_ruleset(json: &serde_json::Value) -> Vec<DiscoveredHostN
     let mut seen = std::collections::HashSet::new();
 
     for item in items {
-        let Some(rule) = item.get("rule") else { continue };
-        let table = rule
-            .get("table")
-            .and_then(|t| t.as_str())
-            .unwrap_or("?");
-        let chain = rule
-            .get("chain")
-            .and_then(|c| c.as_str())
-            .unwrap_or("?");
+        let Some(rule) = item.get("rule") else {
+            continue;
+        };
+        let table = rule.get("table").and_then(|t| t.as_str()).unwrap_or("?");
+        let chain = rule.get("chain").and_then(|c| c.as_str()).unwrap_or("?");
         let handle = rule.get("handle").and_then(|h| h.as_u64()).unwrap_or(0);
         let exprs = rule.get("expr").and_then(|e| e.as_array());
 

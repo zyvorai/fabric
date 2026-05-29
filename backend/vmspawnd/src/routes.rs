@@ -8,16 +8,16 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use cloud_init::{CloudInitConfig, CloudInitGenerator};
+use security::{RequireAdmin, RequireRead, RequireWrite};
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use vm_model::{CreateVMRequest, VMStartOptions};
-use cloud_init::{CloudInitConfig, CloudInitGenerator};
-use security::{RequireRead, RequireWrite, RequireAdmin};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
-use vmspawnd_driver_core::{VMDriver, ResourceStatsDriver};
+use vmspawnd_driver_core::{ResourceStatsDriver, VMDriver};
 
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {
@@ -47,7 +47,11 @@ fn audit(state: &AppState, user: &str, action: &str, resource: &str, status: &st
 use crate::api_error::{json_error, json_error_code};
 
 /// JSON error with path sanitization for non-admin users.
-fn json_error_safe(status: StatusCode, msg: impl Into<String>, claims: &security::Claims) -> (StatusCode, Json<serde_json::Value>) {
+fn json_error_safe(
+    status: StatusCode,
+    msg: impl Into<String>,
+    claims: &security::Claims,
+) -> (StatusCode, Json<serde_json::Value>) {
     let msg = msg.into();
     let safe_msg = if claims.role.can_manage() {
         msg
@@ -71,8 +75,10 @@ pub async fn list_vms(
         Ok((vms, total)) => (
             StatusCode::OK,
             Json(json!({ "items": vms, "total": total, "offset": offset, "limit": limit })),
-        ).into_response(),
-        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims).into_response(),
+        )
+            .into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims)
+            .into_response(),
     }
 }
 
@@ -87,7 +93,8 @@ pub async fn get_vm(
     match state.store.get_vm(&name) {
         Ok(Some(vm)) => (StatusCode::OK, Json(vm)).into_response(),
         Ok(None) => json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
-        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims)
+            .into_response(),
     }
 }
 
@@ -101,7 +108,11 @@ pub async fn create_vm(
     }
 
     if let Err(errors) = req.validate() {
-        return json_error(StatusCode::BAD_REQUEST, format!("Invalid VM parameters: {}", errors.join("; "))).into_response();
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid VM parameters: {}", errors.join("; ")),
+        )
+        .into_response();
     }
 
     // Acquire per-VM lock before duplicate check to prevent TOCTOU races
@@ -109,41 +120,75 @@ pub async fn create_vm(
 
     // Check for duplicate VM name
     if let Ok(Some(_)) = state.store.get_vm(&req.name) {
-        return json_error(StatusCode::CONFLICT, "VM with this name already exists").into_response();
+        return json_error(StatusCode::CONFLICT, "VM with this name already exists")
+            .into_response();
     }
 
     match vmspawn_driver::create_vm(&req) {
         Ok(vm) => {
             if let Err(e) = state.store.save_vm(&vm) {
-                return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                    .into_response();
             }
 
             // Allocate security identity if VM has labels
             if let Some(ref labels) = vm.labels {
                 if !labels.is_empty() {
-                    match state.policy_engine.allocator.allocate_or_get(labels, &vm.name) {
+                    match state
+                        .policy_engine
+                        .allocator
+                        .allocate_or_get(labels, &vm.name)
+                    {
                         Ok(id) => {
                             if let Some(ref ip) = vm.ip {
-                                if let Err(e) = state.policy_engine.allocator.update_ip_mapping(ip, id) {
-                                    tracing::warn!("Failed to update IP mapping for VM '{}': {}", vm.name, e);
+                                if let Err(e) =
+                                    state.policy_engine.allocator.update_ip_mapping(ip, id)
+                                {
+                                    tracing::warn!(
+                                        "Failed to update IP mapping for VM '{}': {}",
+                                        vm.name,
+                                        e
+                                    );
                                 }
                             }
                             tracing::debug!("Allocated identity {} for VM '{}'", id, vm.name);
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to allocate identity for VM '{}': {}", vm.name, e);
+                            tracing::warn!(
+                                "Failed to allocate identity for VM '{}': {}",
+                                vm.name,
+                                e
+                            );
                         }
                     }
                 }
             }
 
-            audit(&state, &claims.sub, "CREATE", &format!("vm/{}", vm.name), "SUCCESS");
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Created, &vm.name, None);
+            audit(
+                &state,
+                &claims.sub,
+                "CREATE",
+                &format!("vm/{}", vm.name),
+                "SUCCESS",
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Created,
+                &vm.name,
+                None,
+            );
             (StatusCode::CREATED, Json(vm)).into_response()
         }
         Err(e) => {
-            audit(&state, &claims.sub, "CREATE", &format!("vm/{}", req.name), "FAILED");
-            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response()
+            audit(
+                &state,
+                &claims.sub,
+                "CREATE",
+                &format!("vm/{}", req.name),
+                "FAILED",
+            );
+            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
         }
     }
 }
@@ -190,12 +235,29 @@ pub async fn delete_vm(
             if let Ok(mut locks) = state.vm_locks.lock() {
                 locks.remove(&name);
             }
-            audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "SUCCESS");
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Deleted, &name, None);
+            audit(
+                &state,
+                &claims.sub,
+                "DELETE",
+                &format!("vm/{}", name),
+                "SUCCESS",
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Deleted,
+                &name,
+                None,
+            );
             StatusCode::NO_CONTENT.into_response()
         }
         Err(e) => {
-            audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "DELETE",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
@@ -217,8 +279,14 @@ pub async fn start_vm(
     // Check current state before transitioning
     if let Ok(Some(vm)) = state.store.get_vm(&name) {
         match vm.state {
-            vm_model::VMState::Running | vm_model::VMState::Starting | vm_model::VMState::Stopping => {
-                return json_error(StatusCode::CONFLICT, format!("VM is already {:?}", vm.state)).into_response();
+            vm_model::VMState::Running
+            | vm_model::VMState::Starting
+            | vm_model::VMState::Stopping => {
+                return json_error(
+                    StatusCode::CONFLICT,
+                    format!("VM is already {:?}", vm.state),
+                )
+                .into_response();
             }
             _ => {}
         }
@@ -231,7 +299,8 @@ pub async fn start_vm(
             return json_error(
                 StatusCode::BAD_REQUEST,
                 format!("Invalid start options: {}", errors.join("; ")),
-            ).into_response();
+            )
+            .into_response();
         }
     }
 
@@ -239,11 +308,21 @@ pub async fn start_vm(
     if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
         vm.state = vm_model::VMState::Starting;
         if let Err(e) = state.store.save_vm(&vm) {
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save VM state: {}", e)).into_response();
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to save VM state: {}", e),
+            )
+            .into_response();
         }
     }
 
-    audit(&state, &claims.sub, "START", &format!("vm/{}", name), "ACCEPTED");
+    audit(
+        &state,
+        &claims.sub,
+        "START",
+        &format!("vm/{}", name),
+        "ACCEPTED",
+    );
 
     // Spawn start in background so API returns immediately.
     // Transfer the lock into the spawned task to avoid a race window
@@ -282,9 +361,9 @@ pub async fn start_vm(
                 }
             };
             // start_vm_with_options is blocking, run on blocking thread pool
-            tokio::task::spawn_blocking(move || {
-                vmspawn_driver::start_vm_with_options(&vm, &opts)
-            }).await.unwrap_or_else(|e| Err(anyhow::anyhow!("Task join error: {}", e)))
+            tokio::task::spawn_blocking(move || vmspawn_driver::start_vm_with_options(&vm, &opts))
+                .await
+                .unwrap_or_else(|e| Err(anyhow::anyhow!("Task join error: {}", e)))
         } else {
             // Default: use machined driver (D-Bus)
             state_clone.driver.start(&vm_name).await
@@ -300,11 +379,21 @@ pub async fn start_vm(
                         tracing::error!("Failed to save VM state: {}", e);
                     }
                 }
-                crate::api::events::record_event(&state_clone, crate::api::events::VMEventType::Started, &vm_name, None);
+                crate::api::events::record_event(
+                    &state_clone,
+                    crate::api::events::VMEventType::Started,
+                    &vm_name,
+                    None,
+                );
             }
             Err(e) => {
                 tracing::error!("Failed to start VM '{}': {}", vm_name, e);
-                crate::api::events::record_event(&state_clone, crate::api::events::VMEventType::Error, &vm_name, Some(format!("Failed to start: {}", e)));
+                crate::api::events::record_event(
+                    &state_clone,
+                    crate::api::events::VMEventType::Error,
+                    &vm_name,
+                    Some(format!("Failed to start: {}", e)),
+                );
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
                     vm.state = vm_model::VMState::Failed;
                     vm.last_error = Some(e.to_string());
@@ -339,13 +428,31 @@ pub async fn stop_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
-            audit(&state, &claims.sub, "STOP", &format!("vm/{}", name), "SUCCESS");
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Stopped, &name, None);
+            audit(
+                &state,
+                &claims.sub,
+                "STOP",
+                &format!("vm/{}", name),
+                "SUCCESS",
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Stopped,
+                &name,
+                None,
+            );
             (StatusCode::OK, Json(json!({ "status": "stopped" }))).into_response()
         }
         Err(e) => {
-            audit(&state, &claims.sub, "STOP", &format!("vm/{}", name), "FAILED");
-            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response()
+            audit(
+                &state,
+                &claims.sub,
+                "STOP",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
+            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
         }
     }
 }
@@ -370,12 +477,25 @@ pub async fn restart_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
-            audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "SUCCESS");
+            audit(
+                &state,
+                &claims.sub,
+                "RESTART",
+                &format!("vm/{}", name),
+                "SUCCESS",
+            );
             (StatusCode::OK, Json(json!({ "status": "restarted" }))).into_response()
         }
         Err(e) => {
-            audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "FAILED");
-            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response()
+            audit(
+                &state,
+                &claims.sub,
+                "RESTART",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
+            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
         }
     }
 }
@@ -405,11 +525,23 @@ pub async fn pause_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
-            audit(&state, &claims.sub, "PAUSE", &format!("vm/{}", name), "SUCCESS");
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Paused, &name, None);
+            audit(
+                &state,
+                &claims.sub,
+                "PAUSE",
+                &format!("vm/{}", name),
+                "SUCCESS",
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Paused,
+                &name,
+                None,
+            );
             (StatusCode::OK, Json(json!({ "status": "paused" }))).into_response()
         }
-        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+            .into_response(),
     }
 }
 
@@ -438,11 +570,23 @@ pub async fn resume_vm(
                     tracing::error!("Failed to save VM state: {}", e);
                 }
             }
-            audit(&state, &claims.sub, "RESUME", &format!("vm/{}", name), "SUCCESS");
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Resumed, &name, None);
+            audit(
+                &state,
+                &claims.sub,
+                "RESUME",
+                &format!("vm/{}", name),
+                "SUCCESS",
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Resumed,
+                &name,
+                None,
+            );
             (StatusCode::OK, Json(json!({ "status": "running" }))).into_response()
         }
-        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims).into_response(),
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+            .into_response(),
     }
 }
 
@@ -468,7 +612,11 @@ pub async fn clone_vm(
 
     // Prevent cloning to same name
     if source_name == req.target_name {
-        return json_error(StatusCode::BAD_REQUEST, "Source and target VM names must be different").into_response();
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "Source and target VM names must be different",
+        )
+        .into_response();
     }
 
     // Lock both VMs in canonical (lexicographic) order to prevent deadlock
@@ -495,7 +643,11 @@ pub async fn clone_vm(
 
     // Prevent linked clone while source VM is running
     if req.linked_clone && source_vm.state == vm_model::VMState::Running {
-        return json_error(StatusCode::CONFLICT, "Cannot create a linked clone while the source VM is running").into_response();
+        return json_error(
+            StatusCode::CONFLICT,
+            "Cannot create a linked clone while the source VM is running",
+        )
+        .into_response();
     }
 
     // Check target name not taken
@@ -510,26 +662,42 @@ pub async fn clone_vm(
             return json_error(
                 StatusCode::NOT_FOUND,
                 format!("No disk image found for source VM '{}'", source_name),
-            ).into_response();
+            )
+            .into_response();
         }
     };
 
     // Build target path using proper Path API
     let src = std::path::Path::new(&src_path);
-    let target_path = src.with_file_name(format!("{}.qcow2", &req.target_name))
+    let target_path = src
+        .with_file_name(format!("{}.qcow2", &req.target_name))
         .to_string_lossy()
         .to_string();
 
     // Ensure target directory exists
     if let Some(parent) = std::path::Path::new(&target_path).parent() {
         if let Err(e) = tokio::fs::create_dir_all(parent).await {
-            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e), &claims).into_response();
+            return json_error_safe(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to create directory: {}", e),
+                &claims,
+            )
+            .into_response();
         }
     }
 
     let result = if req.linked_clone {
         tokio::process::Command::new("qemu-img")
-            .args(["create", "-f", "qcow2", "-b", &src_path, "-F", "qcow2", &target_path])
+            .args([
+                "create",
+                "-f",
+                "qcow2",
+                "-b",
+                &src_path,
+                "-F",
+                "qcow2",
+                &target_path,
+            ])
             .output()
             .await
     } else {
@@ -542,12 +710,34 @@ pub async fn clone_vm(
     match result {
         Ok(output) if !output.status.success() => {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "FAILED");
-            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", stderr), &claims).into_response();
+            audit(
+                &state,
+                &claims.sub,
+                "CLONE",
+                &format!("vm/{}->{}", source_name, req.target_name),
+                "FAILED",
+            );
+            return json_error_safe(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to clone disk: {}", stderr),
+                &claims,
+            )
+            .into_response();
         }
         Err(e) => {
-            audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "FAILED");
-            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to clone disk: {}", e), &claims).into_response();
+            audit(
+                &state,
+                &claims.sub,
+                "CLONE",
+                &format!("vm/{}->{}", source_name, req.target_name),
+                "FAILED",
+            );
+            return json_error_safe(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to clone disk: {}", e),
+                &claims,
+            )
+            .into_response();
         }
         _ => {}
     }
@@ -563,8 +753,19 @@ pub async fn clone_vm(
 
     match state.store.save_vm(&new_vm) {
         Ok(_) => {
-            audit(&state, &claims.sub, "CLONE", &format!("vm/{}->{}", source_name, req.target_name), "SUCCESS");
-            crate::api::events::record_event(&state, crate::api::events::VMEventType::Cloned, &req.target_name, Some(format!("Cloned from {}", source_name)));
+            audit(
+                &state,
+                &claims.sub,
+                "CLONE",
+                &format!("vm/{}->{}", source_name, req.target_name),
+                "SUCCESS",
+            );
+            crate::api::events::record_event(
+                &state,
+                crate::api::events::VMEventType::Cloned,
+                &req.target_name,
+                Some(format!("Cloned from {}", source_name)),
+            );
             (StatusCode::CREATED, Json(new_vm)).into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),

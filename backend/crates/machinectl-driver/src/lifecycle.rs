@@ -151,7 +151,10 @@ impl VMDriver for MachinectlDriver {
         );
         props.insert(
             "Leader".to_string(),
-            machine.leader().await.map_or_else(|_| String::new(), |p| p.to_string()),
+            machine
+                .leader()
+                .await
+                .map_or_else(|_| String::new(), |p| p.to_string()),
         );
 
         // Also try to get OS release info

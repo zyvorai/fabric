@@ -2,11 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::Query,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::Query, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
@@ -67,10 +63,7 @@ fn validate_pid(pid: u32) -> Result<(), (StatusCode, String)> {
         ));
     }
     if pid > 4_194_304 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "invalid pid: out of range".into(),
-        ));
+        return Err((StatusCode::BAD_REQUEST, "invalid pid: out of range".into()));
     }
     Ok(())
 }
@@ -125,25 +118,13 @@ fn list_processes_blocking(limit: u32) -> Result<Vec<ProcessRow>, (StatusCode, S
 #[cfg(target_os = "linux")]
 fn list_processes_linux(limit: u32) -> Result<Vec<ProcessRow>, (StatusCode, String)> {
     let output = Command::new("ps")
-        .args([
-            "-eo",
-            "pid=,pcpu=,rss=,stat=,nlwp=,comm=",
-            "--no-headers",
-        ])
+        .args(["-eo", "pid=,pcpu=,rss=,stat=,nlwp=,comm=", "--no-headers"])
         .output()
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("ps failed: {e}"),
-            )
-        })?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("ps failed: {e}")))?;
     if !output.status.success() {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!(
-                "ps failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ),
+            format!("ps failed: {}", String::from_utf8_lossy(&output.stderr)),
         ));
     }
 

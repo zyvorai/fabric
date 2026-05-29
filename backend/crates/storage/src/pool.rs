@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::nfs::NfsConfig;
@@ -87,11 +87,17 @@ impl StoragePool {
     }
 
     pub fn is_local(&self) -> bool {
-        matches!(self.pool_type, StoragePoolType::Local | StoragePoolType::Directory { .. })
+        matches!(
+            self.pool_type,
+            StoragePoolType::Local | StoragePoolType::Directory { .. }
+        )
     }
 
     pub fn is_lvm(&self) -> bool {
-        matches!(self.pool_type, StoragePoolType::LVM { .. } | StoragePoolType::LVMThin { .. })
+        matches!(
+            self.pool_type,
+            StoragePoolType::LVM { .. } | StoragePoolType::LVMThin { .. }
+        )
     }
 
     pub fn is_zfs(&self) -> bool {

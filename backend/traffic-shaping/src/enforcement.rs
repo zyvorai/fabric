@@ -214,7 +214,15 @@ mod tests {
     #[test]
     fn test_build_class_args_with_burst() {
         let enforcer = make_enforcer();
-        let rule = make_rule("br0", 256, "100mbit", "500mbit", Some("15k"), 1, &["10.0.0.5"]);
+        let rule = make_rule(
+            "br0",
+            256,
+            "100mbit",
+            "500mbit",
+            Some("15k"),
+            1,
+            &["10.0.0.5"],
+        );
 
         let args = enforcer.build_class_args(&rule);
         assert!(args.contains(&"class".to_string()));

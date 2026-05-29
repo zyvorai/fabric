@@ -66,11 +66,7 @@ impl TunnelCompiler {
             return vec![];
         }
 
-        let subnet_base = network
-            .subnet
-            .split('/')
-            .next()
-            .unwrap_or("10.10.0.0");
+        let subnet_base = network.subnet.split('/').next().unwrap_or("10.10.0.0");
 
         match network.topology {
             VpnTopology::FullMesh => self.build_full_mesh(&matching_vms, subnet_base, network),
@@ -129,7 +125,10 @@ impl TunnelCompiler {
                 .filter(|(j, _)| *j != i)
                 .map(|(j, peer_vm)| CompiledWgPeer {
                     public_key: format!("pubkey-{}", peer_vm.name),
-                    endpoint: peer_vm.ip.as_ref().map(|ip| format!("{}:{}", ip, network.listen_port)),
+                    endpoint: peer_vm
+                        .ip
+                        .as_ref()
+                        .map(|ip| format!("{}:{}", ip, network.listen_port)),
                     allowed_ips: vec![format!("{}.{}/32", base_prefix, j + 1)],
                     persistent_keepalive: 25,
                 })
@@ -175,7 +174,10 @@ impl TunnelCompiler {
             .skip(1)
             .map(|(j, spoke)| CompiledWgPeer {
                 public_key: format!("pubkey-{}", spoke.name),
-                endpoint: spoke.ip.as_ref().map(|ip| format!("{}:{}", ip, network.listen_port)),
+                endpoint: spoke
+                    .ip
+                    .as_ref()
+                    .map(|ip| format!("{}:{}", ip, network.listen_port)),
                 allowed_ips: vec![format!("{}.{}/32", base_prefix, j + 1)],
                 persistent_keepalive: 25,
             })
@@ -198,7 +200,10 @@ impl TunnelCompiler {
                 private_key_ref: format!("privkey-{}", spoke.name),
                 peers: vec![CompiledWgPeer {
                     public_key: format!("pubkey-{}", hub.name),
-                    endpoint: hub.ip.as_ref().map(|ip| format!("{}:{}", ip, network.listen_port)),
+                    endpoint: hub
+                        .ip
+                        .as_ref()
+                        .map(|ip| format!("{}:{}", ip, network.listen_port)),
                     allowed_ips: vec![format!("{}.0/24", base_prefix)],
                     persistent_keepalive: 25,
                 }],
@@ -237,7 +242,10 @@ impl TunnelCompiler {
                 private_key_ref: format!("privkey-{}", vm_a.name),
                 peers: vec![CompiledWgPeer {
                     public_key: format!("pubkey-{}", vm_b.name),
-                    endpoint: vm_b.ip.as_ref().map(|ip| format!("{}:{}", ip, network.listen_port)),
+                    endpoint: vm_b
+                        .ip
+                        .as_ref()
+                        .map(|ip| format!("{}:{}", ip, network.listen_port)),
                     allowed_ips: vec![format!("{}.2/32", base_prefix)],
                     persistent_keepalive: 25,
                 }],
@@ -249,7 +257,10 @@ impl TunnelCompiler {
                 private_key_ref: format!("privkey-{}", vm_b.name),
                 peers: vec![CompiledWgPeer {
                     public_key: format!("pubkey-{}", vm_a.name),
-                    endpoint: vm_a.ip.as_ref().map(|ip| format!("{}:{}", ip, network.listen_port)),
+                    endpoint: vm_a
+                        .ip
+                        .as_ref()
+                        .map(|ip| format!("{}:{}", ip, network.listen_port)),
                     allowed_ips: vec![format!("{}.1/32", base_prefix)],
                     persistent_keepalive: 25,
                 }],
@@ -267,7 +278,10 @@ mod tests {
     fn make_vm(name: &str, labels: &[(&str, &str)], ip: Option<&str>) -> VMSnapshot {
         VMSnapshot {
             name: name.to_string(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             ip: ip.map(|s| s.to_string()),
         }
     }
@@ -294,17 +308,16 @@ mod tests {
         }
     }
 
-    fn make_network(
-        name: &str,
-        selector: &[(&str, &str)],
-        topology: VpnTopology,
-    ) -> VpnNetwork {
+    fn make_network(name: &str, selector: &[(&str, &str)], topology: VpnTopology) -> VpnNetwork {
         VpnNetwork {
             id: Uuid::new_v4(),
             name: name.to_string(),
             description: String::new(),
             selector: LabelSelector {
-                match_labels: selector.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                match_labels: selector
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
             },
             subnet: "10.10.0.0/24".to_string(),
             topology,
@@ -393,7 +406,11 @@ mod tests {
             make_vm("vm-a", &[("role", "vpn")], Some("10.0.0.1")),
             make_vm("vm-b", &[("role", "vpn")], Some("10.0.0.2")),
         ];
-        let networks = vec![make_network("mesh", &[("role", "vpn")], VpnTopology::FullMesh)];
+        let networks = vec![make_network(
+            "mesh",
+            &[("role", "vpn")],
+            VpnTopology::FullMesh,
+        )];
 
         let result = compiler.compile_all(&tunnels, &networks, &vms);
         // 1 tunnel + 2 full mesh interfaces

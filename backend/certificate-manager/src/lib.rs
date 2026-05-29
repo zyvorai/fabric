@@ -361,29 +361,34 @@ impl CertificateManager {
         let not_after = now + Duration::days(req.validity_days as i64);
 
         // Try to issue a real X.509 certificate if CA PEM material is available.
-        let (fingerprint, serial, cert_pem, key_pem) =
-            if let (Some(ca_cert), Some(ca_key)) = (ca.ca_cert_pem.clone(), ca.ca_key_pem.clone())
-            {
-                let output = crypto::issue_certificate(
-                    &req.common_name,
-                    &req.subject_alt_names,
-                    req.validity_days,
-                    &ca_cert,
-                    &ca_key,
-                )?;
-                (output.fingerprint, output.serial, Some(output.cert_pem), Some(output.key_pem))
-            } else {
-                // Fallback: compute a real SHA-256 hash from certificate metadata.
-                let data = format!(
-                    "{}:{}:{}",
-                    req.common_name,
-                    uuid::Uuid::new_v4(),
-                    now.to_rfc3339()
-                );
-                let fingerprint = crypto::compute_fingerprint(data.as_bytes());
-                let serial = uuid::Uuid::new_v4().to_string();
-                (fingerprint, serial, None, None)
-            };
+        let (fingerprint, serial, cert_pem, key_pem) = if let (Some(ca_cert), Some(ca_key)) =
+            (ca.ca_cert_pem.clone(), ca.ca_key_pem.clone())
+        {
+            let output = crypto::issue_certificate(
+                &req.common_name,
+                &req.subject_alt_names,
+                req.validity_days,
+                &ca_cert,
+                &ca_key,
+            )?;
+            (
+                output.fingerprint,
+                output.serial,
+                Some(output.cert_pem),
+                Some(output.key_pem),
+            )
+        } else {
+            // Fallback: compute a real SHA-256 hash from certificate metadata.
+            let data = format!(
+                "{}:{}:{}",
+                req.common_name,
+                uuid::Uuid::new_v4(),
+                now.to_rfc3339()
+            );
+            let fingerprint = crypto::compute_fingerprint(data.as_bytes());
+            let serial = uuid::Uuid::new_v4().to_string();
+            (fingerprint, serial, None, None)
+        };
 
         let cert = Certificate {
             id: uuid::Uuid::new_v4().to_string(),
@@ -478,15 +483,12 @@ impl CertificateManager {
         let validity_days = validity.num_days().max(1) as u32;
 
         // Try to issue a real X.509 certificate if CA PEM material is available.
-        let ca_pem = inner
-            .cas
-            .get(&old_cert.issuer)
-            .and_then(|ca| {
-                ca.ca_cert_pem
-                    .as_ref()
-                    .zip(ca.ca_key_pem.as_ref())
-                    .map(|(c, k)| (c.clone(), k.clone()))
-            });
+        let ca_pem = inner.cas.get(&old_cert.issuer).and_then(|ca| {
+            ca.ca_cert_pem
+                .as_ref()
+                .zip(ca.ca_key_pem.as_ref())
+                .map(|(c, k)| (c.clone(), k.clone()))
+        });
 
         let (fingerprint, serial, cert_pem, key_pem) = if let Some((ca_cert, ca_key)) = ca_pem {
             let output = crypto::issue_certificate(
@@ -496,7 +498,12 @@ impl CertificateManager {
                 &ca_cert,
                 &ca_key,
             )?;
-            (output.fingerprint, output.serial, Some(output.cert_pem), Some(output.key_pem))
+            (
+                output.fingerprint,
+                output.serial,
+                Some(output.cert_pem),
+                Some(output.key_pem),
+            )
         } else {
             // Fallback: compute a real SHA-256 hash from certificate metadata.
             let data = format!(
@@ -540,11 +547,7 @@ impl CertificateManager {
             ca.certificates_issued += 1;
         }
 
-        tracing::info!(
-            "Renewed certificate '{}' -> '{}'",
-            id,
-            new_cert.id
-        );
+        tracing::info!("Renewed certificate '{}' -> '{}'", id, new_cert.id);
         inner
             .certificates
             .insert(new_cert.id.clone(), new_cert.clone());
@@ -635,11 +638,7 @@ impl CertificateManager {
             .ok_or_else(|| anyhow::anyhow!("Certificate request '{}' not found", id))?;
 
         if req.status != CsrStatus::Pending {
-            bail!(
-                "Cannot reject request '{}': status is {:?}",
-                id,
-                req.status
-            );
+            bail!("Cannot reject request '{}': status is {:?}", id, req.status);
         }
 
         req.status = CsrStatus::Rejected;
@@ -706,9 +705,7 @@ impl CertificateManager {
             let rotation = inner
                 .rotations
                 .get_mut(rotation_id)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Rotation '{}' not found", rotation_id)
-                })?;
+                .ok_or_else(|| anyhow::anyhow!("Rotation '{}' not found", rotation_id))?;
 
             if rotation.status != RotationStatus::Scheduled {
                 bail!(
@@ -777,9 +774,7 @@ impl CertificateManager {
             trust.host_id,
             trust.hostname
         );
-        inner
-            .trust_chains
-            .insert(trust.host_id.clone(), trust);
+        inner.trust_chains.insert(trust.host_id.clone(), trust);
         Ok(())
     }
 
@@ -833,10 +828,7 @@ impl CertificateManager {
     // -- Attestation --------------------------------------------------------
 
     /// Submit a trust attestation for a host.
-    pub fn submit_attestation(
-        &self,
-        attestation: TrustAttestation,
-    ) -> Result<TrustAttestation> {
+    pub fn submit_attestation(&self, attestation: TrustAttestation) -> Result<TrustAttestation> {
         let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         tracing::info!(
             "Submitted attestation for host '{}' ({})",
@@ -870,8 +862,7 @@ impl CertificateManager {
             .get_mut(host_id)
             .ok_or_else(|| anyhow::anyhow!("No attestation for host '{}'", host_id))?;
 
-        let trusted =
-            att.tpm_present && att.secure_boot_enabled && att.measured_boot_valid;
+        let trusted = att.tpm_present && att.secure_boot_enabled && att.measured_boot_valid;
 
         att.attestation_status = if trusted {
             AttestationStatus::Trusted
@@ -880,11 +871,7 @@ impl CertificateManager {
         };
         att.last_attested = Some(Utc::now());
 
-        tracing::info!(
-            "Attestation for host '{}': trusted={}",
-            host_id,
-            trusted
-        );
+        tracing::info!("Attestation for host '{}': trusted={}", host_id, trusted);
         Ok(trusted)
     }
 
@@ -949,10 +936,7 @@ impl CertificateManager {
                     baseline_id: baseline_id.to_string(),
                     baseline_name: "unknown".to_string(),
                     compliant: false,
-                    violations: vec![format!(
-                        "Baseline '{}' not found",
-                        baseline_id
-                    )],
+                    violations: vec![format!("Baseline '{}' not found", baseline_id)],
                     checked_at: Utc::now(),
                 };
             }
@@ -1189,8 +1173,7 @@ mod tests {
         let req = make_request("rotate-me.local", "ca-1", "vmspawnd");
         let cert = mgr.issue_certificate(req).unwrap();
 
-        let rotation =
-            mgr.schedule_rotation(&cert.id, Utc::now()).unwrap();
+        let rotation = mgr.schedule_rotation(&cert.id, Utc::now()).unwrap();
         assert_eq!(rotation.status, RotationStatus::Scheduled);
         assert_eq!(rotation.old_cert_fingerprint, cert.fingerprint_sha256);
 
@@ -1318,10 +1301,10 @@ mod tests {
         let result = mgr.check_vm_compliance(
             "vm-secure",
             "bl-1",
-            true,  // encrypted
-            true,  // tpm
-            true,  // secure boot
-            true,  // trusted host
+            true, // encrypted
+            true, // tpm
+            true, // secure boot
+            true, // trusted host
         );
         assert!(result.compliant);
         assert!(result.violations.is_empty());

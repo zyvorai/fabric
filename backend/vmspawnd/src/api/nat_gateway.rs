@@ -40,22 +40,38 @@ pub async fn create_nat_rule(
     }
     if let Some(ref cidr) = req.source_cidr {
         if let Err(e) = crate::validation::validate_cidr(cidr) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid source_cidr: {}", e)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid source_cidr: {}", e)})),
+            )
+                .into_response();
         }
     }
     if let Some(ref cidr) = req.dest_cidr {
         if let Err(e) = crate::validation::validate_cidr(cidr) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid dest_cidr: {}", e)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid dest_cidr: {}", e)})),
+            )
+                .into_response();
         }
     }
     if let Some(ref ip) = req.translate_to {
         if let Err(e) = crate::validation::validate_ip_address(ip) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid translate_to: {}", e)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid translate_to: {}", e)})),
+            )
+                .into_response();
         }
     }
     if let Some(ref iface) = req.outbound_interface {
         if let Err(msg) = crate::validation::validate_hostname(iface) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid outbound_interface: {}", msg)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid outbound_interface: {}", msg)})),
+            )
+                .into_response();
         }
     }
     let now = Utc::now();
@@ -328,7 +344,11 @@ pub async fn create_nat_pool(
     tracing::debug!("nat_gateway::{}", stringify!(create_nat_pool));
     for ip_range in &req.ip_ranges {
         if let Err(e) = crate::validation::validate_ip_address(ip_range) {
-            return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid ip_range: {}", e)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Invalid ip_range: {}", e)})),
+            )
+                .into_response();
         }
     }
     let now = Utc::now();
@@ -417,10 +437,18 @@ pub async fn create_nat_gateway(
 ) -> impl IntoResponse {
     tracing::debug!("nat_gateway::{}", stringify!(create_nat_gateway));
     if let Err(msg) = crate::validation::validate_hostname(&req.outbound_interface) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid outbound_interface: {}", msg)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid outbound_interface: {}", msg)})),
+        )
+            .into_response();
     }
     if let Err(e) = crate::validation::validate_cidr(&req.subnet) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid subnet: {}", e)}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid subnet: {}", e)})),
+        )
+            .into_response();
     }
     let now = Utc::now();
     let gw = NatGatewayConfig {
@@ -585,12 +613,11 @@ pub async fn reconcile_nat(state: &AppState) -> anyhow::Result<()> {
     let enabled_gateways: Vec<NatGatewayConfig> =
         gateways.into_iter().filter(|g| g.enabled).collect();
 
-    let compiled = state.nat_gateway.compiler.compile_all(
-        &enabled_rules,
-        &enabled_gateways,
-        &pools,
-        &vms,
-    );
+    let compiled =
+        state
+            .nat_gateway
+            .compiler
+            .compile_all(&enabled_rules, &enabled_gateways, &pools, &vms);
 
     state.nat_gateway.enforcer.sync_all(&compiled)?;
 
@@ -611,12 +638,10 @@ fn build_vm_snapshots(state: &AppState) -> Vec<VMSnapshot> {
     };
 
     vms.into_iter()
-        .map(|vm| {
-            VMSnapshot {
-                name: vm.name,
-                labels: vm.labels.clone().unwrap_or_default(),
-                ip: vm.ip,
-            }
+        .map(|vm| VMSnapshot {
+            name: vm.name,
+            labels: vm.labels.clone().unwrap_or_default(),
+            ip: vm.ip,
         })
         .collect()
 }

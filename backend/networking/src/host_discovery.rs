@@ -98,7 +98,11 @@ pub fn discover_interfaces() -> Result<Vec<HostNetDevice>> {
         let addresses = addr_map.get(&name).cloned().unwrap_or_default();
 
         let sysfs = format!("/sys/class/net/{}", name);
-        let device_type = classify_interface(&name, &sysfs, entry.get("link_type").and_then(|v| v.as_str()));
+        let device_type = classify_interface(
+            &name,
+            &sysfs,
+            entry.get("link_type").and_then(|v| v.as_str()),
+        );
         let (vlan_id, parent) = parse_vlan_info(&name, &sysfs, device_type);
 
         devices.push(HostNetDevice {
@@ -194,10 +198,7 @@ pub fn list_systemd_network_files(config_dir: &str) -> Vec<String> {
     };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.ends_with(".link")
-            || name.ends_with(".netdev")
-            || name.ends_with(".network")
-        {
+        if name.ends_with(".link") || name.ends_with(".netdev") || name.ends_with(".network") {
             files.push(name);
         }
     }

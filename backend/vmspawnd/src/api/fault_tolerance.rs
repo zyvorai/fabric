@@ -2,6 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+use crate::server::AppState;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -9,12 +10,9 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use std::sync::Arc;
-use crate::server::AppState;
+use fault_tolerance::{FailoverResult, FtConfig, FtEvent, FtMetrics, FtStatus, ReplicationState};
 use security::{RequireRead, RequireWrite};
-use fault_tolerance::{
-    FailoverResult, FtConfig, FtEvent, FtMetrics, FtStatus, ReplicationState,
-};
+use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
 pub struct EnableFtRequest {
@@ -51,7 +49,11 @@ pub async fn enable_ft(
     };
     match state.store.save_entity("ft_configs", &req.vm_name, &config) {
         Ok(_) => (StatusCode::CREATED, Json(config)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -66,11 +68,19 @@ pub async fn disable_ft(
     }
     if let Err(e) = state.store.delete_entity("ft_configs", &vm_name) {
         tracing::error!("Failed to delete entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     if let Err(e) = state.store.delete_entity("ft_metrics", &vm_name) {
         tracing::error!("Failed to delete entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     StatusCode::NO_CONTENT.into_response()
 }
@@ -86,14 +96,28 @@ pub async fn get_ft_config(
     }
     match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => Json(c).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Fault tolerance config not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to load fault tolerance config"})),
+        )
+            .into_response(),
     }
 }
 
-pub async fn list_ft_vms(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_ft_vms(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(list_ft_vms));
-    let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<FtConfig> = state.store.list_entities("ft_configs").unwrap_or_else(|e| {
+        tracing::error!("Storage error: {}", e);
+        Vec::new()
+    });
     Json(items)
 }
 
@@ -126,8 +150,20 @@ pub async fn trigger_failover(
     }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Fault tolerance config not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load fault tolerance config"})),
+            )
+                .into_response()
+        }
     };
     let old_primary = config.primary_host_id.clone();
     let new_primary = config.secondary_host_id.clone();
@@ -166,8 +202,20 @@ pub async fn test_failover(
     }
     let config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Fault tolerance config not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load fault tolerance config"})),
+            )
+                .into_response()
+        }
     };
     let result = FailoverResult {
         vm_name,
@@ -195,14 +243,30 @@ pub async fn suspend_replication(
     }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Fault tolerance config not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load fault tolerance config"})),
+            )
+                .into_response()
+        }
     };
     config.replication_state = ReplicationState::Suspended;
     config.updated = Utc::now();
     if let Err(e) = state.store.save_entity("ft_configs", &vm_name, &config) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -218,14 +282,30 @@ pub async fn resume_replication(
     }
     let mut config = match state.store.get_entity::<FtConfig>("ft_configs", &vm_name) {
         Ok(Some(c)) => c,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance config not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance config"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Fault tolerance config not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load fault tolerance config"})),
+            )
+                .into_response()
+        }
     };
     config.replication_state = ReplicationState::Syncing;
     config.updated = Utc::now();
     if let Err(e) = state.store.save_entity("ft_configs", &vm_name, &config) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     StatusCode::OK.into_response()
 }
@@ -241,13 +321,27 @@ pub async fn get_ft_metrics(
     }
     match state.store.get_entity::<FtMetrics>("ft_metrics", &vm_name) {
         Ok(Some(m)) => Json(m).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Fault tolerance metrics not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load fault tolerance metrics"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Fault tolerance metrics not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to load fault tolerance metrics"})),
+        )
+            .into_response(),
     }
 }
 
-pub async fn get_ft_events(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn get_ft_events(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("fault_tolerance::{}", stringify!(get_ft_events));
-    let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<FtEvent> = state.store.list_entities("ft_events").unwrap_or_else(|e| {
+        tracing::error!("Storage error: {}", e);
+        Vec::new()
+    });
     Json(items)
 }

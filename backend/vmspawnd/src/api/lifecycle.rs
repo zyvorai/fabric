@@ -13,19 +13,28 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
 use lifecycle_manager::{
     Baseline, ComplianceSummary, HostComplianceStatus, RemediationTask, RollingUpdatePlan,
     RollingUpdateStatus,
 };
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Baseline handlers
 // ============================================================================
 
-pub async fn list_baselines(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_baselines(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_baselines));
-    let items: Vec<Baseline> = state.store.list_entities("lm_baselines").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<Baseline> = state
+        .store
+        .list_entities("lm_baselines")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(items)
 }
 
@@ -38,9 +47,16 @@ pub async fn create_baseline(
     baseline.id = Uuid::new_v4().to_string();
     baseline.created = Utc::now();
     baseline.updated = None;
-    match state.store.save_entity("lm_baselines", &baseline.id, &baseline) {
+    match state
+        .store
+        .save_entity("lm_baselines", &baseline.id, &baseline)
+    {
         Ok(_) => (StatusCode::CREATED, Json(baseline)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -52,8 +68,16 @@ pub async fn get_baseline(
     tracing::debug!("lifecycle::{}", stringify!(get_baseline));
     match state.store.get_entity::<Baseline>("lm_baselines", &id) {
         Ok(Some(b)) => Json(b).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Baseline not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Baseline not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal server error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -64,14 +88,28 @@ pub async fn update_baseline(
     Json(mut baseline): Json<Baseline>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(update_baseline));
-    if state.store.get_entity::<Baseline>("lm_baselines", &id).ok().flatten().is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Not found"}))).into_response();
+    if state
+        .store
+        .get_entity::<Baseline>("lm_baselines", &id)
+        .ok()
+        .flatten()
+        .is_none()
+    {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Not found"})),
+        )
+            .into_response();
     }
     baseline.id = id.clone();
     baseline.updated = Some(Utc::now());
     if let Err(e) = state.store.save_entity("lm_baselines", &id, &baseline) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     Json(baseline).into_response()
 }
@@ -84,9 +122,17 @@ pub async fn delete_baseline(
     tracing::debug!("lifecycle::{}", stringify!(delete_baseline));
     if let Err(e) = state.store.delete_entity("lm_baselines", &id) {
         tracing::error!("Failed to delete entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::NO_CONTENT, Json(serde_json::json!({"status": "deleted"}))).into_response()
+    (
+        StatusCode::NO_CONTENT,
+        Json(serde_json::json!({"status": "deleted"})),
+    )
+        .into_response()
 }
 
 // ============================================================================
@@ -109,12 +155,20 @@ pub async fn scan_host_compliance(
     tracing::debug!("lifecycle::{}", stringify!(scan_host_compliance));
     let mgr = lifecycle_manager::LifecycleManager::new();
     // Load baseline into manager
-    if let Ok(Some(baseline)) = state.store.get_entity::<Baseline>("lm_baselines", &req.baseline_id) {
+    if let Ok(Some(baseline)) = state
+        .store
+        .get_entity::<Baseline>("lm_baselines", &req.baseline_id)
+    {
         if let Err(e) = mgr.create_baseline(baseline) {
             tracing::warn!("Failed to load baseline into manager: {}", e);
         }
     }
-    match mgr.scan_host_compliance(&req.host_id, &req.hostname, &req.baseline_id, &req.installed_packages) {
+    match mgr.scan_host_compliance(
+        &req.host_id,
+        &req.hostname,
+        &req.baseline_id,
+        &req.installed_packages,
+    ) {
         Ok(status) => {
             let id = Uuid::new_v4().to_string();
             if let Err(e) = state.store.save_entity("compliance_results", &id, &status) {
@@ -122,7 +176,11 @@ pub async fn scan_host_compliance(
             }
             Json(status).into_response()
         }
-        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -132,7 +190,13 @@ pub async fn get_compliance_status(
     Path(host_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_compliance_status));
-    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<HostComplianceStatus> = state
+        .store
+        .list_entities("compliance_results")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     let filtered: Vec<_> = items.into_iter().filter(|s| s.host_id == host_id).collect();
     Json(filtered)
 }
@@ -143,7 +207,13 @@ pub async fn get_cluster_compliance(
     Path(_cluster_id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_cluster_compliance));
-    let items: Vec<HostComplianceStatus> = state.store.list_entities("compliance_results").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<HostComplianceStatus> = state
+        .store
+        .list_entities("compliance_results")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     let mut total_hosts = 0u32;
     let mut compliant_hosts = 0u32;
     let mut non_compliant_hosts = 0u32;
@@ -157,7 +227,9 @@ pub async fn get_cluster_compliance(
                 compliant_hosts += 1;
             } else {
                 non_compliant_hosts += 1;
-                critical_missing += status.missing_patches.iter()
+                critical_missing += status
+                    .missing_patches
+                    .iter()
                     .filter(|p| p.severity == Some(lifecycle_manager::PatchSeverity::Critical))
                     .count() as u32;
             }
@@ -176,9 +248,19 @@ pub async fn get_cluster_compliance(
 // Remediation handlers
 // ============================================================================
 
-pub async fn list_remediations(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_remediations(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_remediations));
-    let items: Vec<RemediationTask> = state.store.list_entities("remediations").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<RemediationTask> =
+        state
+            .store
+            .list_entities("remediations")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     Json(items)
 }
 
@@ -203,7 +285,11 @@ pub async fn create_remediation(
             }
             (StatusCode::CREATED, Json(task)).into_response()
         }
-        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -213,10 +299,21 @@ pub async fn get_remediation(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(get_remediation));
-    match state.store.get_entity::<RemediationTask>("remediations", &id) {
+    match state
+        .store
+        .get_entity::<RemediationTask>("remediations", &id)
+    {
         Ok(Some(t)) => Json(t).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Remediation not found"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Remediation not found"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Internal server error"})),
+        )
+            .into_response(),
     }
 }
 
@@ -224,9 +321,18 @@ pub async fn get_remediation(
 // Rolling update handlers
 // ============================================================================
 
-pub async fn list_rolling_updates(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_rolling_updates(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(list_rolling_updates));
-    let items: Vec<RollingUpdatePlan> = state.store.list_entities("rolling_updates").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<RollingUpdatePlan> = state
+        .store
+        .list_entities("rolling_updates")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(items)
 }
 
@@ -241,10 +347,16 @@ pub async fn create_rolling_update(
     plan.current_host_index = 0;
     plan.started = None;
     plan.completed = None;
-    if plan.max_concurrent == 0 { plan.max_concurrent = 1; }
+    if plan.max_concurrent == 0 {
+        plan.max_concurrent = 1;
+    }
     match state.store.save_entity("rolling_updates", &plan.id, &plan) {
         Ok(_) => (StatusCode::CREATED, Json(plan)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -254,17 +366,36 @@ pub async fn start_rolling_update(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(start_rolling_update));
-    let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
+    let mut plan = match state
+        .store
+        .get_entity::<RollingUpdatePlan>("rolling_updates", &id)
+    {
         Ok(Some(p)) => p,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rolling update not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Rolling update not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     plan.status = RollingUpdateStatus::InProgress;
     plan.started = Some(Utc::now());
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
     }
-    (StatusCode::OK, Json(serde_json::json!({"status": "rolling update started"}))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"status": "rolling update started"})),
+    )
+        .into_response()
 }
 
 pub async fn pause_rolling_update(
@@ -273,17 +404,40 @@ pub async fn pause_rolling_update(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(pause_rolling_update));
-    let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
+    let mut plan = match state
+        .store
+        .get_entity::<RollingUpdatePlan>("rolling_updates", &id)
+    {
         Ok(Some(p)) => p,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rolling update not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Rolling update not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     plan.status = RollingUpdateStatus::Paused;
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
-    (StatusCode::OK, Json(serde_json::json!({"status": "rolling update paused"}))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"status": "rolling update paused"})),
+    )
+        .into_response()
 }
 
 pub async fn advance_rolling_update(
@@ -292,10 +446,25 @@ pub async fn advance_rolling_update(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("lifecycle::{}", stringify!(advance_rolling_update));
-    let mut plan = match state.store.get_entity::<RollingUpdatePlan>("rolling_updates", &id) {
+    let mut plan = match state
+        .store
+        .get_entity::<RollingUpdatePlan>("rolling_updates", &id)
+    {
         Ok(Some(p)) => p,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rolling update not found"}))).into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Internal server error"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Rolling update not found"})),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     };
     let index = plan.current_host_index as usize;
     if index >= plan.host_order.len() {
@@ -303,7 +472,11 @@ pub async fn advance_rolling_update(
         plan.completed = Some(Utc::now());
         if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
             tracing::error!("Failed to save entity: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
         }
         return Json(serde_json::json!({"completed": true})).into_response();
     }
@@ -311,7 +484,11 @@ pub async fn advance_rolling_update(
     plan.current_host_index += 1;
     if let Err(e) = state.store.save_entity("rolling_updates", &plan.id, &plan) {
         tracing::error!("Failed to save entity: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     Json(serde_json::json!({"next_host_id": host_id})).into_response()
 }

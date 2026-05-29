@@ -40,7 +40,9 @@ async fn test_cpu_topology_detection() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let topology: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert!(topology.get("total_cpus").is_some());
@@ -62,7 +64,9 @@ async fn test_numa_topology_detection() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let topology: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert!(topology.get("nodes").is_some());
@@ -81,7 +85,9 @@ async fn test_system_memory_info() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let memory: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert!(memory.get("total_kb").is_some());
@@ -246,7 +252,9 @@ async fn test_networkd_bridge_lifecycle() {
     let response = app.clone().oneshot(create_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let bridge: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let bridge_id = bridge["id"].as_str().unwrap();
 
@@ -260,7 +268,9 @@ async fn test_networkd_bridge_lifecycle() {
     let response = app.clone().oneshot(list_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let bridges: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(!bridges.is_empty());
 
@@ -347,7 +357,9 @@ async fn test_template_lifecycle() {
     let response = app.clone().oneshot(create_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let template: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let template_id = template["id"].as_str().unwrap().to_string();
 
@@ -365,7 +377,9 @@ async fn test_template_lifecycle() {
     let response = app.clone().oneshot(list_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let templates: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(!templates.is_empty());
 
@@ -396,7 +410,9 @@ async fn test_template_lifecycle() {
     let response = app.clone().oneshot(update_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let updated: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(updated["name"], "ubuntu-base-v2");
     assert_eq!(updated["cpus"], 4);
@@ -461,7 +477,9 @@ async fn test_deploy_template() {
     let response = app.clone().oneshot(create_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let template: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let template_id = template["id"].as_str().unwrap().to_string();
 
@@ -470,15 +488,15 @@ async fn test_deploy_template() {
         .method("POST")
         .uri(&format!("/api/templates/{}/deploy", template_id))
         .header("content-type", "application/json")
-        .body(Body::from(
-            json!({ "vm_name": "deployed-vm" }).to_string(),
-        ))
+        .body(Body::from(json!({ "vm_name": "deployed-vm" }).to_string()))
         .unwrap();
 
     let response = app.clone().oneshot(deploy_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let vm: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(vm["name"], "deployed-vm");
     assert_eq!(vm["cpus"], 1);
@@ -583,9 +601,14 @@ async fn test_clone_vm() {
     // (in test environments there is no real disk image on the filesystem)
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let error: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(error["error"].as_str().unwrap().contains("No disk image found"));
+    assert!(error["error"]
+        .as_str()
+        .unwrap()
+        .contains("No disk image found"));
 }
 
 #[tokio::test]
@@ -617,9 +640,7 @@ async fn test_clone_vm_name_conflict() {
         .method("POST")
         .uri("/api/vms/vm-a/clone")
         .header("content-type", "application/json")
-        .body(Body::from(
-            json!({ "target_name": "vm-b" }).to_string(),
-        ))
+        .body(Body::from(json!({ "target_name": "vm-b" }).to_string()))
         .unwrap();
 
     let response = app.oneshot(clone_request).await.unwrap();
@@ -641,7 +662,9 @@ async fn test_list_migrations() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let migrations: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(migrations.is_empty());
 }
@@ -711,7 +734,9 @@ async fn test_optimization_recommendations() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let recommendations: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     // No running VMs so no recommendations
     assert!(recommendations.is_empty());
@@ -806,7 +831,9 @@ async fn test_list_plugins() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let plugins: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     // No plugins registered in test env
     assert!(plugins.is_empty());
@@ -854,7 +881,9 @@ async fn test_cluster_health_with_cluster() {
     let response = app.clone().oneshot(create_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let cluster: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let cluster_id = cluster["id"].as_str().unwrap();
 
@@ -868,7 +897,9 @@ async fn test_cluster_health_with_cluster() {
     let response = app.oneshot(health_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let health: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(health["total_hosts"], 0);
     assert_eq!(health["health_status"], "empty");
@@ -896,7 +927,9 @@ async fn test_host_discovery_unreachable() {
     let response = app.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["reachable"], false);
     assert_eq!(result["already_registered"], false);
@@ -942,7 +975,9 @@ async fn test_datacenter_host_lifecycle() {
     let response = app.clone().oneshot(host_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let host: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let host_id = host["id"].as_str().unwrap();
 
@@ -975,7 +1010,9 @@ async fn test_datacenter_host_lifecycle() {
     let response = app.clone().oneshot(list_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let hosts: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(!hosts.is_empty());
 
@@ -1045,16 +1082,29 @@ async fn test_concurrent_start_same_vm() {
     //   the VM may transition to Failed, allowing the second request to also be ACCEPTED.
     // Both outcomes are correct — the key is no simultaneous state mutations occur.
     let statuses = vec![s1, s2];
-    let accepted = statuses.iter().filter(|s| **s == StatusCode::ACCEPTED).count();
-    let _conflict = statuses.iter().filter(|s| **s == StatusCode::CONFLICT).count();
+    let accepted = statuses
+        .iter()
+        .filter(|s| **s == StatusCode::ACCEPTED)
+        .count();
+    let _conflict = statuses
+        .iter()
+        .filter(|s| **s == StatusCode::CONFLICT)
+        .count();
 
     // At least one should be accepted
-    assert!(accepted >= 1, "Expected at least 1 ACCEPTED, got {:?}", statuses);
+    assert!(
+        accepted >= 1,
+        "Expected at least 1 ACCEPTED, got {:?}",
+        statuses
+    );
     // All responses should be one of: ACCEPTED, CONFLICT, or INTERNAL_SERVER_ERROR
     for s in &statuses {
         assert!(
-            *s == StatusCode::ACCEPTED || *s == StatusCode::CONFLICT || *s == StatusCode::INTERNAL_SERVER_ERROR,
-            "Unexpected status code: {:?}", s
+            *s == StatusCode::ACCEPTED
+                || *s == StatusCode::CONFLICT
+                || *s == StatusCode::INTERNAL_SERVER_ERROR,
+            "Unexpected status code: {:?}",
+            s
         );
     }
 }
@@ -1094,7 +1144,9 @@ async fn test_clone_self_rejected() {
     let response = app.oneshot(clone_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let error: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(error["error"].as_str().unwrap().contains("different"));
 }
@@ -1132,7 +1184,9 @@ async fn test_list_vms_pagination() {
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     // Should return at most 2 items (limit=2), with total >= 3
     assert!(result["items"].as_array().unwrap().len() <= 2);
@@ -1235,7 +1289,9 @@ async fn test_create_vm_returns_fields() {
     let response = app.oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let vm: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(vm["name"].as_str().unwrap(), "lifecycle-test");
     assert_eq!(vm["cpus"].as_u64().unwrap(), 2);
@@ -1245,7 +1301,8 @@ async fn test_create_vm_returns_fields() {
 #[tokio::test]
 async fn test_create_vm_invalid_name_rejected() {
     let app = common::create_test_app().await;
-    let body = json!({"name": "; rm -rf /", "cpus": 2, "memory": 512, "disk": 10, "image": "test.raw"});
+    let body =
+        json!({"name": "; rm -rf /", "cpus": 2, "memory": 512, "disk": 10, "image": "test.raw"});
     let req = Request::builder()
         .method("POST")
         .uri("/api/vms")
@@ -1261,7 +1318,8 @@ async fn test_delete_vm_success() {
     let app = common::create_test_app().await;
 
     // Create
-    let body = json!({"name": "delete-me", "cpus": 1, "memory": 256, "disk": 5, "image": "test.raw"});
+    let body =
+        json!({"name": "delete-me", "cpus": 1, "memory": 256, "disk": 5, "image": "test.raw"});
     let req = Request::builder()
         .method("POST")
         .uri("/api/vms")
@@ -1307,7 +1365,9 @@ async fn test_schedule_lifecycle() {
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let schedule: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let id = schedule["id"].as_str().unwrap();
 
@@ -1422,7 +1482,9 @@ async fn test_secrets_lifecycle() {
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let secret: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let id = secret["id"].as_str().unwrap();
     assert_eq!(secret["name"].as_str().unwrap(), "db-password");
@@ -1435,7 +1497,9 @@ async fn test_secrets_lifecycle() {
         .unwrap();
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let list: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(!list.is_empty());
 
@@ -1462,7 +1526,9 @@ async fn test_list_snapshots_empty() {
     let response = app.oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let snapshots: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(snapshots.is_empty());
 }
@@ -1478,7 +1544,9 @@ async fn test_snapshot_tree_empty() {
     let response = app.oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let tree: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     assert!(tree.is_empty());
 }

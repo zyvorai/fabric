@@ -54,10 +54,7 @@ pub fn generate_ca(common_name: &str, validity_days: u32) -> Result<CaOutput> {
     params.distinguished_name = dn;
 
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    params.key_usages = vec![
-        KeyUsagePurpose::KeyCertSign,
-        KeyUsagePurpose::CrlSign,
-    ];
+    params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
 
     // Set validity period.
     let now = time::OffsetDateTime::now_utc();
@@ -101,8 +98,8 @@ pub fn issue_certificate(
 
     // Add Subject Alternative Names.
     for name in san_names {
-        let ia5 = Ia5String::try_from(name.as_str())
-            .context(format!("invalid SAN name: {}", name))?;
+        let ia5 =
+            Ia5String::try_from(name.as_str()).context(format!("invalid SAN name: {}", name))?;
         params.subject_alt_names.push(SanType::DnsName(ia5));
     }
 

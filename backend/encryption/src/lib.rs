@@ -176,7 +176,9 @@ impl EncryptionManager {
             provider.name,
             provider.provider_type
         );
-        inner.providers.insert(provider.id.clone(), provider.clone());
+        inner
+            .providers
+            .insert(provider.id.clone(), provider.clone());
         Ok(provider)
     }
 
@@ -295,7 +297,10 @@ impl EncryptionManager {
             .values()
             .any(|s| s.policy_id.as_deref() == Some(id));
         if in_use {
-            bail!("Cannot delete policy '{}': still in use by one or more VMs", id);
+            bail!(
+                "Cannot delete policy '{}': still in use by one or more VMs",
+                id
+            );
         }
         inner.policies.remove(id);
         tracing::info!("Deleted encryption policy '{}'", id);
@@ -354,7 +359,11 @@ impl EncryptionManager {
             .clone();
 
         if old_key.status != KeyStatus::Active {
-            bail!("Key '{}' is not active (status: {:?})", key_id, old_key.status);
+            bail!(
+                "Key '{}' is not active (status: {:?})",
+                key_id,
+                old_key.status
+            );
         }
 
         let now = Utc::now();
@@ -483,7 +492,9 @@ impl EncryptionManager {
 
         let key_id_for_disk = key.id.clone();
         inner.keys.insert(key.id.clone(), key);
-        inner.vm_statuses.insert(vm_name.to_string(), status.clone());
+        inner
+            .vm_statuses
+            .insert(vm_name.to_string(), status.clone());
 
         tracing::info!(
             "Encrypted VM '{}' with policy '{}' (algorithm: {:?})",
@@ -501,24 +512,25 @@ impl EncryptionManager {
             let encrypted_path = format!("{}.encrypted", image_path);
 
             // Write the encryption key to a temporary file for qemu-img --object
-            let secret_file = format!(
-                "/tmp/vmspawnd-encrypt-{}",
-                uuid::Uuid::new_v4().simple()
-            );
+            let secret_file = format!("/tmp/vmspawnd-encrypt-{}", uuid::Uuid::new_v4().simple());
             if let Err(e) = std::fs::write(&secret_file, &key_id_for_disk) {
                 tracing::error!(
                     "Failed to write encryption secret file for VM '{}': {}",
-                    vm_name, e
+                    vm_name,
+                    e
                 );
             } else {
                 let output = std::process::Command::new("qemu-img")
                     .args([
                         "convert",
-                        "-f", "qcow2",
-                        "-O", "qcow2",
+                        "-f",
+                        "qcow2",
+                        "-O",
+                        "qcow2",
                         "--object",
                         &format!("secret,id=sec0,file={}", secret_file),
-                        "-o", "encrypt.format=luks,encrypt.key-secret=sec0",
+                        "-o",
+                        "encrypt.format=luks,encrypt.key-secret=sec0",
                         &image_path,
                         &encrypted_path,
                     ])
@@ -533,7 +545,8 @@ impl EncryptionManager {
                         if let Err(e) = std::fs::rename(&encrypted_path, &image_path) {
                             tracing::error!(
                                 "Failed to replace disk with encrypted version for VM '{}': {}",
-                                vm_name, e
+                                vm_name,
+                                e
                             );
                         } else {
                             tracing::info!(
@@ -546,23 +559,22 @@ impl EncryptionManager {
                         let stderr = String::from_utf8_lossy(&out.stderr);
                         tracing::error!(
                             "qemu-img encryption failed for VM '{}': {}",
-                            vm_name, stderr
+                            vm_name,
+                            stderr
                         );
                         // Clean up partial output file
                         let _ = std::fs::remove_file(&encrypted_path);
                     }
                     Err(e) => {
-                        tracing::error!(
-                            "Failed to execute qemu-img for VM '{}': {}",
-                            vm_name, e
-                        );
+                        tracing::error!("Failed to execute qemu-img for VM '{}': {}", vm_name, e);
                     }
                 }
             }
         } else {
             tracing::debug!(
                 "No disk image found at '{}' for VM '{}', skipping disk encryption",
-                image_path, vm_name
+                image_path,
+                vm_name
             );
         }
 
@@ -616,15 +628,14 @@ impl EncryptionManager {
         if std::path::Path::new(&image_path).exists() {
             if let Some(ref key_id) = key_for_decrypt {
                 let decrypted_path = format!("{}.decrypted", image_path);
-                let secret_file = format!(
-                    "/tmp/vmspawnd-decrypt-{}",
-                    uuid::Uuid::new_v4().simple()
-                );
+                let secret_file =
+                    format!("/tmp/vmspawnd-decrypt-{}", uuid::Uuid::new_v4().simple());
 
                 if let Err(e) = std::fs::write(&secret_file, key_id) {
                     tracing::error!(
                         "Failed to write decryption secret file for VM '{}': {}",
-                        vm_name, e
+                        vm_name,
+                        e
                     );
                 } else {
                     let output = std::process::Command::new("qemu-img")
@@ -663,14 +674,16 @@ impl EncryptionManager {
                             let stderr = String::from_utf8_lossy(&out.stderr);
                             tracing::error!(
                                 "qemu-img decryption failed for VM '{}': {}",
-                                vm_name, stderr
+                                vm_name,
+                                stderr
                             );
                             let _ = std::fs::remove_file(&decrypted_path);
                         }
                         Err(e) => {
                             tracing::error!(
                                 "Failed to execute qemu-img for VM '{}': {}",
-                                vm_name, e
+                                vm_name,
+                                e
                             );
                         }
                     }
@@ -679,7 +692,8 @@ impl EncryptionManager {
         } else {
             tracing::debug!(
                 "No disk image found at '{}' for VM '{}', skipping disk decryption",
-                image_path, vm_name
+                image_path,
+                vm_name
             );
         }
 
@@ -731,10 +745,7 @@ impl EncryptionManager {
         inner
             .keys
             .values()
-            .filter(|k| {
-                k.status == KeyStatus::Active
-                    && k.expires.map_or(false, |exp| exp <= now)
-            })
+            .filter(|k| k.status == KeyStatus::Active && k.expires.map_or(false, |exp| exp <= now))
             .cloned()
             .collect()
     }
@@ -811,7 +822,8 @@ mod tests {
     fn test_remove_provider_with_active_keys_fails() {
         let mgr = EncryptionManager::new();
         mgr.register_provider(make_provider("p1", "A")).unwrap();
-        mgr.generate_key("p1", EncryptionAlgorithm::Aes256Xts).unwrap();
+        mgr.generate_key("p1", EncryptionAlgorithm::Aes256Xts)
+            .unwrap();
         assert!(mgr.remove_provider("p1").is_err());
     }
 
@@ -943,9 +955,12 @@ mod tests {
         let mgr = EncryptionManager::new();
         mgr.register_provider(make_provider("p1", "A")).unwrap();
         mgr.register_provider(make_provider("p2", "B")).unwrap();
-        mgr.generate_key("p1", EncryptionAlgorithm::Aes256Xts).unwrap();
-        mgr.generate_key("p1", EncryptionAlgorithm::Aes256Cbc).unwrap();
-        mgr.generate_key("p2", EncryptionAlgorithm::ChaCha20Poly1305).unwrap();
+        mgr.generate_key("p1", EncryptionAlgorithm::Aes256Xts)
+            .unwrap();
+        mgr.generate_key("p1", EncryptionAlgorithm::Aes256Cbc)
+            .unwrap();
+        mgr.generate_key("p2", EncryptionAlgorithm::ChaCha20Poly1305)
+            .unwrap();
 
         assert_eq!(mgr.list_keys(Some("p1")).len(), 2);
         assert_eq!(mgr.list_keys(Some("p2")).len(), 1);

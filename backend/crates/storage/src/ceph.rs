@@ -167,8 +167,8 @@ impl CephPool {
             });
         }
 
-        let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .map_err(|e| CephError::Parse(e.to_string()))?;
+        let json: serde_json::Value =
+            serde_json::from_slice(&output.stdout).map_err(|e| CephError::Parse(e.to_string()))?;
 
         let status_str = json["status"].as_str().unwrap_or("HEALTH_ERR");
         let status = match status_str {
@@ -233,8 +233,7 @@ impl CephPool {
             ));
         }
 
-        let images: Vec<String> = serde_json::from_slice(&output.stdout)
-            .unwrap_or_default();
+        let images: Vec<String> = serde_json::from_slice(&output.stdout).unwrap_or_default();
         Ok(images)
     }
 

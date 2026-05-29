@@ -7,11 +7,11 @@ use axum::{
     response::sse::{Event, Sse},
     Json,
 };
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::convert::Infallible;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use crate::server::AppState;
 use security::{RequireRead, RequireWrite};
@@ -99,9 +99,7 @@ pub async fn list_events(
 ) -> Json<Vec<VMEvent>> {
     tracing::debug!("events::{}", stringify!(list_events));
     let keep = retention_limit(&state);
-    let mut events: Vec<VMEvent> = state.store
-        .list_entities("vm_events")
-        .unwrap_or_default();
+    let mut events: Vec<VMEvent> = state.store.list_entities("vm_events").unwrap_or_default();
 
     // Sort by timestamp descending and limit to retention
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
@@ -151,7 +149,12 @@ pub async fn set_retention(
 static EVENT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Helper: Record a VM event (called internally by other handlers)
-pub fn record_event(state: &Arc<AppState>, event_type: VMEventType, vm_name: &str, detail: Option<String>) {
+pub fn record_event(
+    state: &Arc<AppState>,
+    event_type: VMEventType,
+    vm_name: &str,
+    detail: Option<String>,
+) {
     let event = VMEvent {
         id: uuid::Uuid::new_v4().to_string(),
         event_type,

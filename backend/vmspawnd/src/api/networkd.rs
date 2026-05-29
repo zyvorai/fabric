@@ -13,7 +13,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
 use networking::models::{
     AdoptHostRequest, BondConfig, BridgeConfig, CreateBondRequest, CreateBridgeRequest,
     CreateLinkFileRequest, CreateMacvtapRequest, CreateNetworkFileRequest,
@@ -23,6 +22,7 @@ use networking::models::{
 };
 use networking::nftables::NftManager;
 use networking::NetworkdManager;
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 pub(crate) fn networkd_manager(state: &AppState) -> NetworkdManager {
     NetworkdManager::new(
@@ -52,7 +52,10 @@ fn reject_host_delete(id: &str, kind: &str) -> Option<axum::response::Response> 
 // Bridge handlers
 // ============================================================================
 
-pub async fn list_bridges(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_bridges(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bridges));
     let items: Vec<BridgeConfig> = state
         .store
@@ -96,15 +99,19 @@ pub async fn create_bridge(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_bridge(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -114,7 +121,10 @@ pub async fn get_bridge(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(get_bridge));
-    match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
+    match state
+        .store
+        .get_entity::<BridgeConfig>("networkd_bridges", &id)
+    {
         Ok(Some(b)) => Json(b).into_response(),
         Ok(None) => {
             if super::networkd_discover::is_host_managed_id(&id) {
@@ -124,7 +134,10 @@ pub async fn get_bridge(
             }
             crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found").into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bridge").into_response(),
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bridge")
+                .into_response()
+        }
     }
 }
 
@@ -138,17 +151,31 @@ pub async fn update_bridge(
     if let Err((status, msg)) = crate::validation::validate_vm_name(&req.name) {
         return crate::api_error::json_error(status, msg).into_response();
     }
-    let existing = match state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
+    let existing = match state
+        .store
+        .get_entity::<BridgeConfig>("networkd_bridges", &id)
+    {
         Ok(Some(b)) => b,
-        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found").into_response(),
-        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bridge").into_response(),
+        Ok(None) => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Bridge not found")
+                .into_response()
+        }
+        Err(_) => {
+            return crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load bridge",
+            )
+            .into_response()
+        }
     };
 
     let mgr = networkd_manager(&state);
 
     // Remove old config files if name changed
     if existing.name != req.name {
-        if let Err(e) = mgr.remove_device(&existing.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.remove_device(&existing.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
     }
 
     let cfg = BridgeConfig {
@@ -172,15 +199,19 @@ pub async fn update_bridge(
     };
 
     if let Err(e) = mgr.apply_bridge(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_bridges", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             Json(cfg).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -268,11 +299,20 @@ pub async fn delete_bridge(
         .into_response();
     }
     let mgr = networkd_manager(&state);
-    if let Ok(Some(cfg)) = state.store.get_entity::<BridgeConfig>("networkd_bridges", &id) {
-        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+    if let Ok(Some(cfg)) = state
+        .store
+        .get_entity::<BridgeConfig>("networkd_bridges", &id)
+    {
+        if let Err(e) = mgr.remove_device(&cfg.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_bridges", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_bridges", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -280,9 +320,18 @@ pub async fn delete_bridge(
 // VLAN handlers
 // ============================================================================
 
-pub async fn list_vlans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_vlans(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vlans));
-    let items: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<VlanConfig> = state
+        .store
+        .list_entities("networkd_vlans")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_vlans(&state, items))
 }
 
@@ -321,15 +370,19 @@ pub async fn create_vlan(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_vlan(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -349,7 +402,10 @@ pub async fn get_vlan(
             }
             crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found").into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VLAN").into_response(),
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VLAN")
+                .into_response()
+        }
     }
 }
 
@@ -372,13 +428,24 @@ pub async fn update_vlan(
     }
     let existing = match state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
         Ok(Some(v)) => v,
-        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found").into_response(),
-        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VLAN").into_response(),
+        Ok(None) => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "VLAN not found")
+                .into_response()
+        }
+        Err(_) => {
+            return crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load VLAN",
+            )
+            .into_response()
+        }
     };
 
     let mgr = networkd_manager(&state);
     if existing.name != req.name {
-        if let Err(e) = mgr.remove_device(&existing.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.remove_device(&existing.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
     }
 
     let cfg = VlanConfig {
@@ -398,15 +465,19 @@ pub async fn update_vlan(
     };
 
     if let Err(e) = mgr.apply_vlan(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             Json(cfg).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -417,15 +488,26 @@ pub async fn adopt_vlan(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(adopt_vlan));
     if !super::networkd_discover::is_host_managed_id(&req.host_id) {
-        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…")
+            .into_response();
     }
     let host = match super::networkd_discover::find_host_vlan(&state, &req.host_id) {
         Some(v) => v,
-        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host VLAN not found").into_response(),
+        None => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host VLAN not found")
+                .into_response()
+        }
     };
-    let stored: Vec<VlanConfig> = state.store.list_entities("networkd_vlans").unwrap_or_default();
+    let stored: Vec<VlanConfig> = state
+        .store
+        .list_entities("networkd_vlans")
+        .unwrap_or_default();
     if stored.iter().any(|v| v.name == host.name) {
-        return crate::api_error::json_error(StatusCode::CONFLICT, format!("VLAN '{}' already managed", host.name)).into_response();
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("VLAN '{}' already managed", host.name),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = VlanConfig {
@@ -445,14 +527,18 @@ pub async fn adopt_vlan(
     };
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_vlan(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
     match state.store.save_entity("networkd_vlans", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -467,10 +553,16 @@ pub async fn delete_vlan(
     }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<VlanConfig>("networkd_vlans", &id) {
-        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+        if let Err(e) = mgr.remove_device(&cfg.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_vlans", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_vlans", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -478,9 +570,18 @@ pub async fn delete_vlan(
 // Macvtap handlers
 // ============================================================================
 
-pub async fn list_macvtaps(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_macvtaps(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_macvtaps));
-    let items: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<MacvtapConfig> = state
+        .store
+        .list_entities("networkd_macvtaps")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_macvtaps(&state, items))
 }
 
@@ -501,7 +602,9 @@ pub async fn create_macvtap(
         .into_response();
     }
     let now = Utc::now().to_rfc3339();
-    let mac = req.mac_address.unwrap_or_else(|| NetworkdManager::generate_mac_address());
+    let mac = req
+        .mac_address
+        .unwrap_or_else(|| NetworkdManager::generate_mac_address());
     let cfg = MacvtapConfig {
         id: Uuid::new_v4().to_string(),
         name: req.name,
@@ -517,15 +620,19 @@ pub async fn create_macvtap(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_macvtap(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_macvtaps", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -535,7 +642,10 @@ pub async fn get_macvtap(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(get_macvtap));
-    match state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
+    match state
+        .store
+        .get_entity::<MacvtapConfig>("networkd_macvtaps", &id)
+    {
         Ok(Some(m)) => Json(m).into_response(),
         Ok(None) => {
             if super::networkd_discover::is_host_managed_id(&id) {
@@ -545,7 +655,11 @@ pub async fn get_macvtap(
             }
             crate::api_error::json_error(StatusCode::NOT_FOUND, "Macvtap not found").into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load macvtap").into_response(),
+        Err(_) => crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load macvtap",
+        )
+        .into_response(),
     }
 }
 
@@ -556,15 +670,26 @@ pub async fn adopt_macvtap(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(adopt_macvtap));
     if !super::networkd_discover::is_host_managed_id(&req.host_id) {
-        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…")
+            .into_response();
     }
     let host = match super::networkd_discover::find_host_macvtap(&state, &req.host_id) {
         Some(m) => m,
-        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host macvtap not found").into_response(),
+        None => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host macvtap not found")
+                .into_response()
+        }
     };
-    let stored: Vec<MacvtapConfig> = state.store.list_entities("networkd_macvtaps").unwrap_or_default();
+    let stored: Vec<MacvtapConfig> = state
+        .store
+        .list_entities("networkd_macvtaps")
+        .unwrap_or_default();
     if stored.iter().any(|m| m.name == host.name) {
-        return crate::api_error::json_error(StatusCode::CONFLICT, format!("Macvtap '{}' already managed", host.name)).into_response();
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("Macvtap '{}' already managed", host.name),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = MacvtapConfig {
@@ -581,14 +706,18 @@ pub async fn adopt_macvtap(
     };
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_macvtap(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
     match state.store.save_entity("networkd_macvtaps", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -602,11 +731,20 @@ pub async fn delete_macvtap(
         return resp;
     }
     let mgr = networkd_manager(&state);
-    if let Ok(Some(cfg)) = state.store.get_entity::<MacvtapConfig>("networkd_macvtaps", &id) {
-        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+    if let Ok(Some(cfg)) = state
+        .store
+        .get_entity::<MacvtapConfig>("networkd_macvtaps", &id)
+    {
+        if let Err(e) = mgr.remove_device(&cfg.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_macvtaps", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_macvtaps", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -614,9 +752,18 @@ pub async fn delete_macvtap(
 // Tap handlers
 // ============================================================================
 
-pub async fn list_taps(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_taps(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_taps));
-    let items: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<TapConfig> = state
+        .store
+        .list_entities("networkd_taps")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_taps(&state, items))
 }
 
@@ -648,15 +795,19 @@ pub async fn create_tap(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_tap(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_taps", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -674,9 +825,14 @@ pub async fn get_tap(
                     return Json(t).into_response();
                 }
             }
-            crate::api_error::json_error(StatusCode::NOT_FOUND, "TAP device not found").into_response()
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "TAP device not found")
+                .into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load TAP device").into_response(),
+        Err(_) => crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load TAP device",
+        )
+        .into_response(),
     }
 }
 
@@ -687,15 +843,26 @@ pub async fn adopt_tap(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(adopt_tap));
     if !super::networkd_discover::is_host_managed_id(&req.host_id) {
-        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…")
+            .into_response();
     }
     let host = match super::networkd_discover::find_host_tap(&state, &req.host_id) {
         Some(t) => t,
-        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host tap not found").into_response(),
+        None => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host tap not found")
+                .into_response()
+        }
     };
-    let stored: Vec<TapConfig> = state.store.list_entities("networkd_taps").unwrap_or_default();
+    let stored: Vec<TapConfig> = state
+        .store
+        .list_entities("networkd_taps")
+        .unwrap_or_default();
     if stored.iter().any(|t| t.name == host.name) {
-        return crate::api_error::json_error(StatusCode::CONFLICT, format!("Tap '{}' already managed", host.name)).into_response();
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("Tap '{}' already managed", host.name),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = TapConfig {
@@ -715,14 +882,18 @@ pub async fn adopt_tap(
     };
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_tap(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
     match state.store.save_entity("networkd_taps", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -737,10 +908,16 @@ pub async fn delete_tap(
     }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<TapConfig>("networkd_taps", &id) {
-        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+        if let Err(e) = mgr.remove_device(&cfg.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_taps", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_taps", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -748,7 +925,10 @@ pub async fn delete_tap(
 // Status & control handlers
 // ============================================================================
 
-pub async fn list_links(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_links(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_links));
     let mgr = networkd_manager(&state);
     match mgr.list_links() {
@@ -769,20 +949,28 @@ pub async fn get_device_status(
     let mgr = networkd_manager(&state);
     match mgr.device_status(&name) {
         Ok(status) => Json(serde_json::json!({"name": name, "status": status})).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
-pub async fn reload_networkd(RequireWrite(_claims): RequireWrite, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn reload_networkd(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(reload_networkd));
     let mgr = networkd_manager(&state);
     match mgr.reload() {
         Ok(_) => Json(serde_json::json!({"status": "reloaded"})).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
-pub async fn list_managed_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_managed_files(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_managed_files));
     let mut files = networking::host_discovery::list_systemd_network_files(
         &state.config.network.networkd_config_dir,
@@ -802,9 +990,18 @@ pub async fn list_managed_files(RequireRead(_claims): RequireRead, State(state):
 // Bond handlers
 // ============================================================================
 
-pub async fn list_bonds(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_bonds(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_bonds));
-    let items: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<BondConfig> = state
+        .store
+        .list_entities("networkd_bonds")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_bonds(&state, items))
 }
 
@@ -854,15 +1051,19 @@ pub async fn create_bond(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_bond(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -882,7 +1083,10 @@ pub async fn get_bond(
             }
             crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found").into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bond").into_response(),
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bond")
+                .into_response()
+        }
     }
 }
 
@@ -907,13 +1111,24 @@ pub async fn update_bond(
     }
     let existing = match state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
         Ok(Some(b)) => b,
-        Ok(None) => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found").into_response(),
-        Err(_) => return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load bond").into_response(),
+        Ok(None) => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Bond not found")
+                .into_response()
+        }
+        Err(_) => {
+            return crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load bond",
+            )
+            .into_response()
+        }
     };
 
     let mgr = networkd_manager(&state);
     if existing.name != req.name {
-        if let Err(e) = mgr.remove_device(&existing.name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.remove_device(&existing.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
     }
 
     let cfg = BondConfig {
@@ -942,15 +1157,19 @@ pub async fn update_bond(
     };
 
     if let Err(e) = mgr.apply_bond(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             Json(cfg).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -961,15 +1180,26 @@ pub async fn adopt_bond(
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(adopt_bond));
     if !super::networkd_discover::is_host_managed_id(&req.host_id) {
-        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…").into_response();
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, "host_id must be host:…")
+            .into_response();
     }
     let host = match super::networkd_discover::find_host_bond(&state, &req.host_id) {
         Some(b) => b,
-        None => return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host bond not found").into_response(),
+        None => {
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host bond not found")
+                .into_response()
+        }
     };
-    let stored: Vec<BondConfig> = state.store.list_entities("networkd_bonds").unwrap_or_default();
+    let stored: Vec<BondConfig> = state
+        .store
+        .list_entities("networkd_bonds")
+        .unwrap_or_default();
     if stored.iter().any(|b| b.name == host.name) {
-        return crate::api_error::json_error(StatusCode::CONFLICT, format!("Bond '{}' already managed", host.name)).into_response();
+        return crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("Bond '{}' already managed", host.name),
+        )
+        .into_response();
     }
     let now = Utc::now().to_rfc3339();
     let cfg = BondConfig {
@@ -998,14 +1228,18 @@ pub async fn adopt_bond(
     };
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_bond(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
     match state.store.save_entity("networkd_bonds", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1020,10 +1254,16 @@ pub async fn delete_bond(
     }
     let mgr = networkd_manager(&state);
     if let Ok(Some(cfg)) = state.store.get_entity::<BondConfig>("networkd_bonds", &id) {
-        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+        if let Err(e) = mgr.remove_device(&cfg.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_bonds", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_bonds", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -1031,9 +1271,18 @@ pub async fn delete_bond(
 // Network file handlers (physical interface config)
 // ============================================================================
 
-pub async fn list_network_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_network_files(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_network_files));
-    let items: Vec<NetworkFileConfig> = state.store.list_entities("networkd_netfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<NetworkFileConfig> = state
+        .store
+        .list_entities("networkd_netfiles")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_netfiles(&state, items))
 }
 
@@ -1068,15 +1317,19 @@ pub async fn create_network_file(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_network_file(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_netfiles", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1086,7 +1339,10 @@ pub async fn get_network_file(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(get_network_file));
-    match state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
+    match state
+        .store
+        .get_entity::<NetworkFileConfig>("networkd_netfiles", &id)
+    {
         Ok(Some(n)) => Json(n).into_response(),
         Ok(None) => {
             if super::networkd_discover::is_host_managed_id(&id) {
@@ -1094,9 +1350,14 @@ pub async fn get_network_file(
                     return Json(n).into_response();
                 }
             }
-            crate::api_error::json_error(StatusCode::NOT_FOUND, "Network file not found").into_response()
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Network file not found")
+                .into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load network file").into_response(),
+        Err(_) => crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load network file",
+        )
+        .into_response(),
     }
 }
 
@@ -1116,11 +1377,8 @@ pub async fn adopt_network_file(
     let host = match super::networkd_discover::find_host_netfile(&state, &req.host_id) {
         Some(n) => n,
         None => {
-            return crate::api_error::json_error(
-                StatusCode::NOT_FOUND,
-                "Host interface not found",
-            )
-            .into_response()
+            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host interface not found")
+                .into_response()
         }
     };
     let stored: Vec<NetworkFileConfig> = state
@@ -1185,11 +1443,20 @@ pub async fn delete_network_file(
         return resp;
     }
     let mgr = networkd_manager(&state);
-    if let Ok(Some(cfg)) = state.store.get_entity::<NetworkFileConfig>("networkd_netfiles", &id) {
-        if let Err(e) = mgr.remove_device(&format!("net-{}", cfg.match_name)) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+    if let Ok(Some(cfg)) = state
+        .store
+        .get_entity::<NetworkFileConfig>("networkd_netfiles", &id)
+    {
+        if let Err(e) = mgr.remove_device(&format!("net-{}", cfg.match_name)) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_netfiles", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_netfiles", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -1197,9 +1464,18 @@ pub async fn delete_network_file(
 // Link file handlers
 // ============================================================================
 
-pub async fn list_link_files(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_link_files(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_link_files));
-    let items: Vec<LinkFileConfig> = state.store.list_entities("networkd_linkfiles").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<LinkFileConfig> = state
+        .store
+        .list_entities("networkd_linkfiles")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_link_files(&state, items))
 }
 
@@ -1234,15 +1510,19 @@ pub async fn create_link_file(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_link_file(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_linkfiles", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1256,14 +1536,25 @@ pub async fn delete_link_file(
         return resp;
     }
     let mgr = networkd_manager(&state);
-    if let Ok(Some(cfg)) = state.store.get_entity::<LinkFileConfig>("networkd_linkfiles", &id) {
-        let file_id = cfg.name.as_deref()
+    if let Ok(Some(cfg)) = state
+        .store
+        .get_entity::<LinkFileConfig>("networkd_linkfiles", &id)
+    {
+        let file_id = cfg
+            .name
+            .as_deref()
             .or(cfg.match_original_name.as_deref())
             .unwrap_or(&cfg.id);
-        if let Err(e) = mgr.remove_device(&format!("link-{}", file_id)) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+        if let Err(e) = mgr.remove_device(&format!("link-{}", file_id)) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_linkfiles", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_linkfiles", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -1271,7 +1562,10 @@ pub async fn delete_link_file(
 // Port forwarding handlers (nftables DNAT)
 // ============================================================================
 
-pub async fn list_port_forwards(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_port_forwards(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_port_forwards));
     let items: Vec<PortForwardConfig> = state
         .store
@@ -1317,11 +1611,7 @@ pub async fn create_port_forward(
         .store
         .save_entity("networkd_port_forwards", &cfg.id, &cfg)
     {
-        Ok(_) => (
-            StatusCode::CREATED,
-            Json(cfg),
-        )
-            .into_response(),
+        Ok(_) => (StatusCode::CREATED, Json(cfg)).into_response(),
         Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             .into_response(),
     }
@@ -1344,9 +1634,14 @@ pub async fn get_port_forward(
                     return Json(pf).into_response();
                 }
             }
-            crate::api_error::json_error(StatusCode::NOT_FOUND, "Port forward not found").into_response()
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "Port forward not found")
+                .into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load port forward").into_response(),
+        Err(_) => crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load port forward",
+        )
+        .into_response(),
     }
 }
 
@@ -1364,9 +1659,13 @@ pub async fn delete_port_forward(
         .get_entity::<PortForwardConfig>("networkd_port_forwards", &id)
     {
         let nft = NftManager::new();
-        if let Err(e) = nft.remove(&cfg) { tracing::warn!("Failed to remove nft rule: {}", e); }
+        if let Err(e) = nft.remove(&cfg) {
+            tracing::warn!("Failed to remove nft rule: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_port_forwards", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_port_forwards", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -1379,8 +1678,11 @@ pub async fn adopt_port_forward(
     let host = match super::networkd_discover::find_host_port_forward(&req.host_id) {
         Some(p) if super::networkd_discover::is_host_managed_id(&p.id) => p,
         _ => {
-            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host port forward not found")
-                .into_response();
+            return crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                "Host port forward not found",
+            )
+            .into_response();
         }
     };
 
@@ -1391,7 +1693,10 @@ pub async fn adopt_port_forward(
     if stored.iter().any(|p| p.name == host.name) {
         return crate::api_error::json_error(
             StatusCode::CONFLICT,
-            format!("Port forward '{}' is already managed by vmspawnd", host.name),
+            format!(
+                "Port forward '{}' is already managed by vmspawnd",
+                host.name
+            ),
         )
         .into_response();
     }
@@ -1419,7 +1724,10 @@ pub async fn adopt_port_forward(
     (StatusCode::CREATED, Json(cfg)).into_response()
 }
 
-pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn sync_port_forwards(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(sync_port_forwards));
     let configs: Vec<PortForwardConfig> = state
         .store
@@ -1442,9 +1750,19 @@ pub async fn sync_port_forwards(RequireWrite(_claims): RequireWrite, State(state
 // VXLAN handlers
 // ============================================================================
 
-pub async fn list_vxlans(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_vxlans(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_vxlans));
-    let items: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<VxlanConfig> =
+        state
+            .store
+            .list_entities("networkd_vxlans")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     Json(super::networkd_discover::merge_vxlans(&state, items))
 }
 
@@ -1460,10 +1778,10 @@ pub async fn create_vxlan(
     if let Some(ref iface) = req.parent_interface {
         if let Err(msg) = crate::validation::validate_hostname(iface) {
             return crate::api_error::json_error(
-            StatusCode::BAD_REQUEST,
-            format!("Invalid parent interface: {}", msg),
-        )
-        .into_response();
+                StatusCode::BAD_REQUEST,
+                format!("Invalid parent interface: {}", msg),
+            )
+            .into_response();
         }
     }
     let now = Utc::now().to_rfc3339();
@@ -1487,15 +1805,19 @@ pub async fn create_vxlan(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_vxlan(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_vxlans", &cfg.id, &cfg) {
         Ok(_) => {
-            if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+            if let Err(e) = mgr.reload() {
+                tracing::warn!("Failed to reload networkd: {}", e);
+            }
             (StatusCode::CREATED, Json(cfg)).into_response()
         }
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1505,7 +1827,10 @@ pub async fn get_vxlan(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(get_vxlan));
-    match state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
+    match state
+        .store
+        .get_entity::<VxlanConfig>("networkd_vxlans", &id)
+    {
         Ok(Some(v)) => Json(v).into_response(),
         Ok(None) => {
             if let Some(v) = super::networkd_discover::find_host_vxlan(&state, &id) {
@@ -1513,7 +1838,10 @@ pub async fn get_vxlan(
             }
             crate::api_error::json_error(StatusCode::NOT_FOUND, "VXLAN not found").into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VXLAN").into_response(),
+        Err(_) => {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load VXLAN")
+                .into_response()
+        }
     }
 }
 
@@ -1527,11 +1855,20 @@ pub async fn delete_vxlan(
         return resp;
     }
     let mgr = networkd_manager(&state);
-    if let Ok(Some(cfg)) = state.store.get_entity::<VxlanConfig>("networkd_vxlans", &id) {
-        if let Err(e) = mgr.remove_device(&cfg.name) { tracing::warn!("Failed to remove device: {}", e); }
-        if let Err(e) = mgr.reload() { tracing::warn!("Failed to reload networkd: {}", e); }
+    if let Ok(Some(cfg)) = state
+        .store
+        .get_entity::<VxlanConfig>("networkd_vxlans", &id)
+    {
+        if let Err(e) = mgr.remove_device(&cfg.name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
+        if let Err(e) = mgr.reload() {
+            tracing::warn!("Failed to reload networkd: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_vxlans", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_vxlans", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -1549,7 +1886,10 @@ pub async fn adopt_vxlan(
         }
     };
 
-    let stored: Vec<VxlanConfig> = state.store.list_entities("networkd_vxlans").unwrap_or_default();
+    let stored: Vec<VxlanConfig> = state
+        .store
+        .list_entities("networkd_vxlans")
+        .unwrap_or_default();
     if stored.iter().any(|v| v.name == host.name) {
         return crate::api_error::json_error(
             StatusCode::CONFLICT,
@@ -1597,9 +1937,18 @@ pub async fn adopt_vxlan(
 // SR-IOV handlers
 // ============================================================================
 
-pub async fn list_sriov(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn list_sriov(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(list_sriov));
-    let items: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let items: Vec<SriovConfig> = state
+        .store
+        .list_entities("networkd_sriov")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(super::networkd_discover::merge_sriov(&state, items))
 }
 
@@ -1629,12 +1978,14 @@ pub async fn create_sriov(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_sriov(&cfg) {
-        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
     }
 
     match state.store.save_entity("networkd_sriov", &cfg.id, &cfg) {
         Ok(_) => (StatusCode::CREATED, Json(cfg)).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1650,9 +2001,14 @@ pub async fn get_sriov(
             if let Some(s) = super::networkd_discover::find_host_sriov(&state, &id) {
                 return Json(s).into_response();
             }
-            crate::api_error::json_error(StatusCode::NOT_FOUND, "SR-IOV config not found").into_response()
+            crate::api_error::json_error(StatusCode::NOT_FOUND, "SR-IOV config not found")
+                .into_response()
         }
-        Err(_) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load SR-IOV config").into_response(),
+        Err(_) => crate::api_error::json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load SR-IOV config",
+        )
+        .into_response(),
     }
 }
 
@@ -1667,9 +2023,13 @@ pub async fn delete_sriov(
     }
     if let Ok(Some(cfg)) = state.store.get_entity::<SriovConfig>("networkd_sriov", &id) {
         let mgr = networkd_manager(&state);
-        if let Err(e) = mgr.remove_sriov(&cfg.pf_name) { tracing::warn!("Failed to remove device: {}", e); }
+        if let Err(e) = mgr.remove_sriov(&cfg.pf_name) {
+            tracing::warn!("Failed to remove device: {}", e);
+        }
     }
-    if let Err(e) = state.store.delete_entity("networkd_sriov", &id) { tracing::error!("Failed to delete entity: {}", e); }
+    if let Err(e) = state.store.delete_entity("networkd_sriov", &id) {
+        tracing::error!("Failed to delete entity: {}", e);
+    }
     StatusCode::NO_CONTENT.into_response()
 }
 
@@ -1682,16 +2042,25 @@ pub async fn adopt_sriov(
     let host = match super::networkd_discover::find_host_sriov(&state, &req.host_id) {
         Some(s) if super::networkd_discover::is_host_managed_id(&s.id) => s,
         _ => {
-            return crate::api_error::json_error(StatusCode::NOT_FOUND, "Host SR-IOV config not found")
-                .into_response();
+            return crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                "Host SR-IOV config not found",
+            )
+            .into_response();
         }
     };
 
-    let stored: Vec<SriovConfig> = state.store.list_entities("networkd_sriov").unwrap_or_default();
+    let stored: Vec<SriovConfig> = state
+        .store
+        .list_entities("networkd_sriov")
+        .unwrap_or_default();
     if stored.iter().any(|s| s.pf_name == host.pf_name) {
         return crate::api_error::json_error(
             StatusCode::CONFLICT,
-            format!("SR-IOV on '{}' is already managed by vmspawnd", host.pf_name),
+            format!(
+                "SR-IOV on '{}' is already managed by vmspawnd",
+                host.pf_name
+            ),
         )
         .into_response();
     }
@@ -1724,12 +2093,16 @@ pub async fn adopt_sriov(
 // Scan existing configs (parser)
 // ============================================================================
 
-pub async fn scan_configs(RequireRead(_claims): RequireRead, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn scan_configs(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::debug!("networkd::{}", stringify!(scan_configs));
     let dir = std::path::Path::new(&state.config.network.networkd_config_dir);
     match networking::parser::scan_networkd_dir(dir) {
         Ok(configs) => Json(configs).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1812,7 +2185,8 @@ pub async fn list_netlink_interfaces(RequireRead(_claims): RequireRead) -> impl 
     tracing::debug!("networkd::{}", stringify!(list_netlink_interfaces));
     match networking::netlink::list_interfaces().await {
         Ok(ifaces) => Json(ifaces).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1821,7 +2195,8 @@ pub async fn list_physical_interfaces(RequireRead(_claims): RequireRead) -> impl
     tracing::debug!("networkd::{}", stringify!(list_physical_interfaces));
     match networking::netlink::list_physical_interfaces().await {
         Ok(ifaces) => Json(ifaces).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }
 
@@ -1830,6 +2205,7 @@ pub async fn list_available_interfaces(RequireRead(_claims): RequireRead) -> imp
     tracing::debug!("networkd::{}", stringify!(list_available_interfaces));
     match networking::netlink::list_available_interfaces().await {
         Ok(ifaces) => Json(ifaces).into_response(),
-        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
     }
 }

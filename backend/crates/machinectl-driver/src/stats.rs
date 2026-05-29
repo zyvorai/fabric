@@ -74,11 +74,7 @@ async fn read_cpu_usage(cgroup: &CgroupPath) -> Result<f64> {
         .unwrap_or_else(|_| {
             // Fall back to /proc/cpuinfo
             std::fs::read_to_string("/proc/cpuinfo")
-                .map(|c| {
-                    c.lines()
-                        .filter(|l| l.starts_with("processor"))
-                        .count() as u32
-                })
+                .map(|c| c.lines().filter(|l| l.starts_with("processor")).count() as u32)
                 .unwrap_or(1)
                 .max(1)
         });

@@ -206,7 +206,8 @@ impl App {
         for &idx in &self.selected_vms.clone() {
             if let Some(vm) = filtered.get(idx) {
                 let vm_name = vm.name.clone();
-                match self.client
+                match self
+                    .client
                     .post(format!("{}/vms/{}/start", API_BASE, vm_name))
                     .send()
                     .await
@@ -224,7 +225,12 @@ impl App {
             self.add_status(format!("Started {} VMs", success), StatusLevel::Success);
         } else {
             self.add_status(
-                format!("Started {} VMs, {} failed: {}", success, failed.len(), failed.join(", ")),
+                format!(
+                    "Started {} VMs, {} failed: {}",
+                    success,
+                    failed.len(),
+                    failed.join(", ")
+                ),
                 StatusLevel::Warning,
             );
         }
@@ -238,7 +244,8 @@ impl App {
         for &idx in &self.selected_vms.clone() {
             if let Some(vm) = filtered.get(idx) {
                 let vm_name = vm.name.clone();
-                match self.client
+                match self
+                    .client
                     .post(format!("{}/vms/{}/stop", API_BASE, vm_name))
                     .send()
                     .await
@@ -256,7 +263,12 @@ impl App {
             self.add_status(format!("Stopped {} VMs", success), StatusLevel::Success);
         } else {
             self.add_status(
-                format!("Stopped {} VMs, {} failed: {}", success, failed.len(), failed.join(", ")),
+                format!(
+                    "Stopped {} VMs, {} failed: {}",
+                    success,
+                    failed.len(),
+                    failed.join(", ")
+                ),
                 StatusLevel::Warning,
             );
         }
@@ -265,7 +277,9 @@ impl App {
 
     pub async fn bulk_delete(&mut self) -> Result<()> {
         let filtered = self.filtered_vms();
-        let names: Vec<String> = self.selected_vms.iter()
+        let names: Vec<String> = self
+            .selected_vms
+            .iter()
             .filter_map(|&idx| filtered.get(idx).map(|vm| vm.name.clone()))
             .collect();
         self.pending_action = Some(PendingAction::BulkDelete(names));
@@ -280,7 +294,8 @@ impl App {
 
         match action {
             PendingAction::DeleteVM(name) => {
-                match self.client
+                match self
+                    .client
                     .delete(format!("{}/vms/{}", API_BASE, name))
                     .send()
                     .await
@@ -306,7 +321,8 @@ impl App {
                 let mut success = 0;
                 let mut failed = Vec::new();
                 for name in &names {
-                    match self.client
+                    match self
+                        .client
                         .delete(format!("{}/vms/{}", API_BASE, name))
                         .send()
                         .await
@@ -321,7 +337,12 @@ impl App {
                     self.add_status(format!("Deleted {} VMs", success), StatusLevel::Success);
                 } else {
                     self.add_status(
-                        format!("Deleted {} VMs, {} failed: {}", success, failed.len(), failed.join(", ")),
+                        format!(
+                            "Deleted {} VMs, {} failed: {}",
+                            success,
+                            failed.len(),
+                            failed.join(", ")
+                        ),
                         StatusLevel::Warning,
                     );
                 }
@@ -449,7 +470,12 @@ impl App {
     }
 
     async fn refresh_system_info(&mut self) {
-        match self.client.get(format!("{}/system/memory", API_BASE)).send().await {
+        match self
+            .client
+            .get(format!("{}/system/memory", API_BASE))
+            .send()
+            .await
+        {
             Ok(res) if res.status().is_success() => {
                 self.system_info = res.json().await.ok();
             }
@@ -467,26 +493,38 @@ impl App {
         self.storage_pools = self.fetch_list("/storage/pools").await;
 
         // Find first Ceph pool and load its images/health
-        let ceph_pool = self.storage_pools.iter().find(|p| {
-            if let Some(pt) = p.get("pool_type") {
-                if pt.is_object() {
-                    return pt.get("Ceph").is_some();
+        let ceph_pool = self
+            .storage_pools
+            .iter()
+            .find(|p| {
+                if let Some(pt) = p.get("pool_type") {
+                    if pt.is_object() {
+                        return pt.get("Ceph").is_some();
+                    }
                 }
-            }
-            false
-        }).and_then(|p| p.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()));
+                false
+            })
+            .and_then(|p| {
+                p.get("name")
+                    .and_then(|n| n.as_str())
+                    .map(|s| s.to_string())
+            });
 
         if let Some(ref pool_name) = ceph_pool {
-            self.ceph_images = match self.client
+            self.ceph_images = match self
+                .client
                 .get(format!("{}/storage/pools/{}/images", API_BASE, pool_name))
-                .send().await
+                .send()
+                .await
             {
                 Ok(res) if res.status().is_success() => res.json().await.unwrap_or_default(),
                 _ => Vec::new(),
             };
-            self.ceph_health = match self.client
+            self.ceph_health = match self
+                .client
                 .get(format!("{}/storage/pools/{}/health", API_BASE, pool_name))
-                .send().await
+                .send()
+                .await
             {
                 Ok(res) if res.status().is_success() => res.json().await.ok(),
                 _ => None,
@@ -495,10 +533,13 @@ impl App {
     }
 
     async fn fetch_list(&self, path: &str) -> Vec<serde_json::Value> {
-        match self.client.get(format!("{}{}", API_BASE, path)).send().await {
-            Ok(res) if res.status().is_success() => {
-                res.json().await.unwrap_or_default()
-            }
+        match self
+            .client
+            .get(format!("{}{}", API_BASE, path))
+            .send()
+            .await
+        {
+            Ok(res) if res.status().is_success() => res.json().await.unwrap_or_default(),
             _ => Vec::new(),
         }
     }
@@ -516,7 +557,9 @@ impl App {
     }
 
     pub fn netsec_tab_names(&self) -> Vec<&str> {
-        vec!["Policies", "Firewall", "Services", "QoS", "DNS", "VPN", "Mirror", "NAT", "Monitor"]
+        vec![
+            "Policies", "Firewall", "Services", "QoS", "DNS", "VPN", "Mirror", "NAT", "Monitor",
+        ]
     }
 
     pub fn netsec_current_items(&self) -> &[serde_json::Value] {
@@ -540,7 +583,11 @@ impl App {
     }
 
     pub fn netsec_prev_tab(&mut self) {
-        self.netsec_tab = if self.netsec_tab == 0 { 8 } else { self.netsec_tab - 1 };
+        self.netsec_tab = if self.netsec_tab == 0 {
+            8
+        } else {
+            self.netsec_tab - 1
+        };
         self.netsec_selected = 0;
     }
 
@@ -554,7 +601,11 @@ impl App {
     pub fn netsec_prev_item(&mut self) {
         let len = self.netsec_current_items().len();
         if len > 0 {
-            self.netsec_selected = if self.netsec_selected == 0 { len - 1 } else { self.netsec_selected - 1 };
+            self.netsec_selected = if self.netsec_selected == 0 {
+                len - 1
+            } else {
+                self.netsec_selected - 1
+            };
         }
     }
 
@@ -571,7 +622,12 @@ impl App {
             8 => "/monitor-policies/sync",
             _ => return,
         };
-        match self.client.post(format!("{}{}", API_BASE, path)).send().await {
+        match self
+            .client
+            .post(format!("{}{}", API_BASE, path))
+            .send()
+            .await
+        {
             Ok(res) if res.status().is_success() => {
                 self.add_status("Sync completed".to_string(), StatusLevel::Success);
             }
@@ -595,7 +651,11 @@ impl App {
             Some(id) => id.to_string(),
             None => return,
         };
-        let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(&id).to_string();
+        let name = item
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&id)
+            .to_string();
         let path = match self.netsec_tab {
             0 => format!("/network-policies/{}", id),
             1 => format!("/firewall-profiles/{}", id),
@@ -608,12 +668,20 @@ impl App {
             8 => format!("/monitor-policies/{}", id),
             _ => return,
         };
-        match self.client.delete(format!("{}{}", API_BASE, path)).send().await {
+        match self
+            .client
+            .delete(format!("{}{}", API_BASE, path))
+            .send()
+            .await
+        {
             Ok(res) if res.status().is_success() => {
                 self.add_status(format!("Deleted '{}'", name), StatusLevel::Success);
             }
             Ok(res) => {
-                self.add_status(format!("Delete failed: {}", res.status()), StatusLevel::Error);
+                self.add_status(
+                    format!("Delete failed: {}", res.status()),
+                    StatusLevel::Error,
+                );
             }
             Err(e) => {
                 self.add_status(format!("Delete error: {}", e), StatusLevel::Error);
@@ -628,7 +696,8 @@ impl App {
 
     async fn update_metrics_history(&mut self) {
         // Try to fetch real system performance data from the API
-        match self.client
+        match self
+            .client
             .get(format!("{}/analytics/system", API_BASE))
             .send()
             .await
@@ -636,10 +705,12 @@ impl App {
             Ok(res) if res.status().is_success() => {
                 if let Ok(data) = res.json::<Vec<serde_json::Value>>().await {
                     if let Some(latest) = data.last() {
-                        let cpu = latest.get("total_cpu_usage")
+                        let cpu = latest
+                            .get("total_cpu_usage")
                             .and_then(|v| v.as_f64())
                             .unwrap_or(0.0);
-                        let mem = latest.get("total_memory_usage")
+                        let mem = latest
+                            .get("total_memory_usage")
                             .and_then(|v| v.as_f64())
                             .unwrap_or(0.0);
 
@@ -655,7 +726,9 @@ impl App {
         }
 
         // Fallback: calculate from VM count (basic approximation)
-        let running = self.vms.iter()
+        let running = self
+            .vms
+            .iter()
             .filter(|v| v.state == vm_model::VMState::Running)
             .count() as f64;
         let total = self.vms.len().max(1) as f64;
@@ -733,7 +806,8 @@ impl App {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            match self.client
+            match self
+                .client
                 .post(format!("{}/vms/{}/start", API_BASE, vm_name))
                 .send()
                 .await
@@ -764,7 +838,8 @@ impl App {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            match self.client
+            match self
+                .client
                 .post(format!("{}/vms/{}/stop", API_BASE, vm_name))
                 .send()
                 .await
@@ -795,7 +870,8 @@ impl App {
         let filtered = self.filtered_vms();
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
-            match self.client
+            match self
+                .client
                 .post(format!("{}/vms/{}/restart", API_BASE, vm_name))
                 .send()
                 .await
@@ -835,14 +911,18 @@ impl App {
         if let Some(vm) = filtered.get(self.selected) {
             let vm_name = vm.name.clone();
             let body = serde_json::json!({"vm_name": vm_name, "backup_type": "full"});
-            match self.client
+            match self
+                .client
                 .post(format!("{}/backups", API_BASE))
                 .json(&body)
                 .send()
                 .await
             {
                 Ok(res) if res.status().is_success() => {
-                    self.add_status(format!("Backup started for VM '{}'", vm_name), StatusLevel::Success);
+                    self.add_status(
+                        format!("Backup started for VM '{}'", vm_name),
+                        StatusLevel::Success,
+                    );
                 }
                 Ok(res) => {
                     self.add_status(
@@ -883,7 +963,11 @@ impl App {
     }
 
     pub fn show_toast(&mut self, text: impl Into<String>, level: StatusLevel) {
-        self.toast = Some((api_error::format_user_error(&text.into()), Instant::now(), level));
+        self.toast = Some((
+            api_error::format_user_error(&text.into()),
+            Instant::now(),
+            level,
+        ));
     }
 
     pub fn clear_expired_toast(&mut self) {
@@ -968,7 +1052,10 @@ impl App {
                 .await
             {
                 Ok(res) if res.status().is_success() => {
-                    self.show_toast(format!("Snapshot created for '{}'", vm_name), StatusLevel::Success);
+                    self.show_toast(
+                        format!("Snapshot created for '{}'", vm_name),
+                        StatusLevel::Success,
+                    );
                 }
                 Ok(res) => {
                     let msg = http_error_message(res).await;

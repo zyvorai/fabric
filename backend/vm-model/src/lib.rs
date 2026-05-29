@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,10 +80,7 @@ impl CreateVMRequest {
         }
 
         if self.cpus < 1 || self.cpus > 256 {
-            errors.push(format!(
-                "CPUs must be between 1 and 256, got {}",
-                self.cpus
-            ));
+            errors.push(format!("CPUs must be between 1 and 256, got {}", self.cpus));
         }
 
         if self.memory < 128 || self.memory > 1_048_576 {
@@ -109,19 +106,14 @@ impl CreateVMRequest {
 }
 
 /// Console mode for the VM
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum ConsoleMode {
+    #[default]
     Interactive,
     ReadOnly,
     Native,
     Gui,
-}
-
-impl Default for ConsoleMode {
-    fn default() -> Self {
-        ConsoleMode::Interactive
-    }
 }
 
 impl std::fmt::Display for ConsoleMode {
@@ -214,7 +206,7 @@ pub enum DisplayType {
 }
 
 /// Options for starting a VM via systemd-vmspawn
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct VMStartOptions {
     // -- Manager Scope --
     /// Whether to use the system or user manager/machined instance
@@ -358,50 +350,6 @@ pub struct VMCredential {
     pub value: String,
 }
 
-impl Default for VMStartOptions {
-    fn default() -> Self {
-        Self {
-            scope: None,
-            directory: None,
-            kvm: None,
-            secure_boot: None,
-            vsock: None,
-            vsock_cid: None,
-            tpm: None,
-            tpm_state: None,
-            linux: None,
-            initrd: Vec::new(),
-            network_tap: false,
-            network_user_mode: false,
-            firmware: None,
-            discard_disk: None,
-            grow_image: None,
-            smbios11: Vec::new(),
-            notify_ready: None,
-            uuid: None,
-            slice: None,
-            properties: Vec::new(),
-            register: None,
-            private_users: None,
-            bind_mounts: Vec::new(),
-            extra_drives: Vec::new(),
-            bind_users: Vec::new(),
-            bind_user_shell: None,
-            bind_user_groups: Vec::new(),
-            forward_journal: None,
-            pass_ssh_key: None,
-            ssh_key_type: None,
-            console: None,
-            background: None,
-            quiet: false,
-            credentials: Vec::new(),
-            load_credentials: Vec::new(),
-            display: None,
-            extra_args: Vec::new(),
-        }
-    }
-}
-
 // ============================================================================
 // VMStartOptions validation
 // ============================================================================
@@ -410,20 +358,36 @@ impl Default for VMStartOptions {
 /// Only resource-control and informational properties are permitted.
 const SAFE_PROPERTY_PREFIXES: &[&str] = &[
     // Memory
-    "MemoryMax=", "MemoryMin=", "MemoryHigh=", "MemoryLow=", "MemorySwapMax=",
+    "MemoryMax=",
+    "MemoryMin=",
+    "MemoryHigh=",
+    "MemoryLow=",
+    "MemorySwapMax=",
     "MemoryLimit=",
     // CPU
-    "CPUQuota=", "CPUWeight=", "CPUShares=", "AllowedCPUs=",
+    "CPUQuota=",
+    "CPUWeight=",
+    "CPUShares=",
+    "AllowedCPUs=",
     // IO
-    "IOWeight=", "IOReadBandwidthMax=", "IOWriteBandwidthMax=",
-    "IOReadIOPSMax=", "IOWriteIOPSMax=", "IODeviceWeight=",
+    "IOWeight=",
+    "IOReadBandwidthMax=",
+    "IOWriteBandwidthMax=",
+    "IOReadIOPSMax=",
+    "IOWriteIOPSMax=",
+    "IODeviceWeight=",
     // Tasks
     "TasksMax=",
     // Network
-    "IPAddressAllow=", "IPAddressDeny=",
+    "IPAddressAllow=",
+    "IPAddressDeny=",
     // Limits
-    "LimitNOFILE=", "LimitNPROC=", "LimitMEMLOCK=", "LimitAS=",
-    "LimitCORE=", "LimitFSIZE=",
+    "LimitNOFILE=",
+    "LimitNPROC=",
+    "LimitMEMLOCK=",
+    "LimitAS=",
+    "LimitCORE=",
+    "LimitFSIZE=",
     // Description
     "Description=",
 ];
@@ -434,16 +398,19 @@ fn is_valid_uuid(s: &str) -> bool {
         return false;
     }
     let expected_lengths = [8, 4, 4, 4, 12];
-    parts.iter().zip(expected_lengths.iter()).all(|(part, &len)| {
-        part.len() == len && part.chars().all(|c| c.is_ascii_hexdigit())
-    })
+    parts
+        .iter()
+        .zip(expected_lengths.iter())
+        .all(|(part, &len)| part.len() == len && part.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 fn is_valid_credential_id(id: &str) -> bool {
     !id.is_empty()
         && !id.contains(':')
         && !id.contains('/')
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
 }
 
 fn is_valid_size_string(s: &str) -> bool {
@@ -459,8 +426,11 @@ fn is_valid_size_string(s: &str) -> bool {
         return false;
     }
     let suffix = &s[num_part.len()..];
-    suffix.is_empty() || matches!(suffix, "K" | "M" | "G" | "T" | "P" | "E"
-        | "k" | "m" | "g" | "t" | "p" | "e")
+    suffix.is_empty()
+        || matches!(
+            suffix,
+            "K" | "M" | "G" | "T" | "P" | "E" | "k" | "m" | "g" | "t" | "p" | "e"
+        )
 }
 
 fn path_has_traversal(path: &str) -> bool {
@@ -534,7 +504,10 @@ impl VMStartOptions {
 
         // Validate properties against allowlist
         for prop in &self.properties {
-            if !SAFE_PROPERTY_PREFIXES.iter().any(|prefix| prop.starts_with(prefix)) {
+            if !SAFE_PROPERTY_PREFIXES
+                .iter()
+                .any(|prefix| prop.starts_with(prefix))
+            {
                 errors.push(format!(
                     "Property '{}' not in allowlist. Allowed prefixes: MemoryMax, CPUQuota, IOWeight, TasksMax, etc.",
                     prop
@@ -557,10 +530,27 @@ impl VMStartOptions {
 
         // Validate bind_users don't include root or system accounts
         const BLOCKED_USERS: &[&str] = &[
-            "root", "daemon", "bin", "sys", "sync", "games", "man",
-            "lp", "mail", "news", "uucp", "proxy", "www-data", "backup",
-            "nobody", "systemd-network", "systemd-resolve", "messagebus",
-            "sshd", "polkitd", "avahi",
+            "root",
+            "daemon",
+            "bin",
+            "sys",
+            "sync",
+            "games",
+            "man",
+            "lp",
+            "mail",
+            "news",
+            "uucp",
+            "proxy",
+            "www-data",
+            "backup",
+            "nobody",
+            "systemd-network",
+            "systemd-resolve",
+            "messagebus",
+            "sshd",
+            "polkitd",
+            "avahi",
         ];
         for user in &self.bind_users {
             if BLOCKED_USERS.contains(&user.as_str()) {
@@ -573,7 +563,11 @@ impl VMStartOptions {
                 }
             }
             // Validate username character set
-            if user.is_empty() || !user.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+            if user.is_empty()
+                || !user
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            {
                 errors.push(format!(
                     "Invalid bind_user '{}': must be alphanumeric with hyphens/underscores/dots only",
                     user
@@ -585,7 +579,9 @@ impl VMStartOptions {
         if let Some(ref slice) = self.slice {
             let valid = slice.ends_with(".slice")
                 && !slice.is_empty()
-                && slice.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+                && slice
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
             if !valid {
                 errors.push(format!(
                     "Invalid slice name '{}': must end with '.slice', alphanumeric/hyphens/underscores/dots only",
@@ -606,7 +602,11 @@ impl VMStartOptions {
 
         // Validate bind_user_groups names (alphanumeric, hyphens, underscores only)
         for group in &self.bind_user_groups {
-            if group.is_empty() || !group.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')) {
+            if group.is_empty()
+                || !group
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+            {
                 errors.push(format!(
                     "Invalid bind_user_group '{}': must be alphanumeric with hyphens/underscores only",
                     group
@@ -617,7 +617,10 @@ impl VMStartOptions {
         // Validate bind_user_shell: must be absolute path or boolean-like
         if let Some(ref shell) = self.bind_user_shell {
             let is_bool = matches!(shell.as_str(), "true" | "false" | "yes" | "no");
-            let is_abs_path = shell.starts_with('/') && shell.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.'));
+            let is_abs_path = shell.starts_with('/')
+                && shell
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.'));
             if !is_bool && !is_abs_path {
                 errors.push(format!(
                     "Invalid bind_user_shell '{}': must be an absolute path or boolean",
@@ -642,7 +645,9 @@ impl VMStartOptions {
         // Validate private_users format
         if let Some(ref pu) = self.private_users {
             let valid = matches!(pu.as_str(), "yes" | "no" | "identity" | "pick")
-                || pu.split(':').all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()));
+                || pu
+                    .split(':')
+                    .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()));
             if !valid {
                 errors.push(format!(
                     "Invalid private_users '{}': must be yes|no|identity|pick or UID:COUNT format",
@@ -661,7 +666,10 @@ impl VMStartOptions {
         for (name, field) in path_fields {
             if let Some(ref path) = field {
                 if path_has_traversal(path) {
-                    errors.push(format!("Field '{}' must not contain '..' path traversal", name));
+                    errors.push(format!(
+                        "Field '{}' must not contain '..' path traversal",
+                        name
+                    ));
                 }
             }
         }
@@ -675,30 +683,45 @@ impl VMStartOptions {
 
         for (i, initrd) in self.initrd.iter().enumerate() {
             if path_has_traversal(initrd) {
-                errors.push(format!("initrd[{}] must not contain '..' path traversal", i));
+                errors.push(format!(
+                    "initrd[{}] must not contain '..' path traversal",
+                    i
+                ));
             }
         }
 
         for (i, drive) in self.extra_drives.iter().enumerate() {
             if path_has_traversal(drive) {
-                errors.push(format!("extra_drives[{}] must not contain '..' path traversal", i));
+                errors.push(format!(
+                    "extra_drives[{}] must not contain '..' path traversal",
+                    i
+                ));
             }
         }
 
         for (i, bm) in self.bind_mounts.iter().enumerate() {
             if path_has_traversal(&bm.source) {
-                errors.push(format!("bind_mounts[{}].source must not contain '..' path traversal", i));
+                errors.push(format!(
+                    "bind_mounts[{}].source must not contain '..' path traversal",
+                    i
+                ));
             }
             if let Some(ref dest) = bm.destination {
                 if path_has_traversal(dest) {
-                    errors.push(format!("bind_mounts[{}].destination must not contain '..' path traversal", i));
+                    errors.push(format!(
+                        "bind_mounts[{}].destination must not contain '..' path traversal",
+                        i
+                    ));
                 }
             }
         }
 
         for (i, cred) in self.load_credentials.iter().enumerate() {
             if path_has_traversal(&cred.path) {
-                errors.push(format!("load_credentials[{}].path must not contain '..' path traversal", i));
+                errors.push(format!(
+                    "load_credentials[{}].path must not contain '..' path traversal",
+                    i
+                ));
             }
         }
 
@@ -899,12 +922,15 @@ mod tests {
 
     #[test]
     fn test_default_disk_size() {
-        let req: CreateVMRequest = serde_json::from_str(r#"{
+        let req: CreateVMRequest = serde_json::from_str(
+            r#"{
             "name": "test",
             "image": "img",
             "cpus": 1,
             "memory": 512
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         assert_eq!(req.disk, 20); // default
     }
 
@@ -1044,13 +1070,22 @@ mod tests {
         // BindMount fields
         assert_eq!(deserialized.bind_mounts.len(), 1);
         assert_eq!(deserialized.bind_mounts[0].source, "/host/data");
-        assert_eq!(deserialized.bind_mounts[0].destination, Some("/vm/data".into()));
+        assert_eq!(
+            deserialized.bind_mounts[0].destination,
+            Some("/vm/data".into())
+        );
         assert!(deserialized.bind_mounts[0].read_only);
         // Credentials
         assert_eq!(deserialized.credentials.len(), 1);
-        assert_eq!(deserialized.credentials[0].id, "passwd.hashed-password.root");
+        assert_eq!(
+            deserialized.credentials[0].id,
+            "passwd.hashed-password.root"
+        );
         assert_eq!(deserialized.load_credentials.len(), 1);
-        assert_eq!(deserialized.load_credentials[0].id, "ssh.authorized_keys.root");
+        assert_eq!(
+            deserialized.load_credentials[0].id,
+            "ssh.authorized_keys.root"
+        );
     }
 
     #[test]
@@ -1122,18 +1157,39 @@ mod tests {
 
     #[test]
     fn test_console_mode_serialization() {
-        assert_eq!(serde_json::to_string(&ConsoleMode::Interactive).unwrap(), "\"interactive\"");
-        assert_eq!(serde_json::to_string(&ConsoleMode::ReadOnly).unwrap(), "\"read-only\"");
-        assert_eq!(serde_json::to_string(&ConsoleMode::Native).unwrap(), "\"native\"");
+        assert_eq!(
+            serde_json::to_string(&ConsoleMode::Interactive).unwrap(),
+            "\"interactive\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ConsoleMode::ReadOnly).unwrap(),
+            "\"read-only\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ConsoleMode::Native).unwrap(),
+            "\"native\""
+        );
         assert_eq!(serde_json::to_string(&ConsoleMode::Gui).unwrap(), "\"gui\"");
     }
 
     #[test]
     fn test_console_mode_deserialization() {
-        assert_eq!(serde_json::from_str::<ConsoleMode>("\"interactive\"").unwrap(), ConsoleMode::Interactive);
-        assert_eq!(serde_json::from_str::<ConsoleMode>("\"read-only\"").unwrap(), ConsoleMode::ReadOnly);
-        assert_eq!(serde_json::from_str::<ConsoleMode>("\"native\"").unwrap(), ConsoleMode::Native);
-        assert_eq!(serde_json::from_str::<ConsoleMode>("\"gui\"").unwrap(), ConsoleMode::Gui);
+        assert_eq!(
+            serde_json::from_str::<ConsoleMode>("\"interactive\"").unwrap(),
+            ConsoleMode::Interactive
+        );
+        assert_eq!(
+            serde_json::from_str::<ConsoleMode>("\"read-only\"").unwrap(),
+            ConsoleMode::ReadOnly
+        );
+        assert_eq!(
+            serde_json::from_str::<ConsoleMode>("\"native\"").unwrap(),
+            ConsoleMode::Native
+        );
+        assert_eq!(
+            serde_json::from_str::<ConsoleMode>("\"gui\"").unwrap(),
+            ConsoleMode::Gui
+        );
     }
 
     // ========================================================================
@@ -1175,14 +1231,26 @@ mod tests {
 
     #[test]
     fn test_manager_scope_serialization() {
-        assert_eq!(serde_json::to_string(&ManagerScope::System).unwrap(), "\"system\"");
-        assert_eq!(serde_json::to_string(&ManagerScope::User).unwrap(), "\"user\"");
+        assert_eq!(
+            serde_json::to_string(&ManagerScope::System).unwrap(),
+            "\"system\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ManagerScope::User).unwrap(),
+            "\"user\""
+        );
     }
 
     #[test]
     fn test_manager_scope_deserialization() {
-        assert_eq!(serde_json::from_str::<ManagerScope>("\"system\"").unwrap(), ManagerScope::System);
-        assert_eq!(serde_json::from_str::<ManagerScope>("\"user\"").unwrap(), ManagerScope::User);
+        assert_eq!(
+            serde_json::from_str::<ManagerScope>("\"system\"").unwrap(),
+            ManagerScope::System
+        );
+        assert_eq!(
+            serde_json::from_str::<ManagerScope>("\"user\"").unwrap(),
+            ManagerScope::User
+        );
     }
 
     #[test]
@@ -1245,16 +1313,31 @@ mod tests {
 
     #[test]
     fn test_ssh_key_type_serialization() {
-        assert_eq!(serde_json::to_string(&SshKeyType::Ed25519).unwrap(), "\"ed25519\"");
-        assert_eq!(serde_json::to_string(&SshKeyType::Ecdsa).unwrap(), "\"ecdsa\"");
+        assert_eq!(
+            serde_json::to_string(&SshKeyType::Ed25519).unwrap(),
+            "\"ed25519\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SshKeyType::Ecdsa).unwrap(),
+            "\"ecdsa\""
+        );
         assert_eq!(serde_json::to_string(&SshKeyType::Rsa).unwrap(), "\"rsa\"");
     }
 
     #[test]
     fn test_ssh_key_type_deserialization() {
-        assert_eq!(serde_json::from_str::<SshKeyType>("\"ed25519\"").unwrap(), SshKeyType::Ed25519);
-        assert_eq!(serde_json::from_str::<SshKeyType>("\"ecdsa\"").unwrap(), SshKeyType::Ecdsa);
-        assert_eq!(serde_json::from_str::<SshKeyType>("\"rsa\"").unwrap(), SshKeyType::Rsa);
+        assert_eq!(
+            serde_json::from_str::<SshKeyType>("\"ed25519\"").unwrap(),
+            SshKeyType::Ed25519
+        );
+        assert_eq!(
+            serde_json::from_str::<SshKeyType>("\"ecdsa\"").unwrap(),
+            SshKeyType::Ecdsa
+        );
+        assert_eq!(
+            serde_json::from_str::<SshKeyType>("\"rsa\"").unwrap(),
+            SshKeyType::Rsa
+        );
     }
 
     #[test]

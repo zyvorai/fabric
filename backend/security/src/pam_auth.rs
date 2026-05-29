@@ -14,12 +14,14 @@ pub fn authenticate(username: &str, password: &str) -> Result<()> {
         "login"
     };
 
-    let mut client = pam::Client::with_password(service)
-        .context("Failed to create PAM client")?;
+    let mut client = pam::Client::with_password(service).context("Failed to create PAM client")?;
 
-    client.conversation_mut().set_credentials(username, password);
+    client
+        .conversation_mut()
+        .set_credentials(username, password);
 
-    client.authenticate()
+    client
+        .authenticate()
         .map_err(|e| anyhow::anyhow!("PAM authentication failed: {:?}", e))?;
 
     Ok(())

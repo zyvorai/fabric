@@ -32,8 +32,7 @@ fn decrypt_totp(ciphertext: &str) -> Result<String> {
         .enumerate()
         .map(|(i, b)| b ^ TOTP_KEY[i % TOTP_KEY.len()])
         .collect();
-    String::from_utf8(decrypted)
-        .map_err(|e| anyhow::anyhow!("Invalid TOTP secret UTF-8: {}", e))
+    String::from_utf8(decrypted).map_err(|e| anyhow::anyhow!("Invalid TOTP secret UTF-8: {}", e))
 }
 
 pub struct UserDb {
@@ -94,9 +93,8 @@ impl UserDb {
 
     pub fn get_by_username(&self, username: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
-        let mut stmt = conn.prepare(
-            "SELECT id, username, password_hash, role FROM users WHERE username = ?1",
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?1")?;
 
         let result = stmt.query_row(params![username], |row| {
             let id: String = row.get(0)?;
@@ -108,8 +106,7 @@ impl UserDb {
 
         match result {
             Ok((id, username, password_hash, role_str)) => {
-                let role: Role = serde_json::from_str(&role_str)
-                    .unwrap_or(Role::Viewer);
+                let role: Role = serde_json::from_str(&role_str).unwrap_or(Role::Viewer);
                 Ok(Some(User {
                     id,
                     username,
@@ -124,9 +121,8 @@ impl UserDb {
 
     pub fn get_by_id(&self, id: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
-        let mut stmt = conn.prepare(
-            "SELECT id, username, password_hash, role FROM users WHERE id = ?1",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT id, username, password_hash, role FROM users WHERE id = ?1")?;
 
         let result = stmt.query_row(params![id], |row| {
             let id: String = row.get(0)?;
@@ -138,8 +134,7 @@ impl UserDb {
 
         match result {
             Ok((id, username, password_hash, role_str)) => {
-                let role: Role = serde_json::from_str(&role_str)
-                    .unwrap_or(Role::Viewer);
+                let role: Role = serde_json::from_str(&role_str).unwrap_or(Role::Viewer);
                 Ok(Some(User {
                     id,
                     username,
@@ -237,9 +232,7 @@ impl UserDb {
     /// Get the TOTP secret for a user, if set (decrypted from at-rest storage).
     pub fn get_totp_secret(&self, user_id: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
-        let mut stmt = conn.prepare(
-            "SELECT totp_secret FROM users WHERE id = ?1",
-        )?;
+        let mut stmt = conn.prepare("SELECT totp_secret FROM users WHERE id = ?1")?;
         let result = stmt.query_row(params![user_id], |row| {
             let secret: Option<String> = row.get(0)?;
             Ok(secret)
@@ -255,9 +248,7 @@ impl UserDb {
     /// Check whether TOTP 2FA is enabled for a user.
     pub fn is_totp_enabled(&self, user_id: &str) -> Result<bool> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
-        let mut stmt = conn.prepare(
-            "SELECT totp_enabled FROM users WHERE id = ?1",
-        )?;
+        let mut stmt = conn.prepare("SELECT totp_enabled FROM users WHERE id = ?1")?;
         let result = stmt.query_row(params![user_id], |row| {
             let enabled: i32 = row.get(0)?;
             Ok(enabled)
@@ -441,10 +432,17 @@ mod tests {
     #[test]
     fn test_totp_encrypt_decrypt_roundtrip() {
         // Verify that the encrypt/decrypt functions preserve the original value
-        let test_values = ["JBSWY3DPEHPK3PXP", "short", "a-longer-secret-value-1234567890"];
+        let test_values = [
+            "JBSWY3DPEHPK3PXP",
+            "short",
+            "a-longer-secret-value-1234567890",
+        ];
         for val in &test_values {
             let encrypted = encrypt_totp(val);
-            assert_ne!(encrypted, *val, "Encrypted value should differ from plaintext");
+            assert_ne!(
+                encrypted, *val,
+                "Encrypted value should differ from plaintext"
+            );
             let decrypted = decrypt_totp(&encrypted).unwrap();
             assert_eq!(decrypted, *val, "Decrypt should recover original");
         }

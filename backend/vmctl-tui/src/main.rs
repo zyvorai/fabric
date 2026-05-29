@@ -34,7 +34,11 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::registry()
         .with(env_filter)
-        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(non_blocking)
+                .with_ansi(false),
+        )
         .init();
 
     tracing::debug!("vmctl-tui starting");
@@ -42,7 +46,11 @@ async fn main() -> Result<()> {
     // Setup terminal (no mouse capture - cleaner terminal interaction)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, crossterm::event::EnableMouseCapture)?;
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        crossterm::event::EnableMouseCapture
+    )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -253,10 +261,7 @@ async fn run_app<B: ratatui::backend::Backend>(
             tracing::debug!("Auto-refresh triggered");
             if let Err(e) = app.refresh().await {
                 tracing::warn!("Refresh failed: {}", e);
-                app.add_status(
-                    format!("Refresh failed: {}", e),
-                    app::StatusLevel::Error,
-                );
+                app.add_status(format!("Refresh failed: {}", e), app::StatusLevel::Error);
             }
             last_refresh = std::time::Instant::now();
         }

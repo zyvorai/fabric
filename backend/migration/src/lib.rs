@@ -96,7 +96,11 @@ impl MigrationManager {
         // Create VM directory on target
         let output = Command::new("ssh")
             .arg(&config.target_node)
-            .args(["mkdir", "-p", &format!("/var/lib/vmspawnd/vms/{}", config.vm_name)])
+            .args([
+                "mkdir",
+                "-p",
+                &format!("/var/lib/vmspawnd/vms/{}", config.vm_name),
+            ])
             .output()?;
 
         if !output.status.success() {
@@ -155,7 +159,11 @@ impl MigrationManager {
         // Iterative rsync: sync changed blocks while VM is still running
         // This minimizes downtime by pre-copying most data
         for iteration in 1..=3 {
-            tracing::info!("Live sync iteration {}/3 for VM '{}'", iteration, config.vm_name);
+            tracing::info!(
+                "Live sync iteration {}/3 for VM '{}'",
+                iteration,
+                config.vm_name
+            );
 
             let mut cmd = Command::new("rsync");
             cmd.args(["-avz", "--inplace", "--no-whole-file"]);
@@ -194,7 +202,11 @@ impl MigrationManager {
         }
 
         // Start VM on target node
-        tracing::info!("Starting VM '{}' on target node {}", config.vm_name, config.target_node);
+        tracing::info!(
+            "Starting VM '{}' on target node {}",
+            config.vm_name,
+            config.target_node
+        );
         let output = Command::new("ssh")
             .arg(&config.target_node)
             .args(["machinectl", "start", "--runner=vmspawn", &config.vm_name])
@@ -205,14 +217,22 @@ impl MigrationManager {
             return Err(anyhow::anyhow!("Failed to start VM on target: {}", stderr));
         }
 
-        tracing::info!("Live migration of VM '{}' completed — now running on {}", config.vm_name, config.target_node);
+        tracing::info!(
+            "Live migration of VM '{}' completed — now running on {}",
+            config.vm_name,
+            config.target_node
+        );
         Ok(())
     }
 
     /// Cancel ongoing migration
     pub async fn cancel_migration(&self, vm_name: &str) -> Result<()> {
         // Validate vm_name to prevent regex injection in pgrep/pkill patterns
-        if vm_name.is_empty() || !vm_name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) {
+        if vm_name.is_empty()
+            || !vm_name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        {
             return Err(anyhow::anyhow!("Invalid VM name for migration"));
         }
 
@@ -233,7 +253,11 @@ impl MigrationManager {
     /// Get migration status
     pub async fn get_migration_status(&self, vm_name: &str) -> Result<MigrationStatus> {
         // Validate vm_name to prevent regex injection in pgrep/pkill patterns
-        if vm_name.is_empty() || !vm_name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) {
+        if vm_name.is_empty()
+            || !vm_name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        {
             return Err(anyhow::anyhow!("Invalid VM name for migration"));
         }
 

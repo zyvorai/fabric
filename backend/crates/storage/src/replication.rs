@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use crate::zfs::{ZfsPool, ZfsReplicationTarget, ZfsSendResult, ZfsError};
+use crate::zfs::{ZfsError, ZfsPool, ZfsReplicationTarget, ZfsSendResult};
 
 pub struct ZfsReplicationDriver {
     source_pool: ZfsPool,

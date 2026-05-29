@@ -7,14 +7,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // Data Structures
@@ -140,7 +140,10 @@ fn default_limit() -> usize {
 // Validation Functions
 // ============================================================================
 
-fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, serde_json::Value>) -> Result<(), String> {
+fn validate_channel_config(
+    channel_type: &ChannelType,
+    config: &HashMap<String, serde_json::Value>,
+) -> Result<(), String> {
     match channel_type {
         ChannelType::Email => {
             // Validate email configuration
@@ -164,9 +167,15 @@ fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, 
             }
             // Validate webhook URL format
             if let Some(url) = config.get("webhook_url").and_then(|v| v.as_str()) {
-                let parsed_host = url.trim_start_matches("https://").trim_start_matches("http://")
-                    .split('/').next().unwrap_or("")
-                    .split(':').next().unwrap_or("");
+                let parsed_host = url
+                    .trim_start_matches("https://")
+                    .trim_start_matches("http://")
+                    .split('/')
+                    .next()
+                    .unwrap_or("")
+                    .split(':')
+                    .next()
+                    .unwrap_or("");
                 if parsed_host != "hooks.slack.com" {
                     return Err("Slack webhook URL must have host hooks.slack.com".to_string());
                 }
@@ -195,11 +204,22 @@ fn validate_channel_config(channel_type: &ChannelType, config: &HashMap<String, 
             }
             // Validate webhook URL format
             if let Some(url) = config.get("webhook_url").and_then(|v| v.as_str()) {
-                let parsed_host = url.trim_start_matches("https://").trim_start_matches("http://")
-                    .split('/').next().unwrap_or("")
-                    .split(':').next().unwrap_or("");
-                if !(parsed_host.ends_with(".office.com") || parsed_host.ends_with(".microsoft.com")) {
-                    return Err("Teams webhook URL must be from office.com or microsoft.com domain".to_string());
+                let parsed_host = url
+                    .trim_start_matches("https://")
+                    .trim_start_matches("http://")
+                    .split('/')
+                    .next()
+                    .unwrap_or("")
+                    .split(':')
+                    .next()
+                    .unwrap_or("");
+                if !(parsed_host.ends_with(".office.com")
+                    || parsed_host.ends_with(".microsoft.com"))
+                {
+                    return Err(
+                        "Teams webhook URL must be from office.com or microsoft.com domain"
+                            .to_string(),
+                    );
                 }
                 if !url.starts_with("https://") {
                     return Err("Teams webhook URL must use HTTPS".to_string());
@@ -262,7 +282,10 @@ fn validate_external_url(url: &str) -> Result<(), String> {
     ];
     let host_lower = host.to_lowercase();
     if blocked_hosts.iter().any(|&b| host_lower == b) {
-        return Err(format!("Webhook URL host '{}' is not allowed (internal host)", host));
+        return Err(format!(
+            "Webhook URL host '{}' is not allowed (internal host)",
+            host
+        ));
     }
 
     // Check if the host is an IP address and block private/internal ranges
@@ -274,19 +297,20 @@ fn validate_external_url(url: &str) -> Result<(), String> {
                     || v4.is_link_local()                     // 169.254.0.0/16
                     || v4.is_unspecified()                     // 0.0.0.0
                     || v4.is_broadcast()                      // 255.255.255.255
-                    || v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64  // 100.64.0.0/10 (CGNAT)
+                    || v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64 // 100.64.0.0/10 (CGNAT)
             }
             std::net::IpAddr::V6(v6) => {
                 v6.is_loopback()                              // ::1
                     || v6.is_unspecified()                     // ::
                     || (v6.segments()[0] & 0xffc0) == 0xfe80   // fe80::/10 link-local
-                    || (v6.segments()[0] & 0xfe00) == 0xfc00   // fc00::/7 ULA
+                    || (v6.segments()[0] & 0xfe00) == 0xfc00 // fc00::/7 ULA
             }
         };
 
         if is_private {
             return Err(format!(
-                "Webhook URL must not target private/internal IP address '{}'", ip
+                "Webhook URL must not target private/internal IP address '{}'",
+                ip
             ));
         }
     }
@@ -299,19 +323,26 @@ fn validate_external_url(url: &str) -> Result<(), String> {
                 let ip = addr.ip();
                 let is_resolved_private = match ip {
                     std::net::IpAddr::V4(v4) => {
-                        v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
+                        v4.is_loopback()
+                            || v4.is_private()
+                            || v4.is_link_local()
+                            || v4.is_unspecified()
                             || v4.is_broadcast()
                             || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64)
                             || (v4.octets()[0] == 169 && v4.octets()[1] == 254)
                     }
                     std::net::IpAddr::V6(v6) => {
-                        v6.is_loopback() || v6.is_unspecified()
+                        v6.is_loopback()
+                            || v6.is_unspecified()
                             || (v6.segments()[0] & 0xffc0) == 0xfe80
                             || (v6.segments()[0] & 0xfe00) == 0xfc00
                     }
                 };
                 if is_resolved_private {
-                    return Err(format!("URL host '{}' resolves to private/internal IP '{}'", host, ip));
+                    return Err(format!(
+                        "URL host '{}' resolves to private/internal IP '{}'",
+                        host, ip
+                    ));
                 }
             }
         }
@@ -333,14 +364,24 @@ pub async fn list_channels(
 ) -> Result<Json<Vec<NotificationChannel>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(list_channels));
     // Load from state store
-    let mut channels = state.store.list_entities::<NotificationChannel>("notifications/channels")
-        .map_err(|e| { tracing::error!("Failed to load channels: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification channels"}))) })?;
+    let mut channels = state
+        .store
+        .list_entities::<NotificationChannel>("notifications/channels")
+        .map_err(|e| {
+            tracing::error!("Failed to load channels: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load notification channels"})),
+            )
+        })?;
 
     // Redact sensitive config fields
     for channel in &mut channels {
         for key in REDACTED_CONFIG_KEYS {
             if channel.config.contains_key(*key) {
-                channel.config.insert(key.to_string(), serde_json::json!("**REDACTED**"));
+                channel
+                    .config
+                    .insert(key.to_string(), serde_json::json!("**REDACTED**"));
             }
         }
     }
@@ -357,7 +398,10 @@ pub async fn create_channel(
     // Validate config based on channel type
     if let Err(err) = validate_channel_config(&req.channel_type, &req.config) {
         tracing::warn!("Invalid channel config: {}", err);
-        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": err})),
+        ));
     }
 
     let channel = NotificationChannel {
@@ -371,16 +415,24 @@ pub async fn create_channel(
     };
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/channels", &channel.id, &channel)
+    {
         tracing::error!("Failed to save notification channel: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save notification channel"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to save notification channel"})),
+        ));
     }
 
     // Redact secrets before returning
     let mut response = channel;
     for key in REDACTED_CONFIG_KEYS {
         if response.config.contains_key(*key) {
-            response.config.insert(key.to_string(), serde_json::json!("**REDACTED**"));
+            response
+                .config
+                .insert(key.to_string(), serde_json::json!("**REDACTED**"));
         }
     }
 
@@ -395,9 +447,21 @@ pub async fn update_channel(
 ) -> Result<Json<NotificationChannel>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(update_channel));
     // Load existing channel from state store
-    let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load channel"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Channel not found"}))))?;
+    let mut channel = state
+        .store
+        .get_entity::<NotificationChannel>("notifications/channels", &id)
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load channel"})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Channel not found"})),
+            )
+        })?;
 
     // Update fields if provided
     if let Some(name) = req.name {
@@ -407,7 +471,10 @@ pub async fn update_channel(
         // Validate new config
         if let Err(err) = validate_channel_config(&channel.channel_type, &config) {
             tracing::warn!("Invalid channel config: {}", err);
-            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": err})),
+            ));
         }
         channel.config = config;
     }
@@ -416,15 +483,23 @@ pub async fn update_channel(
     }
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/channels", &channel.id, &channel)
+    {
         tracing::error!("Failed to update channel: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update channel"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to update channel"})),
+        ));
     }
 
     // Redact secrets before returning
     for key in REDACTED_CONFIG_KEYS {
         if channel.config.contains_key(*key) {
-            channel.config.insert(key.to_string(), serde_json::json!("**REDACTED**"));
+            channel
+                .config
+                .insert(key.to_string(), serde_json::json!("**REDACTED**"));
         }
     }
 
@@ -438,20 +513,36 @@ pub async fn delete_channel(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(delete_channel));
     // Check if channel is used by any rules
-    let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification rules"}))) })?;
+    let rules = state
+        .store
+        .list_entities::<NotificationRule>("notifications/rules")
+        .map_err(|e| {
+            tracing::error!("Failed to load rules: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load notification rules"})),
+            )
+        })?;
 
     for rule in rules {
         if rule.channels.contains(&id) {
             tracing::warn!("Cannot delete channel {} - used by rule {}", id, rule.name);
-            return Err((StatusCode::CONFLICT, Json(serde_json::json!({"error": format!("Channel is in use by rule '{}'", rule.name)}))));
+            return Err((
+                StatusCode::CONFLICT,
+                Json(
+                    serde_json::json!({"error": format!("Channel is in use by rule '{}'", rule.name)}),
+                ),
+            ));
         }
     }
 
     // Remove from state store
     if let Err(e) = state.store.delete_entity("notifications/channels", &id) {
         tracing::error!("Failed to delete channel: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete channel"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to delete channel"})),
+        ));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -464,21 +555,52 @@ pub async fn test_channel(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(test_channel));
     // Load channel from state store
-    let mut channel = state.store.get_entity::<NotificationChannel>("notifications/channels", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load channel"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Channel not found"}))))?;
+    let mut channel = state
+        .store
+        .get_entity::<NotificationChannel>("notifications/channels", &id)
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load channel"})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Channel not found"})),
+            )
+        })?;
 
     // Send test notification based on channel type
-    let test_message = format!("Test notification from vmspawnd - Channel: {}", channel.name);
-    match send_notification(&state.http_client, &channel, "Test Notification", &test_message).await {
+    let test_message = format!(
+        "Test notification from vmspawnd - Channel: {}",
+        channel.name
+    );
+    match send_notification(
+        &state.http_client,
+        &channel,
+        "Test Notification",
+        &test_message,
+    )
+    .await
+    {
         Ok(_) => {
-            tracing::info!("Successfully sent test notification to channel {} (type: {:?})",
-                channel.name, channel.channel_type);
+            tracing::info!(
+                "Successfully sent test notification to channel {} (type: {:?})",
+                channel.name,
+                channel.channel_type
+            );
         }
         Err(e) => {
-            tracing::error!("Failed to send test notification to channel {}: {}",
-                channel.name, e);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("Test notification failed: {}", e)}))));
+            tracing::error!(
+                "Failed to send test notification to channel {}: {}",
+                channel.name,
+                e
+            );
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Test notification failed: {}", e)})),
+            ));
         }
     }
 
@@ -486,9 +608,15 @@ pub async fn test_channel(
     channel.last_test = Some(Utc::now());
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/channels", &channel.id, &channel) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/channels", &channel.id, &channel)
+    {
         tracing::error!("Failed to update channel last_test: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update channel"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to update channel"})),
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -504,8 +632,16 @@ pub async fn list_rules(
 ) -> Result<Json<Vec<NotificationRule>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(list_rules));
     // Load from state store
-    let rules = state.store.list_entities::<NotificationRule>("notifications/rules")
-        .map_err(|e| { tracing::error!("Failed to load rules: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification rules"}))) })?;
+    let rules = state
+        .store
+        .list_entities::<NotificationRule>("notifications/rules")
+        .map_err(|e| {
+            tracing::error!("Failed to load rules: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load notification rules"})),
+            )
+        })?;
 
     Ok(Json(rules))
 }
@@ -519,15 +655,26 @@ pub async fn create_rule(
     // Validate rule
     if let Err(err) = validate_notification_rule(&req) {
         tracing::warn!("Invalid notification rule: {}", err);
-        return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": err}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": err})),
+        ));
     }
 
     // Validate channels exist
     for channel_id in &req.channels {
-        if state.store.get_entity::<NotificationChannel>("notifications/channels", channel_id)
-            .ok().flatten().is_none() {
+        if state
+            .store
+            .get_entity::<NotificationChannel>("notifications/channels", channel_id)
+            .ok()
+            .flatten()
+            .is_none()
+        {
             tracing::warn!("Channel not found: {}", channel_id);
-            return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Channel not found: {}", channel_id)}))));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("Channel not found: {}", channel_id)})),
+            ));
         }
     }
 
@@ -546,9 +693,15 @@ pub async fn create_rule(
     };
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/rules", &rule.id, &rule)
+    {
         tracing::error!("Failed to save notification rule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to save notification rule"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to save notification rule"})),
+        ));
     }
 
     Ok((StatusCode::CREATED, Json(rule)))
@@ -562,9 +715,21 @@ pub async fn update_rule(
 ) -> Result<Json<NotificationRule>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(update_rule));
     // Load existing rule from state store
-    let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load rule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rule not found"}))))?;
+    let mut rule = state
+        .store
+        .get_entity::<NotificationRule>("notifications/rules", &id)
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load rule"})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Rule not found"})),
+            )
+        })?;
 
     // Update fields if provided
     if let Some(name) = req.name {
@@ -582,10 +747,20 @@ pub async fn update_rule(
     if let Some(channels) = req.channels {
         // Validate channels exist
         for channel_id in &channels {
-            if state.store.get_entity::<NotificationChannel>("notifications/channels", channel_id)
-                .ok().flatten().is_none() {
+            if state
+                .store
+                .get_entity::<NotificationChannel>("notifications/channels", channel_id)
+                .ok()
+                .flatten()
+                .is_none()
+            {
                 tracing::warn!("Channel not found: {}", channel_id);
-                return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Channel not found: {}", channel_id)}))));
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(
+                        serde_json::json!({"error": format!("Channel not found: {}", channel_id)}),
+                    ),
+                ));
             }
         }
         rule.channels = channels;
@@ -598,9 +773,15 @@ pub async fn update_rule(
     }
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/rules", &rule.id, &rule)
+    {
         tracing::error!("Failed to update rule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to update rule"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to update rule"})),
+        ));
     }
 
     Ok(Json(rule))
@@ -615,7 +796,10 @@ pub async fn delete_rule(
     // Remove from state store
     if let Err(e) = state.store.delete_entity("notifications/rules", &id) {
         tracing::error!("Failed to delete rule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to delete rule"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to delete rule"})),
+        ));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -628,17 +812,35 @@ pub async fn enable_rule(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(enable_rule));
     // Load rule from state store
-    let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load rule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rule not found"}))))?;
+    let mut rule = state
+        .store
+        .get_entity::<NotificationRule>("notifications/rules", &id)
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load rule"})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Rule not found"})),
+            )
+        })?;
 
     // Set enabled = true
     rule.enabled = true;
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/rules", &rule.id, &rule)
+    {
         tracing::error!("Failed to enable rule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to enable rule"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to enable rule"})),
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -651,17 +853,35 @@ pub async fn disable_rule(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(disable_rule));
     // Load rule from state store
-    let mut rule = state.store.get_entity::<NotificationRule>("notifications/rules", &id)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load rule"}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Rule not found"}))))?;
+    let mut rule = state
+        .store
+        .get_entity::<NotificationRule>("notifications/rules", &id)
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load rule"})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Rule not found"})),
+            )
+        })?;
 
     // Set enabled = false
     rule.enabled = false;
 
     // Save to state store
-    if let Err(e) = state.store.save_entity("notifications/rules", &rule.id, &rule) {
+    if let Err(e) = state
+        .store
+        .save_entity("notifications/rules", &rule.id, &rule)
+    {
         tracing::error!("Failed to disable rule: {}", e);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to disable rule"}))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Failed to disable rule"})),
+        ));
     }
 
     Ok(StatusCode::OK)
@@ -678,8 +898,16 @@ pub async fn get_history(
 ) -> Result<Json<Vec<NotificationHistory>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("notifications::{}", stringify!(get_history));
     // Load from state store
-    let mut history = state.store.list_entities::<NotificationHistory>("notification_history")
-        .map_err(|e| { tracing::error!("Failed to load history: {}", e); (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Failed to load notification history"}))) })?;
+    let mut history = state
+        .store
+        .list_entities::<NotificationHistory>("notification_history")
+        .map_err(|e| {
+            tracing::error!("Failed to load history: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Failed to load notification history"})),
+            )
+        })?;
 
     // Sort by sent_at (most recent first)
     history.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
@@ -687,7 +915,10 @@ pub async fn get_history(
     // Prune old history entries beyond retention limit (keep 500 most recent)
     const HISTORY_RETENTION_LIMIT: usize = 500;
     if history.len() > HISTORY_RETENTION_LIMIT {
-        let to_delete: Vec<String> = history.drain(HISTORY_RETENTION_LIMIT..).map(|h| h.id).collect();
+        let to_delete: Vec<String> = history
+            .drain(HISTORY_RETENTION_LIMIT..)
+            .map(|h| h.id)
+            .collect();
         let deleted_count = to_delete.len();
         for id in to_delete {
             let _ = state.store.delete_entity("notification_history", &id);
@@ -717,18 +948,12 @@ async fn send_notification(
 
     for attempt in 0..max_retries {
         let result = match channel.channel_type {
-            ChannelType::Email => {
-                send_email_notification(channel, subject, message).await
-            }
-            ChannelType::Slack => {
-                send_slack_notification(client, channel, subject, message).await
-            }
+            ChannelType::Email => send_email_notification(channel, subject, message).await,
+            ChannelType::Slack => send_slack_notification(client, channel, subject, message).await,
             ChannelType::Webhook => {
                 send_webhook_notification(client, channel, subject, message).await
             }
-            ChannelType::Teams => {
-                send_teams_notification(client, channel, subject, message).await
-            }
+            ChannelType::Teams => send_teams_notification(client, channel, subject, message).await,
         };
 
         match result {
@@ -762,20 +987,28 @@ async fn send_email_notification(
     subject: &str,
     message: &str,
 ) -> Result<(), String> {
-    use lettre::{Message, SmtpTransport, Transport};
     use lettre::message::header::ContentType;
     use lettre::transport::smtp::authentication::Credentials;
+    use lettre::{Message, SmtpTransport, Transport};
 
-    let smtp_host = channel.config.get("smtp_host")
+    let smtp_host = channel
+        .config
+        .get("smtp_host")
         .and_then(|v| v.as_str())
         .ok_or("Missing smtp_host in channel config")?;
-    let smtp_port = channel.config.get("smtp_port")
+    let smtp_port = channel
+        .config
+        .get("smtp_port")
         .and_then(|v| v.as_u64())
         .unwrap_or(587) as u16;
-    let from = channel.config.get("from")
+    let from = channel
+        .config
+        .get("from")
         .and_then(|v| v.as_str())
         .ok_or("Missing from address in channel config")?;
-    let to_addrs = channel.config.get("to")
+    let to_addrs = channel
+        .config
+        .get("to")
         .and_then(|v| v.as_array())
         .ok_or("Missing to addresses in channel config")?;
 
@@ -785,25 +1018,35 @@ async fn send_email_notification(
 
     tracing::info!(
         "Sending email notification: {} -> {:?} via {}:{} (Subject: {})",
-        from, to_addrs, smtp_host, smtp_port, subject
+        from,
+        to_addrs,
+        smtp_host,
+        smtp_port,
+        subject
     );
 
     // Send email to each recipient
     for to_value in to_addrs {
-        let to = to_value.as_str()
-            .ok_or("Invalid to address format")?;
+        let to = to_value.as_str().ok_or("Invalid to address format")?;
 
         // Build email message
         let email = Message::builder()
-            .from(from.parse().map_err(|e| format!("Invalid from address: {}", e))?)
-            .to(to.parse().map_err(|e| format!("Invalid to address: {}", e))?)
+            .from(
+                from.parse()
+                    .map_err(|e| format!("Invalid from address: {}", e))?,
+            )
+            .to(to
+                .parse()
+                .map_err(|e| format!("Invalid to address: {}", e))?)
             .subject(subject)
             .header(ContentType::TEXT_PLAIN)
             .body(message.to_string())
             .map_err(|e| format!("Failed to build email: {}", e))?;
 
         // Check if TLS verification is disabled via config
-        let tls_verify = channel.config.get("tls_verify")
+        let tls_verify = channel
+            .config
+            .get("tls_verify")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
@@ -856,11 +1099,17 @@ async fn send_slack_notification(
     subject: &str,
     message: &str,
 ) -> Result<(), String> {
-    let webhook_url = channel.config.get("webhook_url")
+    let webhook_url = channel
+        .config
+        .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("Missing webhook_url in channel config")?;
 
-    tracing::info!("Sending Slack notification to webhook: {} (Subject: {})", webhook_url, subject);
+    tracing::info!(
+        "Sending Slack notification to webhook: {} (Subject: {})",
+        webhook_url,
+        subject
+    );
 
     // Prepare Slack message payload
     let payload = serde_json::json!({
@@ -895,14 +1144,20 @@ async fn send_webhook_notification(
     subject: &str,
     message: &str,
 ) -> Result<(), String> {
-    let webhook_url = channel.config.get("url")
+    let webhook_url = channel
+        .config
+        .get("url")
         .and_then(|v| v.as_str())
         .ok_or("Missing url in channel config")?;
 
     // Re-validate URL at send time to catch DNS rebinding attacks
     validate_external_url(webhook_url)?;
 
-    tracing::info!("Sending webhook notification to: {} (Subject: {})", webhook_url, subject);
+    tracing::info!(
+        "Sending webhook notification to: {} (Subject: {})",
+        webhook_url,
+        subject
+    );
 
     // Prepare generic webhook payload
     let payload = serde_json::json!({
@@ -921,10 +1176,7 @@ async fn send_webhook_notification(
         .map_err(|e| format!("Failed to send webhook notification: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!(
-            "Webhook returned error: {}",
-            response.status()
-        ));
+        return Err(format!("Webhook returned error: {}", response.status()));
     }
 
     tracing::info!("Webhook notification sent successfully");
@@ -938,11 +1190,17 @@ async fn send_teams_notification(
     subject: &str,
     message: &str,
 ) -> Result<(), String> {
-    let webhook_url = channel.config.get("webhook_url")
+    let webhook_url = channel
+        .config
+        .get("webhook_url")
         .and_then(|v| v.as_str())
         .ok_or("Missing webhook_url in channel config")?;
 
-    tracing::info!("Sending Teams notification to webhook: {} (Subject: {})", webhook_url, subject);
+    tracing::info!(
+        "Sending Teams notification to webhook: {} (Subject: {})",
+        webhook_url,
+        subject
+    );
 
     // Prepare Teams message card payload
     let payload = serde_json::json!({

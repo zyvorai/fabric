@@ -14,14 +14,7 @@ impl LogDriver for MachinectlDriver {
         let lines_str = lines.to_string();
 
         let mut child = tokio::process::Command::new("journalctl")
-            .args([
-                "--follow",
-                "--output=json",
-                "-n",
-                &lines_str,
-                "-u",
-                &scope,
-            ])
+            .args(["--follow", "--output=json", "-n", &lines_str, "-u", &scope])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .spawn()?;

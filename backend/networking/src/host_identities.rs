@@ -106,10 +106,7 @@ fn parse_nft_set_identities(json: &serde_json::Value) -> Vec<DiscoveredHostIdent
             if name.is_empty() || name.starts_with("identity_") {
                 continue;
             }
-            let type_name = set
-                .get("type")
-                .and_then(|t| t.as_str())
-                .unwrap_or("");
+            let type_name = set.get("type").and_then(|t| t.as_str()).unwrap_or("");
             if !is_address_set_type(type_name) {
                 continue;
             }
@@ -145,7 +142,9 @@ fn parse_nft_set_identities(json: &serde_json::Value) -> Vec<DiscoveredHostIdent
     address_sets
         .into_iter()
         .filter_map(|((table, name), type_name)| {
-            let endpoints = elements.remove(&(table.clone(), name.clone())).unwrap_or_default();
+            let endpoints = elements
+                .remove(&(table.clone(), name.clone()))
+                .unwrap_or_default();
             if endpoints.is_empty() {
                 return None;
             }
@@ -236,7 +235,10 @@ mod tests {
         let identities = parse_nft_set_identities(&json);
         assert_eq!(identities.len(), 1);
         assert_eq!(identities[0].endpoints.len(), 2);
-        assert_eq!(identities[0].labels.get("set").map(String::as_str), Some("trusted"));
+        assert_eq!(
+            identities[0].labels.get("set").map(String::as_str),
+            Some("trusted")
+        );
     }
 
     #[test]

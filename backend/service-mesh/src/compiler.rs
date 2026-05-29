@@ -81,7 +81,10 @@ impl ServiceCompiler {
             .await;
 
         // Get healthy backends for DNAT rules
-        let healthy = self.health_checker.get_healthy_backends(&service.name).await;
+        let healthy = self
+            .health_checker
+            .get_healthy_backends(&service.name)
+            .await;
 
         // If no healthy backends, use all backends (graceful degradation)
         let backend_ips: Vec<String> = if healthy.is_empty() {

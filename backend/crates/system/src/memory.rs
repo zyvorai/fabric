@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use vmspawnd_cgroup::CgroupManager;
 
@@ -32,9 +32,7 @@ pub enum MemoryError {
 impl From<vmspawnd_cgroup::CgroupError> for MemoryError {
     fn from(e: vmspawnd_cgroup::CgroupError) -> Self {
         match &e {
-            vmspawnd_cgroup::CgroupError::NotFound(_) => {
-                MemoryError::CgroupNotFound(e.to_string())
-            }
+            vmspawnd_cgroup::CgroupError::NotFound(_) => MemoryError::CgroupNotFound(e.to_string()),
             vmspawnd_cgroup::CgroupError::ReadFailed { .. } => {
                 MemoryError::ReadStatsFailed(e.to_string())
             }
@@ -73,9 +71,9 @@ impl HugepageSize {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OvercommitPolicy {
-    None,           // No overcommit, 1:1 allocation
-    Conservative,   // 1.5x overcommit
-    Aggressive,     // 2x overcommit
+    None,         // No overcommit, 1:1 allocation
+    Conservative, // 1.5x overcommit
+    Aggressive,   // 2x overcommit
 }
 
 impl OvercommitPolicy {
@@ -170,11 +168,7 @@ impl MemoryController {
             (current_bytes as f64 / limit_bytes as f64) * 100.0
         };
 
-        let swap_max_bytes = self
-            .manager()?
-            .memory()
-            .get_swap_max()
-            .unwrap_or(0);
+        let swap_max_bytes = self.manager()?.memory().get_swap_max().unwrap_or(0);
 
         Ok(MemoryStats {
             current_bytes,
@@ -201,15 +195,13 @@ pub struct HugepageManager;
 impl HugepageManager {
     /// Allocate hugepages
     pub fn allocate(size: HugepageSize, count: u32) -> Result<(), MemoryError> {
-        let path = PathBuf::from(format!(
-            "/sys/kernel/mm/hugepages/{}",
-            size.as_str()
-        ));
+        let path = PathBuf::from(format!("/sys/kernel/mm/hugepages/{}", size.as_str()));
 
         if !path.exists() {
-            return Err(MemoryError::HugepageAllocationFailed(
-                format!("Hugepage size {} not supported", size.as_str())
-            ));
+            return Err(MemoryError::HugepageAllocationFailed(format!(
+                "Hugepage size {} not supported",
+                size.as_str()
+            )));
         }
 
         let nr_path = path.join("nr_hugepages");
@@ -228,10 +220,7 @@ impl HugepageManager {
 
     /// Get hugepage statistics
     pub fn get_stats(size: HugepageSize) -> Result<HugepageStats, MemoryError> {
-        let path = PathBuf::from(format!(
-            "/sys/kernel/mm/hugepages/{}",
-            size.as_str()
-        ));
+        let path = PathBuf::from(format!("/sys/kernel/mm/hugepages/{}", size.as_str()));
 
         if !path.exists() {
             return Ok(HugepageStats {
@@ -263,9 +252,9 @@ impl HugepageManager {
         }
 
         let content = fs::read_to_string(path)?;
-        content.trim()
-            .parse()
-            .map_err(|e| MemoryError::ParseError(format!("Failed to parse {}: {}", path.display(), e)))
+        content.trim().parse().map_err(|e| {
+            MemoryError::ParseError(format!("Failed to parse {}: {}", path.display(), e))
+        })
     }
 
     /// Get total system memory info

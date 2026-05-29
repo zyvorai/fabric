@@ -22,9 +22,9 @@ pub struct VmConfig {
 pub struct CpuConfig {
     pub count: u32,
     pub pinning: Option<CpuPinning>,
-    pub shares: u32,           // CPU shares (relative weight, default 1024)
-    pub quota: Option<u64>,    // CPU quota in microseconds per period
-    pub period: u64,           // CPU period (default 100000 = 100ms)
+    pub shares: u32,                // CPU shares (relative weight, default 1024)
+    pub quota: Option<u64>,         // CPU quota in microseconds per period
+    pub period: u64,                // CPU period (default 100000 = 100ms)
     pub affinity: Option<Vec<u32>>, // Physical CPU cores
 }
 
@@ -43,10 +43,10 @@ impl Default for CpuConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CpuPinning {
-    Auto,                          // Let scheduler decide
-    Explicit(Vec<CpuPin>),         // Manual vCPU to physical CPU mapping
-    NumaNode(u32),                 // Pin to all CPUs in NUMA node
-    Socket(u32),                   // Pin to all CPUs in socket
+    Auto,                  // Let scheduler decide
+    Explicit(Vec<CpuPin>), // Manual vCPU to physical CPU mapping
+    NumaNode(u32),         // Pin to all CPUs in NUMA node
+    Socket(u32),           // Pin to all CPUs in socket
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -72,18 +72,15 @@ impl CpuPinning {
                     }
 
                     if !topology.is_cpu_online(pin.physical_cpu) {
-                        return Err(format!(
-                            "Physical CPU {} is offline",
-                            pin.physical_cpu
-                        ));
+                        return Err(format!("Physical CPU {} is offline", pin.physical_cpu));
                     }
                 }
                 Ok(())
             }
 
             CpuPinning::NumaNode(node_id) => {
-                let numa = NumaTopology::detect()
-                    .map_err(|e| format!("NUMA not available: {}", e))?;
+                let numa =
+                    NumaTopology::detect().map_err(|e| format!("NUMA not available: {}", e))?;
 
                 if numa.get_node(*node_id).is_none() {
                     return Err(format!("NUMA node {} does not exist", node_id));
@@ -110,17 +107,11 @@ impl CpuPinning {
         match self {
             CpuPinning::Auto => Vec::new(),
 
-            CpuPinning::Explicit(pins) => {
-                pins.iter().map(|p| p.physical_cpu).collect()
-            }
+            CpuPinning::Explicit(pins) => pins.iter().map(|p| p.physical_cpu).collect(),
 
-            CpuPinning::NumaNode(node_id) => {
-                topology.get_cpus_for_numa_node(*node_id)
-            }
+            CpuPinning::NumaNode(node_id) => topology.get_cpus_for_numa_node(*node_id),
 
-            CpuPinning::Socket(socket_id) => {
-                topology.get_cpus_for_socket(*socket_id)
-            }
+            CpuPinning::Socket(socket_id) => topology.get_cpus_for_socket(*socket_id),
         }
     }
 }
@@ -128,11 +119,11 @@ impl CpuPinning {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryConfig {
     pub size_mb: u64,
-    pub max_mb: Option<u64>,        // Hard limit (for ballooning)
-    pub balloon: bool,               // Enable memory ballooning
+    pub max_mb: Option<u64>, // Hard limit (for ballooning)
+    pub balloon: bool,       // Enable memory ballooning
     pub hugepages: Option<HugepageSize>,
-    pub numa_node: Option<u32>,      // NUMA placement
-    pub swap_enabled: bool,          // Allow swap
+    pub numa_node: Option<u32>, // NUMA placement
+    pub swap_enabled: bool,     // Allow swap
 }
 
 impl Default for MemoryConfig {
@@ -279,8 +270,7 @@ impl VmConfig {
 
         // Validate NUMA placement if specified
         if let Some(numa_node) = self.memory.numa_node {
-            let numa = NumaTopology::detect()
-                .map_err(|e| format!("NUMA not available: {}", e))?;
+            let numa = NumaTopology::detect().map_err(|e| format!("NUMA not available: {}", e))?;
 
             if numa.get_node(numa_node).is_none() {
                 return Err(format!("NUMA node {} does not exist", numa_node));
@@ -338,14 +328,29 @@ mod tests {
     #[test]
     fn test_cpu_pinning_explicit() {
         let pinning = CpuPinning::Explicit(vec![
-            CpuPin { vcpu_id: 0, physical_cpu: 0 },
-            CpuPin { vcpu_id: 1, physical_cpu: 2 },
+            CpuPin {
+                vcpu_id: 0,
+                physical_cpu: 0,
+            },
+            CpuPin {
+                vcpu_id: 1,
+                physical_cpu: 2,
+            },
         ]);
 
-        assert_eq!(pinning, CpuPinning::Explicit(vec![
-            CpuPin { vcpu_id: 0, physical_cpu: 0 },
-            CpuPin { vcpu_id: 1, physical_cpu: 2 },
-        ]));
+        assert_eq!(
+            pinning,
+            CpuPinning::Explicit(vec![
+                CpuPin {
+                    vcpu_id: 0,
+                    physical_cpu: 0
+                },
+                CpuPin {
+                    vcpu_id: 1,
+                    physical_cpu: 2
+                },
+            ])
+        );
     }
 
     #[test]

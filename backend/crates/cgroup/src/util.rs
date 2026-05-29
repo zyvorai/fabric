@@ -46,13 +46,11 @@ pub fn read_u64_or_max(path: &Path) -> Result<u64> {
 /// Read a cgroup file and parse as u64.
 pub fn read_u64(path: &Path) -> Result<u64> {
     let content = read_cgroup_file(path)?;
-    content
-        .parse::<u64>()
-        .map_err(|_| CgroupError::ParseError {
-            path: path.to_path_buf(),
-            content,
-            detail: "expected u64".to_string(),
-        })
+    content.parse::<u64>().map_err(|_| CgroupError::ParseError {
+        path: path.to_path_buf(),
+        content,
+        detail: "expected u64".to_string(),
+    })
 }
 
 /// Parse flat keyed format: "key value\n" lines into (key, value) pairs.
@@ -66,11 +64,13 @@ pub fn parse_flat_keyed(path: &Path, content: &str) -> Result<Vec<(String, u64)>
         let mut parts = line.splitn(2, ' ');
         let key = parts.next().unwrap_or("");
         let value_str = parts.next().unwrap_or("").trim();
-        let value = value_str.parse::<u64>().map_err(|_| CgroupError::ParseError {
-            path: path.to_path_buf(),
-            content: line.to_string(),
-            detail: format!("expected u64 value for key {key:?}, got {value_str:?}"),
-        })?;
+        let value = value_str
+            .parse::<u64>()
+            .map_err(|_| CgroupError::ParseError {
+                path: path.to_path_buf(),
+                content: line.to_string(),
+                detail: format!("expected u64 value for key {key:?}, got {value_str:?}"),
+            })?;
         entries.push((key.to_string(), value));
     }
     Ok(entries)

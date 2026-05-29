@@ -256,7 +256,10 @@ impl QemuBuilder {
         if let Some(ref firmware) = self.uefi_firmware {
             args.extend_from_slice(&[
                 "-drive".to_string(),
-                format!("if=pflash,format=raw,readonly=on,file={}", firmware.display()),
+                format!(
+                    "if=pflash,format=raw,readonly=on,file={}",
+                    firmware.display()
+                ),
             ]);
         }
 
@@ -293,10 +296,7 @@ impl QemuBuilder {
                     format!("tap,id=net{},ifname={},script=no,downscript=no", i, tap),
                 ]);
             } else {
-                args.extend_from_slice(&[
-                    "-netdev".to_string(),
-                    format!("user,id=net{}", i),
-                ]);
+                args.extend_from_slice(&["-netdev".to_string(), format!("user,id=net{}", i)]);
             }
         }
 
@@ -306,16 +306,10 @@ impl QemuBuilder {
                 args.extend_from_slice(&["-display".to_string(), "none".to_string()]);
             }
             QemuDisplay::Vnc { port } => {
-                args.extend_from_slice(&[
-                    "-vnc".to_string(),
-                    format!(":{}", port - 5900),
-                ]);
+                args.extend_from_slice(&["-vnc".to_string(), format!(":{}", port - 5900)]);
             }
             QemuDisplay::Spice { port } => {
-                args.extend_from_slice(&[
-                    "-spice".to_string(),
-                    format!("port={}", port),
-                ]);
+                args.extend_from_slice(&["-spice".to_string(), format!("port={}", port)]);
             }
             QemuDisplay::Gtk => {
                 args.extend_from_slice(&["-display".to_string(), "gtk".to_string()]);
@@ -461,8 +455,8 @@ mod tests {
 
     #[test]
     fn test_qemu_builder_with_disk() {
-        let builder = QemuBuilder::new("test-vm")
-            .add_disk_simple(Path::new("/tmp/test.qcow2"), "qcow2");
+        let builder =
+            QemuBuilder::new("test-vm").add_disk_simple(Path::new("/tmp/test.qcow2"), "qcow2");
 
         let cmd = builder.build_command();
         assert!(cmd.contains("file=/tmp/test.qcow2,format=qcow2"));
@@ -470,8 +464,7 @@ mod tests {
 
     #[test]
     fn test_qemu_builder_with_network() {
-        let builder = QemuBuilder::new("test-vm")
-            .add_bridge_network("br0");
+        let builder = QemuBuilder::new("test-vm").add_bridge_network("br0");
 
         let cmd = builder.build_command();
         assert!(cmd.contains("virtio-net-pci"));
@@ -480,8 +473,7 @@ mod tests {
 
     #[test]
     fn test_qemu_builder_smp_topology() {
-        let builder = QemuBuilder::new("test-vm")
-            .smp(1, 4, 2);
+        let builder = QemuBuilder::new("test-vm").smp(1, 4, 2);
 
         let cmd = builder.build_command();
         assert!(cmd.contains("sockets=1,cores=4,threads=2"));
@@ -489,8 +481,7 @@ mod tests {
 
     #[test]
     fn test_qemu_builder_vnc() {
-        let builder = QemuBuilder::new("test-vm")
-            .display(QemuDisplay::Vnc { port: 5901 });
+        let builder = QemuBuilder::new("test-vm").display(QemuDisplay::Vnc { port: 5901 });
 
         let cmd = builder.build_command();
         assert!(cmd.contains("-vnc :1"));

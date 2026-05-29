@@ -245,7 +245,10 @@ mod tests {
     fn make_vm(name: &str, labels: &[(&str, &str)], ip: Option<&str>) -> VMSnapshot {
         VMSnapshot {
             name: name.to_string(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             ip: ip.map(|s| s.to_string()),
         }
     }
@@ -262,7 +265,10 @@ mod tests {
             description: String::new(),
             rule_type,
             selector: LabelSelector {
-                match_labels: selector.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                match_labels: selector
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
             },
             protocol: NatProtocol::Any,
             source_cidr: None,
@@ -283,7 +289,12 @@ mod tests {
     fn test_masquerade() {
         let compiler = NatCompiler::new();
         let vms = vec![make_vm("web-1", &[("zone", "internal")], Some("10.0.0.5"))];
-        let rule = make_rule("masq", NatRuleType::Masquerade, &[("zone", "internal")], true);
+        let rule = make_rule(
+            "masq",
+            NatRuleType::Masquerade,
+            &[("zone", "internal")],
+            true,
+        );
 
         let result = compiler.compile_masquerade(&rule, &vms);
         assert!(result.is_some());
@@ -339,7 +350,12 @@ mod tests {
     fn test_hairpin() {
         let compiler = NatCompiler::new();
         let vms = vec![make_vm("web-1", &[("zone", "internal")], Some("10.0.0.5"))];
-        let mut rule = make_rule("hairpin", NatRuleType::Hairpin, &[("zone", "internal")], true);
+        let mut rule = make_rule(
+            "hairpin",
+            NatRuleType::Hairpin,
+            &[("zone", "internal")],
+            true,
+        );
         rule.translate_to = Some("10.0.0.5".to_string());
 
         let result = compiler.compile_hairpin(&rule, &vms);
@@ -376,7 +392,12 @@ mod tests {
     fn test_disabled_rule() {
         let compiler = NatCompiler::new();
         let vms = vec![make_vm("web-1", &[("zone", "internal")], Some("10.0.0.5"))];
-        let rule = make_rule("masq", NatRuleType::Masquerade, &[("zone", "internal")], false);
+        let rule = make_rule(
+            "masq",
+            NatRuleType::Masquerade,
+            &[("zone", "internal")],
+            false,
+        );
 
         let result = compiler.compile_masquerade(&rule, &vms);
         assert!(result.is_none());
@@ -386,7 +407,12 @@ mod tests {
     fn test_no_matching_vms() {
         let compiler = NatCompiler::new();
         let vms = vec![make_vm("web-1", &[("zone", "public")], Some("10.0.0.5"))];
-        let rule = make_rule("masq", NatRuleType::Masquerade, &[("zone", "internal")], true);
+        let rule = make_rule(
+            "masq",
+            NatRuleType::Masquerade,
+            &[("zone", "internal")],
+            true,
+        );
 
         let result = compiler.compile_masquerade(&rule, &vms);
         assert!(result.is_none());
@@ -396,7 +422,12 @@ mod tests {
     fn test_compile_all() {
         let compiler = NatCompiler::new();
         let vms = vec![make_vm("web-1", &[("zone", "internal")], Some("10.0.0.5"))];
-        let rules = vec![make_rule("masq", NatRuleType::Masquerade, &[("zone", "internal")], true)];
+        let rules = vec![make_rule(
+            "masq",
+            NatRuleType::Masquerade,
+            &[("zone", "internal")],
+            true,
+        )];
         let gateways = vec![NatGatewayConfig {
             id: Uuid::new_v4(),
             name: "gw".to_string(),

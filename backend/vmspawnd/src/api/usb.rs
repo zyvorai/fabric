@@ -3,8 +3,8 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use axum::{http::StatusCode, Json};
-use serde::Serialize;
 use security::RequireRead;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct UsbDevice {

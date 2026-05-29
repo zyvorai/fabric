@@ -2,12 +2,12 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+pub mod enforcement;
 pub mod models;
 pub mod resolver;
-pub mod enforcement;
 
-use resolver::DnsResolver;
 use enforcement::DnsEnforcer;
+use resolver::DnsResolver;
 
 pub struct DnsManager {
     pub resolver: DnsResolver,
@@ -18,9 +18,6 @@ impl DnsManager {
     pub fn new() -> Self {
         let resolver = DnsResolver::new();
         let enforcer = DnsEnforcer::new();
-        Self {
-            resolver,
-            enforcer,
-        }
+        Self { resolver, enforcer }
     }
 }

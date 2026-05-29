@@ -7,14 +7,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireWrite, RequireAdmin};
 use crate::validation::validate_vm_name;
+use security::{RequireAdmin, RequireRead, RequireWrite};
 
 // ============================================================================
 // Auto-Scaling Policy
@@ -61,11 +61,21 @@ pub struct CreateScalingPolicyRequest {
     pub cooldown_secs: u64,
 }
 
-fn default_min_cpus() -> u32 { 1 }
-fn default_max_cpus() -> u32 { 8 }
-fn default_min_mem() -> u64 { 512 }
-fn default_max_mem() -> u64 { 16384 }
-fn default_cooldown() -> u64 { 300 }
+fn default_min_cpus() -> u32 {
+    1
+}
+fn default_max_cpus() -> u32 {
+    8
+}
+fn default_min_mem() -> u64 {
+    512
+}
+fn default_max_mem() -> u64 {
+    16384
+}
+fn default_cooldown() -> u64 {
+    300
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScaleEvent {
@@ -104,30 +114,55 @@ pub async fn create_scaling_policy(
         ("cpu_scale_up_threshold", req.cpu_scale_up_threshold),
         ("cpu_scale_down_threshold", req.cpu_scale_down_threshold),
         ("memory_scale_up_threshold", req.memory_scale_up_threshold),
-        ("memory_scale_down_threshold", req.memory_scale_down_threshold),
+        (
+            "memory_scale_down_threshold",
+            req.memory_scale_down_threshold,
+        ),
     ];
     for (name, val) in &thresholds {
         if let Some(v) = val {
             if !v.is_finite() || *v < 0.0 || *v > 100.0 {
-                return Err((StatusCode::BAD_REQUEST, Json(json!({"error": format!("{} must be between 0.0 and 100.0", name)}))));
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("{} must be between 0.0 and 100.0", name)})),
+                ));
             }
         }
     }
     if req.min_cpus > req.max_cpus {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "min_cpus must not exceed max_cpus"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "min_cpus must not exceed max_cpus"})),
+        ));
     }
     if req.min_memory_mb > req.max_memory_mb {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "min_memory_mb must not exceed max_memory_mb"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "min_memory_mb must not exceed max_memory_mb"})),
+        ));
     }
     if req.cooldown_secs > 86400 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "cooldown_secs must not exceed 86400"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "cooldown_secs must not exceed 86400"})),
+        ));
     }
 
     // Verify VM exists
     match state.store.get_vm(&req.vm_name) {
         Ok(Some(_)) => {}
-        Ok(None) => return Err((StatusCode::NOT_FOUND, Json(json!({ "error": "VM not found" })))),
-        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "VM not found" })),
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
     }
 
     let policy = ScalingPolicy {
@@ -146,9 +181,15 @@ pub async fn create_scaling_policy(
         created: Utc::now(),
     };
 
-    state.store.save_entity("autoscale_policies", &policy.vm_name, &policy).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .save_entity("autoscale_policies", &policy.vm_name, &policy)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(policy)))
 }
@@ -159,7 +200,13 @@ pub async fn list_scaling_policies(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScalingPolicy>> {
     tracing::debug!("autoscale::{}", stringify!(list_scaling_policies));
-    let policies: Vec<ScalingPolicy> = state.store.list_entities("autoscale_policies").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let policies: Vec<ScalingPolicy> = state
+        .store
+        .list_entities("autoscale_policies")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
     Json(policies)
 }
 
@@ -170,10 +217,19 @@ pub async fn get_scaling_policy(
     Path(vm_name): Path<String>,
 ) -> Result<Json<ScalingPolicy>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("autoscale::{}", stringify!(get_scaling_policy));
-    match state.store.get_entity::<ScalingPolicy>("autoscale_policies", &vm_name) {
+    match state
+        .store
+        .get_entity::<ScalingPolicy>("autoscale_policies", &vm_name)
+    {
         Ok(Some(p)) => Ok(Json(p)),
-        Ok(None) => Err((StatusCode::NOT_FOUND, Json(json!({ "error": "No scaling policy for this VM" })))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "No scaling policy for this VM" })),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -184,9 +240,15 @@ pub async fn delete_scaling_policy(
     Path(vm_name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("autoscale::{}", stringify!(delete_scaling_policy));
-    state.store.delete_entity("autoscale_policies", &vm_name).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
-    })?;
+    state
+        .store
+        .delete_entity("autoscale_policies", &vm_name)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -197,7 +259,14 @@ pub async fn list_scale_events(
     State(state): State<Arc<AppState>>,
 ) -> Json<Vec<ScaleEvent>> {
     tracing::debug!("autoscale::{}", stringify!(list_scale_events));
-    let mut events: Vec<ScaleEvent> = state.store.list_entities("scale_events").unwrap_or_else(|e| { tracing::error!("Storage error: {}", e); Vec::new() });
+    let mut events: Vec<ScaleEvent> =
+        state
+            .store
+            .list_entities("scale_events")
+            .unwrap_or_else(|e| {
+                tracing::error!("Storage error: {}", e);
+                Vec::new()
+            });
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     events.truncate(100);
     Json(events)

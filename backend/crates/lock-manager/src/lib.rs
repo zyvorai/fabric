@@ -382,11 +382,7 @@ impl LockManager {
         Ok(action)
     }
 
-    pub fn complete_fence(
-        &self,
-        vm_name: &str,
-        fence_action_id: &str,
-    ) -> Result<(), LockError> {
+    pub fn complete_fence(&self, vm_name: &str, fence_action_id: &str) -> Result<(), LockError> {
         // Lock ordering: always acquire `locks` first, then `fence_actions`
         let mut locks = self.locks.write().map_err(lock_err)?;
         let mut fences = self.fence_actions.write().map_err(lock_err)?;

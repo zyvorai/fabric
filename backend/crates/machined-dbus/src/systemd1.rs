@@ -38,10 +38,7 @@ pub trait SystemdManager {
         &self,
         name: &str,
         runtime: bool,
-        properties: &[(
-            &str,
-            zbus::zvariant::Value<'_>,
-        )],
+        properties: &[(&str, zbus::zvariant::Value<'_>)],
     ) -> zbus::Result<()>;
 }
 

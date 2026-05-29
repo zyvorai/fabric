@@ -69,8 +69,7 @@ impl DnsResolver {
         zones: &[DnsZone],
         all_vms: &[VMSnapshot],
     ) -> Vec<DnsRecord> {
-        let zone_map: HashMap<uuid::Uuid, &DnsZone> =
-            zones.iter().map(|z| (z.id, z)).collect();
+        let zone_map: HashMap<uuid::Uuid, &DnsZone> = zones.iter().map(|z| (z.id, z)).collect();
 
         let mut seen = HashSet::new();
         let mut records = Vec::new();
@@ -117,7 +116,12 @@ impl DnsResolver {
                     .get(key)
                     .cloned()
                     .unwrap_or_else(|| "unknown".to_string());
-                result = format!("{}{}{}", &result[..start], value, &result[start + end + 1..]);
+                result = format!(
+                    "{}{}{}",
+                    &result[..start],
+                    value,
+                    &result[start + end + 1..]
+                );
             } else {
                 break;
             }
@@ -298,8 +302,7 @@ mod tests {
             DnsRecordType::A,
         );
 
-        let records =
-            resolver.resolve_all(&[policy1, policy2], &[zone], &vms);
+        let records = resolver.resolve_all(&[policy1, policy2], &[zone], &vms);
         // Same FQDN + type = deduplicated
         assert_eq!(records.len(), 1);
     }

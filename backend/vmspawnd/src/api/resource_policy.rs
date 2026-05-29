@@ -2,17 +2,13 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // Resource Overcommit Policy
@@ -42,8 +38,15 @@ pub async fn get_overcommit_policy(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<OvercommitPolicy>, (StatusCode, Json<serde_json::Value>)> {
-    let policy = state.store.get_entity::<OvercommitPolicy>("config", "overcommit")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+    let policy = state
+        .store
+        .get_entity::<OvercommitPolicy>("config", "overcommit")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
         .unwrap_or_default();
     Ok(Json(policy))
 }
@@ -56,17 +59,36 @@ pub async fn update_overcommit_policy(
 ) -> Result<Json<OvercommitPolicy>, (StatusCode, Json<serde_json::Value>)> {
     // Validate ratios
     if policy.cpu_ratio < 1.0 || policy.memory_ratio < 1.0 || policy.storage_ratio < 1.0 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Overcommit ratios must be >= 1.0"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Overcommit ratios must be >= 1.0"})),
+        ));
     }
     if policy.cpu_ratio > 16.0 || policy.memory_ratio > 4.0 || policy.storage_ratio > 2.0 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Overcommit ratios too high (max: CPU 16:1, memory 4:1, storage 2:1)"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({"error": "Overcommit ratios too high (max: CPU 16:1, memory 4:1, storage 2:1)"}),
+            ),
+        ));
     }
 
-    state.store.save_entity("config", "overcommit", &policy)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .save_entity("config", "overcommit", &policy)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
-    tracing::info!("Updated overcommit policy: CPU {}:1, Memory {}:1, Storage {}:1",
-        policy.cpu_ratio, policy.memory_ratio, policy.storage_ratio);
+    tracing::info!(
+        "Updated overcommit policy: CPU {}:1, Memory {}:1, Storage {}:1",
+        policy.cpu_ratio,
+        policy.memory_ratio,
+        policy.storage_ratio
+    );
 
     Ok(Json(policy))
 }
@@ -76,12 +98,23 @@ pub async fn get_capacity(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let policy = state.store.get_entity::<OvercommitPolicy>("config", "overcommit")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+    let policy = state
+        .store
+        .get_entity::<OvercommitPolicy>("config", "overcommit")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
         .unwrap_or_default();
 
-    let vms = state.store.list_vms()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let vms = state.store.list_vms().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     // Physical resources (from system)
     let physical_cpus = num_cpus().await;
@@ -92,8 +125,18 @@ pub async fn get_capacity(
     let allocated_memory: u64 = vms.iter().map(|v| v.memory).sum();
 
     // Effective capacity (with overcommit)
-    let effective_cpus = (physical_cpus as f64 * if policy.enabled { policy.cpu_ratio } else { 1.0 }) as u32;
-    let effective_memory = (physical_memory_mb as f64 * if policy.enabled { policy.memory_ratio } else { 1.0 }) as u64;
+    let effective_cpus = (physical_cpus as f64
+        * if policy.enabled {
+            policy.cpu_ratio
+        } else {
+            1.0
+        }) as u32;
+    let effective_memory = (physical_memory_mb as f64
+        * if policy.enabled {
+            policy.memory_ratio
+        } else {
+            1.0
+        }) as u64;
 
     Ok(Json(json!({
         "physical": {
@@ -122,14 +165,16 @@ pub async fn get_capacity(
 }
 
 async fn num_cpus() -> u32 {
-    tokio::fs::read_to_string("/proc/cpuinfo").await
+    tokio::fs::read_to_string("/proc/cpuinfo")
+        .await
         .map(|c| c.lines().filter(|l| l.starts_with("processor")).count() as u32)
         .unwrap_or(1)
         .max(1)
 }
 
 async fn total_memory_mb() -> u64 {
-    tokio::fs::read_to_string("/proc/meminfo").await
+    tokio::fs::read_to_string("/proc/meminfo")
+        .await
         .ok()
         .and_then(|c| {
             c.lines()
@@ -173,8 +218,15 @@ pub async fn get_metrics_retention(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<MetricsRetentionPolicy>, (StatusCode, Json<serde_json::Value>)> {
-    let policy = state.store.get_entity::<MetricsRetentionPolicy>("config", "metrics_retention")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+    let policy = state
+        .store
+        .get_entity::<MetricsRetentionPolicy>("config", "metrics_retention")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
         .unwrap_or_default();
     Ok(Json(policy))
 }
@@ -185,10 +237,21 @@ pub async fn update_metrics_retention(
     State(state): State<Arc<AppState>>,
     Json(policy): Json<MetricsRetentionPolicy>,
 ) -> Result<Json<MetricsRetentionPolicy>, (StatusCode, Json<serde_json::Value>)> {
-    state.store.save_entity("config", "metrics_retention", &policy)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
-    tracing::info!("Updated metrics retention: raw={}h, hourly={}d, daily={}d",
-        policy.raw_retention_hours, policy.hourly_retention_days, policy.daily_retention_days);
+    state
+        .store
+        .save_entity("config", "metrics_retention", &policy)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
+    tracing::info!(
+        "Updated metrics retention: raw={}h, hourly={}d, daily={}d",
+        policy.raw_retention_hours,
+        policy.hourly_retention_days,
+        policy.daily_retention_days
+    );
     Ok(Json(policy))
 }
 
@@ -197,8 +260,15 @@ pub async fn cleanup_metrics(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let policy = state.store.get_entity::<MetricsRetentionPolicy>("config", "metrics_retention")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
+    let policy = state
+        .store
+        .get_entity::<MetricsRetentionPolicy>("config", "metrics_retention")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
         .unwrap_or_default();
 
     let now = chrono::Utc::now();
@@ -206,8 +276,12 @@ pub async fn cleanup_metrics(
 
     // Metrics are stored as VMPerformance objects keyed by VM name.
     // Load each VM's metrics, filter out old entries, and re-save.
-    let vms = state.store.list_vms()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let vms = state.store.list_vms().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     let mut total_metrics = 0usize;
     let mut deleted = 0usize;
@@ -254,7 +328,11 @@ pub async fn cleanup_metrics(
         }
     }
 
-    tracing::info!("Metrics cleanup: {} total, {} deleted", total_metrics, deleted);
+    tracing::info!(
+        "Metrics cleanup: {} total, {} deleted",
+        total_metrics,
+        deleted
+    );
 
     Ok(Json(json!({
         "total_metrics": total_metrics,

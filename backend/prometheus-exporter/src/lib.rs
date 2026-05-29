@@ -5,8 +5,7 @@
 use axum::{http::StatusCode, response::IntoResponse};
 use lazy_static::lazy_static;
 use prometheus::{
-    register_int_counter, register_int_gauge, Encoder, IntCounter,
-    IntGauge, TextEncoder,
+    register_int_counter, register_int_gauge, Encoder, IntCounter, IntGauge, TextEncoder,
 };
 
 lazy_static! {

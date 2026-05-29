@@ -56,7 +56,12 @@ fn discover_resolvectl_servers() -> Result<Vec<(String, String)>> {
 
     for line in text.lines() {
         let trimmed = line.trim();
-        for prefix in ["DNS Servers:", "DNS Server:", "Fallback DNS Servers:", "Fallback DNS Server:"] {
+        for prefix in [
+            "DNS Servers:",
+            "DNS Server:",
+            "Fallback DNS Servers:",
+            "Fallback DNS Server:",
+        ] {
             if let Some(rest) = trimmed.strip_prefix(prefix) {
                 for part in rest.split_whitespace() {
                     let server = part.trim_end_matches('#').trim();

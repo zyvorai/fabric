@@ -7,13 +7,13 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
 
 use crate::server::AppState;
-use security::{RequireRead, RequireAdmin};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // Multi-Tenancy — Project/Namespace Isolation
@@ -78,8 +78,15 @@ pub async fn list_projects(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Project>>, (StatusCode, Json<serde_json::Value>)> {
-    let projects = state.store.list_entities::<Project>("projects")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let projects = state
+        .store
+        .list_entities::<Project>("projects")
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
     Ok(Json(projects))
 }
 
@@ -107,8 +114,15 @@ pub async fn create_project(
         updated: now,
     };
 
-    state.store.save_entity("projects", &project.id, &project)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .save_entity("projects", &project.id, &project)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(project)))
 }
@@ -119,9 +133,21 @@ pub async fn get_project(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Project>, (StatusCode, Json<serde_json::Value>)> {
-    let project = state.store.get_entity::<Project>("projects", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Project not found"}))))?;
+    let project = state
+        .store
+        .get_entity::<Project>("projects", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Project not found"})),
+            )
+        })?;
     Ok(Json(project))
 }
 
@@ -131,8 +157,12 @@ pub async fn delete_project(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    state.store.delete_entity("projects", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state.store.delete_entity("projects", &id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -143,18 +173,36 @@ pub async fn add_member(
     Path(id): Path<String>,
     Json(req): Json<AddMemberRequest>,
 ) -> Result<Json<Project>, (StatusCode, Json<serde_json::Value>)> {
-    let mut project = state.store.get_entity::<Project>("projects", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Project not found"}))))?;
+    let mut project = state
+        .store
+        .get_entity::<Project>("projects", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Project not found"})),
+            )
+        })?;
 
     // Limit total members to prevent unbounded growth
     if project.members.len() >= 1000 {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Project has reached the maximum number of members (1000)"}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Project has reached the maximum number of members (1000)"})),
+        ));
     }
 
     // Check if user already a member
     if project.members.iter().any(|m| m.user_id == req.user_id) {
-        return Err((StatusCode::CONFLICT, Json(json!({"error": "User is already a member"}))));
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({"error": "User is already a member"})),
+        ));
     }
 
     project.members.push(ProjectMember {
@@ -164,8 +212,15 @@ pub async fn add_member(
     });
     project.updated = Utc::now();
 
-    state.store.save_entity("projects", &project.id, &project)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .save_entity("projects", &project.id, &project)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     Ok(Json(project))
 }
@@ -176,25 +231,50 @@ pub async fn remove_member(
     State(state): State<Arc<AppState>>,
     Path((id, user_id)): Path<(String, String)>,
 ) -> Result<Json<Project>, (StatusCode, Json<serde_json::Value>)> {
-    let mut project = state.store.get_entity::<Project>("projects", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Project not found"}))))?;
+    let mut project = state
+        .store
+        .get_entity::<Project>("projects", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Project not found"})),
+            )
+        })?;
 
     // Cannot remove the project owner
     if user_id == project.owner {
-        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "Cannot remove the project owner. Transfer ownership first."}))));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "Cannot remove the project owner. Transfer ownership first."})),
+        ));
     }
 
     let before = project.members.len();
     project.members.retain(|m| m.user_id != user_id);
 
     if project.members.len() == before {
-        return Err((StatusCode::NOT_FOUND, Json(json!({"error": "Member not found"}))));
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Member not found"})),
+        ));
     }
 
     project.updated = Utc::now();
-    state.store.save_entity("projects", &project.id, &project)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    state
+        .store
+        .save_entity("projects", &project.id, &project)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     Ok(Json(project))
 }
@@ -206,17 +286,35 @@ pub async fn list_project_vms(
     Path(id): Path<String>,
 ) -> Result<Json<Vec<vm_model::VM>>, (StatusCode, Json<serde_json::Value>)> {
     // Verify project exists
-    let _project = state.store.get_entity::<Project>("projects", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "Project not found"}))))?;
+    let _project = state
+        .store
+        .get_entity::<Project>("projects", &id)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Project not found"})),
+            )
+        })?;
 
     // List VMs tagged with this project
-    let all_vms = state.store.list_vms()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let all_vms = state.store.list_vms().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
-    let project_vms: Vec<vm_model::VM> = all_vms.into_iter()
+    let project_vms: Vec<vm_model::VM> = all_vms
+        .into_iter()
         .filter(|vm| {
-            vm.labels.as_ref()
+            vm.labels
+                .as_ref()
                 .map(|l| l.get("project") == Some(&id))
                 .unwrap_or(false)
         })

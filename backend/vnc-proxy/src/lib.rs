@@ -10,9 +10,9 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
+use state_store::StateStore;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use state_store::StateStore;
 
 /// VNC WebSocket proxy handler
 /// Bridges WebSocket (browser) <-> VNC server (TCP)
@@ -103,8 +103,13 @@ async fn get_vnc_port(vm_name: &str) -> u16 {
     }
 
     // Fallback: use hash-based port assignment
-    tracing::warn!("VNC port not set for VM '{}', using hash-based assignment", vm_name);
-    let hash = vm_name.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32));
+    tracing::warn!(
+        "VNC port not set for VM '{}', using hash-based assignment",
+        vm_name
+    );
+    let hash = vm_name
+        .bytes()
+        .fold(0u32, |acc, b| acc.wrapping_add(b as u32));
     5900 + (hash % 100) as u16
 }
 
@@ -121,7 +126,10 @@ pub fn configure_vnc_for_vm(vm_name: &str, vnc_port: u16) -> anyhow::Result<()> 
             store.save_vm(&vm)?;
             tracing::info!("VNC port {} saved to VM '{}' metadata", vnc_port, vm_name);
         } else {
-            tracing::warn!("VM '{}' not found in state store, cannot save VNC port", vm_name);
+            tracing::warn!(
+                "VM '{}' not found in state store, cannot save VNC port",
+                vm_name
+            );
         }
     } else {
         tracing::warn!("Failed to open state store, cannot save VNC port");

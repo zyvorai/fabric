@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::pressure::PressureStats;
 use crate::util::{
-    lookup_key, read_cgroup_file, read_flat_keyed, read_u64, read_u64_or_max,
-    write_cgroup_file,
+    lookup_key, read_cgroup_file, read_flat_keyed, read_u64, read_u64_or_max, write_cgroup_file,
 };
 
 /// Memory statistics from memory.stat.

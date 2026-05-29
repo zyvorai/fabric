@@ -59,15 +59,31 @@ pub struct SystemMetrics {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HostCommand {
-    StartVm { vm_name: String },
-    StopVm { vm_name: String },
-    RestartVm { vm_name: String },
-    MigrateVm { vm_name: String, target_host: String },
+    StartVm {
+        vm_name: String,
+    },
+    StopVm {
+        vm_name: String,
+    },
+    RestartVm {
+        vm_name: String,
+    },
+    MigrateVm {
+        vm_name: String,
+        target_host: String,
+    },
     EnterMaintenance,
     ExitMaintenance,
-    FenceVm { vm_name: String },
-    PromoteStorage { vm_name: String, dataset: String },
-    AcknowledgeFence { vm_name: String },
+    FenceVm {
+        vm_name: String,
+    },
+    PromoteStorage {
+        vm_name: String,
+        dataset: String,
+    },
+    AcknowledgeFence {
+        vm_name: String,
+    },
 }
 
 /// Payload sent when registering with the controller.
@@ -288,7 +304,9 @@ impl Agent {
                         if pid.is_empty() {
                             return Ok(out); // No PID found
                         }
-                        std::process::Command::new("kill").args(["-9", &pid]).output()
+                        std::process::Command::new("kill")
+                            .args(["-9", &pid])
+                            .output()
                     });
                     match kill_result {
                         Ok(out) if out.status.success() => {
@@ -305,7 +323,10 @@ impl Agent {
             HostCommand::PromoteStorage { vm_name, dataset } => {
                 info!(vm = %vm_name, dataset = %dataset, "promoting ZFS storage for failover");
                 // Promote the received ZFS dataset on this host
-                match std::process::Command::new("zfs").args(["promote", &dataset]).output() {
+                match std::process::Command::new("zfs")
+                    .args(["promote", &dataset])
+                    .output()
+                {
                     Ok(out) if out.status.success() => {
                         info!(vm = %vm_name, dataset = %dataset, "ZFS storage promoted");
                     }
@@ -435,8 +456,7 @@ async fn read_cpu_usage() -> Result<f64> {
     }
 
     fn read_first_cpu_line() -> Result<String> {
-        let content = std::fs::read_to_string("/proc/stat")
-            .context("reading /proc/stat")?;
+        let content = std::fs::read_to_string("/proc/stat").context("reading /proc/stat")?;
         content
             .lines()
             .next()
@@ -465,8 +485,7 @@ async fn read_cpu_usage() -> Result<f64> {
 
 /// Parse /proc/meminfo for MemTotal and MemAvailable.
 fn read_memory_info() -> Result<(u64, u64, f64)> {
-    let content =
-        std::fs::read_to_string("/proc/meminfo").context("reading /proc/meminfo")?;
+    let content = std::fs::read_to_string("/proc/meminfo").context("reading /proc/meminfo")?;
 
     let mut total_kb: u64 = 0;
     let mut available_kb: u64 = 0;
@@ -493,17 +512,13 @@ fn read_memory_info() -> Result<(u64, u64, f64)> {
 /// Parse a single value from a /proc/meminfo line (e.g. "  12345 kB").
 fn parse_meminfo_value(s: &str) -> Result<u64> {
     let s = s.trim();
-    let num_str = s
-        .split_whitespace()
-        .next()
-        .context("empty meminfo value")?;
+    let num_str = s.split_whitespace().next().context("empty meminfo value")?;
     num_str.parse::<u64>().context("invalid meminfo number")
 }
 
 /// Read system uptime from /proc/uptime.
 fn read_uptime() -> Result<u64> {
-    let content =
-        std::fs::read_to_string("/proc/uptime").context("reading /proc/uptime")?;
+    let content = std::fs::read_to_string("/proc/uptime").context("reading /proc/uptime")?;
     let first = content
         .split_whitespace()
         .next()
@@ -514,8 +529,7 @@ fn read_uptime() -> Result<u64> {
 
 /// Read 1, 5, 15-minute load averages from /proc/loadavg.
 fn read_loadavg() -> Result<[f64; 3]> {
-    let content =
-        std::fs::read_to_string("/proc/loadavg").context("reading /proc/loadavg")?;
+    let content = std::fs::read_to_string("/proc/loadavg").context("reading /proc/loadavg")?;
     let fields: Vec<&str> = content.split_whitespace().collect();
     if fields.len() < 3 {
         anyhow::bail!("unexpected /proc/loadavg format");
@@ -570,8 +584,7 @@ fn load_or_generate_host_id(path: &std::path::Path) -> Result<String> {
             .with_context(|| format!("creating directory {}", parent.display()))?;
     }
 
-    std::fs::write(path, &id)
-        .with_context(|| format!("writing host-id to {}", path.display()))?;
+    std::fs::write(path, &id).with_context(|| format!("writing host-id to {}", path.display()))?;
 
     info!(host_id = %id, path = %path.display(), "generated new host ID");
     Ok(id)
@@ -586,9 +599,8 @@ fn detect_address() -> String {
     if let Ok(hostname) = hostname::get() {
         let hostname_str = hostname.to_string_lossy().to_string();
         // Use a DNS lookup for the hostname.
-        if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(
-            &(hostname_str.as_str(), 0u16),
-        ) {
+        if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&(hostname_str.as_str(), 0u16))
+        {
             for addr in addrs {
                 let ip = addr.ip();
                 if !ip.is_loopback() {
@@ -664,9 +676,8 @@ async fn main() -> Result<()> {
     // Spawn a task that listens for SIGTERM / SIGINT.
     tokio::spawn(async move {
         let ctrl_c = signal::ctrl_c();
-        let mut sigterm =
-            signal::unix::signal(signal::unix::SignalKind::terminate())
-                .expect("failed to register SIGTERM handler");
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to register SIGTERM handler");
 
         tokio::select! {
             _ = ctrl_c => {

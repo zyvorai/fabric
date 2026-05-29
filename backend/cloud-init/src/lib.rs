@@ -89,7 +89,10 @@ impl CloudInitGenerator {
 
         // Write user-data
         if let Some(user_data) = &config.user_data {
-            fs::write(vm_dir.join("user-data"), format!("#cloud-config\n{}", user_data))?;
+            fs::write(
+                vm_dir.join("user-data"),
+                format!("#cloud-config\n{}", user_data),
+            )?;
         }
 
         // Write network-config

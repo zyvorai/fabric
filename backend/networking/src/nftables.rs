@@ -39,26 +39,42 @@ impl NftManager {
     pub fn ensure_chains(&self) -> Result<()> {
         // IPv4 chains
         run_nft(&[
-            "add", "chain", TABLE_FAMILY, TABLE_NAME, "prerouting",
+            "add",
+            "chain",
+            TABLE_FAMILY,
+            TABLE_NAME,
+            "prerouting",
             "{ type nat hook prerouting priority dstnat; }",
         ])
         .context("Failed to create IPv4 prerouting chain")?;
 
         run_nft(&[
-            "add", "chain", TABLE_FAMILY, TABLE_NAME, "postrouting",
+            "add",
+            "chain",
+            TABLE_FAMILY,
+            TABLE_NAME,
+            "postrouting",
             "{ type nat hook postrouting priority srcnat; }",
         ])
         .context("Failed to create IPv4 postrouting chain")?;
 
         // IPv6 chains
         run_nft(&[
-            "add", "chain", TABLE_FAMILY_V6, TABLE_NAME_V6, "prerouting",
+            "add",
+            "chain",
+            TABLE_FAMILY_V6,
+            TABLE_NAME_V6,
+            "prerouting",
             "{ type nat hook prerouting priority dstnat; }",
         ])
         .context("Failed to create IPv6 prerouting chain")?;
 
         run_nft(&[
-            "add", "chain", TABLE_FAMILY_V6, TABLE_NAME_V6, "postrouting",
+            "add",
+            "chain",
+            TABLE_FAMILY_V6,
+            TABLE_NAME_V6,
+            "postrouting",
             "{ type nat hook postrouting priority srcnat; }",
         ])
         .context("Failed to create IPv6 postrouting chain")?;
@@ -98,19 +114,26 @@ impl NftManager {
     /// We derive a /24 from the guest IP so that all VMs on the same subnet
     /// share one masquerade rule.  Duplicate adds are harmless in nftables.
     pub fn add_masquerade_rule(&self, cfg: &PortForwardConfig) -> Result<()> {
-        validate_nft_ip(&cfg.guest_ip)
-            .context("Invalid guest IP for masquerade rule")?;
+        validate_nft_ip(&cfg.guest_ip).context("Invalid guest IP for masquerade rule")?;
         validate_nft_identifier(&cfg.name, "Port forward name")
             .context("Invalid name for masquerade rule")?;
 
         let subnet = subnet_from_ip(&cfg.guest_ip);
         let comment = format!("vm-nat-{}", cfg.name);
         run_nft(&[
-            "add", "rule", TABLE_FAMILY, TABLE_NAME, "postrouting",
-            "ip", "daddr", &subnet, "masquerade",
-            "comment", &format!("\"{}\"", comment),
+            "add",
+            "rule",
+            TABLE_FAMILY,
+            TABLE_NAME,
+            "postrouting",
+            "ip",
+            "daddr",
+            &subnet,
+            "masquerade",
+            "comment",
+            &format!("\"{}\"", comment),
         ])
-            .with_context(|| format!("Failed to add masquerade rule for {subnet}"))?;
+        .with_context(|| format!("Failed to add masquerade rule for {subnet}"))?;
         tracing::info!("Added masquerade rule for subnet {subnet}");
         Ok(())
     }
@@ -124,8 +147,13 @@ impl NftManager {
             let handles = find_rule_handles(&rules, chain, comment_needle);
             for handle in handles {
                 run_nft(&[
-                    "delete", "rule", TABLE_FAMILY, TABLE_NAME, chain,
-                    "handle", &handle.to_string(),
+                    "delete",
+                    "rule",
+                    TABLE_FAMILY,
+                    TABLE_NAME,
+                    chain,
+                    "handle",
+                    &handle.to_string(),
                 ])
                 .with_context(|| format!("Failed to delete rule handle {handle} in {chain}"))?;
                 tracing::debug!("Deleted rule handle {handle} from chain {chain}");
@@ -182,8 +210,8 @@ impl NftManager {
             return Err(anyhow::anyhow!("nft list table failed: {stderr}"));
         }
 
-        let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .context("Failed to parse nft JSON output")?;
+        let json: serde_json::Value =
+            serde_json::from_slice(&output.stdout).context("Failed to parse nft JSON output")?;
         Ok(json)
     }
 
@@ -243,7 +271,10 @@ fn validate_nft_identifier(s: &str, label: &str) -> Result<()> {
     if s.is_empty() || s.len() > 64 {
         return Err(anyhow::anyhow!("{} must be 1-64 characters", label));
     }
-    if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.') {
+    if !s
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+    {
         return Err(anyhow::anyhow!(
             "{} '{}' contains invalid characters (only alphanumeric, hyphens, underscores, dots allowed)",
             label, s
@@ -274,10 +305,7 @@ fn build_dnat_args(proto: &str, cfg: &PortForwardConfig) -> Result<Vec<String>> 
 
     if let Some(ref iface) = cfg.interface {
         validate_nft_identifier(iface, "Interface name")?;
-        args.extend_from_slice(&[
-            "iifname".into(),
-            format!("\"{}\"", iface),
-        ]);
+        args.extend_from_slice(&["iifname".into(), format!("\"{}\"", iface)]);
     }
 
     args.extend_from_slice(&[
@@ -327,7 +355,9 @@ fn parse_dnat_rules_from_table_json(json: &serde_json::Value) -> Vec<PortForward
     };
     let mut partial = Vec::new();
     for item in items {
-        let Some(rule) = item.get("rule") else { continue };
+        let Some(rule) = item.get("rule") else {
+            continue;
+        };
         if rule.get("chain").and_then(|c| c.as_str()) != Some("prerouting") {
             continue;
         }
@@ -390,7 +420,9 @@ fn parse_external_dnat_from_ruleset(json: &serde_json::Value) -> Vec<PortForward
 
     let mut partial = Vec::new();
     for item in items {
-        let Some(rule) = item.get("rule") else { continue };
+        let Some(rule) = item.get("rule") else {
+            continue;
+        };
         let family = rule
             .get("family")
             .and_then(|f| f.as_str())
@@ -488,15 +520,8 @@ fn parse_dnat_exprs(
     }
 
     let (host_port, guest_ip, guest_port) = (host_port?, guest_ip?, guest_port?);
-    let name = name.unwrap_or_else(|| {
-        format!(
-            "{}-{}-{}-{}",
-            table,
-            chain,
-            host_port,
-            handle.unwrap_or(0)
-        )
-    });
+    let name = name
+        .unwrap_or_else(|| format!("{}-{}-{}-{}", table, chain, host_port, handle.unwrap_or(0)));
 
     Some(ParsedDnatRule {
         name,
@@ -629,15 +654,10 @@ fn run_nft(args: &[&str]) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!(
-            "nft {} failed: {}",
-            args.join(" "),
-            stderr
-        ));
+        return Err(anyhow::anyhow!("nft {} failed: {}", args.join(" "), stderr));
     }
     Ok(())
 }
-
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
