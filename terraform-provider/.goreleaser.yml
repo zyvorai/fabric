@@ -1,0 +1,42 @@
+version: 2
+
+project_name: terraform-provider-vmspawnd
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: terraform-provider-vmspawnd
+    goos:
+      - freebsd
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+
+terraformproviders:
+  - name: registry.terraform.io/ssahani/vmspawnd
+    version: "{{ .Version }}"
+
+release:
+  github:
+    owner: ssahani
+    name: zyvor-fabric
+  name_template: "terraform-provider-vmspawnd {{.Version}}"

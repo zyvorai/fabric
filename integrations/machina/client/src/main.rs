@@ -2,11 +2,12 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use vmspawn_sdk::logs::LogQuery;
-use vmspawn_sdk::{Client, ClientConfig};
+use vmspawn_sdk::{Client, ClientConfig, VMEvent};
 
 #[derive(Debug, Parser)]
 #[command(name = "machina-fabric", about = "Zyvor Fabric CLI for Machina v0.1")]
@@ -38,6 +39,11 @@ enum Commands {
     },
     /// Recent VM lifecycle events
     Events,
+    /// Stream live events (SSE)
+    Watch {
+        #[arg(long, default_value_t = 0)]
+        limit: usize,
+    },
     /// System or VM journal logs
     Logs {
         #[arg(long)]
@@ -100,6 +106,33 @@ async fn main() -> Result<()> {
             let events = client.list_events().await?;
             println!("{}", serde_json::to_string_pretty(&events)?);
         }
+        Commands::Watch { limit } => {
+            let mut stream = client.stream_events().await?;
+            if limit == 0 {
+                loop {
+                    match stream.next().await {
+                        Some(Ok(ev)) => print_event(&ev),
+                        Some(Err(e)) => return Err(e),
+                        None => {
+                            eprintln!("stream ended");
+                            break;
+                        }
+                    }
+                }
+            } else {
+                let mut n = 0usize;
+                while n < limit {
+                    match stream.next().await {
+                        Some(Ok(ev)) => {
+                            print_event(&ev);
+                            n += 1;
+                        }
+                        Some(Err(e)) => return Err(e),
+                        None => break,
+                    }
+                }
+            }
+        }
         Commands::Logs { vm, lines } => {
             let q = LogQuery {
                 lines: Some(lines),
@@ -149,4 +182,15 @@ fn home_dir() -> PathBuf {
     std::env::var("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."))
+}
+
+fn print_event(ev: &VMEvent) {
+    let detail = ev.detail.as_deref().unwrap_or("");
+    println!(
+        "{} [{}] {} {}",
+        ev.timestamp,
+        ev.event_type,
+        ev.vm_name,
+        detail
+    );
 }

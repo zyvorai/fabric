@@ -14,6 +14,7 @@ export ZYVOR_FABRIC_PASSWORD="$(sudo cat /var/lib/vmspawnd/.admin_password)"
 ./target/release/machina-fabric vms
 ./target/release/machina-fabric vms metrics my-vm
 ./target/release/machina-fabric events
+./target/release/machina-fabric watch
 ./target/release/machina-fabric logs --lines 30
 ./target/release/machina-fabric logs --vm my-vm --lines 30
 ```

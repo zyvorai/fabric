@@ -37,9 +37,10 @@ Machina v0.1 targets these `vmspawnd` surfaces:
 | Capability | Endpoints | WebSocket |
 |------------|-----------|-----------|
 | Auth | `POST /api/auth/login`, `GET /api/auth/me` | — |
-| VM inventory | `GET /api/vms`, `GET /api/vms/:name` | `WS /ws/events` |
+| VM inventory | `GET /api/vms`, `GET /api/vms/:name` | — |
 | VM metrics | `GET /api/vms/:name/metrics` | — |
 | Logs / journal | `GET /api/logs`, `GET /api/vms/:name/logs` | — |
+| Live events | — | `GET /api/events/stream` (SSE) |
 | Health | `GET /health` | — |
 
 ### Connection profile (`~/.machina/clusters.yaml`)
@@ -111,7 +112,15 @@ ZYVOR_FABRIC_USER=admin ZYVOR_FABRIC_PASSWORD=... \
 ./target/release/machina-fabric logs --lines 20 -c homelab
 ```
 
-Uses `vmspawn-sdk` from this repository. A Tauri/SwiftUI shell will wrap this client in a later milestone.
+Uses `vmspawn-sdk` from this repository (including `Client::stream_events()` for SSE). A Tauri shell lives in `integrations/machina/desktop/`.
+
+### Desktop app (Tauri)
+
+```bash
+cd integrations/machina/desktop
+npm install
+npm run tauri dev
+```
 
 ---
 

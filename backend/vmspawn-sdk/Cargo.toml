@@ -7,8 +7,10 @@ description = "Rust SDK for the Zyvor Fabric (vmspawnd) REST API"
 
 [dependencies]
 anyhow = { workspace = true }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+futures-util = "0.3"
+eventsource-stream = "0.2"
 vm-model = { path = "../vm-model" }

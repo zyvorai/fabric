@@ -154,6 +154,14 @@ cp terraform-provider-vmspawnd ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/lin
 go test ./...
 ```
 
+## Registry release
+
+See [REGISTRY.md](REGISTRY.md). Tag with:
+
+```bash
+git tag terraform-provider/v0.1.0 && git push origin terraform-provider/v0.1.0
+```
+
 ## Registry migration (planned)
 
 When `ssahani/zyvor-fabric` is published to the Terraform Registry:

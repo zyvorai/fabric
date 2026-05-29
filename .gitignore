@@ -46,3 +46,12 @@ Thumbs.db
 # Local presentation exports
 presentations/
 .deploy-last
+
+# Terraform provider local build
+terraform-provider/terraform-provider-vmspawnd
+
+# Machina desktop
+integrations/machina/desktop/node_modules/
+integrations/machina/desktop/dist/
+integrations/machina/desktop/src-tauri/target/
+integrations/machina/desktop/src-tauri/gen/

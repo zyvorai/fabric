@@ -15,7 +15,7 @@ pub mod events;
 pub mod metrics;
 
 pub use logs::{LogEntry, LogQuery, LogResponse};
-pub use events::VMEvent;
+pub use events::{EventStream, VMEvent};
 pub use metrics::VMMetrics;
 
 /// Client configuration.
