@@ -40,7 +40,7 @@ Part of the [Zyvor](https://zyvor.dev) product family. Manage infrastructure thr
 
 ---
 
-## Highlights
+**Docs:** [Index](docs/README.md) · [User stories](docs/USER_STORIES.md) · ## Highlights
 
 | | |
 |---|---|
