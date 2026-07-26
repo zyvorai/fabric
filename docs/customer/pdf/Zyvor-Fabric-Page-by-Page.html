@@ -1,0 +1,3206 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Page-by-Page Product Manual — Zyvor Fabric</title>
+<style>
+@page{size:A4;margin:15mm 16mm}*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Segoe UI',system-ui,sans-serif;color:#1f2937;line-height:1.58;font-size:10.5pt}
+.cover{height:262mm;margin:-15mm -16mm 0;background:linear-gradient(135deg,#042f2e,#115e59,#0d1b2a);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;page-break-after:always;position:relative}
+.cover .kicker{letter-spacing:5px;text-transform:uppercase;opacity:.72;margin-bottom:1.4em}
+.cover h1{font-size:3.2em;font-weight:800;letter-spacing:-2px}
+.cover h1 span{color:#2dd4bf}
+.cover .sub{font-size:1.3em;font-weight:300;opacity:.93;margin:1em 0;max-width:24em}
+.cover .badge{display:inline-block;background:rgba(96,165,250,.2);border:1px solid #2dd4bf;padding:8px 22px;border-radius:20px;margin-top:2em}
+.cover .foot{position:absolute;bottom:34px;font-size:.82em;opacity:.6}
+h2{page-break-before:always;margin:0 0 .35em;font-size:1.55em;font-weight:750;color:#12203a;border-bottom:2px solid #e5edfb;padding-bottom:.28em}
+h2:first-of-type{page-break-before:avoid}
+h3{margin:1.1em 0 .4em;font-size:1.12em;font-weight:700}
+p,li{margin:.4em 0}ul,ol{margin:.5em 0 .9em 1.4em}
+a{color:#2563eb;text-decoration:none}
+code{background:#eef2f7;padding:1px 6px;border-radius:4px;font-size:.86em;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0f172a;color:#e2e8f0;padding:12px 15px;border-radius:9px;overflow-x:auto;margin:.8em 0}
+table{width:100%;border-collapse:collapse;margin:.8em 0 1.1em;font-size:9.5pt}
+th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9}
+hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
+</style></head><body>
+<section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
+<h1>Zyvor <span>Fabric</span></h1>
+<div class="sub">Page-by-Page Product Manual</div>
+<div class="badge">2026-07-26</div>
+<div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
+<main><h2>Page-by-page guides</h2>
+<p>Each guide follows: Purpose → When to use it → How to get there → What you can do → Related pages.</p>
+<p>Every route is also listed in the <a href="../PAGE_INDEX.md">complete page index</a>.</p>
+<h3>Auth</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="auth/login.md">Login</a></td>
+<td>Login — Auth surface.</td>
+</tr>
+</tbody></table>
+<h3>Core</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="core/create.md">Create VM</a></td>
+<td>Create VM — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/datacenters.md">Datacenters</a></td>
+<td>Datacenters — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/favorites.md">Favorites</a></td>
+<td>Favorites — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/home.md">Dashboard</a></td>
+<td>Dashboard — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/machines.md">Machines</a></td>
+<td>Machines — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/profiles.md">Profiles</a></td>
+<td>Profiles — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/vm-browser.md">VM Browser</a></td>
+<td>VM Browser — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/vms-name-console.md">VM Console</a></td>
+<td>VM Console — Core surface.</td>
+</tr>
+<tr>
+<td><a href="core/vms.md">Virtual Machines</a></td>
+<td>Virtual Machines — Core surface.</td>
+</tr>
+</tbody></table>
+<h3>Infrastructure</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="infrastructure/containers.md">Containers</a></td>
+<td>Containers — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/distributed-storage.md">Distributed Storage</a></td>
+<td>Distributed Storage — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/network-security.md">Net Security</a></td>
+<td>Net Security — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/network.md">Network</a></td>
+<td>Network — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/resource-pools.md">Resource Pools</a></td>
+<td>Resource Pools — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/storage-pools.md">Storage Pools</a></td>
+<td>Storage Pools — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/storage.md">Storage</a></td>
+<td>Storage — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/system-health.md">System Health</a></td>
+<td>System Health — Infrastructure surface.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/system.md">System</a></td>
+<td>System — Infrastructure surface.</td>
+</tr>
+</tbody></table>
+<h3>Monitoring</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="monitoring/alerts.md">Alerts</a></td>
+<td>Alerts — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/analytics.md">Analytics</a></td>
+<td>Analytics — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/audit.md">Audit</a></td>
+<td>Audit — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/capacity-planning.md">Capacity</a></td>
+<td>Capacity — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/debug.md">Debug Tools</a></td>
+<td>Debug Tools — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/event-stream.md">Event Stream</a></td>
+<td>Event Stream — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/explain.md">Explain</a></td>
+<td>Explain — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/kernel.md">Kernel</a></td>
+<td>Kernel — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/live-metrics.md">Live Metrics</a></td>
+<td>Live Metrics — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/logs.md">Logs</a></td>
+<td>Logs — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/notifications.md">Notifications</a></td>
+<td>Notifications — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/processes.md">Processes</a></td>
+<td>Processes — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/resource-optimizer.md">Optimizer</a></td>
+<td>Optimizer — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/service-map.md">Service Map</a></td>
+<td>Service Map — Monitoring surface.</td>
+</tr>
+<tr>
+<td><a href="monitoring/timeline.md">Timeline</a></td>
+<td>Timeline — Monitoring surface.</td>
+</tr>
+</tbody></table>
+<h3>More Images Migrations Managers</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="more-images-migrations-managers/backup-scheduler.md">Backup Scheduler</a></td>
+<td>Backup Scheduler — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/batch-import.md">Batch Import</a></td>
+<td>Batch Import — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/batch-migration.md">Batch Migration</a></td>
+<td>Batch Migration — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/disk-converter.md">Disk Converter</a></td>
+<td>Disk Converter — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/disk-images.md">Disk Images</a></td>
+<td>Disk Images — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/download-disk.md">Download Disk</a></td>
+<td>Download Disk — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/image-builder.md">Image Builder</a></td>
+<td>Image Builder — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/iso-images.md">ISO Images</a></td>
+<td>ISO Images — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/job-monitor.md">Job Monitor</a></td>
+<td>Job Monitor — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/manifest-builder.md">Manifest Builder</a></td>
+<td>Manifest Builder — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/migration-history.md">History</a></td>
+<td>History — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/migration-readiness.md">Readiness</a></td>
+<td>Readiness — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/migration-report.md">Report</a></td>
+<td>Report — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/migration-templates.md">Migration Templates</a></td>
+<td>Migration Templates — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/network-topology.md">Network Topology</a></td>
+<td>Network Topology — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/pipeline.md">Pipeline</a></td>
+<td>Pipeline — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/snapshot-manager.md">Snapshot Mgr</a></td>
+<td>Snapshot Mgr — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/storage-manager.md">Storage Mgr</a></td>
+<td>Storage Mgr — More — images, migrations &amp; managers surface.</td>
+</tr>
+<tr>
+<td><a href="more-images-migrations-managers/upload-disk.md">Upload Disk</a></td>
+<td>Upload Disk — More — images, migrations &amp; managers surface.</td>
+</tr>
+</tbody></table>
+<h3>Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="operations/autoscale.md">Autoscale</a></td>
+<td>Autoscale — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/backups.md">Backups</a></td>
+<td>Backups — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/bulk-operations.md">Bulk Operations</a></td>
+<td>Bulk Operations — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/content-library.md">Content Library</a></td>
+<td>Content Library — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/drs.md">DRS</a></td>
+<td>DRS — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/fault-tolerance.md">Fault Tolerance</a></td>
+<td>Fault Tolerance — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/lifecycle.md">Lifecycle</a></td>
+<td>Lifecycle — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/migration-wizard.md">Migration Wizard</a></td>
+<td>Migration Wizard — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/migrations.md">Migrations</a></td>
+<td>Migrations — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/quotas.md">Quotas</a></td>
+<td>Quotas — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/replication.md">Replication</a></td>
+<td>Replication — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/schedules.md">Schedules</a></td>
+<td>Schedules — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/site-recovery.md">Site Recovery</a></td>
+<td>Site Recovery — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/snapshots.md">Snapshots</a></td>
+<td>Snapshots — Operations surface.</td>
+</tr>
+<tr>
+<td><a href="operations/templates.md">Templates</a></td>
+<td>Templates — Operations surface.</td>
+</tr>
+</tbody></table>
+<h3>Security</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="security/access-control.md">Access Control</a></td>
+<td>Access Control — Security surface.</td>
+</tr>
+<tr>
+<td><a href="security/certificates.md">Certificates</a></td>
+<td>Certificates — Security surface.</td>
+</tr>
+<tr>
+<td><a href="security/compliance.md">Compliance</a></td>
+<td>Compliance — Security surface.</td>
+</tr>
+<tr>
+<td><a href="security/encryption.md">Encryption</a></td>
+<td>Encryption — Security surface.</td>
+</tr>
+<tr>
+<td><a href="security/plugins.md">Plugins</a></td>
+<td>Plugins — Security surface.</td>
+</tr>
+<tr>
+<td><a href="security/security-dashboard.md">Security Dashboard</a></td>
+<td>Security Dashboard — Security surface.</td>
+</tr>
+</tbody></table>
+<h3>Tools</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="tools/cost-estimator.md">Cost Estimator</a></td>
+<td>Cost Estimator — Tools surface.</td>
+</tr>
+<tr>
+<td><a href="tools/notification-center.md">Notification Center</a></td>
+<td>Notification Center — Tools surface.</td>
+</tr>
+<tr>
+<td><a href="tools/vm-compare.md">VM Compare</a></td>
+<td>VM Compare — Tools surface.</td>
+</tr>
+<tr>
+<td><a href="tools/vm-healthcheck.md">VM Health Check</a></td>
+<td>VM Health Check — Tools surface.</td>
+</tr>
+<tr>
+<td><a href="tools/webhooks.md">Webhooks</a></td>
+<td>Webhooks — Tools surface.</td>
+</tr>
+</tbody></table>
+<hr>
+<p>79 guides. Regenerate: <code>node scripts/customer-docs/generate-guide-index.mjs</code>.</p>
+<hr>
+<h2>Login</h2>
+<h3>Purpose</h3>
+<p>Login — Auth surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/login</code></li>
+<li>Nav: <strong>Auth → Login</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/login</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Create VM</h2>
+<h3>Purpose</h3>
+<p>Create VM — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/create</code></li>
+<li>Nav: <strong>Core → Create VM</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/create</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Datacenters</h2>
+<h3>Purpose</h3>
+<p>Datacenters — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/datacenters</code></li>
+<li>Nav: <strong>Core → Datacenters</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/datacenters</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Favorites</h2>
+<h3>Purpose</h3>
+<p>Favorites — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/favorites</code></li>
+<li>Nav: <strong>Core → Favorites</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/favorites</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Dashboard</h2>
+<h3>Purpose</h3>
+<p>Dashboard — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/</code></li>
+<li>Nav: <strong>Core → Dashboard</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Machines</h2>
+<h3>Purpose</h3>
+<p>Machines — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/machines</code></li>
+<li>Nav: <strong>Core → Machines</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/machines</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Profiles</h2>
+<h3>Purpose</h3>
+<p>Profiles — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/profiles</code></li>
+<li>Nav: <strong>Core → Profiles</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/profiles</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>VM Browser</h2>
+<h3>Purpose</h3>
+<p>VM Browser — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vm-browser</code></li>
+<li>Nav: <strong>Core → VM Browser</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vm-browser</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>VM Console</h2>
+<h3>Purpose</h3>
+<p>VM Console — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vms/:name/console</code></li>
+<li>Nav: <strong>Core → VM Console</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vms/:name/console</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Virtual Machines</h2>
+<h3>Purpose</h3>
+<p>Virtual Machines — Core surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vms</code></li>
+<li>Nav: <strong>Core → Virtual Machines</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vms</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Containers</h2>
+<h3>Purpose</h3>
+<p>Containers — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/containers</code></li>
+<li>Nav: <strong>Infrastructure → Containers</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/containers</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Distributed Storage</h2>
+<h3>Purpose</h3>
+<p>Distributed Storage — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/distributed-storage</code></li>
+<li>Nav: <strong>Infrastructure → Distributed Storage</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/distributed-storage</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Net Security</h2>
+<h3>Purpose</h3>
+<p>Net Security — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/network-security</code></li>
+<li>Nav: <strong>Infrastructure → Net Security</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/network-security</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Network</h2>
+<h3>Purpose</h3>
+<p>Network — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/network</code></li>
+<li>Nav: <strong>Infrastructure → Network</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/network</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Resource Pools</h2>
+<h3>Purpose</h3>
+<p>Resource Pools — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/resource-pools</code></li>
+<li>Nav: <strong>Infrastructure → Resource Pools</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/resource-pools</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Storage Pools</h2>
+<h3>Purpose</h3>
+<p>Storage Pools — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/storage-pools</code></li>
+<li>Nav: <strong>Infrastructure → Storage Pools</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/storage-pools</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Storage</h2>
+<h3>Purpose</h3>
+<p>Storage — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/storage</code></li>
+<li>Nav: <strong>Infrastructure → Storage</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/storage</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>System Health</h2>
+<h3>Purpose</h3>
+<p>System Health — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/system-health</code></li>
+<li>Nav: <strong>Infrastructure → System Health</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/system-health</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>System</h2>
+<h3>Purpose</h3>
+<p>System — Infrastructure surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/system</code></li>
+<li>Nav: <strong>Infrastructure → System</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/system</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Alerts</h2>
+<h3>Purpose</h3>
+<p>Alerts — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/alerts</code></li>
+<li>Nav: <strong>Monitoring → Alerts</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/alerts</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Analytics</h2>
+<h3>Purpose</h3>
+<p>Analytics — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/analytics</code></li>
+<li>Nav: <strong>Monitoring → Analytics</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/analytics</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Audit</h2>
+<h3>Purpose</h3>
+<p>Audit — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/audit</code></li>
+<li>Nav: <strong>Monitoring → Audit</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/audit</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Capacity</h2>
+<h3>Purpose</h3>
+<p>Capacity — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/capacity-planning</code></li>
+<li>Nav: <strong>Monitoring → Capacity</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/capacity-planning</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Debug Tools</h2>
+<h3>Purpose</h3>
+<p>Debug Tools — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/debug</code></li>
+<li>Nav: <strong>Monitoring → Debug Tools</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/debug</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Event Stream</h2>
+<h3>Purpose</h3>
+<p>Event Stream — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/event-stream</code></li>
+<li>Nav: <strong>Monitoring → Event Stream</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/event-stream</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Explain</h2>
+<h3>Purpose</h3>
+<p>Explain — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/explain</code></li>
+<li>Nav: <strong>Monitoring → Explain</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/explain</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Kernel</h2>
+<h3>Purpose</h3>
+<p>Kernel — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/kernel</code></li>
+<li>Nav: <strong>Monitoring → Kernel</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/kernel</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Live Metrics</h2>
+<h3>Purpose</h3>
+<p>Live Metrics — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/live-metrics</code></li>
+<li>Nav: <strong>Monitoring → Live Metrics</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/live-metrics</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Logs</h2>
+<h3>Purpose</h3>
+<p>Logs — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/logs</code></li>
+<li>Nav: <strong>Monitoring → Logs</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/logs</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Notifications</h2>
+<h3>Purpose</h3>
+<p>Notifications — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/notifications</code></li>
+<li>Nav: <strong>Monitoring → Notifications</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/notifications</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Processes</h2>
+<h3>Purpose</h3>
+<p>Processes — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/processes</code></li>
+<li>Nav: <strong>Monitoring → Processes</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/processes</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Optimizer</h2>
+<h3>Purpose</h3>
+<p>Optimizer — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/resource-optimizer</code></li>
+<li>Nav: <strong>Monitoring → Optimizer</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/resource-optimizer</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Service Map</h2>
+<h3>Purpose</h3>
+<p>Service Map — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/service-map</code></li>
+<li>Nav: <strong>Monitoring → Service Map</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/service-map</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Timeline</h2>
+<h3>Purpose</h3>
+<p>Timeline — Monitoring surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/timeline</code></li>
+<li>Nav: <strong>Monitoring → Timeline</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/timeline</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Backup Scheduler</h2>
+<h3>Purpose</h3>
+<p>Backup Scheduler — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/backup-scheduler</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Backup Scheduler</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/backup-scheduler</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Batch Import</h2>
+<h3>Purpose</h3>
+<p>Batch Import — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/batch-import</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Batch Import</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/batch-import</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Batch Migration</h2>
+<h3>Purpose</h3>
+<p>Batch Migration — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/batch-migration</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Batch Migration</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/batch-migration</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Disk Converter</h2>
+<h3>Purpose</h3>
+<p>Disk Converter — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/disk-converter</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Disk Converter</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/disk-converter</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Disk Images</h2>
+<h3>Purpose</h3>
+<p>Disk Images — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/disk-images</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Disk Images</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/disk-images</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Download Disk</h2>
+<h3>Purpose</h3>
+<p>Download Disk — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/download-disk</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Download Disk</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/download-disk</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Image Builder</h2>
+<h3>Purpose</h3>
+<p>Image Builder — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/image-builder</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Image Builder</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/image-builder</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>ISO Images</h2>
+<h3>Purpose</h3>
+<p>ISO Images — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/iso-images</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → ISO Images</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/iso-images</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Job Monitor</h2>
+<h3>Purpose</h3>
+<p>Job Monitor — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/job-monitor</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Job Monitor</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/job-monitor</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Manifest Builder</h2>
+<h3>Purpose</h3>
+<p>Manifest Builder — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/manifest-builder</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Manifest Builder</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/manifest-builder</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>History</h2>
+<h3>Purpose</h3>
+<p>History — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/migration-history</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → History</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/migration-history</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Readiness</h2>
+<h3>Purpose</h3>
+<p>Readiness — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/migration-readiness</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Readiness</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/migration-readiness</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Report</h2>
+<h3>Purpose</h3>
+<p>Report — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/migration-report</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Report</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/migration-report</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Migration Templates</h2>
+<h3>Purpose</h3>
+<p>Migration Templates — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/migration-templates</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Migration Templates</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/migration-templates</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Network Topology</h2>
+<h3>Purpose</h3>
+<p>Network Topology — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/network-topology</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Network Topology</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/network-topology</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Pipeline</h2>
+<h3>Purpose</h3>
+<p>Pipeline — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/pipeline</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Pipeline</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/pipeline</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Snapshot Mgr</h2>
+<h3>Purpose</h3>
+<p>Snapshot Mgr — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/snapshot-manager</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Snapshot Mgr</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/snapshot-manager</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Storage Mgr</h2>
+<h3>Purpose</h3>
+<p>Storage Mgr — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/storage-manager</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Storage Mgr</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/storage-manager</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Upload Disk</h2>
+<h3>Purpose</h3>
+<p>Upload Disk — More — images, migrations &amp; managers surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/upload-disk</code></li>
+<li>Nav: <strong>More — images, migrations &amp; managers → Upload Disk</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/upload-disk</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Autoscale</h2>
+<h3>Purpose</h3>
+<p>Autoscale — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/autoscale</code></li>
+<li>Nav: <strong>Operations → Autoscale</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/autoscale</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Backups</h2>
+<h3>Purpose</h3>
+<p>Backups — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/backups</code></li>
+<li>Nav: <strong>Operations → Backups</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/backups</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Bulk Operations</h2>
+<h3>Purpose</h3>
+<p>Bulk Operations — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/bulk-operations</code></li>
+<li>Nav: <strong>Operations → Bulk Operations</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/bulk-operations</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Content Library</h2>
+<h3>Purpose</h3>
+<p>Content Library — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/content-library</code></li>
+<li>Nav: <strong>Operations → Content Library</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/content-library</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>DRS</h2>
+<h3>Purpose</h3>
+<p>DRS — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/drs</code></li>
+<li>Nav: <strong>Operations → DRS</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/drs</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Fault Tolerance</h2>
+<h3>Purpose</h3>
+<p>Fault Tolerance — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/fault-tolerance</code></li>
+<li>Nav: <strong>Operations → Fault Tolerance</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/fault-tolerance</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Lifecycle</h2>
+<h3>Purpose</h3>
+<p>Lifecycle — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/lifecycle</code></li>
+<li>Nav: <strong>Operations → Lifecycle</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/lifecycle</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Migration Wizard</h2>
+<h3>Purpose</h3>
+<p>Migration Wizard — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/migration-wizard</code></li>
+<li>Nav: <strong>Operations → Migration Wizard</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/migration-wizard</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Migrations</h2>
+<h3>Purpose</h3>
+<p>Migrations — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/migrations</code></li>
+<li>Nav: <strong>Operations → Migrations</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/migrations</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Quotas</h2>
+<h3>Purpose</h3>
+<p>Quotas — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/quotas</code></li>
+<li>Nav: <strong>Operations → Quotas</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/quotas</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Replication</h2>
+<h3>Purpose</h3>
+<p>Replication — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/replication</code></li>
+<li>Nav: <strong>Operations → Replication</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/replication</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Schedules</h2>
+<h3>Purpose</h3>
+<p>Schedules — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/schedules</code></li>
+<li>Nav: <strong>Operations → Schedules</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/schedules</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Site Recovery</h2>
+<h3>Purpose</h3>
+<p>Site Recovery — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/site-recovery</code></li>
+<li>Nav: <strong>Operations → Site Recovery</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/site-recovery</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Snapshots</h2>
+<h3>Purpose</h3>
+<p>Snapshots — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/snapshots</code></li>
+<li>Nav: <strong>Operations → Snapshots</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/snapshots</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Templates</h2>
+<h3>Purpose</h3>
+<p>Templates — Operations surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/templates</code></li>
+<li>Nav: <strong>Operations → Templates</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/templates</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Access Control</h2>
+<h3>Purpose</h3>
+<p>Access Control — Security surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/access-control</code></li>
+<li>Nav: <strong>Security → Access Control</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/access-control</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Certificates</h2>
+<h3>Purpose</h3>
+<p>Certificates — Security surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/certificates</code></li>
+<li>Nav: <strong>Security → Certificates</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/certificates</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Compliance</h2>
+<h3>Purpose</h3>
+<p>Compliance — Security surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/compliance</code></li>
+<li>Nav: <strong>Security → Compliance</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/compliance</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Encryption</h2>
+<h3>Purpose</h3>
+<p>Encryption — Security surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/encryption</code></li>
+<li>Nav: <strong>Security → Encryption</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/encryption</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Plugins</h2>
+<h3>Purpose</h3>
+<p>Plugins — Security surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/plugins</code></li>
+<li>Nav: <strong>Security → Plugins</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/plugins</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Security Dashboard</h2>
+<h3>Purpose</h3>
+<p>Security Dashboard — Security surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/security-dashboard</code></li>
+<li>Nav: <strong>Security → Security Dashboard</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/security-dashboard</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Cost Estimator</h2>
+<h3>Purpose</h3>
+<p>Cost Estimator — Tools surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/cost-estimator</code></li>
+<li>Nav: <strong>Tools → Cost Estimator</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/cost-estimator</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Notification Center</h2>
+<h3>Purpose</h3>
+<p>Notification Center — Tools surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/notification-center</code></li>
+<li>Nav: <strong>Tools → Notification Center</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/notification-center</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>VM Compare</h2>
+<h3>Purpose</h3>
+<p>VM Compare — Tools surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vm-compare</code></li>
+<li>Nav: <strong>Tools → VM Compare</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vm-compare</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>VM Health Check</h2>
+<h3>Purpose</h3>
+<p>VM Health Check — Tools surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vm-healthcheck</code></li>
+<li>Nav: <strong>Tools → VM Health Check</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vm-healthcheck</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Webhooks</h2>
+<h3>Purpose</h3>
+<p>Webhooks — Tools surface.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/webhooks</code></li>
+<li>Nav: <strong>Tools → Webhooks</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/webhooks</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Zyvor Fabric — Complete page index</h2>
+<p>Every primary navigable dashboard route.</p>
+<p><em>Generated: 2026-07-26 · 79 routes</em></p>
+<p>Regenerate: <code>node scripts/customer-docs/generate-page-index.mjs</code></p>
+<h3>Core</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dashboard</td>
+<td><code>/</code></td>
+<td>Dashboard — Core surface.</td>
+<td><a href="pages/core/home.md">Open</a></td>
+</tr>
+<tr>
+<td>Favorites</td>
+<td><code>/favorites</code></td>
+<td>Favorites — Core surface.</td>
+<td><a href="pages/core/favorites.md">Open</a></td>
+</tr>
+<tr>
+<td>Virtual Machines</td>
+<td><code>/vms</code></td>
+<td>Virtual Machines — Core surface.</td>
+<td><a href="pages/core/vms.md">Open</a></td>
+</tr>
+<tr>
+<td>Machines</td>
+<td><code>/machines</code></td>
+<td>Machines — Core surface.</td>
+<td><a href="pages/core/machines.md">Open</a></td>
+</tr>
+<tr>
+<td>Profiles</td>
+<td><code>/profiles</code></td>
+<td>Profiles — Core surface.</td>
+<td><a href="pages/core/profiles.md">Open</a></td>
+</tr>
+<tr>
+<td>Datacenters</td>
+<td><code>/datacenters</code></td>
+<td>Datacenters — Core surface.</td>
+<td><a href="pages/core/datacenters.md">Open</a></td>
+</tr>
+<tr>
+<td>VM Browser</td>
+<td><code>/vm-browser</code></td>
+<td>VM Browser — Core surface.</td>
+<td><a href="pages/core/vm-browser.md">Open</a></td>
+</tr>
+<tr>
+<td>Create VM</td>
+<td><code>/create</code></td>
+<td>Create VM — Core surface.</td>
+<td><a href="pages/core/create.md">Open</a></td>
+</tr>
+<tr>
+<td>VM Console</td>
+<td><code>/vms/:name/console</code></td>
+<td>VM Console — Core surface.</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h3>Infrastructure</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Network</td>
+<td><code>/network</code></td>
+<td>Network — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/network.md">Open</a></td>
+</tr>
+<tr>
+<td>Net Security</td>
+<td><code>/network-security</code></td>
+<td>Net Security — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/network-security.md">Open</a></td>
+</tr>
+<tr>
+<td>Storage</td>
+<td><code>/storage</code></td>
+<td>Storage — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/storage.md">Open</a></td>
+</tr>
+<tr>
+<td>Storage Pools</td>
+<td><code>/storage-pools</code></td>
+<td>Storage Pools — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/storage-pools.md">Open</a></td>
+</tr>
+<tr>
+<td>Distributed Storage</td>
+<td><code>/distributed-storage</code></td>
+<td>Distributed Storage — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/distributed-storage.md">Open</a></td>
+</tr>
+<tr>
+<td>Resource Pools</td>
+<td><code>/resource-pools</code></td>
+<td>Resource Pools — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/resource-pools.md">Open</a></td>
+</tr>
+<tr>
+<td>System</td>
+<td><code>/system</code></td>
+<td>System — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/system.md">Open</a></td>
+</tr>
+<tr>
+<td>System Health</td>
+<td><code>/system-health</code></td>
+<td>System Health — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/system-health.md">Open</a></td>
+</tr>
+<tr>
+<td>Containers</td>
+<td><code>/containers</code></td>
+<td>Containers — Infrastructure surface.</td>
+<td><a href="pages/infrastructure/containers.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DRS</td>
+<td><code>/drs</code></td>
+<td>DRS — Operations surface.</td>
+<td><a href="pages/operations/drs.md">Open</a></td>
+</tr>
+<tr>
+<td>Fault Tolerance</td>
+<td><code>/fault-tolerance</code></td>
+<td>Fault Tolerance — Operations surface.</td>
+<td><a href="pages/operations/fault-tolerance.md">Open</a></td>
+</tr>
+<tr>
+<td>Replication</td>
+<td><code>/replication</code></td>
+<td>Replication — Operations surface.</td>
+<td><a href="pages/operations/replication.md">Open</a></td>
+</tr>
+<tr>
+<td>Site Recovery</td>
+<td><code>/site-recovery</code></td>
+<td>Site Recovery — Operations surface.</td>
+<td><a href="pages/operations/site-recovery.md">Open</a></td>
+</tr>
+<tr>
+<td>Migrations</td>
+<td><code>/migrations</code></td>
+<td>Migrations — Operations surface.</td>
+<td><a href="pages/operations/migrations.md">Open</a></td>
+</tr>
+<tr>
+<td>Migration Wizard</td>
+<td><code>/migration-wizard</code></td>
+<td>Migration Wizard — Operations surface.</td>
+<td><a href="pages/operations/migration-wizard.md">Open</a></td>
+</tr>
+<tr>
+<td>Templates</td>
+<td><code>/templates</code></td>
+<td>Templates — Operations surface.</td>
+<td><a href="pages/operations/templates.md">Open</a></td>
+</tr>
+<tr>
+<td>Content Library</td>
+<td><code>/content-library</code></td>
+<td>Content Library — Operations surface.</td>
+<td><a href="pages/operations/content-library.md">Open</a></td>
+</tr>
+<tr>
+<td>Schedules</td>
+<td><code>/schedules</code></td>
+<td>Schedules — Operations surface.</td>
+<td><a href="pages/operations/schedules.md">Open</a></td>
+</tr>
+<tr>
+<td>Autoscale</td>
+<td><code>/autoscale</code></td>
+<td>Autoscale — Operations surface.</td>
+<td><a href="pages/operations/autoscale.md">Open</a></td>
+</tr>
+<tr>
+<td>Snapshots</td>
+<td><code>/snapshots</code></td>
+<td>Snapshots — Operations surface.</td>
+<td><a href="pages/operations/snapshots.md">Open</a></td>
+</tr>
+<tr>
+<td>Backups</td>
+<td><code>/backups</code></td>
+<td>Backups — Operations surface.</td>
+<td><a href="pages/operations/backups.md">Open</a></td>
+</tr>
+<tr>
+<td>Quotas</td>
+<td><code>/quotas</code></td>
+<td>Quotas — Operations surface.</td>
+<td><a href="pages/operations/quotas.md">Open</a></td>
+</tr>
+<tr>
+<td>Lifecycle</td>
+<td><code>/lifecycle</code></td>
+<td>Lifecycle — Operations surface.</td>
+<td><a href="pages/operations/lifecycle.md">Open</a></td>
+</tr>
+<tr>
+<td>Bulk Operations</td>
+<td><code>/bulk-operations</code></td>
+<td>Bulk Operations — Operations surface.</td>
+<td><a href="pages/operations/bulk-operations.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>Monitoring</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Logs</td>
+<td><code>/logs</code></td>
+<td>Logs — Monitoring surface.</td>
+<td><a href="pages/monitoring/logs.md">Open</a></td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td><code>/analytics</code></td>
+<td>Analytics — Monitoring surface.</td>
+<td><a href="pages/monitoring/analytics.md">Open</a></td>
+</tr>
+<tr>
+<td>Audit</td>
+<td><code>/audit</code></td>
+<td>Audit — Monitoring surface.</td>
+<td><a href="pages/monitoring/audit.md">Open</a></td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td><code>/notifications</code></td>
+<td>Notifications — Monitoring surface.</td>
+<td><a href="pages/monitoring/notifications.md">Open</a></td>
+</tr>
+<tr>
+<td>Alerts</td>
+<td><code>/alerts</code></td>
+<td>Alerts — Monitoring surface.</td>
+<td><a href="pages/monitoring/alerts.md">Open</a></td>
+</tr>
+<tr>
+<td>Timeline</td>
+<td><code>/timeline</code></td>
+<td>Timeline — Monitoring surface.</td>
+<td><a href="pages/monitoring/timeline.md">Open</a></td>
+</tr>
+<tr>
+<td>Processes</td>
+<td><code>/processes</code></td>
+<td>Processes — Monitoring surface.</td>
+<td><a href="pages/monitoring/processes.md">Open</a></td>
+</tr>
+<tr>
+<td>Kernel</td>
+<td><code>/kernel</code></td>
+<td>Kernel — Monitoring surface.</td>
+<td><a href="pages/monitoring/kernel.md">Open</a></td>
+</tr>
+<tr>
+<td>Debug Tools</td>
+<td><code>/debug</code></td>
+<td>Debug Tools — Monitoring surface.</td>
+<td><a href="pages/monitoring/debug.md">Open</a></td>
+</tr>
+<tr>
+<td>Explain</td>
+<td><code>/explain</code></td>
+<td>Explain — Monitoring surface.</td>
+<td><a href="pages/monitoring/explain.md">Open</a></td>
+</tr>
+<tr>
+<td>Live Metrics</td>
+<td><code>/live-metrics</code></td>
+<td>Live Metrics — Monitoring surface.</td>
+<td><a href="pages/monitoring/live-metrics.md">Open</a></td>
+</tr>
+<tr>
+<td>Event Stream</td>
+<td><code>/event-stream</code></td>
+<td>Event Stream — Monitoring surface.</td>
+<td><a href="pages/monitoring/event-stream.md">Open</a></td>
+</tr>
+<tr>
+<td>Optimizer</td>
+<td><code>/resource-optimizer</code></td>
+<td>Optimizer — Monitoring surface.</td>
+<td><a href="pages/monitoring/resource-optimizer.md">Open</a></td>
+</tr>
+<tr>
+<td>Capacity</td>
+<td><code>/capacity-planning</code></td>
+<td>Capacity — Monitoring surface.</td>
+<td><a href="pages/monitoring/capacity-planning.md">Open</a></td>
+</tr>
+<tr>
+<td>Service Map</td>
+<td><code>/service-map</code></td>
+<td>Service Map — Monitoring surface.</td>
+<td><a href="pages/monitoring/service-map.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>Security</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Security Dashboard</td>
+<td><code>/security-dashboard</code></td>
+<td>Security Dashboard — Security surface.</td>
+<td><a href="pages/security/security-dashboard.md">Open</a></td>
+</tr>
+<tr>
+<td>Encryption</td>
+<td><code>/encryption</code></td>
+<td>Encryption — Security surface.</td>
+<td><a href="pages/security/encryption.md">Open</a></td>
+</tr>
+<tr>
+<td>Certificates</td>
+<td><code>/certificates</code></td>
+<td>Certificates — Security surface.</td>
+<td><a href="pages/security/certificates.md">Open</a></td>
+</tr>
+<tr>
+<td>Compliance</td>
+<td><code>/compliance</code></td>
+<td>Compliance — Security surface.</td>
+<td><a href="pages/security/compliance.md">Open</a></td>
+</tr>
+<tr>
+<td>Access Control</td>
+<td><code>/access-control</code></td>
+<td>Access Control — Security surface.</td>
+<td><a href="pages/security/access-control.md">Open</a></td>
+</tr>
+<tr>
+<td>Plugins</td>
+<td><code>/plugins</code></td>
+<td>Plugins — Security surface.</td>
+<td><a href="pages/security/plugins.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>Tools</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Webhooks</td>
+<td><code>/webhooks</code></td>
+<td>Webhooks — Tools surface.</td>
+<td><a href="pages/tools/webhooks.md">Open</a></td>
+</tr>
+<tr>
+<td>Cost Estimator</td>
+<td><code>/cost-estimator</code></td>
+<td>Cost Estimator — Tools surface.</td>
+<td><a href="pages/tools/cost-estimator.md">Open</a></td>
+</tr>
+<tr>
+<td>VM Compare</td>
+<td><code>/vm-compare</code></td>
+<td>VM Compare — Tools surface.</td>
+<td><a href="pages/tools/vm-compare.md">Open</a></td>
+</tr>
+<tr>
+<td>VM Health Check</td>
+<td><code>/vm-healthcheck</code></td>
+<td>VM Health Check — Tools surface.</td>
+<td><a href="pages/tools/vm-healthcheck.md">Open</a></td>
+</tr>
+<tr>
+<td>Notification Center</td>
+<td><code>/notification-center</code></td>
+<td>Notification Center — Tools surface.</td>
+<td><a href="pages/tools/notification-center.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>More — images, migrations &amp; managers</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Readiness</td>
+<td><code>/migration-readiness</code></td>
+<td>Readiness — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/migration-readiness.md">Open</a></td>
+</tr>
+<tr>
+<td>History</td>
+<td><code>/migration-history</code></td>
+<td>History — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/migration-history.md">Open</a></td>
+</tr>
+<tr>
+<td>Report</td>
+<td><code>/migration-report</code></td>
+<td>Report — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/migration-report.md">Open</a></td>
+</tr>
+<tr>
+<td>Migration Templates</td>
+<td><code>/migration-templates</code></td>
+<td>Migration Templates — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/migration-templates.md">Open</a></td>
+</tr>
+<tr>
+<td>Batch Migration</td>
+<td><code>/batch-migration</code></td>
+<td>Batch Migration — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/batch-migration.md">Open</a></td>
+</tr>
+<tr>
+<td>ISO Images</td>
+<td><code>/iso-images</code></td>
+<td>ISO Images — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/iso-images.md">Open</a></td>
+</tr>
+<tr>
+<td>Upload Disk</td>
+<td><code>/upload-disk</code></td>
+<td>Upload Disk — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/upload-disk.md">Open</a></td>
+</tr>
+<tr>
+<td>Download Disk</td>
+<td><code>/download-disk</code></td>
+<td>Download Disk — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/download-disk.md">Open</a></td>
+</tr>
+<tr>
+<td>Image Builder</td>
+<td><code>/image-builder</code></td>
+<td>Image Builder — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/image-builder.md">Open</a></td>
+</tr>
+<tr>
+<td>Pipeline</td>
+<td><code>/pipeline</code></td>
+<td>Pipeline — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/pipeline.md">Open</a></td>
+</tr>
+<tr>
+<td>Disk Images</td>
+<td><code>/disk-images</code></td>
+<td>Disk Images — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/disk-images.md">Open</a></td>
+</tr>
+<tr>
+<td>Disk Converter</td>
+<td><code>/disk-converter</code></td>
+<td>Disk Converter — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/disk-converter.md">Open</a></td>
+</tr>
+<tr>
+<td>Backup Scheduler</td>
+<td><code>/backup-scheduler</code></td>
+<td>Backup Scheduler — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/backup-scheduler.md">Open</a></td>
+</tr>
+<tr>
+<td>Batch Import</td>
+<td><code>/batch-import</code></td>
+<td>Batch Import — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/batch-import.md">Open</a></td>
+</tr>
+<tr>
+<td>Snapshot Mgr</td>
+<td><code>/snapshot-manager</code></td>
+<td>Snapshot Mgr — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/snapshot-manager.md">Open</a></td>
+</tr>
+<tr>
+<td>Storage Mgr</td>
+<td><code>/storage-manager</code></td>
+<td>Storage Mgr — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/storage-manager.md">Open</a></td>
+</tr>
+<tr>
+<td>Manifest Builder</td>
+<td><code>/manifest-builder</code></td>
+<td>Manifest Builder — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/manifest-builder.md">Open</a></td>
+</tr>
+<tr>
+<td>Job Monitor</td>
+<td><code>/job-monitor</code></td>
+<td>Job Monitor — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/job-monitor.md">Open</a></td>
+</tr>
+<tr>
+<td>Network Topology</td>
+<td><code>/network-topology</code></td>
+<td>Network Topology — More — images, migrations &amp; managers surface.</td>
+<td><a href="pages/more-images-migrations-managers/network-topology.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>Auth</h3>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Route</th>
+<th>Purpose</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Login</td>
+<td><code>/login</code></td>
+<td>Login — Auth surface.</td>
+<td><a href="pages/auth/login.md">Open</a></td>
+</tr>
+</tbody></table>
+<h3>Related</h3>
+<ul>
+<li><a href="README.md">Customer docs home</a></li>
+<li><a href="pages/README.md">Page-by-page guides</a></li>
+</ul>
+</main></body></html>

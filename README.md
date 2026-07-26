@@ -7,6 +7,8 @@
 
 **[Zyvor Fabric — Customer Feature Guide](docs/zyvor-fabric-customer-feature-guide.md)** — a complete, customer-facing reference covering all **55 features** across **9 areas**, grounded in the product's actual capabilities. Also available as a print-ready **[PDF](docs/zyvor-fabric-customer-feature-guide.pdf)**.
 
+**[Customer manual (page-by-page)](docs/customer/README.md)** — getting started, admin basics, and a guide for every product surface (PDFs under `docs/customer/pdf/`).
+
 Clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support on Linux — manage infrastructure through **CLI, TUI, web dashboard, Kubernetes operator, or Terraform**. Proxmox + KubeVirt UX without the heavyweight stack.
 
 ```text
