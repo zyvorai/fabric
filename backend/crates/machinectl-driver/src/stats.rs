@@ -3,12 +3,14 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use anyhow::Result;
+use async_trait::async_trait;
 use vm_model::{PressureRecord, VMMetrics, VMPressure};
 use vmspawnd_cgroup::CgroupPath;
 use vmspawnd_driver_core::ResourceStatsDriver;
 
 use crate::MachinectlDriver;
 
+#[async_trait]
 impl ResourceStatsDriver for MachinectlDriver {
     async fn get_metrics(&self, name: &str) -> Result<VMMetrics> {
         let cgroup = CgroupPath::for_machine(name);

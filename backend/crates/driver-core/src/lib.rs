@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -40,123 +41,121 @@ pub type LogStream = Pin<Box<dyn Stream<Item = LogEntry> + Send>>;
 // ============================================================================
 // Driver traits
 // ============================================================================
+//
+// These use `#[async_trait]` (boxed futures) rather than native RPITIT
+// (`impl Future<...> + Send`) specifically so `VmDriver` below is
+// dyn-compatible — `vmspawnd`'s `AppState.driver` needs to hold either a
+// `MachinectlDriver` or an `EphemeraDriver` behind one `Arc<dyn VmDriver>`,
+// selected at startup by config, and RPITIT traits cannot be turned into
+// trait objects. This also matches the convention Ephemera's own
+// `VmBackend` trait already uses.
 
-/// Core VM lifecycle operations via machined / systemd.
+/// Core VM lifecycle operations. Historically machined/systemd-shaped
+/// (`name`-keyed, "enable at boot" semantics) — implementations backed by a
+/// different engine (e.g. Ephemera) adapt to this shape rather than the
+/// trait adapting to them, so callers don't need to care which backend is
+/// active.
+#[async_trait]
 pub trait VMDriver: Send + Sync {
     /// Start a machine by name.
-    fn start(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn start(&self, name: &str) -> Result<()>;
 
     /// Graceful poweroff.
-    fn poweroff(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn poweroff(&self, name: &str) -> Result<()>;
 
     /// Force terminate.
-    fn terminate(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn terminate(&self, name: &str) -> Result<()>;
 
     /// Reboot a machine.
-    fn reboot(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn reboot(&self, name: &str) -> Result<()>;
 
     /// Query the current state of a machine.
-    fn get_state(&self, name: &str) -> impl std::future::Future<Output = Result<VMState>> + Send;
+    async fn get_state(&self, name: &str) -> Result<VMState>;
 
     /// List all registered machines.
-    fn list_machines(&self) -> impl std::future::Future<Output = Result<Vec<MachineInfo>>> + Send;
+    async fn list_machines(&self) -> Result<Vec<MachineInfo>>;
 
     /// Retrieve all properties of a machine as key-value pairs.
-    fn get_properties(
-        &self,
-        name: &str,
-    ) -> impl std::future::Future<Output = Result<HashMap<String, String>>> + Send;
+    async fn get_properties(&self, name: &str) -> Result<HashMap<String, String>>;
 
     /// Get the PID of the machine leader process.
-    fn get_leader_pid(&self, name: &str) -> impl std::future::Future<Output = Result<u32>> + Send;
+    async fn get_leader_pid(&self, name: &str) -> Result<u32>;
 
     /// Enable auto-start at boot.
-    fn enable(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn enable(&self, name: &str) -> Result<()>;
 
     /// Disable auto-start at boot.
-    fn disable(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn disable(&self, name: &str) -> Result<()>;
 }
 
 /// Resource metrics collection from cgroup v2.
+#[async_trait]
 pub trait ResourceStatsDriver: Send + Sync {
     /// Collect current metrics for a machine.
-    fn get_metrics(
-        &self,
-        name: &str,
-    ) -> impl std::future::Future<Output = Result<VMMetrics>> + Send;
+    async fn get_metrics(&self, name: &str) -> Result<VMMetrics>;
 
     /// Collect PSI pressure metrics for a machine.
-    fn get_pressure(
-        &self,
-        name: &str,
-    ) -> impl std::future::Future<Output = Result<VMPressure>> + Send;
+    async fn get_pressure(&self, name: &str) -> Result<VMPressure>;
 }
 
-/// Runtime resource control via systemd unit properties.
+/// Runtime resource control via cgroup v2 (systemd unit properties for the
+/// machinectl backend; a vendored equivalent, per the migration plan, for
+/// any backend not itself managed by systemd).
+#[async_trait]
 pub trait ResourceControlDriver: Send + Sync {
     /// Set CPU quota as a percentage (e.g. 200 = 2 full cores).
-    fn set_cpu_quota(
-        &self,
-        name: &str,
-        percent: u32,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn set_cpu_quota(&self, name: &str, percent: u32) -> Result<()>;
 
     /// Set memory limit in bytes.
-    fn set_memory_max(
-        &self,
-        name: &str,
-        bytes: u64,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn set_memory_max(&self, name: &str, bytes: u64) -> Result<()>;
 
     /// Set I/O weight (1-10000, default 100).
-    fn set_io_weight(
-        &self,
-        name: &str,
-        weight: u32,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn set_io_weight(&self, name: &str, weight: u32) -> Result<()>;
 
     /// Freeze (pause) all processes in the machine's cgroup.
-    fn freeze(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn freeze(&self, name: &str) -> Result<()>;
 
     /// Thaw (resume) all processes in the machine's cgroup.
-    fn thaw(&self, name: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn thaw(&self, name: &str) -> Result<()>;
 
     /// Check if the machine's cgroup is frozen.
-    fn is_frozen(&self, name: &str) -> impl std::future::Future<Output = Result<bool>> + Send;
+    async fn is_frozen(&self, name: &str) -> Result<bool>;
 
     /// Set the maximum number of PIDs in the machine's cgroup.
-    fn set_pids_max(
-        &self,
-        name: &str,
-        max: u64,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn set_pids_max(&self, name: &str, max: u64) -> Result<()>;
 
     /// Pin the machine to specific CPU cores.
-    fn set_cpuset(
-        &self,
-        name: &str,
-        cpus: &[u32],
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn set_cpuset(&self, name: &str, cpus: &[u32]) -> Result<()>;
 }
 
-/// Structured log streaming from journal.
+/// Structured log streaming.
+#[async_trait]
 pub trait LogDriver: Send + Sync {
     /// Stream structured log entries for a machine scope.
-    fn stream_logs(
-        &self,
-        name: &str,
-        lines: u32,
-    ) -> impl std::future::Future<Output = Result<LogStream>> + Send;
+    async fn stream_logs(&self, name: &str, lines: u32) -> Result<LogStream>;
 }
 
 /// Feature detection for optional capabilities.
 pub trait CapabilityProvider: Send + Sync {
-    /// Whether the system bus is reachable.
-    fn has_dbus(&self) -> bool;
+    /// A short, stable identifier for the active backend (e.g.
+    /// `"machinectl"`, `"ephemera"`) — surfaced by health/capability
+    /// endpoints instead of the systemd-specific `has_dbus`/`has_machined`
+    /// booleans this replaced.
+    fn backend_name(&self) -> &'static str;
 
-    /// Whether machined is available.
-    fn has_machined(&self) -> bool;
-
-    /// Whether systemd resource control (cgroup v2) is available.
+    /// Whether resource control (cgroup v2 quota/freeze/etc.) is available.
     fn has_resource_control(&self) -> bool;
+}
+
+/// Umbrella trait letting `vmspawnd` hold one `Arc<dyn VmDriver>` covering
+/// every driver capability, instead of five separate trait objects. Blanket
+/// `impl`'d for anything implementing the five component traits — backends
+/// only need to implement those, never this trait directly.
+pub trait VmDriver:
+    VMDriver + ResourceStatsDriver + ResourceControlDriver + LogDriver + CapabilityProvider
+{
+}
+impl<T> VmDriver for T where
+    T: VMDriver + ResourceStatsDriver + ResourceControlDriver + LogDriver + CapabilityProvider
+{
 }

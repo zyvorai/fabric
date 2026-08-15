@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use vmspawnd_cgroup::CgroupPath;
 use vmspawnd_driver_core::ResourceControlDriver;
 use vmspawnd_machined_dbus::SystemdManagerProxy;
@@ -10,6 +11,7 @@ use zbus::zvariant::Value;
 
 use crate::MachinectlDriver;
 
+#[async_trait]
 impl ResourceControlDriver for MachinectlDriver {
     async fn set_cpu_quota(&self, name: &str, percent: u32) -> Result<()> {
         let scope = format!("machine-{}.scope", name);

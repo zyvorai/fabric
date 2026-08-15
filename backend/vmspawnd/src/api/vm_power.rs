@@ -173,7 +173,6 @@ pub async fn resume_hibernate(
     }
 
     // Start the VM
-    use vmspawnd_driver_core::VMDriver;
     if let Err(e) = state.driver.start(&vm_name).await {
         return Err(crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,

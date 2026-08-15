@@ -5,12 +5,14 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use vm_model::VMState;
 use vmspawnd_driver_core::{MachineInfo, VMDriver};
 use vmspawnd_machined_dbus::{MachineManagerProxy, MachineProxy, SystemdManagerProxy};
 
 use crate::MachinectlDriver;
 
+#[async_trait]
 impl VMDriver for MachinectlDriver {
     async fn start(&self, name: &str) -> Result<()> {
         // Try D-Bus first: start the vmspawn template unit

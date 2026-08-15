@@ -24,7 +24,7 @@ use crate::server::AppState;
 use crate::validation::{validate_machine_path, validate_vm_name};
 use security::{RequireAdmin, RequireRead, RequireWrite};
 use vmspawn_driver::machinectl;
-use vmspawnd_driver_core::{MachineInfo, VMDriver};
+use vmspawnd_driver_core::MachineInfo;
 
 // ============================================================================
 // Machine operations (migrated to D-Bus driver)

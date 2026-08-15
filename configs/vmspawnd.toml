@@ -22,6 +22,18 @@ backup_dir = "/var/lib/vmspawnd/backups"
 # Default network bridge
 bridge = "br0"
 
+[driver]
+# VM lifecycle driver backend: "machinectl" (default, systemd-machined/D-Bus)
+# or "ephemera" (see the systemd-removal migration plan — opt-in until the
+# lifecycle cutover has soaked in staging; CPU pinning, log streaming, and
+# hotplug still require "machinectl" until Ephemera gains resource-control
+# and log-streaming endpoints).
+# backend = "machinectl"
+# Ephemera's REST API base URL. Only consulted when backend = "ephemera".
+# ephemera_url = "http://127.0.0.1:7788"
+# Bearer token for Ephemera's auth layer, if it has auth.tokens configured.
+# ephemera_token = "..."
+
 [auth]
 # Enable JWT-based authentication (default: true)
 enabled = true

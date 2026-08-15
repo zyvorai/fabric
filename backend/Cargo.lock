@@ -4176,6 +4176,7 @@ name = "vmspawnd-driver-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "futures",
  "serde",
@@ -4198,6 +4199,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "vmspawnd-ephemera-driver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "tokio",
+ "tracing",
+ "vm-model",
+ "vmspawnd-driver-core",
+ "vmspawnd-ephemera-client",
+]
+
+[[package]]
 name = "vmspawnd-lock-manager"
 version = "0.1.0"
 dependencies = [
@@ -4216,6 +4230,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
+ "async-trait",
  "chrono",
  "futures",
  "serde",

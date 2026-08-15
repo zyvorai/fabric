@@ -38,12 +38,8 @@ impl MachinectlDriver {
 }
 
 impl CapabilityProvider for MachinectlDriver {
-    fn has_dbus(&self) -> bool {
-        true // We successfully connected in new()
-    }
-
-    fn has_machined(&self) -> bool {
-        true // If we got this far, machined is expected
+    fn backend_name(&self) -> &'static str {
+        "machinectl"
     }
 
     fn has_resource_control(&self) -> bool {

@@ -33,6 +33,7 @@ members = [
     "crates/machined-dbus",
     "crates/machinectl-driver",
     "crates/ephemera-client",
+    "crates/ephemera-driver",
     "crates/lock-manager",
     "crates/cgroup",
     "crates/api-error",
@@ -82,6 +83,7 @@ hostname = "0.4"
 rand = "0.9"
 zbus = { version = "4", default-features = false, features = ["tokio"] }
 async-stream = "0.3"
+async-trait = "0.1"
 rcgen = { version = "0.13", features = ["pem", "x509-parser"] }
 sha2 = "0.10"
 hex = "0.4"

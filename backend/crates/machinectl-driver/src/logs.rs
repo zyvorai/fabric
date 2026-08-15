@@ -3,11 +3,13 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 use vmspawnd_driver_core::{LogDriver, LogEntry, LogStream};
 
 use crate::MachinectlDriver;
 
+#[async_trait]
 impl LogDriver for MachinectlDriver {
     async fn stream_logs(&self, name: &str, lines: u32) -> Result<LogStream> {
         let scope = format!("machine-{}.scope", name);

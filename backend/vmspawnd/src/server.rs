@@ -15,9 +15,13 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use vmspawnd_storage::StorageManager;
 
-use vmspawnd_driver_core::{ResourceStatsDriver, VMDriver};
+use vmspawnd_driver_core::VmDriver;
 
-use crate::{api, config::Config, plugins, routes, websocket};
+use crate::{
+    api,
+    config::{Config, DriverBackend},
+    plugins, routes, websocket,
+};
 
 pub struct AppState {
     pub store: StateStore,
@@ -28,7 +32,7 @@ pub struct AppState {
     pub user_db: Option<Arc<security::db::UserDb>>,
     pub jwt_config: Option<Arc<security::JwtConfig>>,
     pub plugin_registry: Arc<RwLock<plugins::PluginRegistry>>,
-    pub driver: Arc<vmspawnd_machinectl_driver::MachinectlDriver>,
+    pub driver: Arc<dyn VmDriver>,
     pub lock_manager: Arc<vmspawnd_lock_manager::LockManager>,
     pub policy_engine: Arc<network_policy::PolicyEngine>,
     pub service_mesh: Arc<service_mesh::ServiceMesh>,
@@ -115,10 +119,27 @@ impl Server {
             (None, None)
         };
 
-        // Initialize the D-Bus machined driver
-        let driver = vmspawnd_machinectl_driver::MachinectlDriver::new()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to initialize machined D-Bus driver: {}", e))?;
+        // Select the VM driver backend — see the systemd-removal migration
+        // plan. Defaults to `machinectl` (today's systemd-machined/D-Bus
+        // backend); `driver.backend = "ephemera"` in config switches to the
+        // Ephemera-backed driver instead. Only one is ever constructed.
+        let driver: Arc<dyn VmDriver> = match config.driver.backend {
+            DriverBackend::Machinectl => {
+                let d = vmspawnd_machinectl_driver::MachinectlDriver::new()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to initialize machined D-Bus driver: {}", e))?;
+                Arc::new(d)
+            }
+            DriverBackend::Ephemera => {
+                let mut d = vmspawnd_ephemera_driver::EphemeraDriver::new(&config.driver.ephemera_url)
+                    .map_err(|e| anyhow::anyhow!("Failed to initialize Ephemera driver: {}", e))?;
+                if let Some(token) = &config.driver.ephemera_token {
+                    d = d.with_token(token.clone());
+                }
+                tracing::info!(url = %config.driver.ephemera_url, "Using Ephemera VM driver backend");
+                Arc::new(d)
+            }
+        };
 
         let lock_manager = Arc::new(vmspawnd_lock_manager::LockManager::new(
             vmspawnd_lock_manager::LockConfig::default(),
@@ -133,7 +154,7 @@ impl Server {
             user_db,
             jwt_config,
             plugin_registry: Arc::new(RwLock::new(plugins::PluginRegistry::new())),
-            driver: Arc::new(driver),
+            driver,
             lock_manager,
             policy_engine: Arc::new(network_policy::PolicyEngine::new()),
             service_mesh: Arc::new(service_mesh::ServiceMesh::new()),

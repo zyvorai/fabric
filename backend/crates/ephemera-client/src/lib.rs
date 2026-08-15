@@ -285,6 +285,14 @@ impl EphemeraClient {
         Self::parse(resp).await
     }
 
+    /// `POST /v1/vms/{id}/start` — relaunch a `Stopped` VM from its existing
+    /// disk (image cloning/cloud-init reseed are skipped server-side).
+    /// Idempotent: a VM already `Running` is returned unchanged.
+    pub async fn start_vm(&self, id: Uuid) -> Result<VmRecord> {
+        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/start"))?)).send().await?;
+        Self::parse(resp).await
+    }
+
     pub async fn stop_vm(&self, id: Uuid) -> Result<VmRecord> {
         let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/stop"))?)).send().await?;
         Self::parse(resp).await

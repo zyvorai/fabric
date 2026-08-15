@@ -17,7 +17,6 @@ use vm_model::{CreateVMRequest, VMStartOptions};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
-use vmspawnd_driver_core::{ResourceStatsDriver, VMDriver};
 
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {

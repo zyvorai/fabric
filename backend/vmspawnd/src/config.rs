@@ -15,6 +15,49 @@ pub struct Config {
     pub controller: ControllerConfig,
     #[serde(default)]
     pub auth: AuthConfig,
+    #[serde(default)]
+    pub driver: DriverConfig,
+}
+
+/// Which `driver-core::VmDriver` backend `AppState.driver` is built from.
+/// See the systemd-removal migration plan: `machinectl` (default, today's
+/// systemd-machined/D-Bus backend) stays the default through Phase 3;
+/// `ephemera` is opt-in until the lifecycle cutover has soaked in staging.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DriverBackend {
+    Machinectl,
+    Ephemera,
+}
+
+impl Default for DriverBackend {
+    fn default() -> Self {
+        Self::Machinectl
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriverConfig {
+    #[serde(default)]
+    pub backend: DriverBackend,
+    /// Ephemera's REST API base URL, e.g. `http://127.0.0.1:7788`. Only
+    /// consulted when `backend = "ephemera"`.
+    #[serde(default = "default_ephemera_url")]
+    pub ephemera_url: String,
+    /// Bearer token for Ephemera's auth layer, if it has `auth.tokens`
+    /// configured. Leave unset against a deployment with auth disabled.
+    #[serde(default)]
+    pub ephemera_token: Option<String>,
+}
+
+impl Default for DriverConfig {
+    fn default() -> Self {
+        Self { backend: DriverBackend::default(), ephemera_url: default_ephemera_url(), ephemera_token: None }
+    }
+}
+
+fn default_ephemera_url() -> String {
+    "http://127.0.0.1:7788".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -276,6 +319,7 @@ impl Config {
             },
             controller: ControllerConfig::default(),
             auth: AuthConfig::default(),
+            driver: DriverConfig::default(),
         })
     }
 

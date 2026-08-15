@@ -44,6 +44,7 @@ tpm-support = { path = "../tpm-support" }
 prometheus-exporter = { path = "../prometheus-exporter" }
 vmspawnd-driver-core = { path = "../crates/driver-core" }
 vmspawnd-machinectl-driver = { path = "../crates/machinectl-driver" }
+vmspawnd-ephemera-driver = { path = "../crates/ephemera-driver" }
 vmspawnd-storage = { path = "../crates/storage" }
 vmspawnd-system = { path = "../crates/system" }
 vmspawnd-vm = { path = "../crates/vm" }

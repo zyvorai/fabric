@@ -7,7 +7,6 @@
 use axum::{extract::State, Json};
 use serde::Serialize;
 use std::sync::Arc;
-use vmspawnd_driver_core::VMDriver;
 
 use crate::server::AppState;
 use security::RequireRead;

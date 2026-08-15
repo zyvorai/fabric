@@ -1,14 +1,14 @@
 [package]
-name = "vmspawnd-driver-core"
+name = "vmspawnd-ephemera-driver"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-futures.workspace = true
-chrono.workspace = true
+tracing.workspace = true
 async-trait.workspace = true
+tokio.workspace = true
 vm-model = { path = "../../vm-model" }
+vmspawnd-driver-core = { path = "../driver-core" }
+vmspawnd-ephemera-client = { path = "../ephemera-client" }
