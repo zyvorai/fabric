@@ -8,6 +8,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use futures::StreamExt;
 use security::RequireRead;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -39,10 +40,12 @@ pub struct LogResponse {
     pub count: usize,
 }
 
-/// GET /api/vms/:name/logs - Returns recent journal entries for a specific VM.
+/// GET /api/vms/:name/logs - Returns recent log entries for a specific VM,
+/// via `state.driver`'s `LogDriver` (journald for `MachinectlDriver`,
+/// Ephemera's captured console output for `EphemeraDriver`).
 pub async fn get_vm_logs(
     RequireRead(_claims): RequireRead,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Query(query): Query<LogQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -61,47 +64,43 @@ pub async fn get_vm_logs(
 
     let lines = query.lines.unwrap_or(100).min(1000);
 
-    let mut args = vec![
-        "--machine".to_string(),
-        vm_name.clone(),
-        "--output".to_string(),
-        "json".to_string(),
-        "--no-pager".to_string(),
-        "-n".to_string(),
-        lines.to_string(),
-    ];
+    // `LogDriver::stream_logs` always follows (it mirrors `journalctl
+    // --follow -n lines`), which is right for a websocket tail but would
+    // hang this one-shot GET waiting for more output than currently
+    // exists. Drain what's immediately available within a short deadline
+    // instead of awaiting the stream to completion.
+    let mut stream = state.driver.stream_logs(&vm_name, lines).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to read VM logs: {:#}", e)})),
+        )
+    })?;
 
-    if let Some(priority) = query.priority {
-        if priority <= 7 {
-            args.push(format!("--priority={}", priority));
+    let mut raw = Vec::new();
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(3);
+    while raw.len() < lines as usize {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match tokio::time::timeout(remaining, stream.next()).await {
+            Ok(Some(entry)) => raw.push(entry),
+            Ok(None) | Err(_) => break,
         }
     }
 
-    if let Some(ref pattern) = query.grep {
-        // Sanitize grep pattern: only allow alphanumeric, spaces, hyphens, underscores, dots
-        if pattern.len() <= 256
-            && pattern.chars().all(|c| {
-                c.is_ascii_alphanumeric()
-                    || matches!(c, ' ' | '-' | '_' | '.' | ':' | '/' | '=' | '[' | ']')
-            })
-        {
-            args.push(format!("--grep={}", pattern));
-        }
-    }
-
-    let output = tokio::process::Command::new("journalctl")
-        .args(&args)
-        .output()
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to run journalctl: {}", e)})),
-            )
-        })?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let entries = parse_journal_json(&stdout);
+    let entries: Vec<LogEntry> = raw
+        .into_iter()
+        .filter(|e| query.priority.map(|p| e.priority <= p).unwrap_or(true))
+        .filter(|e| query.grep.as_ref().map(|g| e.message.contains(g.as_str())).unwrap_or(true))
+        .map(|e| LogEntry {
+            timestamp: e.timestamp.to_rfc3339(),
+            hostname: String::new(),
+            unit: e.unit,
+            message: e.message,
+            priority: e.priority.to_string(),
+        })
+        .collect();
     let count = entries.len();
 
     Ok(Json(LogResponse { entries, count }))

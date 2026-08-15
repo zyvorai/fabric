@@ -8,6 +8,8 @@ license.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
+chrono.workspace = true
+futures.workspace = true
 tokio.workspace = true
 vm-model = { path = "../../vm-model" }
 zyvor-fabric-driver-core = { path = "../driver-core" }

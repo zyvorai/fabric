@@ -2,28 +2,18 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-//! `ResourceStatsDriver`/`ResourceControlDriver` mapped onto Ephemera's
-//! cgroup-delegation extension (systemd-removal migration plan, Phase 5):
-//! `GET/POST /v1/vms/{id}/resources|freeze|thaw|frozen|stats|pressure`.
-//!
-//! `LogDriver` stays unimplemented here — log streaming needs a separate
-//! `GET /v1/vms/{id}/logs?follow=true` endpoint Ephemera doesn't have yet.
-//! Callers needing it (`api/logs.rs`, `websocket.rs`) stay on the
-//! `MachinectlDriver` path via the `driver` config flag until then.
+//! `ResourceStatsDriver`/`ResourceControlDriver`/`LogDriver` mapped onto
+//! Ephemera's cgroup-delegation and log-streaming extensions (systemd-removal
+//! migration plan, Phase 5): `GET/POST /v1/vms/{id}/resources|freeze|thaw|
+//! frozen|stats|pressure|logs`.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use async_trait::async_trait;
+use futures::StreamExt;
 use vm_model::{PressureRecord, VMMetrics, VMPressure};
-use zyvor_fabric_driver_core::{LogDriver, LogStream, ResourceControlDriver, ResourceStatsDriver};
+use zyvor_fabric_driver_core::{LogDriver, LogEntry, LogStream, ResourceControlDriver, ResourceStatsDriver};
 
 use crate::EphemeraDriver;
-
-fn unsupported(op: &str) -> anyhow::Error {
-    anyhow::anyhow!(
-        "'{op}' is not yet supported by the Ephemera driver backend — pending Ephemera's \
-         log-streaming extension (systemd-removal migration plan, Phase 5)"
-    )
-}
 
 fn convert_pressure(p: Option<zyvor_fabric_ephemera_client::PressureRecord>) -> Option<PressureRecord> {
     p.map(|p| PressureRecord { avg10: p.avg10, avg60: p.avg60, avg300: p.avg300, total: p.total })
@@ -124,7 +114,29 @@ impl ResourceControlDriver for EphemeraDriver {
 
 #[async_trait]
 impl LogDriver for EphemeraDriver {
-    async fn stream_logs(&self, _name: &str, _lines: u32) -> Result<LogStream> {
-        bail!(unsupported("stream_logs"))
+    async fn stream_logs(&self, name: &str, lines: u32) -> Result<LogStream> {
+        let record = self.resolve(name).await?;
+        let unit = name.to_string();
+        let lines_stream = self.client.stream_logs(record.id, lines, true).await?;
+
+        // Raw serial console output has no journald-equivalent per-line
+        // priority/unit metadata (see `ephemera_api::vm_logs`), so every
+        // entry is stamped with the same "info" priority and the VM's own
+        // name as the unit — an accepted fidelity reduction versus
+        // `MachinectlDriver`'s `journalctl --output=json` mapping.
+        let entries = lines_stream.filter_map(move |line| {
+            let unit = unit.clone();
+            async move {
+                match line {
+                    Ok(message) => Some(LogEntry { timestamp: chrono::Utc::now(), message, priority: 6, unit }),
+                    Err(e) => {
+                        tracing::warn!("Ephemera log stream for '{unit}' ended with error: {e:#}");
+                        None
+                    }
+                }
+            }
+        });
+
+        Ok(Box::pin(entries))
     }
 }

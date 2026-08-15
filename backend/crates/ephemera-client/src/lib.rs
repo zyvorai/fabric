@@ -26,7 +26,9 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
+use futures::{Stream, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncBufReadExt;
 use uuid::Uuid;
 
 // ============================================================================
@@ -424,6 +426,52 @@ impl EphemeraClient {
     pub async fn pressure(&self, id: Uuid) -> Result<VmPressure> {
         let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/pressure"))?)).send().await?;
         Self::parse(resp).await
+    }
+
+    /// `GET /v1/vms/{id}/logs?lines=N&follow=true` — tail the VM's captured
+    /// console output, one line per stream item. `follow` streams
+    /// indefinitely (until the caller drops the returned stream), so this
+    /// overrides the client's default 30s request timeout in that case.
+    pub async fn stream_logs(
+        &self,
+        id: Uuid,
+        lines: u32,
+        follow: bool,
+    ) -> Result<impl Stream<Item = Result<String>>> {
+        let mut url = self.url(&format!("/v1/vms/{id}/logs"))?;
+        url.query_pairs_mut().append_pair("lines", &lines.to_string()).append_pair(
+            "follow",
+            &follow.to_string(),
+        );
+
+        let mut builder = self.authed(self.http.get(url));
+        if follow {
+            builder = builder.timeout(std::time::Duration::from_secs(30 * 24 * 3600));
+        }
+        let resp = builder.send().await?;
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            bail!("Ephemera request failed: {status} — {body}");
+        }
+
+        let byte_stream =
+            resp.bytes_stream().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+        let reader = tokio_util::io::StreamReader::new(byte_stream);
+        let mut lines_reader = reader.lines();
+
+        Ok(async_stream::stream! {
+            loop {
+                match lines_reader.next_line().await {
+                    Ok(Some(line)) => yield Ok(line),
+                    Ok(None) => break,
+                    Err(e) => {
+                        yield Err(anyhow::anyhow!(e));
+                        break;
+                    }
+                }
+            }
+        })
     }
 
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {
