@@ -1,5 +1,5 @@
 .PHONY: all build build-backend build-web \
-       install install-bin install-conf install-systemd install-web install-modules \
+       install install-bin install-conf install-systemd install-web install-modules install-libexec \
        uninstall run dev tui cli test clean fmt lint \
        docker-build docker-up docker-down rpm deb help
 
@@ -8,10 +8,10 @@ DESTDIR    ?=
 BINDIR      = $(PREFIX)/bin
 SYSCONFDIR  = /etc
 DATADIR     = $(PREFIX)/share
+# systemd is optional (see systemd/zyvor-fabricd.service) — nothing under
+# install-* requires, auto-enables, or auto-starts it. install-systemd only
+# drops the unit files in place for operators who choose to run under it.
 UNITDIR     = $(PREFIX)/lib/systemd/system
-PRESETDIR   = $(PREFIX)/lib/systemd/system-preset
-SYSUSERSDIR = $(PREFIX)/lib/sysusers.d
-TMPFILESDIR = $(PREFIX)/lib/tmpfiles.d
 MODULESDIR  = $(SYSCONFDIR)/modules-load.d
 LIBEXECDIR  = $(PREFIX)/libexec/zyvor-fabricd
 
@@ -25,7 +25,7 @@ build-backend:
 build-web:
 	cd web && npm install && npm run build
 
-install: install-bin install-conf install-systemd install-web install-modules
+install: install-bin install-conf install-systemd install-web install-modules install-libexec
 
 install-bin:
 	install -d $(DESTDIR)$(BINDIR)
@@ -33,27 +33,28 @@ install-bin:
 	install -m 0755 backend/target/release/zyvorctl      $(DESTDIR)$(BINDIR)/zyvorctl
 	install -m 0755 backend/target/release/zyvorctl-tui  $(DESTDIR)$(BINDIR)/zyvorctl-tui
 
+# Directories are also created defensively by the daemon itself at startup
+# (see daemon.rs::ensure_runtime_dirs) — installed here too so they exist
+# with the right ownership/mode from first boot, without depending on
+# systemd-tmpfiles.
 install-conf:
 	install -d $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd
 	install -m 0644 configs/zyvor-fabricd.toml $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd/zyvor-fabricd.toml
 	install -m 0644 configs/zyvor-fabricd.env  $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd/zyvor-fabricd.env
 	install -d $(DESTDIR)/var/lib/zyvor-fabricd/images
+	install -d -m 0750 $(DESTDIR)/var/lib/zyvor-fabricd/state
+	install -d $(DESTDIR)/var/log/zyvor-fabricd
+	install -d $(DESTDIR)/run/zyvor-fabricd
 
+# Optional: unit files for operators who choose to run zyvor-fabricd under
+# systemd. Installing them here does not enable, start, or otherwise wire
+# them up — that's a manual `systemctl enable --now zyvor-fabricd.service`.
 install-systemd:
 	install -d $(DESTDIR)$(UNITDIR)
-	install -m 0644 systemd/zyvor-fabricd.service         $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
-	install -m 0644 systemd/zyvor-fabricd.socket          $(DESTDIR)$(UNITDIR)/zyvor-fabricd.socket
-	install -m 0644 systemd/vm@.service              $(DESTDIR)$(UNITDIR)/vm@.service
-	install -m 0644 systemd/zyvor-fabricd-backup.service   $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.service
-	install -m 0644 systemd/zyvor-fabricd-backup.timer    $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.timer
-	install -m 0644 systemd/zyvor-fabricd-cleanup.service $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.service
-	install -m 0644 systemd/zyvor-fabricd-cleanup.timer   $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.timer
-	install -d $(DESTDIR)$(PRESETDIR)
-	install -m 0644 systemd/zyvor-fabricd.preset  $(DESTDIR)$(PRESETDIR)/90-zyvor-fabricd.preset
-	install -d $(DESTDIR)$(SYSUSERSDIR)
-	install -m 0644 systemd/zyvor-fabricd.sysusers $(DESTDIR)$(SYSUSERSDIR)/zyvor-fabricd.conf
-	install -d $(DESTDIR)$(TMPFILESDIR)
-	install -m 0644 systemd/zyvor-fabricd.tmpfiles $(DESTDIR)$(TMPFILESDIR)/zyvor-fabricd.conf
+	install -m 0644 systemd/zyvor-fabricd.service $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
+	install -m 0644 systemd/vm@.service           $(DESTDIR)$(UNITDIR)/vm@.service
+
+install-libexec:
 	install -d $(DESTDIR)$(LIBEXECDIR)
 	install -m 0755 scripts/backup-vms    $(DESTDIR)$(LIBEXECDIR)/backup-vms
 	install -m 0755 scripts/cleanup-store $(DESTDIR)$(LIBEXECDIR)/cleanup-store
@@ -77,19 +78,10 @@ uninstall:
 	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl
 	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl-tui
 	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
-	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd.socket
 	rm -f  $(DESTDIR)$(UNITDIR)/vm@.service
-	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.service
-	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.timer
-	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.service
-	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.timer
 	rm -f  $(DESTDIR)/etc/logrotate.d/zyvor-fabricd
 	rm -f  $(DESTDIR)/etc/bash_completion.d/zyvorctl
-	rm -f  $(DESTDIR)/etc/bash_completion.d/zyvorctl
 	rm -rf $(DESTDIR)$(LIBEXECDIR)
-	rm -f  $(DESTDIR)$(PRESETDIR)/90-zyvor-fabricd.preset
-	rm -f  $(DESTDIR)$(SYSUSERSDIR)/zyvor-fabricd.conf
-	rm -f  $(DESTDIR)$(TMPFILESDIR)/zyvor-fabricd.conf
 	rm -rf $(DESTDIR)$(DATADIR)/zyvor-fabricd
 	rm -rf $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd
 
@@ -145,7 +137,8 @@ help:
 	@echo "  install         - Install everything (use DESTDIR= for staged installs)"
 	@echo "  install-bin     - Install binaries only"
 	@echo "  install-conf    - Install configuration files"
-	@echo "  install-systemd - Install systemd units (service, socket, preset, sysusers, tmpfiles)"
+	@echo "  install-systemd - Install optional systemd unit files (not enabled/started)"
+	@echo "  install-libexec - Install backup/cleanup/health-check scripts"
 	@echo "  install-web     - Install web UI static files"
 	@echo "  install-modules - Install kernel module config"
 	@echo "  uninstall       - Remove installed files"

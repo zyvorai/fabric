@@ -498,15 +498,14 @@ cmd_verify() {
         warn "Password file not found — skipping auth tests"
     fi
 
-    # 7. Check timers
-    info "Checking timers..."
-    for timer in zyvor-fabricd-backup zyvor-fabricd-cleanup; do
-        if systemctl is-active --quiet "${timer}.timer" 2>/dev/null; then
-            ok "${timer} timer active"
-        else
-            warn "${timer} timer not active (enable with: systemctl enable --now ${timer}.timer)"
-        fi
-    done
+    # 7. Backup/cleanup scheduling (in-process, no separate timer units —
+    # active whenever zyvor-fabricd itself is running)
+    info "Checking scheduled backup/cleanup..."
+    if systemctl is-active --quiet zyvor-fabricd 2>/dev/null; then
+        ok "backup/cleanup scheduler active (runs inside zyvor-fabricd — daily 2:00 AM / weekly Sun 3:00 AM)"
+    else
+        warn "zyvor-fabricd not running — scheduled backup/cleanup won't run"
+    fi
 
     # Summary
     echo ""
@@ -617,26 +616,19 @@ cmd_backup() {
                 exit 1
             fi
             ;;
-        enable)
-            need_root
-            systemctl enable --now zyvor-fabricd-backup.timer
-            ok "Backup timer enabled (daily at 2:00 AM)"
-            systemctl list-timers zyvor-fabricd-backup.timer --no-pager
-            ;;
-        disable)
-            need_root
-            systemctl disable --now zyvor-fabricd-backup.timer
-            ok "Backup timer disabled"
+        enable|disable)
+            warn "There's no longer a separate backup timer to $subcmd — zyvor-fabricd"
+            warn "runs its own in-process daily backup at 2:00 AM whenever it's running"
+            warn "(see backend/zyvor-fabricd/src/schedulers.rs). Stop the daemon itself"
+            warn "if you want to stop scheduled backups."
             ;;
         status)
             echo ""
-            if systemctl is-active --quiet zyvor-fabricd-backup.timer 2>/dev/null; then
-                ok "Backup timer is ${GREEN}active${NC}"
+            if systemctl is-active --quiet zyvor-fabricd 2>/dev/null; then
+                ok "zyvor-fabricd is running — daily backup scheduled for 2:00 AM (in-process, no separate timer)"
             else
-                warn "Backup timer is ${RED}inactive${NC}"
+                warn "zyvor-fabricd is not running under systemd — scheduled backups only run while the daemon is up"
             fi
-            echo ""
-            systemctl list-timers zyvor-fabricd-backup.timer --no-pager 2>/dev/null || true
             echo ""
             info "Backup directory: ${BOLD}/var/lib/zyvor-fabricd/backups${NC}"
             if [[ -d /var/lib/zyvor-fabricd/backups ]]; then

@@ -43,38 +43,30 @@ echo "  ║     🗑️  zyvor-fabricd Uninstall                       ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo ""
 
-# Stop and disable services
-step "Stopping services"
-for svc in zyvor-fabricd.service zyvor-fabricd-backup.timer zyvor-fabricd-cleanup.timer; do
-    if systemctl is-active "$svc" &>/dev/null; then
-        systemctl stop "$svc" 2>/dev/null || true
-        info "Stopped $svc"
+# Stop, disable, and remove the (optional) systemd units, if systemd is
+# even in use here — zyvor-fabricd doesn't require it.
+if command -v systemctl &>/dev/null; then
+    step "Stopping services"
+    if systemctl is-active zyvor-fabricd.service &>/dev/null; then
+        systemctl stop zyvor-fabricd.service 2>/dev/null || true
+        info "Stopped zyvor-fabricd.service"
     fi
-    if systemctl is-enabled "$svc" &>/dev/null; then
-        systemctl disable "$svc" 2>/dev/null || true
+    if systemctl is-enabled zyvor-fabricd.service &>/dev/null; then
+        systemctl disable zyvor-fabricd.service 2>/dev/null || true
     fi
-done
 
-# Remove systemd units
-step "Removing systemd units"
-for unit in zyvor-fabricd.service vm@.service \
-            zyvor-fabricd-backup.service zyvor-fabricd-backup.timer \
-            zyvor-fabricd-cleanup.service zyvor-fabricd-cleanup.timer; do
-    for dir in /usr/lib/systemd/system /etc/systemd/system; do
-        if [[ -f "$dir/$unit" ]]; then
-            rm -f "$dir/$unit"
-            info "Removed $dir/$unit"
-        fi
+    step "Removing systemd units"
+    for unit in zyvor-fabricd.service vm@.service; do
+        for dir in /usr/lib/systemd/system /etc/systemd/system; do
+            if [[ -f "$dir/$unit" ]]; then
+                rm -f "$dir/$unit"
+                info "Removed $dir/$unit"
+            fi
+        done
     done
-done
-
-# Remove preset, sysusers, tmpfiles
-rm -f /usr/lib/systemd/system-preset/90-zyvor-fabricd.preset 2>/dev/null
-rm -f /usr/lib/sysusers.d/zyvor-fabricd.conf 2>/dev/null
-rm -f /usr/lib/tmpfiles.d/zyvor-fabricd.conf 2>/dev/null
-
-systemctl daemon-reload
-info "Systemd units removed"
+    systemctl daemon-reload
+    info "Systemd units removed"
+fi
 
 # Remove binaries
 step "Removing binaries"
@@ -106,7 +98,6 @@ rm -rf /etc/zyvor-fabricd 2>/dev/null && info "Removed /etc/zyvor-fabricd" || tr
 rm -f /etc/modules-load.d/zyvor-fabricd.conf 2>/dev/null
 rm -f /etc/logrotate.d/zyvor-fabricd 2>/dev/null
 rm -f /etc/bash_completion.d/zyvorctl 2>/dev/null
-rm -f /etc/bash_completion.d/zyvorctl 2>/dev/null
 
 # Remove data
 if $PURGE; then
@@ -114,6 +105,7 @@ if $PURGE; then
     rm -rf /var/lib/zyvor-fabricd 2>/dev/null && info "Removed /var/lib/zyvor-fabricd" || true
     rm -rf /var/log/zyvor-fabricd 2>/dev/null && info "Removed /var/log/zyvor-fabricd" || true
     rm -rf /run/zyvor-fabricd 2>/dev/null
+    getent group zyvor-fabricd &>/dev/null && groupdel zyvor-fabricd 2>/dev/null && info "Removed zyvor-fabricd group" || true
 elif $KEEP_DATA; then
     step "Keeping data"
     info "/var/lib/zyvor-fabricd preserved (use --purge to remove)"

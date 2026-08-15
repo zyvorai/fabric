@@ -243,6 +243,10 @@ impl Server {
         spawn_bg!(self.state, "net_monitor", run_net_monitor);
         spawn_bg!(self.state, "oidc_state_cleanup", run_oidc_state_cleanup);
         spawn_bg!(self.state, "snapshot_retention", run_snapshot_retention);
+        // Replaces zyvor-fabricd-backup.timer/-cleanup.timer (systemd-removal
+        // migration plan, Phase 6) — see schedulers.rs.
+        spawn_bg!(self.state, "backup_scheduler", crate::schedulers::run_backup_scheduler);
+        spawn_bg!(self.state, "cleanup_scheduler", crate::schedulers::run_cleanup_scheduler);
 
         axum::serve(listener, app)
             .with_graceful_shutdown(shutdown_signal())

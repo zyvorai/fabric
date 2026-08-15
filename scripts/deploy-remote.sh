@@ -463,7 +463,6 @@ fi
 \$PKG gcc openssl-devel pam-devel dbus-devel systemd-devel clang-devel 2>&1 | tail -1 || true
 \$PKG gcc libssl-dev libpam0g-dev libdbus-1-dev libsystemd-dev clang 2>&1 | tail -1 || true
 \$PKG qemu-system-x86 edk2-ovmf 2>&1 | tail -1 || true
-\$SUDO systemctl enable --now systemd-machined 2>/dev/null || true
 echo 'System deps installed'
 " || die "system deps install failed"
     ok "System dependencies installed"
@@ -529,11 +528,8 @@ if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
     echo \"  ✅ listen bound to \${BIND}:\${API_PORT}\"
 fi
 
-for unit in zyvor-fabricd.service vm@.service zyvor-fabricd-backup.service zyvor-fabricd-cleanup.service; do
+for unit in zyvor-fabricd.service vm@.service; do
     [ -f \"systemd/\$unit\" ] && \$SUDO install -m 644 \"systemd/\$unit\" \"/usr/lib/systemd/system/\$unit\"
-done
-for extra in zyvor-fabricd-backup.timer zyvor-fabricd-cleanup.timer; do
-    [ -f \"systemd/\$extra\" ] && \$SUDO install -m 644 \"systemd/\$extra\" \"/usr/lib/systemd/system/\$extra\"
 done
 if [ -f configs/pam.d/zyvor-fabricd ]; then
     \$SUDO install -m 644 configs/pam.d/zyvor-fabricd /etc/pam.d/zyvor-fabricd

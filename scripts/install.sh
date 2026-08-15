@@ -33,26 +33,26 @@ sudo install -m 0644 configs/zyvor-fabricd.toml /etc/zyvor-fabricd/zyvor-fabricd
 sudo install -m 0644 configs/zyvor-fabricd.env  /etc/zyvor-fabricd/zyvor-fabricd.env
 sudo install -m 0644 configs/pam.d/zyvor-fabricd /etc/pam.d/zyvor-fabricd
 
-# Create directories
+# Create the zyvor-fabricd system group and runtime directories directly
+# (no systemd-sysusers/tmpfiles dependency — the daemon also creates these
+# defensively at startup, see daemon.rs::ensure_runtime_dirs, but creating
+# them here up front gets ownership/mode right from first boot).
+echo "[5/6] Creating system group and directories..."
+getent group zyvor-fabricd >/dev/null || sudo groupadd -r zyvor-fabricd
 sudo install -d /var/lib/zyvor-fabricd/images
-sudo install -d /var/lib/zyvor-fabricd/state
+sudo install -d -m 0750 /var/lib/zyvor-fabricd/state
 sudo install -d /run/zyvor-fabricd
 sudo install -d /var/log/zyvor-fabricd
 
-# Install systemd units
-echo "[5/6] Installing systemd units..."
+# Install systemd units (optional — nothing here enables or starts them;
+# zyvor-fabricd runs fine without systemd at all, this is only for
+# operators who choose to supervise it that way).
 sudo install -d /usr/lib/systemd/system
 sudo install -m 0644 systemd/zyvor-fabricd.service /usr/lib/systemd/system/zyvor-fabricd.service
 sudo install -m 0644 systemd/vm@.service      /usr/lib/systemd/system/vm@.service
-
-sudo install -d /usr/lib/systemd/system-preset
-sudo install -m 0644 systemd/zyvor-fabricd.preset /usr/lib/systemd/system-preset/90-zyvor-fabricd.preset
-
-sudo install -d /usr/lib/sysusers.d
-sudo install -m 0644 systemd/zyvor-fabricd.sysusers /usr/lib/sysusers.d/zyvor-fabricd.conf
-
-sudo install -d /usr/lib/tmpfiles.d
-sudo install -m 0644 systemd/zyvor-fabricd.tmpfiles /usr/lib/tmpfiles.d/zyvor-fabricd.conf
+if command -v systemctl &>/dev/null; then
+    sudo systemctl daemon-reload
+fi
 
 sudo install -d /etc/modules-load.d
 sudo install -m 0644 configs/modules-load.d/zyvor-fabricd.conf /etc/modules-load.d/zyvor-fabricd.conf
@@ -62,25 +62,18 @@ echo "[6/6] Installing web UI..."
 sudo install -d /usr/share/zyvor-fabricd/web
 sudo cp -r web/dist/* /usr/share/zyvor-fabricd/web/
 
-# Create sysusers and tmpfiles
-sudo systemd-sysusers zyvor-fabricd.conf 2>/dev/null || true
-sudo systemd-tmpfiles --create zyvor-fabricd.conf 2>/dev/null || true
-
-# Reload systemd
-sudo systemctl daemon-reload
-
 echo ""
 echo "=== Installation complete ==="
 echo ""
-echo "To enable and start zyvor-fabricd:"
-echo "  sudo systemctl enable --now zyvor-fabricd.service"
+echo "To run zyvor-fabricd directly:"
+echo "  sudo zyvor-fabricd"
 echo ""
-echo "To check status:"
+echo "Or, if you'd rather run it under systemd:"
+echo "  sudo systemctl enable --now zyvor-fabricd.service"
 echo "  sudo systemctl status zyvor-fabricd"
 echo ""
 echo "To enable debug logging:"
 echo "  echo 'ZYVOR_FABRICD_LOG_LEVEL=debug' | sudo tee -a /etc/zyvor-fabricd/zyvor-fabricd.env"
-echo "  sudo systemctl restart zyvor-fabricd"
 echo ""
 echo "Access web UI at http://localhost:9095"
 echo "Use zyvorctl or zyvorctl-tui from the command line"

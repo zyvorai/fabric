@@ -11,16 +11,16 @@ BuildRequires:  cargo
 BuildRequires:  rust
 BuildRequires:  nodejs
 BuildRequires:  npm
-BuildRequires:  systemd-rpm-macros
-Requires:       systemd >= 256
 Recommends:     systemd-container
 Recommends:     nftables
 Recommends:     wireguard-tools
 
 %description
-zyvor-fabricd is a daemon for managing virtual machines with systemd-vmspawn
-and systemd-machined. Provides REST API, WebSocket console, VNC proxy,
-and comprehensive VM lifecycle management.
+zyvor-fabricd is a daemon for managing virtual machines, with a pluggable
+VM lifecycle driver (systemd-vmspawn/systemd-machined, or Ephemera — see
+driver.backend in zyvor-fabricd.toml). Provides REST API, WebSocket
+console, VNC proxy, and comprehensive VM lifecycle management. Runs under
+systemd or any other supervisor — nothing in this package requires it.
 
 Includes zyvorctl CLI tool and zyvorctl-tui terminal interface.
 
@@ -43,17 +43,19 @@ with 37+ pages for managing VMs, storage, network security, and more.
 %make_install PREFIX=%{_prefix}
 
 %pre
-%sysusers_create_package %{name} systemd/zyvor-fabricd.sysusers
+getent group zyvor-fabricd >/dev/null || groupadd -r zyvor-fabricd
+exit 0
 
 %post
-%systemd_post zyvor-fabricd.service
-%tmpfiles_create %{name}.conf
-
-%preun
-%systemd_preun zyvor-fabricd.service
-
-%postun
-%systemd_postun_with_restart zyvor-fabricd.service
+# Directories are also created defensively by the daemon itself at startup
+# (see backend/zyvor-fabricd/src/daemon.rs::ensure_runtime_dirs) — created
+# here too so they exist with the right ownership/mode from first boot,
+# without a systemd-tmpfiles dependency.
+mkdir -p /var/lib/zyvor-fabricd/images
+mkdir -p /var/lib/zyvor-fabricd/state && chmod 0750 /var/lib/zyvor-fabricd/state
+mkdir -p /run/zyvor-fabricd
+mkdir -p /var/log/zyvor-fabricd
+exit 0
 
 %files
 %license LICENSE
@@ -61,11 +63,14 @@ with 37+ pages for managing VMs, storage, network security, and more.
 %{_bindir}/zyvor-fabricd
 %{_bindir}/zyvorctl
 %{_bindir}/zyvorctl-tui
-%{_unitdir}/zyvor-fabricd.service
-%{_unitdir}/vm@.service
-%{_presetdir}/90-zyvor-fabricd.preset
-%{_sysusersdir}/zyvor-fabricd.conf
-%{_tmpfilesdir}/zyvor-fabricd.conf
+# Optional: for operators who choose to run zyvor-fabricd under systemd.
+# Nothing in this package enables, starts, or otherwise wires these up —
+# that's a manual `systemctl enable --now zyvor-fabricd.service`.
+/usr/lib/systemd/system/zyvor-fabricd.service
+/usr/lib/systemd/system/vm@.service
+%{_libexecdir}/%{name}/backup-vms
+%{_libexecdir}/%{name}/cleanup-store
+%{_libexecdir}/%{name}/health-check
 %dir %{_sysconfdir}/zyvor-fabricd
 %config(noreplace) %{_sysconfdir}/zyvor-fabricd/zyvor-fabricd.toml
 %config(noreplace) %{_sysconfdir}/zyvor-fabricd/zyvor-fabricd.env
@@ -84,4 +89,5 @@ with 37+ pages for managing VMs, storage, network security, and more.
 - zyvorctl-tui terminal UI with 8 views
 - Network security (policies, firewall, service mesh, QoS, DNS, VPN, mirror, NAT, monitor)
 - Ceph/RBD storage support
-- systemd units with socket activation, sysusers, tmpfiles, and preset
+- systemd units are optional; nothing in this package requires, enables, or
+  auto-starts them (no hard systemd dependency, no sysusers/tmpfiles/preset)

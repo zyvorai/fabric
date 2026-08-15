@@ -123,12 +123,6 @@ install_system_deps() {
             ;;
     esac
 
-    # Ensure machined is running
-    if command -v systemctl &>/dev/null && systemctl list-unit-files systemd-machined.service &>/dev/null; then
-        systemctl enable --now systemd-machined 2>/dev/null || true
-        success "systemd-machined enabled and started"
-    fi
-
     success "System dependencies installed"
 }
 
@@ -257,42 +251,32 @@ install_config() {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Systemd services
+# 6. System group, runtime directories, optional systemd units, helper scripts
 # ---------------------------------------------------------------------------
 install_systemd() {
-    step "Installing systemd services"
+    step "Installing system group, units, and helper scripts"
 
+    # Replaces what systemd-sysusers/tmpfiles previously provisioned — the
+    # daemon also creates its runtime directories defensively at startup
+    # (see backend/zyvor-fabricd/src/daemon.rs::ensure_runtime_dirs), but
+    # doing it here too gets ownership/mode right from first boot.
+    getent group zyvor-fabricd &>/dev/null || groupadd -r zyvor-fabricd
+
+    # Optional: unit files for operators who choose to run zyvor-fabricd
+    # under systemd. Installing them here does not enable, start, or
+    # otherwise wire them up.
     local unit_dir="${INSTALL_PREFIX}/lib/systemd/system"
     install -d "${unit_dir}"
-
-    for unit in zyvor-fabricd.service vm@.service \
-                zyvor-fabricd-backup.service zyvor-fabricd-backup.timer \
-                zyvor-fabricd-cleanup.service zyvor-fabricd-cleanup.timer; do
+    for unit in zyvor-fabricd.service vm@.service; do
         if [[ -f "${SCRIPT_DIR}/systemd/${unit}" ]]; then
             install -m 0644 "${SCRIPT_DIR}/systemd/${unit}" "${unit_dir}/${unit}"
             info "  Installed ${unit}"
         fi
     done
 
-    # Install sysusers and tmpfiles
-    if [[ -f "${SCRIPT_DIR}/systemd/zyvor-fabricd.sysusers" ]]; then
-        install -d "${INSTALL_PREFIX}/lib/sysusers.d"
-        install -m 0644 "${SCRIPT_DIR}/systemd/zyvor-fabricd.sysusers" "${INSTALL_PREFIX}/lib/sysusers.d/zyvor-fabricd.conf"
-        systemd-sysusers zyvor-fabricd.conf 2>/dev/null || true
-    fi
-
-    if [[ -f "${SCRIPT_DIR}/systemd/zyvor-fabricd.tmpfiles" ]]; then
-        install -d "${INSTALL_PREFIX}/lib/tmpfiles.d"
-        install -m 0644 "${SCRIPT_DIR}/systemd/zyvor-fabricd.tmpfiles" "${INSTALL_PREFIX}/lib/tmpfiles.d/zyvor-fabricd.conf"
-        systemd-tmpfiles --create zyvor-fabricd.conf 2>/dev/null || true
-    fi
-
-    if [[ -f "${SCRIPT_DIR}/systemd/zyvor-fabricd.preset" ]]; then
-        install -d "${INSTALL_PREFIX}/lib/systemd/system-preset"
-        install -m 0644 "${SCRIPT_DIR}/systemd/zyvor-fabricd.preset" "${INSTALL_PREFIX}/lib/systemd/system-preset/90-zyvor-fabricd.preset"
-    fi
-
-    # Install helper scripts
+    # Install helper scripts — backup-vms/cleanup-store are now run by an
+    # in-process scheduler inside zyvor-fabricd itself (no systemd timer
+    # needed), but still live here since that's where it looks for them.
     if [[ -d "${SCRIPT_DIR}/scripts" ]]; then
         local libexec_dir="${INSTALL_PREFIX}/libexec/zyvor-fabricd"
         install -d "${libexec_dir}"
@@ -303,8 +287,10 @@ install_systemd() {
         done
     fi
 
-    systemctl daemon-reload
-    success "Systemd services installed"
+    if command -v systemctl &>/dev/null; then
+        systemctl daemon-reload
+    fi
+    success "System group, units, and helper scripts installed"
 }
 
 install_web() {
@@ -324,6 +310,11 @@ install_web() {
 # ---------------------------------------------------------------------------
 start_daemon() {
     step "Starting zyvor-fabricd daemon"
+
+    if ! command -v systemctl &>/dev/null; then
+        warn "systemctl not found — start zyvor-fabricd yourself, e.g.: ${INSTALL_PREFIX}/bin/zyvor-fabricd &"
+        return
+    fi
 
     systemctl enable zyvor-fabricd 2>/dev/null || true
     systemctl start zyvor-fabricd
@@ -375,7 +366,7 @@ print_summary() {
     if systemctl is-active --quiet zyvor-fabricd 2>/dev/null; then
         echo "  ✅ Daemon status: RUNNING"
         echo "  Dashboard:      http://localhost:9095/"
-        echo "  API:            http://localhost:9095/api/health"
+        echo "  API:            http://localhost:9095/health"
     else
         echo "  ⚠️ Daemon status: STOPPED"
     fi

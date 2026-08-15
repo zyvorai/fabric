@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # backup-vms — Automated VM backup script for zyvor-fabricd
 #
-# Called by zyvor-fabricd-backup.timer (systemd timer) or manually.
+# Run daily at 2:00 AM by zyvor-fabricd's own in-process scheduler (see
+# backend/zyvor-fabricd/src/schedulers.rs), or manually.
 # Backs up all running VMs by creating qcow2 snapshots and copying
 # disk images to the backup directory.
 #

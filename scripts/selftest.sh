@@ -75,38 +75,37 @@ for dir in /var/lib/zyvor-fabricd /var/lib/zyvor-fabricd/images /var/log/zyvor-f
     fi
 done
 
-# ── Systemd ──
-section "Systemd Services"
-for unit in zyvor-fabricd.service zyvor-fabricd-backup.service zyvor-fabricd-cleanup.service; do
-    if systemctl list-unit-files "$unit" &>/dev/null 2>&1; then
-        if systemctl is-active "$unit" &>/dev/null; then
-            pass "$unit: running"
-        elif systemctl is-enabled "$unit" &>/dev/null; then
-            warn "$unit: enabled but not running"
+# ── Systemd (optional — zyvor-fabricd runs fine without it) ──
+if command -v systemctl &>/dev/null; then
+    section "Systemd (optional)"
+    if systemctl list-unit-files zyvor-fabricd.service &>/dev/null 2>&1; then
+        if systemctl is-active zyvor-fabricd.service &>/dev/null; then
+            pass "zyvor-fabricd.service: running under systemd"
         else
-            warn "$unit: installed but not enabled"
+            warn "zyvor-fabricd.service: installed but not running under systemd (fine if it's supervised another way)"
         fi
     else
-        fail "$unit: not installed"
+        warn "zyvor-fabricd.service: not installed (fine — it's optional)"
     fi
-done
 
-for unit in vm@.service; do
-    if systemctl list-unit-files "$unit" &>/dev/null 2>&1; then
-        pass "$unit: installed"
+    if systemctl list-unit-files vm@.service &>/dev/null 2>&1; then
+        pass "vm@.service: installed"
     else
-        warn "$unit: not installed (optional)"
+        warn "vm@.service: not installed (optional)"
     fi
-done
 
-# ── machined ──
-section "systemd-machined"
-if systemctl is-active systemd-machined &>/dev/null; then
-    pass "systemd-machined: running"
-    MACHINE_COUNT=$(machinectl list --no-legend 2>/dev/null | wc -l || echo "0")
-    pass "Machines registered: $MACHINE_COUNT"
+    # Only relevant to the "machinectl" driver backend — the "ephemera"
+    # backend has no systemd-machined dependency at all.
+    if systemctl is-active systemd-machined &>/dev/null; then
+        pass "systemd-machined: running"
+        MACHINE_COUNT=$(machinectl list --no-legend 2>/dev/null | wc -l || echo "0")
+        pass "Machines registered (machinectl backend): $MACHINE_COUNT"
+    else
+        warn "systemd-machined: not running (fine if driver.backend = \"ephemera\")"
+    fi
 else
-    warn "systemd-machined: not running"
+    section "Systemd (optional)"
+    warn "systemctl not found — zyvor-fabricd doesn't require it, checking via HTTP instead"
 fi
 
 # ── Web Dashboard ──
@@ -123,18 +122,20 @@ if [[ ! -d /usr/share/zyvor-fabricd/web ]] && [[ ! -d /usr/local/share/zyvor-fab
 fi
 
 # ── API Tests ──
-if ! $QUICK && systemctl is-active zyvor-fabricd &>/dev/null; then
+# Gate on the daemon actually answering HTTP, not on it running under
+# systemd — it may be supervised any other way, or run in the foreground.
+if ! $QUICK && curl -sf -o /dev/null "http://localhost:${API_PORT}/health" 2>/dev/null; then
     section "API Health"
 
     # Health endpoint
-    if HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${API_PORT}/api/health" 2>/dev/null); then
+    if HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${API_PORT}/health" 2>/dev/null); then
         if [[ "$HTTP_CODE" == "200" ]]; then
-            pass "GET /api/health: 200 OK"
+            pass "GET /health: 200 OK"
         else
-            fail "GET /api/health: HTTP $HTTP_CODE"
+            fail "GET /health: HTTP $HTTP_CODE"
         fi
     else
-        fail "GET /api/health: connection refused"
+        fail "GET /health: connection refused"
     fi
 
     # VM list endpoint
@@ -147,9 +148,18 @@ if ! $QUICK && systemctl is-active zyvor-fabricd &>/dev/null; then
     else
         warn "GET /api/vms: connection failed"
     fi
+
+    # Ephemera control plane (optional — only relevant when
+    # driver.backend = "ephemera" in zyvor-fabricd.toml)
+    EPHEMERA_URL="${EPHEMERA_URL:-http://127.0.0.1:7788}"
+    if curl -sf -o /dev/null "${EPHEMERA_URL}/healthz" 2>/dev/null; then
+        pass "Ephemera at ${EPHEMERA_URL}: healthy"
+    else
+        warn "Ephemera at ${EPHEMERA_URL}: not reachable (fine if driver.backend = \"machinectl\")"
+    fi
 elif ! $QUICK; then
     section "API Health"
-    warn "Skipped — zyvor-fabricd not running"
+    warn "Skipped — zyvor-fabricd not answering on port ${API_PORT}"
 fi
 
 # ── Summary ──
@@ -161,8 +171,11 @@ echo ""
 
 if [[ $FAIL -gt 0 ]]; then
     echo "  Some checks failed. Run these to investigate:"
-    echo "    systemctl status zyvor-fabricd"
-    echo "    journalctl -u zyvor-fabricd -n 20"
+    echo "    curl http://localhost:${API_PORT}/health"
+    if command -v systemctl &>/dev/null && systemctl list-unit-files zyvor-fabricd.service &>/dev/null 2>&1; then
+        echo "    systemctl status zyvor-fabricd"
+        echo "    journalctl -u zyvor-fabricd -n 20"
+    fi
     echo ""
     exit 1
 elif [[ $WARN -gt 0 ]]; then

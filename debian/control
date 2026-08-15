@@ -13,15 +13,16 @@ Homepage: https://github.com/ssahani/zyvor-fabric
 Package: zyvor-fabricd
 Architecture: any
 Depends: ${shlibs:Depends},
-         ${misc:Depends},
-         systemd (>= 256)
+         ${misc:Depends}
 Recommends: systemd-container,
             nftables,
             wireguard-tools
 Description: Virtual Machine Management Daemon
- zyvor-fabricd is a daemon for managing virtual machines with systemd-vmspawn
- and systemd-machined. Provides REST API, WebSocket console, VNC proxy,
- and comprehensive VM lifecycle management.
+ zyvor-fabricd is a daemon for managing virtual machines, with a pluggable
+ VM lifecycle driver (systemd-vmspawn/systemd-machined, or Ephemera — see
+ driver.backend in zyvor-fabricd.toml). Provides REST API, WebSocket
+ console, VNC proxy, and comprehensive VM lifecycle management. Runs under
+ systemd or any other supervisor — nothing in this package requires it.
  .
  Includes zyvorctl CLI tool and zyvorctl-tui terminal interface.
 

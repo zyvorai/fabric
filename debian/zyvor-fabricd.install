@@ -3,9 +3,9 @@ usr/bin/zyvorctl
 usr/bin/zyvorctl-tui
 usr/lib/systemd/system/zyvor-fabricd.service
 usr/lib/systemd/system/vm@.service
-usr/lib/systemd/system-preset/90-zyvor-fabricd.preset
-usr/lib/sysusers.d/zyvor-fabricd.conf
-usr/lib/tmpfiles.d/zyvor-fabricd.conf
+usr/libexec/zyvor-fabricd/backup-vms
+usr/libexec/zyvor-fabricd/cleanup-store
+usr/libexec/zyvor-fabricd/health-check
 etc/zyvor-fabricd/zyvor-fabricd.toml
 etc/zyvor-fabricd/zyvor-fabricd.env
 etc/modules-load.d/zyvor-fabricd.conf
