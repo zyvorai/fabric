@@ -34,6 +34,7 @@ members = [
     "crates/machinectl-driver",
     "crates/ephemera-client",
     "crates/ephemera-driver",
+    "crates/dnsmasq-manager",
     "crates/lock-manager",
     "crates/cgroup",
     "crates/api-error",

@@ -443,25 +443,34 @@ pub async fn create_dhcp_server(
         created: Utc::now(),
     };
 
-    // Generate systemd-networkd .network file with [DHCPServer] section
-    let network_content = generate_dhcp_network_file(&config);
-    let config_dir = &state.config.network.networkd_config_dir;
-    let prefix = &state.config.network.networkd_file_prefix;
-    let file_path = format!("{}/{}{}-dhcp.network", config_dir, prefix, req.bridge);
-
-    tokio::fs::write(&file_path, &network_content)
-        .await
-        .map_err(|e| {
+    // Start (or restart) a per-bridge dnsmasq DHCP server — replaces
+    // systemd-networkd's [DHCPServer] .network-file directive.
+    let gateway: std::net::Ipv4Addr = config
+        .gateway
+        .as_deref()
+        .unwrap_or("0.0.0.0")
+        .parse()
+        .map_err(|_| {
             (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": format!("Failed to write config: {}", e) })),
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "gateway is required and must be a valid IPv4 address for the DHCP server's own /24" })),
             )
         })?;
-
-    // Reload networkd
-    if let Err(e) = Command::new("networkctl").arg("reload").output().await {
-        tracing::warn!("Command failed: {}", e);
-    }
+    let dhcp_cfg = zyvor_fabric_dnsmasq_manager::DhcpConfig {
+        bridge: config.bridge.clone(),
+        gateway,
+        pool_offset: config.pool_offset,
+        pool_size: config.pool_size,
+        default_lease_time_sec: config.default_lease_time_sec,
+        dns_servers: config.dns_servers.clone(),
+        domain: config.domain.clone(),
+    };
+    state.dnsmasq_manager.start(&dhcp_cfg).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to start DHCP server: {:#}", e) })),
+        )
+    })?;
 
     state
         .store
@@ -504,14 +513,8 @@ pub async fn delete_dhcp_server(
         .store
         .get_entity::<DhcpServerConfig>("dhcp_servers", &id)
     {
-        let config_dir = &state.config.network.networkd_config_dir;
-        let prefix = &state.config.network.networkd_file_prefix;
-        let file_path = format!("{}/{}{}-dhcp.network", config_dir, prefix, config.bridge);
-        if let Err(e) = tokio::fs::remove_file(&file_path).await {
-            tracing::warn!("Failed to remove file: {}", e);
-        }
-        if let Err(e) = Command::new("networkctl").arg("reload").output().await {
-            tracing::warn!("Command failed: {}", e);
+        if let Err(e) = state.dnsmasq_manager.stop(&config.bridge).await {
+            tracing::warn!("Failed to stop DHCP server for {}: {:#}", config.bridge, e);
         }
     }
 
@@ -526,54 +529,6 @@ pub async fn delete_dhcp_server(
         })?;
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-fn generate_dhcp_network_file(config: &DhcpServerConfig) -> String {
-    let mut content = format!(
-        "[Match]\nName={}\n\n[Network]\nDHCPServer=yes\n",
-        config.bridge
-    );
-
-    // Sanitize values to prevent INI injection via newlines
-    let sanitize = |s: &str| -> String { s.replace('\n', "").replace('\r', "") };
-
-    if let Some(ref gw) = config.gateway {
-        content.push_str(&format!("Address={}/24\n", sanitize(gw)));
-    }
-
-    if let Some(ref domain) = config.domain {
-        content.push_str(&format!("Domains={}\n", sanitize(domain)));
-    }
-
-    for dns in &config.dns_servers {
-        content.push_str(&format!("DNS={}\n", sanitize(dns)));
-    }
-
-    content.push_str(&format!(
-        "\n[DHCPServer]\nPoolOffset={}\nPoolSize={}\nDefaultLeaseTimeSec={}\nMaxLeaseTimeSec={}\n",
-        config.pool_offset,
-        config.pool_size,
-        config.default_lease_time_sec,
-        config.max_lease_time_sec,
-    ));
-
-    if !config.dns_servers.is_empty() {
-        content.push_str(&format!(
-            "DNS={}\n",
-            config
-                .dns_servers
-                .iter()
-                .map(|s| sanitize(s))
-                .collect::<Vec<_>>()
-                .join(" ")
-        ));
-    }
-
-    if let Some(ref domain) = config.domain {
-        content.push_str(&format!("SendOption=15:string:{}\n", sanitize(domain)));
-    }
-
-    content
 }
 
 // ============================================================================
@@ -657,31 +612,6 @@ pub async fn create_dns_config(
         created: Utc::now(),
     };
 
-    // Configure systemd-resolved search domains
-    if !config.search_domains.is_empty() {
-        if let Err(e) = Command::new("resolvectl")
-            .arg("domain")
-            .arg("--")
-            .args(&config.search_domains)
-            .output()
-            .await
-        {
-            tracing::warn!("Command failed: {}", e);
-        }
-    }
-
-    if !config.upstream_servers.is_empty() {
-        if let Err(e) = Command::new("resolvectl")
-            .arg("dns")
-            .arg("--")
-            .args(&config.upstream_servers)
-            .output()
-            .await
-        {
-            tracing::warn!("Command failed: {}", e);
-        }
-    }
-
     state
         .store
         .save_entity("dns_configs", &config.id, &config)
@@ -692,7 +622,54 @@ pub async fn create_dns_config(
             )
         })?;
 
+    // Regenerate /etc/resolv.conf from every enabled DnsConfig — replaces
+    // pushing this one config's search-domains/upstream-servers into
+    // systemd-resolved via `resolvectl domain`/`resolvectl dns`.
+    // `/etc/resolv.conf` is host-wide and single, so this aggregates across
+    // all stored configs rather than letting each call clobber the last;
+    // written atomically (temp file + rename), which also correctly
+    // replaces a symlink there (e.g. one systemd-resolved left behind)
+    // with a plain file, same as any other resolv.conf-managing tool does.
+    let all_configs: Vec<DnsConfig> = state.store.list_entities("dns_configs").unwrap_or_default();
+    if let Err(e) = write_resolv_conf(&all_configs, RESOLV_CONF_PATH).await {
+        tracing::warn!("Failed to update {}: {:#}", RESOLV_CONF_PATH, e);
+    }
+
     Ok((StatusCode::CREATED, Json(config)))
+}
+
+const RESOLV_CONF_PATH: &str = "/etc/resolv.conf";
+
+/// Render and atomically write `/etc/resolv.conf` from every enabled
+/// `DnsConfig`, deduplicating nameservers/search domains across configs in
+/// first-seen order.
+async fn write_resolv_conf(configs: &[DnsConfig], path: &str) -> std::io::Result<()> {
+    let mut nameservers = Vec::new();
+    let mut search_domains = Vec::new();
+    for cfg in configs.iter().filter(|c| c.enabled) {
+        for ns in &cfg.upstream_servers {
+            if !nameservers.contains(ns) {
+                nameservers.push(ns.clone());
+            }
+        }
+        for sd in &cfg.search_domains {
+            if !search_domains.contains(sd) {
+                search_domains.push(sd.clone());
+            }
+        }
+    }
+
+    let mut content = String::from("# Managed by zyvor-fabricd — do not edit directly\n");
+    if !search_domains.is_empty() {
+        content.push_str(&format!("search {}\n", search_domains.join(" ")));
+    }
+    for ns in &nameservers {
+        content.push_str(&format!("nameserver {ns}\n"));
+    }
+
+    let tmp_path = format!("{path}.zyvor-fabricd.tmp");
+    tokio::fs::write(&tmp_path, &content).await?;
+    tokio::fs::rename(&tmp_path, path).await
 }
 
 /// GET /api/dns - List DNS configurations
@@ -805,6 +782,11 @@ pub async fn delete_dns_config(
         )
     })?;
 
+    let remaining: Vec<DnsConfig> = state.store.list_entities("dns_configs").unwrap_or_default();
+    if let Err(e) = write_resolv_conf(&remaining, RESOLV_CONF_PATH).await {
+        tracing::warn!("Failed to update {}: {:#}", RESOLV_CONF_PATH, e);
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -827,5 +809,72 @@ async fn update_hosts_file(config: &DnsConfig) {
 
     if let Err(e) = tokio::fs::write(hosts_path, content).await {
         tracing::warn!("Failed to write hosts file: {}", e);
+    }
+}
+
+#[cfg(test)]
+mod resolv_conf_tests {
+    use super::*;
+
+    fn dns_config(upstream: &[&str], search: &[&str], enabled: bool) -> DnsConfig {
+        DnsConfig {
+            id: uuid::Uuid::new_v4().to_string(),
+            domain: "vms.local".into(),
+            upstream_servers: upstream.iter().map(|s| s.to_string()).collect(),
+            search_domains: search.iter().map(|s| s.to_string()).collect(),
+            records: Vec::new(),
+            enabled,
+            created: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_write_resolv_conf_aggregates_and_dedupes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("resolv.conf");
+        let configs = vec![
+            dns_config(&["8.8.8.8", "1.1.1.1"], &["a.local"], true),
+            dns_config(&["1.1.1.1", "9.9.9.9"], &["b.local"], true),
+        ];
+
+        write_resolv_conf(&configs, path.to_str().unwrap()).await.unwrap();
+        let content = tokio::fs::read_to_string(&path).await.unwrap();
+
+        assert_eq!(content.matches("nameserver 8.8.8.8").count(), 1);
+        assert_eq!(content.matches("nameserver 1.1.1.1").count(), 1, "duplicate nameserver should be deduped");
+        assert!(content.contains("nameserver 9.9.9.9"));
+        assert!(content.contains("search a.local b.local"));
+    }
+
+    #[tokio::test]
+    async fn test_write_resolv_conf_skips_disabled_configs() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("resolv.conf");
+        let configs = vec![dns_config(&["8.8.8.8"], &["a.local"], false)];
+
+        write_resolv_conf(&configs, path.to_str().unwrap()).await.unwrap();
+        let content = tokio::fs::read_to_string(&path).await.unwrap();
+
+        assert!(!content.contains("nameserver"));
+        assert!(!content.contains("search"));
+    }
+
+    #[tokio::test]
+    async fn test_write_resolv_conf_replaces_existing_symlink() {
+        // /etc/resolv.conf is very often a symlink (systemd-resolved leaves
+        // one pointing at its stub resolver) — writing must replace it with
+        // a plain file, not follow it and clobber whatever it points to.
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("stub-resolv.conf");
+        tokio::fs::write(&target, "should not be touched").await.unwrap();
+        let link = dir.path().join("resolv.conf");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        write_resolv_conf(&[dns_config(&["8.8.8.8"], &[], true)], link.to_str().unwrap()).await.unwrap();
+
+        assert!(!link.is_symlink(), "resolv.conf should now be a plain file, not the old symlink");
+        let target_content = tokio::fs::read_to_string(&target).await.unwrap();
+        assert_eq!(target_content, "should not be touched");
     }
 }

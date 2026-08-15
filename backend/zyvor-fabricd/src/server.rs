@@ -44,6 +44,7 @@ pub struct AppState {
     pub nat_gateway: Arc<nat_gateway::NatGateway>,
     pub net_monitor: Arc<net_monitor::NetMonitor>,
     pub secrets_manager: Arc<secrets_manager::SecretsManager>,
+    pub dnsmasq_manager: Arc<zyvor_fabric_dnsmasq_manager::DnsmasqManager>,
     /// Per-VM mutex to serialize state-changing operations on the same VM.
     pub vm_locks:
         Arc<std::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
@@ -166,6 +167,7 @@ impl Server {
             nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
             net_monitor: Arc::new(net_monitor::NetMonitor::new()),
             secrets_manager: Arc::new(secrets_manager::SecretsManager::new()),
+            dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new("/run/zyvor-fabricd/dnsmasq")),
             vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             event_tx: {
                 let (tx, _) = tokio::sync::broadcast::channel(256);

@@ -65,6 +65,7 @@ net-monitor = { path = "../net-monitor" }
 
 ova-tools = { path = "../ova-tools" }
 secrets-manager = { path = "../secrets-manager" }
+zyvor-fabric-dnsmasq-manager = { path = "../crates/dnsmasq-manager" }
 migration = { path = "../migration" }
 fault-tolerance = { path = "../fault-tolerance" }
 zyvor-fabric-lock-manager = { path = "../crates/lock-manager" }
@@ -75,3 +76,6 @@ lifecycle-manager = { path = "../lifecycle-manager" }
 certificate-manager = { path = "../certificate-manager" }
 billing = { path = "../billing" }
 compliance = { path = "../compliance" }
+
+[dev-dependencies]
+tempfile = "3"
