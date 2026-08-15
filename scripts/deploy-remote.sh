@@ -289,11 +289,11 @@ if $UNINSTALL; then
 set -euo pipefail
 SUDO='${SUDO}'
 REMOTE_DIR='${REMOTE_DIR}'
-for svc in vmspawnd.service vmspawnd.socket; do
+for svc in vmspawnd.service; do
   \$SUDO systemctl stop \$svc 2>/dev/null || true
   \$SUDO systemctl disable \$svc 2>/dev/null || true
 done
-for unit in vmspawnd.service vmspawnd.socket vm@.service vmspawnd-backup.service vmspawnd-backup.timer vmspawnd-cleanup.service vmspawnd-cleanup.timer; do
+for unit in vmspawnd.service vm@.service vmspawnd-backup.service vmspawnd-backup.timer vmspawnd-cleanup.service vmspawnd-cleanup.timer; do
   \$SUDO rm -f /usr/lib/systemd/system/\$unit 2>/dev/null || true
 done
 for bin in vmspawnd vmctl vmctl-tui vmspawnctl; do
@@ -531,7 +531,7 @@ fi
 for unit in vmspawnd.service vm@.service vmspawnd-backup.service vmspawnd-cleanup.service; do
     [ -f \"systemd/\$unit\" ] && \$SUDO install -m 644 \"systemd/\$unit\" \"/usr/lib/systemd/system/\$unit\"
 done
-for extra in vmspawnd.socket vmspawnd-backup.timer vmspawnd-cleanup.timer; do
+for extra in vmspawnd-backup.timer vmspawnd-cleanup.timer; do
     [ -f \"systemd/\$extra\" ] && \$SUDO install -m 644 \"systemd/\$extra\" \"/usr/lib/systemd/system/\$extra\"
 done
 if [ -f configs/pam.d/vmspawnd ]; then

@@ -265,7 +265,7 @@ install_systemd() {
     local unit_dir="${INSTALL_PREFIX}/lib/systemd/system"
     install -d "${unit_dir}"
 
-    for unit in vmspawnd.service vmspawnd.socket vm@.service \
+    for unit in vmspawnd.service vm@.service \
                 vmspawnd-backup.service vmspawnd-backup.timer \
                 vmspawnd-cleanup.service vmspawnd-cleanup.timer; do
         if [[ -f "${SCRIPT_DIR}/systemd/${unit}" ]]; then

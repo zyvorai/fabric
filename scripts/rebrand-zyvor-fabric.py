@@ -31,7 +31,6 @@ PROTECTED = [
     "vmspawnd-operator",
     "vmspawnd-cleanup",
     "vmspawnd-backup",
-    "vmspawnd.socket",
     "vmspawnd.service",
     "vmspawnd.toml",
     "vmspawnd.env",

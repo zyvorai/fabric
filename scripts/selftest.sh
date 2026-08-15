@@ -91,7 +91,7 @@ for unit in vmspawnd.service vmspawnd-backup.service vmspawnd-cleanup.service; d
     fi
 done
 
-for unit in vmspawnd.socket vm@.service; do
+for unit in vm@.service; do
     if systemctl list-unit-files "$unit" &>/dev/null 2>&1; then
         pass "$unit: installed"
     else

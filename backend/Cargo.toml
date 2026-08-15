@@ -32,6 +32,7 @@ members = [
     "crates/driver-core",
     "crates/machined-dbus",
     "crates/machinectl-driver",
+    "crates/ephemera-client",
     "crates/lock-manager",
     "crates/cgroup",
     "crates/api-error",

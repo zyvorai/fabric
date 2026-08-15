@@ -4184,6 +4184,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "vmspawnd-ephemera-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "vmspawnd-lock-manager"
 version = "0.1.0"
 dependencies = [

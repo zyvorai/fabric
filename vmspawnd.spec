@@ -46,11 +46,11 @@ with 37+ pages for managing VMs, storage, network security, and more.
 %sysusers_create_package %{name} systemd/vmspawnd.sysusers
 
 %post
-%systemd_post vmspawnd.service vmspawnd.socket
+%systemd_post vmspawnd.service
 %tmpfiles_create %{name}.conf
 
 %preun
-%systemd_preun vmspawnd.service vmspawnd.socket
+%systemd_preun vmspawnd.service
 
 %postun
 %systemd_postun_with_restart vmspawnd.service
@@ -62,7 +62,6 @@ with 37+ pages for managing VMs, storage, network security, and more.
 %{_bindir}/vmctl
 %{_bindir}/vmctl-tui
 %{_unitdir}/vmspawnd.service
-%{_unitdir}/vmspawnd.socket
 %{_unitdir}/vm@.service
 %{_presetdir}/90-vmspawnd.preset
 %{_sysusersdir}/vmspawnd.conf

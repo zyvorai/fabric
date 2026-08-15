@@ -45,7 +45,7 @@ echo ""
 
 # Stop and disable services
 step "Stopping services"
-for svc in vmspawnd.service vmspawnd.socket vmspawnd-backup.timer vmspawnd-cleanup.timer; do
+for svc in vmspawnd.service vmspawnd-backup.timer vmspawnd-cleanup.timer; do
     if systemctl is-active "$svc" &>/dev/null; then
         systemctl stop "$svc" 2>/dev/null || true
         info "Stopped $svc"
@@ -57,7 +57,7 @@ done
 
 # Remove systemd units
 step "Removing systemd units"
-for unit in vmspawnd.service vmspawnd.socket vm@.service \
+for unit in vmspawnd.service vm@.service \
             vmspawnd-backup.service vmspawnd-backup.timer \
             vmspawnd-cleanup.service vmspawnd-cleanup.timer; do
     for dir in /usr/lib/systemd/system /etc/systemd/system; do

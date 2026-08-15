@@ -43,7 +43,6 @@ sudo install -d /var/log/vmspawnd
 echo "[5/6] Installing systemd units..."
 sudo install -d /usr/lib/systemd/system
 sudo install -m 0644 systemd/vmspawnd.service /usr/lib/systemd/system/vmspawnd.service
-sudo install -m 0644 systemd/vmspawnd.socket  /usr/lib/systemd/system/vmspawnd.socket
 sudo install -m 0644 systemd/vm@.service      /usr/lib/systemd/system/vm@.service
 
 sudo install -d /usr/lib/systemd/system-preset
@@ -74,7 +73,6 @@ echo ""
 echo "=== Installation complete ==="
 echo ""
 echo "To enable and start vmspawnd:"
-echo "  sudo systemctl enable --now vmspawnd.socket"
 echo "  sudo systemctl enable --now vmspawnd.service"
 echo ""
 echo "To check status:"
