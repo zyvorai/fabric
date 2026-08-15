@@ -158,21 +158,21 @@ pub async fn get_numa_placement(
 
 /// POST /api/vms/:name/cpu/pin - Set CPU pinning for a VM
 pub async fn set_cpu_pinning(
+    State(state): State<Arc<AppState>>,
     RequireWrite(_claims): RequireWrite,
     Path(vm_name): Path<String>,
     Json(req): Json<SetCpuPinningRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(set_cpu_pinning));
     validate_vm_name(&vm_name)?;
-    // Implement CPU pinning via systemd
     tracing::info!(
         "Setting CPU pinning for VM '{}': {:?}",
         vm_name,
         req.pinning
     );
 
-    // Build CPU affinity list for systemd based on pinning type
-    let cpu_list = match &req.pinning {
+    // Build the cpuset list based on pinning type.
+    let cpus: Vec<u32> = match &req.pinning {
         CpuPinningDto::Auto => {
             tracing::info!("Auto CPU pinning - no explicit affinity set");
             return Ok(StatusCode::OK);
@@ -180,42 +180,28 @@ pub async fn set_cpu_pinning(
         CpuPinningDto::NumaNode { value } => {
             tracing::warn!("NUMA node pinning requires reading node CPU list");
             // Would need to read /sys/devices/system/node/nodeN/cpulist
-            format!("{}", value) // Simplified for now
+            vec![*value] // Simplified for now
         }
         CpuPinningDto::Socket { value } => {
             tracing::warn!("Socket pinning requires reading socket CPU list");
             // Would need to read socket topology
-            format!("{}", value) // Simplified for now
+            vec![*value] // Simplified for now
         }
-        CpuPinningDto::Explicit { value } => value
-            .iter()
-            .map(|pin| pin.physical_cpu.to_string())
-            .collect::<Vec<_>>()
-            .join(","),
+        CpuPinningDto::Explicit { value } => {
+            value.iter().map(|pin| pin.physical_cpu).collect()
+        }
     };
 
-    // Set CPUAffinity via systemctl set-property
-    let service_name = format!("systemd-vmspawn@{}.service", vm_name);
-    let output = Command::new("systemctl")
-        .arg("set-property")
-        .arg(&service_name)
-        .arg(format!("CPUAffinity={}", cpu_list))
-        .output()
+    state
+        .driver
+        .set_cpuset(&vm_name, &cpus)
         .await
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to execute systemctl: {}", e),
+                format!("Failed to set CPU affinity: {}", e),
             )
         })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to set CPU affinity: {}", stderr),
-        ));
-    }
 
     tracing::info!("CPU pinning set successfully for VM '{}'", vm_name);
     Ok(StatusCode::OK)

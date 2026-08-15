@@ -188,6 +188,55 @@ pub struct VmRecord {
     pub request: CreateVmRequest,
     #[serde(default)]
     pub guest_cid: Option<u32>,
+    /// cgroup v2 path the launched VMM process was migrated into, once
+    /// `VmManager` has done so — `None` until the first successful launch
+    /// completes cgroup setup, or if cgroup delegation failed for this VM.
+    #[serde(default)]
+    pub cgroup_path: Option<PathBuf>,
+}
+
+/// cgroup v2 resource-control settings to apply to a running VM. Mirrors
+/// `ephemera_core::model::ResourcePatch`.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ResourcePatch {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_quota_percent: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_max_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_weight: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pids_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpuset_cpus: Option<Vec<u32>>,
+}
+
+/// Mirrors `ephemera_core::model::VmMetrics`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VmMetrics {
+    pub cpu_usage_percent: f64,
+    pub memory_usage_bytes: u64,
+    pub disk_read_bytes: u64,
+    pub disk_write_bytes: u64,
+}
+
+/// Mirrors `ephemera_cgroup::PressureRecord`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PressureRecord {
+    pub avg10: f64,
+    pub avg60: f64,
+    pub avg300: f64,
+    pub total: u64,
+}
+
+/// Mirrors `ephemera_core::model::VmPressure`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VmPressure {
+    pub cpu_some: Option<PressureRecord>,
+    pub memory_some: Option<PressureRecord>,
+    pub memory_full: Option<PressureRecord>,
+    pub io_some: Option<PressureRecord>,
+    pub io_full: Option<PressureRecord>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -334,6 +383,57 @@ impl EphemeraClient {
             .send()
             .await?;
         Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/resources` — apply a partial cgroup resource
+    /// patch to a running VM. Only fields set on `patch` are changed.
+    pub async fn set_resources(&self, id: Uuid, patch: &ResourcePatch) -> Result<()> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/resources"))?))
+            .json(patch)
+            .send()
+            .await?;
+        Self::expect_no_content(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/freeze` — suspend the VM's cgroup via the v2
+    /// freezer (`cgroup.freeze`), independent of guest-level pause/resume.
+    pub async fn freeze(&self, id: Uuid) -> Result<()> {
+        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/freeze"))?)).send().await?;
+        Self::expect_no_content(resp).await
+    }
+
+    pub async fn thaw(&self, id: Uuid) -> Result<()> {
+        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/thaw"))?)).send().await?;
+        Self::expect_no_content(resp).await
+    }
+
+    pub async fn is_frozen(&self, id: Uuid) -> Result<bool> {
+        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/frozen"))?)).send().await?;
+        let body: serde_json::Value = Self::parse(resp).await?;
+        Ok(body.get("frozen").and_then(|v| v.as_bool()).unwrap_or(false))
+    }
+
+    /// `GET /v1/vms/{id}/stats` — point-in-time cgroup usage.
+    pub async fn stats(&self, id: Uuid) -> Result<VmMetrics> {
+        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/stats"))?)).send().await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/vms/{id}/pressure` — PSI (cpu/memory/io) for the VM's cgroup.
+    pub async fn pressure(&self, id: Uuid) -> Result<VmPressure> {
+        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/pressure"))?)).send().await?;
+        Self::parse(resp).await
+    }
+
+    async fn expect_no_content(resp: reqwest::Response) -> Result<()> {
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            let body = resp.text().await.unwrap_or_default();
+            bail!("Ephemera request failed: {status} — {body}")
+        }
     }
 
     async fn parse<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {

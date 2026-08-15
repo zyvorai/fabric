@@ -4,18 +4,17 @@
 
 //! `driver-core` implementation backed by [Ephemera](https://github.com/hypersdk/ephemera)
 //! instead of systemd-machined/systemd-vmspawn — see the systemd-removal
-//! migration plan. This is the Phase 3 (VM lifecycle cutover) slice:
-//! `VMDriver`'s create/stop/pause/resume/list/state/properties/leader-pid
-//! map directly onto Ephemera's REST API. `ResourceControlDriver`,
-//! `ResourceStatsDriver`, and `LogDriver` are implemented but every method
-//! returns an "unsupported" error for now — Ephemera has no cgroup
-//! delegation or log-streaming endpoint yet (Phase 5 of the plan). Callers
-//! (`api/system.rs` CPU pinning, `api/logs.rs`, hotplug) stay on the
+//! migration plan. `VMDriver`'s create/stop/pause/resume/list/state/
+//! properties/leader-pid map directly onto Ephemera's REST API (Phase 3).
+//! `ResourceControlDriver`/`ResourceStatsDriver` are backed by Ephemera's
+//! cgroup-delegation extension (Phase 5, see `resource_control.rs`).
+//! `LogDriver` still errors — Ephemera has no log-streaming endpoint yet.
+//! Callers needing it (`api/logs.rs`, `websocket.rs`) stay on the
 //! `MachinectlDriver` path until that lands, selected by zyvor-fabricd's
 //! `driver = "machinectl" | "ephemera"` config flag.
 
 mod lifecycle;
-mod unsupported;
+mod resource_control;
 
 use anyhow::{Context, Result};
 use zyvor_fabric_ephemera_client::EphemeraClient;
@@ -60,7 +59,7 @@ impl CapabilityProvider for EphemeraDriver {
     }
 
     fn has_resource_control(&self) -> bool {
-        // Ephemera has no cgroup delegation yet (see `unsupported.rs`).
-        false
+        // Backed by Ephemera's cgroup-delegation extension — see `resource_control.rs`.
+        true
     }
 }
