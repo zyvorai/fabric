@@ -11,12 +11,16 @@
 //! that mapping lives in a separate `ephemera-driver` crate so the raw
 //! client can be reused/tested independently of that trait boundary.
 //!
-//! The DTOs below mirror `ephemera-core::model` and `ephemera-api::router`
-//! at Ephemera commit `408f4389ba4453448d5e1dc0e7b0001a568b1f19`. Because
-//! integration is out-of-process (REST, not a Cargo path/git dependency on
-//! Ephemera's own crates), these types must be kept in sync by hand when
-//! Ephemera's API changes — that's the deliberate trade for not coupling
-//! zyvor-fabric's build to Ephemera's crate versions.
+//! The DTOs below mirror `ephemera-core::model` and `ephemera-api::router`.
+//! Because integration is out-of-process (REST, not a Cargo path/git
+//! dependency on Ephemera's own crates), these types must be kept in sync
+//! by hand when Ephemera's API changes — that's the deliberate trade for
+//! not coupling zyvor-fabric's build to Ephemera's crate versions. Ephemera
+//! has grown a bearer-token auth layer (`Role::Admin`/`Role::ReadOnly`)
+//! since this client was first written; `EphemeraClient::with_token` covers
+//! it, and stays a no-op against a deployment that leaves `auth.tokens`
+//! empty (auth off — today's default posture, see the migration plan's
+//! "Auth boundary" note).
 
 use std::path::PathBuf;
 
@@ -35,6 +39,9 @@ pub enum BackendKind {
     Qemu,
     CloudHypervisor,
     Firecracker,
+    /// Resolved to a concrete backend server-side; never appears on a
+    /// stored `VmRecord`, only ever sent on a `CreateVmRequest`.
+    Auto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +92,11 @@ pub struct AgentSpec {
     pub enabled: bool,
     #[serde(default = "default_agent_port")]
     pub port: u32,
+    /// Shared secret the guest agent requires on every request. Leave unset
+    /// on a request with `enabled: true` and Ephemera generates one and
+    /// burns it into the VM's disk before boot.
+    #[serde(default)]
+    pub token: Option<String>,
 }
 fn default_agent_port() -> u32 {
     17777
@@ -92,7 +104,7 @@ fn default_agent_port() -> u32 {
 
 impl Default for AgentSpec {
     fn default() -> Self {
-        Self { enabled: false, port: default_agent_port() }
+        Self { enabled: false, port: default_agent_port(), token: None }
     }
 }
 
@@ -199,6 +211,10 @@ struct ExecRequest {
 pub struct EphemeraClient {
     base_url: reqwest::Url,
     http: reqwest::Client,
+    /// Bearer token sent on every request once Ephemera's `auth.tokens` is
+    /// non-empty. `None` is correct (and required) against a deployment
+    /// that leaves auth disabled — there's nothing to send.
+    token: Option<String>,
 }
 
 impl EphemeraClient {
@@ -210,14 +226,31 @@ impl EphemeraClient {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .context("failed to build Ephemera HTTP client")?;
-        Ok(Self { base_url, http })
+        Ok(Self { base_url, http, token: None })
+    }
+
+    /// Attach a bearer token, required once the target instance has
+    /// `auth.tokens` configured (see `ephemera_core::config::AuthConfig`).
+    pub fn with_token(mut self, token: impl Into<String>) -> Self {
+        self.token = Some(token.into());
+        self
     }
 
     fn url(&self, path: &str) -> Result<reqwest::Url> {
         self.base_url.join(path).with_context(|| format!("failed to build Ephemera URL for {path}"))
     }
 
-    /// `GET /healthz` — used at startup and by capability probes.
+    fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match &self.token {
+            Some(t) => builder.bearer_auth(t),
+            None => builder,
+        }
+    }
+
+    /// `GET /healthz` — used at startup and by capability probes. Unlike
+    /// every other endpoint, `/healthz` is reachable without a bearer token
+    /// even when auth is enabled (see `ephemera_api::auth_middleware`), so
+    /// this deliberately does not go through `authed()`.
     pub async fn healthy(&self) -> bool {
         matches!(
             self.http.get(self.url("/healthz").unwrap()).send().await,
@@ -226,46 +259,49 @@ impl EphemeraClient {
     }
 
     pub async fn create_vm(&self, req: &CreateVmRequest) -> Result<VmRecord> {
-        let resp = self.http.post(self.url("/v1/vms")?).json(req).send().await?;
+        let resp = self.authed(self.http.post(self.url("/v1/vms")?)).json(req).send().await?;
         Self::parse(resp).await
     }
 
     pub async fn list_vms(&self) -> Result<Vec<VmRecord>> {
-        let resp = self.http.get(self.url("/v1/vms")?).send().await?;
+        let resp = self.authed(self.http.get(self.url("/v1/vms")?)).send().await?;
         let body: VmListResponse = Self::parse(resp).await?;
         Ok(body.items)
     }
 
-    /// Find a VM by name. Ephemera has no server-side name filter yet, so
-    /// this scans `list_vms()` client-side — fine for the harness/smoke-test
-    /// scale this crate is used at today; revisit with a `?name=` query
-    /// parameter (server-side) before VM counts grow large.
+    /// Find a VM by exact name via the server-side `?name=` filter — needed
+    /// because `driver-core`'s `VMDriver` trait is keyed by name
+    /// (systemd-machined's model) while `VmRecord` is keyed by `Uuid`.
     pub async fn find_by_name(&self, name: &str) -> Result<Option<VmRecord>> {
-        Ok(self.list_vms().await?.into_iter().find(|vm| vm.name == name))
+        let mut url = self.url("/v1/vms")?;
+        url.query_pairs_mut().append_pair("name", name);
+        let resp = self.authed(self.http.get(url)).send().await?;
+        let body: VmListResponse = Self::parse(resp).await?;
+        Ok(body.items.into_iter().next())
     }
 
     pub async fn get_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.http.get(self.url(&format!("/v1/vms/{id}"))?).send().await?;
+        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}"))?)).send().await?;
         Self::parse(resp).await
     }
 
     pub async fn stop_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.http.post(self.url(&format!("/v1/vms/{id}/stop"))?).send().await?;
+        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/stop"))?)).send().await?;
         Self::parse(resp).await
     }
 
     pub async fn pause_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.http.post(self.url(&format!("/v1/vms/{id}/pause"))?).send().await?;
+        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/pause"))?)).send().await?;
         Self::parse(resp).await
     }
 
     pub async fn resume_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.http.post(self.url(&format!("/v1/vms/{id}/resume"))?).send().await?;
+        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/resume"))?)).send().await?;
         Self::parse(resp).await
     }
 
     pub async fn delete_vm(&self, id: Uuid) -> Result<()> {
-        let resp = self.http.delete(self.url(&format!("/v1/vms/{id}"))?).send().await?;
+        let resp = self.authed(self.http.delete(self.url(&format!("/v1/vms/{id}"))?)).send().await?;
         if resp.status().is_success() {
             Ok(())
         } else {
@@ -276,7 +312,8 @@ impl EphemeraClient {
     /// `POST /v1/vms/{id}/agent` — exec a command over the in-guest vsock
     /// agent (requires `CreateVmRequest.agent.enabled`). Returned as raw
     /// JSON for now; `ephemera-guest-protocol::AgentResponse` isn't mirrored
-    /// here yet since exec isn't part of the Phase 1 lifecycle smoke test.
+    /// here yet since exec isn't part of the Phase 1/2 read-only/lifecycle
+    /// scope this client currently covers.
     pub async fn agent_exec(
         &self,
         id: Uuid,
@@ -284,8 +321,7 @@ impl EphemeraClient {
         timeout_seconds: Option<u64>,
     ) -> Result<serde_json::Value> {
         let resp = self
-            .http
-            .post(self.url(&format!("/v1/vms/{id}/agent"))?)
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent"))?))
             .json(&ExecRequest { command: command.into(), timeout_seconds })
             .send()
             .await?;
