@@ -155,16 +155,30 @@ pub struct FaultToleranceManager {
     configs: Arc<RwLock<HashMap<String, FtConfig>>>,
     events: Arc<RwLock<Vec<FtEvent>>>,
     metrics: Arc<RwLock<HashMap<String, FtMetrics>>>,
+    /// VM driver used by `trigger_failover` to fence/start VMs. `None` for
+    /// every other method (config/event/metric bookkeeping needs no driver),
+    /// and for callers that only need those — `trigger_failover` itself
+    /// requires one, see `with_driver`.
+    driver: Option<Arc<dyn zyvor_fabric_driver_core::VmDriver>>,
 }
 
 impl FaultToleranceManager {
-    /// Create a new fault-tolerance manager with empty state.
+    /// Create a new fault-tolerance manager with empty state and no driver
+    /// (sufficient for everything except `trigger_failover`).
     pub fn new() -> Self {
         Self {
             configs: Arc::new(RwLock::new(HashMap::new())),
             events: Arc::new(RwLock::new(Vec::new())),
             metrics: Arc::new(RwLock::new(HashMap::new())),
+            driver: None,
         }
+    }
+
+    /// Attach the VM driver `trigger_failover` uses to fence and restart
+    /// VMs during a real failover.
+    pub fn with_driver(mut self, driver: Arc<dyn zyvor_fabric_driver_core::VmDriver>) -> Self {
+        self.driver = Some(driver);
+        self
     }
 
     /// Enable fault tolerance for a VM, setting up synchronous replication
@@ -303,49 +317,46 @@ impl FaultToleranceManager {
     }
 
     /// Trigger a real failover: fence the old primary, promote the secondary
-    /// host to primary, and start the VM on the new primary.
-    pub fn trigger_failover(&self, vm_name: &str) -> Result<FailoverResult> {
-        let mut configs = self
-            .configs
-            .write()
-            .map_err(|e| anyhow!("lock poisoned: {e}"))?;
+    /// host to primary, and start the VM on the new primary — via the
+    /// injected `VmDriver` (see `with_driver`) rather than shelling out to
+    /// machinectl/systemd-vmspawn directly.
+    pub async fn trigger_failover(&self, vm_name: &str) -> Result<FailoverResult> {
+        let driver = self.driver.clone().ok_or_else(|| {
+            anyhow!(
+                "fault tolerance failover requires a VM driver — construct via \
+                 FaultToleranceManager::with_driver()"
+            )
+        })?;
 
-        let config = configs
-            .get_mut(vm_name)
-            .ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
-
-        if config.status != FtStatus::Enabled {
-            return Err(FtError::NotEnabled(vm_name.to_string()).into());
-        }
+        let (old_primary, new_primary) = {
+            let configs = self.configs.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            let config = configs.get(vm_name).ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
+            if config.status != FtStatus::Enabled {
+                return Err(FtError::NotEnabled(vm_name.to_string()).into());
+            }
+            (config.primary_host_id.clone(), config.secondary_host_id.clone())
+        };
 
         let start_time = std::time::Instant::now();
 
-        let old_primary = config.primary_host_id.clone();
-        let new_primary = config.secondary_host_id.clone();
-
-        // Step 1: Fence the old primary (stop the VM via machinectl).
+        // Step 1: Fence the old primary.
         tracing::info!(
             vm = vm_name,
             host = %old_primary,
             "FT failover: fencing VM on old primary"
         );
-        let fence_method = match std::process::Command::new("machinectl")
-            .args(["poweroff", vm_name])
-            .output()
-        {
-            Ok(out) if out.status.success() => {
+        let fence_method = match driver.poweroff(vm_name).await {
+            Ok(()) => {
                 tracing::info!(vm = vm_name, "FT failover: VM powered off on old primary");
                 "poweroff".to_string()
             }
-            _ => {
-                // Force terminate if graceful poweroff fails.
+            Err(e) => {
                 tracing::warn!(
                     vm = vm_name,
+                    error = %e,
                     "FT failover: graceful poweroff failed, force terminating"
                 );
-                let _ = std::process::Command::new("machinectl")
-                    .args(["terminate", vm_name])
-                    .output();
+                let _ = driver.terminate(vm_name).await;
                 "terminate".to_string()
             }
         };
@@ -356,40 +367,25 @@ impl FaultToleranceManager {
             new_primary = %new_primary,
             "FT failover: promoting secondary host as primary"
         );
-        config.primary_host_id = new_primary.clone();
-        config.secondary_host_id = String::new();
-        config.status = FtStatus::NeedSecondary;
-        config.replication_state = ReplicationState::OutOfSync;
-        config.failover_count += 1;
-        config.updated = Utc::now();
-
-        // Step 3: Start the VM on the new primary via systemd-vmspawn.
-        let image_path = format!("/var/lib/machines/{}.raw", vm_name);
-        let (success, error) = match std::process::Command::new("systemd-vmspawn")
-            .args(["--image", &image_path, "--machine", vm_name])
-            .spawn()
         {
-            Ok(mut child) => match child.wait() {
-                Ok(status) if status.success() => {
-                    tracing::info!(vm = vm_name, "FT failover: VM started on new primary");
-                    (true, None)
-                }
-                Ok(status) => {
-                    let msg = format!(
-                        "systemd-vmspawn exited with status {}",
-                        status.code().unwrap_or(-1)
-                    );
-                    tracing::error!(vm = vm_name, %msg, "FT failover: VM start failed");
-                    (false, Some(msg))
-                }
-                Err(e) => {
-                    let msg = format!("failed waiting for systemd-vmspawn: {e}");
-                    tracing::error!(vm = vm_name, %msg, "FT failover: VM start failed");
-                    (false, Some(msg))
-                }
-            },
+            let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            let config = configs.get_mut(vm_name).ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
+            config.primary_host_id = new_primary.clone();
+            config.secondary_host_id = String::new();
+            config.status = FtStatus::NeedSecondary;
+            config.replication_state = ReplicationState::OutOfSync;
+            config.failover_count += 1;
+            config.updated = Utc::now();
+        }
+
+        // Step 3: Start the VM on the new primary.
+        let (success, error) = match driver.start(vm_name).await {
+            Ok(()) => {
+                tracing::info!(vm = vm_name, "FT failover: VM started on new primary");
+                (true, None)
+            }
             Err(e) => {
-                let msg = format!("failed to spawn systemd-vmspawn: {e}");
+                let msg = format!("failed to start VM on new primary: {e:#}");
                 tracing::error!(vm = vm_name, %msg, "FT failover: VM start failed");
                 (false, Some(msg))
             }
@@ -425,8 +421,6 @@ impl FaultToleranceManager {
             success = success,
             "Failover completed"
         );
-
-        drop(configs);
 
         // Record start and completion events.
         let now = Utc::now();
@@ -783,18 +777,124 @@ mod tests {
 
     // -- failover -----------------------------------------------------------
 
+    struct MockDriver;
+
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::VMDriver for MockDriver {
+        async fn start(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn poweroff(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn terminate(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn reboot(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn get_state(&self, _name: &str) -> Result<vm_model::VMState> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn list_machines(&self) -> Result<Vec<zyvor_fabric_driver_core::MachineInfo>> {
+            Ok(vec![])
+        }
+        async fn get_properties(&self, _name: &str) -> Result<std::collections::HashMap<String, String>> {
+            Ok(Default::default())
+        }
+        async fn get_leader_pid(&self, _name: &str) -> Result<u32> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn enable(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn disable(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn get_control_socket(&self, _name: &str) -> Result<Option<std::path::PathBuf>> {
+            Ok(None)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::ResourceStatsDriver for MockDriver {
+        async fn get_metrics(&self, _name: &str) -> Result<vm_model::VMMetrics> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn get_pressure(&self, _name: &str) -> Result<vm_model::VMPressure> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::ResourceControlDriver for MockDriver {
+        async fn set_cpu_quota(&self, _name: &str, _percent: u32) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn set_memory_max(&self, _name: &str, _bytes: u64) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn set_io_weight(&self, _name: &str, _weight: u32) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn freeze(&self, _name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn thaw(&self, _name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn is_frozen(&self, _name: &str) -> Result<bool> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn set_pids_max(&self, _name: &str, _max: u64) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn set_cpuset(&self, _name: &str, _cpus: &[u32]) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::LogDriver for MockDriver {
+        async fn stream_logs(&self, _name: &str, _lines: u32) -> Result<zyvor_fabric_driver_core::LogStream> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
+    impl zyvor_fabric_driver_core::CapabilityProvider for MockDriver {
+        fn backend_name(&self) -> &'static str {
+            "mock"
+        }
+        fn has_resource_control(&self) -> bool {
+            false
+        }
+    }
+
     #[test]
-    fn test_trigger_failover() {
+    fn test_trigger_failover_requires_driver() {
         let mgr = manager();
         mgr.enable_ft("vm-1", "host-a", "host-b").unwrap();
 
-        let result = mgr.trigger_failover("vm-1").unwrap();
-        // Real failover invokes machinectl/systemd-vmspawn which are unlikely
-        // to succeed in a unit-test environment, so we only assert structural
+        let result = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(mgr.trigger_failover("vm-1"));
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_trigger_failover() {
+        let mgr = manager().with_driver(Arc::new(MockDriver));
+        mgr.enable_ft("vm-1", "host-a", "host-b").unwrap();
+
+        let result = mgr.trigger_failover("vm-1").await.unwrap();
+        // MockDriver's start/poweroff/terminate all succeed, so this exercises
         // correctness, not success.
         assert_eq!(result.old_primary, "host-a");
         assert_eq!(result.new_primary, "host-b");
-        assert!(result.fence_method.is_some());
+        assert_eq!(result.fence_method.as_deref(), Some("poweroff"));
+        assert!(result.success);
+        assert!(result.error.is_none());
 
         // After failover the VM should need a new secondary regardless of
         // whether the VM actually started.

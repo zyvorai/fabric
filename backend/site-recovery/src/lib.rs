@@ -295,16 +295,29 @@ pub struct SiteRecoveryManager {
     plans: Arc<RwLock<HashMap<String, RecoveryPlan>>>,
     executions: Arc<RwLock<HashMap<String, RecoveryExecution>>>,
     test_results: Arc<RwLock<Vec<TestResult>>>,
+    /// VM driver used by `execute_step`'s `PowerOff`/`PowerOn` steps. `None`
+    /// for every other method (plan/execution bookkeeping needs no driver) —
+    /// `run_execution` itself requires one, see `with_driver`.
+    driver: Option<Arc<dyn zyvor_fabric_driver_core::VmDriver>>,
 }
 
 impl SiteRecoveryManager {
-    /// Create a new, empty manager.
+    /// Create a new, empty manager with no driver (sufficient for
+    /// everything except `run_execution`).
     pub fn new() -> Self {
         Self {
             plans: Arc::new(RwLock::new(HashMap::new())),
             executions: Arc::new(RwLock::new(HashMap::new())),
             test_results: Arc::new(RwLock::new(Vec::new())),
+            driver: None,
         }
+    }
+
+    /// Attach the VM driver `run_execution` uses for `PowerOff`/`PowerOn`
+    /// recovery steps.
+    pub fn with_driver(mut self, driver: Arc<dyn zyvor_fabric_driver_core::VmDriver>) -> Self {
+        self.driver = Some(driver);
+        self
     }
 
     // -- Plan CRUD ----------------------------------------------------------
@@ -780,13 +793,14 @@ impl SiteRecoveryManager {
         steps
     }
 
-    /// Execute a single recovery step by dispatching to the appropriate
-    /// system command based on its `step_type`.
+    /// Execute a single recovery step, dispatching `PowerOff`/`PowerOn` to
+    /// `self.driver` (see `with_driver`) rather than shelling out to
+    /// machinectl/systemd-vmspawn directly.
     ///
     /// Updates the step's `status`, `started`, `completed`, and `error`
     /// fields in place.  Returns `Ok(())` on success or an error describing
     /// what went wrong.
-    pub fn execute_step(step: &mut RecoveryStep) -> Result<()> {
+    pub async fn execute_step(&self, step: &mut RecoveryStep) -> Result<()> {
         step.status = StepStatus::Running;
         step.started = Some(Utc::now());
 
@@ -794,36 +808,20 @@ impl SiteRecoveryManager {
 
         let result = match step.step_type {
             StepType::PowerOff => {
-                // Stop the VM via machinectl.
                 tracing::info!(vm = target, "step {}: powering off VM", step.step_number);
-                let output = std::process::Command::new("machinectl")
-                    .args(["poweroff", target])
-                    .output()
-                    .map_err(|e| anyhow::anyhow!("failed to run machinectl: {e}"))?;
-                if output.status.success() {
-                    Ok(())
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    Err(anyhow::anyhow!(
-                        "machinectl poweroff failed: {}",
-                        stderr.trim()
-                    ))
-                }
+                let driver = self
+                    .driver
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("recovery execution requires a VM driver — construct via SiteRecoveryManager::with_driver()"))?;
+                driver.poweroff(target).await.map_err(|e| anyhow::anyhow!("failed to power off '{target}': {e:#}"))
             }
             StepType::PowerOn => {
-                // Start the VM via systemd-vmspawn.
                 tracing::info!(vm = target, "step {}: powering on VM", step.step_number);
-                let image_path = format!("/var/lib/machines/{}.raw", target);
-                let output = std::process::Command::new("systemd-vmspawn")
-                    .args(["--image", &image_path, "--machine", target])
-                    .output()
-                    .map_err(|e| anyhow::anyhow!("failed to run systemd-vmspawn: {e}"))?;
-                if output.status.success() {
-                    Ok(())
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    Err(anyhow::anyhow!("systemd-vmspawn failed: {}", stderr.trim()))
-                }
+                let driver = self
+                    .driver
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("recovery execution requires a VM driver — construct via SiteRecoveryManager::with_driver()"))?;
+                driver.start(target).await.map_err(|e| anyhow::anyhow!("failed to start '{target}': {e:#}"))
             }
             StepType::Sync => {
                 // Sync the VM image to the target site using rsync.
@@ -931,7 +929,7 @@ impl SiteRecoveryManager {
     ///
     /// Returns `Ok(true)` if all steps completed, `Ok(false)` if a step
     /// failed (execution is marked as failed), or `Err` on internal errors.
-    pub fn run_execution(&self, execution_id: &str) -> Result<bool> {
+    pub async fn run_execution(&self, execution_id: &str) -> Result<bool> {
         // Collect the step numbers we need to execute.
         let step_numbers: Vec<u32> = {
             let executions = self.executions.read().unwrap_or_else(|e| e.into_inner());
@@ -963,7 +961,7 @@ impl SiteRecoveryManager {
                     })?
             };
 
-            let exec_result = Self::execute_step(&mut step);
+            let exec_result = self.execute_step(&mut step).await;
 
             // Write the step result back.
             {

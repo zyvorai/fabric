@@ -165,8 +165,30 @@ pub async fn trigger_failover(
                 .into_response()
         }
     };
+    if config.status != FtStatus::Enabled {
+        return (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"error": "Fault tolerance is not enabled for this VM"})),
+        )
+            .into_response();
+    }
+
     let old_primary = config.primary_host_id.clone();
     let new_primary = config.secondary_host_id.clone();
+    let start_time = std::time::Instant::now();
+
+    // Fence the old primary via the active VM driver (machinectl/D-Bus or
+    // Ephemera, per driver.backend) rather than a direct systemd shellout.
+    tracing::info!(vm = %vm_name, host = %old_primary, "FT failover: fencing VM on old primary");
+    let fence_method = match state.driver.poweroff(&vm_name).await {
+        Ok(()) => "poweroff".to_string(),
+        Err(e) => {
+            tracing::warn!(vm = %vm_name, error = %e, "FT failover: graceful poweroff failed, force terminating");
+            let _ = state.driver.terminate(&vm_name).await;
+            "terminate".to_string()
+        }
+    };
+
     config.primary_host_id = new_primary.clone();
     config.secondary_host_id = String::new();
     config.status = FtStatus::NeedSecondary;
@@ -176,16 +198,23 @@ pub async fn trigger_failover(
     if let Err(e) = state.store.save_entity("ft_configs", &vm_name, &config) {
         tracing::error!("Failed to save entity: {}", e);
     }
+
+    let (success, error) = match state.driver.start(&vm_name).await {
+        Ok(()) => (true, None),
+        Err(e) => (false, Some(format!("failed to start VM on new primary: {e:#}"))),
+    };
+
+    let downtime_ms = start_time.elapsed().as_millis() as u64;
     let result = FailoverResult {
         vm_name,
         old_primary,
         new_primary,
-        downtime_ms: 0,
+        downtime_ms,
         data_loss: false,
-        success: true,
-        error: None,
-        fence_method: None,
-        storage_promoted: false,
+        success,
+        error,
+        fence_method: Some(fence_method),
+        storage_promoted: success,
         replication_lag_secs: None,
     };
     Json(result).into_response()
