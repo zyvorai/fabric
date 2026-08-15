@@ -304,7 +304,7 @@ cmd_deps() {
     ok "All dependencies installed"
     echo ""
     info "Next: run ${BOLD}./zyvorctl build${NC} to build the project"
-    info "  Or: run ${BOLD}./zyvorctl doctor${NC} to verify readiness"
+    info "  Or: run ${BOLD}./zyvor-fabricd-ctl doctor${NC} to verify readiness"
 }
 
 # ── build: Build the project ────────────────────────────────────────────
@@ -555,8 +555,8 @@ cmd_deploy() {
     echo ""
     echo -e "  ${BOLD}API:${NC}        ${CYAN}$API_URL${NC}"
     echo -e "  ${BOLD}Password:${NC}   ${CYAN}sudo cat /var/lib/zyvor-fabricd/.admin_password${NC}"
-    echo -e "  ${BOLD}Status:${NC}     ${CYAN}./zyvorctl status${NC}"
-    echo -e "  ${BOLD}Demo:${NC}       ${CYAN}./zyvorctl demo${NC}"
+    echo -e "  ${BOLD}Status:${NC}     ${CYAN}./zyvor-fabricd-ctl status${NC}"
+    echo -e "  ${BOLD}Demo:${NC}       ${CYAN}./zyvor-fabricd-ctl demo${NC}"
     echo -e "  ${BOLD}Logs:${NC}       ${CYAN}sudo journalctl -u zyvor-fabricd -f${NC}"
     echo ""
 }
@@ -652,7 +652,7 @@ cmd_backup() {
             journalctl -u zyvor-fabricd-backup -f --no-hostname
             ;;
         *)
-            echo "Usage: zyvorctl backup <now|enable|disable|status|logs>"
+            echo "Usage: zyvor-fabricd-ctl backup <now|enable|disable|status|logs>"
             ;;
     esac
 }
@@ -893,7 +893,7 @@ cmd_doctor() {
     if [[ $issues -eq 0 ]]; then
         ok "System is ready"
     else
-        warn "$issues issue(s) found — run ${BOLD}sudo ./zyvorctl deps${NC} to fix"
+        warn "$issues issue(s) found — run ${BOLD}sudo ./zyvor-fabricd-ctl deps${NC} to fix"
     fi
 }
 
@@ -1115,15 +1115,15 @@ cmd_help() {
     echo "  help              Show this help"
     echo ""
     echo -e "${BOLD}Quick start (manual):${NC}"
-    echo "  ./zyvorctl deps            # Install dependencies (auto-sudo)"
+    echo "  ./zyvor-fabricd-ctl deps            # Install dependencies (auto-sudo)"
     echo "  ./zyvorctl build           # Build everything"
     echo "  ./zyvorctl test            # Run tests"
     echo "  ./zyvorctl install         # Install to system (auto-sudo)"
     echo "  ./zyvorctl start           # Start the service (auto-sudo)"
-    echo "  ./zyvorctl demo            # Run the demo"
+    echo "  ./zyvor-fabricd-ctl demo            # Run the demo"
     echo ""
     echo -e "${BOLD}Quick start (automated):${NC}"
-    echo "  ./zyvorctl deploy          # Does everything in one command"
+    echo "  ./zyvor-fabricd-ctl deploy          # Does everything in one command"
     echo ""
     echo -e "${BOLD}Environment:${NC}"
     echo "  ZYVOR_FABRICD_URL    API URL (default: http://127.0.0.1:9095)"

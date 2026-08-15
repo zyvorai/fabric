@@ -150,7 +150,7 @@ check_remote_health() {
     deploy_ui_highlight "🩺 Remote health check"
     hr
     info "SSH target → $r"
-    ssh_r "$r" env STRICT="$STRICT" HEALTH_URL="$HEALTH_URL" API_PORT="$API_PORT" bash -s <<'EOS'
+    ssh_r "$r" env STRICT="$STRICT" HEALTH_URL="$HEALTH_URL" API_PORT="$API_PORT" REMOTE_DIR="$REMOTE_DIR" bash -s <<'EOS'
 run() {
     info() { printf 'ℹ️  %s\n' "$*"; }
     ok()   { printf '✅ %s\n' "$*"; }
@@ -178,9 +178,10 @@ run() {
     else
         warn "curl missing — skip HTTP check"
     fi
-    if command -v zyvorctl &>/dev/null; then
-        printf '\n🧪 zyvorctl verify\n'
-        ZYVOR_FABRICD_URL="http://127.0.0.1:${API_PORT}" zyvorctl verify 2>/dev/null && ok "verify passed" || warn "verify failed (check admin password / service logs)"
+    ctl="${REMOTE_DIR:-$HOME/zyvor-fabric}/zyvor-fabricd-ctl"
+    if [[ -x "$ctl" ]]; then
+        printf '\n🧪 zyvor-fabricd-ctl verify\n'
+        ZYVOR_FABRICD_URL="http://127.0.0.1:${API_PORT}" "$ctl" verify 2>/dev/null && ok "verify passed" || warn "verify failed (check admin password / service logs)"
     fi
     printf '\n'
 }
@@ -588,7 +589,7 @@ fi
 ok "Web dashboard deployed"
 install_step=$((install_step + 1))
 
-phase "$install_step" "$TOTAL_STEPS" "Post-flight verification" "health endpoint · systemd · zyvorctl verify"
+phase "$install_step" "$TOTAL_STEPS" "Post-flight verification" "health endpoint · systemd · zyvor-fabricd-ctl verify"
 sleep 1
 check_remote_health "$REMOTE" || true
 
@@ -611,12 +612,12 @@ deploy_ui_celebrate "Ship it!"
 vmspawn_print_success "$HOST" "$ELAPSED" "$USER"
 deploy_ui_kv "🔗" "SSH" "ssh ${USER}@${HOST}"
 deploy_ui_kv "🔑" "Password" "sudo cat /var/lib/zyvor-fabricd/.admin_password"
-deploy_ui_kv "🚀" "Manage" "zyvorctl status · zyvorctl verify"
+deploy_ui_kv "🚀" "Manage" "zyvor-fabricd-ctl status · zyvor-fabricd-ctl verify"
 tip "HOST USER also works: ./scripts/deploy-remote.sh ${HOST} ${USER} --quick"
 
 if $RUN_E2E; then
     deploy_ui_highlight "🧪 Post-deploy E2E"
-    if ssh_r_bash "$REMOTE" "ZYVOR_FABRICD_URL=http://127.0.0.1:${API_PORT} zyvorctl verify"; then
+    if ssh_r_bash "$REMOTE" "ZYVOR_FABRICD_URL=http://127.0.0.1:${API_PORT} ${REMOTE_DIR}/zyvor-fabricd-ctl verify"; then
         deploy_ui_celebrate "E2E passed"
     else
         warn "E2E failed (deploy itself succeeded)"

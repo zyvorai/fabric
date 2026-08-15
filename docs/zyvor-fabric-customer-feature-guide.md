@@ -25,16 +25,16 @@ This is the customer-facing onboarding guide — how to access the product, your
 
 **How to access it**
 
-- **Web:** React dashboard served by the `zyvor-fabricd` daemon at https://localhost:8443 — dark-themed, 37+ pages, a `Ctrl+K` command palette, and live WebSocket/SSE updates. It shares the daemon's origin (no separate web server); generate the TLS cert with `./zyvorctl tls`.
+- **Web:** React dashboard served by the `zyvor-fabricd` daemon at https://localhost:8443 — dark-themed, 37+ pages, a `Ctrl+K` command palette, and live WebSocket/SSE updates. It shares the daemon's origin (no separate web server); generate the TLS cert with `./zyvor-fabricd-ctl tls`.
 - **CLI:** `zyvorctl` — scriptable client with table/JSON/YAML output (`--output json`). Examples: `zyvorctl vm list`, `zyvorctl vm create --name web-01 --cpus 2 --memory 4G`, `zyvorctl vm start web-01`, `zyvorctl apply -f config.yaml`. Live terminal dashboard: `zyvorctl-tui` (k9s-style, vim keys, 8 views), pointed at the daemon with `--url http://:`.
 - **API:** REST + WebSocket exposed by the `zyvor-fabricd` daemon (480+ endpoints under `/api/...`). Obtain a token with `POST /api/auth/login`, then pass `Authorization: Bearer ` on every call. The same API also backs the Terraform provider, the Kubernetes `VirtualMachine` CRD operator, and the Rust/Python/Ansible SDKs.
-- **Login:** Username `admin`; the initial password is auto-generated on first run — read it with `./zyvorctl password` (or `sudo cat /var/lib/zyvor-fabricd/.admin_password`). JWT tokens last 24h by default (`auth.token_expiration_hours`); 3-tier RBAC (admin/user/viewer) is enforced on every endpoint, with optional TOTP 2FA.
+- **Login:** Username `admin`; the initial password is auto-generated on first run — read it with `./zyvor-fabricd-ctl password` (or `sudo cat /var/lib/zyvor-fabricd/.admin_password`). JWT tokens last 24h by default (`auth.token_expiration_hours`); 3-tier RBAC (admin/user/viewer) is enforced on every endpoint, with optional TOTP 2FA.
 - **Needs:** A Linux host with systemd 256+ and KVM; install and bring the daemon up with `sudo systemctl enable --now zyvor-fabric`.
 
 **Your first workflows**
 
 - **Launch your first VM in five minutes**
-  1. Start the daemon: `sudo systemctl enable --now zyvor-fabric`, then read the admin password with `./zyvorctl password`.
+  1. Start the daemon: `sudo systemctl enable --now zyvor-fabric`, then read the admin password with `./zyvor-fabricd-ctl password`.
   1. Pull a cloud image from the built-in catalog (`POST /api/images/cloud/download` with `{"name":"fedora-41"}`), or list options first with `GET /api/images/cloud`.
   1. Create the VM: `zyvorctl vm create --name web-01 --cpus 2 --memory 4G` (image `fedora-41`).
   1. Start it: `zyvorctl vm start web-01`, then confirm `state: running` with `zyvorctl vm list`.
@@ -132,7 +132,7 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 - **Audit Logging** — Audit trail on all VM lifecycle operations with JSON/CSV export. — _Answer 'who did what, when' for compliance and RCA._
   - **How:** Audit trail via `GET /api/audit/logs` with JSON/CSV export · Web Audit page (filter by user/action/resource/time) · TUI Logs view.
 - **PKI & Certificate Manager** — CA creation, certificate issue/renew/revoke, automated rotation, and hardware attestation. — _Run internal TLS without a separate PKI product._
-  - **How:** CA create + cert issue/renew/revoke + rotation via the certificate REST endpoints; `./zyvorctl tls` generates the web-server cert · Web Administration → certificates.
+  - **How:** CA create + cert issue/renew/revoke + rotation via the certificate REST endpoints; `./zyvor-fabricd-ctl tls` generates the web-server cert · Web Administration → certificates.
 - **Compliance Scanning** — Built-in CIS, STIG, and PCI-DSS profiles with per-VM findings and remediation guidance. — _Prove and improve posture against recognized benchmarks._
   - **How:** REST `GET /api/compliance/profiles`, `POST /api/compliance/scan/:vm` (`profile_id` cis-level1/cis-level2/stig/pci-dss/hipaa), `GET /api/compliance/results` · Web Compliance page · `[compliance]` config enables auto-scan.
 
@@ -185,7 +185,7 @@ _Metrics, scheduling, notifications, and self-checks that keep the fabric health
 - **Multi-Channel Notifications** — Email, Slack, Microsoft Teams, and webhook alerts with retry and backoff. — _The right people hear about problems the moment they happen._
   - **How:** REST `POST /api/notifications/channels` (email/slack/webhook/teams) + `/rules`, verify with `POST .../channels/:id/test` · Web Notifications page · exponential-backoff retry (max 10 attempts).
 - **Health & Auto-Verify** — Deep health checks (API, disk, DB, timers, KVM) and post-install smoke tests of API, auth, VM CRUD, and backups. — _Catch a broken deploy before your users do._
-  - **How:** Run `./zyvorctl health` (API/disk/DB/timers/KVM) and `./zyvorctl verify` (post-install smoke tests of API, auth, VM CRUD, backups) · health also exposed over REST.
+  - **How:** Run `./zyvor-fabricd-ctl health` (API/disk/DB/timers/KVM) and `./zyvor-fabricd-ctl verify` (post-install smoke tests of API, auth, VM CRUD, backups) · health also exposed over REST.
 - **Config Snapshots & Events** — Versioned config-snapshot API, retained lifecycle events, and an SSE event stream for time-machine correlation. — _Diff infrastructure over time and reconstruct incidents._
   - **How:** Versioned config-snapshot REST API + recent events `GET /api/events` and live SSE `GET /api/events/stream` (created/started/stopped/migrated/error/…) · Web activity feed.
 
@@ -233,11 +233,11 @@ _Datacenter hierarchy, resource pools, chargeback, and lifecycle compliance at s
 
 ## Getting started
 
-1. **Install in one command** — Clone the repo and run make build && sudo make install, or ./zyvorctl deploy for an auto-sudo end-to-end setup.
-2. **Start the service** — Run sudo systemctl enable --now zyvor-fabric, then read the auto-generated admin password with ./zyvorctl password.
+1. **Install in one command** — Clone the repo and run make build && sudo make install, or ./zyvor-fabricd-ctl deploy for an auto-sudo end-to-end setup.
+2. **Start the service** — Run sudo systemctl enable --now zyvor-fabric, then read the auto-generated admin password with ./zyvor-fabricd-ctl password.
 3. **Create your first VM** — Use zyvorctl vm create --name web-01 --cpus 2 --memory 4G, or declare it in YAML and run zyvorctl apply -f config.yaml.
 4. **Open your interface of choice** — Launch zyvorctl-tui in a terminal or open the web dashboard at https://localhost:8443 to manage the fleet.
-5. **Verify and monitor** — Run ./zyvorctl verify and ./zyvorctl health, then scrape /metrics into Prometheus and import the bundled Grafana dashboard.
+5. **Verify and monitor** — Run ./zyvor-fabricd-ctl verify and ./zyvor-fabricd-ctl health, then scrape /metrics into Prometheus and import the bundled Grafana dashboard.
 
 > **Good to know:** Zyvor Fabric requires Linux with systemd 256+ (Fedora, Ubuntu, Debian, RHEL, or SUSE) and KVM; it is not a hosted or Windows-server product. Some enterprise capabilities carry environmental prerequisites — swtpm for vTPM, an etcd cluster and shared/replicated storage for HA and live migration, and matching hardware/IOMMU for GPU passthrough. Multi-node HA is designed for 3+ nodes; single-server deployments run standalone. The published endpoint and page counts (480+ REST endpoints, 37+ web pages) reflect current documentation and may vary by release, and the macOS Machina workbench is a separate desktop product that consumes the Fabric API rather than part of this daemon.
 

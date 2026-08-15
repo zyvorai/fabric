@@ -30,7 +30,7 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 |-------|------|-------|
 | **Product** | Zyvor Fabric | Marketing, UI, documentation, sales |
 | **Daemon** | `zyvor-fabricd` | systemd unit, config paths, APIs — stable technical identifier |
-| **CLI** | `zyvorctl`, `zyvorctl` | Operational tools; no rename required for v1 |
+| **CLI** | `zyvorctl`, `zyvor-fabricd-ctl` | Operational tools |
 | **Repo** | [zyvor-fabric](https://github.com/ssahani/zyvor-fabric) | GitHub redirects from `vmspawn` |
 
 Keeping `zyvor-fabricd` as the daemon name avoids breaking installs, Ansible roles, and automation. User-facing surfaces say **Zyvor Fabric**; ops runbooks reference `zyvor-fabricd` where commands and paths matter.

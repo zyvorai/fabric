@@ -37,7 +37,7 @@ Zyvor Fabric uses JWT authentication. First, retrieve the admin password:
 
 ```bash
 # Using zyvorctl
-./zyvorctl password
+./zyvor-fabricd-ctl password
 
 # Or read the file directly
 sudo cat /var/lib/zyvor-fabricd/.admin_password

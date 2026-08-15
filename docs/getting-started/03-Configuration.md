@@ -198,7 +198,7 @@ Read the current admin password:
 ```bash
 sudo cat /var/lib/zyvor-fabricd/.admin_password
 # Or using zyvorctl
-./zyvorctl password
+./zyvor-fabricd-ctl password
 ```
 
 For production, set a known password:

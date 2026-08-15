@@ -54,10 +54,10 @@ git clone <repository-url>
 cd zyvor-fabric
 
 # One-command deployment (auto-sudo)
-./zyvorctl deploy
+./zyvor-fabricd-ctl deploy
 
 # Read the generated admin password
-./zyvorctl password
+./zyvor-fabricd-ctl password
 
 # Open the web dashboard
 open http://127.0.0.1:9095

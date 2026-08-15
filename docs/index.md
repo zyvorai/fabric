@@ -42,7 +42,7 @@ Step-by-step walkthroughs for common workflows.
 | Document | Description |
 |----------|-------------|
 | zyvorctl Reference | Full CLI command reference with examples |
-| zyvorctl Operations | Deployment, management, and maintenance commands |
+| zyvor-fabricd-ctl Operations | Deployment, management, and maintenance commands |
 | Declarative Configuration | Define VM infrastructure as YAML with `zyvorctl apply` |
 | Shell Completions | Enable tab completion for bash |
 
@@ -253,30 +253,30 @@ Detailed documentation for each major feature area.
 | `zyvorctl ceph` | Ceph storage management |
 | `zyvorctl console` | Attach to VM console |
 
-### zyvorctl Reference
+### zyvor-fabricd-ctl Reference
 
 | Command | Description |
 |---------|-------------|
-| `zyvorctl deploy` | Full deployment (deps + build + install + start) |
-| `zyvorctl deps` | Install system dependencies |
-| `zyvorctl build` | Build from source |
-| `zyvorctl install` | Install binaries and systemd units |
-| `zyvorctl start` | Start the zyvor-fabricd service |
-| `zyvorctl stop` | Stop the zyvor-fabricd service |
-| `zyvorctl restart` | Restart the service |
-| `zyvorctl status` | Show service status |
-| `zyvorctl logs` | Follow service logs |
-| `zyvorctl verify` | Post-install smoke test |
-| `zyvorctl health` | Deep health check |
-| `zyvorctl password` | Read the admin password |
-| `zyvorctl doctor` | System readiness check |
-| `zyvorctl tls` | Generate self-signed TLS certificate |
-| `zyvorctl upgrade` | Git pull + reinstall |
-| `zyvorctl uninstall` | Remove everything |
-| `zyvorctl billing` | View billing and usage reports |
-| `zyvorctl backup now` | Trigger immediate backup |
-| `zyvorctl backup enable` | Enable daily backup timer |
-| `zyvorctl backup status` | Show backup timer and storage info |
+| `zyvor-fabricd-ctl deploy` | Full deployment (deps + build + install + start) |
+| `zyvor-fabricd-ctl deps` | Install system dependencies |
+| `zyvor-fabricd-ctl build` | Build from source |
+| `zyvor-fabricd-ctl install` | Install binaries and systemd units |
+| `zyvor-fabricd-ctl start` | Start the zyvor-fabricd service |
+| `zyvor-fabricd-ctl stop` | Stop the zyvor-fabricd service |
+| `zyvor-fabricd-ctl restart` | Restart the service |
+| `zyvor-fabricd-ctl status` | Show service status |
+| `zyvor-fabricd-ctl logs` | Follow service logs |
+| `zyvor-fabricd-ctl verify` | Post-install smoke test |
+| `zyvor-fabricd-ctl health` | Deep health check |
+| `zyvor-fabricd-ctl password` | Read the admin password |
+| `zyvor-fabricd-ctl doctor` | System readiness check |
+| `zyvor-fabricd-ctl tls` | Generate self-signed TLS certificate |
+| `zyvor-fabricd-ctl upgrade` | Git pull + reinstall |
+| `zyvor-fabricd-ctl uninstall` | Remove everything |
+| `zyvor-fabricd-ctl billing` | View billing and usage reports |
+| `zyvor-fabricd-ctl backup now` | Trigger immediate backup |
+| `zyvor-fabricd-ctl backup enable` | Enable daily backup timer |
+| `zyvor-fabricd-ctl backup status` | Show backup timer and storage info |
 
 ### Rust SDK
 

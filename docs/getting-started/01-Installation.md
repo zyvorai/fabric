@@ -87,7 +87,7 @@ git clone <repository-url>
 cd zyvor-fabric
 
 # One-command deployment
-./zyvorctl deploy
+./zyvor-fabricd-ctl deploy
 ```
 
 This command will:
@@ -145,7 +145,7 @@ sudo modprobe kvm_amd     # AMD
 ```bash
 git clone <repository-url>
 cd zyvor-fabric
-./zyvorctl deploy
+./zyvor-fabricd-ctl deploy
 ```
 
 ---
@@ -270,7 +270,7 @@ On first start, Zyvor Fabric generates a random admin password:
 
 ```bash
 # Using zyvorctl
-./zyvorctl password
+./zyvor-fabricd-ctl password
 
 # Or read directly
 sudo cat /var/lib/zyvor-fabricd/.admin_password
@@ -279,7 +279,7 @@ sudo cat /var/lib/zyvor-fabricd/.admin_password
 ### 4. Run the Smoke Test
 
 ```bash
-./zyvorctl verify
+./zyvor-fabricd-ctl verify
 ```
 
 This runs automated checks against the API, authentication, VM CRUD operations, and backup functionality.
@@ -287,7 +287,7 @@ This runs automated checks against the API, authentication, VM CRUD operations, 
 ### 5. Run the Health Check
 
 ```bash
-./zyvorctl health
+./zyvor-fabricd-ctl health
 ```
 
 This performs a deep check of API availability, disk space, database integrity, credential files, systemd timers, memory, and KVM support.

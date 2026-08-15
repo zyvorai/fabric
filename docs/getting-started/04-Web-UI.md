@@ -31,7 +31,7 @@ Access it at `http://your-server-ip:9095`.
 For HTTPS access, generate a TLS certificate:
 
 ```bash
-./zyvorctl tls
+./zyvor-fabricd-ctl tls
 ```
 
 ---
@@ -48,7 +48,7 @@ On the login page, enter:
 Retrieve the admin password:
 
 ```bash
-./zyvorctl password
+./zyvor-fabricd-ctl password
 # Or: sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```
 

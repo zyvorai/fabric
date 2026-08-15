@@ -363,7 +363,7 @@ On first startup with authentication enabled:
 ### 4.3 Password Retrieval
 
 ```bash
-./zyvorctl password
+./zyvor-fabricd-ctl password
 # or directly:
 sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```

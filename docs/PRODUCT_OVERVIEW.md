@@ -144,8 +144,8 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 - **Backup configuration** via `[backup]` section in config file or `ZYVOR_FABRICD_BACKUP_DIR`/`ZYVOR_FABRICD_BACKUP_RETAIN`/`ZYVOR_FABRICD_BACKUP_TYPE` env vars
 - **Post-install auto-verify** — smoke test runs automatically after deploy/reinstall (API, auth, VM CRUD, backups)
 - **Deep health check** — API, disk space, DB integrity, credentials, timers, memory, KVM
-- **TLS certificate generation** — self-signed certs with SAN via `zyvorctl tls`
-- **Shell completions** — Bash tab completion for `zyvorctl` and `zyvorctl`
+- **TLS certificate generation** — self-signed certs with SAN via `zyvor-fabricd-ctl tls`
+- **Shell completions** — Bash tab completion for `zyvorctl` and `zyvor-fabricd-ctl`
 - Resource quotas, pools, and datacenter abstractions
 - **Database schema migrations** with version tracking
 
@@ -339,7 +339,7 @@ MIT — free for commercial use, modification, and distribution.
 
 ```bash
 # Deploy everything (auto-sudo — no manual sudo needed)
-./zyvorctl deploy
+./zyvor-fabricd-ctl deploy
 
 # That's it. Zyvor Fabric is running.
 ```
@@ -348,23 +348,23 @@ MIT — free for commercial use, modification, and distribution.
 
 ```bash
 # Install dependencies (auto-sudo)
-./zyvorctl deps
+./zyvor-fabricd-ctl deps
 
 # Build
-./zyvorctl build
+./zyvor-fabricd-ctl build
 
 # Run tests
-./zyvorctl test
+./zyvor-fabricd-ctl test
 
 # Install and start (auto-sudo)
-./zyvorctl install
-./zyvorctl start
+./zyvor-fabricd-ctl install
+./zyvor-fabricd-ctl start
 
 # Read admin password
-./zyvorctl password
+./zyvor-fabricd-ctl password
 
 # Run interactive demo
-./zyvorctl demo
+./zyvor-fabricd-ctl demo
 
 # Create your first VM
 zyvorctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
@@ -377,26 +377,26 @@ open http://localhost:9095
 ### Management Commands
 
 ```bash
-./zyvorctl status      # Check service status
-./zyvorctl verify      # Post-install smoke test (API, auth, VM CRUD, backups)
-./zyvorctl health      # Deep health check (disk, DB, timers, resources)
-./zyvorctl logs        # Follow logs
-./zyvorctl restart     # Restart service (auto-sudo)
-./zyvorctl reinstall   # Rebuild + reinstall + auto-verify (auto-sudo)
-./zyvorctl upgrade     # Git pull + reinstall (auto-sudo)
-./zyvorctl uninstall   # Remove everything (auto-sudo)
-./zyvorctl doctor      # System readiness check
-./zyvorctl tls         # Generate self-signed TLS certificate
+./zyvor-fabricd-ctl status      # Check service status
+./zyvor-fabricd-ctl verify      # Post-install smoke test (API, auth, VM CRUD, backups)
+./zyvor-fabricd-ctl health      # Deep health check (disk, DB, timers, resources)
+./zyvor-fabricd-ctl logs        # Follow logs
+./zyvor-fabricd-ctl restart     # Restart service (auto-sudo)
+./zyvor-fabricd-ctl reinstall   # Rebuild + reinstall + auto-verify (auto-sudo)
+./zyvor-fabricd-ctl upgrade     # Git pull + reinstall (auto-sudo)
+./zyvor-fabricd-ctl uninstall   # Remove everything (auto-sudo)
+./zyvor-fabricd-ctl doctor      # System readiness check
+./zyvor-fabricd-ctl tls         # Generate self-signed TLS certificate
 ```
 
 ### Backup Commands
 
 ```bash
-./zyvorctl backup now      # Run backup immediately
-./zyvorctl backup enable   # Enable daily backup timer (2:00 AM)
-./zyvorctl backup disable  # Disable backup timer
-./zyvorctl backup status   # Show timer state + storage info
-./zyvorctl backup logs     # Follow backup logs
+./zyvor-fabricd-ctl backup now      # Run backup immediately
+./zyvor-fabricd-ctl backup enable   # Enable daily backup timer (2:00 AM)
+./zyvor-fabricd-ctl backup disable  # Disable backup timer
+./zyvor-fabricd-ctl backup status   # Show timer state + storage info
+./zyvor-fabricd-ctl backup logs     # Follow backup logs
 ```
 
 ---

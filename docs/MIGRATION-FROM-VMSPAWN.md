@@ -16,7 +16,7 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 | Item | Value |
 |------|-------|
 | systemd unit | `zyvor-fabricd.service` |
-| Binary | `zyvor-fabricd`, `zyvorctl`, `zyvorctl` |
+| Binary | `zyvor-fabricd`, `zyvorctl`, `zyvor-fabricd-ctl` |
 | Config | `/etc/zyvor-fabricd/zyvor-fabricd.toml` |
 | State | `/var/lib/zyvor-fabricd/` |
 | Env vars | `ZYVOR_FABRICD_*` |

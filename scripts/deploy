@@ -31,7 +31,7 @@ Flags (passed to deploy-remote.sh):
   --remote-check    compile check on server (cargo check)
   --bind ADDR       API listen address (default 0.0.0.0 for remote IPv4)
   --open-firewall   open firewalld port 9095
-  --e2e             run zyvorctl verify after deploy
+  --e2e             run zyvor-fabricd-ctl verify after deploy
   --verify-apis     run scripts/audit-ux-apis.sh against deployed host
   --dry-run         show plan only
   --uninstall       remove zyvor-fabricd from remote
