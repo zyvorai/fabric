@@ -19,13 +19,38 @@ use security::{RequireAdmin, RequireRead, RequireWrite};
 // Data Structures
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VMAction {
     Start,
     Stop,
     Restart,
     Snapshot,
+}
+
+/// Run a `Start`/`Stop`/`Restart` schedule action through the active VM
+/// driver (machinectl/D-Bus or Ephemera, per `driver.backend`) instead of
+/// shelling directly to systemd-vmspawn/machinectl. `Snapshot` isn't a
+/// driver action — callers handle it separately (qemu-img against the
+/// VM's disk file).
+pub async fn run_vm_action(
+    driver: &Arc<dyn zyvor_fabric_driver_core::VmDriver>,
+    action: &VMAction,
+    vm_name: &str,
+) -> anyhow::Result<()> {
+    match action {
+        VMAction::Start => driver.start(vm_name).await,
+        VMAction::Stop => driver.poweroff(vm_name).await,
+        VMAction::Restart => {
+            driver.poweroff(vm_name).await?;
+            // Brief pause to allow the VM to fully stop before restarting,
+            // matching the prior stop-then-start behavior (not an in-guest
+            // reboot request).
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            driver.start(vm_name).await
+        }
+        VMAction::Snapshot => anyhow::bail!("Snapshot is not a driver action"),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -552,14 +577,9 @@ pub async fn run_schedule_now(
         schedule.vm_name
     );
 
-    // Execute the VM action via spawn_blocking to avoid blocking async runtime
     let vm_name_clone = schedule.vm_name.clone();
-    let action = schedule.action.clone();
-    let result = tokio::task::spawn_blocking(move || match action {
-        VMAction::Start => zyvor_fabric_vm_driver::start_vm(&vm_name_clone),
-        VMAction::Stop => zyvor_fabric_vm_driver::stop_vm(&vm_name_clone),
-        VMAction::Restart => zyvor_fabric_vm_driver::restart_vm(&vm_name_clone),
-        VMAction::Snapshot => {
+    let result = if schedule.action == VMAction::Snapshot {
+        tokio::task::spawn_blocking(move || {
             let snap_name = format!("scheduled-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
             let image_path = crate::validation::find_vm_image(&vm_name_clone);
             match image_path {
@@ -581,10 +601,12 @@ pub async fn run_schedule_now(
                     vm_name_clone
                 )),
             }
-        }
-    })
-    .await
-    .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+        })
+        .await
+        .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)))
+    } else {
+        run_vm_action(&state.driver, &schedule.action, &vm_name_clone).await
+    };
 
     // Check if execution was successful
     let (success, error) = match result {

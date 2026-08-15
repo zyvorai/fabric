@@ -3,12 +3,13 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use vm_model::VMState;
+use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
-use zyvor_fabric_ephemera_client::{VmRecord, VmStatus};
+use zyvor_fabric_ephemera_client::{BackendKind, CreateVmRequest, NetworkSpec, VmRecord, VmStatus};
 
 use crate::EphemeraDriver;
 
@@ -17,6 +18,18 @@ impl VMDriver for EphemeraDriver {
     async fn start(&self, name: &str) -> Result<()> {
         let vm = self.resolve(name).await?;
         self.client.start_vm(vm.id).await.map(|_| ())
+    }
+
+    async fn start_with_options(&self, vm: &VM, opts: &VMStartOptions) -> Result<()> {
+        // Already known to Ephemera: options were (or should have been)
+        // baked in at creation time — replay the stored request rather
+        // than trying to apply a second, possibly-different option set.
+        if let Some(record) = self.client.find_by_name(&vm.name).await? {
+            return self.client.start_vm(record.id).await.map(|_| ());
+        }
+        // First launch: translate into an Ephemera CreateVmRequest.
+        let req = translate_start_options(vm, opts)?;
+        self.client.create_vm(&req).await.map(|_| ())
     }
 
     async fn poweroff(&self, name: &str) -> Result<()> {
@@ -117,4 +130,75 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
         props.insert("TapName".to_string(), tap.clone());
     }
     props
+}
+
+/// Translate a `vm-model` `VM`/`VMStartOptions` pair — systemd-vmspawn's
+/// launch-option shape — into an Ephemera `CreateVmRequest`. Errors loudly
+/// on any option Ephemera has no equivalent for yet (per the
+/// systemd-removal migration plan's Ephemera gap list) rather than
+/// silently dropping it, since a dropped option is a correctness bug a
+/// caller has no way to notice.
+fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmRequest> {
+    if opts.directory.is_some() {
+        bail!("the ephemera backend does not support directory-based boot (VMStartOptions.directory)");
+    }
+    if opts.tpm == Some(true) {
+        bail!("the ephemera backend does not yet support TPM (VMStartOptions.tpm)");
+    }
+    if opts.secure_boot == Some(true) {
+        bail!("the ephemera backend does not yet support secure boot (VMStartOptions.secure_boot)");
+    }
+    if opts.vsock == Some(true) {
+        bail!(
+            "the ephemera backend does not support raw vsock passthrough (VMStartOptions.vsock) \
+             — use CreateVmRequest.agent for the in-guest vsock agent instead"
+        );
+    }
+    if !opts.bind_mounts.is_empty() {
+        bail!("the ephemera backend does not support bind mounts (VMStartOptions.bind_mounts)");
+    }
+    if !opts.extra_drives.is_empty() {
+        bail!("the ephemera backend does not support extra drives (VMStartOptions.extra_drives)");
+    }
+    if !opts.bind_users.is_empty() {
+        bail!("the ephemera backend does not support bind users (VMStartOptions.bind_users)");
+    }
+    if !opts.credentials.is_empty() || !opts.load_credentials.is_empty() {
+        bail!(
+            "the ephemera backend does not support systemd credentials \
+             (VMStartOptions.credentials/load_credentials) — use cloud_init instead"
+        );
+    }
+    if !opts.smbios11.is_empty() {
+        bail!("the ephemera backend does not support SMBIOS injection (VMStartOptions.smbios11)");
+    }
+
+    let vcpus: u8 = vm
+        .cpus
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("vcpu count {} exceeds the ephemera backend's limit", vm.cpus))?;
+
+    let network = if opts.network_tap {
+        NetworkSpec::Tap { tap_name: None, bridge: None, mac: vm.mac_address.clone() }
+    } else {
+        NetworkSpec::User { forwards: vec![] }
+    };
+
+    Ok(CreateVmRequest {
+        name: vm.name.clone(),
+        backend: BackendKind::Qemu,
+        image: PathBuf::from(&vm.image),
+        vcpus,
+        memory_mib: vm.memory,
+        disk_size_gib: if vm.disk > 0 { Some(vm.disk) } else { None },
+        kernel: opts.linux.clone().map(PathBuf::from),
+        initrd: opts.initrd.first().cloned().map(PathBuf::from),
+        firmware: opts.firmware.clone().map(PathBuf::from),
+        kernel_args: if opts.extra_args.is_empty() { None } else { Some(opts.extra_args.join(" ")) },
+        network,
+        cloud_init: None,
+        ttl_seconds: None,
+        extra_args: vec![],
+        agent: None,
+    })
 }

@@ -304,7 +304,7 @@ pub async fn evict_spot_instance(
     // Apply eviction policy
     match spot.eviction_policy {
         EvictionPolicy::Stop => {
-            if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&spot.vm_name) {
+            if let Err(e) = state.driver.poweroff(&spot.vm_name).await {
                 tracing::error!("Failed to stop VM: {}", e);
             }
             if let Ok(Some(mut vm)) = state.store.get_vm(&spot.vm_name) {
@@ -315,7 +315,7 @@ pub async fn evict_spot_instance(
             }
         }
         EvictionPolicy::Delete => {
-            if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&spot.vm_name) {
+            if let Err(e) = state.driver.poweroff(&spot.vm_name).await {
                 tracing::error!("Failed to stop VM: {}", e);
             }
             if let Err(e) = state.store.delete_vm(&spot.vm_name) {
@@ -323,7 +323,7 @@ pub async fn evict_spot_instance(
             }
         }
         EvictionPolicy::Deallocate => {
-            if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&spot.vm_name) {
+            if let Err(e) = state.driver.poweroff(&spot.vm_name).await {
                 tracing::error!("Failed to stop VM: {}", e);
             }
             if let Ok(Some(mut vm)) = state.store.get_vm(&spot.vm_name) {

@@ -449,7 +449,7 @@ pub async fn apply_vm_spec(
             }
         };
 
-        match zyvor_fabric_vm_driver::start_vm_with_options(&vm, &start_opts) {
+        match state.driver.start_with_options(&vm, &start_opts).await {
             Ok(_) => {
                 started = true;
                 if let Ok(Some(mut vm)) = state.store.get_vm(&spec.name) {

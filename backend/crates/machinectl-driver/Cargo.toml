@@ -19,3 +19,4 @@ vm-model = { path = "../../vm-model" }
 zyvor-fabric-driver-core = { path = "../driver-core" }
 vmspawnd-machined-dbus = { path = "../machined-dbus" }
 zyvor-fabric-cgroup = { path = "../cgroup" }
+zyvor-fabric-vm-driver = { path = "../../zyvor-fabric-vm-driver" }

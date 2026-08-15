@@ -359,10 +359,7 @@ pub async fn start_vm(
                     return;
                 }
             };
-            // start_vm_with_options is blocking, run on blocking thread pool
-            tokio::task::spawn_blocking(move || zyvor_fabric_vm_driver::start_vm_with_options(&vm, &opts))
-                .await
-                .unwrap_or_else(|e| Err(anyhow::anyhow!("Task join error: {}", e)))
+            state_clone.driver.start_with_options(&vm, &opts).await
         } else {
             // Default: use machined driver (D-Bus)
             state_clone.driver.start(&vm_name).await
@@ -510,10 +507,7 @@ pub async fn pause_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    let name_clone = name.clone();
-    let result = tokio::task::spawn_blocking(move || zyvor_fabric_vm_driver::pause_vm(&name_clone))
-        .await
-        .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+    let result = state.driver.freeze(&name).await;
 
     match result {
         Ok(_) => {
@@ -555,10 +549,7 @@ pub async fn resume_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    let name_clone = name.clone();
-    let result = tokio::task::spawn_blocking(move || zyvor_fabric_vm_driver::resume_vm(&name_clone))
-        .await
-        .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+    let result = state.driver.thaw(&name).await;
 
     match result {
         Ok(_) => {

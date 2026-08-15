@@ -2184,15 +2184,8 @@ async fn run_schedule_checker(state: Arc<AppState>) {
 
                 let schedule_action = schedule_clone.action.clone();
                 let schedule_vm = schedule_clone.vm_name.clone();
-                let result = tokio::task::spawn_blocking(move || match schedule_action {
-                    crate::api::schedules::VMAction::Start => {
-                        zyvor_fabric_vm_driver::start_vm(&schedule_vm)
-                    }
-                    crate::api::schedules::VMAction::Stop => zyvor_fabric_vm_driver::stop_vm(&schedule_vm),
-                    crate::api::schedules::VMAction::Restart => {
-                        zyvor_fabric_vm_driver::restart_vm(&schedule_vm)
-                    }
-                    crate::api::schedules::VMAction::Snapshot => {
+                let result = if schedule_action == crate::api::schedules::VMAction::Snapshot {
+                    tokio::task::spawn_blocking(move || {
                         let snap_name = format!("scheduled-{}", Utc::now().format("%Y%m%d-%H%M%S"));
                         let image_path = crate::validation::find_vm_image(&schedule_vm);
                         match image_path {
@@ -2214,10 +2207,13 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                                 Ok(())
                             }
                         }
-                    }
-                })
-                .await
-                .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)));
+                    })
+                    .await
+                    .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)))
+                } else {
+                    crate::api::schedules::run_vm_action(&state_clone.driver, &schedule_action, &schedule_vm)
+                        .await
+                };
 
                 let executed_at = Utc::now();
                 let (success, error) = match result {

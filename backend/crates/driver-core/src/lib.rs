@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
-use vm_model::{VMMetrics, VMPressure, VMState};
+use vm_model::{VMMetrics, VMPressure, VMStartOptions, VMState, VM};
 
 // ============================================================================
 // Shared types
@@ -59,6 +59,15 @@ pub type LogStream = Pin<Box<dyn Stream<Item = LogEntry> + Send>>;
 pub trait VMDriver: Send + Sync {
     /// Start a machine by name.
     async fn start(&self, name: &str) -> Result<()>;
+
+    /// Start a machine with explicit low-level launch options (TPM,
+    /// secure-boot, vsock, network-tap, bind mounts, credentials, ...).
+    /// Unlike `start`, this bypasses whatever the backend would otherwise
+    /// derive/replay for the machine — a backend that bakes launch options
+    /// in at creation time rather than at start time (Ephemera) may not be
+    /// able to honor every field and should error clearly rather than
+    /// silently ignore what it can't apply.
+    async fn start_with_options(&self, vm: &VM, opts: &VMStartOptions) -> Result<()>;
 
     /// Graceful poweroff.
     async fn poweroff(&self, name: &str) -> Result<()>;

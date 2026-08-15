@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use vm_model::VMState;
+use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
 use vmspawnd_machined_dbus::{MachineManagerProxy, MachineProxy, SystemdManagerProxy};
 
@@ -46,6 +46,16 @@ impl VMDriver for MachinectlDriver {
             let stderr = String::from_utf8_lossy(&output.stderr);
             Err(anyhow!("Failed to start '{}': {}", name, stderr))
         }
+    }
+
+    async fn start_with_options(&self, vm: &VM, opts: &VMStartOptions) -> Result<()> {
+        let vm = vm.clone();
+        let opts = opts.clone();
+        // zyvor_fabric_vm_driver::start_vm_with_options is a blocking
+        // systemd-vmspawn invocation — run it on the blocking pool.
+        tokio::task::spawn_blocking(move || zyvor_fabric_vm_driver::start_vm_with_options(&vm, &opts))
+            .await
+            .map_err(|e| anyhow!("start_with_options task panicked: {e}"))?
     }
 
     async fn poweroff(&self, name: &str) -> Result<()> {
