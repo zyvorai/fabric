@@ -1,10 +1,10 @@
-apiVersion: vmspawnd.io/v1alpha1
+apiVersion: zyvor-fabricd.io/v1alpha1
 kind: VirtualMachine
 metadata:
   name: ubuntu-vm
   namespace: default
 spec:
-  image: /var/lib/vmspawnd/images/ubuntu-22.04.qcow2
+  image: /var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2
   cpus: 4
   memory: 4096
   cloudInit:

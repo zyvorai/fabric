@@ -137,7 +137,7 @@ mod tests {
         let pool = StoragePool::new(
             "test-pool".to_string(),
             StoragePoolType::Local,
-            PathBuf::from("/var/lib/vmspawnd/storage"),
+            PathBuf::from("/var/lib/zyvor-fabricd/storage"),
         );
 
         assert_eq!(pool.name, "test-pool");

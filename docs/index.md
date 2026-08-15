@@ -41,9 +41,9 @@ Step-by-step walkthroughs for common workflows.
 
 | Document | Description |
 |----------|-------------|
-| vmctl Reference | Full CLI command reference with examples |
-| vmspawnctl Operations | Deployment, management, and maintenance commands |
-| Declarative Configuration | Define VM infrastructure as YAML with `vmctl apply` |
+| zyvorctl Reference | Full CLI command reference with examples |
+| zyvorctl Operations | Deployment, management, and maintenance commands |
+| Declarative Configuration | Define VM infrastructure as YAML with `zyvorctl apply` |
 | Shell Completions | Enable tab completion for bash |
 
 ### Operations Guides
@@ -86,7 +86,7 @@ Detailed documentation for each major feature area.
 | VM Profiles | Instance types and resource presets |
 | VM Import | Import from VMDK, VDI, VHD formats |
 | OVA/OVF Export | Export VMs to OVA/OVF format for portability |
-| Declarative Specs | YAML-based VM definitions with `vmctl apply` |
+| Declarative Specs | YAML-based VM definitions with `zyvorctl apply` |
 | VM Checkpoints | Create and restore in-memory checkpoints |
 | VM Forking | Fork a running VM for testing |
 
@@ -242,47 +242,47 @@ Detailed documentation for each major feature area.
 
 | Command | Description |
 |---------|-------------|
-| `vmctl list` | List VMs with table, JSON, or YAML output |
-| `vmctl create` | Create a new VM |
-| `vmctl start` | Start a stopped VM |
-| `vmctl stop` | Stop a running VM |
-| `vmctl restart` | Restart a VM |
-| `vmctl delete` | Delete a VM |
-| `vmctl apply` | Apply declarative YAML specification |
-| `vmctl policy` | Manage network policies |
-| `vmctl ceph` | Ceph storage management |
-| `vmctl console` | Attach to VM console |
+| `zyvorctl list` | List VMs with table, JSON, or YAML output |
+| `zyvorctl create` | Create a new VM |
+| `zyvorctl start` | Start a stopped VM |
+| `zyvorctl stop` | Stop a running VM |
+| `zyvorctl restart` | Restart a VM |
+| `zyvorctl delete` | Delete a VM |
+| `zyvorctl apply` | Apply declarative YAML specification |
+| `zyvorctl policy` | Manage network policies |
+| `zyvorctl ceph` | Ceph storage management |
+| `zyvorctl console` | Attach to VM console |
 
-### vmspawnctl Reference
+### zyvorctl Reference
 
 | Command | Description |
 |---------|-------------|
-| `vmspawnctl deploy` | Full deployment (deps + build + install + start) |
-| `vmspawnctl deps` | Install system dependencies |
-| `vmspawnctl build` | Build from source |
-| `vmspawnctl install` | Install binaries and systemd units |
-| `vmspawnctl start` | Start the vmspawnd service |
-| `vmspawnctl stop` | Stop the vmspawnd service |
-| `vmspawnctl restart` | Restart the service |
-| `vmspawnctl status` | Show service status |
-| `vmspawnctl logs` | Follow service logs |
-| `vmspawnctl verify` | Post-install smoke test |
-| `vmspawnctl health` | Deep health check |
-| `vmspawnctl password` | Read the admin password |
-| `vmspawnctl doctor` | System readiness check |
-| `vmspawnctl tls` | Generate self-signed TLS certificate |
-| `vmspawnctl upgrade` | Git pull + reinstall |
-| `vmspawnctl uninstall` | Remove everything |
-| `vmspawnctl billing` | View billing and usage reports |
-| `vmspawnctl backup now` | Trigger immediate backup |
-| `vmspawnctl backup enable` | Enable daily backup timer |
-| `vmspawnctl backup status` | Show backup timer and storage info |
+| `zyvorctl deploy` | Full deployment (deps + build + install + start) |
+| `zyvorctl deps` | Install system dependencies |
+| `zyvorctl build` | Build from source |
+| `zyvorctl install` | Install binaries and systemd units |
+| `zyvorctl start` | Start the zyvor-fabricd service |
+| `zyvorctl stop` | Stop the zyvor-fabricd service |
+| `zyvorctl restart` | Restart the service |
+| `zyvorctl status` | Show service status |
+| `zyvorctl logs` | Follow service logs |
+| `zyvorctl verify` | Post-install smoke test |
+| `zyvorctl health` | Deep health check |
+| `zyvorctl password` | Read the admin password |
+| `zyvorctl doctor` | System readiness check |
+| `zyvorctl tls` | Generate self-signed TLS certificate |
+| `zyvorctl upgrade` | Git pull + reinstall |
+| `zyvorctl uninstall` | Remove everything |
+| `zyvorctl billing` | View billing and usage reports |
+| `zyvorctl backup now` | Trigger immediate backup |
+| `zyvorctl backup enable` | Enable daily backup timer |
+| `zyvorctl backup status` | Show backup timer and storage info |
 
 ### Rust SDK
 
 | Item | Description |
 |------|-------------|
-| `vmspawn-sdk` | Typed Rust SDK for the Zyvor Fabric API with async client |
+| `zyvor-fabric-sdk` | Typed Rust SDK for the Zyvor Fabric API with async client |
 | Authentication | Login, token refresh, and 2FA helpers |
 | VM Operations | Create, start, stop, delete, clone, and snapshot VMs |
 | Storage / Networking | Pool, volume, bridge, VLAN, and firewall management |
@@ -296,7 +296,7 @@ Detailed documentation for each major feature area.
 |----------|-------------|
 | Single Server | One-node deployment for development and small teams |
 | Multi-Node Cluster | HA deployment with shared storage and etcd |
-| Kubernetes-Managed | VMs as CRDs with the vmspawnd operator |
+| Kubernetes-Managed | VMs as CRDs with the zyvor-fabricd operator |
 | Terraform Provider | Declarative provisioning with plan/apply |
 | Edge Deployment | Lightweight single-node deployment for edge locations |
 | Air-Gapped Install | Offline installation without internet access |
@@ -389,14 +389,14 @@ The REST API is organized into the following endpoint groups:
 | Item | Default |
 |------|---------|
 | API listen address | `127.0.0.1:9095` |
-| Config file | `/etc/vmspawnd/vmspawnd.toml` |
-| State directory | `/var/lib/vmspawnd/` |
-| Image directory | `/var/lib/vmspawnd/images/` |
-| Auth database | `/var/lib/vmspawnd/auth.db` |
-| Cloud-init directory | `/var/lib/vmspawnd/cloud-init/` |
-| Storage pools | `/var/lib/vmspawnd/storage/` |
-| JWT secret file | `/var/lib/vmspawnd/.jwt_secret` |
-| Admin password file | `/var/lib/vmspawnd/.admin_password` |
+| Config file | `/etc/zyvor-fabricd/zyvor-fabricd.toml` |
+| State directory | `/var/lib/zyvor-fabricd/` |
+| Image directory | `/var/lib/zyvor-fabricd/images/` |
+| Auth database | `/var/lib/zyvor-fabricd/auth.db` |
+| Cloud-init directory | `/var/lib/zyvor-fabricd/cloud-init/` |
+| Storage pools | `/var/lib/zyvor-fabricd/storage/` |
+| JWT secret file | `/var/lib/zyvor-fabricd/.jwt_secret` |
+| Admin password file | `/var/lib/zyvor-fabricd/.admin_password` |
 | networkd config dir | `/etc/systemd/network/` |
 | networkd file prefix | `50-Zyvor Fabric-` |
 | Network bridge | `br0` |
@@ -433,11 +433,11 @@ The REST API is organized into the following endpoint groups:
 
 | Variable | Description |
 |----------|-------------|
-| `VMSPAWND_JWT_SECRET` | Override JWT signing secret |
-| `VMSPAWND_ADMIN_PASSWORD` | Override default admin password |
-| `VMSPAWND_BACKUP_DIR` | Override backup directory |
-| `VMSPAWND_BACKUP_RETAIN` | Override backup retention count |
-| `VMSPAWND_BACKUP_TYPE` | Override backup type |
+| `ZYVOR_FABRICD_JWT_SECRET` | Override JWT signing secret |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Override default admin password |
+| `ZYVOR_FABRICD_BACKUP_DIR` | Override backup directory |
+| `ZYVOR_FABRICD_BACKUP_RETAIN` | Override backup retention count |
+| `ZYVOR_FABRICD_BACKUP_TYPE` | Override backup type |
 
 ---
 

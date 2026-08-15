@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-const RECENT_KEY = 'vmspawnd-recent-pages'
+const RECENT_KEY = 'zyvor-fabricd-recent-pages'
 const MAX_RECENT = 8
 
 /** VM detail routes use recentVMs instead. */

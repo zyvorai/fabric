@@ -8,14 +8,14 @@ Zyvor Fabric is a virtual machine management platform built in Rust. It provides
 
 ```
  +--------+   +-----------+   +----------+   +-----------+   +------------+
- | vmctl  |   | vmctl-tui |   |  Web UI  |   |    K8s    |   | Terraform  |
+ | zyvorctl  |   | zyvorctl-tui |   |  Web UI  |   |    K8s    |   | Terraform  |
  | (CLI)  |   |   (TUI)   |   | (React)  |   | Operator  |   | Provider   |
  +---+----+   +-----+-----+   +----+-----+   +-----+-----+   +------+-----+
      |              |              |               |                 |
      +--------------+--------------+---------------+-----------------+
                                    |
                     +--------------v--------------+
-                    |      vmspawnd daemon         |
+                    |      zyvor-fabricd daemon         |
                     |  (Axum + Tokio async runtime)|
                     +-+--+--+--+--+--+--+--+--+---+
                       |  |  |  |  |  |  |  |  |
@@ -48,11 +48,11 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 | Crate | Purpose |
 |-------|---------|
 | `Zyvor Fabric` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
-| `vmspawn-driver` | systemd-vmspawn integration for VM creation and management |
+| `zyvor-fabric-vm-driver` | systemd-vmspawn integration for VM creation and management |
 | `vm-model` | Core data structures: VM definitions, state enums, request/response types |
 | `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
-| `vmctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
-| `vmctl-tui` | TUI -- k9s-style terminal dashboard with 8 views |
+| `zyvorctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
+| `zyvorctl-tui` | TUI -- k9s-style terminal dashboard with 8 views |
 
 ### Core Library Crates (`backend/crates/`)
 
@@ -165,7 +165,7 @@ User --> CLI / TUI / Web UI / K8s Operator / Terraform Provider
                Core Daemon (Zyvor Fabric)
                  /          \
                 v            v
-          VM Drivers     State Store (/var/lib/vmspawnd/)
+          VM Drivers     State Store (/var/lib/zyvor-fabricd/)
               |
               v
         systemd-vmspawn --> Virtual Machines
@@ -173,10 +173,10 @@ User --> CLI / TUI / Web UI / K8s Operator / Terraform Provider
 
 ## Storage Layout
 
-VM state and artifacts are stored under `/var/lib/vmspawnd/`:
+VM state and artifacts are stored under `/var/lib/zyvor-fabricd/`:
 
 ```
-/var/lib/vmspawnd/
+/var/lib/zyvor-fabricd/
   *.json              VM metadata and configuration
   images/             VM disk images
   tpm/                Per-VM vTPM state directories
@@ -203,8 +203,8 @@ The daemon runs with systemd hardening: `ProtectSystem=strict`, `ProtectHome=yes
 - Runs as root (required for VM management and networking)
 - systemd hardening directives restrict filesystem and network access
 - JWT-based API authentication with SQLite user store
-- Auto-generated JWT secret persisted to `/var/lib/vmspawnd/.jwt_secret` (mode `0600`)
-- Auto-generated admin password written to `/var/lib/vmspawnd/.admin_password` (mode `0600`) on first startup
+- Auto-generated JWT secret persisted to `/var/lib/zyvor-fabricd/.jwt_secret` (mode `0600`)
+- Auto-generated admin password written to `/var/lib/zyvor-fabricd/.admin_password` (mode `0600`) on first startup
 - RBAC with three roles: Admin, User, Viewer
 - TLS support for production deployments
 - vTPM for guest attestation and secure boot

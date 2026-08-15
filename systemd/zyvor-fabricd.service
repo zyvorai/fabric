@@ -1,0 +1,73 @@
+[Unit]
+Description=zyvor-fabricd - Virtual Machine Management Daemon
+Documentation=https://github.com/ssahani/zyvor-fabric
+After=network-online.target systemd-machined.service systemd-networkd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/zyvor-fabricd
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+# Watchdog requires sd_notify(WATCHDOG=1) from the daemon; enable once implemented.
+# WatchdogSec=60s
+
+# Environment
+Environment=ZYVOR_FABRICD_LOG_LEVEL=info
+EnvironmentFile=-/etc/zyvor-fabricd/zyvor-fabricd.env
+
+# Credentials
+User=root
+Group=root
+
+# Filesystem access
+ReadWritePaths=/var/lib/zyvor-fabricd
+ReadWritePaths=/etc/zyvor-fabricd
+ReadWritePaths=/etc/systemd/network
+ReadWritePaths=/run/systemd/machines
+ReadWritePaths=-/run/systemd/nspawn
+ReadWritePaths=/tmp
+StateDirectory=zyvor-fabricd
+ConfigurationDirectory=zyvor-fabricd
+LogsDirectory=zyvor-fabricd
+RuntimeDirectory=zyvor-fabricd
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=no
+ProtectKernelModules=no
+ProtectControlGroups=no
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+RestrictNamespaces=no
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+SystemCallArchitectures=native
+
+# Capabilities required for VM management
+AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_NET_RAW CAP_MKNOD CAP_SYS_PTRACE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_NET_RAW CAP_MKNOD CAP_SYS_PTRACE CAP_KILL CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+LimitMEMLOCK=infinity
+TasksMax=infinity
+
+# OOM handling
+OOMScoreAdjust=-900
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zyvor-fabricd
+
+[Install]
+WantedBy=multi-user.target

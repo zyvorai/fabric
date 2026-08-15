@@ -1,0 +1,12 @@
+[Unit]
+Description=zyvor-fabricd Weekly State Store Cleanup Timer
+Documentation=https://github.com/ssahani/zyvor-fabric
+
+[Timer]
+# Run weekly on Sunday at 3:00 AM
+OnCalendar=Sun *-*-* 03:00:00
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,4 @@
+# Enable zyvor-fabricd by default on install
+enable zyvor-fabricd.service
+enable zyvor-fabricd-backup.timer
+enable zyvor-fabricd-cleanup.timer

@@ -1129,12 +1129,12 @@ mod tests {
         let mgr = CertificateManager::new();
         mgr.create_ca(make_ca("ca-1", "Root CA")).unwrap();
 
-        let req = make_request("vmspawnd.local", "ca-1", "vmspawnd");
+        let req = make_request("zyvor-fabricd.local", "ca-1", "zyvor-fabricd");
         let cert = mgr.issue_certificate(req).unwrap();
 
-        assert_eq!(cert.common_name, "vmspawnd.local");
+        assert_eq!(cert.common_name, "zyvor-fabricd.local");
         assert_eq!(cert.status, CertStatus::Active);
-        assert_eq!(cert.component, "vmspawnd");
+        assert_eq!(cert.component, "zyvor-fabricd");
         assert!(cert.fingerprint_sha256.starts_with("sha256:"));
 
         // CA issued count should be incremented.
@@ -1170,7 +1170,7 @@ mod tests {
         let mgr = CertificateManager::new();
         mgr.create_ca(make_ca("ca-1", "Root CA")).unwrap();
 
-        let req = make_request("rotate-me.local", "ca-1", "vmspawnd");
+        let req = make_request("rotate-me.local", "ca-1", "zyvor-fabricd");
         let cert = mgr.issue_certificate(req).unwrap();
 
         let rotation = mgr.schedule_rotation(&cert.id, Utc::now()).unwrap();
@@ -1341,7 +1341,7 @@ mod tests {
         mgr.create_ca(make_ca("ca-2", "Intermediate CA")).unwrap();
 
         // Issue certificates.
-        let req1 = make_request("active.local", "ca-1", "vmspawnd");
+        let req1 = make_request("active.local", "ca-1", "zyvor-fabricd");
         mgr.issue_certificate(req1).unwrap();
 
         let mut req2 = make_request("expiring.local", "ca-1", "host-agent");
@@ -1382,7 +1382,7 @@ mod tests {
             usage: CertificateUsage::Server,
             status: CertStatus::Active,
             auto_renew: true,
-            component: "vmspawnd".to_string(),
+            component: "zyvor-fabricd".to_string(),
             created: now,
             updated: now,
             cert_pem: None,

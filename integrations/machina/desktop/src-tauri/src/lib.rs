@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
-use vmspawn_sdk::{Client, ClientConfig};
+use zyvor_fabric_sdk::{Client, ClientConfig};
 
 #[derive(Serialize)]
 struct VmSummary {

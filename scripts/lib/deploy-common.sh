@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # shellcheck shell=bash
-# vmspawnd deploy library (self-contained under scripts/lib/).
+# zyvor-fabricd deploy library (self-contained under scripts/lib/).
 
 _DEPLOY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-DEPLOY_UI_PROJECT="vmspawnd"
+DEPLOY_UI_PROJECT="zyvor-fabricd"
 DEPLOY_UI_ICON="🖥️"
 DEPLOY_UI_ICON_UNINSTALL="🗑️"
 DEPLOY_UI_ICON_MAGIC="✨"

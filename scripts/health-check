@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# health-check — Deep health check for vmspawnd
+# health-check — Deep health check for zyvor-fabricd
 #
 # Checks: service status, API responsiveness, disk space, database,
 # VM states, backup timer, certificate expiry, and system resources.
@@ -11,8 +11,8 @@
 
 set -uo pipefail
 
-VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:9095}"
-STATE_DIR="/var/lib/vmspawnd"
+ZYVOR_FABRICD_URL="${ZYVOR_FABRICD_URL:-http://127.0.0.1:9095}"
+STATE_DIR="/var/lib/zyvor-fabricd"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,26 +27,26 @@ ok()   { echo -e "  ${GREEN}✓${NC} $*"; }
 warn() { echo -e "  ${YELLOW}▸${NC} $*"; ((WARNINGS++)) || true; }
 fail() { echo -e "  ${RED}✗${NC} $*"; ((ERRORS++)) || true; }
 
-echo -e "\n${BOLD}vmspawnd Health Check${NC}\n"
+echo -e "\n${BOLD}zyvor-fabricd Health Check${NC}\n"
 
 # ── Service ─────────────────────────────────────────────────────────
 echo -e "${BOLD}Service${NC}"
-if systemctl is-active --quiet vmspawnd 2>/dev/null; then
-    ok "vmspawnd service is running"
+if systemctl is-active --quiet zyvor-fabricd 2>/dev/null; then
+    ok "zyvor-fabricd service is running"
 else
-    fail "vmspawnd service is not running"
+    fail "zyvor-fabricd service is not running"
 fi
 
 # ── API ─────────────────────────────────────────────────────────────
 echo -e "\n${BOLD}API${NC}"
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "$VMSPAWND_URL/api/vms" --max-time 5 2>/dev/null) || HTTP_CODE="000"
+HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "$ZYVOR_FABRICD_URL/api/vms" --max-time 5 2>/dev/null) || HTTP_CODE="000"
 if [[ "$HTTP_CODE" =~ ^(200|401)$ ]]; then
-    ok "API responding ($VMSPAWND_URL) — HTTP $HTTP_CODE"
+    ok "API responding ($ZYVOR_FABRICD_URL) — HTTP $HTTP_CODE"
 else
-    fail "API not responding ($VMSPAWND_URL) — HTTP $HTTP_CODE"
+    fail "API not responding ($ZYVOR_FABRICD_URL) — HTTP $HTTP_CODE"
 fi
 
-LATENCY=$(curl -sf -o /dev/null -w "%{time_total}" "$VMSPAWND_URL/api/vms" --max-time 5 2>/dev/null) || LATENCY="0"
+LATENCY=$(curl -sf -o /dev/null -w "%{time_total}" "$ZYVOR_FABRICD_URL/api/vms" --max-time 5 2>/dev/null) || LATENCY="0"
 LATENCY_MS=$(echo "$LATENCY" | awk '{printf "%.0f", $1 * 1000}')
 if [[ "$LATENCY_MS" -lt 500 ]]; then
     ok "API latency: ${LATENCY_MS}ms"
@@ -121,7 +121,7 @@ done
 
 # ── Timers ──────────────────────────────────────────────────────────
 echo -e "\n${BOLD}Timers${NC}"
-for timer in vmspawnd-backup vmspawnd-cleanup; do
+for timer in zyvor-fabricd-backup zyvor-fabricd-cleanup; do
     if systemctl is-active --quiet "${timer}.timer" 2>/dev/null; then
         NEXT=$(systemctl show "${timer}.timer" --property=NextElapseUSecRealtime --value 2>/dev/null | head -1)
         ok "${timer} timer active (next: ${NEXT:-unknown})"

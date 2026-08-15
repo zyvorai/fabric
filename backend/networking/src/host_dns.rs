@@ -121,11 +121,11 @@ mod tests {
 zone "example.com" IN {
     type master;
 };
-zone "vmspawnd.local" {
+zone "zyvor-fabricd.local" {
 };
 "#;
         let names = parse_bind_zone_names(conf);
         assert!(names.contains(&"example.com".to_string()));
-        assert!(names.contains(&"vmspawnd.local".to_string()));
+        assert!(names.contains(&"zyvor-fabricd.local".to_string()));
     }
 }

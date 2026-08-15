@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[kube(
-    group = "vmspawnd.io",
+    group = "zyvor-fabricd.io",
     version = "v1alpha1",
     kind = "VirtualMachine",
     plural = "virtualmachines",

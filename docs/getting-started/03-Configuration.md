@@ -10,9 +10,9 @@ Zyvor Fabric searches for its configuration file in the following order:
 
 | Priority | Path | Use Case |
 |----------|------|----------|
-| 1 | `/etc/vmspawnd/vmspawnd.toml` | Production deployment |
-| 2 | `configs/vmspawnd.toml` | Development (relative to working directory) |
-| 3 | `vmspawnd.toml` | Development (current directory) |
+| 1 | `/etc/zyvor-fabricd/zyvor-fabricd.toml` | Production deployment |
+| 2 | `configs/zyvor-fabricd.toml` | Development (relative to working directory) |
+| 3 | `zyvor-fabricd.toml` | Development (current directory) |
 
 If no config file is found, Zyvor Fabric uses built-in defaults and logs a warning.
 
@@ -26,8 +26,8 @@ listen = "127.0.0.1:9095"
 cors_origins = ["http://127.0.0.1:9095"]
 
 [storage]
-path = "/var/lib/vmspawnd"
-image_path = "/var/lib/vmspawnd/images"
+path = "/var/lib/zyvor-fabricd"
+image_path = "/var/lib/zyvor-fabricd/images"
 
 [network]
 bridge = "br0"
@@ -36,7 +36,7 @@ networkd_file_prefix = "50-Zyvor Fabric-"
 
 [auth]
 enabled = true
-db_path = "/var/lib/vmspawnd/auth.db"
+db_path = "/var/lib/zyvor-fabricd/auth.db"
 token_expiration_hours = 24
 
 [controller]
@@ -101,13 +101,13 @@ Controls where VM state, disk images, and storage pools are located.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `path` | String | `"/var/lib/vmspawnd"` | Root directory for state data |
-| `image_path` | String | `"/var/lib/vmspawnd/images"` | Directory for VM disk images |
+| `path` | String | `"/var/lib/zyvor-fabricd"` | Root directory for state data |
+| `image_path` | String | `"/var/lib/zyvor-fabricd/images"` | Directory for VM disk images |
 
 ```toml
 [storage]
-path = "/var/lib/vmspawnd"
-image_path = "/var/lib/vmspawnd/images"
+path = "/var/lib/zyvor-fabricd"
+image_path = "/var/lib/zyvor-fabricd/images"
 ```
 
 The `path` directory stores:
@@ -121,7 +121,7 @@ The `image_path` directory stores:
 - Downloaded cloud images
 - ISO files
 
-Storage pool data is stored under `/var/lib/vmspawnd/storage/` by default.
+Storage pool data is stored under `/var/lib/zyvor-fabricd/storage/` by default.
 
 ---
 
@@ -154,14 +154,14 @@ Controls authentication and authorization.
 |-----|------|---------|-------------|
 | `enabled` | Bool | `true` | Enable JWT authentication |
 | `jwt_secret` | String | Auto-generated | Secret key for signing JWT tokens |
-| `db_path` | String | `"/var/lib/vmspawnd/auth.db"` | Path to the SQLite user database |
+| `db_path` | String | `"/var/lib/zyvor-fabricd/auth.db"` | Path to the SQLite user database |
 | `default_admin_password` | String | Auto-generated | Initial admin password |
 | `token_expiration_hours` | Integer | `24` | JWT token validity period in hours |
 
 ```toml
 [auth]
 enabled = true
-db_path = "/var/lib/vmspawnd/auth.db"
+db_path = "/var/lib/zyvor-fabricd/auth.db"
 token_expiration_hours = 24
 ```
 
@@ -171,8 +171,8 @@ token_expiration_hours = 24
 
 The JWT signing secret is resolved in the following order:
 
-1. **Environment variable** `VMSPAWND_JWT_SECRET` (highest priority)
-2. **Persisted file** `/var/lib/vmspawnd/.jwt_secret` (survives restarts)
+1. **Environment variable** `ZYVOR_FABRICD_JWT_SECRET` (highest priority)
+2. **Persisted file** `/var/lib/zyvor-fabricd/.jwt_secret` (survives restarts)
 3. **Auto-generated** random 64-character string (written to the persisted file)
 
 The persisted file is created with `0600` permissions (owner-only read/write).
@@ -180,15 +180,15 @@ The persisted file is created with `0600` permissions (owner-only read/write).
 For production deployments, set the secret explicitly:
 
 ```bash
-export VMSPAWND_JWT_SECRET="your-secure-random-string-at-least-64-chars"
+export ZYVOR_FABRICD_JWT_SECRET="your-secure-random-string-at-least-64-chars"
 ```
 
 #### Admin Password Management
 
 The default admin password follows the same resolution order:
 
-1. **Environment variable** `VMSPAWND_ADMIN_PASSWORD` (highest priority)
-2. **Persisted file** `/var/lib/vmspawnd/.admin_password` (survives restarts)
+1. **Environment variable** `ZYVOR_FABRICD_ADMIN_PASSWORD` (highest priority)
+2. **Persisted file** `/var/lib/zyvor-fabricd/.admin_password` (survives restarts)
 3. **Auto-generated** random 64-character string (written to the persisted file)
 
 The password file is created with `0600` permissions. If permissions cannot be set, the file is deleted for security.
@@ -196,15 +196,15 @@ The password file is created with `0600` permissions. If permissions cannot be s
 Read the current admin password:
 
 ```bash
-sudo cat /var/lib/vmspawnd/.admin_password
-# Or using vmspawnctl
-./vmspawnctl password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
+# Or using zyvorctl
+./zyvorctl password
 ```
 
 For production, set a known password:
 
 ```bash
-export VMSPAWND_ADMIN_PASSWORD="your-secure-admin-password"
+export ZYVOR_FABRICD_ADMIN_PASSWORD="your-secure-admin-password"
 ```
 
 #### Disabling Authentication
@@ -261,11 +261,11 @@ Environment variables override config file values for sensitive settings.
 
 | Variable | Overrides | Description |
 |----------|-----------|-------------|
-| `VMSPAWND_JWT_SECRET` | `auth.jwt_secret` | JWT signing secret |
-| `VMSPAWND_ADMIN_PASSWORD` | `auth.default_admin_password` | Default admin password |
-| `VMSPAWND_BACKUP_DIR` | Backup directory | Override backup storage location |
-| `VMSPAWND_BACKUP_RETAIN` | Backup retention | Number of backups to retain |
-| `VMSPAWND_BACKUP_TYPE` | Backup type | Backup format/type |
+| `ZYVOR_FABRICD_JWT_SECRET` | `auth.jwt_secret` | JWT signing secret |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | `auth.default_admin_password` | Default admin password |
+| `ZYVOR_FABRICD_BACKUP_DIR` | Backup directory | Override backup storage location |
+| `ZYVOR_FABRICD_BACKUP_RETAIN` | Backup retention | Number of backups to retain |
+| `ZYVOR_FABRICD_BACKUP_TYPE` | Backup type | Backup format/type |
 
 Set environment variables in the systemd service unit for production:
 
@@ -277,8 +277,8 @@ Add:
 
 ```ini
 [Service]
-Environment="VMSPAWND_JWT_SECRET=your-secret-here"
-Environment="VMSPAWND_ADMIN_PASSWORD=your-password-here"
+Environment="ZYVOR_FABRICD_JWT_SECRET=your-secret-here"
+Environment="ZYVOR_FABRICD_ADMIN_PASSWORD=your-password-here"
 ```
 
 Then reload and restart:
@@ -296,9 +296,9 @@ Zyvor Fabric creates several files with restrictive permissions:
 
 | File | Permissions | Contents |
 |------|-------------|----------|
-| `/var/lib/vmspawnd/.jwt_secret` | `0600` | JWT signing key |
-| `/var/lib/vmspawnd/.admin_password` | `0600` | Admin password |
-| `/var/lib/vmspawnd/auth.db` | `0600` | User database (bcrypt hashes) |
+| `/var/lib/zyvor-fabricd/.jwt_secret` | `0600` | JWT signing key |
+| `/var/lib/zyvor-fabricd/.admin_password` | `0600` | Admin password |
+| `/var/lib/zyvor-fabricd/auth.db` | `0600` | User database (bcrypt hashes) |
 
 These files should only be readable by the user running the Zyvor Fabric process (typically root).
 

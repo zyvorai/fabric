@@ -168,7 +168,7 @@ Create a script that scans all running VMs on a regular schedule:
 #!/bin/bash
 # compliance-scan.sh -- Run via cron daily
 HOST="http://localhost:3000"
-TOKEN="$(cat /etc/vmspawnd/api-token)"
+TOKEN="$(cat /etc/zyvor-fabricd/api-token)"
 AUTH="Authorization: Bearer $TOKEN"
 PROFILE="cis-level1"
 
@@ -199,7 +199,7 @@ Combine compliance scanning with the notification system. After a scan completes
 #!/bin/bash
 # check-compliance-results.sh
 HOST="http://localhost:3000"
-TOKEN="$(cat /etc/vmspawnd/api-token)"
+TOKEN="$(cat /etc/zyvor-fabricd/api-token)"
 AUTH="Authorization: Bearer $TOKEN"
 THRESHOLD=85
 

@@ -1,0 +1,8 @@
+# systemd-tmpfiles configuration for zyvor-fabricd
+# Type Path                          Mode User Group Age Argument
+d /var/lib/zyvor-fabricd                   0755 root root  -   -
+d /var/lib/zyvor-fabricd/images            0755 root root  -   -
+d /var/lib/zyvor-fabricd/state             0750 root root  -   -
+d /etc/zyvor-fabricd                       0755 root root  -   -
+d /run/zyvor-fabricd                       0755 root root  -   -
+d /var/log/zyvor-fabricd                   0755 root root  -   -

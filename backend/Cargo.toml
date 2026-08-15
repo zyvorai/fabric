@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "vmspawnd",
-    "vmctl",
-    "vmctl-tui",
-    "vmspawn-driver",
+    "zyvor-fabricd",
+    "zyvorctl",
+    "zyvorctl-tui",
+    "zyvor-fabric-vm-driver",
     "vm-model",
     "state-store",
     "vnc-proxy",
@@ -48,7 +48,7 @@ members = [
     "net-monitor",
     "ova-tools",
     "secrets-manager",
-    "vmspawn-sdk",
+    "zyvor-fabric-sdk",
     "billing",
     "compliance",
 ]
@@ -57,7 +57,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "LicenseRef-Zyvor-Proprietary"
-authors = ["vmspawnd contributors"]
+authors = ["zyvor-fabricd contributors"]
 
 [workspace.dependencies]
 tokio = { version = "1.44", features = ["full"] }

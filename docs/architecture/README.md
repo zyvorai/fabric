@@ -133,7 +133,7 @@ structured as an Axum web server running on Tokio with the following subsystems:
 
 The `state-store` crate provides persistent storage using atomic JSON file writes:
 
-- **VM state**: Each VM is serialized as a JSON file under `/var/lib/vmspawnd/vms/`
+- **VM state**: Each VM is serialized as a JSON file under `/var/lib/zyvor-fabricd/vms/`
 - **Entity storage**: Generic `save_entity` / `get_entity` / `list_entities` functions
   for all domain objects (snapshots, backups, templates, policies, etc.)
 - **Atomic writes**: Uses write-to-temp + rename pattern to prevent corruption
@@ -201,7 +201,7 @@ The `VMStartOptions` struct maps to the full `systemd-vmspawn(1)` v260 interface
 +----------------------------------------+
            |
            v
-+-- vmspawn-driver (Process) -----------+
++-- zyvor-fabric-vm-driver (Process) -----------+
 |  Builds systemd-vmspawn CLI commands   |
 |  Passes VMStartOptions flags           |
 |  Launches QEMU via systemd-vmspawn     |
@@ -211,7 +211,7 @@ The `VMStartOptions` struct maps to the full `systemd-vmspawn(1)` v260 interface
 The driver layer provides a clean trait boundary (`VMDriver`, `ResourceStatsDriver`)
 between the API handlers and the underlying systemd tooling. The `MachinectlDriver`
 uses D-Bus via the `zbus` crate to communicate asynchronously with `systemd-machined`.
-The `vmspawn-driver` constructs and executes `systemd-vmspawn` commands with the full
+The `zyvor-fabric-vm-driver` constructs and executes `systemd-vmspawn` commands with the full
 set of options supported by systemd v260.
 
 ### Security Crate
@@ -248,7 +248,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
       vm-model  state  security  driver  machined  networking  storage
                store            core    driver              manager
                                   |
-                            vmspawn-driver
+                            zyvor-fabric-vm-driver
                             (systemd-vmspawn CLI)
 ```
 
@@ -256,7 +256,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 **Core** (5 crates): `Zyvor Fabric`, `vm-model`, `state-store`, `security`, `Zyvor Fabric-vm`
 
-**Drivers** (4 crates): `vmspawn-driver`, `Zyvor Fabric-driver-core`, `Zyvor Fabric-machinectl-driver`, `Zyvor Fabric-machined-dbus`
+**Drivers** (4 crates): `zyvor-fabric-vm-driver`, `Zyvor Fabric-driver-core`, `Zyvor Fabric-machinectl-driver`, `Zyvor Fabric-machined-dbus`
 
 **Networking** (10 crates): `networking`, `network-policy`, `service-mesh`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`
 
@@ -268,9 +268,9 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 **Infrastructure** (5 crates): `datacenter`, `host-agent`, `fault-tolerance`, `content-library`, `tpm-support`
 
-**Utilities** (4 crates): `cloud-init`, `prometheus-exporter`, `vnc-proxy`, `vmctl`
+**Utilities** (4 crates): `cloud-init`, `prometheus-exporter`, `vnc-proxy`, `zyvorctl`
 
-**UI** (2 crates): `vmctl`, `vmctl-tui`
+**UI** (2 crates): `zyvorctl`, `zyvorctl-tui`
 
 ---
 
@@ -380,7 +380,7 @@ State transitions:
 3. Handler validates resource limits (CPUs 1-256, Memory 64MB-1TB, Disk 1-10TB)
 4. Handler checks quota availability (if quotas configured)
 5. VM model is created with state=Stopped, timestamps set
-6. State persisted to /var/lib/vmspawnd/vms/{name}.json
+6. State persisted to /var/lib/zyvor-fabricd/vms/{name}.json
 7. Cloud-init ISO generated if hostname/user-data provided
 8. Prometheus counter incremented (vmspawnd_vm_creates_total)
 9. SSE event emitted: { type: "vm_created", name: "..." }
@@ -393,8 +393,8 @@ State transitions:
 1. Client POSTs to /api/v1/vms/{name}/start
 2. Handler acquires per-VM mutex lock
 3. State set to Starting, persisted
-4. vmspawn-driver builds systemd-vmspawn command:
-   - systemd-vmspawn --image=/var/lib/vmspawnd/images/{image}
+4. zyvor-fabric-vm-driver builds systemd-vmspawn command:
+   - systemd-vmspawn --image=/var/lib/zyvor-fabricd/images/{image}
      --cpus={n} --ram={m}M [--kvm=yes] [--tpm=yes] ...
 5. Command executed via tokio::task::spawn_blocking
 6. PID captured from spawned process
@@ -411,7 +411,7 @@ State transitions:
 ### File System Layout
 
 ```
-/var/lib/vmspawnd/
+/var/lib/zyvor-fabricd/
   |
   +-- vms/                     # VM state JSON files
   |   +-- web-server.json
@@ -435,8 +435,8 @@ State transitions:
   +-- .jwt_secret              # Persisted JWT signing secret (mode 0600)
   +-- .admin_password          # Generated admin password (mode 0600)
 
-/etc/vmspawnd/
-  +-- vmspawnd.toml            # Primary configuration file
+/etc/zyvor-fabricd/
+  +-- zyvor-fabricd.toml            # Primary configuration file
 
 /etc/systemd/network/
   +-- 50-Zyvor Fabric-*.network    # Generated networkd configs
@@ -606,9 +606,9 @@ to detect and correct configuration drift:
 ### Security Hardening
 
 - **JWT secret persistence**: Secret is auto-generated and stored at
-  `/var/lib/vmspawnd/.jwt_secret` (mode 0600) so tokens survive daemon restarts
+  `/var/lib/zyvor-fabricd/.jwt_secret` (mode 0600) so tokens survive daemon restarts
 - **Admin password**: Never hardcoded; auto-generated and written to
-  `/var/lib/vmspawnd/.admin_password` (mode 0600)
+  `/var/lib/zyvor-fabricd/.admin_password` (mode 0600)
 - **Input validation**: All VM names, entity names, and IDs are validated with
   strict regex patterns to prevent command injection and path traversal
 - **Error sanitization**: File paths and internal details are stripped from

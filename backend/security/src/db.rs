@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use crate::{Role, User};
 
 /// Simple obfuscation key for TOTP secrets at rest in SQLite.
-const TOTP_KEY: &[u8] = b"vmspawnd-totp-at-rest-key-2026v1!";
+const TOTP_KEY: &[u8] = b"zyvor-fabricd-totp-at-rest-key-2026v1!";
 
 fn encrypt_totp(plaintext: &str) -> String {
     use base64::Engine;

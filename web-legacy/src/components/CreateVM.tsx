@@ -147,7 +147,7 @@ export default function CreateVM() {
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Image Path</label>
               <input
                 type="text"
-                placeholder="e.g. /var/lib/vmspawnd/images/fedora.qcow2"
+                placeholder="e.g. /var/lib/zyvor-fabricd/images/fedora.qcow2"
                 value={config.image}
                 onChange={(e) => updateConfig('image', e.target.value)}
                 className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

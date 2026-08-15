@@ -6,10 +6,10 @@ use anyhow::{Context, Result};
 
 /// Authenticate a user against PAM.
 ///
-/// Uses the "vmspawnd" PAM service if available, falling back to "login".
+/// Uses the "zyvor-fabricd" PAM service if available, falling back to "login".
 pub fn authenticate(username: &str, password: &str) -> Result<()> {
-    let service = if std::path::Path::new("/etc/pam.d/vmspawnd").exists() {
-        "vmspawnd"
+    let service = if std::path::Path::new("/etc/pam.d/zyvor-fabricd").exists() {
+        "zyvor-fabricd"
     } else {
         "login"
     };

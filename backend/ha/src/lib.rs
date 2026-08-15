@@ -29,7 +29,7 @@ impl HAManager {
 
     /// Register this node in the cluster
     pub async fn register_node(&mut self, node: &Node) -> Result<()> {
-        let key = format!("/vmspawnd/nodes/{}", node.id);
+        let key = format!("/zyvor-fabricd/nodes/{}", node.id);
         let value = serde_json::to_string(node)?;
 
         self.client
@@ -43,7 +43,7 @@ impl HAManager {
 
     /// Send heartbeat
     pub async fn heartbeat(&mut self) -> Result<()> {
-        let key = format!("/vmspawnd/nodes/{}/heartbeat", self.node_id);
+        let key = format!("/zyvor-fabricd/nodes/{}/heartbeat", self.node_id);
         let now = chrono::Utc::now().to_rfc3339();
 
         self.client.put(key, now, None).await?;
@@ -53,7 +53,7 @@ impl HAManager {
 
     /// Try to acquire leadership
     pub async fn try_acquire_leadership(&mut self) -> Result<bool> {
-        let key = "/vmspawnd/leader";
+        let key = "/zyvor-fabricd/leader";
 
         // Try to create leader key with TTL
         match self
@@ -75,7 +75,7 @@ impl HAManager {
 
     /// Get current leader
     pub async fn get_leader(&mut self) -> Result<Option<String>> {
-        let key = "/vmspawnd/leader";
+        let key = "/zyvor-fabricd/leader";
 
         match self.client.get(key, None).await {
             Ok(resp) => {
@@ -92,7 +92,7 @@ impl HAManager {
 
     /// List all nodes in the cluster
     pub async fn list_nodes(&mut self) -> Result<Vec<Node>> {
-        let prefix = "/vmspawnd/nodes/";
+        let prefix = "/zyvor-fabricd/nodes/";
         let resp = self
             .client
             .get(prefix, Some(GetOptions::new().with_prefix()))

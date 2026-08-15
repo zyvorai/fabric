@@ -21,5 +21,5 @@ jobs:
         run: cd operator && cargo test
       - name: Helm template lint
         run: |
-          helm template test operator/charts/vmspawnd-operator > /tmp/operator.yaml
-          grep -q 'VMSPAWND_URL' /tmp/operator.yaml
+          helm template test operator/charts/zyvor-fabricd-operator > /tmp/operator.yaml
+          grep -q 'ZYVOR_FABRICD_URL' /tmp/operator.yaml

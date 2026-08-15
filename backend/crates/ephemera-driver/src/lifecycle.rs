@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use vm_model::VMState;
-use vmspawnd_driver_core::{MachineInfo, VMDriver};
-use vmspawnd_ephemera_client::{VmRecord, VmStatus};
+use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
+use zyvor_fabric_ephemera_client::{VmRecord, VmStatus};
 
 use crate::EphemeraDriver;
 
@@ -68,9 +68,9 @@ impl VMDriver for EphemeraDriver {
     async fn enable(&self, _name: &str) -> Result<()> {
         // "Enable at boot" doesn't belong in Ephemera (a disposable-VM
         // engine, not a service manager) — per the migration plan this
-        // becomes an `autostart` flag in vmspawnd's own StateStore plus a
+        // becomes an `autostart` flag in zyvor-fabricd's own StateStore plus a
         // startup reconciliation pass, not yet wired up. No-op for now
-        // rather than erroring, since nothing in vmspawnd calls this yet.
+        // rather than erroring, since nothing in zyvor-fabricd calls this yet.
         Ok(())
     }
 

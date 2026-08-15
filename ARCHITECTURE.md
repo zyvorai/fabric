@@ -11,6 +11,6 @@ This repository’s system architecture lives in the docs tree:
 | [docs/API-VERSIONING.md](docs/API-VERSIONING.md) | `/api` vs `/api/v1` path contract |
 | [docs/TIME-MACHINE-API.md](docs/TIME-MACHINE-API.md) | Config snapshot & event retention APIs |
 
-**Runtime:** `vmspawnd` daemon · **Product:** Zyvor Fabric · **Repo:** [github.com/ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric)
+**Runtime:** `zyvor-fabricd` daemon · **Product:** Zyvor Fabric · **Repo:** [github.com/ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric)
 
 Former clone URL `github.com/ssahani/vmspawn` redirects to this repository.

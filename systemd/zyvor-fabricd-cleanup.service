@@ -1,0 +1,21 @@
+[Unit]
+Description=zyvor-fabricd State Store Cleanup
+Documentation=https://github.com/ssahani/zyvor-fabric
+After=zyvor-fabricd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zyvor-fabricd/cleanup-store
+TimeoutStartSec=300
+
+User=root
+Group=root
+
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/zyvor-fabricd
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zyvor-fabricd-cleanup

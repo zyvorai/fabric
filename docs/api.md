@@ -18,7 +18,7 @@ Authorization: Bearer <token>
 
 ```bash
 # Read the auto-generated admin password (first startup)
-PASSWORD=$(sudo cat /var/lib/vmspawnd/.admin_password)
+PASSWORD=$(sudo cat /var/lib/zyvor-fabricd/.admin_password)
 
 # Login
 curl -X POST http://localhost:9095/api/auth/login \

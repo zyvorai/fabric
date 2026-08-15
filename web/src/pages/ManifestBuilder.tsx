@@ -14,7 +14,7 @@ const SECTIONS: ConfigSection[] = [
     { key: 'name', label: 'VM Name', type: 'text', placeholder: 'my-vm' },
     { key: 'cpus', label: 'vCPUs', type: 'number', placeholder: '2' },
     { key: 'memory', label: 'Memory (MB)', type: 'number', placeholder: '2048' },
-    { key: 'image', label: 'Disk Image Path', type: 'text', placeholder: '/var/lib/vmspawnd/images/disk.qcow2' },
+    { key: 'image', label: 'Disk Image Path', type: 'text', placeholder: '/var/lib/zyvor-fabricd/images/disk.qcow2' },
     { key: 'firmware', label: 'Firmware', type: 'select', options: ['uefi', 'bios'] },
   ]},
   { name: 'Network', key: 'network', expanded: false, fields: [

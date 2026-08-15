@@ -1,4 +1,4 @@
-# vmctl-tui -- Terminal UI
+# zyvorctl-tui -- Terminal UI
 
 A k9s-style interactive terminal dashboard for managing VMs, built with ratatui and crossterm.
 
@@ -21,20 +21,20 @@ A k9s-style interactive terminal dashboard for managing VMs, built with ratatui 
 
 ```bash
 # Connect to local daemon
-vmctl-tui
+zyvorctl-tui
 
 # Connect to remote daemon
-vmctl-tui --url http://remote-host:8080
+zyvorctl-tui --url http://remote-host:8080
 
 # Custom refresh interval (seconds)
-vmctl-tui --refresh-interval 10
+zyvorctl-tui --refresh-interval 10
 ```
 
 ### Requirements
 
 - Terminal with 256-color support (true-color recommended)
 - Minimum 80x24 terminal size (larger recommended)
-- vmspawnd daemon running and accessible
+- zyvor-fabricd daemon running and accessible
 
 ---
 

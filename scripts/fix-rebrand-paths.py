@@ -20,16 +20,16 @@ GLOBS = [
 ]
 
 REPAIRS = [
-    ("/etc/Zyvor Fabric", "/etc/vmspawnd"),
-    ("/var/lib/Zyvor Fabric", "/var/lib/vmspawnd"),
+    ("/etc/Zyvor Fabric", "/etc/zyvor-fabricd"),
+    ("/var/lib/Zyvor Fabric", "/var/lib/zyvor-fabricd"),
     ("Zyvor Fabric/backend", "backend"),
     ("cd Zyvor Fabric", "cd zyvor-fabric"),
     ("systemd-Zyvor Fabric", "systemd-vmspawn"),
-    ("useradd --system --home-dir /var/lib/vmspawnd --shell /usr/sbin/nologin Zyvor Fabric", "useradd --system --home-dir /var/lib/vmspawnd --shell /usr/sbin/nologin vmspawnd"),
-    ("chown -R Zyvor Fabric:Zyvor Fabric /var/lib/vmspawnd", "chown -R vmspawnd:vmspawnd /var/lib/vmspawnd"),
-    ("chown Zyvor Fabric:Zyvor Fabric", "chown vmspawnd:vmspawnd"),
-    ("sudo tar czf /tmp/Zyvor Fabric-pre-upgrade.tar.gz", "sudo tar czf /tmp/vmspawnd-pre-upgrade.tar.gz"),
-    ("Create `Zyvor Fabric/backend/configs/vmspawnd.toml`", "Create `backend/configs/vmspawnd.toml`"),
+    ("useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin Zyvor Fabric", "useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin zyvor-fabricd"),
+    ("chown -R Zyvor Fabric:Zyvor Fabric /var/lib/zyvor-fabricd", "chown -R zyvor-fabricd:zyvor-fabricd /var/lib/zyvor-fabricd"),
+    ("chown Zyvor Fabric:Zyvor Fabric", "chown zyvor-fabricd:zyvor-fabricd"),
+    ("sudo tar czf /tmp/Zyvor Fabric-pre-upgrade.tar.gz", "sudo tar czf /tmp/zyvor-fabricd-pre-upgrade.tar.gz"),
+    ("Create `Zyvor Fabric/backend/configs/zyvor-fabricd.toml`", "Create `backend/configs/zyvor-fabricd.toml`"),
 ]
 
 

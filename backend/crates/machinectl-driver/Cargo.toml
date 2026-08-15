@@ -16,6 +16,6 @@ zbus.workspace = true
 async-stream.workspace = true
 async-trait.workspace = true
 vm-model = { path = "../../vm-model" }
-vmspawnd-driver-core = { path = "../driver-core" }
+zyvor-fabric-driver-core = { path = "../driver-core" }
 vmspawnd-machined-dbus = { path = "../machined-dbus" }
-vmspawnd-cgroup = { path = "../cgroup" }
+zyvor-fabric-cgroup = { path = "../cgroup" }

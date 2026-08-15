@@ -16,7 +16,7 @@ npm install
 npm run tauri dev
 ```
 
-Connect to a running `vmspawnd` instance. Use **Dashboard**, **Live events** (SSE), or **AI Copilot** (v0.1 rule-based).
+Connect to a running `zyvor-fabricd` instance. Use **Dashboard**, **Live events** (SSE), or **AI Copilot** (v0.1 rule-based).
 
 ## Build
 
@@ -27,6 +27,6 @@ npm run tauri build
 ## Architecture
 
 - **Frontend:** React + Vite (`src/`)
-- **Backend:** Tauri Rust commands (`src-tauri/`) calling `vmspawn-sdk`
+- **Backend:** Tauri Rust commands (`src-tauri/`) calling `zyvor-fabric-sdk`
 
 Companion CLI: [../client](../client/) (`machina-fabric`).

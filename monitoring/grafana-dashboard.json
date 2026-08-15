@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "vmspawnd Dashboard",
+    "title": "zyvor-fabricd Dashboard",
     "panels": [
       {
         "title": "Total VMs",

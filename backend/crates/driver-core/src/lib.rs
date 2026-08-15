@@ -44,7 +44,7 @@ pub type LogStream = Pin<Box<dyn Stream<Item = LogEntry> + Send>>;
 //
 // These use `#[async_trait]` (boxed futures) rather than native RPITIT
 // (`impl Future<...> + Send`) specifically so `VmDriver` below is
-// dyn-compatible — `vmspawnd`'s `AppState.driver` needs to hold either a
+// dyn-compatible — `zyvor-fabricd`'s `AppState.driver` needs to hold either a
 // `MachinectlDriver` or an `EphemeraDriver` behind one `Arc<dyn VmDriver>`,
 // selected at startup by config, and RPITIT traits cannot be turned into
 // trait objects. This also matches the convention Ephemera's own
@@ -147,7 +147,7 @@ pub trait CapabilityProvider: Send + Sync {
     fn has_resource_control(&self) -> bool;
 }
 
-/// Umbrella trait letting `vmspawnd` hold one `Arc<dyn VmDriver>` covering
+/// Umbrella trait letting `zyvor-fabricd` hold one `Arc<dyn VmDriver>` covering
 /// every driver capability, instead of five separate trait objects. Blanket
 /// `impl`'d for anything implementing the five component traits — backends
 /// only need to implement those, never this trait directly.

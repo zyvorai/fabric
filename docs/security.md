@@ -8,13 +8,13 @@ Zyvor Fabric provides authentication, authorization, TLS, audit logging, and API
 
 ### Configuration
 
-Authentication is configured in `/etc/vmspawnd/vmspawnd.toml`:
+Authentication is configured in `/etc/zyvor-fabricd/zyvor-fabricd.toml`:
 
 ```toml
 [auth]
 enabled = true                          # Enable/disable authentication
 # jwt_secret = "..."                    # Optional: auto-generated if omitted
-# db_path = "/var/lib/vmspawnd/auth.db" # SQLite user database
+# db_path = "/var/lib/zyvor-fabricd/auth.db" # SQLite user database
 # token_expiration_hours = 24           # JWT token lifetime
 # default_admin_password = "..."        # Optional: auto-generated if omitted
 ```
@@ -24,24 +24,24 @@ enabled = true                          # Enable/disable authentication
 On first startup with authentication enabled, Zyvor Fabric:
 
 1. **Creates an `admin` user** with a randomly generated password
-2. **Writes the password** to `/var/lib/vmspawnd/.admin_password` (mode `0600`, root-only readable)
-3. **Generates a JWT signing secret** and persists it to `/var/lib/vmspawnd/.jwt_secret` (mode `0600`)
+2. **Writes the password** to `/var/lib/zyvor-fabricd/.admin_password` (mode `0600`, root-only readable)
+3. **Generates a JWT signing secret** and persists it to `/var/lib/zyvor-fabricd/.jwt_secret` (mode `0600`)
 
 To retrieve the admin password:
 
 ```bash
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```
 
 To set a custom admin password before first startup:
 
 ```bash
 # Option 1: Environment variable
-export VMSPAWND_ADMIN_PASSWORD="your-strong-password"
+export ZYVOR_FABRICD_ADMIN_PASSWORD="your-strong-password"
 sudo systemctl start Zyvor Fabric
 
 # Option 2: Config file
-# Add to /etc/vmspawnd/vmspawnd.toml:
+# Add to /etc/zyvor-fabricd/zyvor-fabricd.toml:
 # [auth]
 # default_admin_password = "your-strong-password"
 ```
@@ -49,7 +49,7 @@ sudo systemctl start Zyvor Fabric
 To provide your own JWT secret:
 
 ```bash
-export VMSPAWND_JWT_SECRET="your-64-char-secret-here"
+export ZYVOR_FABRICD_JWT_SECRET="your-64-char-secret-here"
 ```
 
 ### JWT Tokens
@@ -60,7 +60,7 @@ All API endpoints (except `/api/auth/login` and `/health`) require authenticatio
 
 ```bash
 # Read the generated password
-PASSWORD=$(sudo cat /var/lib/vmspawnd/.admin_password)
+PASSWORD=$(sudo cat /var/lib/zyvor-fabricd/.admin_password)
 
 # Login
 curl -X POST http://localhost:9095/api/auth/login \
@@ -147,7 +147,7 @@ curl -X DELETE http://localhost:9095/api/auth/users/<user-id> \
 
 ## Credential Files
 
-Zyvor Fabric stores sensitive credentials in `/var/lib/vmspawnd/` with restricted permissions:
+Zyvor Fabric stores sensitive credentials in `/var/lib/zyvor-fabricd/` with restricted permissions:
 
 | File | Purpose | Permissions |
 |------|---------|-------------|
@@ -162,19 +162,19 @@ Zyvor Fabric stores sensitive credentials in `/var/lib/vmspawnd/` with restricte
 ### Enable TLS
 
 ```toml
-# /etc/vmspawnd/vmspawnd.toml
+# /etc/zyvor-fabricd/zyvor-fabricd.toml
 [daemon]
 listen = "0.0.0.0:8443"
-tls_cert = "/etc/vmspawnd/cert.pem"
-tls_key = "/etc/vmspawnd/key.pem"
+tls_cert = "/etc/zyvor-fabricd/cert.pem"
+tls_key = "/etc/zyvor-fabricd/key.pem"
 ```
 
 ### Generate a Self-Signed Certificate
 
 ```bash
 openssl req -x509 -newkey rsa:4096 \
-  -keyout /etc/vmspawnd/key.pem \
-  -out /etc/vmspawnd/cert.pem \
+  -keyout /etc/zyvor-fabricd/key.pem \
+  -out /etc/zyvor-fabricd/cert.pem \
   -days 365 -nodes \
   -subj "/CN=Zyvor Fabric"
 ```
@@ -213,7 +213,7 @@ Audit logs can be exported as JSON or CSV for compliance and analysis.
 Protect against abuse with configurable rate limits:
 
 ```toml
-# /etc/vmspawnd/vmspawnd.toml
+# /etc/zyvor-fabricd/zyvor-fabricd.toml
 [security]
 rate_limit_per_minute = 60
 max_concurrent_requests = 100
@@ -247,17 +247,17 @@ curl http://localhost:9095/api/vms
 
 | Variable | Purpose |
 |----------|---------|
-| `VMSPAWND_JWT_SECRET` | Override the JWT signing secret (takes priority over auto-generated) |
-| `VMSPAWND_ADMIN_PASSWORD` | Set the initial admin password (used only on first startup) |
-| `VMSPAWND_CONFIG` | Override the config file path |
+| `ZYVOR_FABRICD_JWT_SECRET` | Override the JWT signing secret (takes priority over auto-generated) |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Set the initial admin password (used only on first startup) |
+| `ZYVOR_FABRICD_CONFIG` | Override the config file path |
 
 ---
 
 ## Best Practices
 
 1. **Always enable TLS in production** -- never expose the API over plain HTTP on untrusted networks
-2. **Set `VMSPAWND_ADMIN_PASSWORD`** -- use a strong password via environment variable before first startup, then remove it from the environment
-3. **Rotate JWT secrets** -- update `VMSPAWND_JWT_SECRET` and restart; existing tokens will be invalidated
+2. **Set `ZYVOR_FABRICD_ADMIN_PASSWORD`** -- use a strong password via environment variable before first startup, then remove it from the environment
+3. **Rotate JWT secrets** -- update `ZYVOR_FABRICD_JWT_SECRET` and restart; existing tokens will be invalidated
 4. **Use strong passwords** -- enforce a minimum of 12 characters
 5. **Scope API keys** -- grant minimum required role for each key
 6. **Monitor audit logs** -- set up alerts for failed authentication and denied actions

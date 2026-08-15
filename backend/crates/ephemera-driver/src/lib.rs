@@ -11,16 +11,16 @@
 //! returns an "unsupported" error for now — Ephemera has no cgroup
 //! delegation or log-streaming endpoint yet (Phase 5 of the plan). Callers
 //! (`api/system.rs` CPU pinning, `api/logs.rs`, hotplug) stay on the
-//! `MachinectlDriver` path until that lands, selected by vmspawnd's
+//! `MachinectlDriver` path until that lands, selected by zyvor-fabricd's
 //! `driver = "machinectl" | "ephemera"` config flag.
 
 mod lifecycle;
 mod unsupported;
 
 use anyhow::{Context, Result};
-use vmspawnd_ephemera_client::EphemeraClient;
+use zyvor_fabric_ephemera_client::EphemeraClient;
 
-pub use vmspawnd_driver_core::{
+pub use zyvor_fabric_driver_core::{
     CapabilityProvider, LogDriver, LogEntry, MachineInfo, ResourceControlDriver,
     ResourceStatsDriver, VMDriver, VmDriver,
 };
@@ -46,7 +46,7 @@ impl EphemeraDriver {
     /// is keyed by id while `VMDriver` is keyed by name (systemd-machined's
     /// model). Fails loudly rather than silently no-op'ing on an unknown
     /// name, matching machinectl-driver's behavior for the same case.
-    async fn resolve(&self, name: &str) -> Result<vmspawnd_ephemera_client::VmRecord> {
+    async fn resolve(&self, name: &str) -> Result<zyvor_fabric_ephemera_client::VmRecord> {
         self.client
             .find_by_name(name)
             .await?

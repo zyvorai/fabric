@@ -36,7 +36,7 @@ interface AppSettings {
 }
 
 const defaultSettings: AppSettings = {
-  daemon_name: 'vmspawnd-01',
+  daemon_name: 'zyvor-fabricd-01',
   log_level: 'info',
   auto_refresh: true,
   refresh_interval: 5,

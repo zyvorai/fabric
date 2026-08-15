@@ -1,6 +1,6 @@
 [package]
 license = "LicenseRef-Zyvor-Proprietary"
-name = "vmspawnd-vm"
+name = "zyvor-fabric-vm"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,7 +11,7 @@ thiserror.workspace = true
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 uuid = { version = "1.0", features = ["v4", "serde"] }
-vmspawnd-system = { path = "../system" }
+zyvor-fabric-system = { path = "../system" }
 
 [dev-dependencies]
 tempfile = "3.0"

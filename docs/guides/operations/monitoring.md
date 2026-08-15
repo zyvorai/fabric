@@ -16,7 +16,7 @@ How to monitor Zyvor Fabric health, collect metrics, subscribe to real-time even
 
 ## Health Endpoint
 
-The `/health` endpoint provides a quick liveness check for the vmspawnd service. It does not require authentication.
+The `/health` endpoint provides a quick liveness check for the zyvor-fabricd service. It does not require authentication.
 
 ```bash
 curl -s http://localhost:3000/health | jq
@@ -122,7 +122,7 @@ Useful per-VM metrics:
 #!/bin/bash
 # collect-metrics.sh -- Run via cron every minute
 HOST="http://localhost:3000"
-TOKEN="$(cat /etc/vmspawnd/api-token)"
+TOKEN="$(cat /etc/zyvor-fabricd/api-token)"
 AUTH="Authorization: Bearer $TOKEN"
 
 # Host stats
@@ -462,7 +462,7 @@ The `/api/logs` endpoint provides access to the host system journal. This is use
 curl -s "http://localhost:3000/api/logs?lines=200" \
   -H "Authorization: Bearer $TOKEN" | jq
 
-# Filter for vmspawnd service messages
+# Filter for zyvor-fabricd service messages
 curl -s "http://localhost:3000/api/logs?grep=Zyvor Fabric" \
   -H "Authorization: Bearer $TOKEN" | jq
 

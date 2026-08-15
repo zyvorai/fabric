@@ -65,9 +65,9 @@ Full install: system deps + cargo build + systemd + dashboard.
 Quick: skip system deps (rsync + build + install + web).
 Open the UI at http://HOST:9095 (config listens on 0.0.0.0 for remote IPv4 deploys).
 
---remote-build   After rsync+chown, run `cargo build --release -p vmspawnd -p vmctl` only.
+--remote-build   After rsync+chown, run `cargo build --release -p zyvor-fabricd -p zyvorctl` only.
 --remote-check   Same but `cargo check` (faster compile smoke).
---uninstall      Stop service, remove binaries/units; keeps /var/lib/vmspawnd data.
+--uninstall      Stop service, remove binaries/units; keeps /var/lib/zyvor-fabricd data.
 
 Auth: SSH keys/agent by default; optional PASSWORD arg or SSHPASS env → sshpass.
 
@@ -163,24 +163,24 @@ run() {
     }
     if ! command -v systemctl &>/dev/null; then warn "no systemctl"; exit 1; fi
     printf '\n⚙️  Systemd units\n'
-    unit_line vmspawnd.service
+    unit_line zyvor-fabricd.service
     unit_line systemd-machined.service
     local vd md
-    vd=$(systemctl is-active vmspawnd 2>/dev/null || true)
+    vd=$(systemctl is-active zyvor-fabricd 2>/dev/null || true)
     md=$(systemctl is-active systemd-machined 2>/dev/null || true)
-    [[ "$vd" == active ]] && ok "vmspawnd active" || warn "vmspawnd not active ($vd)"
+    [[ "$vd" == active ]] && ok "zyvor-fabricd active" || warn "zyvor-fabricd not active ($vd)"
     [[ "$md" == active ]] && ok "systemd-machined active" || warn "systemd-machined not active ($md)"
-    printf '\n📋 systemctl status vmspawnd\n'
-    systemctl status vmspawnd --no-pager 2>/dev/null || warn "cannot read vmspawnd status"
+    printf '\n📋 systemctl status zyvor-fabricd\n'
+    systemctl status zyvor-fabricd --no-pager 2>/dev/null || warn "cannot read zyvor-fabricd status"
     printf '\n💚 %s\n' "$HEALTH_URL"
     if command -v curl &>/dev/null; then
         curl -sf --connect-timeout 3 "$HEALTH_URL" >/dev/null && ok "GET $HEALTH_URL" || warn "cannot reach $HEALTH_URL"
     else
         warn "curl missing — skip HTTP check"
     fi
-    if command -v vmspawnctl &>/dev/null; then
-        printf '\n🧪 vmspawnctl verify\n'
-        VMSPAWND_URL="http://127.0.0.1:${API_PORT}" vmspawnctl verify 2>/dev/null && ok "verify passed" || warn "verify failed (check admin password / service logs)"
+    if command -v zyvorctl &>/dev/null; then
+        printf '\n🧪 zyvorctl verify\n'
+        ZYVOR_FABRICD_URL="http://127.0.0.1:${API_PORT}" zyvorctl verify 2>/dev/null && ok "verify passed" || warn "verify failed (check admin password / service logs)"
     fi
     printf '\n'
 }
@@ -284,29 +284,29 @@ if $UNINSTALL; then
     deploy_ui_uninstall_banner
     deploy_ui_kv "🎯" "Target" "$REMOTE"
     deploy_ui_kv "📁" "Remote dir" "$REMOTE_DIR"
-    phase 1 1 "Uninstall vmspawnd" "stop services · remove binaries · keep /var/lib/vmspawnd"
+    phase 1 1 "Uninstall zyvor-fabricd" "stop services · remove binaries · keep /var/lib/zyvor-fabricd"
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
 REMOTE_DIR='${REMOTE_DIR}'
-for svc in vmspawnd.service; do
+for svc in zyvor-fabricd.service; do
   \$SUDO systemctl stop \$svc 2>/dev/null || true
   \$SUDO systemctl disable \$svc 2>/dev/null || true
 done
-for unit in vmspawnd.service vm@.service vmspawnd-backup.service vmspawnd-backup.timer vmspawnd-cleanup.service vmspawnd-cleanup.timer; do
+for unit in zyvor-fabricd.service vm@.service zyvor-fabricd-backup.service zyvor-fabricd-backup.timer zyvor-fabricd-cleanup.service zyvor-fabricd-cleanup.timer; do
   \$SUDO rm -f /usr/lib/systemd/system/\$unit 2>/dev/null || true
 done
-for bin in vmspawnd vmctl vmctl-tui vmspawnctl; do
+for bin in zyvor-fabricd zyvorctl zyvorctl-tui zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
-\$SUDO rm -rf /usr/share/vmspawnd 2>/dev/null || true
-\$SUDO rm -rf /etc/vmspawnd 2>/dev/null || true
+\$SUDO rm -rf /usr/share/zyvor-fabricd 2>/dev/null || true
+\$SUDO rm -rf /etc/zyvor-fabricd 2>/dev/null || true
 rm -rf \"\$REMOTE_DIR\"
 \$SUDO systemctl daemon-reload
 echo 'Done'
 " || die "uninstall failed"
-    ok "vmspawnd removed from ${HOST}"
-    tip "Kept: /var/lib/vmspawnd (user data, images, auth.db)"
+    ok "zyvor-fabricd removed from ${HOST}"
+    tip "Kept: /var/lib/zyvor-fabricd (user data, images, auth.db)"
     exit 0
 fi
 
@@ -396,8 +396,8 @@ fi
 
 if $REMOTE_BUILD || $REMOTE_CHECK; then
     mk_target=build
-    cargo_cmd="cargo build --release -p vmspawnd -p vmctl"
-    $REMOTE_CHECK && { mk_target=check; cargo_cmd="cargo check -p vmspawnd -p vmctl"; }
+    cargo_cmd="cargo build --release -p zyvor-fabricd -p zyvorctl"
+    $REMOTE_CHECK && { mk_target=check; cargo_cmd="cargo check -p zyvor-fabricd -p zyvorctl"; }
     phase 3 "$TOTAL_STEPS" "Compile on remote ($mk_target)" "no install — run full deploy to install binaries"
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
@@ -428,12 +428,12 @@ fi
 
 install_step=3
 if ! $QUICK && ! $DEPS_ONLY; then
-    phase "$install_step" "$TOTAL_STEPS" "Remove old binaries" "stop vmspawnd · remove previous /usr/bin installs"
+    phase "$install_step" "$TOTAL_STEPS" "Remove old binaries" "stop zyvor-fabricd · remove previous /usr/bin installs"
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
-\$SUDO systemctl stop vmspawnd.service 2>/dev/null || true
-for bin in vmspawnd vmctl vmctl-tui; do
+\$SUDO systemctl stop zyvor-fabricd.service 2>/dev/null || true
+for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 " || warn "could not remove old binaries"
@@ -473,12 +473,12 @@ echo 'System deps installed'
         exit 0
     fi
 elif ! $DEPS_ONLY; then
-    phase "$install_step" "$TOTAL_STEPS" "Remove old binaries" "stop vmspawnd · remove previous /usr/bin installs"
+    phase "$install_step" "$TOTAL_STEPS" "Remove old binaries" "stop zyvor-fabricd · remove previous /usr/bin installs"
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
-\$SUDO systemctl stop vmspawnd.service 2>/dev/null || true
-for bin in vmspawnd vmctl vmctl-tui; do
+\$SUDO systemctl stop zyvor-fabricd.service 2>/dev/null || true
+for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 " || warn "could not remove old binaries"
@@ -486,17 +486,17 @@ done
     install_step=$((install_step + 1))
 fi
 
-phase "$install_step" "$TOTAL_STEPS" "Build Rust binaries on remote" "cargo build --release -p vmspawnd -p vmctl"
+phase "$install_step" "$TOTAL_STEPS" "Build Rust binaries on remote" "cargo build --release -p zyvor-fabricd -p zyvorctl"
 ssh_r_bash "$REMOTE" "
 set -euo pipefail
 cd $REMOTE_DIR/backend
 $remote_cargo_env
-cargo build --release -p vmspawnd -p vmctl
+cargo build --release -p zyvor-fabricd -p zyvorctl
 " || die "Rust build failed"
 ok "Rust binaries built"
 install_step=$((install_step + 1))
 
-phase "$install_step" "$TOTAL_STEPS" "Install binaries and systemd units" "config · directories · vmspawnctl · restart service"
+phase "$install_step" "$TOTAL_STEPS" "Install binaries and systemd units" "config · directories · zyvorctl · restart service"
 ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
@@ -507,47 +507,47 @@ NO_START='${NO_START}'
 API_PORT='${API_PORT}'
 cd \"\$REMOTE_DIR\"
 
-for bin in vmspawnd vmctl vmctl-tui; do
+for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
     if [ -f \"backend/target/release/\$bin\" ]; then
         \$SUDO install -m 755 \"backend/target/release/\$bin\" \"/usr/bin/\$bin\"
         echo \"  ✅ \$bin -> /usr/bin/\$bin\"
     fi
 done
-[ -f vmspawnctl ] && \$SUDO install -m 755 vmspawnctl /usr/bin/vmspawnctl && echo '  ✅ vmspawnctl -> /usr/bin/vmspawnctl'
+[ -f zyvorctl ] && \$SUDO install -m 755 zyvorctl /usr/bin/zyvorctl && echo '  ✅ zyvorctl -> /usr/bin/zyvorctl'
 
-\$SUDO install -d /etc/vmspawnd /var/lib/vmspawnd/images /var/lib/vmspawnd/state /var/log/vmspawnd /run/vmspawnd
+\$SUDO install -d /etc/zyvor-fabricd /var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/state /var/log/zyvor-fabricd /run/zyvor-fabricd
 
-if [ ! -f /etc/vmspawnd/vmspawnd.toml ] && [ -f configs/vmspawnd.toml ]; then
-    \$SUDO install -m 0644 configs/vmspawnd.toml /etc/vmspawnd/vmspawnd.toml
-    echo '  ✅ Created /etc/vmspawnd/vmspawnd.toml'
+if [ ! -f /etc/zyvor-fabricd/zyvor-fabricd.toml ] && [ -f configs/zyvor-fabricd.toml ]; then
+    \$SUDO install -m 0644 configs/zyvor-fabricd.toml /etc/zyvor-fabricd/zyvor-fabricd.toml
+    echo '  ✅ Created /etc/zyvor-fabricd/zyvor-fabricd.toml'
 fi
 
-if [ -n \"\$BIND\" ] && [ -f /etc/vmspawnd/vmspawnd.toml ]; then
-    \$SUDO sed -i \"s/listen = \\\"127.0.0.1:/listen = \\\"\${BIND}:/\" /etc/vmspawnd/vmspawnd.toml
-    \$SUDO sed -i \"s/listen = \\\"0.0.0.0:/listen = \\\"\${BIND}:/\" /etc/vmspawnd/vmspawnd.toml
+if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
+    \$SUDO sed -i \"s/listen = \\\"127.0.0.1:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
+    \$SUDO sed -i \"s/listen = \\\"0.0.0.0:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
     echo \"  ✅ listen bound to \${BIND}:\${API_PORT}\"
 fi
 
-for unit in vmspawnd.service vm@.service vmspawnd-backup.service vmspawnd-cleanup.service; do
+for unit in zyvor-fabricd.service vm@.service zyvor-fabricd-backup.service zyvor-fabricd-cleanup.service; do
     [ -f \"systemd/\$unit\" ] && \$SUDO install -m 644 \"systemd/\$unit\" \"/usr/lib/systemd/system/\$unit\"
 done
-for extra in vmspawnd-backup.timer vmspawnd-cleanup.timer; do
+for extra in zyvor-fabricd-backup.timer zyvor-fabricd-cleanup.timer; do
     [ -f \"systemd/\$extra\" ] && \$SUDO install -m 644 \"systemd/\$extra\" \"/usr/lib/systemd/system/\$extra\"
 done
-if [ -f configs/pam.d/vmspawnd ]; then
-    \$SUDO install -m 644 configs/pam.d/vmspawnd /etc/pam.d/vmspawnd
-    echo '  ✅ PAM service -> /etc/pam.d/vmspawnd'
+if [ -f configs/pam.d/zyvor-fabricd ]; then
+    \$SUDO install -m 644 configs/pam.d/zyvor-fabricd /etc/pam.d/zyvor-fabricd
+    echo '  ✅ PAM service -> /etc/pam.d/zyvor-fabricd'
 fi
 
 \$SUDO systemctl daemon-reload
 if [ \"\$NO_START\" != true ]; then
-    \$SUDO systemctl enable vmspawnd.service 2>/dev/null || true
-    \$SUDO systemctl restart vmspawnd.service 2>/dev/null || true
+    \$SUDO systemctl enable zyvor-fabricd.service 2>/dev/null || true
+    \$SUDO systemctl restart zyvor-fabricd.service 2>/dev/null || true
     sleep 2
-    if \$SUDO systemctl is-active vmspawnd &>/dev/null; then
-        echo '  ✅ vmspawnd: running'
+    if \$SUDO systemctl is-active zyvor-fabricd &>/dev/null; then
+        echo '  ✅ zyvor-fabricd: running'
     else
-        echo '  ❌ vmspawnd: not running (journalctl -u vmspawnd -n 20)'
+        echo '  ❌ zyvor-fabricd: not running (journalctl -u zyvor-fabricd -n 20)'
     fi
 else
     echo '  ℹ️  --no-start: service not restarted'
@@ -562,7 +562,7 @@ fi
 ok "Binaries and systemd installed"
 install_step=$((install_step + 1))
 
-phase "$install_step" "$TOTAL_STEPS" "Deploy web dashboard" "npm install · npm run build · /usr/share/vmspawnd/web"
+phase "$install_step" "$TOTAL_STEPS" "Deploy web dashboard" "npm install · npm run build · /usr/share/zyvor-fabricd/web"
 ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
@@ -574,12 +574,12 @@ if [ -f web/package.json ] && command -v npm &>/dev/null; then
     npm run build 2>&1 | tail -3
     cd \"\$REMOTE_DIR\"
     if [ -d web/dist ]; then
-        \$SUDO rm -rf /usr/share/vmspawnd/web
-        \$SUDO install -d /usr/share/vmspawnd/web
-        \$SUDO cp -r web/dist/* /usr/share/vmspawnd/web/
-        echo \"  ✅ Dashboard deployed: \$(find /usr/share/vmspawnd/web -type f | wc -l) files\"
+        \$SUDO rm -rf /usr/share/zyvor-fabricd/web
+        \$SUDO install -d /usr/share/zyvor-fabricd/web
+        \$SUDO cp -r web/dist/* /usr/share/zyvor-fabricd/web/
+        echo \"  ✅ Dashboard deployed: \$(find /usr/share/zyvor-fabricd/web -type f | wc -l) files\"
     fi
-elif [ -f /usr/share/vmspawnd/web/index.html ]; then
+elif [ -f /usr/share/zyvor-fabricd/web/index.html ]; then
     echo '  ℹ️  Dashboard already deployed'
 else
     echo '  ⚠️  npm not found — skipping dashboard build'
@@ -588,7 +588,7 @@ fi
 ok "Web dashboard deployed"
 install_step=$((install_step + 1))
 
-phase "$install_step" "$TOTAL_STEPS" "Post-flight verification" "health endpoint · systemd · vmspawnctl verify"
+phase "$install_step" "$TOTAL_STEPS" "Post-flight verification" "health endpoint · systemd · zyvorctl verify"
 sleep 1
 check_remote_health "$REMOTE" || true
 
@@ -603,20 +603,20 @@ $QUICK && MODE_SAVE=quick
 vmspawn_save_deploy_last "$REPO" "$HOST" "$USER" "$MODE_SAVE"
 
 deploy_ui_highlight "📋 Post-deploy checklist"
-deploy_ui_checklist "vmspawnd" "$(ssh_r_bash "$REMOTE" 'systemctl is-active vmspawnd 2>/dev/null || echo unknown' | tr -d '\r')"
+deploy_ui_checklist "zyvor-fabricd" "$(ssh_r_bash "$REMOTE" 'systemctl is-active zyvor-fabricd 2>/dev/null || echo unknown' | tr -d '\r')"
 deploy_ui_checklist "machined" "$(ssh_r_bash "$REMOTE" 'systemctl is-active systemd-machined 2>/dev/null || echo unknown' | tr -d '\r')"
 deploy_ui_checklist "health" "$(curl -sf --connect-timeout 5 "http://${HOST}:${API_PORT}/health" >/dev/null && echo 200 || echo fail)"
 
 deploy_ui_celebrate "Ship it!"
 vmspawn_print_success "$HOST" "$ELAPSED" "$USER"
 deploy_ui_kv "🔗" "SSH" "ssh ${USER}@${HOST}"
-deploy_ui_kv "🔑" "Password" "sudo cat /var/lib/vmspawnd/.admin_password"
-deploy_ui_kv "🚀" "Manage" "vmspawnctl status · vmspawnctl verify"
+deploy_ui_kv "🔑" "Password" "sudo cat /var/lib/zyvor-fabricd/.admin_password"
+deploy_ui_kv "🚀" "Manage" "zyvorctl status · zyvorctl verify"
 tip "HOST USER also works: ./scripts/deploy-remote.sh ${HOST} ${USER} --quick"
 
 if $RUN_E2E; then
     deploy_ui_highlight "🧪 Post-deploy E2E"
-    if ssh_r_bash "$REMOTE" "VMSPAWND_URL=http://127.0.0.1:${API_PORT} vmspawnctl verify"; then
+    if ssh_r_bash "$REMOTE" "ZYVOR_FABRICD_URL=http://127.0.0.1:${API_PORT} zyvorctl verify"; then
         deploy_ui_celebrate "E2E passed"
     else
         warn "E2E failed (deploy itself succeeded)"
@@ -625,7 +625,7 @@ fi
 
 if $VERIFY_APIS; then
     deploy_ui_highlight "🔍 UX API audit"
-    ADMIN_PW="$(ssh_r_bash "$REMOTE" "sudo cat /var/lib/vmspawnd/.admin_password 2>/dev/null | tr -d '\r'" || true)"
+    ADMIN_PW="$(ssh_r_bash "$REMOTE" "sudo cat /var/lib/zyvor-fabricd/.admin_password 2>/dev/null | tr -d '\r'" || true)"
     if [[ -n "$ADMIN_PW" ]] && VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
         deploy_ui_celebrate "API audit passed"
     else

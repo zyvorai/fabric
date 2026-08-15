@@ -1,19 +1,19 @@
 terraform {
   required_providers {
-    vmspawnd = {
-      source  = "ssahani/vmspawnd"
+    zyvor-fabricd = {
+      source  = "ssahani/zyvor-fabricd"
       version = "~> 0.1"
     }
   }
 }
 
-provider "vmspawnd" {
+provider "zyvor-fabricd" {
   endpoint = "http://localhost:9095"
 }
 
-resource "vmspawnd_vm" "example" {
+resource "zyvor_fabric_vm" "example" {
   name   = "terraform-vm"
-  image  = "/var/lib/vmspawnd/images/ubuntu-22.04.qcow2"
+  image  = "/var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2"
   cpus   = 4
   memory = 4096
 
@@ -41,9 +41,9 @@ resource "vmspawnd_vm" "example" {
 }
 
 output "vm_name" {
-  value = vmspawnd_vm.example.name
+  value = zyvor_fabric_vm.example.name
 }
 
 output "vm_state" {
-  value = vmspawnd_vm.example.state
+  value = zyvor_fabric_vm.example.state
 }

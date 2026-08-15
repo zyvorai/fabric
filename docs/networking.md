@@ -13,7 +13,7 @@ Zyvor Fabric provides comprehensive virtual networking with bridge management, V
 | **Isolated** | VMs can only communicate with each other | `mode = "isolated"` |
 
 ```toml
-# /etc/vmspawnd/vmspawnd.toml
+# /etc/zyvor-fabricd/zyvor-fabricd.toml
 [network]
 mode = "bridge"
 bridge = "br0"
@@ -143,7 +143,7 @@ curl -X POST http://localhost:9095/api/firewall-profiles \
   }'
 
 # Assign to a VM
-vmctl firewall assign myvm --profile=web-profile
+zyvorctl firewall assign myvm --profile=web-profile
 ```
 
 ### Service Mesh

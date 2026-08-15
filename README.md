@@ -13,7 +13,7 @@ Clustering, networking, security, storage, operators, Terraform, monitoring, HA,
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│  Interfaces   vmctl CLI · vmctl-tui · Web UI · TF · Operator   │
+│  Interfaces   zyvorctl CLI · zyvorctl-tui · Web UI · TF · Operator   │
 ├──────────────────────────────────────────────────────────────┤
 │  Daemon       Zyvor Fabric — 480+ REST endpoints · WebSocket │
 ├──────────────────────────────────────────────────────────────┤
@@ -56,11 +56,11 @@ git clone https://github.com/ssahani/zyvor-fabric.git && cd zyvor-fabric
 make build && sudo make install
 
 # CLI
-vmctl vm list
-vmctl vm create --name web-01 --cpus 2 --memory 4G
+zyvorctl vm list
+zyvorctl vm create --name web-01 --cpus 2 --memory 4G
 
 # TUI
-vmctl-tui
+zyvorctl-tui
 
 # Web UI → https://localhost:8443
 sudo systemctl start zyvor-fabric
@@ -68,7 +68,7 @@ sudo systemctl start zyvor-fabric
 
 | Scenario | Path |
 |----------|------|
-| Declarative VMs | `vmctl apply -f config.yaml` |
+| Declarative VMs | `zyvorctl apply -f config.yaml` |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator | [operator/](operator/) |
 | Ansible | [ansible/](ansible/) |
@@ -79,8 +79,8 @@ sudo systemctl start zyvor-fabric
 
 ```mermaid
 flowchart TB
-  CLI[vmctl] --> Daemon[Zyvor Fabric Daemon]
-  TUI[vmctl-tui] --> Daemon
+  CLI[zyvorctl] --> Daemon[Zyvor Fabric Daemon]
+  TUI[zyvorctl-tui] --> Daemon
   Web[Web UI] --> Daemon
   TF[Terraform] --> Daemon
   Op[K8s Operator] --> Daemon

@@ -1,5 +1,5 @@
 [package]
-name = "vmspawnd-ephemera-client"
+name = "zyvor-fabric-ephemera-client"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

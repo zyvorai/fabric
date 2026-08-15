@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# End-to-end API test suite for vmspawnd
+# End-to-end API test suite for zyvor-fabricd
 # Runs against a live server at BASE_URL (default: http://localhost:8080)
 #
 set -euo pipefail

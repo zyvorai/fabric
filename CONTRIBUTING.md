@@ -25,7 +25,7 @@ npm install
 ## Project Structure
 
 The backend is a Cargo workspace containing 34 crates. Key crates include `Zyvor Fabric` (the
-main daemon), `vmctl` (CLI), `vmctl-tui` (terminal UI), and `vmspawn-driver` (systemd-vmspawn
+main daemon), `zyvorctl` (CLI), `zyvorctl-tui` (terminal UI), and `zyvor-fabric-vm-driver` (systemd-vmspawn
 integration). Shared libraries live under `backend/crates/` (storage, system, vm).
 
 The web frontend is a React application located in the `web/` directory.

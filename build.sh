@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# build.sh — Build vmspawnd backend and web dashboard
+# build.sh — Build zyvor-fabricd backend and web dashboard
 # ============================================================================
 # Usage:
 #   ./build.sh                  # Build everything (backend + web)
@@ -45,7 +45,7 @@ START_TIME=$(date +%s)
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║     🔨 vmspawnd Build                            ║"
+echo "  ║     🔨 zyvor-fabricd Build                            ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo ""
 
@@ -61,14 +61,14 @@ if $BUILD_BACKEND; then
         cd backend
         if [[ "$BUILD_MODE" == "release" ]]; then
             cargo build --release 2>&1
-            for bin in vmspawnd vmctl vmctl-tui; do
+            for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
                 if [[ -f "target/release/$bin" ]]; then
                     info "$bin ($(du -h "target/release/$bin" | cut -f1))"
                 fi
             done
         else
             cargo build 2>&1
-            for bin in vmspawnd vmctl vmctl-tui; do
+            for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
                 if [[ -f "target/debug/$bin" ]]; then
                     info "$bin (debug, $(du -h "target/debug/$bin" | cut -f1))"
                 fi

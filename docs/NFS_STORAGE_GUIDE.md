@@ -75,7 +75,7 @@ curl -X POST http://localhost:9095/api/storage/pools/nfs \
 ### Via Configuration File
 
 ```toml
-# /etc/vmspawnd/vmspawnd.toml
+# /etc/zyvor-fabricd/zyvor-fabricd.toml
 
 [storage.pools.nfs1]
 type = "nfs"
@@ -217,7 +217,7 @@ curl -X POST http://localhost:9095/api/storage/pools/nfs-pool-1/refresh
 ### Create VM with NFS Storage
 
 ```bash
-vmctl create my-vm \
+zyvorctl create my-vm \
   --image=/mnt/nfs-pool/images/ubuntu-22.04.qcow2 \
   --cpus=4 \
   --memory=4096
@@ -230,7 +230,7 @@ vmctl create my-vm \
 qemu-img create -f qcow2 /mnt/nfs-pool/vms/my-vm.qcow2 20G
 
 # Use for VM
-vmctl create my-vm --disk=/mnt/nfs-pool/vms/my-vm.qcow2
+zyvorctl create my-vm --disk=/mnt/nfs-pool/vms/my-vm.qcow2
 ```
 
 ---

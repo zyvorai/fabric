@@ -1,5 +1,5 @@
 [package]
-name = "vmspawnd-lock-manager"
+name = "zyvor-fabric-lock-manager"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

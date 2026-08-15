@@ -203,7 +203,7 @@ pub struct BridgeConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
-    /// False when discovered on the host but not created via vmspawnd.
+    /// False when discovered on the host but not created via zyvor-fabricd.
     #[serde(default = "default_true")]
     pub managed: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -670,7 +670,7 @@ pub struct PortForwardConfig {
     pub created: String,
     #[serde(default)]
     pub updated: String,
-    /// False when discovered from live nftables but not stored in vmspawnd.
+    /// False when discovered from live nftables but not stored in zyvor-fabricd.
     #[serde(default = "default_true")]
     pub managed: bool,
 }

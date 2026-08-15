@@ -1,4 +1,0 @@
-# Enable vmspawnd by default on install
-enable vmspawnd.service
-enable vmspawnd-backup.timer
-enable vmspawnd-cleanup.timer

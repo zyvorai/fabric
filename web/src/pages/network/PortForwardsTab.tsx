@@ -10,12 +10,12 @@ import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged,
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
-type PfOriginFilter = 'all' | 'managed' | 'host' | 'vmspawnd'
+type PfOriginFilter = 'all' | 'managed' | 'host' | 'zyvor-fabricd'
 
 function portForwardOrigin(pf: PortForwardConfig): Exclude<PfOriginFilter, 'all'> {
   if (!isHostManaged(pf)) return 'managed'
   if (pf.id.startsWith('host:nft-ext')) return 'host'
-  if (pf.id.startsWith('host:nft')) return 'vmspawnd'
+  if (pf.id.startsWith('host:nft')) return 'zyvor-fabricd'
   return 'host'
 }
 
@@ -89,7 +89,7 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
             {([
               ['all', 'All'],
               ['managed', 'Managed'],
-              ['vmspawnd', 'vmspawnd nft'],
+              ['zyvor-fabricd', 'zyvor-fabricd nft'],
               ['host', 'External'],
             ] as const).map(([key, label]) => (
               <button

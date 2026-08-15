@@ -28,13 +28,13 @@ func New(version string) func() provider.Provider {
 }
 
 func (p *vmspawndProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "vmspawnd"
+	resp.TypeName = "zyvor-fabricd"
 	resp.Version = p.version
 }
 
 func (p *vmspawndProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Zyvor Fabric control plane (vmspawnd REST API).",
+		Description: "Zyvor Fabric control plane (zyvor-fabricd REST API).",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
 				Required:    true,

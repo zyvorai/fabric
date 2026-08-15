@@ -39,7 +39,7 @@ These crates abstract the interface between Zyvor Fabric and the underlying hype
 | Crate                        | Path                              | Description                                              |
 |------------------------------|-----------------------------------|----------------------------------------------------------|
 | `Zyvor Fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions: `VMDriver` (lifecycle operations), `ResourceStatsDriver` (metrics). Defines `MachineInfo`, `LogEntry`, `LogStream`. |
-| `vmspawn-driver`             | `backend/vmspawn-driver`          | Process-based driver. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
+| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Process-based driver. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
 | `Zyvor Fabric-machinectl-driver` | `backend/crates/machinectl-driver`| D-Bus driver implementing `VMDriver` trait. Communicates with `systemd-machined` via `zbus` for machine lifecycle, properties, and log streaming. |
 | `Zyvor Fabric-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. |
 
@@ -117,9 +117,9 @@ Enterprise management features for large-scale VM deployments.
 
 | Crate       | Path                  | Description                                              |
 |-------------|-----------------------|----------------------------------------------------------|
-| `vmctl`     | `backend/vmctl`       | Command-line client. Talks to Zyvor Fabric REST API. VM lifecycle commands, image management, status queries. |
-| `vmctl-tui` | `backend/vmctl-tui`   | Terminal UI client. Full-screen ratatui-based interface for VM management with real-time status display. |
-| `vmspawn-sdk`| `backend/vmspawn-sdk` | Typed Rust SDK for the Zyvor Fabric API. Async client with builder pattern, authentication helpers, VM lifecycle, storage, networking, and streaming support. |
+| `zyvorctl`     | `backend/zyvorctl`       | Command-line client. Talks to Zyvor Fabric REST API. VM lifecycle commands, image management, status queries. |
+| `zyvorctl-tui` | `backend/zyvorctl-tui`   | Terminal UI client. Full-screen ratatui-based interface for VM management with real-time status display. |
+| `zyvor-fabric-sdk`| `backend/zyvor-fabric-sdk` | Typed Rust SDK for the Zyvor Fabric API. Async client with builder pattern, authentication helpers, VM lifecycle, storage, networking, and streaming support. |
 
 ### Web UI (not a Rust crate)
 
@@ -150,9 +150,9 @@ Enterprise management features for large-scale VM deployments.
 | `prometheus`           | -       | prometheus-exporter | Metrics registry               |
 | `uuid`                 | 1.16    | All crates        | UUID v4/v5 generation            |
 | `chrono`               | 0.4     | All crates        | Date/time handling               |
-| `clap`                 | 4.5     | vmctl, vmctl-tui  | CLI argument parsing             |
-| `ratatui`              | 0.29    | vmctl-tui         | Terminal UI framework            |
-| `crossterm`            | 0.28    | vmctl-tui         | Terminal control                 |
+| `clap`                 | 4.5     | zyvorctl, zyvorctl-tui  | CLI argument parsing             |
+| `ratatui`              | 0.29    | zyvorctl-tui         | Terminal UI framework            |
+| `crossterm`            | 0.28    | zyvorctl-tui         | Terminal control                 |
 | `futures`              | 0.3     | Async crates      | Stream/sink utilities            |
 | `rand`                 | 0.9     | security, core    | Random number generation         |
 | `tar` / `flate2`       | 0.4/1.1 | content-library   | Archive handling                 |
@@ -167,7 +167,7 @@ Zyvor Fabric (main binary)
   |-- vm-model
   |-- state-store --> vm-model
   |-- security
-  |-- vmspawn-driver --> vm-model
+  |-- zyvor-fabric-vm-driver --> vm-model
   |-- Zyvor Fabric-driver-core --> vm-model
   |-- Zyvor Fabric-machinectl-driver --> Zyvor Fabric-driver-core, Zyvor Fabric-machined-dbus
   |-- Zyvor Fabric-storage

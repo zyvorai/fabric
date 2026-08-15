@@ -52,7 +52,7 @@ impl LabelSelector {
     }
 }
 
-/// A DNS zone (e.g. "vmspawnd.local").
+/// A DNS zone (e.g. "zyvor-fabricd.local").
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DnsZone {
     pub id: Uuid,
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn test_template_parsing() {
         // Templates use {name} and {label:key} placeholders
-        let template = "{name}.{label:app}.vmspawnd.local";
+        let template = "{name}.{label:app}.zyvor-fabricd.local";
         assert!(template.contains("{name}"));
         assert!(template.contains("{label:app}"));
     }
@@ -165,7 +165,7 @@ mod tests {
     fn test_zone_name_validation() {
         let zone = DnsZone {
             id: Uuid::new_v4(),
-            name: "vmspawnd.local".to_string(),
+            name: "zyvor-fabricd.local".to_string(),
             description: "Default zone".to_string(),
             managed: true,
             created: Utc::now(),
@@ -192,7 +192,7 @@ mod tests {
             description: String::new(),
             zone_id: Uuid::new_v4(),
             selector: LabelSelector::default(),
-            record_template: "{name}.{label:app}.vmspawnd.local".to_string(),
+            record_template: "{name}.{label:app}.zyvor-fabricd.local".to_string(),
             record_type: DnsRecordType::A,
             enabled: true,
             managed: true,

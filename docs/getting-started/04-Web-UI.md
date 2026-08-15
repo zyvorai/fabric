@@ -14,7 +14,7 @@ After starting Zyvor Fabric, open your browser and navigate to:
 http://127.0.0.1:9095
 ```
 
-The web UI is served directly by the vmspawnd daemon on the same port as the API. No separate web server is required.
+The web UI is served directly by the zyvor-fabricd daemon on the same port as the API. No separate web server is required.
 
 ### Remote Access
 
@@ -31,7 +31,7 @@ Access it at `http://your-server-ip:9095`.
 For HTTPS access, generate a TLS certificate:
 
 ```bash
-./vmspawnctl tls
+./zyvorctl tls
 ```
 
 ---
@@ -48,8 +48,8 @@ On the login page, enter:
 Retrieve the admin password:
 
 ```bash
-./vmspawnctl password
-# Or: sudo cat /var/lib/vmspawnd/.admin_password
+./zyvorctl password
+# Or: sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```
 
 ### Session Management

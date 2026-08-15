@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
-# backup-vms — Automated VM backup script for vmspawnd
+# backup-vms — Automated VM backup script for zyvor-fabricd
 #
-# Called by vmspawnd-backup.timer (systemd timer) or manually.
+# Called by zyvor-fabricd-backup.timer (systemd timer) or manually.
 # Backs up all running VMs by creating qcow2 snapshots and copying
 # disk images to the backup directory.
 #
 # Configuration:
-#   VMSPAWND_URL     API endpoint (default: http://127.0.0.1:9095)
-#   BACKUP_DIR       Backup destination (default: /var/lib/vmspawnd/backups)
+#   ZYVOR_FABRICD_URL     API endpoint (default: http://127.0.0.1:9095)
+#   BACKUP_DIR       Backup destination (default: /var/lib/zyvor-fabricd/backups)
 #   BACKUP_RETAIN    Days to keep backups (default: 7)
 #   BACKUP_TYPE      full or incremental (default: full)
 
 set -euo pipefail
 
-VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:9095}"
-BACKUP_DIR="${VMSPAWND_BACKUP_DIR:-${BACKUP_DIR:-/var/lib/vmspawnd/backups}}"
-BACKUP_RETAIN="${VMSPAWND_BACKUP_RETAIN:-${BACKUP_RETAIN:-7}}"
-BACKUP_TYPE="${VMSPAWND_BACKUP_TYPE:-${BACKUP_TYPE:-full}}"
-PASSWORD_FILE="/var/lib/vmspawnd/.admin_password"
+ZYVOR_FABRICD_URL="${ZYVOR_FABRICD_URL:-http://127.0.0.1:9095}"
+BACKUP_DIR="${ZYVOR_FABRICD_BACKUP_DIR:-${BACKUP_DIR:-/var/lib/zyvor-fabricd/backups}}"
+BACKUP_RETAIN="${ZYVOR_FABRICD_BACKUP_RETAIN:-${BACKUP_RETAIN:-7}}"
+BACKUP_TYPE="${ZYVOR_FABRICD_BACKUP_TYPE:-${BACKUP_TYPE:-full}}"
+PASSWORD_FILE="/var/lib/zyvor-fabricd/.admin_password"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-LOG_TAG="vmspawnd-backup"
+LOG_TAG="zyvor-fabricd-backup"
 
 log()  { echo "$(date -Iseconds) [$LOG_TAG] $*"; }
 err()  { echo "$(date -Iseconds) [$LOG_TAG] ERROR: $*" >&2; }
 
 # ── Pre-flight checks ──────────────────────────────────────────────────
-if ! curl -sf "$VMSPAWND_URL/health" &>/dev/null; then
-    err "vmspawnd is not running at $VMSPAWND_URL"
+if ! curl -sf "$ZYVOR_FABRICD_URL/health" &>/dev/null; then
+    err "zyvor-fabricd is not running at $ZYVOR_FABRICD_URL"
     exit 1
 fi
 
@@ -39,20 +39,20 @@ mkdir -p "$BACKUP_DIR"
 
 # ── Authenticate ───────────────────────────────────────────────────────
 PASSWORD="$(cat "$PASSWORD_FILE")"
-TOKEN=$(curl -sf "$VMSPAWND_URL/api/auth/login" \
+TOKEN=$(curl -sf "$ZYVOR_FABRICD_URL/api/auth/login" \
     -H "Content-Type: application/json" \
     -d "$(jq -n --arg p "$PASSWORD" '{"username":"admin","password":$p}')" \
     | jq -r '.token // empty')
 
 if [[ -z "$TOKEN" ]]; then
-    err "Failed to authenticate with vmspawnd API"
+    err "Failed to authenticate with zyvor-fabricd API"
     exit 1
 fi
 
 api() {
     local method="$1" path="$2"
     shift 2
-    curl -sf "$VMSPAWND_URL$path" \
+    curl -sf "$ZYVOR_FABRICD_URL$path" \
         -X "$method" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \

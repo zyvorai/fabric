@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use vmspawnd_system::{CpuTopology, NumaTopology};
+use zyvor_fabric_system::{CpuTopology, NumaTopology};
 
 use crate::firmware::Firmware;
 

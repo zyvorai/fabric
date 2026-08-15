@@ -442,7 +442,7 @@ curl -s -X DELETE http://127.0.0.1:9095/api/v1/vms/my-vm/usb/DEVICE_ID \
 
 ## Configuration Quick Reference
 
-### vmspawnd.toml
+### zyvor-fabricd.toml
 
 ```toml
 [daemon]
@@ -450,8 +450,8 @@ listen = "127.0.0.1:9095"       # Bind address
 cors_origins = ["http://..."]    # Allowed CORS origins
 
 [storage]
-path = "/var/lib/vmspawnd"       # State directory
-image_path = "/var/lib/vmspawnd/images"  # VM images
+path = "/var/lib/zyvor-fabricd"       # State directory
+image_path = "/var/lib/zyvor-fabricd/images"  # VM images
 
 [network]
 bridge = "br0"                   # Default bridge
@@ -460,7 +460,7 @@ networkd_file_prefix = "50-Zyvor Fabric-"
 
 [auth]
 enabled = true                   # Enable authentication
-db_path = "/var/lib/vmspawnd/auth.db"
+db_path = "/var/lib/zyvor-fabricd/auth.db"
 token_expiration_hours = 24      # JWT lifetime
 
 [controller]
@@ -472,10 +472,10 @@ mode = "standalone"              # or "controller"
 
 | Variable                  | Purpose                              |
 |---------------------------|--------------------------------------|
-| `VSPAWN_LOG_LEVEL`        | Log level: trace/debug/info/warn/error |
+| `ZYVOR_FABRICD_LOG_LEVEL`        | Log level: trace/debug/info/warn/error |
 | `RUST_LOG`                | Fallback log filter                  |
-| `VMSPAWND_JWT_SECRET`     | JWT signing secret                   |
-| `VMSPAWND_ADMIN_PASSWORD` | Initial admin password               |
+| `ZYVOR_FABRICD_JWT_SECRET`     | JWT signing secret                   |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Initial admin password               |
 
 ---
 
@@ -492,7 +492,7 @@ sudo systemctl status Zyvor Fabric
 journalctl -u Zyvor Fabric -n 50
 
 # Check config file syntax
-cat /etc/vmspawnd/vmspawnd.toml | toml-lint  # or just try to start
+cat /etc/zyvor-fabricd/zyvor-fabricd.toml | toml-lint  # or just try to start
 ```
 
 ### VM will not start
@@ -516,13 +516,13 @@ journalctl -u Zyvor Fabric --since "5 min ago" | grep -i error
 
 ```bash
 # Read the auto-generated admin password
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 
 # Verify JWT secret exists
-sudo ls -la /var/lib/vmspawnd/.jwt_secret
+sudo ls -la /var/lib/zyvor-fabricd/.jwt_secret
 
 # Check auth config
-grep -A5 '\[auth\]' /etc/vmspawnd/vmspawnd.toml
+grep -A5 '\[auth\]' /etc/zyvor-fabricd/zyvor-fabricd.toml
 ```
 
 ### Network issues

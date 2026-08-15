@@ -99,7 +99,7 @@ impl MigrationManager {
             .args([
                 "mkdir",
                 "-p",
-                &format!("/var/lib/vmspawnd/vms/{}", config.vm_name),
+                &format!("/var/lib/zyvor-fabricd/vms/{}", config.vm_name),
             ])
             .output()?;
 
@@ -115,9 +115,9 @@ impl MigrationManager {
     async fn copy_vm_data(&self, config: &MigrationConfig) -> Result<()> {
         tracing::info!("Copying VM data to target node");
 
-        let source_path = format!("/var/lib/vmspawnd/vms/{}/", config.vm_name);
+        let source_path = format!("/var/lib/zyvor-fabricd/vms/{}/", config.vm_name);
         let target_path = format!(
-            "{}:/var/lib/vmspawnd/vms/{}/",
+            "{}:/var/lib/zyvor-fabricd/vms/{}/",
             config.target_node, config.vm_name
         );
 
@@ -150,9 +150,9 @@ impl MigrationManager {
     async fn live_sync(&self, config: &MigrationConfig) -> Result<()> {
         tracing::info!("Starting live synchronization for VM '{}'", config.vm_name);
 
-        let source_path = format!("/var/lib/vmspawnd/vms/{}/", config.vm_name);
+        let source_path = format!("/var/lib/zyvor-fabricd/vms/{}/", config.vm_name);
         let target_path = format!(
-            "{}:/var/lib/vmspawnd/vms/{}/",
+            "{}:/var/lib/zyvor-fabricd/vms/{}/",
             config.target_node, config.vm_name
         );
 

@@ -114,7 +114,7 @@ sudo apt install swtpm swtpm-tools    # Debian/Ubuntu
 ### Usage
 
 ```rust
-let tpm_manager = TPMManager::new("/var/lib/vmspawnd/tpm")?;
+let tpm_manager = TPMManager::new("/var/lib/zyvor-fabricd/tpm")?;
 let tpm_dir = tpm_manager.create_vtpm(&config).await?;
 let pid = tpm_manager.start_swtpm("myvm", TPMVersion::TPM20).await?;
 ```
@@ -122,7 +122,7 @@ let pid = tpm_manager.start_swtpm("myvm", TPMVersion::TPM20).await?;
 ### QEMU Integration
 
 ```bash
--chardev socket,id=chrtpm,path=/var/lib/vmspawnd/tpm/myvm/swtpm-sock
+-chardev socket,id=chrtpm,path=/var/lib/zyvor-fabricd/tpm/myvm/swtpm-sock
 -tpmdev emulator,id=tpm0,chardev=chrtpm
 -device tpm-tis,tpmdev=tpm0
 ```
@@ -192,9 +192,9 @@ provider "Zyvor Fabric" {
   token = var.vmspawnd_token
 }
 
-resource "vmspawnd_vm" "web" {
+resource "zyvor_fabric_vm" "web" {
   name   = "web-server"
-  image  = "/var/lib/vmspawnd/images/ubuntu-22.04.qcow2"
+  image  = "/var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2"
   cpus   = 4
   memory = 4096
 

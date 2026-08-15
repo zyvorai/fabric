@@ -1,6 +1,6 @@
 version: 2
 
-project_name: terraform-provider-vmspawnd
+project_name: terraform-provider-zyvor-fabricd
 
 before:
   hooks:
@@ -8,7 +8,7 @@ before:
 
 builds:
   - main: .
-    binary: terraform-provider-vmspawnd
+    binary: terraform-provider-zyvor-fabricd
     goos:
       - freebsd
       - linux
@@ -32,11 +32,11 @@ checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
 
 terraformproviders:
-  - name: registry.terraform.io/ssahani/vmspawnd
+  - name: registry.terraform.io/ssahani/zyvor-fabricd
     version: "{{ .Version }}"
 
 release:
   github:
     owner: ssahani
     name: zyvor-fabric
-  name_template: "terraform-provider-vmspawnd {{.Version}}"
+  name_template: "terraform-provider-zyvor-fabricd {{.Version}}"

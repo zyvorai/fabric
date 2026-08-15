@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-const KEY = 'vmspawnd-pinned-pages'
+const KEY = 'zyvor-fabricd-pinned-pages'
 const MAX_PINNED = 8
 
 function loadPinned(): string[] {

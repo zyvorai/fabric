@@ -415,7 +415,7 @@ impl ReplicationManager {
         tracing::info!("Sync started for replication {}", replication_id);
 
         // Attempt real data synchronization using rsync.
-        let source_path = format!("/var/lib/vmspawnd/images/{}", vm_name);
+        let source_path = format!("/var/lib/zyvor-fabricd/images/{}", vm_name);
         if std::path::Path::new(&source_path).exists() {
             let mut rsync_args = vec!["-a".to_string(), "--partial".to_string()];
 
@@ -435,7 +435,7 @@ impl ReplicationManager {
             };
             rsync_args.push(source_with_slash);
             rsync_args.push(format!(
-                "{}:/var/lib/vmspawnd/images/{}/",
+                "{}:/var/lib/zyvor-fabricd/images/{}/",
                 target_host, vm_name
             ));
 

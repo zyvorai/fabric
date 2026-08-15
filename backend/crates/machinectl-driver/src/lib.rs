@@ -10,7 +10,7 @@ mod stats;
 use anyhow::Result;
 use zbus::Connection;
 
-pub use vmspawnd_driver_core::{
+pub use zyvor_fabric_driver_core::{
     CapabilityProvider, LogDriver, LogEntry, MachineInfo, ResourceControlDriver,
     ResourceStatsDriver, VMDriver,
 };

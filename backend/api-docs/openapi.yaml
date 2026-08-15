@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Zyvor Fabric API
-  description: Zyvor Fabric control plane (vmspawnd daemon) — REST and WebSocket API
+  description: Zyvor Fabric control plane (zyvor-fabricd daemon) — REST and WebSocket API
   version: 0.1.0
   license:
     name: MIT

@@ -834,7 +834,7 @@ Backup types: `full`, `incremental`.
   "compressed": true,
   "created": "2026-04-12T10:00:00Z",
   "status": "completed",
-  "storage_location": "/var/lib/vmspawnd/backups/my-vm/550e8400.tar.zst",
+  "storage_location": "/var/lib/zyvor-fabricd/backups/my-vm/550e8400.tar.zst",
   "retention_days": 30,
   "expires_at": "2026-05-12T10:00:00Z"
 }
@@ -1404,7 +1404,7 @@ Create a local directory-based storage pool.
 ```json
 {
   "name": "fast-storage",
-  "path": "/var/lib/vmspawnd/images",
+  "path": "/var/lib/zyvor-fabricd/images",
   "auto_start": true
 }
 ```
@@ -1415,7 +1415,7 @@ Create a local directory-based storage pool.
 curl -s -X POST http://localhost:3000/api/storage/pools/local \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"fast-storage","path":"/var/lib/vmspawnd/images","auto_start":true}' | jq
+  -d '{"name":"fast-storage","path":"/var/lib/zyvor-fabricd/images","auto_start":true}' | jq
 ```
 
 ---
@@ -1680,8 +1680,8 @@ Get SSH connection information for a machine.
 ```json
 {
   "address": "192.168.1.100",
-  "key_path": "/var/lib/vmspawnd/keys/my-vm",
-  "ssh_command": "ssh -i /var/lib/vmspawnd/keys/my-vm 192.168.1.100"
+  "key_path": "/var/lib/zyvor-fabricd/keys/my-vm",
+  "ssh_command": "ssh -i /var/lib/zyvor-fabricd/keys/my-vm 192.168.1.100"
 }
 ```
 
@@ -1961,7 +1961,7 @@ curl -s http://localhost:3000/api/system/resource-stats \
 
 ### POST /api/vms/:name/cloud-init
 
-Generate a cloud-init ISO for a VM. The ISO is saved to `/var/lib/vmspawnd/cloud-init/` and can be attached to the VM at start time.
+Generate a cloud-init ISO for a VM. The ISO is saved to `/var/lib/zyvor-fabricd/cloud-init/` and can be attached to the VM at start time.
 
 **Auth level:** User+
 
@@ -1988,7 +1988,7 @@ Generate a cloud-init ISO for a VM. The ISO is saved to `/var/lib/vmspawnd/cloud
 ```json
 {
   "status": "created",
-  "iso_path": "/var/lib/vmspawnd/cloud-init/my-vm.iso"
+  "iso_path": "/var/lib/zyvor-fabricd/cloud-init/my-vm.iso"
 }
 ```
 
@@ -2580,22 +2580,22 @@ Export a VM to OVA format. The VM should be stopped before exporting for consist
 
 ```json
 {
-  "disk_path": "/var/lib/vmspawnd/images/my-vm.qcow2",
-  "output_dir": "/var/lib/vmspawnd/exports"
+  "disk_path": "/var/lib/zyvor-fabricd/images/my-vm.qcow2",
+  "output_dir": "/var/lib/zyvor-fabricd/exports"
 }
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `disk_path` | string | null | Path to the disk image (auto-detected if omitted) |
-| `output_dir` | string | `/var/lib/vmspawnd/exports` | Directory for the exported OVA file |
+| `output_dir` | string | `/var/lib/zyvor-fabricd/exports` | Directory for the exported OVA file |
 
 **Response (200):**
 
 ```json
 {
   "status": "exported",
-  "ova_path": "/var/lib/vmspawnd/exports/my-vm.ova",
+  "ova_path": "/var/lib/zyvor-fabricd/exports/my-vm.ova",
   "size_bytes": 2147483648
 }
 ```
@@ -2614,7 +2614,7 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/export \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "disk_path": "/var/lib/vmspawnd/images/my-vm.qcow2",
+    "disk_path": "/var/lib/zyvor-fabricd/images/my-vm.qcow2",
     "output_dir": "/tmp/exports"
   }' | jq
 ```

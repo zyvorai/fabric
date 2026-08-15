@@ -63,15 +63,15 @@ For a minimal deployment on a single host:
 cd backend && cargo build --release
 
 # 2. Create directories
-sudo mkdir -p /var/lib/vmspawnd/images /etc/vmspawnd
+sudo mkdir -p /var/lib/zyvor-fabricd/images /etc/zyvor-fabricd
 
 # 3. Write minimal config
-sudo tee /etc/vmspawnd/vmspawnd.toml << 'EOF'
+sudo tee /etc/zyvor-fabricd/zyvor-fabricd.toml << 'EOF'
 [daemon]
 listen = "127.0.0.1:9095"
 
 [storage]
-path = "/var/lib/vmspawnd"
+path = "/var/lib/zyvor-fabricd"
 
 [network]
 bridge = "br0"
@@ -83,7 +83,7 @@ sudo ./target/release/Zyvor Fabric
 
 The daemon will start listening on `127.0.0.1:9095`. Authentication is enabled
 by default; the generated admin password will be written to
-`/var/lib/vmspawnd/.admin_password`.
+`/var/lib/zyvor-fabricd/.admin_password`.
 
 ---
 

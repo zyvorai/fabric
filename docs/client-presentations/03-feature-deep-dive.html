@@ -85,8 +85,8 @@
         <tr><td>Boot</td><td>UEFI, Secure Boot</td></tr>
       </table>
       <h3 style="margin-top: 20px;">Declarative Config</h3>
-      <pre><code>vmctl apply -f infrastructure.yaml</code></pre>
-      <p>Define desired state in YAML. vmctl reconciles automatically.</p>
+      <pre><code>zyvorctl apply -f infrastructure.yaml</code></pre>
+      <p>Define desired state in YAML. zyvorctl reconciles automatically.</p>
     </div>
   </div>
 </div>
@@ -107,15 +107,15 @@
       </table>
       <h3 style="margin-top: 20px;">Download and Deploy</h3>
       <pre><code># Download an image
-vmctl image download ubuntu-24.04
+zyvorctl image download ubuntu-24.04
 
 # Create VM from cloud image
-vmctl create webserver \
+zyvorctl create webserver \
   --image=ubuntu-24.04.qcow2 \
   --cpus=4 --memory=4096
 
 # VM boots with cloud-init
-vmctl start webserver</code></pre>
+zyvorctl start webserver</code></pre>
     </div>
     <div>
       <h3>ISO Management</h3>
@@ -227,28 +227,28 @@ runcmd:
     </div>
     <div>
       <h3>Backup Configuration</h3>
-      <pre><code># In vmspawnd.toml
+      <pre><code># In zyvor-fabricd.toml
 [backup]
-dir = "/var/lib/vmspawnd/backups"
+dir = "/var/lib/zyvor-fabricd/backups"
 retain = 7
 type = "full"
 
 # Or via environment variables
-VMSPAWND_BACKUP_DIR=/backups
-VMSPAWND_BACKUP_RETAIN=7
-VMSPAWND_BACKUP_TYPE=full</code></pre>
+ZYVOR_FABRICD_BACKUP_DIR=/backups
+ZYVOR_FABRICD_BACKUP_RETAIN=7
+ZYVOR_FABRICD_BACKUP_TYPE=full</code></pre>
       <h3 style="margin-top: 20px;">Management Commands</h3>
       <pre><code># Immediate backup
-vmspawnctl backup now
+zyvorctl backup now
 
 # Enable daily timer
-vmspawnctl backup enable
+zyvorctl backup enable
 
 # Check backup status
-vmspawnctl backup status
+zyvorctl backup status
 
 # View backup logs
-vmspawnctl backup logs</code></pre>
+zyvorctl backup logs</code></pre>
     </div>
   </div>
 </div>
@@ -310,11 +310,11 @@ vmspawnctl backup logs</code></pre>
       </ul>
       <h3 style="margin-top: 20px;">CPU Pinning Example</h3>
       <pre><code># Pin vCPUs to physical cores
-vmctl config myvm \
+zyvorctl config myvm \
   --cpu-pin 0:0,1:1,2:2,3:3
 
 # Set NUMA node assignment
-vmctl config myvm \
+zyvorctl config myvm \
   --numa-node 0 \
   --numa-cpus 0-3 \
   --numa-memory 4096</code></pre>
@@ -363,14 +363,14 @@ vmctl config myvm \
     <div class="card">
       <h3>VM Firewall</h3>
       <p>Per-VM firewall profiles using nftables. Stateful packet inspection with connection tracking. Security zones for network segmentation.</p>
-      <pre><code>vmctl firewall myvm \
+      <pre><code>zyvorctl firewall myvm \
   --allow tcp:80,443 \
   --deny all</code></pre>
     </div>
     <div class="card">
       <h3>VPN Mesh</h3>
       <p>WireGuard-based encrypted tunnels. Supports point-to-point, hub-spoke, and full-mesh topologies for secure cross-network VM communication.</p>
-      <pre><code>vmctl vpn create \
+      <pre><code>zyvorctl vpn create \
   --topology full-mesh \
   --peers vm1,vm2,vm3</code></pre>
     </div>
@@ -533,16 +533,16 @@ vmctl config myvm \
       </ul>
       <h3 style="margin-top: 20px;">Quick Setup</h3>
       <pre><code># Generate self-signed TLS certificate
-vmspawnctl tls
+zyvorctl tls
 
 # Certificate files created:
-#   /etc/vmspawnd/tls/cert.pem
-#   /etc/vmspawnd/tls/key.pem
+#   /etc/zyvor-fabricd/tls/cert.pem
+#   /etc/zyvor-fabricd/tls/key.pem
 
 # Enable HTTPS in config
 [tls]
-cert = "/etc/vmspawnd/tls/cert.pem"
-key = "/etc/vmspawnd/tls/key.pem"</code></pre>
+cert = "/etc/zyvor-fabricd/tls/cert.pem"
+key = "/etc/zyvor-fabricd/tls/key.pem"</code></pre>
     </div>
     <div>
       <h3>Encryption at Rest</h3>
@@ -657,12 +657,12 @@ key = "/etc/vmspawnd/tls/key.pem"</code></pre>
   <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;">
     <div class="card" style="text-align: center;">
       <h3>CLI</h3>
-      <p><code>vmctl</code></p>
+      <p><code>zyvorctl</code></p>
       <p style="font-size: 0.95em;">Scriptable command-line with JSON, YAML, and table output. Bash tab completion. Perfect for automation.</p>
     </div>
     <div class="card" style="text-align: center;">
       <h3>Terminal UI</h3>
-      <p><code>vmctl-tui</code></p>
+      <p><code>zyvorctl-tui</code></p>
       <p style="font-size: 0.95em;">k9s-style dashboard with 8 views, vim keybindings, sparkline graphs. SSH-friendly for remote servers.</p>
     </div>
     <div class="card" style="text-align: center;">
@@ -1122,7 +1122,7 @@ curl -X POST "$HOST/api/vms/web-01/start" \
     <div>
       <h3>Features</h3>
       <ul>
-        <li>Published as the <code>vmspawn-sdk</code> crate</li>
+        <li>Published as the <code>zyvor-fabric-sdk</code> crate</li>
         <li>Async/await with Tokio runtime</li>
         <li>Automatic authentication and token management</li>
         <li>Type-safe request and response structs</li>
@@ -1141,9 +1141,9 @@ curl -X POST "$HOST/api/vms/web-01/start" \
       <h3>Quick Start</h3>
       <pre><code># Cargo.toml
 [dependencies]
-vmspawn-sdk = "0.1"
+zyvor-fabric-sdk = "0.1"
 tokio = { version = "1", features = ["full"] }</code></pre>
-      <pre><code>use vmspawn_sdk::{Client, ClientConfig};
+      <pre><code>use zyvor_fabric_sdk::{Client, ClientConfig};
 
 #[tokio::main]
 async fn main() -> anyhow::Result&lt;()&gt; {

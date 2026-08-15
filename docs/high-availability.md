@@ -63,7 +63,7 @@ sudo systemctl enable --now etcd
 
 ### 2. Configure Zyvor Fabric for HA
 
-On each node, edit `/etc/vmspawnd/vmspawnd.toml`:
+On each node, edit `/etc/zyvor-fabricd/zyvor-fabricd.toml`:
 
 ```toml
 [daemon]

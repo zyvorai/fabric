@@ -1,4 +1,4 @@
-// Package main runs client smoke checks against a live vmspawnd (see scripts/acceptance-smoke.sh).
+// Package main runs client smoke checks against a live zyvor-fabricd (see scripts/acceptance-smoke.sh).
 package main
 
 import (
@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ssahani/terraform-provider-vmspawnd/internal/provider"
+	"github.com/ssahani/terraform-provider-zyvor-fabricd/internal/provider"
 )
 
 func main() {
-	endpoint := os.Getenv("VMSPAWND_ENDPOINT")
-	token := os.Getenv("VMSPAWND_TOKEN")
+	endpoint := os.Getenv("ZYVOR_FABRICD_ENDPOINT")
+	token := os.Getenv("ZYVOR_FABRICD_TOKEN")
 	if endpoint == "" || token == "" {
-		fmt.Fprintln(os.Stderr, "VMSPAWND_ENDPOINT and VMSPAWND_TOKEN required")
+		fmt.Fprintln(os.Stderr, "ZYVOR_FABRICD_ENDPOINT and ZYVOR_FABRICD_TOKEN required")
 		os.Exit(1)
 	}
 	client := provider.NewClient(endpoint, token)

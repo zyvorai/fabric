@@ -4,7 +4,7 @@
 
 //! Phase 1 harness test (see the systemd-removal plan): boots a real
 //! `ephemera serve` process from the sibling Ephemera checkout and exercises
-//! the wire contract `vmspawnd-ephemera-client` depends on.
+//! the wire contract `zyvor-fabric-ephemera-client` depends on.
 //!
 //! This intentionally does NOT create a real VM (that needs a QEMU/Cloud
 //! Hypervisor/Firecracker binary and a base disk image — heavier
@@ -23,7 +23,7 @@ use std::{
     time::Duration,
 };
 
-use vmspawnd_ephemera_client::EphemeraClient;
+use zyvor_fabric_ephemera_client::EphemeraClient;
 
 struct EphemeraServe {
     child: Child,

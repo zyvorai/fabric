@@ -10,7 +10,7 @@ name = "machina-fabric"
 path = "src/main.rs"
 
 [dependencies]
-vmspawn-sdk = { path = "../../../backend/vmspawn-sdk" }
+zyvor-fabric-sdk = { path = "../../../backend/zyvor-fabric-sdk" }
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 serde = { version = "1", features = ["derive"] }

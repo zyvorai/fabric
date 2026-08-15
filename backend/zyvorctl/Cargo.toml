@@ -1,0 +1,22 @@
+[package]
+name = "zyvorctl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "zyvorctl"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { version = "0.12", features = ["json"] }
+tokio.workspace = true
+tabled = "0.16"
+serde_yaml = "0.9"
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+vm-model = { path = "../vm-model" }

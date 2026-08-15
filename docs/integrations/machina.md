@@ -1,6 +1,6 @@
 # Machina — macOS Companion (Integration Plan)
 
-**Machina** is the planned **AI-native Infrastructure Workbench for macOS**. It is a desktop client — not a replacement for the Linux `vmspawnd` daemon.
+**Machina** is the planned **AI-native Infrastructure Workbench for macOS**. It is a desktop client — not a replacement for the Linux `zyvor-fabricd` daemon.
 
 Zyvor Fabric runs on Linux hypervisor hosts. Machina runs on the operator’s Mac and connects to one or more Fabric clusters over HTTPS.
 
@@ -24,7 +24,7 @@ Zyvor Fabric runs on Linux hypervisor hosts. Machina runs on the operator’s Ma
                    │
          ┌─────────▼─────────┐
          │  Zyvor Fabric     │
-         │  vmspawnd (Linux) │
+         │  zyvor-fabricd (Linux) │
          └───────────────────┘
 ```
 
@@ -32,7 +32,7 @@ Zyvor Fabric runs on Linux hypervisor hosts. Machina runs on the operator’s Ma
 
 ## API contract (v0.1)
 
-Machina v0.1 targets these `vmspawnd` surfaces:
+Machina v0.1 targets these `zyvor-fabricd` surfaces:
 
 | Capability | Endpoints | WebSocket |
 |------------|-----------|-----------|
@@ -62,7 +62,7 @@ Use the in-repo SDK for early prototypes:
 
 ```toml
 # machina/Cargo.toml (future)
-vmspawn-sdk = { path = "../zyvor-fabric/backend/vmspawn-sdk" }
+zyvor-fabric-sdk = { path = "../zyvor-fabric/backend/zyvor-fabric-sdk" }
 ```
 
 Or HTTP directly against [OpenAPI](../../backend/api-docs/openapi.yaml).
@@ -112,7 +112,7 @@ ZYVOR_FABRIC_USER=admin ZYVOR_FABRIC_PASSWORD=... \
 ./target/release/machina-fabric logs --lines 20 -c homelab
 ```
 
-Uses `vmspawn-sdk` from this repository (including `Client::stream_events()` for SSE). A Tauri shell lives in `integrations/machina/desktop/`.
+Uses `zyvor-fabric-sdk` from this repository (including `Client::stream_events()` for SSE). A Tauri shell lives in `integrations/machina/desktop/`.
 
 ### Desktop app (Tauri)
 

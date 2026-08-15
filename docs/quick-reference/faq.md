@@ -66,7 +66,7 @@ VM state, list machines, access properties, and manage machine lifecycle. The
 
 `systemd-vmspawn` is a systemd tool that launches QEMU virtual machines with
 proper systemd integration: cgroup placement, journal logging, machine
-registration, and resource management. Zyvor Fabric's `vmspawn-driver` crate builds
+registration, and resource management. Zyvor Fabric's `zyvor-fabric-vm-driver` crate builds
 the command-line invocation with all supported options from systemd v260.
 
 ### Why are there 46 crates?
@@ -91,7 +91,7 @@ The state store uses atomic JSON file writes (write to `.tmp` file, then
 `rename()`) for crash safety. VM state is also cached in an
 `Arc<RwLock<HashMap>>` for fast reads. Entity IDs are validated to prevent path
 traversal. Each entity type is stored in its own subdirectory under
-`/var/lib/vmspawnd/`.
+`/var/lib/zyvor-fabricd/`.
 
 ---
 
@@ -117,15 +117,15 @@ There are three roles:
 ### How are JWT tokens secured?
 
 JWT tokens are signed with a secret that is either set explicitly via the
-`VMSPAWND_JWT_SECRET` environment variable or auto-generated and persisted to
-`/var/lib/vmspawnd/.jwt_secret` (file permissions 0600). Tokens include a unique
+`ZYVOR_FABRICD_JWT_SECRET` environment variable or auto-generated and persisted to
+`/var/lib/zyvor-fabricd/.jwt_secret` (file permissions 0600). Tokens include a unique
 JTI (JWT ID) that enables per-token revocation. The default expiration is 24 hours.
 
 ### How are passwords stored?
 
 User passwords are hashed with bcrypt before storage in the SQLite database. The
-admin password is either set via the `VMSPAWND_ADMIN_PASSWORD` environment variable
-or auto-generated and written to `/var/lib/vmspawnd/.admin_password` (file
+admin password is either set via the `ZYVOR_FABRICD_ADMIN_PASSWORD` environment variable
+or auto-generated and written to `/var/lib/zyvor-fabricd/.admin_password` (file
 permissions 0600). Passwords are never logged.
 
 ### How is input validation handled?
@@ -420,9 +420,9 @@ fencing_timeout_seconds = 30
 ### Where does Zyvor Fabric look for its config file?
 
 Zyvor Fabric checks the following paths in order, using the first one found:
-1. `/etc/vmspawnd/vmspawnd.toml`
-2. `configs/vmspawnd.toml` (relative to working directory)
-3. `vmspawnd.toml` (relative to working directory)
+1. `/etc/zyvor-fabricd/zyvor-fabricd.toml`
+2. `configs/zyvor-fabricd.toml` (relative to working directory)
+3. `zyvor-fabricd.toml` (relative to working directory)
 
 If no config file is found, default values are used.
 
@@ -434,7 +434,7 @@ network.
 
 ### How do I change the listen address?
 
-Set `daemon.listen` in `vmspawnd.toml`:
+Set `daemon.listen` in `zyvor-fabricd.toml`:
 ```toml
 [daemon]
 listen = "0.0.0.0:9095"   # Listen on all interfaces
@@ -444,7 +444,7 @@ For external access, always use a reverse proxy with TLS termination.
 
 ### How do I configure CORS for the web UI?
 
-Set `daemon.cors_origins` in `vmspawnd.toml`:
+Set `daemon.cors_origins` in `zyvor-fabricd.toml`:
 ```toml
 [daemon]
 cors_origins = ["https://Zyvor Fabric.example.com", "http://localhost:5173"]
@@ -474,8 +474,8 @@ sudo usermod -aG kvm Zyvor Fabric
 
 If the JWT secret was not persisted (file write failed), tokens from the previous
 session are invalid. Either:
-- Set `VMSPAWND_JWT_SECRET` explicitly in the environment
-- Ensure `/var/lib/vmspawnd/.jwt_secret` is writable
+- Set `ZYVOR_FABRICD_JWT_SECRET` explicitly in the environment
+- Ensure `/var/lib/zyvor-fabricd/.jwt_secret` is writable
 
 ### Web UI shows "Network Error" or CORS errors
 

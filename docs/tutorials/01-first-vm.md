@@ -138,7 +138,7 @@ curl -s "$VMSPAWN_HOST/api/images/downloads" \
 ```
 
 Wait until `state` is `"completed"`. The image is saved to
-`/var/lib/vmspawnd/images/fedora-41.qcow2`.
+`/var/lib/zyvor-fabricd/images/fedora-41.qcow2`.
 
 You can also verify it appears in the image list:
 
@@ -153,7 +153,7 @@ Expected response:
 [
   {
     "name": "fedora-41",
-    "path": "/var/lib/vmspawnd/images/fedora-41.qcow2",
+    "path": "/var/lib/zyvor-fabricd/images/fedora-41.qcow2",
     "format": "qcow2",
     "size_bytes": 456789012
   }
@@ -396,7 +396,7 @@ Expected response:
 ```json
 {
   "status": "created",
-  "iso_path": "/var/lib/vmspawnd/cloud-init/my-first-vm-cloud-init.iso"
+  "iso_path": "/var/lib/zyvor-fabricd/cloud-init/my-first-vm-cloud-init.iso"
 }
 ```
 
@@ -587,7 +587,7 @@ Expected response:
 ```json
 {
   "vm_name": "imported-vm",
-  "image_path": "/var/lib/vmspawnd/images/imported-vm.qcow2",
+  "image_path": "/var/lib/zyvor-fabricd/images/imported-vm.qcow2",
   "source_format": "vmdk",
   "target_format": "qcow2",
   "size_bytes": 2147483648

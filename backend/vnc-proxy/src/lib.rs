@@ -91,7 +91,7 @@ async fn handle_vnc(socket: WebSocket, vm_name: String) {
 
 async fn get_vnc_port(vm_name: &str) -> u16 {
     // Get VNC port from VM metadata
-    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd".to_string());
+    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/zyvor-fabricd".to_string());
 
     if let Ok(store) = StateStore::new(&state_dir) {
         if let Ok(Some(vm)) = store.get_vm(vm_name) {
@@ -118,7 +118,7 @@ pub fn configure_vnc_for_vm(vm_name: &str, vnc_port: u16) -> anyhow::Result<()> 
 
     // Add VNC device to VM configuration
     // Store VNC port in VM metadata
-    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/vmspawnd".to_string());
+    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/zyvor-fabricd".to_string());
 
     if let Ok(store) = StateStore::new(&state_dir) {
         if let Ok(Some(mut vm)) = store.get_vm(vm_name) {

@@ -1,5 +1,5 @@
 [package]
-name = "vmspawnd-driver-core"
+name = "zyvor-fabric-driver-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

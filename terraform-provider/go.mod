@@ -1,4 +1,4 @@
-module github.com/ssahani/terraform-provider-vmspawnd
+module github.com/ssahani/terraform-provider-zyvor-fabricd
 
 go 1.22.0
 

@@ -5,7 +5,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
-use vmspawnd_driver_core::{LogDriver, LogEntry, LogStream};
+use zyvor_fabric_driver_core::{LogDriver, LogEntry, LogStream};
 
 use crate::MachinectlDriver;
 

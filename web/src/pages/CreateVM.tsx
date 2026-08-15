@@ -253,7 +253,7 @@ export default function CreateVM() {
                 type="text"
                 value={image}
                 onChange={(e) => setImage(e.target.value)}
-                placeholder="/var/lib/vmspawnd/images/ubuntu-24.04.qcow2"
+                placeholder="/var/lib/zyvor-fabricd/images/ubuntu-24.04.qcow2"
                 className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm font-mono"
                 required
               />

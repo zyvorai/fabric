@@ -15,7 +15,7 @@
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use vm_model::{VMMetrics, VMPressure};
-use vmspawnd_driver_core::{LogDriver, LogStream, ResourceControlDriver, ResourceStatsDriver};
+use zyvor_fabric_driver_core::{LogDriver, LogStream, ResourceControlDriver, ResourceStatsDriver};
 
 use crate::EphemeraDriver;
 

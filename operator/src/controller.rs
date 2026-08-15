@@ -23,9 +23,9 @@ pub struct Context {
 pub async fn run(client: Client) -> Result<()> {
     let vms = Api::<VirtualMachine>::all(client.clone());
 
-    let vmspawnd_url = std::env::var("VMSPAWND_URL")
-        .unwrap_or_else(|_| "http://vmspawnd:9095".to_string());
-    let vmspawnd_token = std::env::var("VMSPAWND_TOKEN").ok().filter(|s| !s.is_empty());
+    let vmspawnd_url = std::env::var("ZYVOR_FABRICD_URL")
+        .unwrap_or_else(|_| "http://zyvor-fabricd:9095".to_string());
+    let vmspawnd_token = std::env::var("ZYVOR_FABRICD_TOKEN").ok().filter(|s| !s.is_empty());
 
     let context = Arc::new(Context {
         client: client.clone(),

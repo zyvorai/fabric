@@ -1,6 +1,6 @@
 # Infrastructure Time Machine — Fabric API foundation
 
-Machina's Time Machine consumes these **Zyvor Fabric** (`vmspawnd`) APIs. Fabric remains the source of truth; Machina records and correlates exports.
+Machina's Time Machine consumes these **Zyvor Fabric** (`zyvor-fabricd`) APIs. Fabric remains the source of truth; Machina records and correlates exports.
 
 ## Config snapshot
 

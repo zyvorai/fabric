@@ -42,7 +42,7 @@ pub fn sanitize_error_text(text: &str) -> String {
     let lower = t.to_ascii_lowercase();
     if lower.contains("<!doctype html") || lower.contains("<html") || t.contains("</html>") {
         return "The API returned an HTML error page instead of JSON. \
-            This usually means a reverse proxy failure or vmspawnd is unreachable."
+            This usually means a reverse proxy failure or zyvor-fabricd is unreachable."
             .to_string();
     }
 
@@ -94,7 +94,7 @@ pub fn format_http_error_body(status: u16, status_text: &str, text: &str) -> Str
     if lower.starts_with("<!doctype html") || lower.starts_with("<html") {
         return format!(
             "Request failed ({status_label}): the server returned an HTML error page instead of JSON. \
-             Check that vmspawnd is running on this host."
+             Check that zyvor-fabricd is running on this host."
         );
     }
 

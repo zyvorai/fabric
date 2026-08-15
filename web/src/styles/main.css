@@ -968,7 +968,7 @@ code {
   }
 }
 
-/* ── vmspawnd page extensions ── */
+/* ── zyvor-fabricd page extensions ── */
 
 @keyframes scale-in {
   from { transform: scale(0.95); opacity: 0; }

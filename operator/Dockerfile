@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/target/release/vmspawnd-operator /usr/local/bin/
+COPY --from=builder /build/target/release/zyvor-fabricd-operator /usr/local/bin/
 
 USER 1000
 
-ENTRYPOINT ["/usr/local/bin/vmspawnd-operator"]
+ENTRYPOINT ["/usr/local/bin/zyvor-fabricd-operator"]

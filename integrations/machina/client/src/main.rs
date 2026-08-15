@@ -6,8 +6,8 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use vmspawn_sdk::logs::LogQuery;
-use vmspawn_sdk::{Client, ClientConfig, VMEvent};
+use zyvor_fabric_sdk::logs::LogQuery;
+use zyvor_fabric_sdk::{Client, ClientConfig, VMEvent};
 
 #[derive(Debug, Parser)]
 #[command(name = "machina-fabric", about = "Zyvor Fabric CLI for Machina v0.1")]

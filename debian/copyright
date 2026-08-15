@@ -1,10 +1,10 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: vmspawnd
-Upstream-Contact: vmspawnd contributors <vmspawnd@example.com>
-Source: https://github.com/vmspawnd/vmspawnd
+Upstream-Name: zyvor-fabricd
+Upstream-Contact: zyvor-fabricd contributors <zyvor-fabricd@example.com>
+Source: https://github.com/zyvor-fabricd/zyvor-fabricd
 
 Files: *
-Copyright: 2026 vmspawnd contributors
+Copyright: 2026 zyvor-fabricd contributors
 License: MIT
 
 License: MIT

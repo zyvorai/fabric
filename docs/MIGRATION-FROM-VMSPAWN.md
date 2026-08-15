@@ -1,4 +1,4 @@
-# Migrating from vmspawn / vmspawnd branding
+# Migrating from vmspawn / zyvor-fabricd branding
 
 Zyvor Fabric is the product name for this platform. Technical identifiers are unchanged so existing installs keep working.
 
@@ -6,7 +6,7 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 
 | Before | After |
 |--------|-------|
-| Product name **vmspawnd** / **vmspawn** | **Zyvor Fabric** |
+| Product name **zyvor-fabricd** / **vmspawn** | **Zyvor Fabric** |
 | GitHub `ssahani/vmspawn` | [ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric) (redirects) |
 | Web UI title / docs prose | Zyvor Fabric |
 | Default deploy path `~/vmspawn` | `~/zyvor-fabric` |
@@ -15,13 +15,13 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 
 | Item | Value |
 |------|-------|
-| systemd unit | `vmspawnd.service` |
-| Binary | `vmspawnd`, `vmctl`, `vmspawnctl` |
-| Config | `/etc/vmspawnd/vmspawnd.toml` |
-| State | `/var/lib/vmspawnd/` |
-| Env vars | `VMSPAWND_*` |
-| Terraform provider type | `vmspawnd` (`ssahani/vmspawnd`) |
-| K8s operator chart | `vmspawnd-operator` |
+| systemd unit | `zyvor-fabricd.service` |
+| Binary | `zyvor-fabricd`, `zyvorctl`, `zyvorctl` |
+| Config | `/etc/zyvor-fabricd/zyvor-fabricd.toml` |
+| State | `/var/lib/zyvor-fabricd/` |
+| Env vars | `ZYVOR_FABRICD_*` |
+| Terraform provider type | `zyvor-fabricd` (`ssahani/zyvor-fabricd`) |
+| K8s operator chart | `zyvor-fabricd-operator` |
 | API paths | `/api/*` unchanged |
 
 ## Clone URL

@@ -1,3 +1,0 @@
-# PAM service for vmspawnd web/API login (system users, same as SSH when using pam_unix).
-auth       required     pam_unix.so
-account    required     pam_unix.so

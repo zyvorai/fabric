@@ -54,13 +54,13 @@ WatchdogSec=120s
 # -------------------------------------------------------------------
 # Environment
 # -------------------------------------------------------------------
-Environment=VSPAWN_LOG_LEVEL=info
+Environment=ZYVOR_FABRICD_LOG_LEVEL=info
 
 # Load secrets from a dedicated environment file (mode 0600)
-# EnvironmentFile=-/etc/vmspawnd/vmspawnd.env
-# Example /etc/vmspawnd/vmspawnd.env:
-#   VMSPAWND_JWT_SECRET=your-64-char-secret
-#   VMSPAWND_ADMIN_PASSWORD=your-admin-password
+# EnvironmentFile=-/etc/zyvor-fabricd/zyvor-fabricd.env
+# Example /etc/zyvor-fabricd/zyvor-fabricd.env:
+#   ZYVOR_FABRICD_JWT_SECRET=your-64-char-secret
+#   ZYVOR_FABRICD_ADMIN_PASSWORD=your-admin-password
 
 # -------------------------------------------------------------------
 # Resource Limits
@@ -87,8 +87,8 @@ CPUWeight=200
 # Restrict filesystem access
 ProtectHome=yes
 ProtectSystem=strict
-ReadWritePaths=/var/lib/vmspawnd /etc/systemd/network /run/systemd
-ReadOnlyPaths=/etc/vmspawnd
+ReadWritePaths=/var/lib/zyvor-fabricd /etc/systemd/network /run/systemd
+ReadOnlyPaths=/etc/zyvor-fabricd
 
 # Restrict privilege escalation
 NoNewPrivileges=yes
@@ -220,7 +220,7 @@ LimitNOFILE=131072
 
 ### Memory
 
-The `MemoryMax` and `MemoryHigh` limits apply only to the vmspawnd daemon
+The `MemoryMax` and `MemoryHigh` limits apply only to the zyvor-fabricd daemon
 process, not to the VMs it manages. VMs run as separate QEMU processes under
 `systemd-vmspawn` and are not children of the Zyvor Fabric cgroup.
 
@@ -356,8 +356,8 @@ sudo mkdir -p /etc/systemd/system/Zyvor Fabric.service.d/
 # Add custom environment variables
 sudo tee /etc/systemd/system/Zyvor Fabric.service.d/environment.conf << 'EOF'
 [Service]
-Environment=VSPAWN_LOG_LEVEL=debug
-Environment=VMSPAWND_JWT_SECRET=my-production-secret
+Environment=ZYVOR_FABRICD_LOG_LEVEL=debug
+Environment=ZYVOR_FABRICD_JWT_SECRET=my-production-secret
 EOF
 
 # Increase resource limits

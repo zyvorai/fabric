@@ -48,7 +48,7 @@ presentations/
 .deploy-last
 
 # Terraform provider local build
-terraform-provider/terraform-provider-vmspawnd
+terraform-provider/terraform-provider-zyvor-fabricd
 
 # Machina desktop
 integrations/machina/desktop/node_modules/

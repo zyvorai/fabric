@@ -511,10 +511,10 @@ impl DistributedStorageManager {
 
         // Attempt the actual data movement using qemu-img convert.
         let source_path = format!(
-            "/var/lib/vmspawnd/storage/{}/{}.qcow2",
+            "/var/lib/zyvor-fabricd/storage/{}/{}.qcow2",
             source_pool, vm_name
         );
-        let dest_dir = format!("/var/lib/vmspawnd/storage/{}", target_pool);
+        let dest_dir = format!("/var/lib/zyvor-fabricd/storage/{}", target_pool);
         let dest_path = format!("{}/{}.qcow2", dest_dir, vm_name);
 
         if std::path::Path::new(&source_path).exists() {

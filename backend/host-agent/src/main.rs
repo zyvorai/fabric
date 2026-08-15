@@ -20,11 +20,11 @@ use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "vmspawnd-agent",
-    about = "Lightweight host agent for vmspawnd – runs on each hypervisor host and communicates with the central controller"
+    name = "zyvor-fabricd-agent",
+    about = "Lightweight host agent for zyvor-fabricd – runs on each hypervisor host and communicates with the central controller"
 )]
 struct AgentConfig {
-    /// URL of the central vmspawnd controller (e.g. http://controller:8080)
+    /// URL of the central zyvor-fabricd controller (e.g. http://controller:8080)
     #[arg(long)]
     controller_url: String,
 
@@ -37,7 +37,7 @@ struct AgentConfig {
     heartbeat_interval: u64,
 
     /// Path to the file that persists this host's unique ID across restarts
-    #[arg(long, default_value = "/var/lib/vmspawnd/host-id")]
+    #[arg(long, default_value = "/var/lib/zyvor-fabricd/host-id")]
     host_id_file: PathBuf,
 }
 
@@ -246,21 +246,21 @@ impl Agent {
 
         match cmd {
             HostCommand::StartVm { vm_name } => {
-                if let Err(e) = vmspawn_driver::start_vm(&vm_name) {
+                if let Err(e) = zyvor_fabric_vm_driver::start_vm(&vm_name) {
                     error!(vm = %vm_name, error = %e, "failed to start VM");
                 } else {
                     info!(vm = %vm_name, "VM started");
                 }
             }
             HostCommand::StopVm { vm_name } => {
-                if let Err(e) = vmspawn_driver::stop_vm(&vm_name) {
+                if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&vm_name) {
                     error!(vm = %vm_name, error = %e, "failed to stop VM");
                 } else {
                     info!(vm = %vm_name, "VM stopped");
                 }
             }
             HostCommand::RestartVm { vm_name } => {
-                if let Err(e) = vmspawn_driver::restart_vm(&vm_name) {
+                if let Err(e) = zyvor_fabric_vm_driver::restart_vm(&vm_name) {
                     error!(vm = %vm_name, error = %e, "failed to restart VM");
                 } else {
                     info!(vm = %vm_name, "VM restarted");
@@ -278,7 +278,7 @@ impl Agent {
                     target = %target_host,
                     "migration requested – stopping local VM for transfer"
                 );
-                if let Err(e) = vmspawn_driver::stop_vm(&vm_name) {
+                if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&vm_name) {
                     error!(vm = %vm_name, error = %e, "failed to stop VM for migration");
                 }
             }
@@ -293,7 +293,7 @@ impl Agent {
             HostCommand::FenceVm { vm_name } => {
                 warn!(vm = %vm_name, "fencing VM – force stopping");
                 // Try graceful stop first via machinectl
-                if let Err(e) = vmspawn_driver::stop_vm(&vm_name) {
+                if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&vm_name) {
                     warn!(vm = %vm_name, error = %e, "graceful stop failed, attempting kill");
                     // Fallback: find the leader PID and kill -9
                     let leader_result = std::process::Command::new("machinectl")
@@ -646,7 +646,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    info!("vmspawnd-agent starting");
+    info!("zyvor-fabricd-agent starting");
 
     // Load or generate the persistent host ID.
     let host_id = load_or_generate_host_id(&config.host_id_file)?;

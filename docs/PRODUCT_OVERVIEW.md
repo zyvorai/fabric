@@ -79,7 +79,7 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 - Full and linked cloning with CoW support
 - **Hibernate (suspend-to-disk)** and resume from snapshot
 - Templates for rapid deployment
-- Declarative config via YAML (`vmctl apply -f config.yaml`)
+- Declarative config via YAML (`zyvorctl apply -f config.yaml`)
 - Multiple disk formats: qcow2, raw, vmdk, vdi
 - **VM import** from VMDK, VDI, VHD (auto-convert to qcow2)
 - **Online disk resize** (qemu-img + QMP block_resize)
@@ -141,11 +141,11 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 - **Per-VM backup** from web UI and TUI (single or bulk)
 - **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
 - **Automated weekly state store cleanup** via systemd timer (events, audit logs, webhook deliveries, history)
-- **Backup configuration** via `[backup]` section in config file or `VMSPAWND_BACKUP_DIR`/`VMSPAWND_BACKUP_RETAIN`/`VMSPAWND_BACKUP_TYPE` env vars
+- **Backup configuration** via `[backup]` section in config file or `ZYVOR_FABRICD_BACKUP_DIR`/`ZYVOR_FABRICD_BACKUP_RETAIN`/`ZYVOR_FABRICD_BACKUP_TYPE` env vars
 - **Post-install auto-verify** — smoke test runs automatically after deploy/reinstall (API, auth, VM CRUD, backups)
 - **Deep health check** — API, disk space, DB integrity, credentials, timers, memory, KVM
-- **TLS certificate generation** — self-signed certs with SAN via `vmspawnctl tls`
-- **Shell completions** — Bash tab completion for `vmctl` and `vmspawnctl`
+- **TLS certificate generation** — self-signed certs with SAN via `zyvorctl tls`
+- **Shell completions** — Bash tab completion for `zyvorctl` and `zyvorctl`
 - Resource quotas, pools, and datacenter abstractions
 - **Database schema migrations** with version tracking
 
@@ -167,20 +167,20 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 
 ## Management Interfaces
 
-### CLI (`vmctl`)
+### CLI (`zyvorctl`)
 
 Scriptable command-line tool with JSON/YAML/table output:
 
 ```bash
-vmctl list -o json
-vmctl create myvm --image=ubuntu.qcow2 --cpus=4 --memory=4G
-vmctl start myvm
-vmctl apply -f infrastructure.yaml
-vmctl policy list
-vmctl ceph health my-pool
+zyvorctl list -o json
+zyvorctl create myvm --image=ubuntu.qcow2 --cpus=4 --memory=4G
+zyvorctl start myvm
+zyvorctl apply -f infrastructure.yaml
+zyvorctl policy list
+zyvorctl ceph health my-pool
 ```
 
-### Terminal UI (`vmctl-tui`)
+### Terminal UI (`zyvorctl-tui`)
 
 k9s-style dashboard with 8 views, vim keybindings, sparkline graphs, and live API data. Per-VM actions: `s` start, `t` stop, `r` restart, `b` backup, `d` delete.
 
@@ -208,7 +208,7 @@ spec:
 Declarative VM provisioning with full plan/apply workflow:
 
 ```hcl
-resource "vmspawnd_vm" "web" {
+resource "zyvor_fabric_vm" "web" {
   name   = "web-server"
   image  = "ubuntu-22.04.qcow2"
   cpus   = 4
@@ -222,14 +222,14 @@ resource "vmspawnd_vm" "web" {
 
 ```
                     +-----------+    +-----------+    +----------+
-                    |   vmctl   |    | vmctl-tui |    |  Web UI  |
+                    |   zyvorctl   |    | zyvorctl-tui |    |  Web UI  |
                     |   (CLI)   |    |   (TUI)   |    | (React)  |
                     +-----+-----+    +-----+-----+    +----+-----+
                           |                |               |
                 +---------+----------+     |      +--------+
                 |         |          |     |      |
            +----v----+   |   +------v-----v------v-------+
-           |   K8s   |   |   |       vmspawnd daemon      |
+           |   K8s   |   |   |       zyvor-fabricd daemon      |
            |Operator |   |   |   REST API + WebSocket      |
            +---------+   |   +---+----+----+----+----+----+
                           |       |    |    |    |    |
@@ -261,7 +261,7 @@ Multiple Zyvor Fabric nodes with etcd-based clustering, shared storage (NFS/Ceph
 
 Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs alongside containerized workloads.
 
-**Requirements:** Kubernetes cluster with vmspawnd operator deployed
+**Requirements:** Kubernetes cluster with zyvor-fabricd operator deployed
 
 ---
 
@@ -339,7 +339,7 @@ MIT — free for commercial use, modification, and distribution.
 
 ```bash
 # Deploy everything (auto-sudo — no manual sudo needed)
-./vmspawnctl deploy
+./zyvorctl deploy
 
 # That's it. Zyvor Fabric is running.
 ```
@@ -348,27 +348,27 @@ MIT — free for commercial use, modification, and distribution.
 
 ```bash
 # Install dependencies (auto-sudo)
-./vmspawnctl deps
+./zyvorctl deps
 
 # Build
-./vmspawnctl build
+./zyvorctl build
 
 # Run tests
-./vmspawnctl test
+./zyvorctl test
 
 # Install and start (auto-sudo)
-./vmspawnctl install
-./vmspawnctl start
+./zyvorctl install
+./zyvorctl start
 
 # Read admin password
-./vmspawnctl password
+./zyvorctl password
 
 # Run interactive demo
-./vmspawnctl demo
+./zyvorctl demo
 
 # Create your first VM
-vmctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
-vmctl start myvm
+zyvorctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
+zyvorctl start myvm
 
 # Open web dashboard
 open http://localhost:9095
@@ -377,26 +377,26 @@ open http://localhost:9095
 ### Management Commands
 
 ```bash
-./vmspawnctl status      # Check service status
-./vmspawnctl verify      # Post-install smoke test (API, auth, VM CRUD, backups)
-./vmspawnctl health      # Deep health check (disk, DB, timers, resources)
-./vmspawnctl logs        # Follow logs
-./vmspawnctl restart     # Restart service (auto-sudo)
-./vmspawnctl reinstall   # Rebuild + reinstall + auto-verify (auto-sudo)
-./vmspawnctl upgrade     # Git pull + reinstall (auto-sudo)
-./vmspawnctl uninstall   # Remove everything (auto-sudo)
-./vmspawnctl doctor      # System readiness check
-./vmspawnctl tls         # Generate self-signed TLS certificate
+./zyvorctl status      # Check service status
+./zyvorctl verify      # Post-install smoke test (API, auth, VM CRUD, backups)
+./zyvorctl health      # Deep health check (disk, DB, timers, resources)
+./zyvorctl logs        # Follow logs
+./zyvorctl restart     # Restart service (auto-sudo)
+./zyvorctl reinstall   # Rebuild + reinstall + auto-verify (auto-sudo)
+./zyvorctl upgrade     # Git pull + reinstall (auto-sudo)
+./zyvorctl uninstall   # Remove everything (auto-sudo)
+./zyvorctl doctor      # System readiness check
+./zyvorctl tls         # Generate self-signed TLS certificate
 ```
 
 ### Backup Commands
 
 ```bash
-./vmspawnctl backup now      # Run backup immediately
-./vmspawnctl backup enable   # Enable daily backup timer (2:00 AM)
-./vmspawnctl backup disable  # Disable backup timer
-./vmspawnctl backup status   # Show timer state + storage info
-./vmspawnctl backup logs     # Follow backup logs
+./zyvorctl backup now      # Run backup immediately
+./zyvorctl backup enable   # Enable daily backup timer (2:00 AM)
+./zyvorctl backup disable  # Disable backup timer
+./zyvorctl backup status   # Show timer state + storage info
+./zyvorctl backup logs     # Follow backup logs
 ```
 
 ---

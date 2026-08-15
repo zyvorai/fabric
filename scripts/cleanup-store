@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cleanup-store — Clean up old state store entities for vmspawnd
+# cleanup-store — Clean up old state store entities for zyvor-fabricd
 #
 # Removes old entries from unbounded collections:
 #   - vm_events (older than 7 days)
@@ -12,19 +12,19 @@
 # Also calls the metrics cleanup API endpoint.
 #
 # Configuration:
-#   VMSPAWND_URL             API endpoint (default: http://127.0.0.1:9095)
-#   VMSPAWND_EVENT_RETAIN    Days to keep events (default: 7)
-#   VMSPAWND_AUDIT_RETAIN    Days to keep audit logs (default: 90)
-#   VMSPAWND_HISTORY_RETAIN  Days to keep history/deliveries (default: 30)
+#   ZYVOR_FABRICD_URL             API endpoint (default: http://127.0.0.1:9095)
+#   ZYVOR_FABRICD_EVENT_RETAIN    Days to keep events (default: 7)
+#   ZYVOR_FABRICD_AUDIT_RETAIN    Days to keep audit logs (default: 90)
+#   ZYVOR_FABRICD_HISTORY_RETAIN  Days to keep history/deliveries (default: 30)
 
 set -euo pipefail
 
-VMSPAWND_URL="${VMSPAWND_URL:-http://127.0.0.1:9095}"
-STATE_DIR="/var/lib/vmspawnd"
-EVENT_RETAIN="${VMSPAWND_EVENT_RETAIN:-7}"
-AUDIT_RETAIN="${VMSPAWND_AUDIT_RETAIN:-90}"
-HISTORY_RETAIN="${VMSPAWND_HISTORY_RETAIN:-30}"
-LOG_TAG="vmspawnd-cleanup"
+ZYVOR_FABRICD_URL="${ZYVOR_FABRICD_URL:-http://127.0.0.1:9095}"
+STATE_DIR="/var/lib/zyvor-fabricd"
+EVENT_RETAIN="${ZYVOR_FABRICD_EVENT_RETAIN:-7}"
+AUDIT_RETAIN="${ZYVOR_FABRICD_AUDIT_RETAIN:-90}"
+HISTORY_RETAIN="${ZYVOR_FABRICD_HISTORY_RETAIN:-30}"
+LOG_TAG="zyvor-fabricd-cleanup"
 
 log()  { echo "$(date -Iseconds) [$LOG_TAG] $*"; }
 
@@ -62,18 +62,18 @@ cleanup_dir "notification_history" "$HISTORY_RETAIN"  "notification history entr
 cleanup_dir "backup_jobs"          "$EVENT_RETAIN"    "backup jobs"
 cleanup_dir "scale_events"         "$HISTORY_RETAIN"  "scale events"
 
-# Call metrics cleanup API if vmspawnd is running
-if curl -sf "$VMSPAWND_URL/health" &>/dev/null; then
+# Call metrics cleanup API if zyvor-fabricd is running
+if curl -sf "$ZYVOR_FABRICD_URL/health" &>/dev/null; then
     PASSWORD_FILE="$STATE_DIR/.admin_password"
     if [[ -f "$PASSWORD_FILE" ]]; then
         PASSWORD=$(cat "$PASSWORD_FILE")
-        TOKEN=$(curl -sf "$VMSPAWND_URL/api/auth/login" \
+        TOKEN=$(curl -sf "$ZYVOR_FABRICD_URL/api/auth/login" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg p "$PASSWORD" '{"username":"admin","password":$p}')" \
             | jq -r '.token // empty')
 
         if [[ -n "$TOKEN" ]]; then
-            RESULT=$(curl -sf "$VMSPAWND_URL/api/system/metrics/cleanup" \
+            RESULT=$(curl -sf "$ZYVOR_FABRICD_URL/api/system/metrics/cleanup" \
                 -X POST \
                 -H "Authorization: Bearer $TOKEN" 2>/dev/null) || RESULT=""
 
@@ -85,7 +85,7 @@ if curl -sf "$VMSPAWND_URL/health" &>/dev/null; then
         fi
     fi
 else
-    log "vmspawnd not running — skipping metrics API cleanup"
+    log "zyvor-fabricd not running — skipping metrics API cleanup"
 fi
 
 # Clean empty directories

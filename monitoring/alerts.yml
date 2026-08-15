@@ -1,15 +1,15 @@
 groups:
-  - name: vmspawnd
+  - name: zyvor-fabricd
     interval: 30s
     rules:
       - alert: VMSpawndDown
-        expr: up{job="vmspawnd"} == 0
+        expr: up{job="zyvor-fabricd"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "vmspawnd is down"
-          description: "vmspawnd has been down for more than 1 minute"
+          summary: "zyvor-fabricd is down"
+          description: "zyvor-fabricd has been down for more than 1 minute"
 
       - alert: HighVMCount
         expr: vmspawnd_vms_total > 100

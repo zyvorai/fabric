@@ -36,11 +36,11 @@ Expected output:
 Zyvor Fabric uses JWT authentication. First, retrieve the admin password:
 
 ```bash
-# Using vmspawnctl
-./vmspawnctl password
+# Using zyvorctl
+./zyvorctl password
 
 # Or read the file directly
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```
 
 Log in to get a JWT token:
@@ -77,7 +77,7 @@ curl -s -X POST http://127.0.0.1:9095/api/images/cloud/download \
 Copy a qcow2 image to the images directory:
 
 ```bash
-sudo cp /path/to/your-image.qcow2 /var/lib/vmspawnd/images/
+sudo cp /path/to/your-image.qcow2 /var/lib/zyvor-fabricd/images/
 ```
 
 ---
@@ -115,10 +115,10 @@ Expected response:
 
 ### Using the CLI
 
-If `vmctl` is installed:
+If `zyvorctl` is installed:
 
 ```bash
-vmctl create my-first-vm \
+zyvorctl create my-first-vm \
   --image=your-image.qcow2 \
   --cpus=2 \
   --memory=2048
@@ -233,7 +233,7 @@ Returns `204 No Content` on success.
 
 ## What You Just Did
 
-1. Started the vmspawnd daemon
+1. Started the zyvor-fabricd daemon
 2. Authenticated and obtained a JWT token
 3. Created a VM with specified resources
 4. Started the VM using systemd-vmspawn

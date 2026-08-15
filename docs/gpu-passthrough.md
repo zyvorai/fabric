@@ -45,7 +45,7 @@ find /sys/kernel/iommu_groups/ -type l
 
 ```bash
 # CLI
-vmctl gpu list
+zyvorctl gpu list
 
 # API
 curl http://localhost:9095/api/gpu/devices
@@ -80,7 +80,7 @@ Before passing a GPU to a VM, bind it to the `vfio-pci` driver:
 
 ```bash
 # CLI
-vmctl gpu bind 0000:02:00.0
+zyvorctl gpu bind 0000:02:00.0
 
 # API
 curl -X POST http://localhost:9095/api/gpu/bind \
@@ -101,7 +101,7 @@ curl -X POST http://localhost:9095/api/vms \
   -H "Content-Type: application/json" \
   -d '{
     "name": "gaming-vm",
-    "image": "/var/lib/vmspawnd/images/windows10.qcow2",
+    "image": "/var/lib/zyvor-fabricd/images/windows10.qcow2",
     "cpus": 8,
     "memory": 16384,
     "gpu_passthrough": {
@@ -115,7 +115,7 @@ curl -X POST http://localhost:9095/api/vms \
 ### VM Configuration File
 
 ```toml
-# /etc/vmspawnd/vms/gaming-vm.toml
+# /etc/zyvor-fabricd/vms/gaming-vm.toml
 [vm]
 name = "gaming-vm"
 cpus = 8
@@ -219,7 +219,7 @@ For NVIDIA GRID/vGPU (requires license):
 
 ```bash
 sudo systemctl start nvidia-vgpud
-vmctl gpu create-vgpu --physical-gpu 0000:02:00.0 --type nvidia-256
+zyvorctl gpu create-vgpu --physical-gpu 0000:02:00.0 --type nvidia-256
 ```
 
 ### Intel GVT-g
@@ -228,7 +228,7 @@ For Intel integrated graphics virtualization:
 
 ```bash
 echo "i915.enable_gvt=1" >> /etc/modprobe.d/i915.conf
-vmctl gpu create-vgpu --physical-gpu 0000:00:02.0 --type i915-GVTg_V5_4
+zyvorctl gpu create-vgpu --physical-gpu 0000:00:02.0 --type i915-GVTg_V5_4
 ```
 
 ---
@@ -272,10 +272,10 @@ echo 1 > /sys/bus/pci/devices/0000:02:00.0/msi_bus
 
 ```bash
 # GPU assignment status
-vmctl gpu list --assigned
+zyvorctl gpu list --assigned
 
 # Per-VM GPU stats
-vmctl gpu stats gaming-vm
+zyvorctl gpu stats gaming-vm
 ```
 
 ---
@@ -286,7 +286,7 @@ vmctl gpu stats gaming-vm
 |---------|----------|
 | NVIDIA Error 43 | Add `<kvm><hidden state='on'/></kvm>` to VM config |
 | Black screen | Check if GPU ROM is needed; verify IOMMU groups; try different display port |
-| GPU not releasing after VM shutdown | `vmctl gpu unbind 0000:02:00.0` then `modprobe -r vfio-pci && modprobe vfio-pci` |
+| GPU not releasing after VM shutdown | `zyvorctl gpu unbind 0000:02:00.0` then `modprobe -r vfio-pci && modprobe vfio-pci` |
 | IOMMU group contains other devices | Use ACS override (`pcie_acs_override=downstream,multifunction`) -- not recommended for production |
 
 ---

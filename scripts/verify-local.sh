@@ -17,8 +17,8 @@ echo "==> Web build"
 echo "==> Backend fmt"
 (cd backend && cargo fmt -- --check)
 
-echo "==> vmspawn-sdk clippy"
-(cd backend && cargo clippy -p vmspawn-sdk -- -D warnings)
+echo "==> zyvor-fabric-sdk clippy"
+(cd backend && cargo clippy -p zyvor-fabric-sdk -- -D warnings)
 
 echo "==> Terraform provider"
 (cd terraform-provider && go mod tidy && go build ./... && go vet ./...)

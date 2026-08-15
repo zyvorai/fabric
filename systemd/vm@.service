@@ -1,9 +1,9 @@
 [Unit]
-Description=Virtual Machine %i (vmspawnd)
+Description=Virtual Machine %i (zyvor-fabricd)
 Documentation=https://github.com/ssahani/zyvor-fabric
-After=vmspawnd.service network-online.target
+After=zyvor-fabricd.service network-online.target
 Wants=network-online.target
-BindsTo=vmspawnd.service
+BindsTo=zyvor-fabricd.service
 
 [Service]
 Type=simple

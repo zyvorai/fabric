@@ -23,7 +23,7 @@ Migrate a running VM with minimal downtime. Memory is copied iteratively while t
 
 ```bash
 # CLI
-vmctl migrate myvm --to node2 --live
+zyvorctl migrate myvm --to node2 --live
 
 # API
 curl -X POST http://localhost:9095/api/vms/myvm/migrate \
@@ -34,7 +34,7 @@ curl -X POST http://localhost:9095/api/vms/myvm/migrate \
 ### With Compression and Bandwidth Limit
 
 ```bash
-vmctl migrate myvm --to node2 --live --compress --bandwidth 100
+zyvorctl migrate myvm --to node2 --live --compress --bandwidth 100
 
 # API equivalent
 curl -X POST http://localhost:9095/api/vms/myvm/migrate \
@@ -63,7 +63,7 @@ Stop the VM, copy its disk and configuration to the target, then start it there.
 
 ```bash
 # CLI
-vmctl migrate myvm --to node2 --offline
+zyvorctl migrate myvm --to node2 --offline
 
 # API
 curl -X POST http://localhost:9095/api/vms/myvm/migrate \
@@ -77,7 +77,7 @@ curl -X POST http://localhost:9095/api/vms/myvm/migrate \
 
 ```bash
 # CLI
-vmctl migrate status myvm
+zyvorctl migrate status myvm
 
 # API
 curl http://localhost:9095/api/vms/myvm/migrate/status
@@ -95,7 +95,7 @@ curl http://localhost:9095/api/vms/myvm/migrate/status
 ### Cancel a Migration
 
 ```bash
-vmctl migrate cancel myvm
+zyvorctl migrate cancel myvm
 
 curl -X POST http://localhost:9095/api/vms/myvm/migrate/cancel
 ```
@@ -111,7 +111,7 @@ Live migration requires that both nodes can access the same VM disk. Two common 
 On the NFS server:
 ```bash
 # /etc/exports
-/var/lib/vmspawnd/images 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
+/var/lib/zyvor-fabricd/images 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
 ```
 
 ```bash
@@ -120,17 +120,17 @@ sudo exportfs -ra
 
 On each Zyvor Fabric node:
 ```bash
-sudo mount node1:/var/lib/vmspawnd/images /var/lib/vmspawnd/images
+sudo mount node1:/var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/images
 
 # Persist across reboots
-echo "node1:/var/lib/vmspawnd/images /var/lib/vmspawnd/images nfs defaults 0 0" \
+echo "node1:/var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/images nfs defaults 0 0" \
   | sudo tee -a /etc/fstab
 ```
 
 ### Ceph/RBD
 
 ```toml
-# /etc/vmspawnd/vmspawnd.toml
+# /etc/zyvor-fabricd/zyvor-fabricd.toml
 [storage]
 backend = "rbd"
 pool = "Zyvor Fabric"
@@ -155,8 +155,8 @@ Required ports: SSH (22) for rsync, Zyvor Fabric API (8080).
 ## Pre-Migration Checklist
 
 ```bash
-vmctl node status node2          # Target node is healthy
-vmctl node resources node2       # Sufficient CPU/memory available
+zyvorctl node status node2          # Target node is healthy
+zyvorctl node resources node2       # Sufficient CPU/memory available
 ping -c 3 node2                  # Network connectivity
 ssh node2 echo "OK"              # SSH access works
 ```
@@ -188,7 +188,7 @@ curl -X POST http://localhost:9095/api/vms/myvm/migrate \
 For heterogeneous clusters, specify a common CPU model:
 
 ```bash
-vmctl migrate myvm --to node2 --live --cpu-model Nehalem
+zyvorctl migrate myvm --to node2 --live --cpu-model Nehalem
 ```
 
 ---
@@ -270,7 +270,7 @@ curl -X POST http://localhost:9095/api/vms/myvm/migrate/schedule \
 | Migration fails | Check logs (`journalctl -u Zyvor Fabric`), verify network connectivity and SSH access |
 | High downtime | Reduce memory dirty rate, enable auto-converge, increase bandwidth, enable compression |
 | Incompatible CPUs | Use a lowest-common-denominator CPU model (`--cpu-model Nehalem`) |
-| Insufficient disk space | Check `df -h /var/lib/vmspawnd` on the target node |
+| Insufficient disk space | Check `df -h /var/lib/zyvor-fabricd` on the target node |
 
 ---
 

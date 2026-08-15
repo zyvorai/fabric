@@ -9,11 +9,11 @@ use crate::models::{PortForwardConfig, Protocol};
 
 /// Manages nftables rules for VM port forwarding (DNAT/masquerade).
 ///
-/// All rules live in `table ip vmspawnd` with `prerouting` and `postrouting`
+/// All rules live in `table ip zyvor-fabricd` with `prerouting` and `postrouting`
 /// chains so they are isolated from other firewall rules.
 pub struct NftManager;
 
-const TABLE_NAME: &str = "vmspawnd";
+const TABLE_NAME: &str = "zyvor-fabricd";
 const TABLE_FAMILY: &str = "ip";
 const TABLE_NAME_V6: &str = "vmspawnd6";
 const TABLE_FAMILY_V6: &str = "ip6";
@@ -23,7 +23,7 @@ impl NftManager {
         Self
     }
 
-    /// Create `table ip vmspawnd` and `table ip6 vmspawnd6` if they do not already exist.
+    /// Create `table ip zyvor-fabricd` and `table ip6 vmspawnd6` if they do not already exist.
     pub fn ensure_table(&self) -> Result<()> {
         // `add table` is idempotent in nftables — it won't fail if the table
         // already exists.
@@ -164,7 +164,7 @@ impl NftManager {
         Ok(())
     }
 
-    /// Discover DNAT rules in the vmspawnd prerouting chain (live nftables).
+    /// Discover DNAT rules in the zyvor-fabricd prerouting chain (live nftables).
     pub fn discover_dnat_rules(&self) -> Result<Vec<PortForwardConfig>> {
         let json = self.list_rules()?;
         Ok(parse_dnat_rules_from_table_json(&json))
@@ -194,7 +194,7 @@ impl NftManager {
         serde_json::from_slice(&output.stdout).context("Failed to parse nft ruleset JSON")
     }
 
-    /// Return the JSON output of `nft -j list table ip vmspawnd`.
+    /// Return the JSON output of `nft -j list table ip zyvor-fabricd`.
     pub fn list_rules(&self) -> Result<serde_json::Value> {
         let output = Command::new("nft")
             .args(["-j", "list", "table", TABLE_FAMILY, TABLE_NAME])
@@ -348,7 +348,7 @@ struct DnatDiscoverMeta {
     description: &'static str,
 }
 
-/// Parse DNAT port-forward rules from `nft -j list table ip vmspawnd`.
+/// Parse DNAT port-forward rules from `nft -j list table ip zyvor-fabricd`.
 fn parse_dnat_rules_from_table_json(json: &serde_json::Value) -> Vec<PortForwardConfig> {
     let Some(items) = json.get("nftables").and_then(|v| v.as_array()) else {
         return Vec::new();
@@ -374,7 +374,7 @@ fn parse_dnat_rules_from_table_json(json: &serde_json::Value) -> Vec<PortForward
         partial,
         DnatDiscoverMeta {
             id_prefix: "host:nft",
-            description: "Live nftables DNAT rule (vmspawnd table)",
+            description: "Live nftables DNAT rule (zyvor-fabricd table)",
         },
     )
 }
@@ -726,7 +726,7 @@ mod tests {
         assert_eq!(args[0], "add");
         assert_eq!(args[1], "rule");
         assert_eq!(args[2], "ip");
-        assert_eq!(args[3], "vmspawnd");
+        assert_eq!(args[3], "zyvor-fabricd");
         assert_eq!(args[4], "prerouting");
         assert_eq!(args[5], "tcp");
         assert_eq!(args[6], "dport");

@@ -67,7 +67,7 @@ Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format
 
 [`Login.tsx`](../web/src/pages/Login.tsx) uses [`PremiumLoginShell`](../web/src/components/PremiumLoginShell.tsx) with aurora/particles; disabled when `prefers-reduced-motion` is set.
 
-## TUI (`vmctl-tui`)
+## TUI (`zyvorctl-tui`)
 
 Machina-aligned **GuestKit** orange theme, inventory sidebar, `:` colon commands (`:vms`, `:dashboard`, `:start`, `:stop`, `:snap`, `:refresh`, `:help`), `/` fuzzy search, styled confirmation overlay (`[y]` red / `[n]` green), recent tasks bar, 3s toasts. Failed VM actions parse API `error_code` via `format_http_error_body`.
 

@@ -46,16 +46,16 @@
 
 ## User Interfaces
 
-### CLI (vmctl)
+### CLI (zyvorctl)
 
 - 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net)
 - Output formats: table, JSON, YAML (`-o json|yaml|table`)
-- Declarative config import: `vmctl apply -f config.yaml`
-- Config export: `vmctl export <resource> -o yaml`
+- Declarative config import: `zyvorctl apply -f config.yaml`
+- Config export: `zyvorctl export <resource> -o yaml`
 - Ceph management: pool create, health, stats, RBD image CRUD
 - Color output and progress indicators
 
-### TUI (vmctl-tui)
+### TUI (zyvorctl-tui)
 
 - 8 views (Dashboard, VMs, Logs, Metrics, Network, Net Security, Storage, Help)
 - Real-time updates from live API data
@@ -125,9 +125,9 @@
 
 ### Authentication
 
-- JWT-based authentication with auto-generated signing secret (persisted to `/var/lib/vmspawnd/.jwt_secret`, mode `0600`)
-- Auto-generated admin password on first startup (written to `/var/lib/vmspawnd/.admin_password`, mode `0600`)
-- Configurable via `VMSPAWND_JWT_SECRET` and `VMSPAWND_ADMIN_PASSWORD` environment variables
+- JWT-based authentication with auto-generated signing secret (persisted to `/var/lib/zyvor-fabricd/.jwt_secret`, mode `0600`)
+- Auto-generated admin password on first startup (written to `/var/lib/zyvor-fabricd/.admin_password`, mode `0600`)
+- Configurable via `ZYVOR_FABRICD_JWT_SECRET` and `ZYVOR_FABRICD_ADMIN_PASSWORD` environment variables
 - User management with SQLite backend
 - Password hashing (bcrypt with DEFAULT_COST)
 - Token generation, validation, and configurable expiration
@@ -313,7 +313,7 @@
 
 ### Terraform Provider
 
-- Resource: vmspawnd_vm
+- Resource: zyvor_fabric_vm
 - Data source: vmspawnd_vms
 - Example configurations
 

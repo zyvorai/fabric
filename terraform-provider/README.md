@@ -1,16 +1,16 @@
 # Terraform Provider for Zyvor Fabric
 
-Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. The provider type is **`vmspawnd`** (stable); registry namespace is **`ssahani/vmspawnd`**.
+Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. The provider type is **`zyvor-fabricd`** (stable); registry namespace is **`ssahani/zyvor-fabricd`**.
 
-> A future registry alias `ssahani/zyvor-fabric` may be published without breaking existing `vmspawnd` provider blocks.
+> A future registry alias `ssahani/zyvor-fabric` may be published without breaking existing `zyvor-fabricd` provider blocks.
 
 ## Installation
 
 ```hcl
 terraform {
   required_providers {
-    vmspawnd = {
-      source  = "ssahani/vmspawnd"
+    zyvor-fabricd = {
+      source  = "ssahani/zyvor-fabricd"
       version = "~> 0.1"
     }
   }
@@ -20,7 +20,7 @@ terraform {
 ## Provider Configuration
 
 ```hcl
-provider "vmspawnd" {
+provider "zyvor-fabricd" {
   endpoint = "http://localhost:9095"
   # token  = var.vmspawnd_token    # Required when auth is enabled
 }
@@ -28,19 +28,19 @@ provider "vmspawnd" {
 
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `endpoint` | Yes | -- | Zyvor Fabric API URL (`vmspawnd`) |
+| `endpoint` | Yes | -- | Zyvor Fabric API URL (`zyvor-fabricd`) |
 | `token` | No | -- | JWT or API key for authentication |
 
 ## Resources
 
-### vmspawnd_vm
+### zyvor_fabric_vm
 
 Manages a virtual machine through its full lifecycle (create, update, delete).
 
 ```hcl
-resource "vmspawnd_vm" "web_server" {
+resource "zyvor_fabric_vm" "web_server" {
   name   = "web-server"
-  image  = "/var/lib/vmspawnd/images/ubuntu-22.04.qcow2"
+  image  = "/var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2"
   cpus   = 4
   memory = 4096
 
@@ -88,21 +88,21 @@ resource "vmspawnd_vm" "web_server" {
 
 ## Data Sources
 
-### vmspawnd_vm
+### zyvor_fabric_vm
 
 Read information about an existing VM.
 
 ```hcl
-data "vmspawnd_vm" "existing" {
+data "zyvor_fabric_vm" "existing" {
   name = "my-vm"
 }
 
 output "vm_state" {
-  value = data.vmspawnd_vm.existing.state
+  value = data.zyvor_fabric_vm.existing.state
 }
 
 output "vm_ip" {
-  value = data.vmspawnd_vm.existing.ip_address
+  value = data.zyvor_fabric_vm.existing.ip_address
 }
 ```
 
@@ -113,11 +113,11 @@ variable "app_servers" {
   default = ["app-1", "app-2", "app-3"]
 }
 
-resource "vmspawnd_vm" "app" {
+resource "zyvor_fabric_vm" "app" {
   for_each = toset(var.app_servers)
 
   name   = each.key
-  image  = "/var/lib/vmspawnd/images/ubuntu-22.04.qcow2"
+  image  = "/var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2"
   cpus   = 2
   memory = 4096
 
@@ -136,7 +136,7 @@ resource "vmspawnd_vm" "app" {
 ```bash
 cd terraform-provider
 make tidy build
-# or: go build -o terraform-provider-vmspawnd .
+# or: go build -o terraform-provider-zyvor-fabricd .
 ```
 
 Example configuration: [examples/basic/main.tf](examples/basic/main.tf)
@@ -144,8 +144,8 @@ Example configuration: [examples/basic/main.tf](examples/basic/main.tf)
 ### Install Locally
 
 ```bash
-mkdir -p ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/linux_amd64
-cp terraform-provider-vmspawnd ~/.terraform.d/plugins/ssahani/vmspawnd/0.1.0/linux_amd64/
+mkdir -p ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64
+cp terraform-provider-zyvor-fabricd ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64/
 ```
 
 ### Run Tests
@@ -169,7 +169,7 @@ When `ssahani/zyvor-fabric` is published to the Terraform Registry:
 ```hcl
 terraform {
   required_providers {
-    vmspawnd = {
+    zyvor-fabricd = {
       source  = "ssahani/zyvor-fabric"
       version = "~> 0.1"
     }
@@ -177,4 +177,4 @@ terraform {
 }
 ```
 
-Provider type name `vmspawnd` and resource names remain unchanged — only the `source` address changes.
+Provider type name `zyvor-fabricd` and resource names remain unchanged — only the `source` address changes.

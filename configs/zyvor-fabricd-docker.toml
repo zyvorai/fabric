@@ -1,0 +1,14 @@
+[daemon]
+listen = "0.0.0.0:8080"
+cors_origins = ["http://localhost:9080"]
+
+[storage]
+path = "/var/lib/zyvor-fabricd"
+image_path = "/var/lib/zyvor-fabricd/images"
+
+[network]
+bridge = "br0"
+
+[auth]
+# Disable auth for local Docker development; enable in production
+enabled = false

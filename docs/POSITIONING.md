@@ -14,9 +14,9 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 |-----------|-------------|
 | **Category** | Systemd-native virtualization platform / private cloud control plane |
 | **Analogy** | Proxmox-class UX + KubeVirt-style operations, single Rust daemon |
-| **Runtime** | `vmspawnd` — one binary, one config, one systemd unit |
+| **Runtime** | `zyvor-fabricd` — one binary, one config, one systemd unit |
 | **Scope** | VMs, network fabric, security policy, storage, HA, migration, observability |
-| **Interfaces** | CLI (`vmctl`), TUI (`vmctl-tui`), Web UI, K8s operator, Terraform provider |
+| **Interfaces** | CLI (`zyvorctl`), TUI (`zyvorctl-tui`), Web UI, K8s operator, Terraform provider |
 
 ### Elevator pitch
 
@@ -29,11 +29,11 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 | Layer | Name | Notes |
 |-------|------|-------|
 | **Product** | Zyvor Fabric | Marketing, UI, documentation, sales |
-| **Daemon** | `vmspawnd` | systemd unit, config paths, APIs — stable technical identifier |
-| **CLI** | `vmctl`, `vmspawnctl` | Operational tools; no rename required for v1 |
+| **Daemon** | `zyvor-fabricd` | systemd unit, config paths, APIs — stable technical identifier |
+| **CLI** | `zyvorctl`, `zyvorctl` | Operational tools; no rename required for v1 |
 | **Repo** | [zyvor-fabric](https://github.com/ssahani/zyvor-fabric) | GitHub redirects from `vmspawn` |
 
-Keeping `vmspawnd` as the daemon name avoids breaking installs, Ansible roles, and automation. User-facing surfaces say **Zyvor Fabric**; ops runbooks reference `vmspawnd` where commands and paths matter.
+Keeping `zyvor-fabricd` as the daemon name avoids breaking installs, Ansible roles, and automation. User-facing surfaces say **Zyvor Fabric**; ops runbooks reference `zyvor-fabricd` where commands and paths matter.
 
 ---
 
@@ -86,7 +86,7 @@ Zyvor Fabric includes:
 └───────────────────────────────┘
 ```
 
-Machina consumes Zyvor Fabric APIs (`vmspawnd`) and eventually Kubernetes, Terraform, and metrics backends. It does **not** replace the Linux daemon — it is the intelligent desktop shell.
+Machina consumes Zyvor Fabric APIs (`zyvor-fabricd`) and eventually Kubernetes, Terraform, and metrics backends. It does **not** replace the Linux daemon — it is the intelligent desktop shell.
 
 ### Killer differentiator: Infrastructure Time Machine
 
@@ -120,16 +120,16 @@ Zyvor Fabric roadmap continues independently: HA, networking depth, operator mat
 ### Avoid
 
 - “VM spawn tool” / “VM manager” as primary positioning
-- Renaming `vmspawnd` in install docs, systemd units, or paths
+- Renaming `zyvor-fabricd` in install docs, systemd units, or paths
 - Conflating Machina (macOS) with Fabric (Linux) in the same install flow
 
 ### Technical docs pattern
 
 First mention in a section:
 
-> **Zyvor Fabric** (`vmspawnd`) provides …
+> **Zyvor Fabric** (`zyvor-fabricd`) provides …
 
-Then use the appropriate name for context (product in prose, `vmspawnd` in commands).
+Then use the appropriate name for context (product in prose, `zyvor-fabricd` in commands).
 
 ---
 

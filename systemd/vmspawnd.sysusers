@@ -1,3 +1,0 @@
-# systemd-sysusers configuration for vmspawnd
-# Creates vmspawnd system group for socket access
-g vmspawnd - -

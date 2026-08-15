@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# deploy — one command to ship vmspawnd to a remote host
+# deploy — one command to ship zyvor-fabricd to a remote host
 # ============================================================================
 #   ./scripts/deploy remote sus@212.8.252.194
 #   ./scripts/deploy remote sus 212.8.252.194 --quick
@@ -27,14 +27,14 @@ Usage:
 Flags (passed to deploy-remote.sh):
   --quick           skip system deps (rsync + build + install)
   --sync-only       rsync only (no install)
-  --remote-build    compile on server (cargo build -p vmspawnd -p vmctl)
+  --remote-build    compile on server (cargo build -p zyvor-fabricd -p zyvorctl)
   --remote-check    compile check on server (cargo check)
   --bind ADDR       API listen address (default 0.0.0.0 for remote IPv4)
   --open-firewall   open firewalld port 9095
-  --e2e             run vmspawnctl verify after deploy
+  --e2e             run zyvorctl verify after deploy
   --verify-apis     run scripts/audit-ux-apis.sh against deployed host
   --dry-run         show plan only
-  --uninstall       remove vmspawnd from remote
+  --uninstall       remove zyvor-fabricd from remote
   --cleanup         remove remote deploy tree after install
 
 Examples:

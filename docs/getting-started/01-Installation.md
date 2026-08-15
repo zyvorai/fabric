@@ -87,16 +87,16 @@ git clone <repository-url>
 cd zyvor-fabric
 
 # One-command deployment
-./vmspawnctl deploy
+./zyvorctl deploy
 ```
 
 This command will:
 - Install any missing system dependencies
 - Build the Rust workspace (40 crates)
-- Install binaries (`Zyvor Fabric`, `vmctl`) to `/usr/local/bin/`
+- Install binaries (`Zyvor Fabric`, `zyvorctl`) to `/usr/local/bin/`
 - Install the systemd service unit
 - Create configuration directories
-- Start the vmspawnd service
+- Start the zyvor-fabricd service
 - Run a post-install verification
 
 ---
@@ -145,7 +145,7 @@ sudo modprobe kvm_amd     # AMD
 ```bash
 git clone <repository-url>
 cd zyvor-fabric
-./vmspawnctl deploy
+./zyvorctl deploy
 ```
 
 ---
@@ -204,15 +204,15 @@ All tests must pass with zero warnings before deployment.
 sudo cp backend/target/release/Zyvor Fabric /usr/local/bin/
 
 # Install the CLI
-sudo cp backend/target/release/vmctl /usr/local/bin/
+sudo cp backend/target/release/zyvorctl /usr/local/bin/
 
 # Create config directory
-sudo mkdir -p /etc/vmspawnd
+sudo mkdir -p /etc/zyvor-fabricd
 
 # Create state directory
-sudo mkdir -p /var/lib/vmspawnd/images
-sudo mkdir -p /var/lib/vmspawnd/storage
-sudo mkdir -p /var/lib/vmspawnd/cloud-init
+sudo mkdir -p /var/lib/zyvor-fabricd/images
+sudo mkdir -p /var/lib/zyvor-fabricd/storage
+sudo mkdir -p /var/lib/zyvor-fabricd/cloud-init
 ```
 
 ### 6. Install the systemd Service
@@ -269,17 +269,17 @@ A successful response returns a JSON object with an empty VM list.
 On first start, Zyvor Fabric generates a random admin password:
 
 ```bash
-# Using vmspawnctl
-./vmspawnctl password
+# Using zyvorctl
+./zyvorctl password
 
 # Or read directly
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```
 
 ### 4. Run the Smoke Test
 
 ```bash
-./vmspawnctl verify
+./zyvorctl verify
 ```
 
 This runs automated checks against the API, authentication, VM CRUD operations, and backup functionality.
@@ -287,7 +287,7 @@ This runs automated checks against the API, authentication, VM CRUD operations, 
 ### 5. Run the Health Check
 
 ```bash
-./vmspawnctl health
+./zyvorctl health
 ```
 
 This performs a deep check of API availability, disk space, database integrity, credential files, systemd timers, memory, and KVM support.
@@ -328,8 +328,8 @@ sudo usermod -aG kvm $USER
 Change the listen address in the config file:
 
 ```bash
-sudo mkdir -p /etc/vmspawnd
-sudo tee /etc/vmspawnd/vmspawnd.toml > /dev/null << 'EOF'
+sudo mkdir -p /etc/zyvor-fabricd
+sudo tee /etc/zyvor-fabricd/zyvor-fabricd.toml > /dev/null << 'EOF'
 [daemon]
 listen = "127.0.0.1:8080"
 EOF

@@ -4,7 +4,7 @@
 
 //! Thin REST client for [Ephemera](https://github.com/hypersdk/ephemera)'s
 //! `/v1/vms...` API — the disposable-VM control plane that is replacing
-//! systemd-machined/systemd-vmspawn as vmspawnd's VM lifecycle backend.
+//! systemd-machined/systemd-vmspawn as zyvor-fabricd's VM lifecycle backend.
 //!
 //! This crate only wraps the wire protocol (request/response types + HTTP
 //! calls); it does not implement `driver-core`'s `VMDriver` trait family —

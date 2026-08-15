@@ -16,7 +16,7 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 ### Story 1 — Create VM via CLI
 
-**As Alex** (Private Cloud Admin), I want full vmspawn lifecycle from vmctl, **so that** I deliver reliable outcomes.
+**As Alex** (Private Cloud Admin), I want full vmspawn lifecycle from zyvorctl, **so that** I deliver reliable outcomes.
 
 | Criterion | Notes |
 |-----------|-------|

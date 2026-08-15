@@ -237,8 +237,8 @@ pub enum SiteRecoveryError {
 const ALLOWED_SCRIPT_PREFIXES: &[&str] = &[
     "/usr/local/bin/",
     "/usr/local/sbin/",
-    "/var/lib/vmspawnd/scripts/",
-    "/opt/vmspawnd/scripts/",
+    "/var/lib/zyvor-fabricd/scripts/",
+    "/opt/zyvor-fabricd/scripts/",
 ];
 
 /// Validate that a script command starts with an allowed absolute path.

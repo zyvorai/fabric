@@ -13,7 +13,7 @@ use crate::models::{CompiledWgInterface, CompiledWgPeer};
 const DEFAULT_CONFIG_DIR: &str = "/etc/systemd/network";
 
 /// File prefix for vpn-mesh managed files.
-const FILE_PREFIX: &str = "50-vmspawnd-wg-";
+const FILE_PREFIX: &str = "50-zyvor-fabricd-wg-";
 
 /// Manages WireGuard interfaces via systemd-networkd .netdev/.network files.
 pub struct WireguardEnforcer {
@@ -389,8 +389,8 @@ mod tests {
         enforcer.write_netdev(&iface).unwrap();
         enforcer.write_network(&iface).unwrap();
 
-        let netdev_path = dir.path().join("50-vmspawnd-wg-wg0.netdev");
-        let network_path = dir.path().join("50-vmspawnd-wg-wg0.network");
+        let netdev_path = dir.path().join("50-zyvor-fabricd-wg-wg0.netdev");
+        let network_path = dir.path().join("50-zyvor-fabricd-wg-wg0.network");
 
         assert!(netdev_path.exists());
         assert!(network_path.exists());
@@ -414,8 +414,8 @@ mod tests {
         enforcer.write_netdev(&iface).unwrap();
         enforcer.write_network(&iface).unwrap();
 
-        let netdev_path = dir.path().join("50-vmspawnd-wg-wg0.netdev");
-        let network_path = dir.path().join("50-vmspawnd-wg-wg0.network");
+        let netdev_path = dir.path().join("50-zyvor-fabricd-wg-wg0.netdev");
+        let network_path = dir.path().join("50-zyvor-fabricd-wg-wg0.network");
         assert!(netdev_path.exists());
         assert!(network_path.exists());
 
@@ -441,11 +441,11 @@ mod tests {
         enforcer.remove_stale_files(&["wg0"]).unwrap();
 
         // wg0 files should remain
-        assert!(dir.path().join("50-vmspawnd-wg-wg0.netdev").exists());
-        assert!(dir.path().join("50-vmspawnd-wg-wg0.network").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-wg-wg0.netdev").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-wg-wg0.network").exists());
         // wg1 files should be gone
-        assert!(!dir.path().join("50-vmspawnd-wg-wg1.netdev").exists());
-        assert!(!dir.path().join("50-vmspawnd-wg-wg1.network").exists());
+        assert!(!dir.path().join("50-zyvor-fabricd-wg-wg1.netdev").exists());
+        assert!(!dir.path().join("50-zyvor-fabricd-wg-wg1.network").exists());
     }
 
     #[test]

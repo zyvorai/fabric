@@ -30,7 +30,7 @@ import {
   Play,
 } from 'lucide-react'
 
-const SAVED_LOGIN_KEY = 'vmspawnd-saved-login'
+const SAVED_LOGIN_KEY = 'zyvor-fabricd-saved-login'
 
 const LOGIN_ORBS = [
   { size: 340, top: '4%', left: '6%', delay: '0s', duration: '11s', hue: 'blue' as const },

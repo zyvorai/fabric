@@ -28,7 +28,7 @@ function parseStoredTheme(raw: string | null): AppTheme {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>(() =>
-    parseStoredTheme(typeof localStorage !== 'undefined' ? localStorage.getItem('vmspawnd-theme') : null),
+    parseStoredTheme(typeof localStorage !== 'undefined' ? localStorage.getItem('zyvor-fabricd-theme') : null),
   )
 
   const setTheme = useCallback((t: AppTheme) => {
@@ -36,7 +36,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('vmspawnd-theme', theme)
+    localStorage.setItem('zyvor-fabricd-theme', theme)
     const root = document.documentElement
     root.classList.remove('steel-theme', 'aurora-theme')
     if (theme === 'steel') {

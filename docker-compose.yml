@@ -1,11 +1,11 @@
 services:
-  vmspawnd:
+  zyvor-fabricd:
     build: .
-    container_name: vmspawnd
+    container_name: zyvor-fabricd
     ports:
       - "9080:8080"
     volumes:
-      - vmspawnd-data:/var/lib/vmspawnd
+      - zyvor-fabricd-data:/var/lib/zyvor-fabricd
     cap_add:
       - SYS_ADMIN
       - NET_ADMIN
@@ -18,4 +18,4 @@ services:
       retries: 3
 
 volumes:
-  vmspawnd-data:
+  zyvor-fabricd-data:

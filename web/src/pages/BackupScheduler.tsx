@@ -38,7 +38,7 @@ export default function BackupScheduler() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [preset, setPreset] = useState<Preset>('daily2am')
   const [customCron, setCustomCron] = useState('0 2 * * *')
-  const [outputDir, setOutputDir] = useState('/var/lib/vmspawnd/backups')
+  const [outputDir, setOutputDir] = useState('/var/lib/zyvor-fabricd/backups')
   const [retention, setRetention] = useState(7)
   const [format, setFormat] = useState('qcow2')
   const [compression, setCompression] = useState(true)

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
-use vmspawnd_cgroup::CgroupManager;
+use zyvor_fabric_cgroup::CgroupManager;
 
 #[derive(Debug, Error)]
 pub enum MemoryError {
@@ -29,17 +29,17 @@ pub enum MemoryError {
     HugepageAllocationFailed(String),
 }
 
-impl From<vmspawnd_cgroup::CgroupError> for MemoryError {
-    fn from(e: vmspawnd_cgroup::CgroupError) -> Self {
+impl From<zyvor_fabric_cgroup::CgroupError> for MemoryError {
+    fn from(e: zyvor_fabric_cgroup::CgroupError) -> Self {
         match &e {
-            vmspawnd_cgroup::CgroupError::NotFound(_) => MemoryError::CgroupNotFound(e.to_string()),
-            vmspawnd_cgroup::CgroupError::ReadFailed { .. } => {
+            zyvor_fabric_cgroup::CgroupError::NotFound(_) => MemoryError::CgroupNotFound(e.to_string()),
+            zyvor_fabric_cgroup::CgroupError::ReadFailed { .. } => {
                 MemoryError::ReadStatsFailed(e.to_string())
             }
-            vmspawnd_cgroup::CgroupError::WriteFailed { .. } => {
+            zyvor_fabric_cgroup::CgroupError::WriteFailed { .. } => {
                 MemoryError::SetLimitFailed(e.to_string())
             }
-            vmspawnd_cgroup::CgroupError::ParseError { .. } => {
+            zyvor_fabric_cgroup::CgroupError::ParseError { .. } => {
                 MemoryError::ParseError(e.to_string())
             }
             _ => MemoryError::SetLimitFailed(e.to_string()),

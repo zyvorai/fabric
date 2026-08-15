@@ -508,7 +508,7 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2 font-mono"
-                placeholder="/var/lib/vmspawnd/storage"
+                placeholder="/var/lib/zyvor-fabricd/storage"
                 required
               />
             </div>

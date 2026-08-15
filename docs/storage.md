@@ -18,12 +18,12 @@ Zyvor Fabric supports multiple storage backends and provides a unified API for v
 ### Configuration
 
 ```toml
-# /etc/vmspawnd/vmspawnd.toml
+# /etc/zyvor-fabricd/zyvor-fabricd.toml
 
 # Local (default)
 [storage]
 backend = "local"
-path = "/var/lib/vmspawnd/volumes"
+path = "/var/lib/zyvor-fabricd/volumes"
 
 # NFS
 [storage]
@@ -105,27 +105,27 @@ curl -X POST http://localhost:9095/api/volumes/data-volume/restore \
 
 ## Ceph/RBD
 
-### CLI (`vmctl`)
+### CLI (`zyvorctl`)
 
 ```bash
 # Create a Ceph storage pool
-vmctl ceph create my-pool \
+zyvorctl ceph create my-pool \
   --monitors=10.0.0.1,10.0.0.2,10.0.0.3 \
   --pool=rbd \
   --user=admin \
   --keyring=/etc/ceph/ceph.client.admin.keyring
 
 # Health and stats
-vmctl ceph health my-pool
-vmctl ceph stats my-pool
+zyvorctl ceph health my-pool
+zyvorctl ceph stats my-pool
 
 # RBD image management
-vmctl ceph images my-pool
-vmctl ceph create-image my-pool vm-disk-01 --size=10240
-vmctl ceph delete-image my-pool vm-disk-01
+zyvorctl ceph images my-pool
+zyvorctl ceph create-image my-pool vm-disk-01 --size=10240
+zyvorctl ceph delete-image my-pool vm-disk-01
 
 # Export as YAML
-vmctl ceph pools -o yaml
+zyvorctl ceph pools -o yaml
 ```
 
 ### API

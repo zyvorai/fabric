@@ -7,7 +7,7 @@ use std::process::Command;
 
 use crate::nftables::NftManager;
 
-/// NAT rule discovered from the host nftables ruleset (not vmspawnd-managed).
+/// NAT rule discovered from the host nftables ruleset (not zyvor-fabricd-managed).
 #[derive(Debug, Clone)]
 pub struct DiscoveredHostNatRule {
     pub key: String,

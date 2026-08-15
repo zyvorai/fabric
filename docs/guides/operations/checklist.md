@@ -45,7 +45,7 @@ Complete these items before deploying Zyvor Fabric to production.
 - [ ] **JWT secret** -- Strong random secret configured (at least 32 characters)
 - [ ] **TLS termination** -- Reverse proxy (nginx, caddy) with TLS in front of Zyvor Fabric for production use
 - [ ] **System users** -- Administrative user accounts created with appropriate group memberships (wheel/sudo for admin role)
-- [ ] **File permissions** -- `/var/lib/vmspawnd/` owned by the vmspawnd service user with restricted permissions
+- [ ] **File permissions** -- `/var/lib/zyvor-fabricd/` owned by the zyvor-fabricd service user with restricted permissions
 
 ---
 
@@ -88,7 +88,7 @@ curl -s -X POST http://localhost:3000/api/storage/pools/local \
   -H "Content-Type: application/json" \
   -d '{
     "name": "default",
-    "path": "/var/lib/vmspawnd/images",
+    "path": "/var/lib/zyvor-fabricd/images",
     "auto_start": true
   }' | jq
 
@@ -231,7 +231,7 @@ curl -N http://localhost:3000/api/events/stream \
 
 ### Day 1 Validation Checklist
 
-- [ ] vmspawnd service is running and healthy
+- [ ] zyvor-fabricd service is running and healthy
 - [ ] Authentication works with expected role assignments
 - [ ] At least one storage pool is configured
 - [ ] Network bridge is operational

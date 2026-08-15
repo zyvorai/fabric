@@ -123,8 +123,8 @@ cargo build --release
 
 The debug build produces binaries in `target/debug/`:
 - `Zyvor Fabric` -- the main daemon
-- `vmctl` -- the CLI client
-- `vmctl-tui` -- the terminal UI client
+- `zyvorctl` -- the CLI client
+- `zyvorctl-tui` -- the terminal UI client
 
 The release build produces optimized binaries in `target/release/`.
 
@@ -162,7 +162,7 @@ cd backend
 cargo build -p vm-model
 cargo build -p state-store
 cargo build -p security
-cargo build -p vmspawn-driver
+cargo build -p zyvor-fabric-vm-driver
 cargo build -p Zyvor Fabric-driver-core
 cargo build -p networking
 cargo build -p network-policy
@@ -191,7 +191,7 @@ security (standalone)
 Zyvor Fabric-driver-core (depends on vm-model)
     |
     v
-vmspawn-driver (depends on vm-model)
+zyvor-fabric-vm-driver (depends on vm-model)
     |
     v
 Zyvor Fabric (depends on everything)
@@ -330,8 +330,8 @@ npm run dev
 
 ### Configuration for Development
 
-Create `backend/configs/vmspawnd.toml` (the daemon checks this
-path before `/etc/vmspawnd/vmspawnd.toml`):
+Create `backend/configs/zyvor-fabricd.toml` (the daemon checks this
+path before `/etc/zyvor-fabricd/zyvor-fabricd.toml`):
 
 ```toml
 [daemon]

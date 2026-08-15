@@ -1,8 +1,8 @@
 #!/bin/bash
 # ============================================================================
-# selftest.sh — Post-install verification for vmspawnd
+# selftest.sh — Post-install verification for zyvor-fabricd
 # ============================================================================
-# Checks that vmspawnd is correctly installed and running.
+# Checks that zyvor-fabricd is correctly installed and running.
 #
 # Usage:
 #   ./scripts/selftest.sh              # Run all checks
@@ -15,7 +15,7 @@ PASS=0
 FAIL=0
 WARN=0
 QUICK=false
-API_PORT="${VMSPAWND_PORT:-9095}"
+API_PORT="${ZYVOR_FABRICD_PORT:-9095}"
 
 [[ "${1:-}" == "--quick" ]] && QUICK=true
 
@@ -26,13 +26,13 @@ section() { echo ""; echo "  ── $* ──"; }
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║     🩺 vmspawnd Self-Test                        ║"
+echo "  ║     🩺 zyvor-fabricd Self-Test                        ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo ""
 
 # ── Binaries ──
 section "Binaries"
-for bin in vmspawnd vmctl vmctl-tui; do
+for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
     if command -v "$bin" &>/dev/null; then
         ver=$("$bin" --version 2>/dev/null || echo "installed")
         pass "$bin: $ver"
@@ -53,21 +53,21 @@ done
 
 # ── Configuration ──
 section "Configuration"
-if [[ -f /etc/vmspawnd/vmspawnd.toml ]]; then
-    pass "Config: /etc/vmspawnd/vmspawnd.toml"
+if [[ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]]; then
+    pass "Config: /etc/zyvor-fabricd/zyvor-fabricd.toml"
 else
-    fail "Config: /etc/vmspawnd/vmspawnd.toml not found"
+    fail "Config: /etc/zyvor-fabricd/zyvor-fabricd.toml not found"
 fi
 
-if [[ -f /etc/vmspawnd/vmspawnd.env ]]; then
-    pass "Environment: /etc/vmspawnd/vmspawnd.env"
+if [[ -f /etc/zyvor-fabricd/zyvor-fabricd.env ]]; then
+    pass "Environment: /etc/zyvor-fabricd/zyvor-fabricd.env"
 else
-    warn "Environment: /etc/vmspawnd/vmspawnd.env not found (optional)"
+    warn "Environment: /etc/zyvor-fabricd/zyvor-fabricd.env not found (optional)"
 fi
 
 # ── Directories ──
 section "Directories"
-for dir in /var/lib/vmspawnd /var/lib/vmspawnd/images /var/log/vmspawnd; do
+for dir in /var/lib/zyvor-fabricd /var/lib/zyvor-fabricd/images /var/log/zyvor-fabricd; do
     if [[ -d "$dir" ]]; then
         pass "$dir ($(du -sh "$dir" 2>/dev/null | cut -f1 || echo 'exists'))"
     else
@@ -77,7 +77,7 @@ done
 
 # ── Systemd ──
 section "Systemd Services"
-for unit in vmspawnd.service vmspawnd-backup.service vmspawnd-cleanup.service; do
+for unit in zyvor-fabricd.service zyvor-fabricd-backup.service zyvor-fabricd-cleanup.service; do
     if systemctl list-unit-files "$unit" &>/dev/null 2>&1; then
         if systemctl is-active "$unit" &>/dev/null; then
             pass "$unit: running"
@@ -111,19 +111,19 @@ fi
 
 # ── Web Dashboard ──
 section "Web Dashboard"
-for dir in /usr/share/vmspawnd/web /usr/local/share/vmspawnd/web; do
+for dir in /usr/share/zyvor-fabricd/web /usr/local/share/zyvor-fabricd/web; do
     if [[ -d "$dir" ]] && [[ -f "$dir/index.html" ]]; then
         FILE_COUNT=$(find "$dir" -type f | wc -l)
         pass "Dashboard: $dir ($FILE_COUNT files)"
         break
     fi
 done
-if [[ ! -d /usr/share/vmspawnd/web ]] && [[ ! -d /usr/local/share/vmspawnd/web ]]; then
+if [[ ! -d /usr/share/zyvor-fabricd/web ]] && [[ ! -d /usr/local/share/zyvor-fabricd/web ]]; then
     warn "Dashboard: not deployed"
 fi
 
 # ── API Tests ──
-if ! $QUICK && systemctl is-active vmspawnd &>/dev/null; then
+if ! $QUICK && systemctl is-active zyvor-fabricd &>/dev/null; then
     section "API Health"
 
     # Health endpoint
@@ -149,7 +149,7 @@ if ! $QUICK && systemctl is-active vmspawnd &>/dev/null; then
     fi
 elif ! $QUICK; then
     section "API Health"
-    warn "Skipped — vmspawnd not running"
+    warn "Skipped — zyvor-fabricd not running"
 fi
 
 # ── Summary ──
@@ -161,8 +161,8 @@ echo ""
 
 if [[ $FAIL -gt 0 ]]; then
     echo "  Some checks failed. Run these to investigate:"
-    echo "    systemctl status vmspawnd"
-    echo "    journalctl -u vmspawnd -n 20"
+    echo "    systemctl status zyvor-fabricd"
+    echo "    journalctl -u zyvor-fabricd -n 20"
     echo ""
     exit 1
 elif [[ $WARN -gt 0 ]]; then
@@ -170,7 +170,7 @@ elif [[ $WARN -gt 0 ]]; then
     echo ""
     exit 0
 else
-    echo "  All checks passed! vmspawnd is fully operational."
+    echo "  All checks passed! zyvor-fabricd is fully operational."
     echo ""
     exit 0
 fi

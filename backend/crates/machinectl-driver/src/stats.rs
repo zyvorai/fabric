@@ -5,8 +5,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use vm_model::{PressureRecord, VMMetrics, VMPressure};
-use vmspawnd_cgroup::CgroupPath;
-use vmspawnd_driver_core::ResourceStatsDriver;
+use zyvor_fabric_cgroup::CgroupPath;
+use zyvor_fabric_driver_core::ResourceStatsDriver;
 
 use crate::MachinectlDriver;
 
@@ -33,9 +33,9 @@ impl ResourceStatsDriver for MachinectlDriver {
         let cgroup = CgroupPath::for_machine(name);
         let path = cgroup.path().to_path_buf();
 
-        let cpu = vmspawnd_cgroup::CpuController::new(path.clone());
-        let mem = vmspawnd_cgroup::MemoryController::new(path.clone());
-        let io = vmspawnd_cgroup::IoController::new(path);
+        let cpu = zyvor_fabric_cgroup::CpuController::new(path.clone());
+        let mem = zyvor_fabric_cgroup::MemoryController::new(path.clone());
+        let io = zyvor_fabric_cgroup::IoController::new(path);
 
         let cpu_pressure = cpu.get_pressure().ok();
         let mem_pressure = mem.get_pressure().ok();
@@ -55,7 +55,7 @@ impl ResourceStatsDriver for MachinectlDriver {
     }
 }
 
-fn to_pressure_record(p: &vmspawnd_cgroup::PressureRecord) -> PressureRecord {
+fn to_pressure_record(p: &zyvor_fabric_cgroup::PressureRecord) -> PressureRecord {
     PressureRecord {
         avg10: p.avg10,
         avg60: p.avg60,
@@ -66,10 +66,10 @@ fn to_pressure_record(p: &vmspawnd_cgroup::PressureRecord) -> PressureRecord {
 
 /// Read CPU usage percentage from cgroup v2 cpu.stat.
 async fn read_cpu_usage(cgroup: &CgroupPath) -> Result<f64> {
-    let cpu = vmspawnd_cgroup::CpuController::new(cgroup.path().to_path_buf());
+    let cpu = zyvor_fabric_cgroup::CpuController::new(cgroup.path().to_path_buf());
     let stat = cpu.get_stat()?;
 
-    let cpuset = vmspawnd_cgroup::CpusetController::new(cgroup.path().to_path_buf());
+    let cpuset = zyvor_fabric_cgroup::CpusetController::new(cgroup.path().to_path_buf());
     let num_cpus = cpuset
         .get_cpus_effective()
         .map(|cpus| cpus.len() as u32)
@@ -99,12 +99,12 @@ async fn read_cpu_usage(cgroup: &CgroupPath) -> Result<f64> {
 }
 
 fn read_memory_usage(cgroup: &CgroupPath) -> Result<u64> {
-    let mem = vmspawnd_cgroup::MemoryController::new(cgroup.path().to_path_buf());
+    let mem = zyvor_fabric_cgroup::MemoryController::new(cgroup.path().to_path_buf());
     Ok(mem.get_current()?)
 }
 
 fn read_disk_io(cgroup: &CgroupPath) -> Result<(u64, u64)> {
-    let io = vmspawnd_cgroup::IoController::new(cgroup.path().to_path_buf());
+    let io = zyvor_fabric_cgroup::IoController::new(cgroup.path().to_path_buf());
     let stats = match io.get_stat() {
         Ok(s) => s,
         Err(_) => return Ok((0, 0)),

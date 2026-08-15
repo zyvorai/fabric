@@ -3,7 +3,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'vmspawnd'
+  - job_name: 'zyvor-fabricd'
     static_configs:
       - targets: ['localhost:9095']
     metrics_path: '/metrics'

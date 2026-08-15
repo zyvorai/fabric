@@ -270,7 +270,7 @@ dashboard, Kubernetes operator, Terraform provider</li>
 <li><strong>Enterprise features</strong> — HA clustering, live
 migration, GPU passthrough, backup/restore, network policies</li>
 </ul>
-<pre><code>sudo systemctl enable --now vmspawnd
+<pre><code>sudo systemctl enable --now zyvor-fabricd
 # That&#39;s it. Platform is running.</code></pre>
 <hr />
 <h2 id="key-differentiators">Key Differentiators</h2>
@@ -374,7 +374,7 @@ backup</strong></li>
 snapshot</li>
 <li>Templates for rapid deployment</li>
 <li>Declarative config via YAML
-(<code>vmctl apply -f config.yaml</code>)</li>
+(<code>zyvorctl apply -f config.yaml</code>)</li>
 <li>Multiple disk formats: qcow2, raw, vmdk, vdi</li>
 <li><strong>VM import</strong> from VMDK, VDI, VHD (auto-convert to
 qcow2)</li>
@@ -469,16 +469,16 @@ bulk)</li>
 timer (events, audit logs, webhook deliveries, history)</li>
 <li><strong>Backup configuration</strong> via <code>[backup]</code>
 section in config file or
-<code>VMSPAWND_BACKUP_DIR</code>/<code>VMSPAWND_BACKUP_RETAIN</code>/<code>VMSPAWND_BACKUP_TYPE</code>
+<code>ZYVOR_FABRICD_BACKUP_DIR</code>/<code>ZYVOR_FABRICD_BACKUP_RETAIN</code>/<code>ZYVOR_FABRICD_BACKUP_TYPE</code>
 env vars</li>
 <li><strong>Post-install auto-verify</strong> — smoke test runs
 automatically after deploy/reinstall (API, auth, VM CRUD, backups)</li>
 <li><strong>Deep health check</strong> — API, disk space, DB integrity,
 credentials, timers, memory, KVM</li>
 <li><strong>TLS certificate generation</strong> — self-signed certs with
-SAN via <code>vmspawnctl tls</code></li>
+SAN via <code>zyvorctl tls</code></li>
 <li><strong>Shell completions</strong> — Bash tab completion for
-<code>vmctl</code> and <code>vmspawnctl</code></li>
+<code>zyvorctl</code> and <code>zyvorctl</code></li>
 <li>Resource quotas, pools, and datacenter abstractions</li>
 <li><strong>Database schema migrations</strong> with version
 tracking</li>
@@ -503,16 +503,16 @@ cutover</li>
 </ul>
 <hr />
 <h2 id="management-interfaces">Management Interfaces</h2>
-<h3 id="cli-vmctl">CLI (<code>vmctl</code>)</h3>
+<h3 id="cli-zyvorctl">CLI (<code>zyvorctl</code>)</h3>
 <p>Scriptable command-line tool with JSON/YAML/table output:</p>
 <div class="sourceCode" id="cb2"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> list <span class="at">-o</span> json</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> create myvm <span class="at">--image</span><span class="op">=</span>ubuntu.qcow2 <span class="at">--cpus</span><span class="op">=</span>4 <span class="at">--memory</span><span class="op">=</span>4G</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> start myvm</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> apply <span class="at">-f</span> infrastructure.yaml</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> policy list</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> ceph health my-pool</span></code></pre></div>
-<h3 id="terminal-ui-vmctl-tui">Terminal UI (<code>vmctl-tui</code>)</h3>
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> list <span class="at">-o</span> json</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> create myvm <span class="at">--image</span><span class="op">=</span>ubuntu.qcow2 <span class="at">--cpus</span><span class="op">=</span>4 <span class="at">--memory</span><span class="op">=</span>4G</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> start myvm</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> apply <span class="at">-f</span> infrastructure.yaml</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> policy list</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> ceph health my-pool</span></code></pre></div>
+<h3 id="terminal-ui-zyvorctl-tui">Terminal UI (<code>zyvorctl-tui</code>)</h3>
 <p>k9s-style dashboard with 8 views, vim keybindings, sparkline graphs,
 and live API data. Per-VM actions: <code>s</code> start, <code>t</code>
 stop, <code>r</code> restart, <code>b</code> backup, <code>d</code>
@@ -536,7 +536,7 @@ class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="dv">4096</span></span></code></pre></div>
 <h3 id="terraform-provider">Terraform Provider</h3>
 <p>Declarative VM provisioning with full plan/apply workflow:</p>
-<pre class="hcl"><code>resource &quot;vmspawnd_vm&quot; &quot;web&quot; {
+<pre class="hcl"><code>resource &quot;zyvor_fabric_vm&quot; &quot;web&quot; {
   name   = &quot;web-server&quot;
   image  = &quot;ubuntu-22.04.qcow2&quot;
   cpus   = 4
@@ -545,14 +545,14 @@ class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="
 <hr />
 <h2 id="architecture">Architecture</h2>
 <pre><code>                    +-----------+    +-----------+    +----------+
-                    |   vmctl   |    | vmctl-tui |    |  Web UI  |
+                    |   zyvorctl   |    | zyvorctl-tui |    |  Web UI  |
                     |   (CLI)   |    |   (TUI)   |    | (React)  |
                     +-----+-----+    +-----+-----+    +----+-----+
                           |                |               |
                 +---------+----------+     |      +--------+
                 |         |          |     |      |
            +----v----+   |   +------v-----v------v-------+
-           |   K8s   |   |   |       vmspawnd daemon      |
+           |   K8s   |   |   |       zyvor-fabricd daemon      |
            |Operator |   |   |   REST API + WebSocket      |
            +---------+   |   +---+----+----+----+----+----+
                           |       |    |    |    |    |
@@ -577,7 +577,7 @@ cluster</p>
 <h3 id="kubernetes-managed">Kubernetes-Managed</h3>
 <p>Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as
 CRDs alongside containerized workloads.</p>
-<p><strong>Requirements:</strong> Kubernetes cluster with vmspawnd
+<p><strong>Requirements:</strong> Kubernetes cluster with zyvor-fabricd
 operator deployed</p>
 <hr />
 <h2 id="comparison">Comparison</h2>
@@ -859,55 +859,55 @@ operator deployed</p>
 <h3 id="one-command-deployment">One-Command Deployment</h3>
 <div class="sourceCode" id="cb6"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Deploy everything (auto-sudo — no manual sudo needed)</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> deploy</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> deploy</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># That&#39;s it. Zyvor Fabric is running.</span></span></code></pre></div>
 <h3 id="step-by-step">Step-by-Step</h3>
 <div class="sourceCode" id="cb7"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Install dependencies (auto-sudo)</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> deps</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> deps</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Build</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> build</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> build</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Run tests</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> test</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> test</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Install and start (auto-sudo)</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> install</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> start</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> install</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> start</span>
 <span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Read admin password</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> password</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> password</span>
 <span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Run interactive demo</span></span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> demo</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> demo</span>
 <span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Create your first VM</span></span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> create myvm <span class="at">--image</span><span class="op">=</span>/path/to/image.qcow2 <span class="at">--cpus</span><span class="op">=</span>4 <span class="at">--memory</span><span class="op">=</span>4096</span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="ex">vmctl</span> start myvm</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> create myvm <span class="at">--image</span><span class="op">=</span>/path/to/image.qcow2 <span class="at">--cpus</span><span class="op">=</span>4 <span class="at">--memory</span><span class="op">=</span>4096</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> start myvm</span>
 <span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Open web dashboard</span></span>
 <span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="ex">open</span> http://localhost:9095</span></code></pre></div>
 <h3 id="management-commands">Management Commands</h3>
 <div class="sourceCode" id="cb8"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> status      <span class="co"># Check service status</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> verify      <span class="co"># Post-install smoke test (API, auth, VM CRUD, backups)</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> health      <span class="co"># Deep health check (disk, DB, timers, resources)</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> logs        <span class="co"># Follow logs</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> restart     <span class="co"># Restart service (auto-sudo)</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> reinstall   <span class="co"># Rebuild + reinstall + auto-verify (auto-sudo)</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> upgrade     <span class="co"># Git pull + reinstall (auto-sudo)</span></span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> uninstall   <span class="co"># Remove everything (auto-sudo)</span></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> doctor      <span class="co"># System readiness check</span></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> tls         <span class="co"># Generate self-signed TLS certificate</span></span></code></pre></div>
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> status      <span class="co"># Check service status</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> verify      <span class="co"># Post-install smoke test (API, auth, VM CRUD, backups)</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> health      <span class="co"># Deep health check (disk, DB, timers, resources)</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> logs        <span class="co"># Follow logs</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> restart     <span class="co"># Restart service (auto-sudo)</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> reinstall   <span class="co"># Rebuild + reinstall + auto-verify (auto-sudo)</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> upgrade     <span class="co"># Git pull + reinstall (auto-sudo)</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> uninstall   <span class="co"># Remove everything (auto-sudo)</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> doctor      <span class="co"># System readiness check</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> tls         <span class="co"># Generate self-signed TLS certificate</span></span></code></pre></div>
 <h3 id="backup-commands">Backup Commands</h3>
 <div class="sourceCode" id="cb9"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup now      <span class="co"># Run backup immediately</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup enable   <span class="co"># Enable daily backup timer (2:00 AM)</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup disable  <span class="co"># Disable backup timer</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup status   <span class="co"># Show timer state + storage info</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> backup logs     <span class="co"># Follow backup logs</span></span></code></pre></div>
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> backup now      <span class="co"># Run backup immediately</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> backup enable   <span class="co"># Enable daily backup timer (2:00 AM)</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> backup disable  <span class="co"># Disable backup timer</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> backup status   <span class="co"># Show timer state + storage info</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> backup logs     <span class="co"># Follow backup logs</span></span></code></pre></div>
 <hr />
 <p><em>For technical details, see the <a
 href="architecture.md">Architecture Guide</a>, <a href="api.md">API

@@ -79,7 +79,7 @@ which systemd-vmspawn
 systemctl status systemd-machined
 
 # 5. Create the Zyvor Fabric system user (optional, for non-root operation)
-sudo useradd --system --home-dir /var/lib/vmspawnd --shell /usr/sbin/nologin vmspawnd
+sudo useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin zyvor-fabricd
 
 # 6. Ensure the user has access to KVM
 sudo usermod -aG kvm Zyvor Fabric
@@ -108,19 +108,19 @@ cargo build --release
 
 # Install binaries
 sudo install -m 755 target/release/Zyvor Fabric /usr/local/bin/
-sudo install -m 755 target/release/vmctl /usr/local/bin/
+sudo install -m 755 target/release/zyvorctl /usr/local/bin/
 ```
 
 ### Directory Setup
 
 ```bash
 # Create required directories
-sudo mkdir -p /var/lib/vmspawnd/{images,storage,vms,snapshots,backups,cloud-init,certificates}
-sudo mkdir -p /etc/vmspawnd
+sudo mkdir -p /var/lib/zyvor-fabricd/{images,storage,vms,snapshots,backups,cloud-init,certificates}
+sudo mkdir -p /etc/zyvor-fabricd
 sudo mkdir -p /var/log/Zyvor Fabric
 
 # Set ownership (if running as Zyvor Fabric user)
-sudo chown -R vmspawnd:vmspawnd /var/lib/vmspawnd
+sudo chown -R zyvor-fabricd:zyvor-fabricd /var/lib/zyvor-fabricd
 sudo chown -R Zyvor Fabric:Zyvor Fabric /var/log/Zyvor Fabric
 ```
 
@@ -128,7 +128,7 @@ sudo chown -R Zyvor Fabric:Zyvor Fabric /var/log/Zyvor Fabric
 
 ## Configuration
 
-Create the main configuration file at `/etc/vmspawnd/vmspawnd.toml`:
+Create the main configuration file at `/etc/zyvor-fabricd/zyvor-fabricd.toml`:
 
 ```toml
 # =============================================================================
@@ -145,10 +145,10 @@ cors_origins = ["https://Zyvor Fabric.example.com"]
 
 [storage]
 # Root directory for all persistent state.
-path = "/var/lib/vmspawnd"
+path = "/var/lib/zyvor-fabricd"
 
 # Directory for VM disk images.
-image_path = "/var/lib/vmspawnd/images"
+image_path = "/var/lib/zyvor-fabricd/images"
 
 [network]
 # Default bridge for VM networking.
@@ -165,12 +165,12 @@ networkd_file_prefix = "50-Zyvor Fabric-"
 enabled = true
 
 # JWT signing secret. Set this explicitly or use the environment variable
-# VMSPAWND_JWT_SECRET. If not set, a random secret is generated and
-# persisted to /var/lib/vmspawnd/.jwt_secret.
+# ZYVOR_FABRICD_JWT_SECRET. If not set, a random secret is generated and
+# persisted to /var/lib/zyvor-fabricd/.jwt_secret.
 # jwt_secret = "your-secure-random-secret-here"
 
 # Path to the SQLite user database.
-db_path = "/var/lib/vmspawnd/auth.db"
+db_path = "/var/lib/zyvor-fabricd/auth.db"
 
 # JWT token expiration in hours.
 token_expiration_hours = 8
@@ -187,9 +187,9 @@ mode = "standalone"
 
 | Variable                  | Description                             | Default              |
 |---------------------------|-----------------------------------------|----------------------|
-| `VMSPAWND_JWT_SECRET`     | JWT signing secret                      | Auto-generated       |
-| `VMSPAWND_ADMIN_PASSWORD` | Initial admin user password             | Auto-generated       |
-| `VSPAWN_LOG_LEVEL`        | Log level (trace/debug/info/warn/error) | `info`               |
+| `ZYVOR_FABRICD_JWT_SECRET`     | JWT signing secret                      | Auto-generated       |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Initial admin user password             | Auto-generated       |
+| `ZYVOR_FABRICD_LOG_LEVEL`        | Log level (trace/debug/info/warn/error) | `info`               |
 | `RUST_LOG`                | Standard Rust log filter (fallback)     | `Zyvor Fabric=info`      |
 
 ---
@@ -200,13 +200,13 @@ mode = "standalone"
 
 On first startup with authentication enabled, Zyvor Fabric creates an `admin` user:
 
-1. If `VMSPAWND_ADMIN_PASSWORD` is set, that password is used
+1. If `ZYVOR_FABRICD_ADMIN_PASSWORD` is set, that password is used
 2. Otherwise, a random password is generated and written to
-   `/var/lib/vmspawnd/.admin_password` (mode 0600)
+   `/var/lib/zyvor-fabricd/.admin_password` (mode 0600)
 
 ```bash
 # Read the generated admin password
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 
 # Log in and obtain a JWT token
 curl -s http://127.0.0.1:9095/api/v1/auth/login \
@@ -336,7 +336,7 @@ journalctl -u Zyvor Fabric --since "1 hour ago" -o json > Zyvor Fabric-logs.json
 
 ### Log Levels
 
-Set the log level via the `VSPAWN_LOG_LEVEL` environment variable in the
+Set the log level via the `ZYVOR_FABRICD_LOG_LEVEL` environment variable in the
 systemd unit file or on the command line:
 
 | Level   | Description                                      |
@@ -368,14 +368,14 @@ curl -s http://127.0.0.1:9095/api/v1/audit/logs/export \
 ### Checklist
 
 - [ ] Enable authentication (`auth.enabled = true`)
-- [ ] Set an explicit JWT secret via `VMSPAWND_JWT_SECRET` environment variable
+- [ ] Set an explicit JWT secret via `ZYVOR_FABRICD_JWT_SECRET` environment variable
 - [ ] Reduce token expiration (`token_expiration_hours = 8` or less)
 - [ ] Bind to localhost only (`listen = "127.0.0.1:9095"`)
 - [ ] Use a reverse proxy with TLS for external access
 - [ ] Restrict CORS origins to your actual domain(s)
 - [ ] Create a dedicated system user for Zyvor Fabric
 - [ ] Apply the systemd sandboxing options from [systemd-service.md](systemd-service.md)
-- [ ] Set restrictive file permissions on `/var/lib/vmspawnd/` (mode 0700)
+- [ ] Set restrictive file permissions on `/var/lib/zyvor-fabricd/` (mode 0700)
 - [ ] Rotate the JWT secret periodically
 - [ ] Monitor audit logs for unauthorized access attempts
 - [ ] Enable resource quotas to prevent resource exhaustion
@@ -385,14 +385,14 @@ curl -s http://127.0.0.1:9095/api/v1/audit/logs/export \
 
 ```bash
 # Lock down the data directory
-sudo chmod 700 /var/lib/vmspawnd
-sudo chmod 600 /var/lib/vmspawnd/.jwt_secret
-sudo chmod 600 /var/lib/vmspawnd/.admin_password
-sudo chmod 600 /var/lib/vmspawnd/auth.db
+sudo chmod 700 /var/lib/zyvor-fabricd
+sudo chmod 600 /var/lib/zyvor-fabricd/.jwt_secret
+sudo chmod 600 /var/lib/zyvor-fabricd/.admin_password
+sudo chmod 600 /var/lib/zyvor-fabricd/auth.db
 
 # Lock down the config directory
-sudo chmod 750 /etc/vmspawnd
-sudo chmod 640 /etc/vmspawnd/vmspawnd.toml
+sudo chmod 750 /etc/zyvor-fabricd
+sudo chmod 640 /etc/zyvor-fabricd/zyvor-fabricd.toml
 ```
 
 ### Network Security
@@ -416,13 +416,13 @@ sudo nft add rule inet filter input tcp dport 9095 drop
 
 | Path                           | Priority | Contents                          |
 |--------------------------------|----------|-----------------------------------|
-| `/etc/vmspawnd/vmspawnd.toml`  | Critical | Daemon configuration              |
-| `/var/lib/vmspawnd/auth.db`    | Critical | User accounts and passwords       |
-| `/var/lib/vmspawnd/.jwt_secret`| Critical | JWT signing key                   |
-| `/var/lib/vmspawnd/vms/`       | High     | VM state metadata                 |
-| `/var/lib/vmspawnd/images/`    | High     | VM disk images (large)            |
-| `/var/lib/vmspawnd/snapshots/` | Medium   | Snapshot metadata                 |
-| `/var/lib/vmspawnd/certificates/` | Medium | TLS certificates and CAs       |
+| `/etc/zyvor-fabricd/zyvor-fabricd.toml`  | Critical | Daemon configuration              |
+| `/var/lib/zyvor-fabricd/auth.db`    | Critical | User accounts and passwords       |
+| `/var/lib/zyvor-fabricd/.jwt_secret`| Critical | JWT signing key                   |
+| `/var/lib/zyvor-fabricd/vms/`       | High     | VM state metadata                 |
+| `/var/lib/zyvor-fabricd/images/`    | High     | VM disk images (large)            |
+| `/var/lib/zyvor-fabricd/snapshots/` | Medium   | Snapshot metadata                 |
+| `/var/lib/zyvor-fabricd/certificates/` | Medium | TLS certificates and CAs       |
 | `/etc/systemd/network/50-Zyvor Fabric-*` | Low | Generated network configs (recreatable) |
 
 ### Backup Script Example
@@ -439,16 +439,16 @@ mkdir -p "$BACKUP_DIR"
 # sudo systemctl stop Zyvor Fabric
 
 # Back up configuration and state
-sudo tar czf "$BACKUP_DIR/config.tar.gz" /etc/vmspawnd/
+sudo tar czf "$BACKUP_DIR/config.tar.gz" /etc/zyvor-fabricd/
 sudo tar czf "$BACKUP_DIR/state.tar.gz" \
-  /var/lib/vmspawnd/auth.db \
-  /var/lib/vmspawnd/.jwt_secret \
-  /var/lib/vmspawnd/vms/ \
-  /var/lib/vmspawnd/snapshots/ \
-  /var/lib/vmspawnd/certificates/
+  /var/lib/zyvor-fabricd/auth.db \
+  /var/lib/zyvor-fabricd/.jwt_secret \
+  /var/lib/zyvor-fabricd/vms/ \
+  /var/lib/zyvor-fabricd/snapshots/ \
+  /var/lib/zyvor-fabricd/certificates/
 
 # Back up VM images (incremental with rsync)
-sudo rsync -a --delete /var/lib/vmspawnd/images/ "$BACKUP_DIR/images/"
+sudo rsync -a --delete /var/lib/zyvor-fabricd/images/ "$BACKUP_DIR/images/"
 
 # Restart if stopped
 # sudo systemctl start Zyvor Fabric
@@ -567,7 +567,7 @@ cd backend && cargo build --release
 sudo systemctl stop Zyvor Fabric
 
 # 3. Back up state
-sudo tar czf /tmp/vmspawnd-pre-upgrade.tar.gz /var/lib/vmspawnd/
+sudo tar czf /tmp/zyvor-fabricd-pre-upgrade.tar.gz /var/lib/zyvor-fabricd/
 
 # 4. Install new binary
 sudo install -m 755 target/release/Zyvor Fabric /usr/local/bin/
@@ -586,6 +586,6 @@ The SQLite user database requires minimal maintenance. To compact it:
 
 ```bash
 sudo systemctl stop Zyvor Fabric
-sudo sqlite3 /var/lib/vmspawnd/auth.db "VACUUM;"
+sudo sqlite3 /var/lib/zyvor-fabricd/auth.db "VACUUM;"
 sudo systemctl start Zyvor Fabric
 ```

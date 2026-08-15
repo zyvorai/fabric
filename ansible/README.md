@@ -8,7 +8,7 @@ Ansible collection for automating Zyvor Fabric virtual machine management. Provi
 ansible/
   plugins/
     modules/
-      vmspawnd_vm.py           # Create/delete/start/stop VMs
+      zyvor_fabric_vm.py           # Create/delete/start/stop VMs
       vmspawnd_vm_info.py      # Gather VM facts
       vmspawnd_snapshot.py     # Create/delete/revert snapshots
       vmspawnd_network.py      # Configure VM networking
@@ -32,9 +32,9 @@ ansible/
 
   tasks:
     - name: Create a web server VM
-      vmspawnd_vm:
+      zyvor_fabric_vm:
         name: web-server
-        image: /var/lib/vmspawnd/images/ubuntu-22.04.qcow2
+        image: /var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2
         cpus: 4
         memory: 4096
         state: started

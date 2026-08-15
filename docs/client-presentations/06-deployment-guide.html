@@ -160,7 +160,7 @@ systemctl --version</code></pre>
   <p class="subtitle">One config file, sensible defaults, environment variable overrides</p>
   <div class="two-col">
     <div>
-      <h3>Config File: <code>/etc/vmspawnd/vmspawnd.toml</code></h3>
+      <h3>Config File: <code>/etc/zyvor-fabricd/zyvor-fabricd.toml</code></h3>
       <pre><code># Core settings
 [server]
 listen = "0.0.0.0:9095"
@@ -174,33 +174,33 @@ session_timeout = "8h"
 # Storage
 [storage]
 default_pool = "local"
-image_dir = "/var/lib/vmspawnd/images"
+image_dir = "/var/lib/zyvor-fabricd/images"
 
 # Backup
 [backup]
-dir = "/var/lib/vmspawnd/backups"
+dir = "/var/lib/zyvor-fabricd/backups"
 retain = 7
 type = "full"
 
 # TLS (optional)
 [tls]
-cert = "/etc/vmspawnd/tls/cert.pem"
-key = "/etc/vmspawnd/tls/key.pem"</code></pre>
+cert = "/etc/zyvor-fabricd/tls/cert.pem"
+key = "/etc/zyvor-fabricd/tls/key.pem"</code></pre>
     </div>
     <div>
       <h3>Environment Variable Overrides</h3>
       <table>
         <tr><th>Variable</th><th>Purpose</th></tr>
-        <tr><td><code>VMSPAWND_LISTEN</code></td><td>Server bind address</td></tr>
-        <tr><td><code>VMSPAWND_BACKUP_DIR</code></td><td>Backup directory</td></tr>
-        <tr><td><code>VMSPAWND_BACKUP_RETAIN</code></td><td>Backup retention (days)</td></tr>
-        <tr><td><code>VMSPAWND_BACKUP_TYPE</code></td><td>Backup type (full/incremental)</td></tr>
+        <tr><td><code>ZYVOR_FABRICD_LISTEN</code></td><td>Server bind address</td></tr>
+        <tr><td><code>ZYVOR_FABRICD_BACKUP_DIR</code></td><td>Backup directory</td></tr>
+        <tr><td><code>ZYVOR_FABRICD_BACKUP_RETAIN</code></td><td>Backup retention (days)</td></tr>
+        <tr><td><code>ZYVOR_FABRICD_BACKUP_TYPE</code></td><td>Backup type (full/incremental)</td></tr>
       </table>
       <h3 style="margin-top: 20px;">Auto-Generated Files</h3>
       <ul>
-        <li><code>/etc/vmspawnd/jwt-secret</code> -- JWT signing key (0600)</li>
-        <li><code>/etc/vmspawnd/admin-password</code> -- Initial admin password (0600)</li>
-        <li><code>/var/lib/vmspawnd/</code> -- Data directory</li>
+        <li><code>/etc/zyvor-fabricd/jwt-secret</code> -- JWT signing key (0600)</li>
+        <li><code>/etc/zyvor-fabricd/admin-password</code> -- Initial admin password (0600)</li>
+        <li><code>/var/lib/zyvor-fabricd/</code> -- Data directory</li>
       </ul>
       <h3 style="margin-top: 20px;">File Permissions</h3>
       <ul>
@@ -219,34 +219,34 @@ key = "/etc/vmspawnd/tls/key.pem"</code></pre>
   <div class="step">
     <h3>Step 1: Deploy</h3>
     <pre><code># One-command deployment (handles deps, build, install, start)
-./vmspawnctl deploy</code></pre>
+./zyvorctl deploy</code></pre>
   </div>
   <div class="step">
     <h3>Step 2: Verify</h3>
     <pre><code># Post-install smoke test (API, auth, VM CRUD, backups)
-./vmspawnctl verify
+./zyvorctl verify
 
 # Deep health check (disk, DB, timers, resources, KVM)
-./vmspawnctl health</code></pre>
+./zyvorctl health</code></pre>
   </div>
   <div class="step">
     <h3>Step 3: Get Admin Credentials</h3>
     <pre><code># Read auto-generated admin password
-./vmspawnctl password</code></pre>
+./zyvorctl password</code></pre>
   </div>
   <div class="step">
     <h3>Step 4: Enable TLS (Recommended)</h3>
     <pre><code># Generate self-signed certificate
-./vmspawnctl tls
+./zyvorctl tls
 
 # Restart with TLS enabled
-./vmspawnctl restart</code></pre>
+./zyvorctl restart</code></pre>
   </div>
   <div class="step">
     <h3>Step 5: Create Your First VM</h3>
-    <pre><code>vmctl create test-vm --image=/path/to/ubuntu-24.04.qcow2 --cpus=2 --memory=2048
-vmctl start test-vm
-vmctl list</code></pre>
+    <pre><code>zyvorctl create test-vm --image=/path/to/ubuntu-24.04.qcow2 --cpus=2 --memory=2048
+zyvorctl start test-vm
+zyvorctl list</code></pre>
   </div>
 </div>
 
@@ -259,28 +259,28 @@ vmctl list</code></pre>
       <h3>Routine Operations</h3>
       <div class="step">
         <h3>Service Management</h3>
-        <pre><code>./vmspawnctl status    # Check service
-./vmspawnctl logs      # Follow logs
-./vmspawnctl restart   # Restart daemon</code></pre>
+        <pre><code>./zyvorctl status    # Check service
+./zyvorctl logs      # Follow logs
+./zyvorctl restart   # Restart daemon</code></pre>
       </div>
       <div class="step">
         <h3>Backup Management</h3>
-        <pre><code>./vmspawnctl backup enable   # Daily 2 AM
-./vmspawnctl backup status   # Check timer
-./vmspawnctl backup now      # Manual backup</code></pre>
+        <pre><code>./zyvorctl backup enable   # Daily 2 AM
+./zyvorctl backup status   # Check timer
+./zyvorctl backup now      # Manual backup</code></pre>
       </div>
       <div class="step">
         <h3>Upgrades</h3>
         <pre><code># Pull latest + rebuild + reinstall + verify
-./vmspawnctl upgrade</code></pre>
+./zyvorctl upgrade</code></pre>
       </div>
     </div>
     <div>
       <h3>Monitoring</h3>
       <div class="step">
         <h3>Health Checks</h3>
-        <pre><code>./vmspawnctl health    # Full system check
-./vmspawnctl doctor    # Readiness check</code></pre>
+        <pre><code>./zyvorctl health    # Full system check
+./zyvorctl doctor    # Readiness check</code></pre>
       </div>
       <div class="step">
         <h3>Prometheus Integration</h3>
@@ -353,20 +353,20 @@ scrape_configs:
   <p class="subtitle">One command. Five minutes. Production ready.</p>
   <div style="margin-top: 30px;">
     <pre style="display: inline-block; text-align: left;"><code># Deploy
-./vmspawnctl deploy
+./zyvorctl deploy
 
 # Verify
-./vmspawnctl verify
+./zyvorctl verify
 
 # Enable backups
-./vmspawnctl backup enable
+./zyvorctl backup enable
 
 # Enable TLS
-./vmspawnctl tls
+./zyvorctl tls
 
 # Create VMs
-vmctl create myvm --image=ubuntu-24.04.qcow2 --cpus=4 --memory=4096
-vmctl start myvm</code></pre>
+zyvorctl create myvm --image=ubuntu-24.04.qcow2 --cpus=4 --memory=4096
+zyvorctl start myvm</code></pre>
   </div>
   <div style="margin-top: 40px;">
     <span class="badge">5-Minute Deploy</span>

@@ -47,33 +47,33 @@ Access the web UI at `http://localhost:3000`
 
 ```bash
 # List VMs
-./backend/target/debug/vmctl list
-./backend/target/debug/vmctl list -o json      # JSON output
-./backend/target/debug/vmctl list -o yaml      # YAML output
+./backend/target/debug/zyvorctl list
+./backend/target/debug/zyvorctl list -o json      # JSON output
+./backend/target/debug/zyvorctl list -o yaml      # YAML output
 
 # Create a VM
-./backend/target/debug/vmctl create myvm \
+./backend/target/debug/zyvorctl create myvm \
   --image=/path/to/image.qcow2 \
   --cpus=2 \
   --memory=2048
 
 # Start a VM
-./backend/target/debug/vmctl start myvm
+./backend/target/debug/zyvorctl start myvm
 
 # Apply config from YAML file
-./backend/target/debug/vmctl apply -f vm.yaml
+./backend/target/debug/zyvorctl apply -f vm.yaml
 
 # Network security
-./backend/target/debug/vmctl policy list
-./backend/target/debug/vmctl firewall list
-./backend/target/debug/vmctl vpn tunnels
+./backend/target/debug/zyvorctl policy list
+./backend/target/debug/zyvorctl firewall list
+./backend/target/debug/zyvorctl vpn tunnels
 
 # Ceph storage
-./backend/target/debug/vmctl ceph create my-pool --monitors=10.0.0.1 --pool=rbd
-./backend/target/debug/vmctl ceph health my-pool
+./backend/target/debug/zyvorctl ceph create my-pool --monitors=10.0.0.1 --pool=rbd
+./backend/target/debug/zyvorctl ceph health my-pool
 
 # Launch TUI
-./backend/target/debug/vmctl-tui
+./backend/target/debug/zyvorctl-tui
 ```
 
 ## Install System-Wide
@@ -86,8 +86,8 @@ Access the web UI at `http://localhost:3000`
 sudo systemctl enable --now Zyvor Fabric
 
 # Use CLI
-vmctl list
-vmctl-tui
+zyvorctl list
+zyvorctl-tui
 ```
 
 ## Access Web UI
@@ -104,7 +104,7 @@ When auth is enabled (default), Zyvor Fabric creates an `admin` user on first st
 
 ```bash
 # Read the auto-generated admin password
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 
 # Login to get a JWT token
 TOKEN=$(curl -s -X POST http://localhost:9095/api/auth/login \
@@ -115,7 +115,7 @@ TOKEN=$(curl -s -X POST http://localhost:9095/api/auth/login \
 curl -H "Authorization: Bearer $TOKEN" http://localhost:9095/api/vms
 ```
 
-To set a custom admin password, use the `VMSPAWND_ADMIN_PASSWORD` environment variable before first startup.
+To set a custom admin password, use the `ZYVOR_FABRICD_ADMIN_PASSWORD` environment variable before first startup.
 
 When auth is disabled (`enabled = false` in config), API calls work without a token.
 
@@ -164,9 +164,9 @@ curl -X POST http://localhost:9095/api/vms/test-vm/start \
 Zyvor Fabric/
 ├── backend/              # Rust backend (40 crates: daemon, CLI, TUI, drivers, enterprise features)
 │   ├── Zyvor Fabric/         # Main daemon with REST API + WebSocket
-│   ├── vmctl/            # CLI tool (JSON/YAML output, 15+ subcommand groups)
-│   ├── vmctl-tui/        # Terminal UI (8 views incl. Net Security)
-│   ├── vmspawn-driver/   # VM driver (systemd-vmspawn integration)
+│   ├── zyvorctl/            # CLI tool (JSON/YAML output, 15+ subcommand groups)
+│   ├── zyvorctl-tui/        # Terminal UI (8 views incl. Net Security)
+│   ├── zyvor-fabric-vm-driver/   # VM driver (systemd-vmspawn integration)
 │   ├── crates/           # Shared libraries (storage with Ceph/RBD, system, vm)
 │   └── ...               # 34 more feature crates (networking, security, ha, migration, etc.)
 ├── web/                  # React web UI

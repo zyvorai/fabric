@@ -54,10 +54,10 @@ git clone <repository-url>
 cd zyvor-fabric
 
 # One-command deployment (auto-sudo)
-./vmspawnctl deploy
+./zyvorctl deploy
 
 # Read the generated admin password
-./vmspawnctl password
+./zyvorctl password
 
 # Open the web dashboard
 open http://127.0.0.1:9095

@@ -1,6 +1,6 @@
 # API versioning
 
-Zyvor Fabric (`vmspawnd`) mounts the same REST router at two URL prefixes:
+Zyvor Fabric (`zyvor-fabricd`) mounts the same REST router at two URL prefixes:
 
 | Prefix | Status |
 |--------|--------|
@@ -20,8 +20,8 @@ Both return the same JSON payload.
 
 | Client | Path |
 |--------|------|
-| `vmspawn-sdk` | `/api/*` |
-| Terraform provider `vmspawnd` | `/api/*` |
+| `zyvor-fabric-sdk` | `/api/*` |
+| Terraform provider `zyvor-fabricd` | `/api/*` |
 | Web UI | `/api/*` |
 | OpenAPI (`backend/api-docs/openapi.yaml`) | `/api/*` |
 

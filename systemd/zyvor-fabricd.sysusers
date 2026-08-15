@@ -1,0 +1,3 @@
+# systemd-sysusers configuration for zyvor-fabricd
+# Creates zyvor-fabricd system group for socket access
+g zyvor-fabricd - -

@@ -1,10 +1,10 @@
 [package]
-name = "vmspawnd-operator"
+name = "zyvor-fabricd-operator"
 version = "0.1.0"
 edition = "2021"
 license = "LicenseRef-Zyvor-Proprietary"
 [[bin]]
-name = "vmspawnd-operator"
+name = "zyvor-fabricd-operator"
 path = "src/main.rs"
 
 [dependencies]

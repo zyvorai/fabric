@@ -70,7 +70,7 @@ export default function ISOImages() {
         setISOs(
           raw.map((iso: { name: string; path?: string; size_bytes?: number; uploaded?: string }) => ({
             name: iso.name,
-            path: iso.path || `/var/lib/vmspawnd/iso/${iso.name}.iso`,
+            path: iso.path || `/var/lib/zyvor-fabricd/iso/${iso.name}.iso`,
             size_bytes: iso.size_bytes ?? 0,
             mod_time: iso.uploaded || '',
           })),

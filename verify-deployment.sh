@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# verify-deployment.sh — Quick deployment health check for Zyvor Fabric (vmspawnd)
+# verify-deployment.sh — Quick deployment health check for Zyvor Fabric (zyvor-fabricd)
 # ============================================================================
 # Lightweight check that can be run after deploy-remote.sh or setup.sh
 # to confirm the deployment is healthy.
@@ -16,7 +16,7 @@ set -euo pipefail
 HOST="${1:-localhost}"
 USER="${2:-root}"
 PASS="${3:-}"
-PORT="${VMSPAWND_PORT:-9095}"
+PORT="${ZYVOR_FABRICD_PORT:-9095}"
 
 pass() { echo "  ✅ $*"; }
 fail() { echo "  ❌ $*"; }
@@ -53,11 +53,11 @@ check() {
 # ── Service check ──
 echo "  ── Services ──"
 check _ssh "
-    if systemctl is-active vmspawnd &>/dev/null; then
-        echo '  ✅ vmspawnd: running'
+    if systemctl is-active zyvor-fabricd &>/dev/null; then
+        echo '  ✅ zyvor-fabricd: running'
         true
     else
-        echo '  ❌ vmspawnd: not running'
+        echo '  ❌ zyvor-fabricd: not running'
         false
     fi
 "
@@ -75,7 +75,7 @@ check _ssh "
 # ── Binary check ──
 echo ""
 echo "  ── Binaries ──"
-for bin in vmspawnd vmctl; do
+for bin in zyvor-fabricd zyvorctl; do
     check _ssh "
         if command -v $bin &>/dev/null; then
             echo \"  ✅ $bin: \$(command -v $bin)\"
@@ -91,8 +91,8 @@ done
 echo ""
 echo "  ── Configuration ──"
 check _ssh "
-    if [ -f /etc/vmspawnd/vmspawnd.toml ]; then
-        echo '  ✅ Config: /etc/vmspawnd/vmspawnd.toml'
+    if [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
+        echo '  ✅ Config: /etc/zyvor-fabricd/zyvor-fabricd.toml'
         true
     else
         echo '  ❌ Config: not found'
@@ -104,12 +104,12 @@ check _ssh "
 echo ""
 echo "  ── Storage ──"
 check _ssh "
-    if [ -d /var/lib/vmspawnd ]; then
-        SIZE=\$(du -sh /var/lib/vmspawnd 2>/dev/null | cut -f1)
-        echo \"  ✅ /var/lib/vmspawnd: \$SIZE\"
+    if [ -d /var/lib/zyvor-fabricd ]; then
+        SIZE=\$(du -sh /var/lib/zyvor-fabricd 2>/dev/null | cut -f1)
+        echo \"  ✅ /var/lib/zyvor-fabricd: \$SIZE\"
         true
     else
-        echo '  ❌ /var/lib/vmspawnd: not found'
+        echo '  ❌ /var/lib/zyvor-fabricd: not found'
         false
     fi
 "
@@ -118,7 +118,7 @@ check _ssh "
 echo ""
 echo "  ── Dashboard ──"
 check _ssh "
-    for dir in /usr/share/vmspawnd/web /usr/local/share/vmspawnd/web; do
+    for dir in /usr/share/zyvor-fabricd/web /usr/local/share/zyvor-fabricd/web; do
         if [ -d \"\$dir\" ] && [ -f \"\$dir/index.html\" ]; then
             COUNT=\$(find \$dir -type f | wc -l)
             echo \"  ✅ Dashboard: \$dir (\$COUNT files)\"
@@ -160,8 +160,8 @@ if [[ $PASSED -eq $CHECKS ]]; then
     echo "  🎉 Deployment is healthy!"
 else
     echo "  ⚠️  Some checks failed. Investigate with:"
-    echo "    systemctl status vmspawnd"
-    echo "    journalctl -u vmspawnd -n 20"
+    echo "    systemctl status zyvor-fabricd"
+    echo "    journalctl -u zyvor-fabricd -n 20"
 fi
 echo ""
 

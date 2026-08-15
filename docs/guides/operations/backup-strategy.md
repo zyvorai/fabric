@@ -350,7 +350,7 @@ curl -s -X DELETE "http://localhost:3000/api/vms/$TEST_VM" \
 
 ### Default Backup Location
 
-Backups are stored in `/var/lib/vmspawnd/backups/` by default. This can be overridden by setting the `BACKUP_DIR` environment variable.
+Backups are stored in `/var/lib/zyvor-fabricd/backups/` by default. This can be overridden by setting the `BACKUP_DIR` environment variable.
 
 ### Compression
 

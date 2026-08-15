@@ -19,7 +19,7 @@ export default function MigrationWizard() {
   const [remoteHost, setRemoteHost] = useState('')
   const [vmName, setVmName] = useState('')
   const [targetFormat, setTargetFormat] = useState('qcow2')
-  const [outputDir, setOutputDir] = useState('/var/lib/vmspawnd/images')
+  const [outputDir, setOutputDir] = useState('/var/lib/zyvor-fabricd/images')
   const [cpus, setCpus] = useState(2)
   const [memory, setMemory] = useState(2048)
   const [autoStart, setAutoStart] = useState(false)

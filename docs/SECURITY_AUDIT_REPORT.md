@@ -68,7 +68,7 @@ A comprehensive multi-round security audit was performed on the Zyvor Fabric cod
 The audit covered the entire Zyvor Fabric backend:
 
 - **Core daemon** (`Zyvor Fabric`) — REST API server with 480+ endpoints
-- **VM driver** (`vmspawn-driver`) — systemd-vmspawn/machined integration
+- **VM driver** (`zyvor-fabric-vm-driver`) — systemd-vmspawn/machined integration
 - **Security** (`security`) — JWT authentication, RBAC, user management
 - **Storage** (`Zyvor Fabric-storage`) — LVM, ZFS, NFS, Ceph backends
 - **Networking** (`networking`, `network-policy`, `vm-firewall`) — nftables, policies
@@ -130,7 +130,7 @@ Each audit round included:
 
 **Finding:** Auto-generated admin password was written to log output via `tracing::warn!`.
 
-**Remediation:** Password written to `/var/lib/vmspawnd/.admin_password` with mode `0600`. JWT secret similarly persisted to `/var/lib/vmspawnd/.jwt_secret` with `0600` permissions. Config directory/file permission errors now logged instead of silently ignored.
+**Remediation:** Password written to `/var/lib/zyvor-fabricd/.admin_password` with mode `0600`. JWT secret similarly persisted to `/var/lib/zyvor-fabricd/.jwt_secret` with `0600` permissions. Config directory/file permission errors now logged instead of silently ignored.
 
 #### C4. Missing RBAC on API Endpoints
 **Status:** RESOLVED (Rounds 4-7)
@@ -344,28 +344,28 @@ Client Request
 
 On first startup with authentication enabled:
 
-1. **Admin password** — randomly generated (64 alphanumeric chars), written to `/var/lib/vmspawnd/.admin_password` (mode `0600`)
-2. **JWT signing secret** — randomly generated (64 alphanumeric chars), persisted to `/var/lib/vmspawnd/.jwt_secret` (mode `0600`)
+1. **Admin password** — randomly generated (64 alphanumeric chars), written to `/var/lib/zyvor-fabricd/.admin_password` (mode `0600`)
+2. **JWT signing secret** — randomly generated (64 alphanumeric chars), persisted to `/var/lib/zyvor-fabricd/.jwt_secret` (mode `0600`)
 3. **Default admin user** created in SQLite database with bcrypt-hashed password
 
 ### 4.2 Configuration
 
 | Setting | Config File | Environment Variable |
 |---------|-------------|---------------------|
-| JWT secret | `auth.jwt_secret` | `VMSPAWND_JWT_SECRET` |
-| Admin password | `auth.default_admin_password` | `VMSPAWND_ADMIN_PASSWORD` |
+| JWT secret | `auth.jwt_secret` | `ZYVOR_FABRICD_JWT_SECRET` |
+| Admin password | `auth.default_admin_password` | `ZYVOR_FABRICD_ADMIN_PASSWORD` |
 | Auth enabled | `auth.enabled` | — |
 | Token expiration | `auth.token_expiration_hours` | — |
-| Backup directory | `backup.backup_dir` | `VMSPAWND_BACKUP_DIR` |
-| Backup retention | `backup.retention_days` | `VMSPAWND_BACKUP_RETAIN` |
-| Backup type | `backup.backup_type` | `VMSPAWND_BACKUP_TYPE` |
+| Backup directory | `backup.backup_dir` | `ZYVOR_FABRICD_BACKUP_DIR` |
+| Backup retention | `backup.retention_days` | `ZYVOR_FABRICD_BACKUP_RETAIN` |
+| Backup type | `backup.backup_type` | `ZYVOR_FABRICD_BACKUP_TYPE` |
 
 ### 4.3 Password Retrieval
 
 ```bash
-./vmspawnctl password
+./zyvorctl password
 # or directly:
-sudo cat /var/lib/vmspawnd/.admin_password
+sudo cat /var/lib/zyvor-fabricd/.admin_password
 ```
 
 ---

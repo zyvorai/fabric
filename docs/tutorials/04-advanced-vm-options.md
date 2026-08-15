@@ -222,7 +222,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 The `tpm_state` field controls where TPM persistent state is stored:
 - `"auto"` -- Zyvor Fabric picks a directory automatically
 - `"off"` -- disable TPM regardless of the `tpm` flag
-- A path (e.g., `"/var/lib/vmspawnd/tpm/my-vm"`) -- explicit directory
+- A path (e.g., `"/var/lib/zyvor-fabricd/tpm/my-vm"`) -- explicit directory
 
 ### VSOCK Communication
 
@@ -317,7 +317,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/hotplug/disk" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "path": "/var/lib/vmspawnd/images/extra-data.qcow2",
+    "path": "/var/lib/zyvor-fabricd/images/extra-data.qcow2",
     "bus": "virtio"
   }' | jq .
 ```
@@ -483,7 +483,7 @@ Expected response:
 ```json
 {
   "status": "created",
-  "iso_path": "/var/lib/vmspawnd/cloud-init/advanced-demo-cloud-init.iso"
+  "iso_path": "/var/lib/zyvor-fabricd/cloud-init/advanced-demo-cloud-init.iso"
 }
 ```
 

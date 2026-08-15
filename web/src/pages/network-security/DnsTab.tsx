@@ -234,7 +234,7 @@ export function CreateDnsPolicyModal({ zones, onClose, onCreated }: { zones: Dns
   const [name, setName] = useState('')
   const [zoneId, setZoneId] = useState(zones[0]?.id ?? '')
   const [labels, setLabels] = useState<Record<string, string>>({})
-  const [recordTemplate, setRecordTemplate] = useState('{name}.vmspawnd.local')
+  const [recordTemplate, setRecordTemplate] = useState('{name}.zyvor-fabricd.local')
   const [recordType, setRecordType] = useState<DnsRecordType>('A')
   const [enabled, setEnabled] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -277,7 +277,7 @@ export function CreateDnsPolicyModal({ zones, onClose, onCreated }: { zones: Dns
           </select>
         </div>
         <LabelSelectorInput labels={labels} onChange={setLabels} />
-        <InputField label="Record Template" value={recordTemplate} onChange={setRecordTemplate} placeholder="{name}.vmspawnd.local" />
+        <InputField label="Record Template" value={recordTemplate} onChange={setRecordTemplate} placeholder="{name}.zyvor-fabricd.local" />
         <div>
           <label className="block text-xs text-slate-400 mb-1">Record Type</label>
           <select value={recordType} onChange={e => setRecordType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">

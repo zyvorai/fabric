@@ -503,7 +503,7 @@ mod tests {
 
     fn tmp_manager() -> (NetworkdManager, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let mgr = NetworkdManager::new(dir.path(), "50-vmspawnd-");
+        let mgr = NetworkdManager::new(dir.path(), "50-zyvor-fabricd-");
         (mgr, dir)
     }
 
@@ -531,8 +531,8 @@ mod tests {
         };
         mgr.apply_bridge(&cfg).unwrap();
 
-        let netdev_path = dir.path().join("50-vmspawnd-br0.netdev");
-        let network_path = dir.path().join("50-vmspawnd-br0.network");
+        let netdev_path = dir.path().join("50-zyvor-fabricd-br0.netdev");
+        let network_path = dir.path().join("50-zyvor-fabricd-br0.network");
         assert!(netdev_path.exists());
         assert!(network_path.exists());
 
@@ -559,11 +559,11 @@ mod tests {
         };
         mgr.apply_macvtap(&cfg).unwrap();
 
-        assert!(dir.path().join("50-vmspawnd-mvt0.netdev").exists());
-        assert!(dir.path().join("50-vmspawnd-mvt0-parent.network").exists());
-        assert!(dir.path().join("50-vmspawnd-mvt0.network").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-mvt0.netdev").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-mvt0-parent.network").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-mvt0.network").exists());
 
-        let netdev = fs::read_to_string(dir.path().join("50-vmspawnd-mvt0.netdev")).unwrap();
+        let netdev = fs::read_to_string(dir.path().join("50-zyvor-fabricd-mvt0.netdev")).unwrap();
         assert!(netdev.contains("Kind=macvtap"));
         assert!(netdev.contains("Mode=bridge"));
     }
@@ -572,26 +572,26 @@ mod tests {
     fn test_remove_device() {
         let (mgr, dir) = tmp_manager();
         // Create some files
-        fs::write(dir.path().join("50-vmspawnd-br0.netdev"), "test").unwrap();
-        fs::write(dir.path().join("50-vmspawnd-br0.network"), "test").unwrap();
+        fs::write(dir.path().join("50-zyvor-fabricd-br0.netdev"), "test").unwrap();
+        fs::write(dir.path().join("50-zyvor-fabricd-br0.network"), "test").unwrap();
 
         mgr.remove_device("br0").unwrap();
 
-        assert!(!dir.path().join("50-vmspawnd-br0.netdev").exists());
-        assert!(!dir.path().join("50-vmspawnd-br0.network").exists());
+        assert!(!dir.path().join("50-zyvor-fabricd-br0.netdev").exists());
+        assert!(!dir.path().join("50-zyvor-fabricd-br0.network").exists());
     }
 
     #[test]
     fn test_list_managed_files() {
         let (mgr, dir) = tmp_manager();
-        fs::write(dir.path().join("50-vmspawnd-br0.netdev"), "test").unwrap();
-        fs::write(dir.path().join("50-vmspawnd-br0.network"), "test").unwrap();
+        fs::write(dir.path().join("50-zyvor-fabricd-br0.netdev"), "test").unwrap();
+        fs::write(dir.path().join("50-zyvor-fabricd-br0.network"), "test").unwrap();
         fs::write(dir.path().join("99-other.network"), "unrelated").unwrap();
 
         let files = mgr.list_managed_files().unwrap();
         assert_eq!(files.len(), 2);
-        assert!(files.contains(&"50-vmspawnd-br0.netdev".to_string()));
-        assert!(files.contains(&"50-vmspawnd-br0.network".to_string()));
+        assert!(files.contains(&"50-zyvor-fabricd-br0.netdev".to_string()));
+        assert!(files.contains(&"50-zyvor-fabricd-br0.network".to_string()));
     }
 
     #[test]
@@ -628,19 +628,19 @@ mod tests {
         };
         mgr.apply_bond(&cfg).unwrap();
 
-        assert!(dir.path().join("50-vmspawnd-bond0.netdev").exists());
-        assert!(dir.path().join("50-vmspawnd-bond0.network").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-bond0.netdev").exists());
+        assert!(dir.path().join("50-zyvor-fabricd-bond0.network").exists());
         assert!(dir
             .path()
-            .join("50-vmspawnd-bond0-slave-eth0.network")
+            .join("50-zyvor-fabricd-bond0-slave-eth0.network")
             .exists());
         assert!(dir
             .path()
-            .join("50-vmspawnd-bond0-slave-eth1.network")
+            .join("50-zyvor-fabricd-bond0-slave-eth1.network")
             .exists());
 
         let slave =
-            fs::read_to_string(dir.path().join("50-vmspawnd-bond0-slave-eth0.network")).unwrap();
+            fs::read_to_string(dir.path().join("50-zyvor-fabricd-bond0-slave-eth0.network")).unwrap();
         assert!(slave.contains("Name=eth0"));
         assert!(slave.contains("Bond=bond0"));
     }
@@ -648,30 +648,30 @@ mod tests {
     #[test]
     fn test_remove_bond_cleans_slaves() {
         let (mgr, dir) = tmp_manager();
-        fs::write(dir.path().join("50-vmspawnd-bond0.netdev"), "test").unwrap();
-        fs::write(dir.path().join("50-vmspawnd-bond0.network"), "test").unwrap();
+        fs::write(dir.path().join("50-zyvor-fabricd-bond0.netdev"), "test").unwrap();
+        fs::write(dir.path().join("50-zyvor-fabricd-bond0.network"), "test").unwrap();
         fs::write(
-            dir.path().join("50-vmspawnd-bond0-slave-eth0.network"),
+            dir.path().join("50-zyvor-fabricd-bond0-slave-eth0.network"),
             "test",
         )
         .unwrap();
         fs::write(
-            dir.path().join("50-vmspawnd-bond0-slave-eth1.network"),
+            dir.path().join("50-zyvor-fabricd-bond0-slave-eth1.network"),
             "test",
         )
         .unwrap();
 
         mgr.remove_device("bond0").unwrap();
 
-        assert!(!dir.path().join("50-vmspawnd-bond0.netdev").exists());
-        assert!(!dir.path().join("50-vmspawnd-bond0.network").exists());
+        assert!(!dir.path().join("50-zyvor-fabricd-bond0.netdev").exists());
+        assert!(!dir.path().join("50-zyvor-fabricd-bond0.network").exists());
         assert!(!dir
             .path()
-            .join("50-vmspawnd-bond0-slave-eth0.network")
+            .join("50-zyvor-fabricd-bond0-slave-eth0.network")
             .exists());
         assert!(!dir
             .path()
-            .join("50-vmspawnd-bond0-slave-eth1.network")
+            .join("50-zyvor-fabricd-bond0-slave-eth1.network")
             .exists());
     }
 
@@ -696,7 +696,7 @@ mod tests {
         };
         mgr.apply_network_file(&cfg).unwrap();
 
-        let path = dir.path().join("50-vmspawnd-net-enp3s0.network");
+        let path = dir.path().join("50-zyvor-fabricd-net-enp3s0.network");
         assert!(path.exists());
         let content = fs::read_to_string(path).unwrap();
         assert!(content.contains("Name=enp3s0"));
@@ -722,7 +722,7 @@ mod tests {
         };
         mgr.apply_link_file(&cfg).unwrap();
 
-        let path = dir.path().join("50-vmspawnd-link-lan0.link");
+        let path = dir.path().join("50-zyvor-fabricd-link-lan0.link");
         assert!(path.exists());
         let content = fs::read_to_string(path).unwrap();
         assert!(content.contains("MACAddress=00:11:22:33:44:55"));

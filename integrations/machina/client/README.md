@@ -1,6 +1,6 @@
 # machina-fabric
 
-Machina v0.1 CLI — probes Zyvor Fabric (`vmspawnd`) clusters from macOS or Linux.
+Machina v0.1 CLI — probes Zyvor Fabric (`zyvor-fabricd`) clusters from macOS or Linux.
 
 ```bash
 mkdir -p ~/.machina
@@ -8,7 +8,7 @@ cp ../clusters.example.yaml ~/.machina/clusters.yaml
 cargo build --release
 
 export ZYVOR_FABRIC_USER=admin
-export ZYVOR_FABRIC_PASSWORD="$(sudo cat /var/lib/vmspawnd/.admin_password)"
+export ZYVOR_FABRIC_PASSWORD="$(sudo cat /var/lib/zyvor-fabricd/.admin_password)"
 
 ./target/release/machina-fabric health
 ./target/release/machina-fabric vms

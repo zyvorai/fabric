@@ -2,14 +2,14 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-//! Unified cgroup v2 management for vmspawnd.
+//! Unified cgroup v2 management for zyvor-fabricd.
 //!
 //! Provides a clean API for all cgroup v2 controllers with consistent path handling.
 //!
 //! # Usage
 //!
 //! ```no_run
-//! use vmspawnd_cgroup::CgroupManager;
+//! use zyvor_fabric_cgroup::CgroupManager;
 //!
 //! let mgr = CgroupManager::for_machine("myvm").unwrap();
 //! let mem_usage = mgr.memory().get_current().unwrap();

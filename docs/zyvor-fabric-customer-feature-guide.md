@@ -25,31 +25,31 @@ This is the customer-facing onboarding guide — how to access the product, your
 
 **How to access it**
 
-- **Web:** React dashboard served by the `vmspawnd` daemon at https://localhost:8443 — dark-themed, 37+ pages, a `Ctrl+K` command palette, and live WebSocket/SSE updates. It shares the daemon's origin (no separate web server); generate the TLS cert with `./vmspawnctl tls`.
-- **CLI:** `vmctl` — scriptable client with table/JSON/YAML output (`--output json`). Examples: `vmctl vm list`, `vmctl vm create --name web-01 --cpus 2 --memory 4G`, `vmctl vm start web-01`, `vmctl apply -f config.yaml`. Live terminal dashboard: `vmctl-tui` (k9s-style, vim keys, 8 views), pointed at the daemon with `--url http://:`.
-- **API:** REST + WebSocket exposed by the `vmspawnd` daemon (480+ endpoints under `/api/...`). Obtain a token with `POST /api/auth/login`, then pass `Authorization: Bearer ` on every call. The same API also backs the Terraform provider, the Kubernetes `VirtualMachine` CRD operator, and the Rust/Python/Ansible SDKs.
-- **Login:** Username `admin`; the initial password is auto-generated on first run — read it with `./vmspawnctl password` (or `sudo cat /var/lib/vmspawnd/.admin_password`). JWT tokens last 24h by default (`auth.token_expiration_hours`); 3-tier RBAC (admin/user/viewer) is enforced on every endpoint, with optional TOTP 2FA.
+- **Web:** React dashboard served by the `zyvor-fabricd` daemon at https://localhost:8443 — dark-themed, 37+ pages, a `Ctrl+K` command palette, and live WebSocket/SSE updates. It shares the daemon's origin (no separate web server); generate the TLS cert with `./zyvorctl tls`.
+- **CLI:** `zyvorctl` — scriptable client with table/JSON/YAML output (`--output json`). Examples: `zyvorctl vm list`, `zyvorctl vm create --name web-01 --cpus 2 --memory 4G`, `zyvorctl vm start web-01`, `zyvorctl apply -f config.yaml`. Live terminal dashboard: `zyvorctl-tui` (k9s-style, vim keys, 8 views), pointed at the daemon with `--url http://:`.
+- **API:** REST + WebSocket exposed by the `zyvor-fabricd` daemon (480+ endpoints under `/api/...`). Obtain a token with `POST /api/auth/login`, then pass `Authorization: Bearer ` on every call. The same API also backs the Terraform provider, the Kubernetes `VirtualMachine` CRD operator, and the Rust/Python/Ansible SDKs.
+- **Login:** Username `admin`; the initial password is auto-generated on first run — read it with `./zyvorctl password` (or `sudo cat /var/lib/zyvor-fabricd/.admin_password`). JWT tokens last 24h by default (`auth.token_expiration_hours`); 3-tier RBAC (admin/user/viewer) is enforced on every endpoint, with optional TOTP 2FA.
 - **Needs:** A Linux host with systemd 256+ and KVM; install and bring the daemon up with `sudo systemctl enable --now zyvor-fabric`.
 
 **Your first workflows**
 
 - **Launch your first VM in five minutes**
-  1. Start the daemon: `sudo systemctl enable --now zyvor-fabric`, then read the admin password with `./vmspawnctl password`.
+  1. Start the daemon: `sudo systemctl enable --now zyvor-fabric`, then read the admin password with `./zyvorctl password`.
   1. Pull a cloud image from the built-in catalog (`POST /api/images/cloud/download` with `{"name":"fedora-41"}`), or list options first with `GET /api/images/cloud`.
-  1. Create the VM: `vmctl vm create --name web-01 --cpus 2 --memory 4G` (image `fedora-41`).
-  1. Start it: `vmctl vm start web-01`, then confirm `state: running` with `vmctl vm list`.
-  1. Open a console from the web dashboard (https://localhost:8443) or drive it from `vmctl-tui`.
+  1. Create the VM: `zyvorctl vm create --name web-01 --cpus 2 --memory 4G` (image `fedora-41`).
+  1. Start it: `zyvorctl vm start web-01`, then confirm `state: running` with `zyvorctl vm list`.
+  1. Open a console from the web dashboard (https://localhost:8443) or drive it from `zyvorctl-tui`.
 - **Manage VMs declaratively (GitOps)**
   1. Describe one or more VMs (name, cpus, memory, disk, image, tags/labels) in a YAML file.
-  1. Reconcile them into the fabric: `vmctl apply -f config.yaml`.
-  1. Commit `config.yaml` to git as the source of truth; re-run `vmctl apply -f config.yaml` to converge after edits.
+  1. Reconcile them into the fabric: `zyvorctl apply -f config.yaml`.
+  1. Commit `config.yaml` to git as the source of truth; re-run `zyvorctl apply -f config.yaml` to converge after edits.
   1. For K8s shops, express the same VMs as `VirtualMachine` CRDs and let the Helm-installed operator reconcile them continuously.
 - **Wire up VM networking**
   1. Create a bridge (virtual switch): `POST /api/networkd/bridges` with a name, address, and MTU — every change writes `.netdev`/`.network` files and reloads networkd.
   1. Segment traffic with a VLAN: `POST /api/networkd/vlans` (`{name, id, parent}`), or bond NICs via `POST /api/networkd/bonds`.
   1. Hand out addresses: `POST /api/networkd/dhcp` with the bridge name and a pool range.
   1. Expose a guest service with a port-forward: `POST /api/networkd/port-forwards`.
-  1. Do the same from the Web Network Security page (9 Cilium-style tabs) or the `vmctl-tui` Network / Net Security views.
+  1. Do the same from the Web Network Security page (9 Cilium-style tabs) or the `zyvorctl-tui` Network / Net Security views.
 - **Protect a VM with snapshots and backups**
   1. Before a risky change, take a snapshot: `POST /api/vms/web-01/snapshots` (use `snapshot_type: Full` to include memory state).
   1. Roll back if needed: `POST /api/vms/web-01/snapshots//revert`.
@@ -67,17 +67,17 @@ This is the customer-facing onboarding guide — how to access the product, your
 _Create, run, and reshape virtual machines on systemd-vmspawn with declarative or interactive workflows._
 
 - **Full VM Lifecycle** — Create, start, stop, restart, pause, resume, hibernate, and delete VMs backed by systemd-vmspawn and KVM. — _One consistent lifecycle across CLI, TUI, web, Terraform, and Kubernetes._
-  - **How:** CLI `vmctl vm start|stop|restart|pause|resume|delete ` · Web dashboard VM-list quick actions · TUI VMs view (`s`/`t`/`r`/`d`) · REST `POST /api/vms/:name/{start,stop,restart,pause,resume}` and `DELETE /api/vms/:name`.
-- **Declarative Apply** — Define VMs in YAML and reconcile them with vmctl apply -f config.yaml. — _GitOps-friendly infrastructure without a control-plane rewrite._
-  - **How:** CLI `vmctl apply -f config.yaml` reconciles a YAML spec (version it in git); equivalent imperative path is REST `POST /api/vms`, or a `VirtualMachine` CRD via the K8s operator.
+  - **How:** CLI `zyvorctl vm start|stop|restart|pause|resume|delete ` · Web dashboard VM-list quick actions · TUI VMs view (`s`/`t`/`r`/`d`) · REST `POST /api/vms/:name/{start,stop,restart,pause,resume}` and `DELETE /api/vms/:name`.
+- **Declarative Apply** — Define VMs in YAML and reconcile them with zyvorctl apply -f config.yaml. — _GitOps-friendly infrastructure without a control-plane rewrite._
+  - **How:** CLI `zyvorctl apply -f config.yaml` reconciles a YAML spec (version it in git); equivalent imperative path is REST `POST /api/vms`, or a `VirtualMachine` CRD via the K8s operator.
 - **Cloning & Templates** — Full and linked copy-on-write clones plus reusable templates for rapid deployment. — _Stand up fleets from a golden image in seconds, not minutes._
-  - **How:** REST `POST /api/vms/:name/clone` (`linked_clone: true|false`) · templates via `POST /api/templates` and `POST /api/templates/:id/deploy` · Web Templates / VM Cloning pages · `vmctl vm clone`.
+  - **How:** REST `POST /api/vms/:name/clone` (`linked_clone: true|false`) · templates via `POST /api/templates` and `POST /api/templates/:id/deploy` · Web Templates / VM Cloning pages · `zyvorctl vm clone`.
 - **Hibernate & Checkpoint** — Suspend-to-disk hibernate, resume from snapshot, and VM checkpoint/restore and forking. — _Pause idle workloads and restore exact machine state on demand._
   - **How:** Capture machine state with a full snapshot: REST `POST /api/vms/:name/snapshots` (`snapshot_type: Full`) then `POST .../snapshots/:id/revert` · Web VM detail Snapshots tab · TUI/CLI snapshot actions.
 - **Live Hotplug** — Hotplug CPU, memory, disk, and NIC into running VMs without a reboot. — _Scale a VM to demand while it keeps serving traffic._
   - **How:** Web VM detail Hotplug tab (live CPU/memory/disk/NIC) · REST resource endpoints under `/api/system/vms/:name/...` · emits `cpu_hotplug`/`memory_hotplug`/`disk_attached` events on the SSE stream.
 - **Disk Import & Conversion** — Import VMs from VMDK, VDI, and VHD with auto-conversion to qcow2, and online disk resize via QMP. — _Bring machines off VMware or VirtualBox without downtime._
-  - **How:** REST `POST /api/images/import` (VMDK/VDI/VHD → qcow2) and online resize `POST /api/images/:id/resize` · Web VM Create from imported image · `vmctl` image import.
+  - **How:** REST `POST /api/images/import` (VMDK/VDI/VHD → qcow2) and online resize `POST /api/images/:id/resize` · Web VM Create from imported image · `zyvorctl` image import.
 
 > VMs are ordinary systemd units — journalctl, watchdogs, and socket activation work exactly as operators already expect.
 
@@ -88,7 +88,7 @@ _Six pluggable backends, live disk mobility, and a built-in cloud-image catalog.
 - **Six Storage Backends** — Pool and volume management across Local, NFS, LVM, LVM-thin, ZFS, and Ceph/RBD. — _Use the storage you already run — no dedicated SAN required._
   - **How:** REST `POST /api/storage/pools/{local,nfs,lvm,lvm-thin,zfs,ceph}`, list with `GET /api/storage/pools` · Web Storage page · TUI Storage view (type auto-detected).
 - **Volume Management** — Full volume CRUD with attach/detach, online resize, and clone operations. — _Reshape storage for a workload without recreating the VM._
-  - **How:** Volume CRUD + attach/detach/resize/clone via the `/api/storage/...` volume endpoints · Web Storage → Volumes (capacity + attachment info) · `vmctl` storage commands.
+  - **How:** Volume CRUD + attach/detach/resize/clone via the `/api/storage/...` volume endpoints · Web Storage → Volumes (capacity + attachment info) · `zyvorctl` storage commands.
 - **Snapshots & Retention** — Create and restore snapshots with configurable retention policies. — _Roll back a bad change in seconds and prune old state automatically._
   - **How:** REST `POST /api/vms/:name/snapshots`, `GET .../snapshots/tree`, `POST .../snapshots/:id/revert` · Web VM Snapshots tab · retention applied per backup/snapshot policy.
 - **Storage Live Migration** — Move VM disks between pools with no downtime, guided by SDRS recommendations. — _Rebalance or evacuate storage while VMs stay online._
@@ -96,7 +96,7 @@ _Six pluggable backends, live disk mobility, and a built-in cloud-image catalog.
 - **ZFS Replication** — Incremental ZFS send/receive replication between hosts and sites. — _Efficient, block-level DR copies that only ship the delta._
   - **How:** Configure incremental send/receive between hosts via the replication REST endpoints · Web replication page · requires ZFS pools on both ends.
 - **Cloud Image & ISO Catalog** — Built-in downloader for Ubuntu, Fedora, Debian, and Alma images plus ISO download/list/delete. — _Boot a fresh distro without hunting for images._
-  - **How:** REST `GET /api/images/cloud`, `POST /api/images/cloud/download`, ISOs under `GET /api/images/iso` · Web Content Library / Images · files land in `/var/lib/vmspawnd/images`.
+  - **How:** REST `GET /api/images/cloud`, `POST /api/images/cloud/download`, ISOs under `GET /api/images/iso` · Web Content Library / Images · files land in `/var/lib/zyvor-fabricd/images`.
 
 ## 3. Software-Defined Networking
 
@@ -124,7 +124,7 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 - **JWT Auth + RBAC** — JWT authentication with configurable expiry and 3-tier RBAC (Admin/User/Viewer) enforced on every endpoint. — _Least-privilege access is the default, not an add-on._
   - **How:** `POST /api/auth/login` returns a bearer JWT (`auth.token_expiration_hours`, default 24); roles admin/user/viewer are enforced per endpoint · Web login form · CLI/SDK send the token in `Authorization`.
 - **Enterprise SSO** — LDAP and OIDC/OAuth2 integration plus API keys for service-to-service auth. — _Plug into existing identity providers instead of a new user silo._
-  - **How:** Configure LDAP/OIDC in `vmspawnd.toml` `[auth]`; issue API keys for service-to-service calls · Web Administration → users/roles.
+  - **How:** Configure LDAP/OIDC in `zyvor-fabricd.toml` `[auth]`; issue API keys for service-to-service calls · Web Administration → users/roles.
 - **Multi-Tenancy** — Project isolation with member roles and per-project quotas. — _Give teams their own bounded slice of the fabric._
   - **How:** Projects with member roles and per-project quotas via the tenant/project REST endpoints · Web Quotas + Administration pages.
 - **Encryption & Secrets** — Encryption at rest, per-VM disk encryption with key rotation, and an encrypted secrets store with access policies. — _Protect data and credentials without external KMS scaffolding._
@@ -132,7 +132,7 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 - **Audit Logging** — Audit trail on all VM lifecycle operations with JSON/CSV export. — _Answer 'who did what, when' for compliance and RCA._
   - **How:** Audit trail via `GET /api/audit/logs` with JSON/CSV export · Web Audit page (filter by user/action/resource/time) · TUI Logs view.
 - **PKI & Certificate Manager** — CA creation, certificate issue/renew/revoke, automated rotation, and hardware attestation. — _Run internal TLS without a separate PKI product._
-  - **How:** CA create + cert issue/renew/revoke + rotation via the certificate REST endpoints; `./vmspawnctl tls` generates the web-server cert · Web Administration → certificates.
+  - **How:** CA create + cert issue/renew/revoke + rotation via the certificate REST endpoints; `./zyvorctl tls` generates the web-server cert · Web Administration → certificates.
 - **Compliance Scanning** — Built-in CIS, STIG, and PCI-DSS profiles with per-VM findings and remediation guidance. — _Prove and improve posture against recognized benchmarks._
   - **How:** REST `GET /api/compliance/profiles`, `POST /api/compliance/scan/:vm` (`profile_id` cis-level1/cis-level2/stig/pci-dss/hipaa), `GET /api/compliance/results` · Web Compliance page · `[compliance]` config enables auto-scan.
 
@@ -143,7 +143,7 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 _Clustering, live migration, fault tolerance, and multi-site recovery._
 
 - **etcd Clustering** — Multi-node clustering on an etcd state store with leader election and heartbeat-based health. — _No single control-plane node to take the fleet down with it._
-  - **How:** Set `[controller] enabled=true, mode="controller"` in `vmspawnd.toml` (etcd-backed state, leader election, heartbeat health) · cluster status via the cluster REST endpoints · Web Administration → datacenter.
+  - **How:** Set `[controller] enabled=true, mode="controller"` in `zyvor-fabricd.toml` (etcd-backed state, leader election, heartbeat health) · cluster status via the cluster REST endpoints · Web Administration → datacenter.
 - **Live Migration** — Move running VMs between hosts with iterative rsync pre-copy and cutover, with progress tracking and cancel. — _Drain a host for maintenance without stopping workloads._
   - **How:** Migrate a running VM between hosts (iterative rsync pre-copy + cutover) via the migration REST endpoints with progress/cancel · Web Site Operations.
 - **Fault Tolerance & Fencing** — Continuous VM replication with automatic failover detection, fencing, and FT metrics. — _Survive a node loss with minimal recovery time._
@@ -185,7 +185,7 @@ _Metrics, scheduling, notifications, and self-checks that keep the fabric health
 - **Multi-Channel Notifications** — Email, Slack, Microsoft Teams, and webhook alerts with retry and backoff. — _The right people hear about problems the moment they happen._
   - **How:** REST `POST /api/notifications/channels` (email/slack/webhook/teams) + `/rules`, verify with `POST .../channels/:id/test` · Web Notifications page · exponential-backoff retry (max 10 attempts).
 - **Health & Auto-Verify** — Deep health checks (API, disk, DB, timers, KVM) and post-install smoke tests of API, auth, VM CRUD, and backups. — _Catch a broken deploy before your users do._
-  - **How:** Run `./vmspawnctl health` (API/disk/DB/timers/KVM) and `./vmspawnctl verify` (post-install smoke tests of API, auth, VM CRUD, backups) · health also exposed over REST.
+  - **How:** Run `./zyvorctl health` (API/disk/DB/timers/KVM) and `./zyvorctl verify` (post-install smoke tests of API, auth, VM CRUD, backups) · health also exposed over REST.
 - **Config Snapshots & Events** — Versioned config-snapshot API, retained lifecycle events, and an SSE event stream for time-machine correlation. — _Diff infrastructure over time and reconstruct incidents._
   - **How:** Versioned config-snapshot REST API + recent events `GET /api/events` and live SSE `GET /api/events/stream` (created/started/stopped/migrated/error/…) · Web activity feed.
 
@@ -195,24 +195,24 @@ _Five first-class ways to drive the same daemon — pick per task, not per produ
 
 | Interface | Best for | Highlights |
 |---|---|---|
-| vmctl CLI | Scripting & automation | JSON/YAML/table output, apply -f |
-| vmctl-tui | Live terminal ops | vim keys, sparklines, per-VM actions |
+| zyvorctl CLI | Scripting & automation | JSON/YAML/table output, apply -f |
+| zyvorctl-tui | Live terminal ops | vim keys, sparklines, per-VM actions |
 | Web dashboard | Operators & teams | 37+ pages, Ctrl+K palette, bulk ops |
 | K8s operator | GitOps / K8s shops | VirtualMachine CRD reconciliation |
 | Terraform / SDK | Infra-as-code | plan/apply, typed Rust + Python + Ansible |
 
-- **vmctl CLI** — Scriptable command-line client with JSON/YAML/table output covering VM, policy, storage, and network operations. — _Automate anything the platform can do from a shell script._
-  - **How:** Install the `vmctl` binary and point it at the daemon: `vmctl vm list`, `vmctl vm create --name web-01 --cpus 2 --memory 4G`, `vmctl apply -f config.yaml`, with `--output json|yaml|table`.
-- **vmctl-tui** — k9s-style ratatui terminal dashboard with vim keybindings, sparklines, and live per-VM actions. — _Fleet control from a terminal, no browser required._
-  - **How:** Run `vmctl-tui` (optionally `--url http://: --refresh-interval N`); 8 views, vim navigation, per-VM `s`/`t`/`r`/`d`, bulk select with `v`/`Space`.
+- **zyvorctl CLI** — Scriptable command-line client with JSON/YAML/table output covering VM, policy, storage, and network operations. — _Automate anything the platform can do from a shell script._
+  - **How:** Install the `zyvorctl` binary and point it at the daemon: `zyvorctl vm list`, `zyvorctl vm create --name web-01 --cpus 2 --memory 4G`, `zyvorctl apply -f config.yaml`, with `--output json|yaml|table`.
+- **zyvorctl-tui** — k9s-style ratatui terminal dashboard with vim keybindings, sparklines, and live per-VM actions. — _Fleet control from a terminal, no browser required._
+  - **How:** Run `zyvorctl-tui` (optionally `--url http://: --refresh-interval N`); 8 views, vim navigation, per-VM `s`/`t`/`r`/`d`, bulk select with `v`/`Space`.
 - **Web Dashboard** — React web UI with 37+ pages, a Ctrl+K command palette, dark theme, live WebSocket updates, and bulk operations. — _Give operators a full GUI without giving up the API._
   - **How:** Browse to https://localhost:8443 and log in as `admin`; `Ctrl+K` command palette, 37+ pages, bulk ops, and live WebSocket/SSE updates — served by the daemon itself.
 - **Console & VNC** — Browser terminal via xterm.js over WebSocket and graphical VNC via a noVNC proxy, authenticated with the same JWT. — _Reach any VM's console without exposing raw ports._
   - **How:** Web VM Console (xterm.js) / VNC (noVNC) buttons · WebSocket `ws:///api/vms/:name/console?token=` (also `/ws/vnc/:name`) · `websocat` from the CLI.
 - **Kubernetes Operator** — Manage VMs as VirtualMachine CRDs with continuous reconciliation via a Helm-installable operator. — _Define VMs alongside containers in the same GitOps flow._
   - **How:** Install the Helm-packaged operator, then declare `VirtualMachine` CRDs; the operator continuously reconciles them against the Fabric API.
-- **Terraform, SDK & Ansible** — A Terraform provider with full plan/apply, a typed Rust vmspawn-sdk, plus Python and Ansible SDKs. — _Provision the fabric from whatever IaC tooling your team already uses._
-  - **How:** Use the Terraform provider (`terraform plan` / `apply`), the typed Rust `vmspawn-sdk`, or the Python / Ansible SDKs — all target the same REST API.
+- **Terraform, SDK & Ansible** — A Terraform provider with full plan/apply, a typed Rust zyvor-fabric-sdk, plus Python and Ansible SDKs. — _Provision the fabric from whatever IaC tooling your team already uses._
+  - **How:** Use the Terraform provider (`terraform plan` / `apply`), the typed Rust `zyvor-fabric-sdk`, or the Python / Ansible SDKs — all target the same REST API.
 
 ## 9. Fleet, Cost & Governance
 
@@ -233,11 +233,11 @@ _Datacenter hierarchy, resource pools, chargeback, and lifecycle compliance at s
 
 ## Getting started
 
-1. **Install in one command** — Clone the repo and run make build && sudo make install, or ./vmspawnctl deploy for an auto-sudo end-to-end setup.
-2. **Start the service** — Run sudo systemctl enable --now zyvor-fabric, then read the auto-generated admin password with ./vmspawnctl password.
-3. **Create your first VM** — Use vmctl vm create --name web-01 --cpus 2 --memory 4G, or declare it in YAML and run vmctl apply -f config.yaml.
-4. **Open your interface of choice** — Launch vmctl-tui in a terminal or open the web dashboard at https://localhost:8443 to manage the fleet.
-5. **Verify and monitor** — Run ./vmspawnctl verify and ./vmspawnctl health, then scrape /metrics into Prometheus and import the bundled Grafana dashboard.
+1. **Install in one command** — Clone the repo and run make build && sudo make install, or ./zyvorctl deploy for an auto-sudo end-to-end setup.
+2. **Start the service** — Run sudo systemctl enable --now zyvor-fabric, then read the auto-generated admin password with ./zyvorctl password.
+3. **Create your first VM** — Use zyvorctl vm create --name web-01 --cpus 2 --memory 4G, or declare it in YAML and run zyvorctl apply -f config.yaml.
+4. **Open your interface of choice** — Launch zyvorctl-tui in a terminal or open the web dashboard at https://localhost:8443 to manage the fleet.
+5. **Verify and monitor** — Run ./zyvorctl verify and ./zyvorctl health, then scrape /metrics into Prometheus and import the bundled Grafana dashboard.
 
 > **Good to know:** Zyvor Fabric requires Linux with systemd 256+ (Fedora, Ubuntu, Debian, RHEL, or SUSE) and KVM; it is not a hosted or Windows-server product. Some enterprise capabilities carry environmental prerequisites — swtpm for vTPM, an etcd cluster and shared/replicated storage for HA and live migration, and matching hardware/IOMMU for GPU passthrough. Multi-node HA is designed for 3+ nodes; single-server deployments run standalone. The published endpoint and page counts (480+ REST endpoints, 37+ web pages) reflect current documentation and may vary by release, and the macOS Machina workbench is a separate desktop product that consumes the Fabric API rather than part of this daemon.
 

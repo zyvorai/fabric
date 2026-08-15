@@ -64,8 +64,8 @@
     <div>
       <h3>Pre-Demo Checklist</h3>
       <ol>
-        <li>Ensure Zyvor Fabric is running: <code>./vmspawnctl status</code></li>
-        <li>Verify health: <code>./vmspawnctl health</code></li>
+        <li>Ensure Zyvor Fabric is running: <code>./zyvorctl status</code></li>
+        <li>Verify health: <code>./zyvorctl health</code></li>
         <li>Download a cloud image in advance</li>
         <li>Clear any leftover demo VMs</li>
         <li>Have the web UI open in a browser tab</li>
@@ -74,10 +74,10 @@
       </ol>
       <h3 style="margin-top: 20px;">Pre-Download Image</h3>
       <pre><code># Download before the demo to avoid wait times
-vmctl image download ubuntu-24.04
+zyvorctl image download ubuntu-24.04
 
 # Verify image is available
-vmctl image list</code></pre>
+zyvorctl image list</code></pre>
     </div>
     <div>
       <h3>Environment Requirements</h3>
@@ -110,12 +110,12 @@ vmctl image list</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 1: List available images</h3>
-    <pre><code>vmctl image list</code></pre>
+    <pre><code>zyvorctl image list</code></pre>
     <p>Show the built-in cloud image catalog.</p>
   </div>
   <div class="demo-step">
     <h3>Step 2: Create the VM</h3>
-    <pre><code>vmctl create demo-web \
+    <pre><code>zyvorctl create demo-web \
   --image=ubuntu-24.04.qcow2 \
   --cpus=2 \
   --memory=2048</code></pre>
@@ -123,11 +123,11 @@ vmctl image list</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 3: Start the VM</h3>
-    <pre><code>vmctl start demo-web</code></pre>
+    <pre><code>zyvorctl start demo-web</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 4: Verify it is running</h3>
-    <pre><code>vmctl list</code></pre>
+    <pre><code>zyvorctl list</code></pre>
     <p>Show the VM status: name, state, CPU, memory.</p>
   </div>
   <div class="talking-point">
@@ -144,7 +144,7 @@ vmctl image list</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 1: Create a VM with cloud-init</h3>
-    <pre><code>vmctl create demo-app \
+    <pre><code>zyvorctl create demo-app \
   --image=ubuntu-24.04.qcow2 \
   --cpus=4 \
   --memory=4096 \
@@ -154,12 +154,12 @@ vmctl image list</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 2: Show VM details</h3>
-    <pre><code>vmctl info demo-app</code></pre>
+    <pre><code>zyvorctl info demo-app</code></pre>
     <p>Show the full configuration: CPU, memory, disk, cloud-init settings.</p>
   </div>
   <div class="demo-step">
     <h3>Step 3: Show JSON output</h3>
-    <pre><code>vmctl list -o json</code></pre>
+    <pre><code>zyvorctl list -o json</code></pre>
     <p>Demonstrate the scriptable JSON output for automation.</p>
   </div>
   <div class="demo-step">
@@ -218,7 +218,7 @@ systemctl status</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 1: Create a snapshot</h3>
-    <pre><code>vmctl snapshot create demo-web --name=before-update</code></pre>
+    <pre><code>zyvorctl snapshot create demo-web --name=before-update</code></pre>
     <p>Explain: snapshots capture the full VM state at a point in time.</p>
   </div>
   <div class="demo-step">
@@ -228,16 +228,16 @@ systemctl status</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 3: Restore the snapshot</h3>
-    <pre><code>vmctl snapshot restore demo-web --name=before-update</code></pre>
+    <pre><code>zyvorctl snapshot restore demo-web --name=before-update</code></pre>
     <p>Show that the VM is back to its previous state.</p>
   </div>
   <div class="demo-step">
     <h3>Step 4: Show backup automation</h3>
     <pre><code># Show backup configuration
-./vmspawnctl backup status
+./zyvorctl backup status
 
 # Trigger an immediate backup
-./vmspawnctl backup now</code></pre>
+./zyvorctl backup now</code></pre>
     <p>Explain: automated daily backups run via systemd timer with configurable retention.</p>
   </div>
   <div class="talking-point">
@@ -254,23 +254,23 @@ systemctl status</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 1: Show current network configuration</h3>
-    <pre><code>vmctl network list</code></pre>
+    <pre><code>zyvorctl network list</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 2: Apply a firewall rule</h3>
     <pre><code># Allow HTTP/HTTPS, deny everything else
-vmctl firewall demo-web --allow tcp:80,443 --deny all</code></pre>
+zyvorctl firewall demo-web --allow tcp:80,443 --deny all</code></pre>
     <p>Explain: per-VM firewall profiles using nftables under the hood.</p>
   </div>
   <div class="demo-step">
     <h3>Step 3: Show network policies</h3>
-    <pre><code>vmctl policy list</code></pre>
+    <pre><code>zyvorctl policy list</code></pre>
     <p>Explain: Cilium-style label-based policies control which VMs can communicate.</p>
   </div>
   <div class="demo-step">
     <h3>Step 4: Show monitoring</h3>
     <pre><code># Per-VM bandwidth tracking
-vmctl net-monitor demo-web</code></pre>
+zyvorctl net-monitor demo-web</code></pre>
     <p>Show real-time bandwidth usage and threshold alerts.</p>
   </div>
   <div class="talking-point">
@@ -307,7 +307,7 @@ vmctl net-monitor demo-web</code></pre>
   <div class="demo-step">
     <h3>Step 3: Terminal UI (Bonus)</h3>
     <pre><code># Show the k9s-style terminal UI
-vmctl-tui</code></pre>
+zyvorctl-tui</code></pre>
     <p>Navigate between views. Show sparkline graphs. Demonstrate vim keybindings. Press <code>s</code> to start a VM, <code>b</code> to backup.</p>
   </div>
   <div class="demo-step">
@@ -326,17 +326,17 @@ vmctl-tui</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 1: Stop the demo VMs</h3>
-    <pre><code>vmctl stop demo-web
-vmctl stop demo-app</code></pre>
+    <pre><code>zyvorctl stop demo-web
+zyvorctl stop demo-app</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 2: Delete the demo VMs</h3>
-    <pre><code>vmctl delete demo-web
-vmctl delete demo-app</code></pre>
+    <pre><code>zyvorctl delete demo-web
+zyvorctl delete demo-app</code></pre>
   </div>
   <div class="demo-step">
     <h3>Step 3: Verify clean state</h3>
-    <pre><code>vmctl list</code></pre>
+    <pre><code>zyvorctl list</code></pre>
     <p>Confirm all demo VMs are removed.</p>
   </div>
   <div class="talking-point">
@@ -364,7 +364,7 @@ vmctl delete demo-app</code></pre>
       Ready to deploy? It takes 5 minutes.
     </p>
   </div>
-  <pre style="margin-top: 30px; display: inline-block;"><code>./vmspawnctl deploy</code></pre>
+  <pre style="margin-top: 30px; display: inline-block;"><code>./zyvorctl deploy</code></pre>
   <div style="margin-top: 40px;">
     <span class="badge">Zyvor Family</span>
     <span class="badge" style="background:#431407;color:#f97316;">zyvor.dev</span>

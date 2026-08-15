@@ -1,8 +1,8 @@
 # Publishing to the Terraform Registry
 
-Provider type: **`vmspawnd`**  
-Registry namespace: **`ssahani/vmspawnd`**  
-Product: **Zyvor Fabric** (`vmspawnd` daemon)
+Provider type: **`zyvor-fabricd`**  
+Registry namespace: **`ssahani/zyvor-fabricd`**  
+Product: **Zyvor Fabric** (`zyvor-fabricd` daemon)
 
 ## Prerequisites
 
@@ -21,8 +21,8 @@ git push origin terraform-provider/v0.1.0
 
 GitHub Actions (`.github/workflows/terraform-provider-release.yml`) runs GoReleaser and uploads:
 
-- Multi-platform `terraform-provider-vmspawnd` binaries
-- Terraform Registry provider manifest (`registry.terraform.io/ssahani/vmspawnd`)
+- Multi-platform `terraform-provider-zyvor-fabricd` binaries
+- Terraform Registry provider manifest (`registry.terraform.io/ssahani/zyvor-fabricd`)
 
 ## Local install (development)
 
@@ -36,14 +36,14 @@ make tidy build install
 ```hcl
 terraform {
   required_providers {
-    vmspawnd = {
-      source  = "ssahani/vmspawnd"
+    zyvor-fabricd = {
+      source  = "ssahani/zyvor-fabricd"
       version = "~> 0.1"
     }
   }
 }
 
-provider "vmspawnd" {
+provider "zyvor-fabricd" {
   endpoint = "https://fabric.example.com:9095"
   token    = var.fabric_token
 }
@@ -51,7 +51,7 @@ provider "vmspawnd" {
 
 ## Future alias: `ssahani/zyvor-fabric`
 
-The provider **type name** stays `vmspawnd` for compatibility. A second registry namespace can mirror the same binaries once published:
+The provider **type name** stays `zyvor-fabricd` for compatibility. A second registry namespace can mirror the same binaries once published:
 
 ```hcl
 source = "ssahani/zyvor-fabric"  # planned mirror
@@ -80,10 +80,10 @@ ls -la dist/
 
 ### Acceptance smoke (live daemon)
 
-After `scripts/ci-api-audit.sh` or with a running `vmspawnd`:
+After `scripts/ci-api-audit.sh` or with a running `zyvor-fabricd`:
 
 ```bash
 chmod +x scripts/acceptance-smoke.sh
-VMSPAWND_ADMIN_PASSWORD=... ./scripts/acceptance-smoke.sh
+ZYVOR_FABRICD_ADMIN_PASSWORD=... ./scripts/acceptance-smoke.sh
 ```
 

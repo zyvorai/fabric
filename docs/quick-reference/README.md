@@ -18,10 +18,10 @@ developers.
 ## At a Glance
 
 - **Default listen address**: `127.0.0.1:9095`
-- **Config file**: `/etc/vmspawnd/vmspawnd.toml`
-- **Data directory**: `/var/lib/vmspawnd/`
+- **Config file**: `/etc/zyvor-fabricd/zyvor-fabricd.toml`
+- **Data directory**: `/var/lib/zyvor-fabricd/`
 - **API base path**: `/api/v1/`
 - **Metrics endpoint**: `/metrics`
 - **WebSocket console**: `/api/v1/ws/{vm_name}/console`
 - **SSE event stream**: `/api/v1/events/stream`
-- **Log level env var**: `VSPAWN_LOG_LEVEL`
+- **Log level env var**: `ZYVOR_FABRICD_LOG_LEVEL`

@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn test_basic_resolution() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![make_vm("web-1", &[("app", "web")], Some("10.0.0.5"))];
         let policy = make_policy(
             "web-dns",
@@ -209,7 +209,7 @@ mod tests {
 
         let records = resolver.resolve_policy(&policy, &zone, &vms);
         assert_eq!(records.len(), 1);
-        assert_eq!(records[0].name, "web-1.web.vmspawnd.local");
+        assert_eq!(records[0].name, "web-1.web.zyvor-fabricd.local");
         assert_eq!(records[0].value, "10.0.0.5");
         assert_eq!(records[0].vm_name, "web-1");
     }
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn test_no_matches() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![make_vm("db-1", &[("app", "db")], Some("10.0.0.20"))];
         let policy = make_policy(
             "web-dns",
@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn test_srv_records() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![make_vm("web-1", &[("app", "web")], Some("10.0.0.5"))];
         let policy = make_policy(
             "web-srv",
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn test_cname() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![make_vm("web-1", &[("app", "web")], Some("10.0.0.5"))];
         let policy = make_policy(
             "web-cname",
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn test_dedup() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![make_vm("web-1", &[("app", "web")], Some("10.0.0.5"))];
 
         let policy1 = make_policy(
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_multiple_policies_same_zone() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![
             make_vm("web-1", &[("app", "web")], Some("10.0.0.5")),
             make_vm("api-1", &[("app", "api")], Some("10.0.0.10")),
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn test_disabled_policy() {
         let resolver = DnsResolver::new();
-        let zone = make_zone("vmspawnd.local");
+        let zone = make_zone("zyvor-fabricd.local");
         let vms = vec![make_vm("web-1", &[("app", "web")], Some("10.0.0.5"))];
         let mut policy = make_policy(
             "web-dns",

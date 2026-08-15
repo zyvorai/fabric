@@ -34,7 +34,7 @@ kind: VirtualMachine
 metadata:
   name: my-vm
 spec:
-  image: /var/lib/vmspawnd/images/ubuntu-22.04.qcow2
+  image: /var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2
   cpus: 2
   memory: 2048
   cloudInit:
@@ -105,7 +105,7 @@ The operator is configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VMSPAWND_URL` | `http://Zyvor Fabric:8080` | URL of the Zyvor Fabric API |
+| `ZYVOR_FABRICD_URL` | `http://Zyvor Fabric:8080` | URL of the Zyvor Fabric API |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 
 ## Development

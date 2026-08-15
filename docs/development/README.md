@@ -43,12 +43,12 @@ Zyvor Fabric/
   |
   +-- backend/                 # Rust workspace (46 crates)
   |   +-- Zyvor Fabric/            # Main daemon binary
-  |   +-- vmctl/               # CLI client
-  |   +-- vmctl-tui/           # Terminal UI client
+  |   +-- zyvorctl/               # CLI client
+  |   +-- zyvorctl-tui/           # Terminal UI client
   |   +-- vm-model/            # Core data structures
   |   +-- state-store/         # Persistent state storage
   |   +-- security/            # Auth, JWT, PAM, RBAC
-  |   +-- vmspawn-driver/      # systemd-vmspawn process driver
+  |   +-- zyvor-fabric-vm-driver/      # systemd-vmspawn process driver
   |   +-- cloud-init/          # cloud-init ISO generation
   |   +-- prometheus-exporter/ # Prometheus metrics
   |   +-- vnc-proxy/           # WebSocket-to-VNC proxy

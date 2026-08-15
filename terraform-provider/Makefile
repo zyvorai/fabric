@@ -1,6 +1,6 @@
 .PHONY: build install tidy test
 
-PROVIDER_NAME := terraform-provider-vmspawnd
+PROVIDER_NAME := terraform-provider-zyvor-fabricd
 VERSION ?= 0.1.0
 
 build:
@@ -10,8 +10,8 @@ tidy:
 	go mod tidy
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/ssahani/vmspawnd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
-	cp $(PROVIDER_NAME) ~/.terraform.d/plugins/registry.terraform.io/ssahani/vmspawnd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(PROVIDER_NAME)_v$(VERSION)
+	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/ssahani/zyvor-fabricd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
+	cp $(PROVIDER_NAME) ~/.terraform.d/plugins/registry.terraform.io/ssahani/zyvor-fabricd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(PROVIDER_NAME)_v$(VERSION)
 
 test:
 	go test ./...

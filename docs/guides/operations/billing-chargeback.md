@@ -210,7 +210,7 @@ Automate invoice generation at the end of each billing period:
 #!/bin/bash
 # generate-invoices.sh -- Run on the 1st of each month
 HOST="http://localhost:3000"
-TOKEN="$(cat /etc/vmspawnd/api-token)"
+TOKEN="$(cat /etc/zyvor-fabricd/api-token)"
 AUTH="Authorization: Bearer $TOKEN"
 
 # Get unique tenant IDs from usage records
@@ -219,7 +219,7 @@ TENANTS=$(curl -s "$HOST/api/billing/usage" -H "$AUTH" | jq -r '.[].tenant_id' |
 for tenant in $TENANTS; do
   echo "Generating invoice for $tenant..."
   curl -s -X POST "$HOST/api/billing/invoice/$tenant" \
-    -H "$AUTH" | jq > "/var/lib/vmspawnd/invoices/${tenant}-$(date +%Y-%m).json"
+    -H "$AUTH" | jq > "/var/lib/zyvor-fabricd/invoices/${tenant}-$(date +%Y-%m).json"
 done
 ```
 

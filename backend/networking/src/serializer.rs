@@ -581,7 +581,7 @@ mod tests {
             created: String::new(),
             updated: String::new(),
         };
-        let out = vlan_parent_network(&cfg, "50-vmspawnd-");
+        let out = vlan_parent_network(&cfg, "50-zyvor-fabricd-");
         assert!(out.contains("Name=eth0\n"));
         assert!(out.contains("VLAN=vlan100\n"));
     }

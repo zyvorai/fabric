@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # Emoji-rich deploy UI (self-contained; configure via deploy-common.sh before sourcing).
 
-DEPLOY_UI_PROJECT="${DEPLOY_UI_PROJECT:-vmspawnd}"
+DEPLOY_UI_PROJECT="${DEPLOY_UI_PROJECT:-zyvor-fabricd}"
 DEPLOY_UI_ICON="${DEPLOY_UI_ICON:-🖥️}"
 DEPLOY_UI_ICON_UNINSTALL="${DEPLOY_UI_ICON_UNINSTALL:-🗑️}"
 DEPLOY_UI_ICON_MAGIC="${DEPLOY_UI_ICON_MAGIC:-✨}"

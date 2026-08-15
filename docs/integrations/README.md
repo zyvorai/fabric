@@ -1,6 +1,6 @@
 # Zyvor Fabric Integrations
 
-Third-party and companion products that connect to the Zyvor Fabric control plane (`vmspawnd`).
+Third-party and companion products that connect to the Zyvor Fabric control plane (`zyvor-fabricd`).
 
 | Integration | Status | Document |
 |-------------|--------|----------|

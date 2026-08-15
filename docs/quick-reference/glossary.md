@@ -405,9 +405,9 @@ the hypervisor.
 **VM (Virtual Machine)**: An isolated computing environment with its own virtual
 hardware (CPU, memory, disk, network), running its own operating system.
 
-**vmctl**: The Zyvor Fabric command-line client for managing VMs via the REST API.
+**zyvorctl**: The Zyvor Fabric command-line client for managing VMs via the REST API.
 
-**vmctl-tui**: The Zyvor Fabric terminal UI client using ratatui for a full-screen
+**zyvorctl-tui**: The Zyvor Fabric terminal UI client using ratatui for a full-screen
 interactive management interface.
 
 **VMDriver**: The trait defined in `Zyvor Fabric-driver-core` that abstracts VM

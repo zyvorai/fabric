@@ -10,7 +10,7 @@ use std::sync::RwLock;
 /// XOR-based obfuscation key for secret values at rest.
 /// In a production deployment with external KMS, this would be replaced
 /// by envelope encryption using the KMS-managed key.
-const OBFUSCATION_KEY: &[u8] = b"vmspawnd-secrets-at-rest-key-v1!";
+const OBFUSCATION_KEY: &[u8] = b"zyvor-fabricd-secrets-at-rest-key-v1!";
 
 /// Encrypt a secret value for storage at rest.
 fn encrypt_value(plaintext: &str) -> String {

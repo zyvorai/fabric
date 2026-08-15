@@ -13,7 +13,7 @@ PRESETDIR   = $(PREFIX)/lib/systemd/system-preset
 SYSUSERSDIR = $(PREFIX)/lib/sysusers.d
 TMPFILESDIR = $(PREFIX)/lib/tmpfiles.d
 MODULESDIR  = $(SYSCONFDIR)/modules-load.d
-LIBEXECDIR  = $(PREFIX)/libexec/vmspawnd
+LIBEXECDIR  = $(PREFIX)/libexec/zyvor-fabricd
 
 all: build
 
@@ -29,86 +29,86 @@ install: install-bin install-conf install-systemd install-web install-modules
 
 install-bin:
 	install -d $(DESTDIR)$(BINDIR)
-	install -m 0755 backend/target/release/vmspawnd  $(DESTDIR)$(BINDIR)/vmspawnd
-	install -m 0755 backend/target/release/vmctl      $(DESTDIR)$(BINDIR)/vmctl
-	install -m 0755 backend/target/release/vmctl-tui  $(DESTDIR)$(BINDIR)/vmctl-tui
+	install -m 0755 backend/target/release/zyvor-fabricd  $(DESTDIR)$(BINDIR)/zyvor-fabricd
+	install -m 0755 backend/target/release/zyvorctl      $(DESTDIR)$(BINDIR)/zyvorctl
+	install -m 0755 backend/target/release/zyvorctl-tui  $(DESTDIR)$(BINDIR)/zyvorctl-tui
 
 install-conf:
-	install -d $(DESTDIR)$(SYSCONFDIR)/vmspawnd
-	install -m 0644 configs/vmspawnd.toml $(DESTDIR)$(SYSCONFDIR)/vmspawnd/vmspawnd.toml
-	install -m 0644 configs/vmspawnd.env  $(DESTDIR)$(SYSCONFDIR)/vmspawnd/vmspawnd.env
-	install -d $(DESTDIR)/var/lib/vmspawnd/images
+	install -d $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd
+	install -m 0644 configs/zyvor-fabricd.toml $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd/zyvor-fabricd.toml
+	install -m 0644 configs/zyvor-fabricd.env  $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd/zyvor-fabricd.env
+	install -d $(DESTDIR)/var/lib/zyvor-fabricd/images
 
 install-systemd:
 	install -d $(DESTDIR)$(UNITDIR)
-	install -m 0644 systemd/vmspawnd.service         $(DESTDIR)$(UNITDIR)/vmspawnd.service
-	install -m 0644 systemd/vmspawnd.socket          $(DESTDIR)$(UNITDIR)/vmspawnd.socket
+	install -m 0644 systemd/zyvor-fabricd.service         $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
+	install -m 0644 systemd/zyvor-fabricd.socket          $(DESTDIR)$(UNITDIR)/zyvor-fabricd.socket
 	install -m 0644 systemd/vm@.service              $(DESTDIR)$(UNITDIR)/vm@.service
-	install -m 0644 systemd/vmspawnd-backup.service   $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
-	install -m 0644 systemd/vmspawnd-backup.timer    $(DESTDIR)$(UNITDIR)/vmspawnd-backup.timer
-	install -m 0644 systemd/vmspawnd-cleanup.service $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.service
-	install -m 0644 systemd/vmspawnd-cleanup.timer   $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.timer
+	install -m 0644 systemd/zyvor-fabricd-backup.service   $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.service
+	install -m 0644 systemd/zyvor-fabricd-backup.timer    $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.timer
+	install -m 0644 systemd/zyvor-fabricd-cleanup.service $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.service
+	install -m 0644 systemd/zyvor-fabricd-cleanup.timer   $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.timer
 	install -d $(DESTDIR)$(PRESETDIR)
-	install -m 0644 systemd/vmspawnd.preset  $(DESTDIR)$(PRESETDIR)/90-vmspawnd.preset
+	install -m 0644 systemd/zyvor-fabricd.preset  $(DESTDIR)$(PRESETDIR)/90-zyvor-fabricd.preset
 	install -d $(DESTDIR)$(SYSUSERSDIR)
-	install -m 0644 systemd/vmspawnd.sysusers $(DESTDIR)$(SYSUSERSDIR)/vmspawnd.conf
+	install -m 0644 systemd/zyvor-fabricd.sysusers $(DESTDIR)$(SYSUSERSDIR)/zyvor-fabricd.conf
 	install -d $(DESTDIR)$(TMPFILESDIR)
-	install -m 0644 systemd/vmspawnd.tmpfiles $(DESTDIR)$(TMPFILESDIR)/vmspawnd.conf
+	install -m 0644 systemd/zyvor-fabricd.tmpfiles $(DESTDIR)$(TMPFILESDIR)/zyvor-fabricd.conf
 	install -d $(DESTDIR)$(LIBEXECDIR)
 	install -m 0755 scripts/backup-vms    $(DESTDIR)$(LIBEXECDIR)/backup-vms
 	install -m 0755 scripts/cleanup-store $(DESTDIR)$(LIBEXECDIR)/cleanup-store
 	install -m 0755 scripts/health-check  $(DESTDIR)$(LIBEXECDIR)/health-check
 
 install-web:
-	install -d $(DESTDIR)$(DATADIR)/vmspawnd/web
-	cp -r web/dist/* $(DESTDIR)$(DATADIR)/vmspawnd/web/
+	install -d $(DESTDIR)$(DATADIR)/zyvor-fabricd/web
+	cp -r web/dist/* $(DESTDIR)$(DATADIR)/zyvor-fabricd/web/
 
 install-modules:
 	install -d $(DESTDIR)$(MODULESDIR)
-	install -m 0644 configs/modules-load.d/vmspawnd.conf $(DESTDIR)$(MODULESDIR)/vmspawnd.conf
+	install -m 0644 configs/modules-load.d/zyvor-fabricd.conf $(DESTDIR)$(MODULESDIR)/zyvor-fabricd.conf
 	install -d $(DESTDIR)/etc/logrotate.d
-	install -m 0644 configs/logrotate.d/vmspawnd $(DESTDIR)/etc/logrotate.d/vmspawnd
+	install -m 0644 configs/logrotate.d/zyvor-fabricd $(DESTDIR)/etc/logrotate.d/zyvor-fabricd
 	install -d $(DESTDIR)/etc/bash_completion.d
-	install -m 0644 completions/vmspawnctl.bash $(DESTDIR)/etc/bash_completion.d/vmspawnctl
-	install -m 0644 completions/vmctl.bash $(DESTDIR)/etc/bash_completion.d/vmctl
+	install -m 0644 completions/zyvorctl.bash $(DESTDIR)/etc/bash_completion.d/zyvorctl
+	install -m 0644 completions/zyvorctl.bash $(DESTDIR)/etc/bash_completion.d/zyvorctl
 
 uninstall:
-	rm -f  $(DESTDIR)$(BINDIR)/vmspawnd
-	rm -f  $(DESTDIR)$(BINDIR)/vmctl
-	rm -f  $(DESTDIR)$(BINDIR)/vmctl-tui
-	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd.service
-	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd.socket
+	rm -f  $(DESTDIR)$(BINDIR)/zyvor-fabricd
+	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl
+	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl-tui
+	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
+	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd.socket
 	rm -f  $(DESTDIR)$(UNITDIR)/vm@.service
-	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.service
-	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-backup.timer
-	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.service
-	rm -f  $(DESTDIR)$(UNITDIR)/vmspawnd-cleanup.timer
-	rm -f  $(DESTDIR)/etc/logrotate.d/vmspawnd
-	rm -f  $(DESTDIR)/etc/bash_completion.d/vmspawnctl
-	rm -f  $(DESTDIR)/etc/bash_completion.d/vmctl
+	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.service
+	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-backup.timer
+	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.service
+	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd-cleanup.timer
+	rm -f  $(DESTDIR)/etc/logrotate.d/zyvor-fabricd
+	rm -f  $(DESTDIR)/etc/bash_completion.d/zyvorctl
+	rm -f  $(DESTDIR)/etc/bash_completion.d/zyvorctl
 	rm -rf $(DESTDIR)$(LIBEXECDIR)
-	rm -f  $(DESTDIR)$(PRESETDIR)/90-vmspawnd.preset
-	rm -f  $(DESTDIR)$(SYSUSERSDIR)/vmspawnd.conf
-	rm -f  $(DESTDIR)$(TMPFILESDIR)/vmspawnd.conf
-	rm -rf $(DESTDIR)$(DATADIR)/vmspawnd
-	rm -rf $(DESTDIR)$(SYSCONFDIR)/vmspawnd
+	rm -f  $(DESTDIR)$(PRESETDIR)/90-zyvor-fabricd.preset
+	rm -f  $(DESTDIR)$(SYSUSERSDIR)/zyvor-fabricd.conf
+	rm -f  $(DESTDIR)$(TMPFILESDIR)/zyvor-fabricd.conf
+	rm -rf $(DESTDIR)$(DATADIR)/zyvor-fabricd
+	rm -rf $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd
 
 run:
-	cd backend && VSPAWN_LOG_LEVEL=info cargo run --bin vmspawnd
+	cd backend && ZYVOR_FABRICD_LOG_LEVEL=info cargo run --bin zyvor-fabricd
 
 run-debug:
-	cd backend && VSPAWN_LOG_LEVEL=debug cargo run --bin vmspawnd
+	cd backend && ZYVOR_FABRICD_LOG_LEVEL=debug cargo run --bin zyvor-fabricd
 
 dev:
-	@echo "Starting Zyvor Fabric (vmspawnd) in development mode..."
-	@cd backend && VSPAWN_LOG_LEVEL=debug cargo run --bin vmspawnd &
+	@echo "Starting Zyvor Fabric (zyvor-fabricd) in development mode..."
+	@cd backend && ZYVOR_FABRICD_LOG_LEVEL=debug cargo run --bin zyvor-fabricd &
 	@cd web && npm run dev
 
 tui:
-	cd backend && cargo run --bin vmctl-tui
+	cd backend && cargo run --bin zyvorctl-tui
 
 cli:
-	cd backend && cargo run --bin vmctl
+	cd backend && cargo run --bin zyvorctl
 
 test:
 	cd backend && cargo test
@@ -125,7 +125,7 @@ lint:
 	cd backend && cargo clippy
 
 rpm:
-	rpmbuild -ba vmspawnd.spec --define "_topdir $(PWD)/rpmbuild" --define "_sourcedir $(PWD)"
+	rpmbuild -ba zyvor-fabricd.spec --define "_topdir $(PWD)/rpmbuild" --define "_sourcedir $(PWD)"
 
 deb:
 	dpkg-buildpackage -us -uc -b

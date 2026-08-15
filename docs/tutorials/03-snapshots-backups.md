@@ -374,7 +374,7 @@ Expected response:
     "compressed": true,
     "created": "2026-04-12T12:10:30Z",
     "status": "completed",
-    "storage_location": "/var/lib/vmspawnd/backups/snapshot-demo/e5f6a7b8.qcow2.zst",
+    "storage_location": "/var/lib/zyvor-fabricd/backups/snapshot-demo/e5f6a7b8.qcow2.zst",
     "retention_days": 30,
     "expires_at": "2026-05-12T12:10:30Z",
     "metadata": null

@@ -430,7 +430,7 @@ store, and core modules.</p>
 <ul>
 <li><strong>Core daemon</strong> (<code>Zyvor Fabric</code>) — REST API
 server with 480+ endpoints</li>
-<li><strong>VM driver</strong> (<code>vmspawn-driver</code>) —
+<li><strong>VM driver</strong> (<code>zyvor-fabric-vm-driver</code>) —
 systemd-vmspawn/machined integration</li>
 <li><strong>Security</strong> (<code>security</code>) — JWT
 authentication, RBAC, user management</li>
@@ -559,9 +559,9 @@ Logged in Plaintext</h4>
 <p><strong>Finding:</strong> Auto-generated admin password was written
 to log output via <code>tracing::warn!</code>.</p>
 <p><strong>Remediation:</strong> Password written to
-<code>/var/lib/vmspawnd/.admin_password</code> with mode
+<code>/var/lib/zyvor-fabricd/.admin_password</code> with mode
 <code>0600</code>. JWT secret similarly persisted to
-<code>/var/lib/vmspawnd/.jwt_secret</code> with <code>0600</code>
+<code>/var/lib/zyvor-fabricd/.jwt_secret</code> with <code>0600</code>
 permissions. Config directory/file permission errors now logged instead
 of silently ignored.</p>
 <h4 id="c4.-missing-rbac-on-api-endpoints">C4. Missing RBAC on API
@@ -1308,11 +1308,11 @@ Results (Round 16)</h3>
 <ol type="1">
 <li><strong>Admin password</strong> — randomly generated (64
 alphanumeric chars), written to
-<code>/var/lib/vmspawnd/.admin_password</code> (mode
+<code>/var/lib/zyvor-fabricd/.admin_password</code> (mode
 <code>0600</code>)</li>
 <li><strong>JWT signing secret</strong> — randomly generated (64
 alphanumeric chars), persisted to
-<code>/var/lib/vmspawnd/.jwt_secret</code> (mode <code>0600</code>)</li>
+<code>/var/lib/zyvor-fabricd/.jwt_secret</code> (mode <code>0600</code>)</li>
 <li><strong>Default admin user</strong> created in SQLite database with
 bcrypt-hashed password</li>
 </ol>
@@ -1334,12 +1334,12 @@ bcrypt-hashed password</li>
 <tr>
 <td>JWT secret</td>
 <td><code>auth.jwt_secret</code></td>
-<td><code>VMSPAWND_JWT_SECRET</code></td>
+<td><code>ZYVOR_FABRICD_JWT_SECRET</code></td>
 </tr>
 <tr>
 <td>Admin password</td>
 <td><code>auth.default_admin_password</code></td>
-<td><code>VMSPAWND_ADMIN_PASSWORD</code></td>
+<td><code>ZYVOR_FABRICD_ADMIN_PASSWORD</code></td>
 </tr>
 <tr>
 <td>Auth enabled</td>
@@ -1354,25 +1354,25 @@ bcrypt-hashed password</li>
 <tr>
 <td>Backup directory</td>
 <td><code>backup.backup_dir</code></td>
-<td><code>VMSPAWND_BACKUP_DIR</code></td>
+<td><code>ZYVOR_FABRICD_BACKUP_DIR</code></td>
 </tr>
 <tr>
 <td>Backup retention</td>
 <td><code>backup.retention_days</code></td>
-<td><code>VMSPAWND_BACKUP_RETAIN</code></td>
+<td><code>ZYVOR_FABRICD_BACKUP_RETAIN</code></td>
 </tr>
 <tr>
 <td>Backup type</td>
 <td><code>backup.backup_type</code></td>
-<td><code>VMSPAWND_BACKUP_TYPE</code></td>
+<td><code>ZYVOR_FABRICD_BACKUP_TYPE</code></td>
 </tr>
 </tbody>
 </table>
 <h3 id="password-retrieval">4.3 Password Retrieval</h3>
 <div class="sourceCode" id="cb2"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./vmspawnctl</span> password</span>
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./zyvorctl</span> password</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># or directly:</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cat /var/lib/vmspawnd/.admin_password</span></code></pre></div>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cat /var/lib/zyvor-fabricd/.admin_password</span></code></pre></div>
 <hr />
 <h2 id="api-security">5. API Security</h2>
 <h3 id="rbac-matrix">5.1 RBAC Matrix</h3>

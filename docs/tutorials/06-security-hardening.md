@@ -392,7 +392,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/encryption/providers" \
     "provider_type": "local",
     "description": "Local key management for development",
     "config": {
-      "key_store_path": "/var/lib/vmspawnd/keys"
+      "key_store_path": "/var/lib/zyvor-fabricd/keys"
     }
   }' | jq .
 ```
@@ -406,7 +406,7 @@ Expected response:
   "provider_type": "local",
   "description": "Local key management for development",
   "config": {
-    "key_store_path": "/var/lib/vmspawnd/keys"
+    "key_store_path": "/var/lib/zyvor-fabricd/keys"
   },
   "created": "2026-04-12T15:10:00Z",
   "updated": "2026-04-12T15:10:00Z"

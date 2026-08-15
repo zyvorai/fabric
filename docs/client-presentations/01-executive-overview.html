@@ -118,7 +118,7 @@
       <div class="label">Management Interfaces</div>
     </div>
   </div>
-  <pre style="text-align: center; margin-top: 30px;"><code>sudo systemctl enable --now vmspawnd
+  <pre style="text-align: center; margin-top: 30px;"><code>sudo systemctl enable --now zyvor-fabricd
 # That's it. Zyvor Fabric is running.</code></pre>
 </div>
 
@@ -164,7 +164,7 @@
   <pre style="font-size: 1.1em; line-height: 1.6;"><code>
     Management Layer
     +----------+  +-----------+  +---------+  +--------+  +-----------+
-    |  vmctl   |  | vmctl-tui |  |  Web UI |  |  K8s   |  | Terraform |
+    |  zyvorctl   |  | zyvorctl-tui |  |  Web UI |  |  K8s   |  | Terraform |
     |  (CLI)   |  |   (TUI)   |  | (React) |  |Operator|  | Provider  |
     +----+-----+  +-----+-----+  +----+----+  +---+----+  +-----+-----+
          |              |             |            |              |
@@ -172,7 +172,7 @@
                                |
     Platform Layer             v
               +-------------------------------+
-              |       vmspawnd daemon         |
+              |       zyvor-fabricd daemon         |
               |   520+ REST + 3 WebSocket     |
               |   JWT + RBAC + Audit Log      |
               +------+-------+-------+--------+
@@ -399,7 +399,7 @@
       One binary. Zero dependencies. Enterprise features.
     </p>
   </div>
-  <pre style="margin-top: 30px; display: inline-block;"><code>./vmspawnctl deploy
+  <pre style="margin-top: 30px; display: inline-block;"><code>./zyvorctl deploy
 # Your VM platform is live.</code></pre>
   <div style="margin-top: 40px;">
     <span class="badge">Zyvor Family</span>

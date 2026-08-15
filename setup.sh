@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Zyvor Fabric One-Shot Setup Script (vmspawnd)
+# Zyvor Fabric One-Shot Setup Script (zyvor-fabricd)
 #
 # Downloads dependencies, builds, installs, starts daemon, and runs verification.
 # Works on fresh Fedora, RHEL, Ubuntu, and Debian systems.
@@ -10,14 +10,14 @@
 #   sudo ./setup.sh                          # Full setup + start
 #   sudo ./setup.sh --no-start              # Don't start daemon
 #   sudo ./setup.sh --dev                   # Also install dev tools
-#   sudo ./setup.sh --prefix /opt/vmspawnd  # Custom install path
+#   sudo ./setup.sh --prefix /opt/zyvor-fabricd  # Custom install path
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-VMSPAWND_VERSION="0.1.0"
+ZYVOR_FABRICD_VERSION="0.1.0"
 RUST_MIN_VERSION="1.80"
 INSTALL_PREFIX="/usr"
 START_DAEMON=true
@@ -83,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             cat <<USAGE
 Usage: sudo $0 [OPTIONS]
 
-One-shot setup for Zyvor Fabric (vmspawnd) on Fedora/Ubuntu.
+One-shot setup for Zyvor Fabric (zyvor-fabricd) on Fedora/Ubuntu.
 Installs deps, Rust, builds, installs, configures, and starts daemon.
 
 Options:
@@ -160,10 +160,10 @@ install_rust() {
 }
 
 # ---------------------------------------------------------------------------
-# 3. Build vmspawnd
+# 3. Build zyvor-fabricd
 # ---------------------------------------------------------------------------
-build_vmspawnd() {
-    step "Building Zyvor Fabric binaries (vmspawnd, vmctl)"
+build_zyvor_fabricd() {
+    step "Building Zyvor Fabric binaries (zyvor-fabricd, zyvorctl)"
 
     local src_dir="${SCRIPT_DIR}"
     [[ -f "${src_dir}/backend/Cargo.toml" ]] || die "Cargo.toml not found in ${src_dir}/backend/. Run from zyvor-fabric source directory."
@@ -173,7 +173,7 @@ build_vmspawnd() {
     info "Building release binaries (this may take a few minutes)"
     cargo build --release 2>&1 | tail -10
 
-    for bin in vmspawnd vmctl vmctl-tui; do
+    for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
         if [[ -f "target/release/${bin}" ]]; then
             success "  target/release/${bin} ($(du -h "target/release/${bin}" | cut -f1))"
         fi
@@ -221,7 +221,7 @@ install_binaries() {
     step "Installing binaries to ${INSTALL_PREFIX}/bin"
     install -d "${INSTALL_PREFIX}/bin"
 
-    for bin in vmspawnd vmctl vmctl-tui; do
+    for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
         if [[ -f "backend/target/release/${bin}" ]]; then
             install -m 0755 "backend/target/release/${bin}" "${INSTALL_PREFIX}/bin/${bin}"
             info "  Installed ${bin}"
@@ -236,21 +236,21 @@ install_binaries() {
 install_config() {
     step "Installing configuration"
 
-    install -d /etc/vmspawnd
-    install -d /var/lib/vmspawnd/images
-    install -d /var/lib/vmspawnd/state
-    install -d /var/log/vmspawnd
-    install -d /run/vmspawnd
+    install -d /etc/zyvor-fabricd
+    install -d /var/lib/zyvor-fabricd/images
+    install -d /var/lib/zyvor-fabricd/state
+    install -d /var/log/zyvor-fabricd
+    install -d /run/zyvor-fabricd
 
-    if [[ ! -f /etc/vmspawnd/vmspawnd.toml ]] && [[ -f "${SCRIPT_DIR}/configs/vmspawnd.toml" ]]; then
-        install -m 0644 "${SCRIPT_DIR}/configs/vmspawnd.toml" /etc/vmspawnd/vmspawnd.toml
-        info "Installed config at /etc/vmspawnd/vmspawnd.toml"
+    if [[ ! -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]] && [[ -f "${SCRIPT_DIR}/configs/zyvor-fabricd.toml" ]]; then
+        install -m 0644 "${SCRIPT_DIR}/configs/zyvor-fabricd.toml" /etc/zyvor-fabricd/zyvor-fabricd.toml
+        info "Installed config at /etc/zyvor-fabricd/zyvor-fabricd.toml"
     else
-        info "/etc/vmspawnd/vmspawnd.toml already exists, skipping"
+        info "/etc/zyvor-fabricd/zyvor-fabricd.toml already exists, skipping"
     fi
 
-    if [[ -f "${SCRIPT_DIR}/configs/vmspawnd.env" ]]; then
-        install -m 0640 "${SCRIPT_DIR}/configs/vmspawnd.env" /etc/vmspawnd/vmspawnd.env
+    if [[ -f "${SCRIPT_DIR}/configs/zyvor-fabricd.env" ]]; then
+        install -m 0640 "${SCRIPT_DIR}/configs/zyvor-fabricd.env" /etc/zyvor-fabricd/zyvor-fabricd.env
     fi
 
     success "Configuration installed"
@@ -265,9 +265,9 @@ install_systemd() {
     local unit_dir="${INSTALL_PREFIX}/lib/systemd/system"
     install -d "${unit_dir}"
 
-    for unit in vmspawnd.service vm@.service \
-                vmspawnd-backup.service vmspawnd-backup.timer \
-                vmspawnd-cleanup.service vmspawnd-cleanup.timer; do
+    for unit in zyvor-fabricd.service vm@.service \
+                zyvor-fabricd-backup.service zyvor-fabricd-backup.timer \
+                zyvor-fabricd-cleanup.service zyvor-fabricd-cleanup.timer; do
         if [[ -f "${SCRIPT_DIR}/systemd/${unit}" ]]; then
             install -m 0644 "${SCRIPT_DIR}/systemd/${unit}" "${unit_dir}/${unit}"
             info "  Installed ${unit}"
@@ -275,26 +275,26 @@ install_systemd() {
     done
 
     # Install sysusers and tmpfiles
-    if [[ -f "${SCRIPT_DIR}/systemd/vmspawnd.sysusers" ]]; then
+    if [[ -f "${SCRIPT_DIR}/systemd/zyvor-fabricd.sysusers" ]]; then
         install -d "${INSTALL_PREFIX}/lib/sysusers.d"
-        install -m 0644 "${SCRIPT_DIR}/systemd/vmspawnd.sysusers" "${INSTALL_PREFIX}/lib/sysusers.d/vmspawnd.conf"
-        systemd-sysusers vmspawnd.conf 2>/dev/null || true
+        install -m 0644 "${SCRIPT_DIR}/systemd/zyvor-fabricd.sysusers" "${INSTALL_PREFIX}/lib/sysusers.d/zyvor-fabricd.conf"
+        systemd-sysusers zyvor-fabricd.conf 2>/dev/null || true
     fi
 
-    if [[ -f "${SCRIPT_DIR}/systemd/vmspawnd.tmpfiles" ]]; then
+    if [[ -f "${SCRIPT_DIR}/systemd/zyvor-fabricd.tmpfiles" ]]; then
         install -d "${INSTALL_PREFIX}/lib/tmpfiles.d"
-        install -m 0644 "${SCRIPT_DIR}/systemd/vmspawnd.tmpfiles" "${INSTALL_PREFIX}/lib/tmpfiles.d/vmspawnd.conf"
-        systemd-tmpfiles --create vmspawnd.conf 2>/dev/null || true
+        install -m 0644 "${SCRIPT_DIR}/systemd/zyvor-fabricd.tmpfiles" "${INSTALL_PREFIX}/lib/tmpfiles.d/zyvor-fabricd.conf"
+        systemd-tmpfiles --create zyvor-fabricd.conf 2>/dev/null || true
     fi
 
-    if [[ -f "${SCRIPT_DIR}/systemd/vmspawnd.preset" ]]; then
+    if [[ -f "${SCRIPT_DIR}/systemd/zyvor-fabricd.preset" ]]; then
         install -d "${INSTALL_PREFIX}/lib/systemd/system-preset"
-        install -m 0644 "${SCRIPT_DIR}/systemd/vmspawnd.preset" "${INSTALL_PREFIX}/lib/systemd/system-preset/90-vmspawnd.preset"
+        install -m 0644 "${SCRIPT_DIR}/systemd/zyvor-fabricd.preset" "${INSTALL_PREFIX}/lib/systemd/system-preset/90-zyvor-fabricd.preset"
     fi
 
     # Install helper scripts
     if [[ -d "${SCRIPT_DIR}/scripts" ]]; then
-        local libexec_dir="${INSTALL_PREFIX}/libexec/vmspawnd"
+        local libexec_dir="${INSTALL_PREFIX}/libexec/zyvor-fabricd"
         install -d "${libexec_dir}"
         for helper in backup-vms cleanup-store health-check; do
             if [[ -f "${SCRIPT_DIR}/scripts/${helper}" ]]; then
@@ -311,9 +311,9 @@ install_web() {
     step "Installing web dashboard"
 
     if [[ -d "${SCRIPT_DIR}/web/dist" ]]; then
-        install -d "${INSTALL_PREFIX}/share/vmspawnd/web"
-        cp -r "${SCRIPT_DIR}/web/dist/"* "${INSTALL_PREFIX}/share/vmspawnd/web/"
-        success "Web dashboard installed to ${INSTALL_PREFIX}/share/vmspawnd/web/"
+        install -d "${INSTALL_PREFIX}/share/zyvor-fabricd/web"
+        cp -r "${SCRIPT_DIR}/web/dist/"* "${INSTALL_PREFIX}/share/zyvor-fabricd/web/"
+        success "Web dashboard installed to ${INSTALL_PREFIX}/share/zyvor-fabricd/web/"
     else
         warn "web/dist not found — skipping dashboard install"
     fi
@@ -323,19 +323,19 @@ install_web() {
 # 7. Start daemon
 # ---------------------------------------------------------------------------
 start_daemon() {
-    step "Starting vmspawnd daemon"
+    step "Starting zyvor-fabricd daemon"
 
-    systemctl enable vmspawnd 2>/dev/null || true
-    systemctl start vmspawnd
+    systemctl enable zyvor-fabricd 2>/dev/null || true
+    systemctl start zyvor-fabricd
 
     sleep 2
 
-    if systemctl is-active --quiet vmspawnd; then
-        success "vmspawnd is running"
-        journalctl -u vmspawnd --no-pager -n 5 2>/dev/null || true
+    if systemctl is-active --quiet zyvor-fabricd; then
+        success "zyvor-fabricd is running"
+        journalctl -u zyvor-fabricd --no-pager -n 5 2>/dev/null || true
     else
-        warn "vmspawnd failed to start — check: journalctl -u vmspawnd -f"
-        journalctl -u vmspawnd --no-pager -n 20 2>/dev/null || true
+        warn "zyvor-fabricd failed to start — check: journalctl -u zyvor-fabricd -f"
+        journalctl -u zyvor-fabricd --no-pager -n 20 2>/dev/null || true
     fi
 }
 
@@ -357,22 +357,22 @@ install_dev_tools() {
 print_summary() {
     echo ""
     echo "✅ ================================================================"
-    echo "✅  vmspawnd ${VMSPAWND_VERSION} — Setup Complete"
+    echo "✅  zyvor-fabricd ${ZYVOR_FABRICD_VERSION} — Setup Complete"
     echo "✅ ================================================================"
     echo ""
-    echo "  Binaries:        ${INSTALL_PREFIX}/bin/vmspawnd, vmctl, vmctl-tui"
-    echo "  Config:          /etc/vmspawnd/vmspawnd.toml"
-    echo "  Data:            /var/lib/vmspawnd/"
-    echo "  Logs:            /var/log/vmspawnd/"
-    echo "  Service:         vmspawnd.service"
-    echo "  Web dashboard:   ${INSTALL_PREFIX}/share/vmspawnd/web/"
+    echo "  Binaries:        ${INSTALL_PREFIX}/bin/zyvor-fabricd, zyvorctl, zyvorctl-tui"
+    echo "  Config:          /etc/zyvor-fabricd/zyvor-fabricd.toml"
+    echo "  Data:            /var/lib/zyvor-fabricd/"
+    echo "  Logs:            /var/log/zyvor-fabricd/"
+    echo "  Service:         zyvor-fabricd.service"
+    echo "  Web dashboard:   ${INSTALL_PREFIX}/share/zyvor-fabricd/web/"
     echo ""
     echo "  Installed binaries:"
     for bin in "${INSTALL_PREFIX}/bin/vm"*; do
         [[ -x "${bin}" ]] && echo "    - $(basename "${bin}")"
     done
     echo ""
-    if systemctl is-active --quiet vmspawnd 2>/dev/null; then
+    if systemctl is-active --quiet zyvor-fabricd 2>/dev/null; then
         echo "  ✅ Daemon status: RUNNING"
         echo "  Dashboard:      http://localhost:9095/"
         echo "  API:            http://localhost:9095/api/health"
@@ -381,12 +381,12 @@ print_summary() {
     fi
     echo ""
     echo "🔹 Commands:"
-    echo "  sudo systemctl start vmspawnd       # Start daemon"
-    echo "  sudo systemctl stop vmspawnd        # Stop daemon"
-    echo "  sudo systemctl status vmspawnd      # Check status"
-    echo "  journalctl -u vmspawnd -f           # Follow logs"
-    echo "  vmctl list                          # List VMs"
-    echo "  vmctl create --name my-vm ...       # Create VM"
+    echo "  sudo systemctl start zyvor-fabricd       # Start daemon"
+    echo "  sudo systemctl stop zyvor-fabricd        # Stop daemon"
+    echo "  sudo systemctl status zyvor-fabricd      # Check status"
+    echo "  journalctl -u zyvor-fabricd -f           # Follow logs"
+    echo "  zyvorctl list                          # List VMs"
+    echo "  zyvorctl create --name my-vm ...       # Create VM"
     echo ""
 }
 
@@ -399,7 +399,7 @@ main() {
     echo " \\ \\ / / '_ \` _ \\/ __| '_ \\ / _\` \\ \\ /\\ / / '_ \\/ _\` |"
     echo "  \\ V /| | | | | \\__ \\ |_) | (_| |\\ V  V /| | | | (_| |"
     echo "   \\_/ |_| |_| |_|___/ .__/ \\__,_| \\_/\\_/ |_| |_|\\__,_|"
-    echo "                     |_|    One-Shot Setup v${VMSPAWND_VERSION}"
+    echo "                     |_|    One-Shot Setup v${ZYVOR_FABRICD_VERSION}"
     echo
 
     need_root
@@ -407,7 +407,7 @@ main() {
 
     install_system_deps
     install_rust
-    build_vmspawnd
+    build_zyvor_fabricd
     build_web
     run_tests
     install_binaries

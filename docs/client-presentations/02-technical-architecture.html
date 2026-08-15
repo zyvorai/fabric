@@ -61,13 +61,13 @@
   <h1>System Architecture</h1>
   <p class="subtitle">Layered design with clean separation of concerns</p>
   <pre style="font-size: 1.05em; line-height: 1.5;"><code>
-  Client Layer          CLI (vmctl)    TUI (vmctl-tui)    Web UI (React)
+  Client Layer          CLI (zyvorctl)    TUI (zyvorctl-tui)    Web UI (React)
                               \              |              /
   Automation Layer       K8s Operator        |        Terraform Provider
                               \              |              /
                                +-------------+--------------+
                                |                            |
-  API Layer                    |     vmspawnd daemon        |
+  API Layer                    |     zyvor-fabricd daemon        |
                                |  +----------------------+  |
                                |  | Axum HTTP Server     |  |
                                |  | 520+ REST endpoints  |  |
@@ -138,8 +138,8 @@
       <h3>Core Platform (6)</h3>
       <ul>
         <li><code>Zyvor Fabric</code> - Main daemon</li>
-        <li><code>vmctl</code> - CLI tool</li>
-        <li><code>vmctl-tui</code> - Terminal UI</li>
+        <li><code>zyvorctl</code> - CLI tool</li>
+        <li><code>zyvorctl-tui</code> - Terminal UI</li>
         <li><code>vm-model</code> - Data models</li>
         <li><code>state-store</code> - Persistence</li>
         <li><code>security</code> - Auth and RBAC</li>
@@ -148,7 +148,7 @@
     <div class="card">
       <h3>VM Infrastructure (7)</h3>
       <ul>
-        <li><code>vmspawn-driver</code> - VM operations</li>
+        <li><code>zyvor-fabric-vm-driver</code> - VM operations</li>
         <li><code>driver-core</code> - Driver abstractions</li>
         <li><code>machined-dbus</code> - D-Bus client</li>
         <li><code>machinectl-driver</code> - Machine control</li>

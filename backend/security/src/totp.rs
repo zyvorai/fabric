@@ -33,7 +33,7 @@ pub fn verify_code(secret_base32: &str, code: &str) -> Result<bool> {
         1,
         30,
         secret.to_bytes()?,
-        Some("vmspawnd".to_string()),
+        Some("zyvor-fabricd".to_string()),
         "user".to_string(),
     )?;
 
@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_generate_and_verify() {
-        let (secret, url) = generate_secret("testuser", "vmspawnd").unwrap();
+        let (secret, url) = generate_secret("testuser", "zyvor-fabricd").unwrap();
         assert!(!secret.is_empty());
         assert!(url.contains("otpauth://"));
         // We can't test verify_code easily since TOTP is time-based,
