@@ -323,6 +323,7 @@ mod tests {
             topology,
             listen_port: 51820,
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

@@ -12,6 +12,6 @@ chrono.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-
-[dev-dependencies]
+tokio.workspace = true
+networking = { path = "../networking" }
 tempfile = "3"

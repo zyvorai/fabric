@@ -557,6 +557,8 @@ mod tests {
             dhcp: DhcpMode::No,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = vlan_netdev(&cfg);
         assert!(out.contains("Name=vlan100\n"));
@@ -580,6 +582,8 @@ mod tests {
             dhcp: DhcpMode::No,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = vlan_parent_network(&cfg, "50-zyvor-fabricd-");
         assert!(out.contains("Name=eth0\n"));
@@ -600,6 +604,8 @@ mod tests {
             dhcp: DhcpMode::Ipv4,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = vlan_network(&cfg);
         assert!(out.contains("Name=vlan200\n"));
@@ -621,6 +627,8 @@ mod tests {
             mac_address: Some("52:54:00:11:22:33".into()),
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = macvtap_netdev(&cfg);
         assert!(out.contains("Name=mvt0\n"));
@@ -642,6 +650,8 @@ mod tests {
             mac_address: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = macvtap_netdev(&cfg);
         assert!(out.contains("Mode=passthru\n"));
@@ -660,6 +670,8 @@ mod tests {
             mac_address: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = macvtap_parent_network(&cfg);
         assert!(out.contains("Name=eth0\n"));
@@ -680,6 +692,8 @@ mod tests {
             mac_address: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = tap_netdev(&cfg);
         assert!(out.contains("Name=tap0\n"));
@@ -706,6 +720,8 @@ mod tests {
             mac_address: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = tap_netdev(&cfg);
         assert!(out.contains("Name=tap-min\n"));
@@ -729,6 +745,8 @@ mod tests {
             mac_address: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = tap_network(&cfg);
         assert!(out.contains("Name=tap0\n"));
@@ -749,6 +767,8 @@ mod tests {
             mac_address: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = tap_network(&cfg);
         assert!(out.contains("Name=tap1\n"));
@@ -780,6 +800,8 @@ mod tests {
             routes: vec![],
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = bond_netdev(&cfg);
         assert!(out.contains("Name=bond0\n"));
@@ -818,6 +840,8 @@ mod tests {
             routes: vec![],
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = bond_netdev(&cfg);
         assert!(out.contains("Mode=active-backup\n"));
@@ -853,6 +877,8 @@ mod tests {
             }],
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = bond_network(&cfg);
         assert!(out.contains("Name=bond0\n"));
@@ -890,6 +916,8 @@ mod tests {
             description: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = network_file(&cfg);
         assert!(out.contains("Name=enp3s0\n"));
@@ -919,6 +947,8 @@ mod tests {
             description: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = network_file(&cfg);
         assert!(out.contains("Name=eth0\n"));
@@ -950,6 +980,8 @@ mod tests {
             description: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            operational_state: None,
         };
         let out = network_file(&cfg);
         assert!(out.contains("Name=eno1\n"));
@@ -974,6 +1006,8 @@ mod tests {
             description: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            source_file: None,
         };
         let out = link_file(&cfg);
         assert!(out.contains("[Match]\n"));
@@ -999,6 +1033,8 @@ mod tests {
             description: None,
             created: String::new(),
             updated: String::new(),
+            managed: true,
+            source_file: None,
         };
         let out = link_file(&cfg);
         assert!(out.contains("Driver=virtio_net\n"));

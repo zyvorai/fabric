@@ -2,13 +2,18 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use futures::TryStreamExt;
 use netlink_packet_route::address::{AddressAttribute, AddressScope};
-use netlink_packet_route::link::{InfoKind, LinkAttribute, LinkFlags, LinkInfo, LinkLayerType};
+use netlink_packet_route::link::{
+    BondMode as NlBondMode, InfoKind, LinkAttribute, LinkFlags, LinkInfo, LinkLayerType,
+    MacVtapMode as NlMacVtapMode,
+};
 use netlink_packet_route::AddressFamily;
+use rtnetlink::{LinkBond, LinkBridge, LinkMacVtap, LinkUnspec, LinkVlan, LinkVxlan, LinkWireguard};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::IpAddr;
 
 /// Network interface information retrieved via netlink.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,4 +223,281 @@ pub async fn list_available_interfaces() -> Result<Vec<NetlinkInterface>> {
         .into_iter()
         .filter(|i| i.name != "lo" && i.master_index.is_none())
         .collect())
+}
+
+// ============================================================================
+// Write operations — replace NetworkdManager's write-a-.netdev/.network-file-
+// then-`networkctl reload` two-step with direct, immediate netlink calls. See
+// the systemd-removal migration plan, Phase 4.
+// ============================================================================
+
+pub async fn connect() -> Result<rtnetlink::Handle> {
+    let (conn, handle, _) = rtnetlink::new_connection().context("failed to open netlink socket")?;
+    tokio::spawn(conn);
+    Ok(handle)
+}
+
+pub async fn link_index_by_name(handle: &rtnetlink::Handle, name: &str) -> Result<u32> {
+    let mut links = handle.link().get().match_name(name.to_string()).execute();
+    match links.try_next().await? {
+        Some(msg) => Ok(msg.header.index),
+        None => bail!("interface '{name}' not found"),
+    }
+}
+
+/// Create a Linux bridge (`ip link add <name> type bridge`), brought up
+/// immediately (`LinkBridge::new` sets the UP flag by default).
+pub async fn create_bridge(name: &str) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .add(LinkBridge::new(name).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to create bridge '{name}'"))
+}
+
+/// Create an 802.1Q VLAN sub-interface on `parent` (`ip link add <name> link
+/// <parent> type vlan id <vlan_id>`).
+pub async fn create_vlan(parent: &str, vlan_id: u16, name: &str) -> Result<()> {
+    let handle = connect().await?;
+    let parent_index = link_index_by_name(&handle, parent).await?;
+    handle
+        .link()
+        .add(LinkVlan::new(name, parent_index, vlan_id).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to create VLAN '{name}' (id={vlan_id}, parent={parent})"))
+}
+
+/// Create a macvtap device on `parent`. `mode` is one of
+/// bridge/vepa/private/passthru/source (defaults to bridge on anything else,
+/// matching `MacvtapConfig`'s own default).
+pub async fn create_macvtap(parent: &str, name: &str, mode: &str) -> Result<()> {
+    let handle = connect().await?;
+    let parent_index = link_index_by_name(&handle, parent).await?;
+    let nl_mode = match mode {
+        "vepa" => NlMacVtapMode::Vepa,
+        "private" => NlMacVtapMode::Private,
+        "passthru" | "passthrough" => NlMacVtapMode::Passthrough,
+        "source" => NlMacVtapMode::Source,
+        _ => NlMacVtapMode::Bridge,
+    };
+    handle
+        .link()
+        .add(LinkMacVtap::new(name, parent_index, nl_mode).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to create macvtap '{name}' (parent={parent})"))
+}
+
+/// Create a persistent TAP device. rtnetlink's generic link-add doesn't cover
+/// tun/tap (the kernel creates those via the `/dev/net/tun` character device
+/// + `TUNSETIFF` ioctl, not `RTM_NEWLINK`), so this is the one device type
+/// still created via `ip tuntap` rather than a raw netlink call — a
+/// pragmatic exception, not a step back toward systemd-networkd (which this
+/// replaces `networkctl reload`, not `iproute2`, for).
+pub async fn create_tap(name: &str) -> Result<()> {
+    let output = tokio::process::Command::new("ip")
+        .args(["tuntap", "add", "dev", name, "mode", "tap"])
+        .output()
+        .await
+        .context("failed to run `ip tuntap add`")?;
+    if !output.status.success() {
+        bail!("ip tuntap add dev {name} failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+    Ok(())
+}
+
+/// Create a bond device with the given mode and enslave `slaves` to it.
+pub async fn create_bond(name: &str, mode: &str, slaves: &[String]) -> Result<()> {
+    let handle = connect().await?;
+    let nl_mode = match mode {
+        "active-backup" => NlBondMode::ActiveBackup,
+        "balance-xor" => NlBondMode::BalanceXor,
+        "broadcast" => NlBondMode::Broadcast,
+        "802.3ad" => NlBondMode::Ieee8023Ad,
+        "balance-tlb" => NlBondMode::BalanceTlb,
+        "balance-alb" => NlBondMode::BalanceAlb,
+        _ => NlBondMode::BalanceRr,
+    };
+    handle
+        .link()
+        .add(LinkBond::new(name).mode(nl_mode).up().build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to create bond '{name}'"))?;
+    let bond_index = link_index_by_name(&handle, name).await?;
+    for slave in slaves {
+        set_master(slave, bond_index).await.with_context(|| format!("failed to enslave '{slave}' to bond '{name}'"))?;
+    }
+    Ok(())
+}
+
+/// Create a VXLAN device. `remote` is `None` for a multicast/BUM-flooding
+/// VXLAN (no fixed remote peer).
+pub async fn create_vxlan(
+    name: &str,
+    vni: u32,
+    local: Option<IpAddr>,
+    remote: Option<IpAddr>,
+    port: Option<u16>,
+) -> Result<()> {
+    let handle = connect().await?;
+    let mut builder = LinkVxlan::new(name, vni).up();
+    if let Some(IpAddr::V4(addr)) = local {
+        builder = builder.local(addr);
+    }
+    if let Some(IpAddr::V4(addr)) = remote {
+        builder = builder.remote(addr);
+    }
+    if let Some(p) = port {
+        builder = builder.port(p);
+    }
+    handle
+        .link()
+        .add(builder.build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to create VXLAN '{name}' (vni={vni})"))
+}
+
+/// Create a WireGuard device (`ip link add <name> type wireguard`). Device
+/// creation is the one part of WireGuard setup that's a normal rtnetlink
+/// link type; private key/listen-port/peers/allowed-ips live in the
+/// WireGuard *generic* netlink family (`NLA_WGDEVICE`/`NLA_WGPEER`, a
+/// different subsystem from `rtnetlink`'s route-netlink messages this
+/// module otherwise uses) — those are set with the `wg` CLI instead, the
+/// same tool `host_wireguard.rs` already shells out to for discovery.
+pub async fn create_wireguard_device(name: &str) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .add(LinkWireguard::new(name).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to create WireGuard device '{name}'"))
+}
+
+/// Enslave `iface` to `master_index` (a bridge or bond) — `ip link set
+/// <iface> master <master-device>`.
+pub async fn set_master(iface: &str, master_index: u32) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).controller(master_index).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to attach '{iface}' to master index {master_index}"))
+}
+
+/// Detach `iface` from whatever bridge/bond it's currently enslaved to —
+/// `ip link set <iface> nomaster`.
+pub async fn unset_master(iface: &str) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).nocontroller().build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to detach '{iface}' from its master"))
+}
+
+/// Assign an IP address in CIDR form (`192.168.1.10/24`) to `iface` — `ip
+/// addr add <cidr> dev <iface>`.
+pub async fn set_addr(iface: &str, cidr: &str) -> Result<()> {
+    let (addr_str, prefix_str) = cidr
+        .split_once('/')
+        .with_context(|| format!("address '{cidr}' is not in CIDR form (expected e.g. 10.0.0.1/24)"))?;
+    let addr: IpAddr = addr_str.parse().with_context(|| format!("invalid IP address '{addr_str}'"))?;
+    let prefix_len: u8 = prefix_str.parse().with_context(|| format!("invalid prefix length '{prefix_str}'"))?;
+
+    let handle = connect().await?;
+    let index = link_index_by_name(&handle, iface).await?;
+    handle
+        .address()
+        .add(index, addr, prefix_len)
+        .execute()
+        .await
+        .with_context(|| format!("failed to add address {cidr} to '{iface}'"))
+}
+
+/// Bring `iface` administratively up — `ip link set <iface> up`.
+pub async fn set_link_up(iface: &str) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).up().build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to bring up '{iface}'"))
+}
+
+/// Set `iface`'s MTU — `ip link set <iface> mtu <mtu>`.
+pub async fn set_mtu(iface: &str, mtu: u32) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).mtu(mtu).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to set mtu {mtu} on '{iface}'"))
+}
+
+/// Set `iface`'s MAC address — `ip link set <iface> address <mac>`.
+pub async fn set_mac_address(iface: &str, mac: &str) -> Result<()> {
+    let bytes = mac
+        .split(':')
+        .map(|b| u8::from_str_radix(b, 16))
+        .collect::<std::result::Result<Vec<u8>, _>>()
+        .with_context(|| format!("invalid MAC address '{mac}'"))?;
+    if bytes.len() != 6 {
+        bail!("invalid MAC address '{mac}': expected 6 octets, got {}", bytes.len());
+    }
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).address(bytes).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to set mac address {mac} on '{iface}'"))
+}
+
+/// Rename `iface` — `ip link set <iface> name <new_name>`. The interface
+/// must be administratively down for the kernel to accept a rename.
+pub async fn rename_link(iface: &str, new_name: &str) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).down().build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to bring down '{iface}' before rename"))?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(iface).name(new_name.to_string()).build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to rename '{iface}' to '{new_name}'"))?;
+    handle
+        .link()
+        .set(LinkUnspec::new_with_name(new_name).up().build())
+        .execute()
+        .await
+        .with_context(|| format!("failed to bring '{new_name}' back up after rename"))
+}
+
+/// Delete a link by name — `ip link del <name>`. Works for any device type
+/// created above (bridge/vlan/macvtap/bond/vxlan); tap devices too, since
+/// tun/tap deletion (unlike creation) does go through the standard
+/// `RTM_DELLINK` netlink call.
+pub async fn delete_link(name: &str) -> Result<()> {
+    let handle = connect().await?;
+    let index = link_index_by_name(&handle, name).await?;
+    handle
+        .link()
+        .del(index)
+        .execute()
+        .await
+        .with_context(|| format!("failed to delete link '{name}'"))
 }
