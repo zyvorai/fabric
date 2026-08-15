@@ -3329,7 +3329,7 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_cpu(&vm.name, old_cpus, new_cpus);
+                                autoscaler_hotplug_cpu(&state.driver, &vm.name, old_cpus, new_cpus).await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3367,7 +3367,7 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_cpu(&vm.name, old_cpus, new_cpus);
+                                autoscaler_hotplug_cpu(&state.driver, &vm.name, old_cpus, new_cpus).await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3412,7 +3412,7 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_memory(&vm.name, old_mem, new_mem);
+                                autoscaler_hotplug_memory(&state.driver, &vm.name, old_mem, new_mem).await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3452,7 +3452,7 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_memory(&vm.name, old_mem, new_mem);
+                                autoscaler_hotplug_memory(&state.driver, &vm.name, old_mem, new_mem).await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3472,15 +3472,22 @@ async fn run_autoscaler(state: Arc<AppState>) {
 
 /// Apply CPU changes to a running VM via QMP hotplug.
 /// Best-effort: logs warnings on failure but does not propagate errors.
-fn autoscaler_hotplug_cpu(vm_name: &str, old_cpus: u32, new_cpus: u32) {
+async fn autoscaler_hotplug_cpu(driver: &Arc<dyn VmDriver>, vm_name: &str, old_cpus: u32, new_cpus: u32) {
     if new_cpus == old_cpus {
         return;
     }
-    let qmp = crate::qmp::QmpClient::new(vm_name);
-    if !qmp.is_available() {
-        tracing::warn!("Autoscaler: QMP not available for '{}', CPU hotplug skipped (will apply on next restart)", vm_name);
-        return;
-    }
+    let socket = match driver.get_control_socket(vm_name).await {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            tracing::warn!("Autoscaler: QMP not available for '{}', CPU hotplug skipped (will apply on next restart)", vm_name);
+            return;
+        }
+        Err(e) => {
+            tracing::warn!("Autoscaler: failed to resolve QMP socket for '{}': {:#}", vm_name, e);
+            return;
+        }
+    };
+    let qmp = crate::qmp::QmpClient::for_socket(socket.to_string_lossy().into_owned());
     if new_cpus > old_cpus {
         // Scale up: query hotpluggable CPU slots and add unrealized ones
         match qmp.execute("query-hotpluggable-cpus", serde_json::Value::Null) {
@@ -3544,15 +3551,27 @@ fn autoscaler_hotplug_cpu(vm_name: &str, old_cpus: u32, new_cpus: u32) {
 
 /// Apply memory changes to a running VM via QMP hotplug.
 /// Best-effort: logs warnings on failure but does not propagate errors.
-fn autoscaler_hotplug_memory(vm_name: &str, old_memory: u64, new_memory: u64) {
+async fn autoscaler_hotplug_memory(
+    driver: &Arc<dyn VmDriver>,
+    vm_name: &str,
+    old_memory: u64,
+    new_memory: u64,
+) {
     if new_memory == old_memory {
         return;
     }
-    let qmp = crate::qmp::QmpClient::new(vm_name);
-    if !qmp.is_available() {
-        tracing::warn!("Autoscaler: QMP not available for '{}', memory hotplug skipped (will apply on next restart)", vm_name);
-        return;
-    }
+    let socket = match driver.get_control_socket(vm_name).await {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            tracing::warn!("Autoscaler: QMP not available for '{}', memory hotplug skipped (will apply on next restart)", vm_name);
+            return;
+        }
+        Err(e) => {
+            tracing::warn!("Autoscaler: failed to resolve QMP socket for '{}': {:#}", vm_name, e);
+            return;
+        }
+    };
+    let qmp = crate::qmp::QmpClient::for_socket(socket.to_string_lossy().into_owned());
     if new_memory > old_memory {
         // Scale up: add a new memory DIMM for the delta
         let delta_mb = new_memory - old_memory;

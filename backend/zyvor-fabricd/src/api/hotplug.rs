@@ -48,9 +48,25 @@ fn not_available_response() -> impl IntoResponse {
     (
         StatusCode::NOT_IMPLEMENTED,
         Json(serde_json::json!({
-            "error": "QMP socket not available. The QEMU monitor socket must be exposed by systemd-vmspawn for hotplug operations."
+            "error": "QMP socket not available for this VM's driver backend."
         })),
     )
+}
+
+/// Resolve `vm_name`'s QMP control socket via the active driver backend
+/// (`MachinectlDriver`'s systemd-vmspawn convention, or Ephemera's
+/// `VmRecord.control_socket`), returning `None` if the driver has no
+/// socket for it (not running, unknown, or a backend/hypervisor with no
+/// QMP equivalent) — the caller falls back to `not_available_response()`.
+async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpClient> {
+    match state.driver.get_control_socket(vm_name).await {
+        Ok(Some(path)) => Some(QmpClient::for_socket(path.to_string_lossy().into_owned())),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!("Failed to resolve QMP control socket for '{vm_name}': {e:#}");
+            None
+        }
+    }
 }
 
 /// POST /api/vms/:name/hotplug/cpu - Hot-add vCPUs
@@ -64,10 +80,9 @@ pub async fn hotplug_cpu(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
     }
-    let qmp = QmpClient::new(&vm_name);
-    if !qmp.is_available() {
+    let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
-    }
+    };
 
     // Query hotpluggable CPUs to find available slots
     match qmp.execute("query-hotpluggable-cpus", serde_json::Value::Null) {
@@ -150,10 +165,9 @@ pub async fn hotplug_memory(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
     }
-    let qmp = QmpClient::new(&vm_name);
-    if !qmp.is_available() {
+    let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
-    }
+    };
 
     let size_bytes = req.size_mb * 1024 * 1024;
     let backend_id = format!("mem-hotplug-{}", uuid::Uuid::new_v4().simple());
@@ -239,10 +253,9 @@ pub async fn hotplug_disk(
         return crate::api_error::json_error(status, msg).into_response();
     }
 
-    let qmp = QmpClient::new(&vm_name);
-    if !qmp.is_available() {
+    let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
-    }
+    };
 
     let node_name = format!("drive-hotplug-{}", uuid::Uuid::new_v4().simple());
     let device_id = format!("disk-hotplug-{}", uuid::Uuid::new_v4().simple());
@@ -310,7 +323,7 @@ pub async fn hotplug_disk(
 /// DELETE /api/vms/:name/hotplug/disk/:id - Hot-remove a disk
 pub async fn hotremove_disk(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotremove_disk));
@@ -327,10 +340,9 @@ pub async fn hotremove_disk(
         return crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid device ID")
             .into_response();
     }
-    let qmp = QmpClient::new(&vm_name);
-    if !qmp.is_available() {
+    let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
-    }
+    };
 
     let args = serde_json::json!({"id": device_id});
     match qmp.execute("device_del", args) {
@@ -353,7 +365,7 @@ pub async fn hotremove_disk(
 /// POST /api/vms/:name/hotplug/nic - Hot-add a NIC
 pub async fn hotplug_nic(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<HotplugNicRequest>,
 ) -> impl IntoResponse {
@@ -361,10 +373,9 @@ pub async fn hotplug_nic(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
     }
-    let qmp = QmpClient::new(&vm_name);
-    if !qmp.is_available() {
+    let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
-    }
+    };
 
     let netdev_id = format!("net-hotplug-{}", uuid::Uuid::new_v4().simple());
     let device_id = format!("nic-hotplug-{}", uuid::Uuid::new_v4().simple());
@@ -452,7 +463,7 @@ pub async fn hotplug_nic(
 /// DELETE /api/vms/:name/hotplug/nic/:id - Hot-remove a NIC
 pub async fn hotremove_nic(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path((vm_name, device_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     tracing::debug!("hotplug::{}", stringify!(hotremove_nic));
@@ -469,10 +480,9 @@ pub async fn hotremove_nic(
         return crate::api_error::json_error(StatusCode::BAD_REQUEST, "Invalid device ID")
             .into_response();
     }
-    let qmp = QmpClient::new(&vm_name);
-    if !qmp.is_available() {
+    let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
-    }
+    };
 
     let args = serde_json::json!({"id": device_id});
     match qmp.execute("device_del", args) {

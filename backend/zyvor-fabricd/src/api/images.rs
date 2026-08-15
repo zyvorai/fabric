@@ -833,8 +833,14 @@ pub async fn resize_disk(
     if req.online {
         if let Ok(Some(vm)) = state.store.get_vm(&vm_name) {
             if vm.state == vm_model::VMState::Running {
-                let qmp = crate::qmp::QmpClient::new(&vm_name);
-                if qmp.is_available() {
+                let qmp = state
+                    .driver
+                    .get_control_socket(&vm_name)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|p| crate::qmp::QmpClient::for_socket(p.to_string_lossy().into_owned()));
+                if let Some(qmp) = qmp {
                     // Parse size to bytes for QMP
                     let size_bytes = match parse_size_to_bytes(&req.size) {
                         Ok(b) => b,

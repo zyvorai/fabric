@@ -209,6 +209,11 @@ impl VMDriver for MachinectlDriver {
             Err(anyhow!("Failed to disable '{}': {}", name, stderr))
         }
     }
+
+    async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
+        let path = std::path::PathBuf::from(format!("/run/systemd/vmspawn/{name}/qemu.sock"));
+        Ok(if path.exists() { Some(path) } else { None })
+    }
 }
 
 /// Map machined state strings to our VMState enum.

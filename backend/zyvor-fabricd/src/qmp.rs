@@ -47,19 +47,18 @@ fn is_command_allowed(command: &str) -> bool {
     ALLOWED_QMP_COMMANDS.contains(&command)
 }
 
-/// Minimal QMP (QEMU Machine Protocol) client for communicating with QEMU
-/// monitor sockets exposed by systemd-vmspawn.
+/// Minimal QMP (QEMU Machine Protocol) client for communicating with a
+/// QEMU monitor socket, at a path resolved by `state.driver.get_control_socket()`
+/// (backend-specific: the systemd-vmspawn convention for `MachinectlDriver`,
+/// `VmRecord.control_socket` for `EphemeraDriver`).
 pub struct QmpClient {
     socket_path: String,
 }
 
 impl QmpClient {
-    /// Create a new QMP client for a given VM name.
-    /// The socket is expected at /run/systemd/vmspawn/{name}/qemu.sock
-    pub fn new(vm_name: &str) -> Self {
-        Self {
-            socket_path: format!("/run/systemd/vmspawn/{}/qemu.sock", vm_name),
-        }
+    /// Create a QMP client for an already-resolved control socket path.
+    pub fn for_socket(socket_path: impl Into<String>) -> Self {
+        Self { socket_path: socket_path.into() }
     }
 
     /// Check if the QMP socket exists and is accessible
@@ -158,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_is_available_nonexistent() {
-        let client = QmpClient::new("nonexistent-vm-12345");
+        let client = QmpClient::for_socket("/run/systemd/vmspawn/nonexistent-vm-12345/qemu.sock");
         assert!(!client.is_available());
     }
 }

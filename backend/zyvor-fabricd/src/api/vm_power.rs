@@ -55,8 +55,14 @@ pub async fn hibernate_vm(
     }
 
     // Use QMP to save VM state via savevm
-    let qmp = crate::qmp::QmpClient::new(&vm_name);
-    if qmp.is_available() {
+    let qmp = state
+        .driver
+        .get_control_socket(&vm_name)
+        .await
+        .ok()
+        .flatten()
+        .map(|p| crate::qmp::QmpClient::for_socket(p.to_string_lossy().into_owned()));
+    if let Some(qmp) = qmp {
         // Create a snapshot that includes memory state
         let snap_name = format!("hibernate-{}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
         if let Err(e) = qmp.execute("savevm", json!({"name": snap_name})) {

@@ -77,6 +77,10 @@ impl VMDriver for EphemeraDriver {
     async fn disable(&self, _name: &str) -> Result<()> {
         Ok(())
     }
+
+    async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
+        Ok(self.resolve(name).await?.control_socket)
+    }
 }
 
 fn map_status(status: VmStatus) -> VMState {

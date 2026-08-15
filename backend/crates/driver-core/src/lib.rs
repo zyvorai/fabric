@@ -86,6 +86,11 @@ pub trait VMDriver: Send + Sync {
 
     /// Disable auto-start at boot.
     async fn disable(&self, name: &str) -> Result<()>;
+
+    /// Path to the machine's QEMU control (QMP) socket, if it has one.
+    /// `None` for a machine with no QMP-capable monitor socket (e.g. not
+    /// currently running, or a backend/hypervisor with no QMP equivalent).
+    async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 }
 
 /// Resource metrics collection from cgroup v2.
