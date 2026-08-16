@@ -19,29 +19,14 @@ pub struct Config {
     pub driver: DriverConfig,
 }
 
-/// Which `driver-core::VmDriver` backend `AppState.driver` is built from.
-/// See the systemd-removal migration plan: `machinectl` (default, today's
-/// systemd-machined/D-Bus backend) stays the default through Phase 3;
-/// `ephemera` is opt-in until the lifecycle cutover has soaked in staging.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum DriverBackend {
-    Machinectl,
-    Ephemera,
-}
-
-impl Default for DriverBackend {
-    fn default() -> Self {
-        Self::Machinectl
-    }
-}
-
+/// Configures the `driver-core::VmDriver` (`Arc<dyn VmDriver>`) that
+/// `AppState.driver` is built from — always Ephemera. The systemd-machined/
+/// D-Bus backend this replaced (`machinectl-driver`/`machined-dbus`) is
+/// gone as of the systemd-removal migration's final phase; there is no
+/// backend selector to configure anymore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriverConfig {
-    #[serde(default)]
-    pub backend: DriverBackend,
-    /// Ephemera's REST API base URL, e.g. `http://127.0.0.1:7788`. Only
-    /// consulted when `backend = "ephemera"`.
+    /// Ephemera's REST API base URL, e.g. `http://127.0.0.1:7788`.
     #[serde(default = "default_ephemera_url")]
     pub ephemera_url: String,
     /// Bearer token for Ephemera's auth layer, if it has `auth.tokens`
@@ -52,7 +37,7 @@ pub struct DriverConfig {
 
 impl Default for DriverConfig {
     fn default() -> Self {
-        Self { backend: DriverBackend::default(), ephemera_url: default_ephemera_url(), ephemera_token: None }
+        Self { ephemera_url: default_ephemera_url(), ephemera_token: None }
     }
 }
 

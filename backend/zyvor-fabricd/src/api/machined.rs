@@ -2,27 +2,17 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-//! API endpoints for machinectl/machined operations.
+//! API endpoints for VM machine-level lifecycle, image management, shell
+//! exec, file copy, and SSH info — all routed through `state.driver`
+//! (`Arc<dyn VmDriver>`, Ephemera-backed), so nothing here shells out to
+//! any external CLI directly. See `ssh_info`'s doc comment for how SSH
+//! info specifically is derived.
 //!
-//! Exposes systemd-machined functionality: machine lifecycle, image management,
-//! file transfer, SSH, and shell execution.
-//!
-//! Machine lifecycle, property queries, image management, shell exec, file
-//! copy, and SSH info all go through `state.driver` and work on both
-//! backends (native D-Bus/CLI for MachinectlDriver; Ephemera's image
-//! catalog, vsock guest agent, and a MAC-to-DHCP-lease lookup respectively
-//! for EphemeraDriver — see driver-core::{ImageDriver, ShellDriver}, and
-//! `ssh_info`'s doc comment for how SSH info specifically is derived on
-//! each backend).
-//!
-//! There is no live bind-mount endpoint (the old `POST
-//! /api/machines/:name/bind` was removed) — a real hardware VM has no
-//! shared-kernel mount trick to piggyback a live bind onto the way nspawn
-//! did. The replacement is declared at VM-create time instead:
-//! `VMStartOptions.bind_mounts`, which both backends now honor (systemd-
-//! vmspawn's own `--bind`/`--bind-ro` for `machinectl`, a virtiofs share
-//! for `ephemera` — see `ephemera-driver::lifecycle`'s translation and the
-//! systemd-removal migration plan's bind-mount notes).
+//! There is no live bind-mount endpoint. A real hardware VM has no
+//! shared-kernel mount trick for a live host-into-guest bind the way
+//! nspawn containers had. The replacement is declared at VM-create time
+//! instead: `VMStartOptions.bind_mounts`, translated into a virtiofs share
+//! per entry (see `ephemera-driver::lifecycle`'s translation).
 
 use axum::{
     extract::{Path, State},
@@ -30,30 +20,28 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
 
 use crate::server::AppState;
 use crate::validation::{validate_machine_path, validate_vm_name};
 use security::{RequireAdmin, RequireRead, RequireWrite};
-use zyvor_fabric_vm_driver::machinectl;
 use zyvor_fabric_driver_core::{ImageInfo, MachineInfo};
 
 // ============================================================================
 // Machine operations (migrated to D-Bus driver)
 // ============================================================================
 
-/// GET /api/machines - List running machines from machined
+/// GET /api/machines - List running machines
 pub async fn list_machines(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<MachineInfo>>, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(list_machines));
+    tracing::debug!("machines::{}", stringify!(list_machines));
     state.driver.list_machines().await.map(Json).map_err(|e| {
-        tracing::error!("machined list_machines failed: {}", e);
+        tracing::error!("machines list_machines failed: {}", e);
         crate::api_error::json_error_code(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "machined_connection",
+            "driver_connection",
             "Machine service operation failed",
         )
     })
@@ -66,7 +54,7 @@ pub async fn show_machine(
     Path(name): Path<String>,
 ) -> Result<Json<std::collections::HashMap<String, String>>, (StatusCode, Json<serde_json::Value>)>
 {
-    tracing::debug!("machined::{}", stringify!(show_machine));
+    tracing::debug!("machines::{}", stringify!(show_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -75,10 +63,10 @@ pub async fn show_machine(
         .await
         .map(Json)
         .map_err(|e| {
-            tracing::error!("machined show_machine failed: {}", e);
+            tracing::error!("machines show_machine failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -90,7 +78,7 @@ pub async fn poweroff_machine(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(poweroff_machine));
+    tracing::debug!("machines::{}", stringify!(poweroff_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -99,10 +87,10 @@ pub async fn poweroff_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined poweroff failed: {}", e);
+            tracing::error!("machines poweroff failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -114,7 +102,7 @@ pub async fn reboot_machine(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(reboot_machine));
+    tracing::debug!("machines::{}", stringify!(reboot_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -123,10 +111,10 @@ pub async fn reboot_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined reboot failed: {}", e);
+            tracing::error!("machines reboot failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -138,7 +126,7 @@ pub async fn terminate_machine(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(terminate_machine));
+    tracing::debug!("machines::{}", stringify!(terminate_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -147,10 +135,10 @@ pub async fn terminate_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined terminate failed: {}", e);
+            tracing::error!("machines terminate failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -162,7 +150,7 @@ pub async fn enable_machine(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(enable_machine));
+    tracing::debug!("machines::{}", stringify!(enable_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -171,10 +159,10 @@ pub async fn enable_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined enable failed: {}", e);
+            tracing::error!("machines enable failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -186,7 +174,7 @@ pub async fn disable_machine(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(disable_machine));
+    tracing::debug!("machines::{}", stringify!(disable_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -195,20 +183,18 @@ pub async fn disable_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined disable failed: {}", e);
+            tracing::error!("machines disable failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
 }
 
 // ============================================================================
-// Shell — machinectl shell (MachinectlDriver) or the vsock guest agent's
-// Exec op (EphemeraDriver, requires the VM to have been created with the
-// agent enabled), via state.driver. SSH/copy/bind stay CLI-based — see the
-// module doc comment.
+// Shell — the vsock guest agent's Exec op via state.driver, requires the VM
+// to have been created with the agent enabled.
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
@@ -223,7 +209,7 @@ pub async fn shell_machine(
     Path(name): Path<String>,
     Json(req): Json<ShellRequest>,
 ) -> Result<Json<zyvor_fabric_driver_core::ShellOutput>, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(shell_machine));
+    tracing::debug!("machines::{}", stringify!(shell_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
 
@@ -258,7 +244,7 @@ pub async fn shell_machine(
             tracing::error!("shell_machine failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -273,79 +259,46 @@ pub struct SshInfo {
 
 /// GET /api/machines/:name/ssh - Get SSH connection info
 ///
-/// `machinectl` backend: systemd-vmspawn's own vsock-based SSH
-/// (`SSHAddress`/`SSHPrivateKeyPath` machine properties, key managed by
-/// systemd). `ephemera` backend: no vsock SSH equivalent, so this instead
-/// resolves the VM's MAC (assigned at create time — see
+/// Resolves the VM's MAC (assigned at create time — see
 /// `EphemeraDriver::get_mac_address`) to a network IP via zyvor-fabricd's
-/// own DHCP lease file. Key management isn't something Ephemera or this
-/// lookup can speak to, so `key_path` is always `None` on that backend —
-/// the operator's own responsibility (e.g. injected via cloud-init).
+/// own DHCP lease file. Key management isn't something this lookup can
+/// speak to, so `key_path` is always `None` — the operator's own
+/// responsibility (e.g. injected via cloud-init).
 pub async fn ssh_info(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<SshInfo>, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(ssh_info));
+    tracing::debug!("machines::{}", stringify!(ssh_info));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
 
-    if state.driver.backend_name() == "ephemera" {
-        let mac = state.driver.get_mac_address(&name).await.map_err(|e| {
-            tracing::error!("ephemera get_mac_address failed: {}", e);
+    let mac = state.driver.get_mac_address(&name).await.map_err(|e| {
+        tracing::error!("get_mac_address failed: {}", e);
+        crate::api_error::json_error_code(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "driver_connection",
+            "Machine service operation failed",
+        )
+    })?;
+    let address = match &mac {
+        Some(mac) => state.dnsmasq_manager.lookup_lease_by_mac(mac).await.map_err(|e| {
+            tracing::error!("dnsmasq lease lookup failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
-        })?;
-        let address = match &mac {
-            Some(mac) => state.dnsmasq_manager.lookup_lease_by_mac(mac).await.map_err(|e| {
-                tracing::error!("dnsmasq lease lookup failed: {}", e);
-                crate::api_error::json_error_code(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "machined_connection",
-                    "Machine service operation failed",
-                )
-            })?,
-            None => None,
-        };
-        let ssh_command = address.as_ref().map(|addr| format!("ssh {addr}"));
-        return Ok(Json(SshInfo { address, key_path: None, ssh_command }));
-    }
-
-    let address = machinectl::ssh_address(&name).map_err(|e| {
-        tracing::error!("machined ssh_address failed: {}", e);
-        crate::api_error::json_error_code(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "machined_connection",
-            "Machine service operation failed",
-        )
-    })?;
-    let key_path = machinectl::ssh_key_path(&name).map_err(|e| {
-        tracing::error!("machined ssh_key_path failed: {}", e);
-        crate::api_error::json_error_code(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "machined_connection",
-            "Machine service operation failed",
-        )
-    })?;
-
-    let ssh_command = match (&address, &key_path) {
-        (Some(addr), Some(key)) => Some(format!("ssh -i {} {}", key, addr)),
-        _ => None,
+        })?,
+        None => None,
     };
-
-    Ok(Json(SshInfo {
-        address,
-        key_path,
-        ssh_command,
-    }))
+    let ssh_command = address.as_ref().map(|addr| format!("ssh {addr}"));
+    Ok(Json(SshInfo { address, key_path: None, ssh_command }))
 }
 
 // ============================================================================
-// File transfer (routed through state.driver — driver_core::ShellDriver;
-// machinectl copy-to/copy-from CLI, or Ephemera's vsock PutFile/GetFile)
+// File transfer — the vsock guest agent's PutFile/GetFile ops via
+// state.driver (driver_core::ShellDriver)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
@@ -366,7 +319,7 @@ pub async fn copy_to_machine(
     Path(name): Path<String>,
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(copy_to_machine));
+    tracing::debug!("machines::{}", stringify!(copy_to_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.host_path)
@@ -379,10 +332,10 @@ pub async fn copy_to_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined copy_to failed: {}", e);
+            tracing::error!("machines copy_to failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -395,7 +348,7 @@ pub async fn copy_from_machine(
     Path(name): Path<String>,
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(copy_from_machine));
+    tracing::debug!("machines::{}", stringify!(copy_from_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.host_path)
@@ -408,10 +361,10 @@ pub async fn copy_from_machine(
         .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined copy_from failed: {}", e);
+            tracing::error!("machines copy_from failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -426,12 +379,12 @@ pub async fn list_machine_images(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ImageInfo>>, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(list_machine_images));
+    tracing::debug!("machines::{}", stringify!(list_machine_images));
     state.driver.list_images().await.map(Json).map_err(|e| {
         tracing::error!("list_images failed: {}", e);
         crate::api_error::json_error_code(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "machined_connection",
+            "driver_connection",
             "Machine service operation failed",
         )
     })
@@ -449,7 +402,7 @@ pub async fn clone_machine_image(
     Path(name): Path<String>,
     Json(req): Json<CloneImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(clone_machine_image));
+    tracing::debug!("machines::{}", stringify!(clone_machine_image));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_vm_name(&req.target_name)
@@ -463,7 +416,7 @@ pub async fn clone_machine_image(
             tracing::error!("clone_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -481,7 +434,7 @@ pub async fn rename_machine_image(
     Path(name): Path<String>,
     Json(req): Json<RenameImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(rename_machine_image));
+    tracing::debug!("machines::{}", stringify!(rename_machine_image));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_vm_name(&req.new_name)
@@ -495,7 +448,7 @@ pub async fn rename_machine_image(
             tracing::error!("rename_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -507,7 +460,7 @@ pub async fn remove_machine_image(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(remove_machine_image));
+    tracing::debug!("machines::{}", stringify!(remove_machine_image));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -519,7 +472,7 @@ pub async fn remove_machine_image(
             tracing::error!("remove_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -537,7 +490,7 @@ pub async fn set_image_read_only(
     Path(name): Path<String>,
     Json(req): Json<SetReadOnlyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(set_image_read_only));
+    tracing::debug!("machines::{}", stringify!(set_image_read_only));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     state
@@ -549,15 +502,16 @@ pub async fn set_image_read_only(
             tracing::error!("set_read_only failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
 }
 
 // ============================================================================
-// Image transfer (pull/import/export — routed through state.driver;
-// tar variants and read-only/clean are machinectl-only, see ImageDriver)
+// Image transfer (pull/import/export — routed through state.driver; tar
+// variants always error unsupported — a tar rootfs isn't a bootable disk
+// image for a real hardware VM, see driver_core::ImageDriver's doc comment)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
@@ -574,7 +528,7 @@ pub async fn pull_raw_image(
     State(state): State<Arc<AppState>>,
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(pull_raw_image));
+    tracing::debug!("machines::{}", stringify!(pull_raw_image));
     validate_vm_name(&req.name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
@@ -588,7 +542,7 @@ pub async fn pull_raw_image(
             tracing::error!("pull_raw_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -600,7 +554,7 @@ pub async fn pull_tar_image(
     State(state): State<Arc<AppState>>,
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(pull_tar_image));
+    tracing::debug!("machines::{}", stringify!(pull_tar_image));
     validate_vm_name(&req.name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
@@ -614,7 +568,7 @@ pub async fn pull_tar_image(
             tracing::error!("pull_tar_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -632,7 +586,7 @@ pub async fn import_raw_image(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(import_raw_image));
+    tracing::debug!("machines::{}", stringify!(import_raw_image));
     validate_vm_name(&req.name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
@@ -646,7 +600,7 @@ pub async fn import_raw_image(
             tracing::error!("import_raw_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -658,7 +612,7 @@ pub async fn import_tar_image(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(import_tar_image));
+    tracing::debug!("machines::{}", stringify!(import_tar_image));
     validate_vm_name(&req.name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
@@ -672,7 +626,7 @@ pub async fn import_tar_image(
             tracing::error!("import_tar_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -690,7 +644,7 @@ pub async fn export_raw_image(
     Path(name): Path<String>,
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(export_raw_image));
+    tracing::debug!("machines::{}", stringify!(export_raw_image));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
@@ -704,7 +658,7 @@ pub async fn export_raw_image(
             tracing::error!("export_raw_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -717,7 +671,7 @@ pub async fn export_tar_image(
     Path(name): Path<String>,
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(export_tar_image));
+    tracing::debug!("machines::{}", stringify!(export_tar_image));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
@@ -731,7 +685,7 @@ pub async fn export_tar_image(
             tracing::error!("export_tar_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })
@@ -742,7 +696,7 @@ pub async fn clean_images(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(clean_images));
+    tracing::debug!("machines::{}", stringify!(clean_images));
     state
         .driver
         .clean_images(false)
@@ -752,7 +706,7 @@ pub async fn clean_images(
             tracing::error!("clean_images failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
+                "driver_connection",
                 "Machine service operation failed",
             )
         })

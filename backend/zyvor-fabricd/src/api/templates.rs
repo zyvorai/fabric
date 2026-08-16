@@ -367,12 +367,7 @@ pub async fn deploy_template(
         labels: None,
     };
 
-    let vm = zyvor_fabric_vm_driver::create_vm(&create_req).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    let vm = vm_model::VM::from_request(&create_req);
 
     state.store.save_vm(&vm).map_err(|e| {
         (

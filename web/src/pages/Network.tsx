@@ -325,7 +325,7 @@ export default function Network() {
   return (
     <ReadOnlyProvider readOnly={!canWrite}>
     <div className="space-y-6">
-      <SubsystemBanner subsystem="machined" title="Network stack" />
+      <SubsystemBanner subsystem="vm_driver" title="Network stack" />
       {!canWrite && <ReadOnlyNotice />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-3">

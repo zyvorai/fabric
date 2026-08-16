@@ -521,6 +521,35 @@ impl EphemeraClient {
         Self::parse(resp).await
     }
 
+    /// `GET /v1/vms/{id}/console?cols=..&rows=..` — dials Ephemera's
+    /// interactive-console WebSocket and returns a raw byte stream: reads
+    /// yield whatever the guest's shell wrote, writes go straight to its
+    /// stdin, with no framing on this side either (WS binary frames only,
+    /// unwrapped transparently by [`ConsoleWs`]).
+    pub async fn open_console(&self, id: Uuid, cols: u16, rows: u16) -> Result<ConsoleWs> {
+        let mut ws_url = self.url(&format!("/v1/vms/{id}/console"))?;
+        ws_url.set_scheme(if self.base_url.scheme() == "https" { "wss" } else { "ws" })
+            .map_err(|_| anyhow::anyhow!("failed to convert Ephemera base URL to a ws(s):// scheme"))?;
+        ws_url.query_pairs_mut().append_pair("cols", &cols.to_string()).append_pair("rows", &rows.to_string());
+
+        let mut request = tokio_tungstenite::tungstenite::http::Request::builder()
+            .uri(ws_url.as_str())
+            .header("Host", ws_url.host_str().unwrap_or_default())
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .header("Sec-WebSocket-Version", "13")
+            .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key());
+        if let Some(token) = &self.token {
+            request = request.header("Authorization", format!("Bearer {token}"));
+        }
+        let request = request.body(()).context("building console WebSocket request")?;
+
+        let (stream, _response) = tokio_tungstenite::connect_async(request)
+            .await
+            .with_context(|| format!("connecting to console WebSocket for VM {id}"))?;
+        Ok(ConsoleWs { stream, read_buf: Vec::new() })
+    }
+
     /// `POST /v1/vms/{id}/resources` — apply a partial cgroup resource
     /// patch to a running VM. Only fields set on `patch` are changed.
     pub async fn set_resources(&self, id: Uuid, patch: &ResourcePatch) -> Result<()> {
@@ -719,5 +748,72 @@ impl EphemeraClient {
         }
         serde_json::from_slice(&bytes)
             .with_context(|| format!("failed to parse Ephemera response ({status})"))
+    }
+}
+
+/// A live console WebSocket, adapted to plain `AsyncRead`/`AsyncWrite` —
+/// callers (e.g. `zyvor-fabricd`'s own browser-facing console WebSocket)
+/// just read/write raw bytes; the WS binary-frame boundary underneath is
+/// invisible on this side, matching Ephemera's own console protocol (see
+/// `ephemera_api::relay_console`'s doc comment on the other end of this
+/// connection).
+pub struct ConsoleWs {
+    stream: tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    read_buf: Vec<u8>,
+}
+
+impl tokio::io::AsyncRead for ConsoleWs {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        use futures::StreamExt;
+        loop {
+            if !self.read_buf.is_empty() {
+                let n = std::cmp::min(self.read_buf.len(), buf.remaining());
+                buf.put_slice(&self.read_buf[..n]);
+                self.read_buf.drain(..n);
+                return std::task::Poll::Ready(Ok(()));
+            }
+            match std::task::ready!(self.stream.poll_next_unpin(cx)) {
+                Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(data))) => {
+                    self.read_buf = data.into();
+                }
+                Some(Ok(tokio_tungstenite::tungstenite::Message::Text(t))) => {
+                    self.read_buf = t.as_bytes().to_vec();
+                }
+                Some(Ok(tokio_tungstenite::tungstenite::Message::Close(_))) | None => {
+                    return std::task::Poll::Ready(Ok(()));
+                }
+                Some(Ok(_)) => continue, // ping/pong/frame — not payload data
+                Some(Err(e)) => return std::task::Poll::Ready(Err(std::io::Error::other(e))),
+            }
+        }
+    }
+}
+
+impl tokio::io::AsyncWrite for ConsoleWs {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        use futures::SinkExt;
+        if let Err(e) = std::task::ready!(self.stream.poll_ready_unpin(cx)) {
+            return std::task::Poll::Ready(Err(std::io::Error::other(e)));
+        }
+        match self.stream.start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(buf.to_vec().into())) {
+            Ok(()) => std::task::Poll::Ready(Ok(buf.len())),
+            Err(e) => std::task::Poll::Ready(Err(std::io::Error::other(e))),
+        }
+    }
+    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+        use futures::SinkExt;
+        self.stream.poll_flush_unpin(cx).map_err(std::io::Error::other)
+    }
+    fn poll_shutdown(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+        use futures::SinkExt;
+        self.stream.poll_close_unpin(cx).map_err(std::io::Error::other)
     }
 }

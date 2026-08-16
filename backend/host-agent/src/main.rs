@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -13,6 +14,7 @@ use tokio::signal;
 use tokio::sync::watch;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+use zyvor_fabric_driver_core::VmDriver;
 
 // ---------------------------------------------------------------------------
 // CLI arguments
@@ -39,6 +41,17 @@ struct AgentConfig {
     /// Path to the file that persists this host's unique ID across restarts
     #[arg(long, default_value = "/var/lib/zyvor-fabricd/host-id")]
     host_id_file: PathBuf,
+
+    /// Base URL of the local Ephemera daemon this host's VMs run under
+    /// (`ephemera serve`) — every VM command from the controller is
+    /// executed against it.
+    #[arg(long, default_value = "http://127.0.0.1:7788")]
+    ephemera_url: String,
+
+    /// Bearer token for Ephemera's auth layer, if `auth.tokens` is
+    /// configured on that `ephemera serve` instance.
+    #[arg(long)]
+    ephemera_token: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +132,7 @@ struct Agent {
     address: String,
     heartbeat_interval: Duration,
     http_client: reqwest::Client,
+    driver: Arc<dyn VmDriver>,
 }
 
 impl Agent {
@@ -128,6 +142,7 @@ impl Agent {
         hostname: String,
         address: String,
         heartbeat_interval: Duration,
+        driver: Arc<dyn VmDriver>,
     ) -> Self {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
@@ -141,6 +156,28 @@ impl Agent {
             address,
             heartbeat_interval,
             http_client,
+            driver,
+        }
+    }
+
+    // -- metrics -------------------------------------------------------------
+
+    async fn collect_system_metrics(&self) -> SystemMetrics {
+        let cpu_usage_pct = read_cpu_usage().await.unwrap_or(0.0);
+        let (memory_total_mb, memory_used_mb, memory_usage_pct) =
+            read_memory_info().unwrap_or((0, 0, 0.0));
+        let uptime_secs = read_uptime().unwrap_or(0);
+        let load_average = read_loadavg().unwrap_or([0.0; 3]);
+        let vm_count = self.driver.list_machines().await.map(|v| v.len() as u32).unwrap_or(0);
+
+        SystemMetrics {
+            cpu_usage_pct,
+            memory_total_mb,
+            memory_used_mb,
+            memory_usage_pct,
+            vm_count,
+            uptime_secs,
+            load_average,
         }
     }
 
@@ -148,7 +185,7 @@ impl Agent {
 
     async fn register_with_controller(&self) -> Result<()> {
         let url = format!("{}/api/hosts", self.controller_url);
-        let metrics = collect_system_metrics().await;
+        let metrics = self.collect_system_metrics().await;
 
         let payload = RegistrationPayload {
             host_id: self.host_id.clone(),
@@ -186,7 +223,7 @@ impl Agent {
             "{}/api/hosts/{}/heartbeat",
             self.controller_url, self.host_id
         );
-        let metrics = collect_system_metrics().await;
+        let metrics = self.collect_system_metrics().await;
 
         let payload = HeartbeatPayload {
             timestamp: Utc::now(),
@@ -246,21 +283,21 @@ impl Agent {
 
         match cmd {
             HostCommand::StartVm { vm_name } => {
-                if let Err(e) = zyvor_fabric_vm_driver::start_vm(&vm_name) {
+                if let Err(e) = self.driver.start(&vm_name).await {
                     error!(vm = %vm_name, error = %e, "failed to start VM");
                 } else {
                     info!(vm = %vm_name, "VM started");
                 }
             }
             HostCommand::StopVm { vm_name } => {
-                if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&vm_name) {
+                if let Err(e) = self.driver.poweroff(&vm_name).await {
                     error!(vm = %vm_name, error = %e, "failed to stop VM");
                 } else {
                     info!(vm = %vm_name, "VM stopped");
                 }
             }
             HostCommand::RestartVm { vm_name } => {
-                if let Err(e) = zyvor_fabric_vm_driver::restart_vm(&vm_name) {
+                if let Err(e) = self.driver.reboot(&vm_name).await {
                     error!(vm = %vm_name, error = %e, "failed to restart VM");
                 } else {
                     info!(vm = %vm_name, "VM restarted");
@@ -278,7 +315,7 @@ impl Agent {
                     target = %target_host,
                     "migration requested – stopping local VM for transfer"
                 );
-                if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&vm_name) {
+                if let Err(e) = self.driver.poweroff(&vm_name).await {
                     error!(vm = %vm_name, error = %e, "failed to stop VM for migration");
                 }
             }
@@ -292,29 +329,11 @@ impl Agent {
             }
             HostCommand::FenceVm { vm_name } => {
                 warn!(vm = %vm_name, "fencing VM – force stopping");
-                // Try graceful stop first via machinectl
-                if let Err(e) = zyvor_fabric_vm_driver::stop_vm(&vm_name) {
-                    warn!(vm = %vm_name, error = %e, "graceful stop failed, attempting kill");
-                    // Fallback: find the leader PID and kill -9
-                    let leader_result = std::process::Command::new("machinectl")
-                        .args(["show", &vm_name, "--property=Leader", "--value"])
-                        .output();
-                    let kill_result = leader_result.and_then(|out| {
-                        let pid = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                        if pid.is_empty() {
-                            return Ok(out); // No PID found
-                        }
-                        std::process::Command::new("kill")
-                            .args(["-9", &pid])
-                            .output()
-                    });
-                    match kill_result {
-                        Ok(out) if out.status.success() => {
-                            info!(vm = %vm_name, "VM forcefully killed via leader PID");
-                        }
-                        _ => {
-                            error!(vm = %vm_name, "failed to fence VM – all methods exhausted");
-                        }
+                if let Err(e) = self.driver.poweroff(&vm_name).await {
+                    warn!(vm = %vm_name, error = %e, "graceful stop failed, force-terminating");
+                    match self.driver.terminate(&vm_name).await {
+                        Ok(()) => info!(vm = %vm_name, "VM forcefully terminated"),
+                        Err(e) => error!(vm = %vm_name, error = %e, "failed to fence VM – all methods exhausted"),
                     }
                 } else {
                     info!(vm = %vm_name, "VM fenced (graceful stop)");
@@ -411,26 +430,6 @@ impl Agent {
 // ---------------------------------------------------------------------------
 // System metrics collection
 // ---------------------------------------------------------------------------
-
-/// Collect host-level system metrics by parsing procfs.
-async fn collect_system_metrics() -> SystemMetrics {
-    let cpu_usage_pct = read_cpu_usage().await.unwrap_or(0.0);
-    let (memory_total_mb, memory_used_mb, memory_usage_pct) =
-        read_memory_info().unwrap_or((0, 0, 0.0));
-    let uptime_secs = read_uptime().unwrap_or(0);
-    let load_average = read_loadavg().unwrap_or([0.0; 3]);
-    let vm_count = count_running_vms().unwrap_or(0);
-
-    SystemMetrics {
-        cpu_usage_pct,
-        memory_total_mb,
-        memory_used_mb,
-        memory_usage_pct,
-        vm_count,
-        uptime_secs,
-        load_average,
-    }
-}
 
 /// Read CPU usage by sampling /proc/stat twice with a short delay and
 /// computing the delta.  Returns an overall utilisation percentage.
@@ -541,24 +540,6 @@ fn read_loadavg() -> Result<[f64; 3]> {
     ])
 }
 
-/// Count running VMs via `machinectl list --no-legend`.
-fn count_running_vms() -> Result<u32> {
-    let output = std::process::Command::new("machinectl")
-        .args(["list", "--no-legend", "--no-pager"])
-        .output();
-
-    match output {
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let count = stdout.lines().filter(|l| !l.trim().is_empty()).count();
-            Ok(count as u32)
-        }
-        Err(_) => {
-            // machinectl might not be available; not fatal.
-            Ok(0)
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Host-ID persistence
@@ -661,12 +642,20 @@ async fn main() -> Result<()> {
 
     let heartbeat_interval = Duration::from_secs(config.heartbeat_interval);
 
+    let mut driver = zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.ephemera_url)
+        .context("failed to initialize Ephemera driver")?;
+    if let Some(token) = config.ephemera_token {
+        driver = driver.with_token(token);
+    }
+    let driver: Arc<dyn VmDriver> = Arc::new(driver);
+
     info!(
         host_id = %host_id,
         hostname = %hostname,
         address = %address,
         controller = %config.controller_url,
         heartbeat_secs = config.heartbeat_interval,
+        ephemera_url = %config.ephemera_url,
         "agent configured"
     );
 
@@ -698,6 +687,7 @@ async fn main() -> Result<()> {
         hostname,
         address,
         heartbeat_interval,
+        driver,
     );
 
     agent.run(shutdown_rx).await

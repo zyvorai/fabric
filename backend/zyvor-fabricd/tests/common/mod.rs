@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use zyvor_fabricd::config::{
-    AuthConfig, Config, ControllerConfig, DaemonConfig, NetworkConfig, StorageConfig,
+    AuthConfig, Config, ControllerConfig, DaemonConfig, DriverConfig, NetworkConfig, StorageConfig,
 };
 use zyvor_fabricd::server::{AppState, QuotaCache};
 
@@ -56,6 +56,7 @@ pub async fn create_test_app() -> Router {
             enabled: false,
             ..AuthConfig::default()
         },
+        driver: DriverConfig::default(),
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -65,9 +66,8 @@ pub async fn create_test_app() -> Router {
         .build()
         .unwrap();
 
-    let driver = vmspawnd_machinectl_driver::MachinectlDriver::new()
-        .await
-        .expect("Failed to connect to system D-Bus for test setup");
+    let driver = zyvor_fabric_ephemera_driver::EphemeraDriver::new("http://127.0.0.1:7788")
+        .expect("failed to construct test Ephemera driver (no real connection made yet)");
 
     let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(
         zyvor_fabric_lock_manager::LockConfig::default(),
@@ -83,6 +83,7 @@ pub async fn create_test_app() -> Router {
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(zyvor_fabricd::plugins::PluginRegistry::new())),
         driver: Arc::new(driver),
+        dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(tmp_dir.join("dnsmasq"))),
         lock_manager,
         policy_engine: Arc::new(network_policy::PolicyEngine::new()),
         service_mesh: Arc::new(service_mesh::ServiceMesh::new()),
@@ -140,6 +141,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
             enabled: false,
             ..AuthConfig::default()
         },
+        driver: DriverConfig::default(),
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -149,9 +151,8 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         .build()
         .unwrap();
 
-    let driver = vmspawnd_machinectl_driver::MachinectlDriver::new()
-        .await
-        .expect("Failed to connect to system D-Bus for test setup");
+    let driver = zyvor_fabric_ephemera_driver::EphemeraDriver::new("http://127.0.0.1:7788")
+        .expect("failed to construct test Ephemera driver (no real connection made yet)");
 
     let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(
         zyvor_fabric_lock_manager::LockConfig::default(),
@@ -167,6 +168,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(zyvor_fabricd::plugins::PluginRegistry::new())),
         driver: Arc::new(driver),
+        dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(tmp_dir.join("dnsmasq"))),
         lock_manager,
         policy_engine: Arc::new(network_policy::PolicyEngine::new()),
         service_mesh: Arc::new(service_mesh::ServiceMesh::new()),

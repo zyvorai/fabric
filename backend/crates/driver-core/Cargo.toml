@@ -11,4 +11,5 @@ serde_json.workspace = true
 futures.workspace = true
 chrono.workspace = true
 async-trait.workspace = true
+tokio.workspace = true
 vm-model = { path = "../../vm-model" }

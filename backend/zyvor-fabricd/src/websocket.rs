@@ -15,7 +15,6 @@ use serde::Deserialize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
 static ACTIVE_WS_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
@@ -33,7 +32,13 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 #[derive(Debug, Deserialize)]
 pub struct ConsoleQuery {
     pub token: Option<String>,
+    #[serde(default = "default_console_cols")]
+    pub cols: u16,
+    #[serde(default = "default_console_rows")]
+    pub rows: u16,
 }
+fn default_console_cols() -> u16 { 80 }
+fn default_console_rows() -> u16 { 24 }
 
 pub async fn console_handler(
     ws: WebSocketUpgrade,
@@ -52,7 +57,6 @@ pub async fn console_handler(
         return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
 
-    // Validate VM name to prevent command injection
     validate_vm_name(&vm_name).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Validate authentication - reject if auth is not configured
@@ -86,12 +90,25 @@ pub async fn console_handler(
         return Err(StatusCode::FORBIDDEN);
     }
 
+    // Open the console *before* upgrading, so a failure (guest agent
+    // disabled, VM unreachable, VM not found) comes back as a normal HTTP
+    // error instead of a WebSocket that opens and immediately closes with
+    // no useful diagnostic for the browser to show.
+    let console = state.driver.open_console(&vm_name, query.cols, query.rows).await.map_err(|e| {
+        tracing::warn!("Failed to open console for VM '{}': {:#}", vm_name, e);
+        StatusCode::BAD_GATEWAY
+    })?;
+
     Ok(ws
         .max_message_size(MAX_MESSAGE_SIZE)
-        .on_upgrade(move |socket| handle_console(socket, vm_name)))
+        .on_upgrade(move |socket| handle_console(socket, vm_name, console)))
 }
 
-async fn handle_console(socket: WebSocket, vm_name: String) {
+async fn handle_console(
+    socket: WebSocket,
+    vm_name: String,
+    console: zyvor_fabric_driver_core::ConsoleSession,
+) {
     ACTIVE_WS_CONNECTIONS.fetch_add(1, Ordering::Relaxed);
     tracing::info!(
         "WebSocket console connection established for VM: {} (active: {})",
@@ -99,63 +116,15 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
         ACTIVE_WS_CONNECTIONS.load(Ordering::Relaxed),
     );
 
-    let mut child = match Command::new("machinectl")
-        .arg("shell")
-        .arg(&vm_name)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(e) => {
-            tracing::error!("Failed to spawn machinectl shell: {}", e);
-            ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
-            return;
-        }
-    };
-
-    let mut stdin = match child.stdin.take() {
-        Some(s) => s,
-        None => {
-            tracing::error!("Failed to capture stdin for machinectl shell");
-            let _ = child.kill().await;
-            let (mut sender, _) = socket.split();
-            let _ = sender
-                .send(Message::Text(
-                    "\r\n[Error: failed to open console]\r\n".into(),
-                ))
-                .await;
-            let _ = sender.send(Message::Close(None)).await;
-            ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
-            return;
-        }
-    };
-    let mut stdout = match child.stdout.take() {
-        Some(s) => s,
-        None => {
-            tracing::error!("Failed to capture stdout for machinectl shell");
-            let _ = child.kill().await;
-            let (mut sender, _) = socket.split();
-            let _ = sender
-                .send(Message::Text(
-                    "\r\n[Error: failed to open console]\r\n".into(),
-                ))
-                .await;
-            let _ = sender.send(Message::Close(None)).await;
-            ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
-            return;
-        }
-    };
-
+    let (mut console_rx, mut console_tx) = tokio::io::split(console);
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    // Read from stdout and send to WebSocket
+    // Read from the console and send to WebSocket
     let vm_name_clone = vm_name.clone();
-    let stdout_task = tokio::spawn(async move {
-        let mut buf = [0u8; 1024];
+    let console_to_ws = tokio::spawn(async move {
+        let mut buf = [0u8; 4096];
         loop {
-            match timeout(IDLE_TIMEOUT, stdout.read(&mut buf)).await {
+            match timeout(IDLE_TIMEOUT, console_rx.read(&mut buf)).await {
                 Ok(Ok(0)) => break,
                 Ok(Ok(n)) => {
                     if ws_sender
@@ -167,7 +136,7 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                     }
                 }
                 Ok(Err(e)) => {
-                    tracing::error!("Error reading from stdout: {}", e);
+                    tracing::error!("Error reading from console: {}", e);
                     break;
                 }
                 Err(_) => {
@@ -181,22 +150,22 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                 }
             }
         }
-        tracing::info!("Console stdout task ended for VM: {}", vm_name_clone);
+        tracing::info!("Console-to-WebSocket task ended for VM: {}", vm_name_clone);
     });
 
-    // Read from WebSocket and write to stdin
+    // Read from WebSocket and write to the console
     let vm_name_clone = vm_name.clone();
-    let stdin_task = tokio::spawn(async move {
+    let ws_to_console = tokio::spawn(async move {
         loop {
             match timeout(IDLE_TIMEOUT, ws_receiver.next()).await {
                 Ok(Some(msg)) => match msg {
                     Ok(Message::Text(text)) => {
-                        if stdin.write_all(text.as_bytes()).await.is_err() {
+                        if console_tx.write_all(text.as_bytes()).await.is_err() {
                             break;
                         }
                     }
                     Ok(Message::Binary(data)) => {
-                        if stdin.write_all(&data).await.is_err() {
+                        if console_tx.write_all(&data).await.is_err() {
                             break;
                         }
                     }
@@ -214,14 +183,15 @@ async fn handle_console(socket: WebSocket, vm_name: String) {
                 }
             }
         }
-        tracing::info!("Console stdin task ended for VM: {}", vm_name_clone);
+        tracing::info!("WebSocket-to-console task ended for VM: {}", vm_name_clone);
     });
 
-    // Wait for both tasks
-    let _ = tokio::join!(stdout_task, stdin_task);
-
-    // Kill the child process
-    let _ = child.kill().await;
+    // Wait for either direction to end — the other side would otherwise
+    // block on a read nothing more is coming from.
+    tokio::select! {
+        _ = console_to_ws => {}
+        _ = ws_to_console => {}
+    }
 
     ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
     tracing::info!(

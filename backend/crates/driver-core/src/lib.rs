@@ -44,17 +44,16 @@ pub type LogStream = Pin<Box<dyn Stream<Item = LogEntry> + Send>>;
 //
 // These use `#[async_trait]` (boxed futures) rather than native RPITIT
 // (`impl Future<...> + Send`) specifically so `VmDriver` below is
-// dyn-compatible — `zyvor-fabricd`'s `AppState.driver` needs to hold either a
-// `MachinectlDriver` or an `EphemeraDriver` behind one `Arc<dyn VmDriver>`,
-// selected at startup by config, and RPITIT traits cannot be turned into
-// trait objects. This also matches the convention Ephemera's own
-// `VmBackend` trait already uses.
+// dyn-compatible — `zyvor-fabricd`'s `AppState.driver` holds an
+// `EphemeraDriver` behind `Arc<dyn VmDriver>`, and RPITIT traits cannot be
+// turned into trait objects. This also matches the convention Ephemera's
+// own `VmBackend` trait already uses.
 
-/// Core VM lifecycle operations. Historically machined/systemd-shaped
-/// (`name`-keyed, "enable at boot" semantics) — implementations backed by a
-/// different engine (e.g. Ephemera) adapt to this shape rather than the
-/// trait adapting to them, so callers don't need to care which backend is
-/// active.
+/// Core VM lifecycle operations (`name`-keyed, "enable at boot" semantics)
+/// — a shape kept from this trait's original systemd-machined-backed
+/// design; implementations backed by a different engine (e.g. Ephemera)
+/// adapt to this shape rather than the trait adapting to them, so callers
+/// don't need to care which backend is active.
 #[async_trait]
 pub trait VMDriver: Send + Sync {
     /// Start a machine by name.
@@ -102,11 +101,8 @@ pub trait VMDriver: Send + Sync {
     async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 
     /// The MAC address the machine's primary NIC was launched with, if
-    /// known. `MachinectlDriver` has no use for this (its own SSH info
-    /// comes from systemd-vmspawn's vsock-based `SSHAddress`, not a network
-    /// lookup) and returns `None`; `EphemeraDriver` returns the MAC it
-    /// assigned at create time, which callers can resolve to an IP via a
-    /// DHCP lease lookup.
+    /// known — `EphemeraDriver` returns the MAC it assigned at create
+    /// time, which callers can resolve to an IP via a DHCP lease lookup.
     async fn get_mac_address(&self, name: &str) -> Result<Option<String>>;
 }
 
@@ -120,9 +116,7 @@ pub trait ResourceStatsDriver: Send + Sync {
     async fn get_pressure(&self, name: &str) -> Result<VMPressure>;
 }
 
-/// Runtime resource control via cgroup v2 (systemd unit properties for the
-/// machinectl backend; a vendored equivalent, per the migration plan, for
-/// any backend not itself managed by systemd).
+/// Runtime resource control via cgroup v2.
 #[async_trait]
 pub trait ResourceControlDriver: Send + Sync {
     /// Set CPU quota as a percentage (e.g. 200 = 2 full cores).
@@ -170,49 +164,45 @@ pub struct ShellOutput {
 }
 
 /// Run a single non-interactive command inside a machine and collect its
-/// output — machinectl's `machinectl shell`, or Ephemera's vsock
-/// guest-agent `Exec` op (requires the VM to have been created with the
-/// agent enabled; see `CreateVmRequest.agent`). Not a substitute for a real
-/// interactive console/PTY — see the systemd-removal migration plan's notes
-/// on `api/machined.rs::shell_machine`.
+/// output — Ephemera's vsock guest-agent `Exec` op (requires the VM to
+/// have been created with the agent enabled; see `CreateVmRequest.agent`).
+/// Not a substitute for a real interactive console/PTY.
 #[async_trait]
 pub trait ShellDriver: Send + Sync {
     async fn shell(&self, name: &str, command: &str, timeout_seconds: Option<u64>) -> Result<ShellOutput>;
 
-    /// Copy a file from the host into the machine — `machinectl copy-to`,
-    /// or Ephemera's vsock guest-agent `PutFile` op (same agent-enabled
-    /// requirement as [`Self::shell`]). `mode` is Unix permission bits
-    /// (e.g. `0o644`); `None` lets the backend pick its own default.
+    /// Copy a file from the host into the machine — Ephemera's vsock
+    /// guest-agent `PutFile` op (same agent-enabled requirement as
+    /// [`Self::shell`]). `mode` is Unix permission bits (e.g. `0o644`);
+    /// `None` lets the backend pick its own default.
     async fn copy_to(&self, name: &str, host_path: &str, machine_path: &str, mode: Option<u32>) -> Result<()>;
 
-    /// Copy a file from the machine to the host — `machinectl copy-from`,
-    /// or Ephemera's vsock guest-agent `GetFile` op.
+    /// Copy a file from the machine to the host — Ephemera's vsock
+    /// guest-agent `GetFile` op.
     async fn copy_from(&self, name: &str, machine_path: &str, host_path: &str) -> Result<()>;
 }
 
-/// One entry in the image registry (machinectl's `/var/lib/machines`
-/// images, or Ephemera's catalog — see `ImageDriver`).
+/// One entry in the image registry — Ephemera's checksummed image catalog
+/// (see `ImageDriver`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageInfo {
     pub name: String,
-    /// Free-form backend-specific label (e.g. `"raw"`/`"subvolume"` for
-    /// machinectl, the on-disk format like `"qcow2"` for Ephemera).
+    /// Free-form backend-specific label, e.g. the on-disk format
+    /// (`"qcow2"`) for Ephemera.
     pub image_type: String,
     pub read_only: bool,
-    /// Free-form, backend-specific size representation (matches
-    /// machinectl's own un-normalized `list-images` output) rather than a
+    /// Free-form, backend-specific size representation rather than a
     /// parsed byte count, since not every backend can report one cheaply.
     pub size: String,
 }
 
 /// Manage named base/VM images independent of any specific machine —
-/// machinectl's `/var/lib/machines` image directory (clone/rename/remove/
-/// pull/import/export/clean), or Ephemera's checksummed image catalog.
-/// Every method must be implemented by every backend; one with no real
-/// equivalent for a given operation (see `EphemeraDriver`'s tar/read-only/
-/// clean methods) should return a clear "not supported" error rather than
-/// silently no-op'ing — a caller has no way to notice a silently-dropped
-/// image operation.
+/// Ephemera's checksummed image catalog. Every method must be implemented
+/// by every backend; one with no real equivalent for a given operation
+/// (see `EphemeraDriver`'s tar-format methods — a tar rootfs isn't a
+/// bootable disk image for a real hardware VM) should return a clear "not
+/// supported" error rather than silently no-op'ing — a caller has no way
+/// to notice a silently-dropped image operation.
 #[async_trait]
 pub trait ImageDriver: Send + Sync {
     async fn list_images(&self) -> Result<Vec<ImageInfo>>;
@@ -231,19 +221,38 @@ pub trait ImageDriver: Send + Sync {
 
 /// Feature detection for optional capabilities.
 pub trait CapabilityProvider: Send + Sync {
-    /// A short, stable identifier for the active backend (e.g.
-    /// `"machinectl"`, `"ephemera"`) — surfaced by health/capability
-    /// endpoints instead of the systemd-specific `has_dbus`/`has_machined`
-    /// booleans this replaced.
+    /// A short, stable identifier for the active backend (`"ephemera"`)
+    /// — surfaced by health/capability endpoints.
     fn backend_name(&self) -> &'static str;
 
     /// Whether resource control (cgroup v2 quota/freeze/etc.) is available.
     fn has_resource_control(&self) -> bool;
 }
 
+/// A live interactive console session (an already-open PTY connection) —
+/// plain bytes both ways once the handshake underneath has completed, no
+/// framing left on this side. Boxed/pinned so `ConsoleDriver::open_console`
+/// can return one concrete type regardless of backend transport.
+pub type ConsoleSession = std::pin::Pin<Box<dyn ConsoleIo>>;
+
+/// Marker trait combining `AsyncRead`+`AsyncWrite`+`Send` into one
+/// dyn-compatible bound, since `dyn AsyncRead + AsyncWrite` isn't directly
+/// expressible. Blanket-`impl`'d — never implemented by hand.
+pub trait ConsoleIo: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}
+impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send> ConsoleIo for T {}
+
+/// Open an interactive shell on a machine — Ephemera's vsock `OpenShell` op,
+/// relayed to the caller as a raw byte stream. No live terminal resize (the
+/// size is fixed at open time — see `AgentRequest::OpenShell`'s doc comment
+/// on the Ephemera side of this connection).
+#[async_trait]
+pub trait ConsoleDriver: Send + Sync {
+    async fn open_console(&self, name: &str, cols: u16, rows: u16) -> Result<ConsoleSession>;
+}
+
 /// Umbrella trait letting `zyvor-fabricd` hold one `Arc<dyn VmDriver>` covering
-/// every driver capability, instead of five separate trait objects. Blanket
-/// `impl`'d for anything implementing the five component traits — backends
+/// every driver capability, instead of eight separate trait objects. Blanket
+/// `impl`'d for anything implementing the eight component traits — backends
 /// only need to implement those, never this trait directly.
 pub trait VmDriver:
     VMDriver
@@ -252,6 +261,7 @@ pub trait VmDriver:
     + LogDriver
     + ImageDriver
     + ShellDriver
+    + ConsoleDriver
     + CapabilityProvider
 {
 }
@@ -262,6 +272,7 @@ impl<T> VmDriver for T where
         + LogDriver
         + ImageDriver
         + ShellDriver
+        + ConsoleDriver
         + CapabilityProvider
 {
 }

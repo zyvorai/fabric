@@ -19,7 +19,7 @@ use zyvor_fabric_driver_core::VmDriver;
 
 use crate::{
     api,
-    config::{Config, DriverBackend},
+    config::Config,
     plugins, routes, websocket,
 };
 
@@ -120,26 +120,17 @@ impl Server {
             (None, None)
         };
 
-        // Select the VM driver backend — see the systemd-removal migration
-        // plan. Defaults to `machinectl` (today's systemd-machined/D-Bus
-        // backend); `driver.backend = "ephemera"` in config switches to the
-        // Ephemera-backed driver instead. Only one is ever constructed.
-        let driver: Arc<dyn VmDriver> = match config.driver.backend {
-            DriverBackend::Machinectl => {
-                let d = vmspawnd_machinectl_driver::MachinectlDriver::new()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to initialize machined D-Bus driver: {}", e))?;
-                Arc::new(d)
+        // VM driver — see the systemd-removal migration plan's final phase.
+        // The systemd-machined/D-Bus backend this replaced is gone; Ephemera
+        // is the only `VmDriver` implementation left.
+        let driver: Arc<dyn VmDriver> = {
+            let mut d = zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.driver.ephemera_url)
+                .map_err(|e| anyhow::anyhow!("Failed to initialize Ephemera driver: {}", e))?;
+            if let Some(token) = &config.driver.ephemera_token {
+                d = d.with_token(token.clone());
             }
-            DriverBackend::Ephemera => {
-                let mut d = zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.driver.ephemera_url)
-                    .map_err(|e| anyhow::anyhow!("Failed to initialize Ephemera driver: {}", e))?;
-                if let Some(token) = &config.driver.ephemera_token {
-                    d = d.with_token(token.clone());
-                }
-                tracing::info!(url = %config.driver.ephemera_url, "Using Ephemera VM driver backend");
-                Arc::new(d)
-            }
+            tracing::info!(url = %config.driver.ephemera_url, "Using Ephemera VM driver");
+            Arc::new(d)
         };
 
         let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(

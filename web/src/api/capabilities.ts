@@ -12,7 +12,7 @@ export interface SubsystemStatus {
 }
 
 export interface Capabilities {
-  machined: SubsystemStatus
+  vm_driver: SubsystemStatus
   storage: SubsystemStatus
   network_security: SubsystemStatus
   auth: SubsystemStatus

@@ -155,7 +155,7 @@ export default function Machines() {
   return (
     <div className="space-y-6">
       <Breadcrumb />
-      <SubsystemBanner subsystem="machined" title="systemd-machined" />
+      <SubsystemBanner subsystem="vm_driver" title="VM driver" />
       {loadError && (
         <ErrorBanner
           title="Could not load machines"

@@ -145,9 +145,9 @@ export default function Dashboard() {
         {(
           [
             {
-              title: 'systemd-machined',
+              title: 'VM driver',
               subtitle: 'VM registration and lifecycle',
-              status: capabilities?.machined,
+              status: capabilities?.vm_driver,
             },
             {
               title: 'Storage',

@@ -932,6 +932,13 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::ConsoleDriver for MockDriver {
+        async fn open_console(&self, _name: &str, _cols: u16, _rows: u16) -> Result<zyvor_fabric_driver_core::ConsoleSession> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
     impl zyvor_fabric_driver_core::CapabilityProvider for MockDriver {
         fn backend_name(&self) -> &'static str {
             "mock"

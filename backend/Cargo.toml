@@ -30,8 +30,6 @@ members = [
     "certificate-manager",
     "security",
     "crates/driver-core",
-    "crates/machined-dbus",
-    "crates/machinectl-driver",
     "crates/ephemera-client",
     "crates/ephemera-driver",
     "crates/dnsmasq-manager",

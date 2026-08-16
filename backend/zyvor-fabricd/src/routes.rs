@@ -13,7 +13,7 @@ use security::{RequireAdmin, RequireRead, RequireWrite};
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
-use vm_model::{CreateVMRequest, VMStartOptions};
+use vm_model::{CreateVMRequest, VMStartOptions, VM};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
@@ -43,7 +43,7 @@ fn audit(state: &AppState, user: &str, action: &str, resource: &str, status: &st
     }
 }
 
-use crate::api_error::{json_error, json_error_code};
+use crate::api_error::json_error;
 
 /// JSON error with path sanitization for non-admin users.
 fn json_error_safe(
@@ -123,73 +123,34 @@ pub async fn create_vm(
             .into_response();
     }
 
-    match zyvor_fabric_vm_driver::create_vm(&req) {
-        Ok(vm) => {
-            if let Err(e) = state.store.save_vm(&vm) {
-                return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                    .into_response();
-            }
+    let vm = VM::from_request(&req);
 
-            // Allocate security identity if VM has labels
-            if let Some(ref labels) = vm.labels {
-                if !labels.is_empty() {
-                    match state
-                        .policy_engine
-                        .allocator
-                        .allocate_or_get(labels, &vm.name)
-                    {
-                        Ok(id) => {
-                            if let Some(ref ip) = vm.ip {
-                                if let Err(e) =
-                                    state.policy_engine.allocator.update_ip_mapping(ip, id)
-                                {
-                                    tracing::warn!(
-                                        "Failed to update IP mapping for VM '{}': {}",
-                                        vm.name,
-                                        e
-                                    );
-                                }
-                            }
-                            tracing::debug!("Allocated identity {} for VM '{}'", id, vm.name);
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to allocate identity for VM '{}': {}",
-                                vm.name,
-                                e
-                            );
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+
+    // Allocate security identity if VM has labels
+    if let Some(ref labels) = vm.labels {
+        if !labels.is_empty() {
+            match state.policy_engine.allocator.allocate_or_get(labels, &vm.name) {
+                Ok(id) => {
+                    if let Some(ref ip) = vm.ip {
+                        if let Err(e) = state.policy_engine.allocator.update_ip_mapping(ip, id) {
+                            tracing::warn!("Failed to update IP mapping for VM '{}': {}", vm.name, e);
                         }
                     }
+                    tracing::debug!("Allocated identity {} for VM '{}'", id, vm.name);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to allocate identity for VM '{}': {}", vm.name, e);
                 }
             }
-
-            audit(
-                &state,
-                &claims.sub,
-                "CREATE",
-                &format!("vm/{}", vm.name),
-                "SUCCESS",
-            );
-            crate::api::events::record_event(
-                &state,
-                crate::api::events::VMEventType::Created,
-                &vm.name,
-                None,
-            );
-            (StatusCode::CREATED, Json(vm)).into_response()
-        }
-        Err(e) => {
-            audit(
-                &state,
-                &claims.sub,
-                "CREATE",
-                &format!("vm/{}", req.name),
-                "FAILED",
-            );
-            json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
-                .into_response()
         }
     }
+
+    audit(&state, &claims.sub, "CREATE", &format!("vm/{}", vm.name), "SUCCESS");
+    crate::api::events::record_event(&state, crate::api::events::VMEventType::Created, &vm.name, None);
+    (StatusCode::CREATED, Json(vm)).into_response()
 }
 
 pub async fn delete_vm(

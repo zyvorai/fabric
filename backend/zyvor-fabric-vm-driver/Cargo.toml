@@ -6,7 +6,4 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-serde.workspace = true
 tracing.workspace = true
-vm-model = { path = "../vm-model" }
-zyvor-fabric-cgroup = { path = "../crates/cgroup" }

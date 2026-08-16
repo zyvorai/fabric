@@ -28,7 +28,7 @@ pub struct SubsystemStatus {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CapabilitiesResponse {
-    pub machined: SubsystemStatus,
+    pub vm_driver: SubsystemStatus,
     pub storage: SubsystemStatus,
     pub network_security: SubsystemStatus,
     pub auth: SubsystemStatus,
@@ -40,14 +40,14 @@ pub async fn get_capabilities(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<CapabilitiesResponse> {
-    let machined = probe_machined(&state).await;
+    let vm_driver = probe_vm_driver(&state).await;
     let storage = probe_storage(&state).await;
     let network_security = probe_network_security(&state);
     let auth = probe_auth(&state);
     let events = probe_events(&state);
 
     Json(CapabilitiesResponse {
-        machined,
+        vm_driver,
         storage,
         network_security,
         auth,
@@ -55,17 +55,17 @@ pub async fn get_capabilities(
     })
 }
 
-async fn probe_machined(state: &AppState) -> SubsystemStatus {
+async fn probe_vm_driver(state: &AppState) -> SubsystemStatus {
     match state.driver.list_machines().await {
         Ok(machines) => SubsystemStatus {
             phase: SubsystemPhase::Live,
             detail: Some(format!("{} machine(s) registered", machines.len())),
         },
         Err(e) => {
-            tracing::debug!("capabilities: machined unreachable: {}", e);
+            tracing::debug!("capabilities: vm driver unreachable: {}", e);
             SubsystemStatus {
                 phase: SubsystemPhase::Unreachable,
-                detail: Some("Could not reach systemd-machined".to_string()),
+                detail: Some("Could not reach the Ephemera VM driver".to_string()),
             }
         }
     }

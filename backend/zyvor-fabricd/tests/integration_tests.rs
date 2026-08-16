@@ -812,8 +812,13 @@ async fn test_vm_metrics() {
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    // get_metrics returns Ok with zeroes even if cgroup doesn't exist, so expect 200
-    assert_eq!(response.status(), StatusCode::OK);
+    // Unlike the old machinectl backend (which read a local cgroup file and
+    // returned zeroed metrics if it didn't exist), the Ephemera backend
+    // resolves the name over its REST API — a nonexistent VM (or, as here,
+    // no Ephemera instance reachable at all in this test environment)
+    // surfaces as a real error rather than a silent fake-success zero
+    // reading.
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 // ─── Plugins ────────────────────────────────────────────────────────────────

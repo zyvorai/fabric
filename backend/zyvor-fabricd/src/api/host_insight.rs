@@ -359,25 +359,23 @@ pub async fn get_kernel_info(RequireRead(_claims): RequireRead) -> Json<serde_js
 }
 
 /// GET /api/system/containers
-pub async fn get_containers(RequireRead(_claims): RequireRead) -> Json<serde_json::Value> {
-    let lines = run_command_lines("machinectl", &["list", "--no-legend", "--no-pager"], 200).await;
-    let mut containers = Vec::new();
-    for line in lines {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.is_empty() {
-            continue;
-        }
-        containers.push(serde_json::json!({
-            "id": parts[0],
-            "name": parts[0],
-            "state": parts.get(1).unwrap_or(&"unknown"),
-            "image": parts.get(2).unwrap_or(&""),
-        }));
-    }
-    let running = containers
+pub async fn get_containers(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let machines = state.driver.list_machines().await.unwrap_or_default();
+    let containers: Vec<serde_json::Value> = machines
         .iter()
-        .filter(|c| c.get("state").and_then(|s| s.as_str()) == Some("running"))
-        .count();
+        .map(|m| {
+            serde_json::json!({
+                "id": m.name,
+                "name": m.name,
+                "state": format!("{:?}", m.state).to_lowercase(),
+                "image": "",
+            })
+        })
+        .collect();
+    let running = machines.iter().filter(|m| matches!(m.state, vm_model::VMState::Running)).count();
     Json(serde_json::json!({
         "summary": {
             "total": containers.len(),

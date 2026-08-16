@@ -3,19 +3,20 @@
 // https://zyvor.dev · info@zyvor.dev
 
 //! `driver-core` implementation backed by [Ephemera](https://github.com/hypersdk/ephemera)
-//! instead of systemd-machined/systemd-vmspawn — see the systemd-removal
-//! migration plan. `VMDriver`'s create/stop/pause/resume/list/state/
-//! properties/leader-pid map directly onto Ephemera's REST API (Phase 3).
-//! `ResourceControlDriver`/`ResourceStatsDriver` are backed by Ephemera's
-//! cgroup-delegation extension (Phase 5, see `resource_control.rs`).
-//! `LogDriver` streams real captured console output over Ephemera's
-//! `GET /v1/vms/{id}/logs` (see `resource_control.rs`'s `stream_logs` impl) —
-//! `api/logs.rs`/`websocket.rs` dispatch through `state.driver` generically,
-//! so this needs no special-casing there; the only fidelity reduction versus
-//! `MachinectlDriver` is that raw serial console output has no
-//! journald-equivalent per-line priority/unit metadata, so every entry is
-//! stamped uniformly (see that impl's comment). Selected by zyvor-fabricd's
-//! `driver = "machinectl" | "ephemera"` config flag.
+//! — the only `VmDriver` implementation left as of the systemd-removal
+//! migration's final phase; the systemd-machined/systemd-vmspawn backend
+//! this replaced (`machinectl-driver`/`machined-dbus`) is gone. `VMDriver`'s
+//! create/stop/pause/resume/list/state/properties/leader-pid map directly
+//! onto Ephemera's REST API. `ResourceControlDriver`/`ResourceStatsDriver`
+//! are backed by Ephemera's cgroup-delegation extension (see
+//! `resource_control.rs`). `LogDriver` streams real captured console output
+//! over Ephemera's `GET /v1/vms/{id}/logs` (see `resource_control.rs`'s
+//! `stream_logs` impl); the one fidelity reduction versus the old
+//! journald-backed driver is that raw serial console output has no
+//! per-line priority/unit metadata, so every entry is stamped uniformly.
+//! `ConsoleDriver` (see `console.rs`) gives an interactive shell over
+//! Ephemera's console WebSocket, itself backed by the vsock guest agent's
+//! `OpenShell` op.
 //!
 //! **Known gap as of Ephemera v0.1.0**: `ephemera-client`'s wire types are a
 //! hand-synced mirror of `ephemera-core::model` (see that crate's own doc
@@ -30,6 +31,7 @@
 //! `ephemera-agent` distributed fleet registry are separate ways to run
 //! Ephemera, not something this REST-client-based driver consumes.
 
+mod console;
 mod images;
 mod lifecycle;
 mod resource_control;
@@ -39,7 +41,7 @@ use anyhow::{Context, Result};
 use zyvor_fabric_ephemera_client::EphemeraClient;
 
 pub use zyvor_fabric_driver_core::{
-    CapabilityProvider, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
+    CapabilityProvider, ConsoleDriver, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
     ResourceControlDriver, ResourceStatsDriver, ShellDriver, ShellOutput, VMDriver, VmDriver,
 };
 
