@@ -197,7 +197,10 @@ pub async fn disable_machine(
 }
 
 // ============================================================================
-// Shell & SSH (still CLI-based)
+// Shell — machinectl shell (MachinectlDriver) or the vsock guest agent's
+// Exec op (EphemeraDriver, requires the VM to have been created with the
+// agent enabled), via state.driver. SSH/copy/bind stay CLI-based — see the
+// module doc comment.
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
@@ -208,9 +211,10 @@ pub struct ShellRequest {
 /// POST /api/machines/:name/shell - Run command inside machine (Admin only)
 pub async fn shell_machine(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<ShellRequest>,
-) -> Result<Json<machinectl::ShellOutput>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<zyvor_fabric_driver_core::ShellOutput>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(shell_machine));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
@@ -237,10 +241,13 @@ pub async fn shell_machine(
         }
     }
 
-    machinectl::shell(&name, &req.command)
+    state
+        .driver
+        .shell(&name, &req.command, None)
+        .await
         .map(Json)
         .map_err(|e| {
-            tracing::error!("machined shell failed: {}", e);
+            tracing::error!("shell_machine failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",

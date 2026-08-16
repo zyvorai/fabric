@@ -304,6 +304,19 @@ struct ExecRequest {
     timeout_seconds: Option<u64>,
 }
 
+/// Mirrors `ephemera_guest_protocol::AgentResponse`. `Error` is an
+/// agent/protocol-level failure (bad token, malformed request) — a command
+/// that ran but exited non-zero is still `Exec` with that `exit_code`, not
+/// this variant.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "result", rename_all = "kebab-case")]
+pub enum AgentResponse {
+    Pong,
+    Exec { exit_code: i32, stdout: String, stderr: String },
+    ShuttingDown,
+    Error { message: String },
+}
+
 // ============================================================================
 // Client
 // ============================================================================
@@ -420,16 +433,15 @@ impl EphemeraClient {
     }
 
     /// `POST /v1/vms/{id}/agent` — exec a command over the in-guest vsock
-    /// agent (requires `CreateVmRequest.agent.enabled`). Returned as raw
-    /// JSON for now; `ephemera-guest-protocol::AgentResponse` isn't mirrored
-    /// here yet since exec isn't part of the Phase 1/2 read-only/lifecycle
-    /// scope this client currently covers.
+    /// agent (requires `CreateVmRequest.agent.enabled`; Ephemera itself
+    /// returns a clear error for a VM that doesn't have it, rather than a
+    /// silent hang).
     pub async fn agent_exec(
         &self,
         id: Uuid,
         command: impl Into<String>,
         timeout_seconds: Option<u64>,
-    ) -> Result<serde_json::Value> {
+    ) -> Result<AgentResponse> {
         let resp = self
             .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent"))?))
             .json(&ExecRequest { command: command.into(), timeout_seconds })

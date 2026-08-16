@@ -6,6 +6,7 @@ mod images;
 mod lifecycle;
 mod logs;
 mod resource_control;
+mod shell;
 mod stats;
 
 use anyhow::Result;
@@ -13,7 +14,7 @@ use zbus::Connection;
 
 pub use zyvor_fabric_driver_core::{
     CapabilityProvider, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
-    ResourceControlDriver, ResourceStatsDriver, VMDriver,
+    ResourceControlDriver, ResourceStatsDriver, ShellDriver, ShellOutput, VMDriver,
 };
 
 /// Main driver that implements all driver-core traits using native D-Bus calls.

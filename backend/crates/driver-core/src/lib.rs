@@ -149,6 +149,25 @@ pub trait LogDriver: Send + Sync {
     async fn stream_logs(&self, name: &str, lines: u32) -> Result<LogStream>;
 }
 
+/// Result of a `ShellDriver::shell` command.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShellOutput {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
+/// Run a single non-interactive command inside a machine and collect its
+/// output — machinectl's `machinectl shell`, or Ephemera's vsock
+/// guest-agent `Exec` op (requires the VM to have been created with the
+/// agent enabled; see `CreateVmRequest.agent`). Not a substitute for a real
+/// interactive console/PTY — see the systemd-removal migration plan's notes
+/// on `api/machined.rs::shell_machine`.
+#[async_trait]
+pub trait ShellDriver: Send + Sync {
+    async fn shell(&self, name: &str, command: &str, timeout_seconds: Option<u64>) -> Result<ShellOutput>;
+}
+
 /// One entry in the image registry (machinectl's `/var/lib/machines`
 /// images, or Ephemera's catalog — see `ImageDriver`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,7 +224,13 @@ pub trait CapabilityProvider: Send + Sync {
 /// `impl`'d for anything implementing the five component traits — backends
 /// only need to implement those, never this trait directly.
 pub trait VmDriver:
-    VMDriver + ResourceStatsDriver + ResourceControlDriver + LogDriver + ImageDriver + CapabilityProvider
+    VMDriver
+    + ResourceStatsDriver
+    + ResourceControlDriver
+    + LogDriver
+    + ImageDriver
+    + ShellDriver
+    + CapabilityProvider
 {
 }
 impl<T> VmDriver for T where
@@ -214,6 +239,7 @@ impl<T> VmDriver for T where
         + ResourceControlDriver
         + LogDriver
         + ImageDriver
+        + ShellDriver
         + CapabilityProvider
 {
 }
