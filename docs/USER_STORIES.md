@@ -1,6 +1,6 @@
 # zyvor-fabric User Stories
 
-**Product:** private cloud control plane with a pluggable VM driver (systemd-machined/vmspawn by default, or Ephemera)
+**Product:** private cloud control plane with VM lifecycle handled by Ephemera (no systemd dependency)
 
 Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 

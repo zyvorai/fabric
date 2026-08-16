@@ -19,14 +19,16 @@ Detailed specification for the Zyvor Fabric WebSocket console protocol, which pr
 ### Endpoint
 
 ```
-ws://<host>:3000/api/vms/:name/console?token=<jwt>
+ws://<host>:3000/ws/console/:name?token=<jwt>&cols=<cols>&rows=<rows>
 ```
 
 For TLS-terminated deployments:
 
 ```
-wss://<host>/api/vms/:name/console?token=<jwt>
+wss://<host>/ws/console/:name?token=<jwt>&cols=<cols>&rows=<rows>
 ```
+
+`cols`/`rows` are optional (default `80`/`24`) and size the PTY once at open time -- there is no live resize once the session is running (see [Protocol Notes](#protocol-notes)).
 
 ### Authentication
 
@@ -35,7 +37,7 @@ Authentication is performed via the `token` query parameter, not the `Authorizat
 The token must be a valid JWT obtained from `POST /api/auth/login`.
 
 ```
-ws://localhost:3000/api/vms/my-vm/console?token=eyJhbGciOiJIUzI1NiJ9...
+ws://localhost:3000/ws/console/my-vm?token=eyJhbGciOiJIUzI1NiJ9...&cols=120&rows=40
 ```
 
 ### Validation
@@ -48,6 +50,7 @@ The server performs these checks during the WebSocket upgrade handshake:
 4. **Token present** -- Rejects with `401 Unauthorized` if the `token` query parameter is missing.
 5. **Token valid** -- Rejects with `401 Unauthorized` if the token is expired, malformed, or revoked.
 6. **Permission check** -- Rejects with `403 Forbidden` if the user does not have at least write (`User`) role.
+7. **Console reachable** -- Rejects with `502 Bad Gateway` if opening the console against the VM's guest agent fails (guest agent disabled, VM unreachable, VM not found). The console is opened *before* the WebSocket upgrade completes, so this comes back as a normal HTTP error rather than a WebSocket that opens and immediately closes.
 
 ---
 
@@ -88,7 +91,7 @@ Messages sent from the server to the client contain output from the VM's stdout.
 ### Protocol Notes
 
 - There is no JSON wrapper or framing protocol. Messages are raw byte streams, making this protocol compatible with any terminal emulator library (xterm.js, hterm, etc.).
-- The server spawns a PTY process connected to the VM via `machinectl shell` and bridges it bidirectionally with the WebSocket connection.
+- The server opens an interactive shell on the VM over Ephemera's vsock guest agent (a real PTY, with job control -- Ctrl-C, Ctrl-Z work normally) and bridges it bidirectionally with the WebSocket connection. There is no live terminal resize once the session is open -- the PTY is sized once at connect time from the `cols`/`rows` query parameters.
 - Close frames are handled normally per the WebSocket specification.
 
 ---
@@ -130,6 +133,7 @@ Errors during the WebSocket upgrade are returned as HTTP responses:
 | `400 Bad Request` | Invalid VM name |
 | `401 Unauthorized` | Missing token, invalid/expired token, auth not configured |
 | `403 Forbidden` | User role is Viewer (insufficient permissions) |
+| `502 Bad Gateway` | Console open failed against the guest agent (disabled, unreachable, or VM not found) |
 | `503 Service Unavailable` | Connection limit reached (50 concurrent) |
 
 ### Runtime Errors
@@ -151,7 +155,7 @@ TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"secret"}' | jq -r '.token')
 
-websocat "ws://localhost:3000/api/vms/my-vm/console?token=$TOKEN"
+websocat "ws://localhost:3000/ws/console/my-vm?token=$TOKEN"
 ```
 
 ### JavaScript (Browser with xterm.js)
@@ -165,7 +169,7 @@ terminal.open(document.getElementById('terminal'));
 const token = 'eyJhbGciOiJIUzI1NiJ9...';
 const vmName = 'my-vm';
 const ws = new WebSocket(
-  `ws://localhost:3000/api/vms/${vmName}/console?token=${token}`
+  `ws://localhost:3000/ws/console/${vmName}?token=${token}`
 );
 ws.binaryType = 'arraybuffer';
 
@@ -222,6 +226,6 @@ async def console(uri):
 
 token = "eyJhbGciOiJIUzI1NiJ9..."
 vm_name = "my-vm"
-uri = f"ws://localhost:3000/api/vms/{vm_name}/console?token={token}"
+uri = f"ws://localhost:3000/ws/console/{vm_name}?token={token}"
 asyncio.run(console(uri))
 ```

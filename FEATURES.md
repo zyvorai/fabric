@@ -19,26 +19,14 @@
 - Create, start, stop, restart, delete, clone VMs
 - VM templates
 - VM state persistence
-- Pluggable VM driver: full systemd-vmspawn(1) v260 + systemd-machined integration via machinectl (default), or Ephemera for a systemd-free backend (`driver.backend = "machinectl" | "ephemera"`)
-- The systemd-vmspawn-specific flags below (`--kvm` through `--console`) apply to the machinectl backend; core VM lifecycle, cgroup resource control, log streaming, CPU/memory hotplug, image management, and shell exec are available on both backends
+- VM driver: [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (QEMU/Cloud Hypervisor/Firecracker)
 - CPU and memory configuration (`--cpus`, `--ram`)
-- KVM acceleration and Secure Boot (`--kvm`, `--secure-boot`)
-- VSock networking with CID assignment (`--vsock`, `--vsock-cid`)
-- TPM 1.2/2.0 with persistent state (`--tpm`, `--tpm-state`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)
 - Firmware selection (`--firmware`)
-- Disk management: discard, grow, extra drives (`--discard-disk`, `--grow-image`, `--extra-drive`)
-- SMBIOS Type #11 vendor strings (`--smbios11`)
-- Bind mounts: paths, users, shells, groups (`--bind`, `--bind-ro`, `--bind-user`)
-- User namespacing (`--private-users`)
-- Machine identity: UUID, slice, properties, machined registration
-- Journal forwarding and SSH key management (`--forward-journal`, `--pass-ssh-key`)
-- Console modes: interactive, read-only, native, GUI (`--console`)
-- System/user manager scope (`--system`, `--user`)
-- Credentials: set and load (`--set-credential`, `--load-credential`)
-- Extra kernel command line arguments via SMBIOS
-- Multiple disk formats (qcow2, raw, vmdk, vdi)
+- Bind mounts as launch-time virtiofs shares (`--bind`, `--bind-ro`) — declared at VM create time, auto-mounted in the guest via cloud-init
+- Core VM lifecycle, cgroup resource control (CPU/memory/IO/pids/cpuset, freeze/thaw), log streaming, CPU/memory/disk/NIC hotplug, image management, and interactive shell/console (real PTY, over the guest vsock agent)
+- Multiple disk formats (qcow2, raw)
 - VM tagging and grouping
 - VM scheduling (once, daily, weekly)
 - Lifecycle management
@@ -86,7 +74,7 @@
 ### WebSocket Console
 
 - Real-time browser-based terminal via xterm.js
-- PTY streaming from machinectl
+- PTY streaming over Ephemera's vsock guest agent
 - Full terminal emulation
 
 ### VNC

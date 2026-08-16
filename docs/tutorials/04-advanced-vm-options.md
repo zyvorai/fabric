@@ -1,18 +1,20 @@
 # Tutorial 04: Advanced VM Configuration
 
 Fine-tune VM behavior with VMStartOptions, CPU and memory hotplug, online disk
-resize, cloud-init customization, bind mounts, and credentials. This tutorial
-covers the full surface area of systemd-vmspawn options exposed through the API.
+resize, cloud-init customization, bind mounts, and credentials. `VMStartOptions`'
+shape traces back to `systemd-vmspawn`'s own CLI options; VM lifecycle itself
+is handled by [Ephemera](https://github.com/hypersdk/ephemera), which
+interprets this same request shape rather than shelling out to systemd-vmspawn.
 
-> **Backend note:** `driver.backend` in `zyvor-fabricd.toml` selects the VM
-> driver — `"machinectl"` (default, described in full below) or `"ephemera"`
-> (an alternative disposable-VM engine with no systemd dependency). On the
-> Ephemera backend, VMStartOptions is only honored for a first launch and a
-> handful of options have no equivalent yet and are rejected with a clear
-> error rather than silently ignored: TPM, SecureBoot, VSOCK passthrough,
-> bind mounts, extra drives, systemd credentials, and SMBIOS injection.
-> Everything else in this tutorial (CPU/memory, networking mode, kernel/
-> initrd/firmware, extra kernel args) works on both.
+> **Note:** `VMStartOptions` is only honored for a VM's first launch, not
+> replayed on every restart. A handful of options have no Ephemera equivalent
+> yet and are rejected with a clear error rather than silently ignored: TPM,
+> SecureBoot, VSOCK passthrough, extra drives, systemd credentials, and
+> SMBIOS injection. Bind mounts *are* supported -- each entry becomes a
+> virtiofs share, auto-mounted in the guest via a generated cloud-init entry
+> (see [Step 8: Bind Mounts](#step-8-bind-mounts) below). Everything else in this tutorial
+> (CPU/memory, networking mode, kernel/initrd/firmware, extra kernel args)
+> works as described.
 
 **Level:** Intermediate
 **Time:** 40 minutes
@@ -176,6 +178,12 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 
 #### systemd Integration
 
+These fields describe `systemd-vmspawn`/`systemd-machined` concepts that
+Ephemera has no equivalent for. They're accepted (not rejected like the
+fields in the note above) but currently silently no-op'd rather than
+applied -- included here for completeness of the request shape, not as
+something that presently takes effect.
+
 | Field            | Type     | Description                             |
 |-----------------|----------|-----------------------------------------|
 | `slice`         | string   | systemd slice (e.g., `"vm.slice"`)      |
@@ -212,6 +220,11 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 ---
 
 ## Step 2: TPM and Secure Boot
+
+> **Not currently supported.** `tpm`/`secure_boot`/`vsock` have no equivalent
+> in the current VM driver yet -- a request setting any of them is rejected
+> with a clear error. The rest of this section is kept for reference on the
+> request shape.
 
 Enable hardware security features for VMs that require measured boot or
 disk encryption (e.g., BitLocker, LUKS with TPM binding):
@@ -501,7 +514,11 @@ Expected response:
 
 ## Step 8: Bind Mounts
 
-Share host directories with the VM. Bind mounts are set through VMStartOptions.
+Share host directories with the VM. Bind mounts are set through VMStartOptions,
+declared at VM-create time (there's no way to add one to an already-running
+VM). Each entry becomes a virtiofs share; the guest auto-mounts it via a
+generated cloud-init entry written into `/etc/fstab`, so it also survives a
+later stop/start.
 
 ```bash
 curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
@@ -533,6 +550,13 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 ---
 
 ## Step 9: Credential Injection
+
+> **Not currently supported.** `credentials`/`load_credentials` rely on
+> systemd-vmspawn's own SMBIOS credential-injection mechanism, which has no
+> equivalent in the current VM driver -- a request using either field is
+> rejected with a clear error rather than silently ignored. Use `cloud_init`
+> (e.g. its `write_files`/`runcmd` fields) to get secrets into a VM instead.
+> The rest of this section is kept for reference on the request shape.
 
 Pass secrets to the VM securely using systemd credentials. The VM receives them
 via SMBIOS or VSOCK without exposing them on the command line.

@@ -14,7 +14,7 @@ Organizations running Linux infrastructure need a unified control plane for virt
 
 ## What Is Zyvor Fabric?
 
-Zyvor Fabric is a production-grade private cloud control plane built in Rust. It provides a complete management layer over a pluggable VM driver — `machinectl` (systemd-vmspawn + systemd-machined, the default) or `ephemera` (a disposable-VM engine with no systemd dependency):
+Zyvor Fabric is a production-grade private cloud control plane built in Rust. It provides a complete management layer over [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency:
 
 - **One binary, one config file** — deploys in under 5 minutes (`zyvor-fabricd`), with systemd support built in but not required
 - **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
@@ -30,13 +30,12 @@ sudo systemctl enable --now zyvor-fabricd
 
 ## Key Differentiators
 
-### 1. Pluggable VM Driver (Not a Custom Hypervisor)
+### 1. VM Driver (Not a Custom Hypervisor)
 
-Zyvor Fabric defaults to systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution with systemd — and can also run entirely without systemd via Ephemera, its own disposable-VM engine (see [the Ephemera driver guide](guides/vm-drivers/ephemera.md) for what's wired up and what isn't yet). This means:
+Zyvor Fabric runs entirely without systemd via [Ephemera](https://github.com/hypersdk/ephemera), its own disposable-VM engine (see [the Ephemera driver guide](guides/vm-drivers/ephemera.md) for the full capability matrix). This means:
 
 - No custom kernel modules or hypervisor patches
-- On the `machinectl` backend, VMs are first-class systemd units with journal logging
-- Works on Fedora, Ubuntu, Debian, RHEL, SUSE, and systemd-free environments alike
+- Works on Fedora, Ubuntu, Debian, RHEL, SUSE, and any other Linux distribution alike, with or without systemd
 - Upstream-maintained VM lifecycle, not a fork
 
 ### 2. Single Binary, Zero Dependencies
@@ -238,7 +237,7 @@ resource "zyvor_fabric_vm" "web" {
            | Provider  |         |    |    |    |    |
            +-----------+         |    |    |    |    |
                                   v    v    v    v    v
-                        VM Driver (pluggable: machinectl | ephemera)
+                        VM Driver: Ephemera
 ```
 
 ---
@@ -249,7 +248,7 @@ resource "zyvor_fabric_vm" "web" {
 
 One Linux server running Zyvor Fabric with local storage. Suitable for development, testing, small teams, and edge deployments.
 
-**Requirements:** Linux, KVM, 4GB RAM minimum. systemd 256+ if using the default `machinectl` driver backend; not required with the `ephemera` backend.
+**Requirements:** Linux, KVM, 4GB RAM minimum. No systemd requirement.
 
 ### Multi-Node Cluster
 
@@ -304,8 +303,7 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Web Framework | Axum 0.8 |
 | Terminal UI | ratatui + crossterm |
 | Web UI | React 18 + TypeScript + Vite + TailwindCSS |
-| VM Backend | Pluggable: systemd-vmspawn + systemd-machined (default), or Ephemera (no systemd) |
-| D-Bus | zbus 4 (machinectl backend only) |
+| VM Backend | Ephemera (no systemd dependency) |
 | Monitoring | Prometheus |
 
 ---

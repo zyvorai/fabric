@@ -1,6 +1,6 @@
 # Zyvor Fabric — Product Positioning
 
-**Zyvor Fabric** is the Linux control plane for private cloud infrastructure: clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support — with a pluggable VM driver (systemd-vmspawn/systemd-machined by default, or [Ephemera](https://github.com/hypersdk/ephemera) — no systemd dependency — opt-in).
+**Zyvor Fabric** is the Linux control plane for private cloud infrastructure: clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support — with VM lifecycle handled by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency.
 
 It is **not** positioned as a basic VM manager. It is a **VM operations fabric** and **private cloud control plane** — closer to Proxmox + KubeVirt UX, without the heavyweight multi-package stack.
 
@@ -42,7 +42,7 @@ Keeping `zyvor-fabricd` as the daemon name avoids breaking installs, Ansible rol
 ### vs. Proxmox / VMware / OpenStack
 
 - **Lighter** — single binary vs. hundreds of packages
-- **Pluggable VM driver** — systemd-vmspawn/systemd-machined by default (VMs as first-class systemd units with journal integration), or Ephemera with zero systemd dependency for environments that don't run it
+- **No systemd dependency for VM lifecycle** — VMs run under Ephemera's own process supervision, not as systemd units
 - **Rust control plane** — memory-safe, sub-ms API latency, ~20MB RSS
 - **API-first** — 480+ REST endpoints, 3 WebSocket channels, full automation surface
 

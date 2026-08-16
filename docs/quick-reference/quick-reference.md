@@ -503,8 +503,8 @@ cat /etc/zyvor-fabricd/zyvor-fabricd.toml | toml-lint  # or just try to start
 # Check KVM availability
 ls -la /dev/kvm
 
-# Check systemd-machined (machinectl driver backend only)
-systemctl status systemd-machined
+# Check Ephemera is reachable
+curl http://127.0.0.1:7788/healthz
 
 # Check the VM state and last error
 curl -s http://127.0.0.1:9095/api/v1/vms/my-vm \

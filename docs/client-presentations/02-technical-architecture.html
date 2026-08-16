@@ -81,10 +81,10 @@
                          |         |         |         |         |
                        VM Ops   Storage  Networking  Security  Monitoring
                          |         |         |         |         |
-  Driver Layer        Zyvor Fabric   qemu-img   nftables    PAM    Prometheus
+  Driver Layer        Ephemera   qemu-img   nftables    PAM    Prometheus
                       driver    lvm/zfs   wireguard   JWT      metrics
                          |         |         |         |         |
-  System Layer        systemd-vmspawn    systemd-machined    Linux KVM
+  System Layer          Linux KVM / QEMU (no systemd dependency)
   </code></pre>
 </div>
 
@@ -102,7 +102,6 @@
         <tr><td>Error Handling</td><td>anyhow + thiserror</td></tr>
         <tr><td>CLI Parsing</td><td>clap 4.5</td></tr>
         <tr><td>Terminal UI</td><td>ratatui 0.29 + crossterm</td></tr>
-        <tr><td>D-Bus IPC</td><td>zbus 4</td></tr>
         <tr><td>UUID Generation</td><td>uuid (v4, v5)</td></tr>
         <tr><td>Date/Time</td><td>chrono</td></tr>
         <tr><td>Regex</td><td>regex 1.11</td></tr>
@@ -116,8 +115,7 @@
         <tr><td>Web UI Language</td><td>TypeScript</td></tr>
         <tr><td>Web UI Build</td><td>Vite</td></tr>
         <tr><td>Web UI Styling</td><td>TailwindCSS</td></tr>
-        <tr><td>VM Backend</td><td>systemd-vmspawn</td></tr>
-        <tr><td>Machine Management</td><td>systemd-machined</td></tr>
+        <tr><td>VM Driver</td><td>Ephemera (no systemd dependency)</td></tr>
         <tr><td>Hypervisor</td><td>Linux KVM / QEMU</td></tr>
         <tr><td>Monitoring</td><td>Prometheus</td></tr>
         <tr><td>VPN</td><td>WireGuard</td></tr>
@@ -148,10 +146,10 @@
     <div class="card">
       <h3>VM Infrastructure (7)</h3>
       <ul>
-        <li><code>zyvor-fabric-vm-driver</code> - VM operations</li>
         <li><code>driver-core</code> - Driver abstractions</li>
-        <li><code>machined-dbus</code> - D-Bus client</li>
-        <li><code>machinectl-driver</code> - Machine control</li>
+        <li><code>ephemera-driver</code> - VM lifecycle via Ephemera</li>
+        <li><code>ephemera-client</code> - Ephemera REST/WebSocket client</li>
+        <li><code>zyvor-fabric-vm-driver</code> - mkosi image builds</li>
         <li><code>cloud-init</code> - Cloud config</li>
         <li><code>tpm-support</code> - TPM/vTPM</li>
         <li><code>vnc-proxy</code> - VNC console</li>

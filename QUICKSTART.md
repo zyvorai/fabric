@@ -4,7 +4,7 @@
 
 - Rust 1.70+ (`rustup`)
 - Node.js 18+ and npm
-- A VM driver backend: systemd-vmspawn/machinectl (default), or [Ephemera](https://github.com/hypersdk/ephemera) for a systemd-free setup — either is optional for building/running the daemon itself, but one is needed for actual VM management
+- [Ephemera](https://github.com/hypersdk/ephemera) running (`ephemera serve`) for actual VM management — optional for building/running the daemon itself, but needed to create/manage VMs
 
 ## Build Everything
 
@@ -166,8 +166,8 @@ Zyvor Fabric/
 │   ├── Zyvor Fabric/         # Main daemon with REST API + WebSocket
 │   ├── zyvorctl/            # CLI tool (JSON/YAML output, 15+ subcommand groups)
 │   ├── zyvorctl-tui/        # Terminal UI (8 views incl. Net Security)
-│   ├── zyvor-fabric-vm-driver/   # systemd-vmspawn/machinectl VM driver (default backend)
-│   ├── crates/ephemera-driver/  # Ephemera VM driver (systemd-free backend, opt-in)
+│   ├── zyvor-fabric-vm-driver/   # mkosi-based VM image building (unrelated to VM lifecycle)
+│   ├── crates/ephemera-driver/  # Ephemera VM driver (no systemd dependency)
 │   ├── crates/           # Shared libraries (storage with Ceph/RBD, system, vm)
 │   └── ...               # 34 more feature crates (networking, security, ha, migration, etc.)
 ├── web/                  # React web UI

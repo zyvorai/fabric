@@ -17,7 +17,7 @@ Clustering, networking, security, storage, operators, Terraform, monitoring, HA,
 ├──────────────────────────────────────────────────────────────┤
 │  Daemon       Zyvor Fabric — 480+ REST endpoints · WebSocket │
 ├──────────────────────────────────────────────────────────────┤
-│  Runtime      systemd-machined (default) or Ephemera · KVM   │
+│  Runtime      Ephemera (no systemd dependency) · KVM          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -29,7 +29,7 @@ Part of the [Zyvor](https://zyvor.dev) product family.
 
 | Problem | Zyvor Fabric answer |
 |---------|---------------------|
-| Private cloud = heavy hypervisor stack | Lightweight VM driver — systemd-vmspawn/machinectl by default, or Ephemera (no systemd dependency) |
+| Private cloud = heavy hypervisor stack | Lightweight VM driver — [Ephemera](https://github.com/hypersdk/ephemera), no systemd dependency |
 | No unified API across interfaces | 480+ REST endpoints, 3 WebSocket channels |
 | Scripting vs GUI is either/or | CLI + TUI + web + Terraform + K8s operator |
 | Enterprise needs RBAC + audit | JWT, roles, audit export, encryption at rest |
@@ -86,9 +86,7 @@ flowchart TB
   Web[Web UI] --> Daemon
   TF[Terraform] --> Daemon
   Op[K8s Operator] --> Daemon
-  Daemon --> Driver{VM driver}
-  Driver --> VS[systemd-vmspawn / machinectl]
-  Driver --> Eph[Ephemera]
+  Daemon --> Eph[Ephemera VM driver]
 ```
 
 ---

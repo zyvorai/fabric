@@ -8,46 +8,43 @@
 
 Zyvor Fabric is an open-source virtual machine management platform built in Rust. It
 provides a REST API, web UI, and CLI for managing the full lifecycle of virtual
-machines on Linux hosts, using QEMU and KVM via a pluggable VM driver
-(systemd-vmspawn/systemd-machined by default, or Ephemera -- see "What VM driver
-backends are available?" below).
+machines on Linux hosts, using QEMU (and Cloud Hypervisor/Firecracker) via
+[Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with
+no systemd dependency -- see "What is the role of Ephemera?" below.
 
 ### How is Zyvor Fabric different from libvirt/virt-manager?
 
-By default, Zyvor Fabric is built on systemd's machine management infrastructure
-rather than libvirt: `systemd-vmspawn` for VM execution, `systemd-machined` for
-machine registration, journald logging, and cgroup-based resource management,
-without the libvirt abstraction layer. Host networking always uses direct
-netlink calls rather than systemd-networkd. Zyvor Fabric also supports a
-systemd-free VM driver (Ephemera) behind the same REST API, for environments
-that don't want the systemd dependency at all.
+Zyvor Fabric talks to Ephemera's own REST API instead of libvirt's abstraction
+layer -- no libvirtd, no XML domain definitions. Host networking always uses
+direct netlink calls rather than systemd-networkd, and DHCP is served by a
+directly-managed `dnsmasq` process per bridge. Neither zyvor-fabricd nor
+Ephemera has a systemd dependency; systemd is optional only as a way to
+supervise the zyvor-fabricd *process* itself, for operators who choose that
+supervisor.
 
-### What VM driver backends are available?
+### What VM driver is Zyvor Fabric built on?
 
-Set `driver.backend` in `zyvor-fabricd.toml`:
-- `"machinectl"` (default) -- systemd-machined via D-Bus, VMs launched with
-  `systemd-vmspawn`.
-- `"ephemera"` -- [Ephemera](https://github.com/hypersdk/ephemera), a
-  disposable-VM engine with no systemd dependency.
-
-Both support VM lifecycle, cgroup resource control, log streaming, hotplug,
-image management, and shell exec through the same API. A few operations
-(interactive shell copy-to/copy-from, bind-mounts, SSH connection info, tar
-image formats) are currently `machinectl`-only.
+VM lifecycle is handled entirely by [Ephemera](https://github.com/hypersdk/ephemera),
+reached over its REST API (`driver.ephemera_url` in `zyvor-fabricd.toml`).
+This covers VM lifecycle, cgroup resource control, log streaming, hotplug,
+image management, shell exec, file copy, SSH info, and interactive console --
+all through the same zyvor-fabricd API. Tar-format images are the one
+exception: they're not supported and never will be, since a tar rootfs isn't
+a bootable disk image for a real hardware VM (that model only worked for
+`systemd-nspawn`'s shared-kernel containers, not for actual VMs).
 
 ### What hypervisor does Zyvor Fabric use?
 
-Zyvor Fabric uses QEMU with KVM hardware acceleration. VMs are launched via
-`systemd-vmspawn` (the `machinectl` driver backend, which handles the QEMU
-process lifecycle, resource allocation, and systemd integration) or via
-Ephemera's own QEMU/Cloud Hypervisor/Firecracker launch path (the `ephemera`
-backend).
+Zyvor Fabric uses QEMU with KVM hardware acceleration by default (Cloud
+Hypervisor and Firecracker are also available through Ephemera). Ephemera
+launches and supervises each VM's hypervisor process directly -- there's no
+systemd-vmspawn or any other intermediary managing VM lifecycle.
 
 ### What operating systems can Zyvor Fabric manage?
 
 Zyvor Fabric can run any operating system that QEMU/KVM supports, including Linux,
-Windows, FreeBSD, and others. The host must be Linux; systemd 254+ is only
-required when using the default `machinectl` driver backend.
+Windows, FreeBSD, and others. The host must be Linux; there is no systemd
+version requirement for VM lifecycle.
 
 ### How many VMs can Zyvor Fabric manage?
 
@@ -75,23 +72,23 @@ guarantees, excellent async performance via Tokio, and low resource overhead.
 These properties are well-suited for a systems management daemon that handles
 concurrent VM operations, network configuration, and real-time event streaming.
 
-### What is the role of systemd-machined?
+### What is the role of Ephemera?
 
-`systemd-machined` is a systemd service that maintains a registry of locally
-running virtual machines and containers. On the default `machinectl` driver
-backend, Zyvor Fabric uses it (via D-Bus) to query VM state, list machines,
-access properties, and manage machine lifecycle. The `MachinectlDriver` crate
-implements the `VMDriver` trait using this interface. The `ephemera` backend
-has no equivalent dependency.
+[Ephemera](https://github.com/hypersdk/ephemera) is the disposable-VM control
+plane zyvor-fabricd's `EphemeraDriver` speaks to over REST (`driver-core`'s
+`VmDriver` trait). It launches and supervises each VM's QEMU/Cloud
+Hypervisor/Firecracker process directly, tracks state in its own JSON-file
+store, and exposes cgroup delegation, log capture, image catalog, and a
+vsock-based in-guest agent (shell exec, file copy, interactive console) --
+all with no systemd dependency of its own.
 
-### What is the role of systemd-vmspawn?
+### Does Zyvor Fabric still use systemd-machined or systemd-vmspawn?
 
-`systemd-vmspawn` is a systemd tool that launches QEMU virtual machines with
-proper systemd integration: cgroup placement, journal logging, machine
-registration, and resource management. On the `machinectl` driver backend,
-`zyvor-fabric-vm-driver` builds the command-line invocation with all supported
-options from systemd v260. The `ephemera` backend launches VMs through its own
-QEMU/Cloud Hypervisor/Firecracker path instead.
+No -- neither is a dependency anymore. `zyvor-fabric-vm-driver` (the crate
+that used to build `systemd-vmspawn` command lines) now only builds VM
+*images* via `mkosi`, an unrelated offline OS-image-building tool. The
+`machinectl-driver`/`machined-dbus` crates that implemented D-Bus/`machinectl`
+based VM lifecycle are deleted entirely.
 
 ### Why are there 46 crates?
 
@@ -328,8 +325,7 @@ curl -s http://127.0.0.1:9095/api/v1/secrets \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-Secrets can be injected into VMs via cloud-init (both driver backends) or
-systemd credentials (`machinectl` backend only) using
+Secrets can be injected into VMs via cloud-init using
 `POST /api/v1/vms/{name}/secrets`.
 
 ### How do I scan for compliance?
@@ -386,9 +382,9 @@ curl -s "http://127.0.0.1:9095/api/v1/logs?query=error&limit=50" \
 ```
 
 Logs can also be streamed in real-time via SSE at
-`GET /api/v1/logs/{vm_name}/stream`. Logs are sourced from the systemd journal
-for each VM's machine scope (`machinectl` backend), or from Ephemera's
-captured console output (`ephemera` backend).
+`GET /api/v1/logs/{vm_name}/stream`. Logs are sourced from Ephemera's captured
+console output; raw serial console output has no journald-equivalent
+per-line priority/unit metadata, so every entry is stamped uniformly.
 
 ### How do I connect iSCSI storage?
 
@@ -480,15 +476,15 @@ cors_origins = ["https://zyvor-fabric.example.com", "http://localhost:5173"]
 
 ## Troubleshooting
 
-### Zyvor Fabric fails to start with "Failed to initialize machined D-Bus driver"
+### Zyvor Fabric fails to start with "Failed to initialize Ephemera driver"
 
-This only happens with the default `driver.backend = "machinectl"`. It means
-`systemd-machined` is not running or not installed. Start it:
+This means `driver.ephemera_url` in `zyvor-fabricd.toml` doesn't point at a
+reachable `ephemera serve` instance (wrong URL, Ephemera not started yet, or
+a firewall blocking the connection). Confirm Ephemera itself is up:
 ```bash
-sudo systemctl start systemd-machined
+curl http://127.0.0.1:7788/healthz
 ```
-Alternatively, switch to the systemd-free `ephemera` driver backend (see "What
-VM driver backends are available?" above), which has no D-Bus dependency.
+and start it if it isn't (see [Ephemera's own README](https://github.com/hypersdk/ephemera#readme)).
 
 ### VMs fail to start with permission errors
 
@@ -496,7 +492,7 @@ Ensure the Zyvor Fabric process has access to `/dev/kvm`:
 ```bash
 sudo chmod 666 /dev/kvm
 # Or add the Zyvor Fabric user to the kvm group:
-sudo usermod -aG kvm Zyvor Fabric
+sudo usermod -aG kvm zyvor-fabricd
 ```
 
 ### "Token expired" errors after daemon restart
@@ -513,9 +509,8 @@ If using the Vite dev server, add `http://localhost:5173`.
 
 ### VM state shows "Unknown"
 
-The VM may have been started outside of Zyvor Fabric, or the active VM driver
-may have lost track of it. Check with `machinectl list` (`machinectl` backend)
-or `curl http://127.0.0.1:7788/v1/vms` (`ephemera` backend) and verify the VM
+The VM may have been started outside of Zyvor Fabric, or Ephemera may have
+lost track of it. Check `curl http://127.0.0.1:7788/v1/vms` and verify the VM
 is registered.
 
 ### High memory usage from Zyvor Fabric process

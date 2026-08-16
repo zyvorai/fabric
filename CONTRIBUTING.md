@@ -25,10 +25,10 @@ npm install
 ## Project Structure
 
 The backend is a Cargo workspace containing 34 crates. Key crates include `zyvor-fabricd` (the
-main daemon), `zyvorctl` (CLI), `zyvorctl-tui` (terminal UI), `zyvor-fabric-vm-driver`
-(systemd-vmspawn/machinectl integration, the default VM driver), and `crates/ephemera-driver`
-(the systemd-free alternative, selected via `driver.backend = "ephemera"`). Shared libraries
-live under `backend/crates/` (storage, system, vm).
+main daemon), `zyvorctl` (CLI), `zyvorctl-tui` (terminal UI), and `crates/ephemera-driver`
+(the VM driver — [Ephemera](https://github.com/hypersdk/ephemera), no systemd dependency).
+`zyvor-fabric-vm-driver` builds VM images via `mkosi`, unrelated to VM lifecycle. Shared
+libraries live under `backend/crates/` (storage, system, vm).
 
 The web frontend is a React application located in the `web/` directory.
 

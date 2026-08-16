@@ -69,11 +69,6 @@ origins can make API requests. Configured via `daemon.cors_origins`.
 
 ## D
 
-**D-Bus**: A message bus system used for inter-process communication on Linux.
-Zyvor Fabric's `machinectl` VM driver backend (the default) uses D-Bus (via
-`zbus`) to communicate with `systemd-machined`; the `ephemera` backend has no
-D-Bus dependency.
-
 **Datacenter**: The top level of the Zyvor Fabric organizational hierarchy, containing
 one or more clusters.
 
@@ -95,16 +90,15 @@ records, and resolution policies.
 
 **Driver**: An abstraction layer between Zyvor Fabric and the underlying VM
 lifecycle tooling. The `VmDriver` trait family defines lifecycle, resource
-control, logs, images, and shell operations. Pluggable via `driver.backend` in
-`zyvor-fabricd.toml`: `machinectl` (systemd-machined/D-Bus, the default) or
-`ephemera` (see "Ephemera").
+control, logs, images, shell, and console operations. Implemented against
+Ephemera (see "Ephemera") -- there's no other backend to choose.
 
 ## E
 
 **Ephemera**: A disposable-VM engine ([github.com/hypersdk/ephemera](https://github.com/hypersdk/ephemera))
-with no systemd dependency. Selectable as Zyvor Fabric's VM driver backend via
-`driver.backend = "ephemera"` -- an alternative to the default `machinectl`
-backend for environments that don't want a systemd dependency.
+with no systemd dependency, reached over its REST API and vsock guest agent
+(`driver.ephemera_url` in `zyvor-fabricd.toml`). Zyvor Fabric's only VM
+driver.
 
 **Encryption**: VM disk encryption using key management providers. Supports
 per-VM encryption policies and key rotation.
@@ -457,8 +451,9 @@ mesh networking between VMs.
 
 ## Z
 
-**zbus**: A Rust crate for D-Bus communication. Zyvor Fabric's `machinectl` VM
-driver backend uses zbus for async communication with systemd-machined.
+**zbus**: A Rust crate for D-Bus communication. No longer a Zyvor Fabric
+dependency -- it was used by the `machinectl`/`machined-dbus` VM driver,
+which is deleted (see "Driver").
 
 **Zone (Availability)**: A logical or physical grouping of hosts within a
 datacenter, used for fault isolation and placement decisions.

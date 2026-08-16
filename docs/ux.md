@@ -43,7 +43,7 @@ Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format
 
 ### Domain hints
 
-[`daemonHints.ts`](../web/src/utils/daemonHints.ts) exports `hintsForError(err, domain?)` for contextual banner copy (machined, storage, auth). Wire via `ErrorBanner` `hints={hintsForError(loadError, 'vm')}` on Dashboard, VM list/detail, Storage, Network, and tier-2 Operations pages.
+[`daemonHints.ts`](../web/src/utils/daemonHints.ts) exports `hintsForError(err, domain?)` for contextual banner copy (VM driver, storage, auth). Wire via `ErrorBanner` `hints={hintsForError(loadError, 'vm')}` on Dashboard, VM list/detail, Storage, Network, and tier-2 Operations pages.
 
 ### Stable codes
 
@@ -51,7 +51,7 @@ Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format
 |------|------------|
 | `operation_failed` | The operation failed on the server |
 | `not_found` | The requested resource was not found |
-| `machined_connection` | Could not reach the VM driver backend (systemd-machined, or Ephemera if `driver.backend = "ephemera"`) |
+| `driver_connection` | Could not reach the VM driver backend (Ephemera) |
 | `invalid_request` | The request was invalid |
 | `forbidden` | You do not have permission |
 | `unauthorized` | Authentication required or session expired |
@@ -73,7 +73,7 @@ Machina-aligned **GuestKit** orange theme, inventory sidebar, `:` colon commands
 
 ## Dashboard health cards
 
-`GET /api/v1/capabilities` returns subsystem phases (`off` | `unreachable` | `live`) for **machined**, **storage**, **network_security**, **auth**, and **events**. The dashboard reads these via [`PlatformInfoContext`](../web/src/contexts/PlatformInfoContext.tsx) and refreshes every 30s.
+`GET /api/v1/capabilities` returns subsystem phases (`off` | `unreachable` | `live`) for **vm_driver**, **storage**, **network_security**, **auth**, and **events**. The dashboard reads these via [`PlatformInfoContext`](../web/src/contexts/PlatformInfoContext.tsx) and refreshes every 30s.
 
 ## Create VM wizard
 

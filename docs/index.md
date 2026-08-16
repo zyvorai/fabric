@@ -232,7 +232,7 @@ Detailed documentation for each major feature area.
 | Security Endpoints | Auth, audit, encryption, tenants |
 | System Endpoints | CPU topology, NUMA, memory, firmware |
 | Enterprise Endpoints | Datacenters, clusters, hosts, DRS |
-| Machine Endpoints | Pluggable VM driver (systemd-machined by default, or Ephemera) |
+| Machine Endpoints | VM driver: Ephemera (no systemd dependency) |
 | Monitoring Endpoints | Analytics, events, notifications, schedules |
 | Backup Endpoints | Backup CRUD, policies, restore |
 | Billing Endpoints | Usage tracking, pricing, and invoicing |
@@ -368,7 +368,7 @@ The REST API is organized into the following endpoint groups:
 | Resource Pools | `/api/resource-pools/` | 7 | Resource pool management |
 | Zones | `/api/zones/` | 3 | Availability zones |
 | Spot Instances | `/api/spot-instances/` | 3 | Spot VM management |
-| Machines | `/api/machines/` | 20 | Pluggable VM driver (systemd-machined by default, or Ephemera) |
+| Machines | `/api/machines/` | 20 | VM driver: Ephemera (no systemd dependency) |
 | Tenants | `/api/tenants/` | varies | Multi-tenancy and projects |
 | Settings | `/api/settings` | 2 | Global settings |
 | Plugins | `/api/plugins` | 1 | Plugin registry |

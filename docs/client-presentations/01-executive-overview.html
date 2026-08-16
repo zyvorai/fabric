@@ -96,9 +96,9 @@
   <h1>The Solution</h1>
   <p class="subtitle">Private cloud control plane in a single binary</p>
   <p style="font-size: 1.3em; margin-bottom: 30px;">
-    Zyvor Fabric is a production-grade private cloud control plane built in Rust. It wraps
-    <span class="highlight">systemd-vmspawn</span> and <span class="highlight">systemd-machined</span>
-    with a complete enterprise management layer.
+    Zyvor Fabric is a production-grade private cloud control plane built in Rust. It runs VM
+    lifecycle on <span class="highlight">Ephemera</span>, a disposable-VM engine with no systemd
+    dependency, wrapped in a complete enterprise management layer.
   </p>
   <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
     <div class="metric">
@@ -178,7 +178,7 @@
               +------+-------+-------+--------+
                      |       |       |
     System Layer     v       v       v
-              systemd-vmspawn + systemd-machined
+              Ephemera (VM driver, no systemd dependency)
               Linux KVM / QEMU
   </code></pre>
 </div>

@@ -1,8 +1,8 @@
 # Zyvor Fabric — Feature Guide
 
-> **A private cloud control plane with a pluggable VM driver.**
+> **A private cloud control plane with no systemd dependency.**
 
-Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-class capabilities without the heavyweight stack. Manage the same infrastructure five ways — CLI, terminal UI, web dashboard, Kubernetes operator, or Terraform — over a single daemon exposing 480+ REST endpoints and live WebSocket channels. The VM driver is pluggable (`driver.backend` in `zyvor-fabricd.toml`): `machinectl` is the default, running VMs as systemd units via systemd-vmspawn/systemd-machined with journal logging; `ephemera` is an alternative disposable-VM engine with no systemd dependency at all. Either way, there are no custom hypervisor patches or kernel modules to maintain, and the daemon itself runs fine under systemd or any other supervisor — it's no longer a hard requirement.
+Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-class capabilities without the heavyweight stack. Manage the same infrastructure five ways — CLI, terminal UI, web dashboard, Kubernetes operator, or Terraform — over a single daemon exposing 480+ REST endpoints and live WebSocket channels. VM lifecycle runs through [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency of its own (`driver.ephemera_url` in `zyvor-fabricd.toml`). There are no custom hypervisor patches or kernel modules to maintain, and the daemon itself runs fine under systemd or any other supervisor — it's no longer a hard requirement.
 
 **480+** REST API endpoints · **5** management interfaces · **40+** Rust backend crates · **6** storage backends · **37+** web dashboard pages · **1** binary, one config, one service
 
@@ -64,9 +64,9 @@ This is the customer-facing onboarding guide — how to access the product, your
 
 ## 1. VM Lifecycle & Provisioning
 
-_Create, run, and reshape virtual machines with declarative or interactive workflows, on either supported VM driver (systemd-vmspawn by default, or Ephemera)._
+_Create, run, and reshape virtual machines with declarative or interactive workflows, backed by Ephemera._
 
-- **Full VM Lifecycle** — Create, start, stop, restart, pause, resume, hibernate, and delete VMs backed by KVM, via systemd-vmspawn (default) or Ephemera. — _One consistent lifecycle across CLI, TUI, web, Terraform, and Kubernetes, regardless of which VM driver is active._
+- **Full VM Lifecycle** — Create, start, stop, restart, pause, resume, hibernate, and delete VMs backed by KVM, via Ephemera. — _One consistent lifecycle across CLI, TUI, web, Terraform, and Kubernetes._
   - **How:** CLI `zyvorctl vm start|stop|restart|pause|resume|delete ` · Web dashboard VM-list quick actions · TUI VMs view (`s`/`t`/`r`/`d`) · REST `POST /api/vms/:name/{start,stop,restart,pause,resume}` and `DELETE /api/vms/:name`.
 - **Declarative Apply** — Define VMs in YAML and reconcile them with zyvorctl apply -f config.yaml. — _GitOps-friendly infrastructure without a control-plane rewrite._
   - **How:** CLI `zyvorctl apply -f config.yaml` reconciles a YAML spec (version it in git); equivalent imperative path is REST `POST /api/vms`, or a `VirtualMachine` CRD via the K8s operator.
