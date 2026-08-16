@@ -127,22 +127,22 @@ Storage pool data is stored under `/var/lib/zyvor-fabricd/storage/` by default.
 
 ### [network]
 
-Controls the default network bridge and systemd-networkd integration.
+Controls the default network bridge and optional discovery of host-managed systemd-networkd files.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `bridge` | String | `"br0"` | Default network bridge for VMs |
-| `networkd_config_dir` | String | `"/etc/systemd/network"` | Directory for generated networkd configs |
-| `networkd_file_prefix` | String | `"50-Zyvor Fabric-"` | Filename prefix for managed networkd files |
+| `networkd_config_dir` | String | `"/etc/systemd/network"` | Directory scanned to *discover* pre-existing, host-managed systemd-networkd files (read-only) |
+| `networkd_file_prefix` | String | `"50-zyvor-fabricd-"` | Prefix historically used to distinguish zyvor-fabricd-managed files from manually created ones |
 
 ```toml
 [network]
 bridge = "br0"
 networkd_config_dir = "/etc/systemd/network"
-networkd_file_prefix = "50-Zyvor Fabric-"
+networkd_file_prefix = "50-zyvor-fabricd-"
 ```
 
-Zyvor Fabric generates systemd-networkd configuration files (`.netdev`, `.network`) in the specified directory. Files are prefixed with `networkd_file_prefix` so they can be identified and managed separately from manually created network configurations.
+Zyvor Fabric creates and configures bridges, VLANs, bonds, TAP/macvtap devices, VXLANs, and addresses directly via netlink (`rtnetlink`) — it does not write `.netdev`/`.network` files and needs no `networkctl reload` step. `networkd_config_dir` is only used to *discover* `.netdev`/`.network`/`.link` files that a host's own independent systemd-networkd setup already manages, so they can be shown (read-only) alongside zyvor-fabricd-managed devices in the network API; it plays no role in how zyvor-fabricd itself configures networking.
 
 ---
 
@@ -373,7 +373,7 @@ dns_servers = ["8.8.8.8", "8.8.4.4"]
 domain = "vm.internal"
 ```
 
-The DHCP server integrates with systemd-networkd and assigns addresses from the pool range configured on each bridge via the API.
+The DHCP server is a directly-managed `dnsmasq` process per bridge (via `zyvor-fabric-dnsmasq-manager`, not systemd-networkd's built-in `[DHCPServer]`) and assigns addresses from the pool range configured on each bridge via the API (see `POST /api/networkd/dhcp`).
 
 ---
 
