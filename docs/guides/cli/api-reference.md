@@ -3051,7 +3051,7 @@ curl -s http://localhost:3000/api/system/usb \
 
 ### POST /api/networkd/dhcp
 
-Configure a DHCP server on a bridge interface. This enables automatic IP address assignment for VMs connected to the bridge.
+Configure a DHCP server on a bridge interface. This enables automatic IP address assignment for VMs connected to the bridge. Despite the route's name, this runs a directly-managed `dnsmasq` process per bridge — not systemd-networkd's built-in `[DHCPServer]` — so it works whether or not systemd is present on the host. `pool_start`/`pool_end` must be in the same /24; the bridge's own gateway is assumed to be that subnet's `.1`.
 
 **Auth level:** Admin only
 
@@ -3070,9 +3070,9 @@ Configure a DHCP server on a bridge interface. This enables automatic IP address
 ```json
 {
   "status": "configured",
-  "bridge_name": "br0",
-  "pool_start": "192.168.1.100",
-  "pool_end": "192.168.1.200"
+  "bridge": "br0",
+  "pool_offset": 100,
+  "pool_size": 101
 }
 ```
 

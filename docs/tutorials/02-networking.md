@@ -1,8 +1,8 @@
 # Tutorial 02: VM Networking
 
-Configure virtual networking for your VMs using systemd-networkd. This tutorial
-covers bridges, VLANs, bond interfaces, port forwarding, network policies, and
-DNS configuration.
+Configure virtual networking for your VMs. This tutorial covers bridges,
+VLANs, bond interfaces, port forwarding, network policies, and DNS
+configuration.
 
 **Level:** Intermediate
 **Time:** 45 minutes
@@ -34,9 +34,13 @@ TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
 
 ## Network Architecture Overview
 
-Zyvor Fabric manages networking through systemd-networkd. Every network change
-generates `.netdev` and `.network` configuration files and triggers a
-`networkctl reload`.
+Zyvor Fabric manages networking through direct netlink calls (rtnetlink) —
+every network change (bridges, VLANs, bonds, TAP/macvtap devices, addresses)
+takes effect immediately in the kernel, with no config files written and no
+`networkctl reload` step. This works identically whether or not systemd is
+present on the host. WireGuard mesh interfaces follow the same pattern; the
+DHCP server described in Step 7 below is the one piece that still shells out
+to an external tool (`dnsmasq`, not systemd-networkd).
 
 ```
                          +------------------+
@@ -559,8 +563,11 @@ curl -s "$VMSPAWN_HOST/api/dns/zones" \
 
 ## Step 7: DHCP Server Configuration
 
-Zyvor Fabric can configure a DHCP server on a bridge interface using systemd-networkd.
-VMs attached to the bridge will receive IP addresses automatically.
+Zyvor Fabric can configure a DHCP server on a bridge interface. Under the hood
+this runs a directly-managed `dnsmasq` process per bridge, not systemd-
+networkd's built-in `[DHCPServer]` — it works the same way whether or not
+systemd is present on the host. VMs attached to the bridge will receive IP
+addresses automatically.
 
 ### Configure DHCP on a Bridge
 
@@ -569,11 +576,11 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "bridge": "vm-bridge",
-    "pool_offset": 100,
-    "dns": "192.168.100.1",
-    "default_lease_time_sec": 3600,
-    "max_lease_time_sec": 86400
+    "bridge_name": "vm-bridge",
+    "pool_start": "192.168.100.100",
+    "pool_end": "192.168.100.199",
+    "dns_servers": ["192.168.100.1"],
+    "lease_time_sec": 3600
   }' | jq .
 ```
 
@@ -584,54 +591,57 @@ Expected response:
   "status": "configured",
   "bridge": "vm-bridge",
   "pool_offset": 100,
-  "pool_size": 100,
-  "dns": "192.168.100.1",
-  "default_lease_time_sec": 3600,
-  "max_lease_time_sec": 86400
+  "pool_size": 100
 }
 ```
 
 ### DHCP Server Parameters
 
-| Parameter              | Type    | Description                                      |
-|-----------------------|---------|--------------------------------------------------|
-| `bridge`              | string  | Bridge interface to serve DHCP on                |
-| `pool_offset`         | integer | Start offset for the DHCP pool (e.g., 100)       |
-| `dns`                 | string  | DNS server address to advertise to clients        |
-| `default_lease_time_sec` | integer | Default lease duration in seconds             |
-| `max_lease_time_sec`  | integer | Maximum lease duration in seconds                |
+| Parameter        | Type            | Description                                              |
+|-------------------|-----------------|------------------------------------------------------------|
+| `bridge_name`      | string          | Bridge interface to serve DHCP on                          |
+| `pool_start`       | string          | First address in the DHCP pool (e.g., `192.168.100.100`)   |
+| `pool_end`         | string          | Last address in the DHCP pool — must be in the same /24 as `pool_start` |
+| `dns_servers`      | array\<string\> | Optional. DNS server addresses to advertise to clients (default: `1.1.1.1`, `8.8.8.8`) |
+| `lease_time_sec`   | integer         | Optional. Lease duration in seconds (default: `3600`)      |
 
 ### How It Works
 
-1. Zyvor Fabric generates a systemd-networkd `.network` file with a `[DHCPServer]` section
-2. The configuration is written to `/etc/systemd/network/`
-3. `networkctl reload` is called to apply the changes
-4. VMs on the bridge receive IPs from the configured pool
+1. `pool_start`/`pool_end` are converted into a pool offset/size relative to
+   their shared `/24`; the bridge's own gateway is assumed to be that
+   subnet's `.1` (e.g. `192.168.100.1` for the example above).
+2. Zyvor Fabric writes a small `dnsmasq` config to
+   `/run/zyvor-fabricd/dnsmasq/<bridge>.conf` and starts (or restarts) a
+   `dnsmasq` process scoped to that one bridge interface, with its own DNS
+   listener disabled (`port=0` — it only serves DHCP leases plus a DNS-server
+   option pushed to clients, not a resolver of its own).
+3. VMs on the bridge receive IPs from the configured pool immediately — no
+   reload step, no systemd unit involved.
 
 ### Setting the Pool Range
 
-The pool range is determined by the bridge address and the `pool_offset` value.
-For example, if the bridge has address `192.168.100.1/24` and `pool_offset` is
-100, DHCP will serve addresses starting at `192.168.100.100` with a default pool
-size of 100 addresses.
+Pass the actual first and last addresses you want handed out — `pool_start`
+and `pool_end` must fall in the same `/24`. For example, `pool_start:
+"192.168.100.100"`, `pool_end: "192.168.100.199"` serves 100 addresses
+starting at `.100`.
 
 ### DNS Server Configuration
 
-The `dns` parameter sets the DNS server address that DHCP clients will use. This
-is typically the bridge IP itself (if running a DNS forwarder) or an upstream
-resolver.
+`dns_servers` sets the DNS server address(es) DHCP clients will use — an
+array, so you can advertise more than one. This is typically the bridge IP
+itself (if you're running a DNS forwarder there) or upstream resolvers.
 
 ```bash
-# Use the bridge as DNS + upstream resolvers
+# Advertise two upstream resolvers with a longer lease time
 curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "bridge": "vm-bridge",
-    "pool_offset": 50,
-    "dns": "192.168.100.1",
-    "default_lease_time_sec": 7200,
-    "max_lease_time_sec": 43200
+    "bridge_name": "vm-bridge",
+    "pool_start": "192.168.100.50",
+    "pool_end": "192.168.100.149",
+    "dns_servers": ["1.1.1.1", "8.8.8.8"],
+    "lease_time_sec": 7200
   }' | jq .
 ```
 
