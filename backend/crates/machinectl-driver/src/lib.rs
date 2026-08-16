@@ -2,6 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
+mod images;
 mod lifecycle;
 mod logs;
 mod resource_control;
@@ -11,8 +12,8 @@ use anyhow::Result;
 use zbus::Connection;
 
 pub use zyvor_fabric_driver_core::{
-    CapabilityProvider, LogDriver, LogEntry, MachineInfo, ResourceControlDriver,
-    ResourceStatsDriver, VMDriver,
+    CapabilityProvider, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
+    ResourceControlDriver, ResourceStatsDriver, VMDriver,
 };
 
 /// Main driver that implements all driver-core traits using native D-Bus calls.

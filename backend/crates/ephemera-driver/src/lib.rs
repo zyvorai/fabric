@@ -13,6 +13,7 @@
 //! `MachinectlDriver` path until that lands, selected by zyvor-fabricd's
 //! `driver = "machinectl" | "ephemera"` config flag.
 
+mod images;
 mod lifecycle;
 mod resource_control;
 
@@ -20,8 +21,8 @@ use anyhow::{Context, Result};
 use zyvor_fabric_ephemera_client::EphemeraClient;
 
 pub use zyvor_fabric_driver_core::{
-    CapabilityProvider, LogDriver, LogEntry, MachineInfo, ResourceControlDriver,
-    ResourceStatsDriver, VMDriver, VmDriver,
+    CapabilityProvider, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
+    ResourceControlDriver, ResourceStatsDriver, VMDriver, VmDriver,
 };
 
 /// Driver backed by one `ephemera serve` instance's REST API.

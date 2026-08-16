@@ -246,6 +246,57 @@ struct VmListResponse {
     items: Vec<VmRecord>,
 }
 
+/// One entry in Ephemera's image catalog. Mirrors
+/// `ephemera_image::catalog::CatalogEntry` on the wire, plus
+/// `signature_valid` which only `GET /v1/images/catalog`'s
+/// `CatalogListEntry` wrapper adds (`None` when the client's own requests —
+/// add/rename/clone/export — return a bare `CatalogEntry` with no
+/// verification result attached).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatalogEntry {
+    pub name: String,
+    pub source: String,
+    pub sha256: String,
+    pub format: String,
+    #[serde(default)]
+    pub distro: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub arch: Option<String>,
+    #[serde(default)]
+    pub signature: Option<String>,
+    #[serde(default)]
+    pub signature_valid: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CatalogListResponse {
+    items: Vec<CatalogEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct AddCatalogEntryRequest {
+    name: String,
+    source: String,
+    format: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RenameCatalogEntryRequest {
+    new_name: String,
+}
+
+#[derive(Debug, Serialize)]
+struct CloneCatalogEntryRequest {
+    target_name: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ExportCatalogEntryRequest {
+    path: PathBuf,
+}
+
 #[derive(Debug, Serialize)]
 struct ExecRequest {
     command: String,
@@ -472,6 +523,66 @@ impl EphemeraClient {
                 }
             }
         })
+    }
+
+    /// `GET /v1/images/catalog`
+    pub async fn list_catalog(&self) -> Result<Vec<CatalogEntry>> {
+        let resp = self.authed(self.http.get(self.url("/v1/images/catalog")?)).send().await?;
+        let body: CatalogListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `POST /v1/images/catalog`
+    pub async fn add_catalog_entry(&self, name: &str, source: &str, format: &str) -> Result<CatalogEntry> {
+        let req = AddCatalogEntryRequest {
+            name: name.to_string(),
+            source: source.to_string(),
+            format: format.to_string(),
+        };
+        let resp = self.authed(self.http.post(self.url("/v1/images/catalog")?)).json(&req).send().await?;
+        Self::parse(resp).await
+    }
+
+    /// `DELETE /v1/images/catalog/{name}`
+    pub async fn remove_catalog_entry(&self, name: &str) -> Result<()> {
+        let resp = self
+            .authed(self.http.delete(self.url(&format!("/v1/images/catalog/{name}"))?))
+            .send()
+            .await?;
+        Self::expect_no_content(resp).await
+    }
+
+    /// `POST /v1/images/catalog/{name}/rename`
+    pub async fn rename_catalog_entry(&self, name: &str, new_name: &str) -> Result<CatalogEntry> {
+        let req = RenameCatalogEntryRequest { new_name: new_name.to_string() };
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/rename"))?))
+            .json(&req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/images/catalog/{name}/clone`
+    pub async fn clone_catalog_entry(&self, name: &str, target_name: &str) -> Result<CatalogEntry> {
+        let req = CloneCatalogEntryRequest { target_name: target_name.to_string() };
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/clone"))?))
+            .json(&req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/images/catalog/{name}/export`
+    pub async fn export_catalog_entry(&self, name: &str, path: &std::path::Path) -> Result<()> {
+        let req = ExportCatalogEntryRequest { path: path.to_path_buf() };
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/export"))?))
+            .json(&req)
+            .send()
+            .await?;
+        Self::expect_no_content(resp).await
     }
 
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {

@@ -7,9 +7,14 @@
 //! Exposes systemd-machined functionality: machine lifecycle, image management,
 //! file transfer, SSH, and shell execution.
 //!
-//! Machine lifecycle and property queries use native D-Bus via the MachinectlDriver.
-//! Image transfer and file operations still use CLI calls (machined's import1
-//! D-Bus interface uses FD passing which is more complex).
+//! Machine lifecycle, property queries, and image management go through
+//! `state.driver` (native D-Bus for MachinectlDriver, Ephemera's image
+//! catalog for EphemeraDriver — see driver-core::ImageDriver). Shell/SSH/
+//! copy/bind still shell out to machinectl directly — Ephemera has no
+//! equivalent yet (needs SSH-into-guest or a console/PTY endpoint for
+//! shell, a vsock guest-agent file-transfer extension for copy, and bind
+//! isn't achievable for a real hardware VM the way it was for nspawn's
+//! shared-kernel containers — see the systemd-removal migration plan).
 
 use axum::{
     extract::{Path, State},
@@ -24,7 +29,7 @@ use crate::server::AppState;
 use crate::validation::{validate_machine_path, validate_vm_name};
 use security::{RequireAdmin, RequireRead, RequireWrite};
 use zyvor_fabric_vm_driver::machinectl;
-use zyvor_fabric_driver_core::MachineInfo;
+use zyvor_fabric_driver_core::{ImageInfo, MachineInfo};
 
 // ============================================================================
 // Machine operations (migrated to D-Bus driver)
@@ -388,10 +393,11 @@ pub async fn bind_machine(
 /// GET /api/machines/images - List images from /var/lib/machines
 pub async fn list_machine_images(
     RequireRead(_claims): RequireRead,
-) -> Result<Json<Vec<machinectl::ImageInfo>>, (StatusCode, Json<serde_json::Value>)> {
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<ImageInfo>>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(list_machine_images));
-    machinectl::list_images().map(Json).map_err(|e| {
-        tracing::error!("machined list_images failed: {}", e);
+    state.driver.list_images().await.map(Json).map_err(|e| {
+        tracing::error!("list_images failed: {}", e);
         crate::api_error::json_error_code(
             StatusCode::INTERNAL_SERVER_ERROR,
             "machined_connection",
@@ -408,6 +414,7 @@ pub struct CloneImageRequest {
 /// POST /api/machines/images/:name/clone - Clone an image
 pub async fn clone_machine_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<CloneImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -416,10 +423,13 @@ pub async fn clone_machine_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_vm_name(&req.target_name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::clone_image(&name, &req.target_name)
+    state
+        .driver
+        .clone_image(&name, &req.target_name)
+        .await
         .map(|_| StatusCode::CREATED)
         .map_err(|e| {
-            tracing::error!("machined clone_image failed: {}", e);
+            tracing::error!("clone_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -436,6 +446,7 @@ pub struct RenameImageRequest {
 /// POST /api/machines/images/:name/rename - Rename an image
 pub async fn rename_machine_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<RenameImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -444,10 +455,13 @@ pub async fn rename_machine_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_vm_name(&req.new_name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::rename_image(&name, &req.new_name)
+    state
+        .driver
+        .rename_image(&name, &req.new_name)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined rename_image failed: {}", e);
+            tracing::error!("rename_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -459,15 +473,19 @@ pub async fn rename_machine_image(
 /// DELETE /api/machines/images/:name - Remove an image
 pub async fn remove_machine_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(remove_machine_image));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::remove_image(&name)
+    state
+        .driver
+        .remove_image(&name)
+        .await
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| {
-            tracing::error!("machined remove_image failed: {}", e);
+            tracing::error!("remove_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -484,16 +502,20 @@ pub struct SetReadOnlyRequest {
 /// POST /api/machines/images/:name/read-only - Toggle read-only
 pub async fn set_image_read_only(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<SetReadOnlyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(set_image_read_only));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::set_read_only(&name, req.read_only)
+    state
+        .driver
+        .set_image_read_only(&name, req.read_only)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined set_read_only failed: {}", e);
+            tracing::error!("set_read_only failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -517,6 +539,7 @@ pub struct PullImageRequest {
 /// POST /api/machines/images/pull-raw - Pull raw image from URL
 pub async fn pull_raw_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(pull_raw_image));
@@ -524,10 +547,13 @@ pub async fn pull_raw_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
-    machinectl::pull_raw(&req.url, &req.name, req.verify)
+    state
+        .driver
+        .pull_raw_image(&req.url, &req.name, req.verify)
+        .await
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| {
-            tracing::error!("machined pull_raw failed: {}", e);
+            tracing::error!("pull_raw_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -539,6 +565,7 @@ pub async fn pull_raw_image(
 /// POST /api/machines/images/pull-tar - Pull tar image from URL
 pub async fn pull_tar_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<PullImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(pull_tar_image));
@@ -546,10 +573,13 @@ pub async fn pull_tar_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     crate::api::notifications::validate_external_url_public(&req.url)
         .map_err(|e| crate::api_error::json_error(StatusCode::BAD_REQUEST, e))?;
-    machinectl::pull_tar(&req.url, &req.name, req.verify)
+    state
+        .driver
+        .pull_tar_image(&req.url, &req.name, req.verify)
+        .await
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| {
-            tracing::error!("machined pull_tar failed: {}", e);
+            tracing::error!("pull_tar_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -567,6 +597,7 @@ pub struct ImportImageRequest {
 /// POST /api/machines/images/import-raw - Import raw image file (Admin only)
 pub async fn import_raw_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(import_raw_image));
@@ -574,10 +605,13 @@ pub async fn import_raw_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::import_raw(&req.path, &req.name)
+    state
+        .driver
+        .import_raw_image(&req.path, &req.name)
+        .await
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| {
-            tracing::error!("machined import_raw failed: {}", e);
+            tracing::error!("import_raw_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -589,6 +623,7 @@ pub async fn import_raw_image(
 /// POST /api/machines/images/import-tar - Import tar image file (Admin only)
 pub async fn import_tar_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<ImportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(import_tar_image));
@@ -596,10 +631,13 @@ pub async fn import_tar_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::import_tar(&req.path, &req.name)
+    state
+        .driver
+        .import_tar_image(&req.path, &req.name)
+        .await
         .map(|_| StatusCode::ACCEPTED)
         .map_err(|e| {
-            tracing::error!("machined import_tar failed: {}", e);
+            tracing::error!("import_tar_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -616,6 +654,7 @@ pub struct ExportImageRequest {
 /// POST /api/machines/images/:name/export-raw - Export to raw file (Admin only)
 pub async fn export_raw_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -624,10 +663,13 @@ pub async fn export_raw_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::export_raw(&name, &req.path)
+    state
+        .driver
+        .export_raw_image(&name, &req.path)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined export_raw failed: {}", e);
+            tracing::error!("export_raw_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -639,6 +681,7 @@ pub async fn export_raw_image(
 /// POST /api/machines/images/:name/export-tar - Export to tar file (Admin only)
 pub async fn export_tar_image(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<ExportImageRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -647,10 +690,13 @@ pub async fn export_tar_image(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_host_path(&req.path)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::export_tar(&name, &req.path)
+    state
+        .driver
+        .export_tar_image(&name, &req.path)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined export_tar failed: {}", e);
+            tracing::error!("export_tar_image failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",
@@ -662,12 +708,16 @@ pub async fn export_tar_image(
 /// POST /api/machines/images/clean - Clean hidden/cached images (Admin only)
 pub async fn clean_images(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(clean_images));
-    machinectl::clean(false)
+    state
+        .driver
+        .clean_images(false)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
-            tracing::error!("machined clean failed: {}", e);
+            tracing::error!("clean_images failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",

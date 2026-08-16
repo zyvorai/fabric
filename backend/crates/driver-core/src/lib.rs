@@ -149,6 +149,45 @@ pub trait LogDriver: Send + Sync {
     async fn stream_logs(&self, name: &str, lines: u32) -> Result<LogStream>;
 }
 
+/// One entry in the image registry (machinectl's `/var/lib/machines`
+/// images, or Ephemera's catalog — see `ImageDriver`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageInfo {
+    pub name: String,
+    /// Free-form backend-specific label (e.g. `"raw"`/`"subvolume"` for
+    /// machinectl, the on-disk format like `"qcow2"` for Ephemera).
+    pub image_type: String,
+    pub read_only: bool,
+    /// Free-form, backend-specific size representation (matches
+    /// machinectl's own un-normalized `list-images` output) rather than a
+    /// parsed byte count, since not every backend can report one cheaply.
+    pub size: String,
+}
+
+/// Manage named base/VM images independent of any specific machine —
+/// machinectl's `/var/lib/machines` image directory (clone/rename/remove/
+/// pull/import/export/clean), or Ephemera's checksummed image catalog.
+/// Every method must be implemented by every backend; one with no real
+/// equivalent for a given operation (see `EphemeraDriver`'s tar/read-only/
+/// clean methods) should return a clear "not supported" error rather than
+/// silently no-op'ing — a caller has no way to notice a silently-dropped
+/// image operation.
+#[async_trait]
+pub trait ImageDriver: Send + Sync {
+    async fn list_images(&self) -> Result<Vec<ImageInfo>>;
+    async fn clone_image(&self, source: &str, target: &str) -> Result<()>;
+    async fn rename_image(&self, old_name: &str, new_name: &str) -> Result<()>;
+    async fn remove_image(&self, name: &str) -> Result<()>;
+    async fn set_image_read_only(&self, name: &str, read_only: bool) -> Result<()>;
+    async fn pull_raw_image(&self, url: &str, name: &str, verify: bool) -> Result<()>;
+    async fn pull_tar_image(&self, url: &str, name: &str, verify: bool) -> Result<()>;
+    async fn import_raw_image(&self, path: &str, name: &str) -> Result<()>;
+    async fn import_tar_image(&self, path: &str, name: &str) -> Result<()>;
+    async fn export_raw_image(&self, name: &str, path: &str) -> Result<()>;
+    async fn export_tar_image(&self, name: &str, path: &str) -> Result<()>;
+    async fn clean_images(&self, all: bool) -> Result<()>;
+}
+
 /// Feature detection for optional capabilities.
 pub trait CapabilityProvider: Send + Sync {
     /// A short, stable identifier for the active backend (e.g.
@@ -166,10 +205,15 @@ pub trait CapabilityProvider: Send + Sync {
 /// `impl`'d for anything implementing the five component traits — backends
 /// only need to implement those, never this trait directly.
 pub trait VmDriver:
-    VMDriver + ResourceStatsDriver + ResourceControlDriver + LogDriver + CapabilityProvider
+    VMDriver + ResourceStatsDriver + ResourceControlDriver + LogDriver + ImageDriver + CapabilityProvider
 {
 }
 impl<T> VmDriver for T where
-    T: VMDriver + ResourceStatsDriver + ResourceControlDriver + LogDriver + CapabilityProvider
+    T: VMDriver
+        + ResourceStatsDriver
+        + ResourceControlDriver
+        + LogDriver
+        + ImageDriver
+        + CapabilityProvider
 {
 }
