@@ -3,7 +3,6 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router'
-import { ZyvorFooter } from './components/ZyvorBrand'
 import { Suspense, lazy, ReactNode, useState, useCallback, useMemo } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
@@ -305,7 +304,6 @@ function MainLayout() {
           </Suspense>
         </PageErrorBoundary>
       </main>
-      <ZyvorFooter />
     </div>
   )
 }
