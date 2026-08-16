@@ -104,6 +104,13 @@ pub trait VMDriver: Send + Sync {
     /// known — `EphemeraDriver` returns the MAC it assigned at create
     /// time, which callers can resolve to an IP via a DHCP lease lookup.
     async fn get_mac_address(&self, name: &str) -> Result<Option<String>>;
+
+    /// Path to the machine's VNC UNIX-domain socket, if it has one.
+    /// `EphemeraDriver` derives this as `<workspace>/vnc.sock` — the fixed
+    /// path Ephemera's QEMU backend always listens on (`-vnc unix:...`),
+    /// no port allocation involved. `None` for a machine with no VNC
+    /// server (not currently running, or a backend with no VNC equivalent).
+    async fn get_vnc_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 }
 
 /// Resource metrics collection from cgroup v2.

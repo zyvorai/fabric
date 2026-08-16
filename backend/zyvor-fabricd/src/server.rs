@@ -71,6 +71,16 @@ impl AppState {
     }
 }
 
+impl vnc_proxy::VncProxyState for AppState {
+    fn driver(&self) -> Arc<dyn VmDriver> {
+        self.driver.clone()
+    }
+
+    fn jwt_config(&self) -> Option<Arc<security::JwtConfig>> {
+        self.jwt_config.clone()
+    }
+}
+
 pub struct QuotaCache {
     pub usage: std::collections::HashMap<String, crate::api::quotas::QuotaUsage>,
     pub last_updated: std::time::Instant,
@@ -2046,7 +2056,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 
     let mut ws_routes = Router::new()
         .route("/console/{name}", get(websocket::console_handler))
-        .route("/vnc/{name}", get(vnc_proxy::vnc_handler))
+        .route("/vnc/{name}", get(vnc_proxy::vnc_handler::<AppState>))
         .with_state(state.clone());
 
     // Apply auth middleware to WebSocket routes if enabled

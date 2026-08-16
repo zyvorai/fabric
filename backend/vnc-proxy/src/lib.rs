@@ -5,45 +5,96 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Path,
+        Path, Query, State,
     },
+    http::StatusCode,
     response::IntoResponse,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
-use state_store::StateStore;
+use serde::Deserialize;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::net::UnixStream;
+use zyvor_fabric_driver_core::VmDriver;
 
-/// VNC WebSocket proxy handler
-/// Bridges WebSocket (browser) <-> VNC server (TCP)
-pub async fn vnc_handler(ws: WebSocketUpgrade, Path(vm_name): Path<String>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_vnc(socket, vm_name))
+#[derive(Debug, Deserialize)]
+pub struct VncQuery {
+    pub token: Option<String>,
 }
 
-async fn handle_vnc(socket: WebSocket, vm_name: String) {
+/// VNC WebSocket proxy handler.
+/// Bridges WebSocket (browser) <-> VNC server (Ephemera's per-VM UNIX
+/// socket at `<workspace>/vnc.sock`, resolved via `VmDriver::get_vnc_socket`
+/// rather than a guessed TCP port — see driver-core's doc comment).
+pub async fn vnc_handler<S>(
+    ws: WebSocketUpgrade,
+    Path(vm_name): Path<String>,
+    Query(query): Query<VncQuery>,
+    State(state): State<Arc<S>>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    S: VncProxyState + Send + Sync + 'static,
+{
+    let jwt_config = state.jwt_config().ok_or_else(|| {
+        tracing::warn!("VNC connection rejected: authentication not configured");
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    let token = query.token.as_deref().ok_or_else(|| {
+        tracing::warn!("VNC connection rejected: no auth token for VM '{}'", vm_name);
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    jwt_config.validate_token(token).map_err(|e| {
+        tracing::warn!("VNC auth failed for VM '{}': {}", vm_name, e);
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    let socket_path = state
+        .driver()
+        .get_vnc_socket(&vm_name)
+        .await
+        .map_err(|e| {
+            tracing::warn!("Failed to resolve VNC socket for VM '{}': {:#}", vm_name, e);
+            StatusCode::BAD_GATEWAY
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(ws.on_upgrade(move |socket| handle_vnc(socket, vm_name, socket_path)))
+}
+
+/// Minimal state accessor `vnc_handler` needs from `zyvor-fabricd::AppState`,
+/// kept as a trait so this crate doesn't depend on `zyvor-fabricd` itself.
+pub trait VncProxyState {
+    fn driver(&self) -> Arc<dyn VmDriver>;
+    fn jwt_config(&self) -> Option<Arc<security::JwtConfig>>;
+}
+
+async fn handle_vnc(socket: WebSocket, vm_name: String, socket_path: std::path::PathBuf) {
     tracing::info!("VNC WebSocket connection for VM: {}", vm_name);
 
-    // Connect to VNC server (typically on localhost:590X where X is VM index)
-    let vnc_port = get_vnc_port(&vm_name).await;
-    let vnc_addr = format!("127.0.0.1:{}", vnc_port);
-
-    let tcp_stream = match TcpStream::connect(&vnc_addr).await {
+    let unix_stream = match UnixStream::connect(&socket_path).await {
         Ok(stream) => stream,
         Err(e) => {
-            tracing::error!("Failed to connect to VNC server at {}: {}", vnc_addr, e);
+            tracing::error!(
+                "Failed to connect to VNC socket {} for VM '{}': {}",
+                socket_path.display(),
+                vm_name,
+                e
+            );
             return;
         }
     };
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
-    let (mut tcp_read, mut tcp_write) = tcp_stream.into_split();
+    let (mut vnc_read, mut vnc_write) = unix_stream.into_split();
 
     // VNC -> WebSocket
     let vm_name_clone = vm_name.clone();
     let vnc_to_ws = tokio::spawn(async move {
         let mut buf = vec![0u8; 8192];
         loop {
-            match tcp_read.read(&mut buf).await {
+            match vnc_read.read(&mut buf).await {
                 Ok(0) => break,
                 Ok(n) => {
                     if ws_sender
@@ -69,7 +120,7 @@ async fn handle_vnc(socket: WebSocket, vm_name: String) {
         while let Some(msg) = ws_receiver.next().await {
             match msg {
                 Ok(Message::Binary(data)) => {
-                    if tcp_write.write_all(&data).await.is_err() {
+                    if vnc_write.write_all(&data).await.is_err() {
                         break;
                     }
                 }
@@ -87,63 +138,4 @@ async fn handle_vnc(socket: WebSocket, vm_name: String) {
     let _ = tokio::join!(vnc_to_ws, ws_to_vnc);
 
     tracing::info!("VNC connection closed for VM: {}", vm_name);
-}
-
-async fn get_vnc_port(vm_name: &str) -> u16 {
-    // Get VNC port from VM metadata
-    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/zyvor-fabricd".to_string());
-
-    if let Ok(store) = StateStore::new(&state_dir) {
-        if let Ok(Some(vm)) = store.get_vm(vm_name) {
-            if let Some(port) = vm.vnc_port {
-                tracing::info!("Using VNC port {} from VM metadata for '{}'", port, vm_name);
-                return port;
-            }
-        }
-    }
-
-    // Fallback: use hash-based port assignment
-    tracing::warn!(
-        "VNC port not set for VM '{}', using hash-based assignment",
-        vm_name
-    );
-    let hash = vm_name
-        .bytes()
-        .fold(0u32, |acc, b| acc.wrapping_add(b as u32));
-    5900 + (hash % 100) as u16
-}
-
-pub fn configure_vnc_for_vm(vm_name: &str, vnc_port: u16) -> anyhow::Result<()> {
-    tracing::info!("Configuring VNC for VM {} on port {}", vm_name, vnc_port);
-
-    // Add VNC device to VM configuration
-    // Store VNC port in VM metadata
-    let state_dir = std::env::var("STATE_DIR").unwrap_or_else(|_| "/var/lib/zyvor-fabricd".to_string());
-
-    if let Ok(store) = StateStore::new(&state_dir) {
-        if let Ok(Some(mut vm)) = store.get_vm(vm_name) {
-            vm.vnc_port = Some(vnc_port);
-            store.save_vm(&vm)?;
-            tracing::info!("VNC port {} saved to VM '{}' metadata", vnc_port, vm_name);
-        } else {
-            tracing::warn!(
-                "VM '{}' not found in state store, cannot save VNC port",
-                vm_name
-            );
-        }
-    } else {
-        tracing::warn!("Failed to open state store, cannot save VNC port");
-    }
-
-    // Generate QEMU VNC arguments for systemd-vmspawn integration
-    // The actual QEMU args would be: -vnc :X where X = vnc_port - 5900
-    let vnc_display = vnc_port - 5900;
-    tracing::info!(
-        "VNC configured for VM '{}': use QEMU arg '-vnc :{}' or '-vnc 0.0.0.0:{}'",
-        vm_name,
-        vnc_display,
-        vnc_port
-    );
-
-    Ok(())
 }
