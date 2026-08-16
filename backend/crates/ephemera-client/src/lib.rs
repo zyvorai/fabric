@@ -482,6 +482,17 @@ impl EphemeraClient {
         Self::expect_no_content(resp).await
     }
 
+    /// `GET /v1/vms/{id}/cpuset`
+    pub async fn get_cpuset(&self, id: Uuid) -> Result<Vec<u32>> {
+        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/cpuset"))?)).send().await?;
+        #[derive(Deserialize)]
+        struct CpusetResponse {
+            cpus: Vec<u32>,
+        }
+        let body: CpusetResponse = Self::parse(resp).await?;
+        Ok(body.cpus)
+    }
+
     /// `POST /v1/vms/{id}/freeze` — suspend the VM's cgroup via the v2
     /// freezer (`cgroup.freeze`), independent of guest-level pause/resume.
     pub async fn freeze(&self, id: Uuid) -> Result<()> {

@@ -110,6 +110,11 @@ impl ResourceControlDriver for EphemeraDriver {
         };
         self.client.set_resources(record.id, &patch).await
     }
+
+    async fn get_cpuset(&self, name: &str) -> Result<Vec<u32>> {
+        let record = self.resolve(name).await?;
+        self.client.get_cpuset(record.id).await
+    }
 }
 
 #[async_trait]

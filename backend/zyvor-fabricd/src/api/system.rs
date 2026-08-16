@@ -221,50 +221,19 @@ pub async fn remove_cpu_pinning(
 /// GET /api/vms/:name/cpu/affinity - Get CPU affinity for a VM
 pub async fn get_cpu_affinity(
     RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<Vec<u32>>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_cpu_affinity));
     validate_vm_name(&vm_name)?;
-    // Read CPU affinity from systemd service
     tracing::info!("Getting CPU affinity for VM '{}'", vm_name);
 
-    let service_name = format!("systemd-vmspawn@{}.service", vm_name);
-    let output = Command::new("systemctl")
-        .arg("show")
-        .arg(&service_name)
-        .arg("--property=CPUAffinity")
-        .output()
+    state
+        .driver
+        .get_cpuset(&vm_name)
         .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to execute systemctl: {}", e),
-            )
-        })?;
-
-    if !output.status.success() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' service not found", vm_name),
-        ));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Parse CPUAffinity output (format: "CPUAffinity=0 1 2 3" or "CPUAffinity=")
-    let affinity = if let Some(line) = stdout.lines().next() {
-        if let Some(cpus) = line.strip_prefix("CPUAffinity=") {
-            cpus.split_whitespace()
-                .filter_map(|s| s.parse::<u32>().ok())
-                .collect()
-        } else {
-            vec![]
-        }
-    } else {
-        vec![]
-    };
-
-    Ok(Json(affinity))
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to read CPU affinity: {e}")))
 }
 
 /// PUT /api/vms/:name/memory/limit - Set memory limit for a VM

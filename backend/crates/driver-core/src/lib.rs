@@ -140,6 +140,10 @@ pub trait ResourceControlDriver: Send + Sync {
 
     /// Pin the machine to specific CPU cores.
     async fn set_cpuset(&self, name: &str, cpus: &[u32]) -> Result<()>;
+
+    /// Read back the machine's currently pinned CPU cores (empty if never
+    /// set — cgroup default is unrestricted).
+    async fn get_cpuset(&self, name: &str) -> Result<Vec<u32>>;
 }
 
 /// Structured log streaming.

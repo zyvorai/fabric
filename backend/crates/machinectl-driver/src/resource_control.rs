@@ -102,4 +102,12 @@ impl ResourceControlDriver for MachinectlDriver {
         );
         Ok(())
     }
+
+    async fn get_cpuset(&self, name: &str) -> Result<Vec<u32>> {
+        let cgroup = CgroupPath::for_machine(name);
+        let cpuset = zyvor_fabric_cgroup::CpusetController::new(cgroup.path().to_path_buf());
+        cpuset
+            .get_cpus()
+            .map_err(|e| anyhow!("Failed to read cpuset for '{}': {}", name, e))
+    }
 }

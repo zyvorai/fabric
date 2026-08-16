@@ -859,6 +859,9 @@ mod tests {
         async fn set_cpuset(&self, _name: &str, _cpus: &[u32]) -> Result<()> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
+        async fn get_cpuset(&self, _name: &str) -> Result<Vec<u32>> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
     }
 
     #[async_trait::async_trait]
