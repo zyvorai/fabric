@@ -924,6 +924,12 @@ mod tests {
         ) -> Result<zyvor_fabric_driver_core::ShellOutput> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
+        async fn copy_to(&self, _name: &str, _host_path: &str, _machine_path: &str, _mode: Option<u32>) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn copy_from(&self, _name: &str, _machine_path: &str, _host_path: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
     }
 
     impl zyvor_fabric_driver_core::CapabilityProvider for MockDriver {

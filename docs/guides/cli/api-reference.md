@@ -1901,7 +1901,7 @@ curl -s http://localhost:3000/api/machines/my-vm/ssh \
 
 ### POST /api/machines/:name/copy-to
 
-Copy a file from the host into a running machine. `machinectl` backend only.
+Copy a file from the host into a running machine. Both backends: `machinectl copy-to`, or Ephemera's vsock guest-agent `PutFile` op (requires the VM to have been created with the agent enabled; capped at 64MiB). `mode` is only consulted on the `ephemera` backend, which has no source file to inherit permission bits from — `machinectl` always preserves the source file's own mode.
 
 **Auth level:** Admin only
 
@@ -1910,7 +1910,8 @@ Copy a file from the host into a running machine. `machinectl` backend only.
 ```json
 {
   "host_path": "/tmp/config.yaml",
-  "machine_path": "/etc/myapp/config.yaml"
+  "machine_path": "/etc/myapp/config.yaml",
+  "mode": 420
 }
 ```
 
@@ -1929,7 +1930,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/copy-to \
 
 ### POST /api/machines/:name/copy-from
 
-Copy a file from a running machine to the host. `machinectl` backend only.
+Copy a file from a running machine to the host. Both backends: `machinectl copy-from`, or Ephemera's vsock guest-agent `GetFile` op (same agent-enabled requirement and 64MiB cap as `copy-to`). The file's mode on the guest is preserved on the host copy.
 
 **Auth level:** Admin only
 

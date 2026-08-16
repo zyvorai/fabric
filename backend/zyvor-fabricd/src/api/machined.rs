@@ -7,17 +7,15 @@
 //! Exposes systemd-machined functionality: machine lifecycle, image management,
 //! file transfer, SSH, and shell execution.
 //!
-//! Machine lifecycle, property queries, image management, shell exec, and
-//! SSH info all go through `state.driver` and work on both backends (native
-//! D-Bus/CLI for MachinectlDriver; Ephemera's image catalog, vsock guest
-//! agent, and a MAC-to-DHCP-lease lookup respectively for EphemeraDriver —
-//! see driver-core::{ImageDriver, ShellDriver}, and `ssh_info`'s doc comment
-//! for how SSH info specifically is derived on each backend). Only
-//! copy-to/copy-from and bind still shell out to machinectl directly —
-//! Ephemera has no equivalent yet (needs a vsock guest-agent file-transfer
-//! extension for copy; bind isn't achievable for a real hardware VM the way
-//! it was for nspawn's shared-kernel containers — see the systemd-removal
-//! migration plan).
+//! Machine lifecycle, property queries, image management, shell exec, file
+//! copy, and SSH info all go through `state.driver` and work on both
+//! backends (native D-Bus/CLI for MachinectlDriver; Ephemera's image
+//! catalog, vsock guest agent, and a MAC-to-DHCP-lease lookup respectively
+//! for EphemeraDriver — see driver-core::{ImageDriver, ShellDriver}, and
+//! `ssh_info`'s doc comment for how SSH info specifically is derived on
+//! each backend). Only `bind` still shells out to machinectl directly —
+//! it isn't achievable for a real hardware VM the way it was for nspawn's
+//! shared-kernel containers (see the systemd-removal migration plan).
 
 use axum::{
     extract::{Path, State},
@@ -339,18 +337,25 @@ pub async fn ssh_info(
 }
 
 // ============================================================================
-// File transfer (still CLI-based)
+// File transfer (routed through state.driver — driver_core::ShellDriver;
+// machinectl copy-to/copy-from CLI, or Ephemera's vsock PutFile/GetFile)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
 pub struct CopyRequest {
     pub host_path: String,
     pub machine_path: String,
+    /// Unix permission bits for the copied file, e.g. `0o644`. Only
+    /// consulted by `copy_to_machine` on the `ephemera` backend, which has
+    /// no source file to inherit a mode from; ignored elsewhere.
+    #[serde(default)]
+    pub mode: Option<u32>,
 }
 
 /// POST /api/machines/:name/copy-to - Copy file from host to machine (Admin only)
 pub async fn copy_to_machine(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -361,7 +366,10 @@ pub async fn copy_to_machine(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_machine_path(&req.machine_path)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::copy_to(&name, &req.host_path, &req.machine_path)
+    state
+        .driver
+        .copy_to(&name, &req.host_path, &req.machine_path, req.mode)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
             tracing::error!("machined copy_to failed: {}", e);
@@ -376,6 +384,7 @@ pub async fn copy_to_machine(
 /// POST /api/machines/:name/copy-from - Copy file from machine to host (Admin only)
 pub async fn copy_from_machine(
     RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(req): Json<CopyRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -386,7 +395,10 @@ pub async fn copy_from_machine(
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
     validate_machine_path(&req.machine_path)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::copy_from(&name, &req.machine_path, &req.host_path)
+    state
+        .driver
+        .copy_from(&name, &req.machine_path, &req.host_path)
+        .await
         .map(|_| StatusCode::OK)
         .map_err(|e| {
             tracing::error!("machined copy_from failed: {}", e);

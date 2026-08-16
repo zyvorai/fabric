@@ -325,6 +325,19 @@ struct ExecRequest {
     timeout_seconds: Option<u64>,
 }
 
+#[derive(Debug, Serialize)]
+struct PutFileRequest {
+    path: String,
+    content_base64: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+struct GetFileRequest {
+    path: String,
+}
+
 /// Mirrors `ephemera_guest_protocol::AgentResponse`. `Error` is an
 /// agent/protocol-level failure (bad token, malformed request) — a command
 /// that ran but exited non-zero is still `Exec` with that `exit_code`, not
@@ -334,6 +347,8 @@ struct ExecRequest {
 pub enum AgentResponse {
     Pong,
     Exec { exit_code: i32, stdout: String, stderr: String },
+    FileWritten,
+    FileContent { content_base64: String, mode: u32 },
     ShuttingDown,
     Error { message: String },
 }
@@ -466,6 +481,26 @@ impl EphemeraClient {
         let resp = self
             .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent"))?))
             .json(&ExecRequest { command: command.into(), timeout_seconds })
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/agent/put-file`
+    pub async fn agent_put_file(&self, id: Uuid, path: &str, content_base64: &str, mode: Option<u32>) -> Result<AgentResponse> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent/put-file"))?))
+            .json(&PutFileRequest { path: path.to_string(), content_base64: content_base64.to_string(), mode })
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/agent/get-file`
+    pub async fn agent_get_file(&self, id: Uuid, path: &str) -> Result<AgentResponse> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent/get-file"))?))
+            .json(&GetFileRequest { path: path.to_string() })
             .send()
             .await?;
         Self::parse(resp).await

@@ -178,6 +178,16 @@ pub struct ShellOutput {
 #[async_trait]
 pub trait ShellDriver: Send + Sync {
     async fn shell(&self, name: &str, command: &str, timeout_seconds: Option<u64>) -> Result<ShellOutput>;
+
+    /// Copy a file from the host into the machine — `machinectl copy-to`,
+    /// or Ephemera's vsock guest-agent `PutFile` op (same agent-enabled
+    /// requirement as [`Self::shell`]). `mode` is Unix permission bits
+    /// (e.g. `0o644`); `None` lets the backend pick its own default.
+    async fn copy_to(&self, name: &str, host_path: &str, machine_path: &str, mode: Option<u32>) -> Result<()>;
+
+    /// Copy a file from the machine to the host — `machinectl copy-from`,
+    /// or Ephemera's vsock guest-agent `GetFile` op.
+    async fn copy_from(&self, name: &str, machine_path: &str, host_path: &str) -> Result<()>;
 }
 
 /// One entry in the image registry (machinectl's `/var/lib/machines`
