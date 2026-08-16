@@ -17,12 +17,11 @@ Complete these items before deploying Zyvor Fabric to production.
 
 ### Host Requirements
 
-`zyvor-fabricd` itself has no systemd dependency -- these requirements apply to the `machinectl` VM driver backend (the default, `driver.backend = "machinectl"`). Deploying with `driver.backend = "ephemera"` instead drops the systemd-vmspawn/machined/networkd requirements below entirely; see [Ephemera](https://github.com/hypersdk/ephemera).
+`zyvor-fabricd` itself has no systemd dependency, and neither does VM lifecycle -- VMs run under [Ephemera](https://github.com/hypersdk/ephemera), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly.
 
-- [ ] **OS version** -- a modern Linux distribution (Fedora 41+, Ubuntu 24.10+, or equivalent); systemd 256+ only if using the `machinectl` driver backend
+- [ ] **OS version** -- a modern Linux distribution (Fedora 41+, Ubuntu 24.10+, or equivalent)
 - [ ] **Kernel** -- Linux 6.x with KVM support (`/dev/kvm` exists and is accessible)
-- [ ] **systemd-vmspawn** -- v260+ installed (`systemd-vmspawn --version`) -- `machinectl` backend only
-- [ ] **systemd-machined** -- Running (`systemctl is-active systemd-machined`) -- `machinectl` backend only
+- [ ] **Ephemera** -- `ephemera serve` running and reachable at the configured `driver.ephemera_url`
 - [ ] **CPU virtualization** -- Enabled in BIOS/UEFI (`grep -c vmx /proc/cpuinfo` or `grep -c svm /proc/cpuinfo`)
 - [ ] **Memory** -- Sufficient RAM for host + all planned VMs (2 GB minimum for host overhead)
 - [ ] **Disk space** -- Storage pools provisioned with adequate capacity for VM images and backups
@@ -33,7 +32,6 @@ Complete these items before deploying Zyvor Fabric to production.
 - [ ] **qemu-img** -- Installed for disk operations (`qemu-img --version`)
 - [ ] **nftables** -- Installed if using port forwarding or firewall rules (`nft --version`)
 - [ ] **PAM** -- System PAM configured for user authentication
-- [ ] **machinectl** -- Available for machine management (`machinectl --version`) -- `machinectl` backend only; not needed with `driver.backend = "ephemera"`
 
 ### Network Configuration
 
@@ -270,7 +268,7 @@ See the [Backup Strategy Guide](backup-strategy.md) for detailed procedures.
 ### Updates
 
 - [ ] **Zyvor Fabric updates** -- Test new versions in a staging environment before production
-- [ ] **systemd updates** -- Only relevant if using the `machinectl` driver backend; verify compatibility when upgrading systemd (requires v260+ for systemd-vmspawn)
+- [ ] **Ephemera updates** -- Test new Ephemera versions in staging before rolling out to hosts running production VMs
 - [ ] **Image maintenance** -- Rebuild base images monthly to include OS security patches
 - [ ] **Certificate rotation** -- Rotate TLS certificates on the reverse proxy before expiration
 
@@ -310,11 +308,10 @@ sudo systemctl restart zyvor-fabricd
 curl -s http://localhost:9095/health
 
 # 4. Check VMs are running (VMs persist independently of zyvor-fabricd)
-machinectl list   # machinectl backend
-# or: curl -s http://127.0.0.1:7788/v1/vms   # ephemera backend
+curl -s http://127.0.0.1:7788/v1/vms
 ```
 
-VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs state from the active VM driver (systemd-machined, or Ephemera) and the state store on startup.
+VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs state from Ephemera and the state store on startup.
 
 ---
 
@@ -325,15 +322,16 @@ VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs s
 **Recovery:**
 
 ```bash
-# 1. Check actual machine status via machined
-machinectl show my-vm
+# 1. Check actual VM status via Ephemera
+curl -s http://127.0.0.1:7788/v1/vms | jq '.[] | select(.name == "my-vm")'
 
-# 2. If machine is running but state is stale, force a stop and restart
+# 2. If the VM is running but state is stale, force a stop and restart
 curl -s -X POST http://localhost:3000/api/vms/my-vm/stop \
   -H "Authorization: Bearer $TOKEN" | jq
 
-# 3. If machined reports no such machine, terminate via machinectl
-sudo machinectl terminate my-vm
+# 3. If Ephemera reports no such VM, terminate via the API directly
+curl -s -X POST http://localhost:3000/api/vms/my-vm/terminate \
+  -H "Authorization: Bearer $TOKEN" | jq
 
 # 4. Wait briefly, then restart
 curl -s -X POST http://localhost:3000/api/vms/my-vm/start \
@@ -352,10 +350,7 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/start \
 # 1. Ensure Zyvor Fabric starts automatically
 sudo systemctl enable zyvor-fabricd
 
-# 2. After reboot, check which machines have auto-start enabled
-machinectl list-images
-
-# 3. List VMs that need manual start
+# 2. List VMs that need manual start
 curl -s http://localhost:3000/api/vms \
   -H "Authorization: Bearer $TOKEN" | jq '.items[] | select(.state != "running") | .name'
 

@@ -20,19 +20,19 @@ Feature-by-feature comparison of Zyvor Fabric against alternative VM management 
 
 | Aspect | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |--------|---------|---------------|------------|
-| **Hypervisor** | QEMU/KVM, via a pluggable VM driver (systemd-vmspawn by default, or Ephemera) | QEMU/KVM (+ Xen, LXC) | QEMU/KVM + LXC |
-| **Management layer** | systemd-machined + REST API (default), or systemd-free via Ephemera | libvirtd daemon + XML API | pvemanager + Perl API |
+| **Hypervisor** | QEMU/KVM/Cloud Hypervisor/Firecracker, via [Ephemera](https://github.com/hypersdk/ephemera) | QEMU/KVM (+ Xen, LXC) | QEMU/KVM + LXC |
+| **Management layer** | Ephemera (systemd-free) + REST API | libvirtd daemon + XML API | pvemanager + Perl API |
 | **Configuration format** | JSON (REST API) | XML domain definitions | Perl config files + web UI |
-| **Init system integration** | systemd optional — machined/journald by default, direct netlink for networking either way; the daemon's own packaging/init doesn't require systemd | Standalone (systemd unit for libvirtd only) | Standalone (custom init scripts) |
+| **Init system integration** | No systemd dependency — direct netlink for networking, Ephemera-supervised VM processes; the daemon's own packaging/init doesn't require systemd either | Standalone (systemd unit for libvirtd only) | Standalone (custom init scripts) |
 | **Language** | Rust (backend), React (frontend) | C (libvirt), various (bindings) | Perl (backend), JavaScript (frontend) |
 | **Cluster support** | Single-host (multi-host networking available) | Single-host (requires external orchestration) | Built-in multi-node cluster |
 | **License** | Open source | LGPL | AGPL (open source) + subscription |
 
 ### Key Architectural Differences
 
-**Zyvor Fabric** uses a pluggable VM driver behind one REST API. By default it delegates VM process management to `systemd-machined` and uses `systemd-vmspawn` for launching VMs -- VMs are first-class systemd units, visible in `machinectl list`, with logs in `journalctl` and resource controls via standard cgroup hierarchies. An alternative driver (Ephemera) provides the same REST API surface -- lifecycle, cgroup resource control, log streaming, hotplug, image management -- without any systemd dependency, for environments that don't want one.
+**Zyvor Fabric** exposes VM lifecycle through one REST API backed by [Ephemera](https://github.com/hypersdk/ephemera) -- a disposable-VM engine with no systemd dependency of its own. Ephemera supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly (never as a systemd unit); the API surface covers lifecycle, cgroup resource control, log streaming, hotplug, and image management.
 
-**libvirt** provides its own abstraction layer over hypervisors. It manages VM lifecycle through its own daemon (libvirtd) and stores configuration as XML. It does not integrate with systemd-machined; VMs are tracked internally by libvirt.
+**libvirt** provides its own abstraction layer over hypervisors. It manages VM lifecycle through its own daemon (libvirtd) and stores configuration as XML. VMs are tracked internally by libvirt, independent of any init system.
 
 **Proxmox VE** is a full-stack solution that includes its own cluster filesystem (pmxcfs), authentication (PAM + PVE realm), and web UI. It uses qemu-server for VM management with its own configuration format.
 
@@ -177,7 +177,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 ### Choose Zyvor Fabric when:
 
-- You want **deep systemd integration** where VMs are managed as first-class systemd units via machined, with logs in journald and resources in cgroups -- or you'd rather not depend on systemd at all, via the same REST API against the pluggable Ephemera driver.
+- You want **VM lifecycle with no systemd dependency** -- Ephemera supervises each VM's process directly, with resource control in standard cgroup hierarchies and no systemd unit involved.
 - You need a **comprehensive REST API** (480+ endpoints) for automation-first infrastructure management.
 - You want **built-in networking** (direct netlink, no systemd-networkd dependency) including bridges, VLANs, bonds, VXLAN overlays, SR-IOV, network policies, and traffic shaping -- all manageable via API.
 - You prefer a **modern technology stack** (Rust backend, React frontend) with strong type safety and memory safety.

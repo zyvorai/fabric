@@ -1,26 +1,18 @@
-# The Ephemera VM driver
+# The VM driver: Ephemera
 
-Zyvor Fabric's VM lifecycle runs through a pluggable `driver-core::VmDriver` implementation, selected by `[driver].backend` in `zyvor-fabricd.toml`:
+Zyvor Fabric's VM lifecycle runs through `driver-core::VmDriver`, implemented against [Ephemera](https://github.com/hypersdk/ephemera) — a standalone disposable-VM control plane with no systemd dependency, spoken to over its REST API and its vsock guest agent. This is the only VM driver; there's no backend to choose.
 
-- **`machinectl`** (default) — systemd-vmspawn + systemd-machined over D-Bus.
-- **`ephemera`** — [Ephemera](https://github.com/hypersdk/ephemera), a standalone disposable-VM control plane with no systemd dependency, spoken to over its REST API.
-
-This page covers the Ephemera backend specifically: what it wires up today, what it doesn't yet, and how to configure it.
-
-## When to choose it
-
-Pick `ephemera` when you want Zyvor Fabric running on a host with no systemd-machined/systemd-vmspawn stack at all, or when you want VM lifecycle backed by Ephemera's own QEMU/Cloud Hypervisor/Firecracker support directly. Stay on the default `machinectl` backend if you need a pluggable storage backend (LVM thin/NBD/Ceph RBD) or per-VM network namespaces — neither is wired through the Ephemera driver yet (see [Known gaps](#known-gaps-as-of-ephemera-v010) below); CPU pinning, hotplug, shell/SSH/file-copy, and bind-mount-via-virtiofs all work on both backends today.
+This page covers what's wired up today, what isn't yet, and how to configure it.
 
 ## Configuration
 
 ```toml
 [driver]
-backend = "ephemera"
 ephemera_url = "http://127.0.0.1:7788"   # Ephemera's REST API base URL
 # ephemera_token = "..."                  # only if Ephemera has auth.tokens configured
 ```
 
-`ephemera_url` and `ephemera_token` are only consulted when `backend = "ephemera"`. See [Ephemera's own README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` itself.
+See [Ephemera's own README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` itself.
 
 ## What's wired today
 
@@ -37,12 +29,13 @@ The `ephemera-driver`/`ephemera-client` crates (`backend/crates/`) implement `dr
 | Freeze/thaw (cgroup v2 freezer) | — | `POST /v1/vms/{id}/{freeze,thaw}`, `GET .../frozen` |
 | Live console log streaming | `LogDriver` | `GET /v1/vms/{id}/logs?follow=true` |
 | Shell exec (no SSH needed) | `ShellDriver::shell` | `POST /v1/vms/{id}/agent` — over Ephemera's vsock guest agent |
+| Interactive console (real PTY) | `ConsoleDriver::open_console` | `GET /v1/vms/{id}/console` — a WebSocket, relayed end-to-end from the browser's own console tab through to a PTY-backed shell in the guest. No live terminal resize — the PTY is sized once at open time |
 | File copy to/from the guest | `ShellDriver::{copy_to,copy_from}` | `POST /v1/vms/{id}/agent/{put,get}-file` — same vsock agent, base64-in-one-request, capped at 64MiB |
 | SSH info | — | Resolves the VM's MAC (pinned at create time) to an IP via zyvor-fabricd's own DHCP lease file — no vsock/Ephemera call at all. `key_path` is always `null`; key management is the operator's own responsibility (e.g. cloud-init) |
 | Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
 | Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
 
-Log streaming's one fidelity reduction versus `MachinectlDriver`: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` stay `machinectl`-only permanently, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM the way it was for nspawn's shared-kernel containers, so "porting" it would mean building a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
+Log streaming's one fidelity reduction: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` are permanently unsupported, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM, so building that would mean writing a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
 
 ## Known gaps (as of Ephemera v0.1.0)
 
@@ -59,4 +52,4 @@ None of this is broken — it's simply not surfaced through `driver-core` yet. C
 ## See also
 
 - [Ephemera README](https://github.com/hypersdk/ephemera#readme) — the full feature set, storage backends, Kubernetes operator, and distributed node-agent.
-- [Operations guide](../operations/README.md) — driver selection in the broader operational context.
+- [Operations guide](../operations/README.md) — the driver in the broader operational context.

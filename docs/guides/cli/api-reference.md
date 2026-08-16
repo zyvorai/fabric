@@ -13,7 +13,7 @@ Complete reference for the Zyvor Fabric REST API, organized by functional catego
 - [Backups](#backups)
 - [Networking](#networking)
 - [Storage](#storage)
-- [Machined (VM driver)](#machined)
+- [Machines (VM driver)](#machines-vm-driver)
 - [Events](#events)
 - [System](#system)
 - [Cloud-init](#cloud-init)
@@ -249,17 +249,18 @@ Start a VM. Returns immediately with `202 Accepted`; the VM transitions through 
 
 **Auth level:** User+
 
-**Request body (optional):**
+**Request body (optional):** `VMStartOptions` — low-level launch options. Ephemera honors `network_tap`, `bind_mounts` (translated into virtiofs shares), `linux`/`initrd`/`firmware`, and `extra_args`; fields with no Ephemera equivalent (`tpm`, `secure_boot`, `vsock`, `credentials`, `directory`, `extra_drives`, `bind_users`) fail with a clear "not supported" error rather than being silently dropped.
 
 ```json
 {
-  "console": true,
-  "network_interface": "tap0",
-  "extra_args": ["--bind=/data"]
+  "network_tap": true,
+  "bind_mounts": [
+    { "source": "/data", "destination": "/mnt/data", "read_only": false }
+  ]
 }
 ```
 
-When a body is provided, the VM is started with the specified low-level options (only supported on the `machinectl` driver backend, via `systemd-vmspawn`). Without a body, the active VM driver is used — `machinectl` (systemd-machined/D-Bus, the default) or `ephemera` (no systemd dependency), selected by `driver.backend` in `zyvor-fabricd.toml`.
+Without a body, the VM is started as previously configured.
 
 **Response (202):**
 
@@ -1534,9 +1535,9 @@ Delete a storage pool.
 
 ---
 
-## Machined
+## Machines (VM driver)
 
-Endpoints for machine-level lifecycle and management, routed through the active VM driver (`driver.backend` in `zyvor-fabricd.toml`): `machinectl` (systemd-machined via D-Bus, the default) or `ephemera`. Image management (list/clone/rename/remove/pull-raw/import-raw/export-raw) and shell exec work on both backends; SSH info, file copy, and bind-mounts are currently `machinectl`-only.
+Endpoints for machine-level lifecycle and management, routed through the VM driver — [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (`driver.ephemera_url` in `zyvor-fabricd.toml`). There is no live bind-mount endpoint; declare `bind_mounts` on `VMStartOptions` at start time instead (see `POST /api/vms/:name/start` above), which Ephemera turns into a virtiofs share per entry.
 
 ### GET /api/machines
 
@@ -1569,7 +1570,7 @@ curl -s http://localhost:3000/api/machines \
 
 ### GET /api/machines/:name/properties
 
-Show machine properties from machined (D-Bus properties).
+Show machine properties.
 
 **Auth level:** Viewer+
 
@@ -1636,7 +1637,7 @@ Disable auto-start at boot for a machine.
 
 ### POST /api/machines/:name/shell
 
-Execute a command inside a running machine, via `machinectl shell` (machinectl backend) or the vsock guest agent's `Exec` op (ephemera backend — requires the VM to have been created with the agent enabled). Shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `>`, `<`, etc.) are rejected for security.
+Execute a command inside a running machine, via the vsock guest agent's `Exec` op (requires the VM to have been created with the agent enabled). Shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `>`, `<`, etc.) are rejected for security.
 
 **Auth level:** Admin only
 
@@ -1671,7 +1672,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/shell \
 
 ### GET /api/machines/images
 
-List images known to the active VM driver (`/var/lib/machines` for `machinectl`, the image catalog for `ephemera`).
+List images known to Ephemera's image catalog.
 
 **Auth level:** Viewer+
 
@@ -1699,7 +1700,7 @@ curl -s http://localhost:3000/api/machines/images \
 
 ### POST /api/machines/images/:name/clone
 
-Clone an existing image under a new name. Both backends.
+Clone an existing image under a new name.
 
 **Auth level:** Admin only
 
@@ -1717,7 +1718,7 @@ Clone an existing image under a new name. Both backends.
 
 ### POST /api/machines/images/:name/rename
 
-Rename an image. Both backends.
+Rename an image.
 
 **Auth level:** Admin only
 
@@ -1735,7 +1736,7 @@ Rename an image. Both backends.
 
 ### DELETE /api/machines/images/:name
 
-Remove an image. Both backends.
+Remove an image.
 
 **Auth level:** Admin only
 
@@ -1745,7 +1746,7 @@ Remove an image. Both backends.
 
 ### POST /api/machines/images/:name/read-only
 
-Toggle an image's read-only flag. `machinectl` backend only.
+Toggle an image's read-only flag. A read-only entry refuses removal or renaming until cleared.
 
 **Auth level:** Admin only
 
@@ -1763,7 +1764,7 @@ Toggle an image's read-only flag. `machinectl` backend only.
 
 ### POST /api/machines/images/pull-raw
 
-Pull a raw disk image from a URL and register it under `name`. Both backends. On the `ephemera` backend, `verify: true` is rejected — catalog signature verification is a separate offline signing flow, not something a pull-time checksum can satisfy.
+Pull a raw disk image from a URL and register it under `name`. `verify: true` is rejected — catalog signature verification is a separate offline signing flow, not something a pull-time checksum can satisfy.
 
 **Auth level:** Admin only
 
@@ -1783,7 +1784,7 @@ Pull a raw disk image from a URL and register it under `name`. Both backends. On
 
 ### POST /api/machines/images/pull-tar
 
-Pull a tar-formatted image from a URL and register it under `name`. `machinectl` backend only.
+Not supported — a tar-formatted rootfs isn't a bootable disk image for a real hardware VM, so this always returns an error. Use `pull-raw` instead.
 
 **Auth level:** Admin only
 
@@ -1795,7 +1796,7 @@ Pull a tar-formatted image from a URL and register it under `name`. `machinectl`
 
 ### POST /api/machines/images/import-raw
 
-Import a raw disk image already present on the host filesystem. Both backends.
+Import a raw disk image already present on the host filesystem.
 
 **Auth level:** Admin only
 
@@ -1814,7 +1815,7 @@ Import a raw disk image already present on the host filesystem. Both backends.
 
 ### POST /api/machines/images/import-tar
 
-Import a tar-formatted image already present on the host filesystem. `machinectl` backend only.
+Not supported — same structural limitation as `pull-tar` above. Use `import-raw` instead.
 
 **Auth level:** Admin only
 
@@ -1826,7 +1827,7 @@ Import a tar-formatted image already present on the host filesystem. `machinectl
 
 ### POST /api/machines/images/:name/export-raw
 
-Export an image to a raw file at the given host path. Both backends.
+Export an image to a raw file at the given host path.
 
 **Auth level:** Admin only
 
@@ -1844,7 +1845,7 @@ Export an image to a raw file at the given host path. Both backends.
 
 ### POST /api/machines/images/:name/export-tar
 
-Export an image to a tar file at the given host path. `machinectl` backend only.
+Not supported — same structural limitation as `pull-tar` above. Use `export-raw` instead.
 
 **Auth level:** Admin only
 
@@ -1856,7 +1857,7 @@ Export an image to a tar file at the given host path. `machinectl` backend only.
 
 ### POST /api/machines/images/clean
 
-Clean hidden/cached images. `machinectl` backend only.
+Remove cached downloads (from `pull-raw`) no longer referenced by any catalog entry — e.g. after a rename or remove.
 
 **Auth level:** Admin only
 
@@ -1866,21 +1867,11 @@ Clean hidden/cached images. `machinectl` backend only.
 
 ### GET /api/machines/:name/ssh
 
-Get SSH connection information for a machine. Both backends, derived differently: `machinectl` reads systemd-vmspawn's own vsock-based `SSHAddress`/`SSHPrivateKeyPath` (key managed by systemd); `ephemera` resolves the VM's MAC (assigned at create time) to an IP via zyvor-fabricd's own DHCP lease file, so `key_path` is always `null` there — key management is the operator's own responsibility (e.g. via cloud-init) on that backend. Either way, all three fields are `null` if nothing is known yet (VM not running / no lease seen).
+Resolves the VM's MAC (assigned at create time) to an IP via zyvor-fabricd's own DHCP lease file. `key_path` is always `null` — key management is the operator's own responsibility (e.g. via cloud-init). All three fields are `null` if nothing is known yet (VM not running / no lease seen).
 
 **Auth level:** Viewer+
 
-**Response (200), machinectl:**
-
-```json
-{
-  "address": "192.168.1.100",
-  "key_path": "/var/lib/zyvor-fabricd/keys/my-vm",
-  "ssh_command": "ssh -i /var/lib/zyvor-fabricd/keys/my-vm 192.168.1.100"
-}
-```
-
-**Response (200), ephemera:**
+**Response (200):**
 
 ```json
 {
@@ -1901,7 +1892,7 @@ curl -s http://localhost:3000/api/machines/my-vm/ssh \
 
 ### POST /api/machines/:name/copy-to
 
-Copy a file from the host into a running machine. Both backends: `machinectl copy-to`, or Ephemera's vsock guest-agent `PutFile` op (requires the VM to have been created with the agent enabled; capped at 64MiB). `mode` is only consulted on the `ephemera` backend, which has no source file to inherit permission bits from — `machinectl` always preserves the source file's own mode.
+Copy a file from the host into a running machine, via Ephemera's vsock guest-agent `PutFile` op (requires the VM to have been created with the agent enabled; capped at 64MiB). `mode` defaults to the source file's own permission bits if not supplied.
 
 **Auth level:** Admin only
 
@@ -1930,7 +1921,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/copy-to \
 
 ### POST /api/machines/:name/copy-from
 
-Copy a file from a running machine to the host. Both backends: `machinectl copy-from`, or Ephemera's vsock guest-agent `GetFile` op (same agent-enabled requirement and 64MiB cap as `copy-to`). The file's mode on the guest is preserved on the host copy.
+Copy a file from a running machine to the host, via Ephemera's vsock guest-agent `GetFile` op (same agent-enabled requirement and 64MiB cap as `copy-to`). The file's mode on the guest is preserved on the host copy.
 
 **Auth level:** Admin only
 
@@ -2681,7 +2672,7 @@ curl -s -X DELETE http://localhost:3000/api/secrets/550e8400-e29b-41d4-a716-4466
 
 ## Log Aggregation
 
-Query logs from individual VMs or from the host system. Host system logs (`/api/logs`) are always retrieved via `journalctl`. Per-VM logs (`/api/vms/:name/logs`) go through the active VM driver: `journalctl` on the `machinectl` backend, or Ephemera's captured console output on the `ephemera` backend — both are drained through the same bounded-wait read, so this stays a one-shot fetch rather than a live tail.
+Query logs from individual VMs or from the host system. Host system logs (`/api/logs`) are always retrieved via `journalctl`. Per-VM logs (`/api/vms/:name/logs`) come from Ephemera's captured console output, drained through a bounded-wait read — a one-shot fetch, not a live tail.
 
 ### GET /api/vms/:name/logs
 

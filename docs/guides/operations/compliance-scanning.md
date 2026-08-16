@@ -91,7 +91,7 @@ The scan runs asynchronously. Use the scan ID or the results endpoint to check p
 ### Scan Prerequisites
 
 - The VM must be **running**. Stopped VMs cannot be scanned.
-- The scan connects to the VM via the machine shell interface (`machinectl shell` on the default backend, or the vsock guest agent on the `ephemera` backend). Ensure the VM is accessible through the active VM driver.
+- The scan connects to the VM via the vsock guest agent's shell interface. The VM must have been created with the guest agent enabled.
 - Only one scan can run against a given VM at a time.
 
 ---
