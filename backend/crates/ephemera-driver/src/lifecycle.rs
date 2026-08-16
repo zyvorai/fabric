@@ -167,9 +167,6 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
              — use CreateVmRequest.agent for the in-guest vsock agent instead"
         );
     }
-    if !opts.bind_mounts.is_empty() {
-        bail!("the ephemera backend does not support bind mounts (VMStartOptions.bind_mounts)");
-    }
     if !opts.extra_drives.is_empty() {
         bail!("the ephemera backend does not support extra drives (VMStartOptions.extra_drives)");
     }
@@ -218,5 +215,47 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         ttl_seconds: None,
         extra_args: vec![],
         agent: None,
+        shared_folders: opts
+            .bind_mounts
+            .iter()
+            .map(|bm| zyvor_fabric_ephemera_client::SharedFolder {
+                host_path: PathBuf::from(&bm.source),
+                guest_path: bm.destination.clone().unwrap_or_else(|| bm.source.clone()),
+                read_only: bm.read_only,
+            })
+            .collect(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vm_model::BindMount;
+
+    #[test]
+    fn bind_mounts_translate_to_shared_folders() {
+        let vm = VM::new("fixture".to_string(), "/tmp/base.qcow2".to_string(), 2, 2048);
+        let opts = VMStartOptions {
+            bind_mounts: vec![
+                BindMount { source: "/srv/data".to_string(), destination: Some("/mnt/data".to_string()), read_only: true },
+                BindMount { source: "/srv/scratch".to_string(), destination: None, read_only: false },
+            ],
+            ..Default::default()
+        };
+        let req = translate_start_options(&vm, &opts).unwrap();
+        assert_eq!(req.shared_folders.len(), 2);
+        assert_eq!(req.shared_folders[0].host_path, PathBuf::from("/srv/data"));
+        assert_eq!(req.shared_folders[0].guest_path, "/mnt/data");
+        assert!(req.shared_folders[0].read_only);
+        // No destination -> mounted at the same path inside the guest.
+        assert_eq!(req.shared_folders[1].guest_path, "/srv/scratch");
+        assert!(!req.shared_folders[1].read_only);
+    }
+
+    #[test]
+    fn no_bind_mounts_means_no_shared_folders() {
+        let vm = VM::new("fixture".to_string(), "/tmp/base.qcow2".to_string(), 2, 2048);
+        let req = translate_start_options(&vm, &VMStartOptions::default()).unwrap();
+        assert!(req.shared_folders.is_empty());
+    }
 }

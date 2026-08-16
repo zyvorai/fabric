@@ -13,9 +13,16 @@
 //! catalog, vsock guest agent, and a MAC-to-DHCP-lease lookup respectively
 //! for EphemeraDriver — see driver-core::{ImageDriver, ShellDriver}, and
 //! `ssh_info`'s doc comment for how SSH info specifically is derived on
-//! each backend). Only `bind` still shells out to machinectl directly —
-//! it isn't achievable for a real hardware VM the way it was for nspawn's
-//! shared-kernel containers (see the systemd-removal migration plan).
+//! each backend).
+//!
+//! There is no live bind-mount endpoint (the old `POST
+//! /api/machines/:name/bind` was removed) — a real hardware VM has no
+//! shared-kernel mount trick to piggyback a live bind onto the way nspawn
+//! did. The replacement is declared at VM-create time instead:
+//! `VMStartOptions.bind_mounts`, which both backends now honor (systemd-
+//! vmspawn's own `--bind`/`--bind-ro` for `machinectl`, a virtiofs share
+//! for `ephemera` — see `ephemera-driver::lifecycle`'s translation and the
+//! systemd-removal migration plan's bind-mount notes).
 
 use axum::{
     extract::{Path, State},
@@ -402,39 +409,6 @@ pub async fn copy_from_machine(
         .map(|_| StatusCode::OK)
         .map_err(|e| {
             tracing::error!("machined copy_from failed: {}", e);
-            crate::api_error::json_error_code(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "machined_connection",
-                "Machine service operation failed",
-            )
-        })
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BindRequest {
-    pub host_path: String,
-    pub machine_path: String,
-    #[serde(default)]
-    pub read_only: bool,
-}
-
-/// POST /api/machines/:name/bind - Bind mount host path into machine (Admin only)
-pub async fn bind_machine(
-    RequireAdmin(_claims): RequireAdmin,
-    Path(name): Path<String>,
-    Json(req): Json<BindRequest>,
-) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("machined::{}", stringify!(bind_machine));
-    validate_vm_name(&name)
-        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_host_path(&req.host_path)
-        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    validate_machine_path(&req.machine_path)
-        .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
-    machinectl::bind(&name, &req.host_path, &req.machine_path, req.read_only)
-        .map(|_| StatusCode::OK)
-        .map_err(|e| {
-            tracing::error!("machined bind failed: {}", e);
             crate::api_error::json_error_code(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "machined_connection",

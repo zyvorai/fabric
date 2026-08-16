@@ -9,7 +9,7 @@ This page covers the Ephemera backend specifically: what it wires up today, what
 
 ## When to choose it
 
-Pick `ephemera` when you want Zyvor Fabric running on a host with no systemd-machined/systemd-vmspawn stack at all, or when you want VM lifecycle backed by Ephemera's own QEMU/Cloud Hypervisor/Firecracker support directly. Stay on the default `machinectl` backend if you need vCPU pinning or hotplug (resizing a running VM) — neither is wired through the Ephemera driver yet (see [Known gaps](#known-gaps-as-of-ephemera-v010) below).
+Pick `ephemera` when you want Zyvor Fabric running on a host with no systemd-machined/systemd-vmspawn stack at all, or when you want VM lifecycle backed by Ephemera's own QEMU/Cloud Hypervisor/Firecracker support directly. Stay on the default `machinectl` backend if you need a pluggable storage backend (LVM thin/NBD/Ceph RBD) or per-VM network namespaces — neither is wired through the Ephemera driver yet (see [Known gaps](#known-gaps-as-of-ephemera-v010) below); CPU pinning, hotplug, shell/SSH/file-copy, and bind-mount-via-virtiofs all work on both backends today.
 
 ## Configuration
 
@@ -30,14 +30,19 @@ The `ephemera-driver`/`ephemera-client` crates (`backend/crates/`) implement `dr
 | --- | --- | --- |
 | Create, list, get, resolve by name | `VMDriver` | `POST`/`GET /v1/vms`, `GET /v1/vms?name=` |
 | Start, stop, pause, resume, delete | `VMDriver` | `/v1/vms/{id}/{start,stop,pause,resume}`, `DELETE /v1/vms/{id}` |
-| Shell exec (no SSH) | `ShellDriver` | `POST /v1/vms/{id}/agent` — over Ephemera's vsock guest agent |
-| CPU/memory/IO/pids/cpuset limits | `ResourceControlDriver` | `POST /v1/vms/{id}/resources` |
+| Hotplug (CPU/memory/disk/nic) | — | Generic — resolves `VMDriver::get_control_socket` and speaks QMP directly, no Ephemera-specific wiring needed |
+| CPU pinning (cgroup cpuset) | `ResourceControlDriver::{set,get}_cpuset` | `POST /v1/vms/{id}/resources`, `GET /v1/vms/{id}/cpuset` |
+| CPU/memory/IO/pids limits | `ResourceControlDriver` | `POST /v1/vms/{id}/resources` |
 | Point-in-time usage + PSI pressure | `ResourceStatsDriver` | `GET /v1/vms/{id}/{stats,pressure}` |
 | Freeze/thaw (cgroup v2 freezer) | — | `POST /v1/vms/{id}/{freeze,thaw}`, `GET .../frozen` |
 | Live console log streaming | `LogDriver` | `GET /v1/vms/{id}/logs?follow=true` |
-| Image catalog CRUD | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export |
+| Shell exec (no SSH needed) | `ShellDriver::shell` | `POST /v1/vms/{id}/agent` — over Ephemera's vsock guest agent |
+| File copy to/from the guest | `ShellDriver::{copy_to,copy_from}` | `POST /v1/vms/{id}/agent/{put,get}-file` — same vsock agent, base64-in-one-request, capped at 64MiB |
+| SSH info | — | Resolves the VM's MAC (pinned at create time) to an IP via zyvor-fabricd's own DHCP lease file — no vsock/Ephemera call at all. `key_path` is always `null`; key management is the operator's own responsibility (e.g. cloud-init) |
+| Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
+| Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
 
-Log streaming's one fidelity reduction versus `MachinectlDriver`: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority.
+Log streaming's one fidelity reduction versus `MachinectlDriver`: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` stay `machinectl`-only permanently, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM the way it was for nspawn's shared-kernel containers, so "porting" it would mean building a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
 
 ## Known gaps (as of Ephemera v0.1.0)
 

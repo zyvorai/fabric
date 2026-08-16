@@ -162,7 +162,22 @@ pub struct CreateVmRequest {
     pub extra_args: Vec<String>,
     #[serde(default)]
     pub agent: Option<AgentSpec>,
+    #[serde(default)]
+    pub shared_folders: Vec<SharedFolder>,
 }
+
+/// A host directory shared into the guest via virtiofs, declared at create
+/// time — see Ephemera's own `ephemera_core::model::SharedFolder` doc
+/// comment for why this replaces `machinectl bind`'s live mount instead of
+/// having a live equivalent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedFolder {
+    pub host_path: PathBuf,
+    pub guest_path: String,
+    #[serde(default)]
+    pub read_only: bool,
+}
+
 fn default_vcpus() -> u8 {
     2
 }

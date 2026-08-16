@@ -879,7 +879,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/machines/{name}/copy-from",
             post(api::machined::copy_from_machine),
         )
-        .route("/machines/{name}/bind", post(api::machined::bind_machine))
         // Plugin routes
         .route("/plugins", get(plugins::list_plugins))
         // Resource optimization routes
