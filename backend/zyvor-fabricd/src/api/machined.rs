@@ -7,14 +7,17 @@
 //! Exposes systemd-machined functionality: machine lifecycle, image management,
 //! file transfer, SSH, and shell execution.
 //!
-//! Machine lifecycle, property queries, and image management go through
-//! `state.driver` (native D-Bus for MachinectlDriver, Ephemera's image
-//! catalog for EphemeraDriver — see driver-core::ImageDriver). Shell/SSH/
-//! copy/bind still shell out to machinectl directly — Ephemera has no
-//! equivalent yet (needs SSH-into-guest or a console/PTY endpoint for
-//! shell, a vsock guest-agent file-transfer extension for copy, and bind
-//! isn't achievable for a real hardware VM the way it was for nspawn's
-//! shared-kernel containers — see the systemd-removal migration plan).
+//! Machine lifecycle, property queries, image management, shell exec, and
+//! SSH info all go through `state.driver` and work on both backends (native
+//! D-Bus/CLI for MachinectlDriver; Ephemera's image catalog, vsock guest
+//! agent, and a MAC-to-DHCP-lease lookup respectively for EphemeraDriver —
+//! see driver-core::{ImageDriver, ShellDriver}, and `ssh_info`'s doc comment
+//! for how SSH info specifically is derived on each backend). Only
+//! copy-to/copy-from and bind still shell out to machinectl directly —
+//! Ephemera has no equivalent yet (needs a vsock guest-agent file-transfer
+//! extension for copy; bind isn't achievable for a real hardware VM the way
+//! it was for nspawn's shared-kernel containers — see the systemd-removal
+//! migration plan).
 
 use axum::{
     extract::{Path, State},
@@ -264,13 +267,48 @@ pub struct SshInfo {
 }
 
 /// GET /api/machines/:name/ssh - Get SSH connection info
+///
+/// `machinectl` backend: systemd-vmspawn's own vsock-based SSH
+/// (`SSHAddress`/`SSHPrivateKeyPath` machine properties, key managed by
+/// systemd). `ephemera` backend: no vsock SSH equivalent, so this instead
+/// resolves the VM's MAC (assigned at create time — see
+/// `EphemeraDriver::get_mac_address`) to a network IP via zyvor-fabricd's
+/// own DHCP lease file. Key management isn't something Ephemera or this
+/// lookup can speak to, so `key_path` is always `None` on that backend —
+/// the operator's own responsibility (e.g. injected via cloud-init).
 pub async fn ssh_info(
     RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<SshInfo>, (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!("machined::{}", stringify!(ssh_info));
     validate_vm_name(&name)
         .map_err(|(_s, msg)| crate::api_error::json_error(StatusCode::BAD_REQUEST, msg))?;
+
+    if state.driver.backend_name() == "ephemera" {
+        let mac = state.driver.get_mac_address(&name).await.map_err(|e| {
+            tracing::error!("ephemera get_mac_address failed: {}", e);
+            crate::api_error::json_error_code(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "machined_connection",
+                "Machine service operation failed",
+            )
+        })?;
+        let address = match &mac {
+            Some(mac) => state.dnsmasq_manager.lookup_lease_by_mac(mac).await.map_err(|e| {
+                tracing::error!("dnsmasq lease lookup failed: {}", e);
+                crate::api_error::json_error_code(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "machined_connection",
+                    "Machine service operation failed",
+                )
+            })?,
+            None => None,
+        };
+        let ssh_command = address.as_ref().map(|addr| format!("ssh {addr}"));
+        return Ok(Json(SshInfo { address, key_path: None, ssh_command }));
+    }
+
     let address = machinectl::ssh_address(&name).map_err(|e| {
         tracing::error!("machined ssh_address failed: {}", e);
         crate::api_error::json_error_code(

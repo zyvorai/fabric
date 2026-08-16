@@ -100,6 +100,14 @@ pub trait VMDriver: Send + Sync {
     /// `None` for a machine with no QMP-capable monitor socket (e.g. not
     /// currently running, or a backend/hypervisor with no QMP equivalent).
     async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
+
+    /// The MAC address the machine's primary NIC was launched with, if
+    /// known. `MachinectlDriver` has no use for this (its own SSH info
+    /// comes from systemd-vmspawn's vsock-based `SSHAddress`, not a network
+    /// lookup) and returns `None`; `EphemeraDriver` returns the MAC it
+    /// assigned at create time, which callers can resolve to an IP via a
+    /// DHCP lease lookup.
+    async fn get_mac_address(&self, name: &str) -> Result<Option<String>>;
 }
 
 /// Resource metrics collection from cgroup v2.

@@ -224,6 +224,10 @@ impl VMDriver for MachinectlDriver {
         let path = std::path::PathBuf::from(format!("/run/systemd/vmspawn/{name}/qemu.sock"));
         Ok(if path.exists() { Some(path) } else { None })
     }
+
+    async fn get_mac_address(&self, _name: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
 }
 
 /// Map machined state strings to our VMState enum.

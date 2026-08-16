@@ -1866,17 +1866,27 @@ Clean hidden/cached images. `machinectl` backend only.
 
 ### GET /api/machines/:name/ssh
 
-Get SSH connection information for a machine. `machinectl` backend only.
+Get SSH connection information for a machine. Both backends, derived differently: `machinectl` reads systemd-vmspawn's own vsock-based `SSHAddress`/`SSHPrivateKeyPath` (key managed by systemd); `ephemera` resolves the VM's MAC (assigned at create time) to an IP via zyvor-fabricd's own DHCP lease file, so `key_path` is always `null` there — key management is the operator's own responsibility (e.g. via cloud-init) on that backend. Either way, all three fields are `null` if nothing is known yet (VM not running / no lease seen).
 
 **Auth level:** Viewer+
 
-**Response (200):**
+**Response (200), machinectl:**
 
 ```json
 {
   "address": "192.168.1.100",
   "key_path": "/var/lib/zyvor-fabricd/keys/my-vm",
   "ssh_command": "ssh -i /var/lib/zyvor-fabricd/keys/my-vm 192.168.1.100"
+}
+```
+
+**Response (200), ephemera:**
+
+```json
+{
+  "address": "10.0.0.42",
+  "key_path": null,
+  "ssh_command": "ssh 10.0.0.42"
 }
 ```
 

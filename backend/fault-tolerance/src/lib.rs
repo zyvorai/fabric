@@ -821,6 +821,9 @@ mod tests {
         async fn get_control_socket(&self, _name: &str) -> Result<Option<std::path::PathBuf>> {
             Ok(None)
         }
+        async fn get_mac_address(&self, _name: &str) -> Result<Option<String>> {
+            Ok(None)
+        }
     }
 
     #[async_trait::async_trait]

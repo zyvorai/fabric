@@ -13,6 +13,12 @@ use zyvor_fabric_ephemera_client::{BackendKind, CreateVmRequest, NetworkSpec, Vm
 
 use crate::EphemeraDriver;
 
+fn generate_mac_address() -> String {
+    use rand::Rng;
+    let mut rng = rand::rng();
+    format!("52:54:00:{:02x}:{:02x}:{:02x}", rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>())
+}
+
 #[async_trait]
 impl VMDriver for EphemeraDriver {
     async fn start(&self, name: &str) -> Result<()> {
@@ -93,6 +99,13 @@ impl VMDriver for EphemeraDriver {
 
     async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
         Ok(self.resolve(name).await?.control_socket)
+    }
+
+    async fn get_mac_address(&self, name: &str) -> Result<Option<String>> {
+        Ok(match self.resolve(name).await?.request.network {
+            NetworkSpec::Tap { mac, .. } => mac,
+            _ => None,
+        })
     }
 }
 
@@ -179,7 +192,12 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         .map_err(|_| anyhow::anyhow!("vcpu count {} exceeds the ephemera backend's limit", vm.cpus))?;
 
     let network = if opts.network_tap {
-        NetworkSpec::Tap { tap_name: None, bridge: None, mac: vm.mac_address.clone() }
+        // Always pin an explicit MAC rather than letting QEMU auto-assign
+        // one: Ephemera never persists an auto-generated MAC anywhere on
+        // VmRecord, so a later ssh_info lookup (get_mac_address, below)
+        // would have nothing to resolve to a DHCP-leased IP.
+        let mac = vm.mac_address.clone().unwrap_or_else(generate_mac_address);
+        NetworkSpec::Tap { tap_name: None, bridge: None, mac: Some(mac) }
     } else {
         NetworkSpec::User { forwards: vec![] }
     };

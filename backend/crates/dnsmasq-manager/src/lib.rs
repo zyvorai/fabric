@@ -120,6 +120,38 @@ impl DnsmasqManager {
     fn lease_path(&self, bridge: &str) -> PathBuf {
         self.run_dir.join(format!("{bridge}.leases"))
     }
+
+    /// Look up the current DHCP-leased IP for a MAC address, across every
+    /// bridge this manager has a lease file for — the caller doesn't
+    /// necessarily know which bridge a given VM's tap landed on. Each
+    /// dnsmasq lease-file line is `<expiry-epoch> <mac> <ip> <hostname>
+    /// <client-id>`; returns the first match, case-insensitively (dnsmasq
+    /// writes MACs lowercase, but a caller-supplied MAC might not be).
+    pub async fn lookup_lease_by_mac(&self, mac: &str) -> Result<Option<String>> {
+        let mac = mac.to_ascii_lowercase();
+        let mut entries = match tokio::fs::read_dir(&self.run_dir).await {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e).with_context(|| format!("reading {}", self.run_dir.display())),
+        };
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("leases") {
+                continue;
+            }
+            let Ok(content) = tokio::fs::read_to_string(&path).await else { continue };
+            for line in content.lines() {
+                let mut fields = line.split_whitespace();
+                let _expiry = fields.next();
+                let Some(line_mac) = fields.next() else { continue };
+                let Some(ip) = fields.next() else { continue };
+                if line_mac.eq_ignore_ascii_case(&mac) {
+                    return Ok(Some(ip.to_string()));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 fn render_config(cfg: &DhcpConfig, pid_path: &Path, lease_path: &Path) -> Result<String> {
@@ -216,5 +248,31 @@ mod tests {
         c.pool_offset = 200;
         c.pool_size = 100; // 200 + 99 = 299 > 254
         assert!(render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).is_err());
+    }
+
+    #[tokio::test]
+    async fn lookup_lease_by_mac_finds_across_bridges_case_insensitively() {
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join("br0.leases"),
+            "1234567890 aa:bb:cc:dd:ee:ff 10.0.0.42 my-vm 01:aa:bb:cc:dd:ee:ff\n",
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(dir.path().join("br1.leases"), "").await.unwrap();
+
+        let mgr = DnsmasqManager::new(dir.path());
+        assert_eq!(
+            mgr.lookup_lease_by_mac("AA:BB:CC:DD:EE:FF").await.unwrap(),
+            Some("10.0.0.42".to_string())
+        );
+        assert_eq!(mgr.lookup_lease_by_mac("00:00:00:00:00:00").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn lookup_lease_by_mac_missing_run_dir_returns_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let mgr = DnsmasqManager::new(dir.path().join("does-not-exist"));
+        assert_eq!(mgr.lookup_lease_by_mac("aa:bb:cc:dd:ee:ff").await.unwrap(), None);
     }
 }
