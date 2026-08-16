@@ -803,10 +803,20 @@ impl tokio::io::AsyncWrite for ConsoleWs {
         if let Err(e) = std::task::ready!(self.stream.poll_ready_unpin(cx)) {
             return std::task::Poll::Ready(Err(std::io::Error::other(e)));
         }
-        match self.stream.start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(buf.to_vec().into())) {
-            Ok(()) => std::task::Poll::Ready(Ok(buf.len())),
-            Err(e) => std::task::Poll::Ready(Err(std::io::Error::other(e))),
+        if let Err(e) = self.stream.start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(buf.to_vec().into())) {
+            return std::task::Poll::Ready(Err(std::io::Error::other(e)));
         }
+        // `start_send` only queues the frame in the WS sink; nothing puts
+        // it on the wire until a flush. Callers that just call
+        // `write_all` — the normal, expected-to-be-sufficient pattern for
+        // any other AsyncWrite (a socket, a file) — would otherwise have
+        // their bytes sit queued forever with no error and no visible
+        // symptom until the connection eventually tears down. Best-effort
+        // opportunistic flush here (ignoring `Pending`/errors, which the
+        // caller's own next real write/flush/drop will surface) matches
+        // the semantics callers actually expect.
+        let _ = self.stream.poll_flush_unpin(cx);
+        std::task::Poll::Ready(Ok(buf.len()))
     }
     fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
         use futures::SinkExt;

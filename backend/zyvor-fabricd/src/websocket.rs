@@ -160,12 +160,21 @@ async fn handle_console(
             match timeout(IDLE_TIMEOUT, ws_receiver.next()).await {
                 Ok(Some(msg)) => match msg {
                     Ok(Message::Text(text)) => {
-                        if console_tx.write_all(text.as_bytes()).await.is_err() {
+                        // `write_all` alone doesn't reach the guest:
+                        // `ConsoleWs::poll_write` only queues the frame via
+                        // the underlying WS sink's `start_send` — nothing
+                        // actually puts it on the wire until `flush`. Found
+                        // live: without this, `write_all` reports success
+                        // (the queue accepted it) but the guest never sees
+                        // a byte, silently and with no error anywhere.
+                        if console_tx.write_all(text.as_bytes()).await.is_err()
+                            || console_tx.flush().await.is_err()
+                        {
                             break;
                         }
                     }
                     Ok(Message::Binary(data)) => {
-                        if console_tx.write_all(&data).await.is_err() {
+                        if console_tx.write_all(&data).await.is_err() || console_tx.flush().await.is_err() {
                             break;
                         }
                     }
