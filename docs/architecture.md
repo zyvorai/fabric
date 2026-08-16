@@ -199,7 +199,8 @@ systemd is no longer required to install or run zyvor-fabricd -- packaging has n
 | Unit | Purpose |
 |------|---------|
 | `zyvor-fabricd.service` | Main daemon (`Type=simple`; systemd hardening via `ProtectSystem=strict`, capability bounding -- no socket activation, no watchdog) |
-| `vm@.service` | Per-VM service template (machinectl driver backend only) |
+
+VMs themselves are never systemd units -- their lifecycle is owned by [Ephemera](https://github.com/hypersdk/ephemera), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly (see [the Ephemera driver guide](guides/vm-drivers/ephemera.md)). There is no per-VM systemd unit template.
 
 ## Security Model
 

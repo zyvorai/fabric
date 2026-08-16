@@ -5,8 +5,6 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
-    libsystemd-dev \
-    libdbus-1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/ ./
@@ -17,7 +15,6 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    libsystemd0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/storage /etc/zyvor-fabricd

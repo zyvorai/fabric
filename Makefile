@@ -52,7 +52,6 @@ install-conf:
 install-systemd:
 	install -d $(DESTDIR)$(UNITDIR)
 	install -m 0644 systemd/zyvor-fabricd.service $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
-	install -m 0644 systemd/vm@.service           $(DESTDIR)$(UNITDIR)/vm@.service
 
 install-libexec:
 	install -d $(DESTDIR)$(LIBEXECDIR)

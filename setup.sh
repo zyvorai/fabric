@@ -267,7 +267,7 @@ install_systemd() {
     # otherwise wire them up.
     local unit_dir="${INSTALL_PREFIX}/lib/systemd/system"
     install -d "${unit_dir}"
-    for unit in zyvor-fabricd.service vm@.service; do
+    for unit in zyvor-fabricd.service; do
         if [[ -f "${SCRIPT_DIR}/systemd/${unit}" ]]; then
             install -m 0644 "${SCRIPT_DIR}/systemd/${unit}" "${unit_dir}/${unit}"
             info "  Installed ${unit}"

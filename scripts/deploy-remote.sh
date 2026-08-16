@@ -528,7 +528,7 @@ if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
     echo \"  ✅ listen bound to \${BIND}:\${API_PORT}\"
 fi
 
-for unit in zyvor-fabricd.service vm@.service; do
+for unit in zyvor-fabricd.service; do
     [ -f \"systemd/\$unit\" ] && \$SUDO install -m 644 \"systemd/\$unit\" \"/usr/lib/systemd/system/\$unit\"
 done
 if [ -f configs/pam.d/zyvor-fabricd ]; then

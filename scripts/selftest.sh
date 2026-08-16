@@ -88,11 +88,6 @@ if command -v systemctl &>/dev/null; then
         warn "zyvor-fabricd.service: not installed (fine — it's optional)"
     fi
 
-    if systemctl list-unit-files vm@.service &>/dev/null 2>&1; then
-        pass "vm@.service: installed"
-    else
-        warn "vm@.service: not installed (optional)"
-    fi
 
     # Only relevant to the "machinectl" driver backend — the "ephemera"
     # backend has no systemd-machined dependency at all.

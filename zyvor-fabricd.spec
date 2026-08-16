@@ -11,14 +11,14 @@ BuildRequires:  cargo
 BuildRequires:  rust
 BuildRequires:  nodejs
 BuildRequires:  npm
-Recommends:     systemd-container
 Recommends:     nftables
 Recommends:     wireguard-tools
 
 %description
-zyvor-fabricd is a daemon for managing virtual machines, with a pluggable
-VM lifecycle driver (systemd-vmspawn/systemd-machined, or Ephemera — see
-driver.backend in zyvor-fabricd.toml). Provides REST API, WebSocket
+zyvor-fabricd is a daemon for managing virtual machines, with VM lifecycle
+handled by Ephemera (https://github.com/hypersdk/ephemera), a standalone
+disposable-VM control plane with no systemd dependency of its own — see
+driver.ephemera_url in zyvor-fabricd.toml. Provides REST API, WebSocket
 console, VNC proxy, and comprehensive VM lifecycle management. Runs under
 systemd or any other supervisor — nothing in this package requires it.
 
@@ -64,10 +64,9 @@ exit 0
 %{_bindir}/zyvorctl
 %{_bindir}/zyvorctl-tui
 # Optional: for operators who choose to run zyvor-fabricd under systemd.
-# Nothing in this package enables, starts, or otherwise wires these up —
+# Nothing in this package enables, starts, or otherwise wires this up —
 # that's a manual `systemctl enable --now zyvor-fabricd.service`.
 /usr/lib/systemd/system/zyvor-fabricd.service
-/usr/lib/systemd/system/vm@.service
 %{_libexecdir}/%{name}/backup-vms
 %{_libexecdir}/%{name}/cleanup-store
 %{_libexecdir}/%{name}/health-check

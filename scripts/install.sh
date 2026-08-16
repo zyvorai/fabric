@@ -49,7 +49,6 @@ sudo install -d /var/log/zyvor-fabricd
 # operators who choose to supervise it that way).
 sudo install -d /usr/lib/systemd/system
 sudo install -m 0644 systemd/zyvor-fabricd.service /usr/lib/systemd/system/zyvor-fabricd.service
-sudo install -m 0644 systemd/vm@.service      /usr/lib/systemd/system/vm@.service
 if command -v systemctl &>/dev/null; then
     sudo systemctl daemon-reload
 fi
