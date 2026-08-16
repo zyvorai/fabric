@@ -8,10 +8,27 @@
 //! properties/leader-pid map directly onto Ephemera's REST API (Phase 3).
 //! `ResourceControlDriver`/`ResourceStatsDriver` are backed by Ephemera's
 //! cgroup-delegation extension (Phase 5, see `resource_control.rs`).
-//! `LogDriver` still errors — Ephemera has no log-streaming endpoint yet.
-//! Callers needing it (`api/logs.rs`, `websocket.rs`) stay on the
-//! `MachinectlDriver` path until that lands, selected by zyvor-fabricd's
+//! `LogDriver` streams real captured console output over Ephemera's
+//! `GET /v1/vms/{id}/logs` (see `resource_control.rs`'s `stream_logs` impl) —
+//! `api/logs.rs`/`websocket.rs` dispatch through `state.driver` generically,
+//! so this needs no special-casing there; the only fidelity reduction versus
+//! `MachinectlDriver` is that raw serial console output has no
+//! journald-equivalent per-line priority/unit metadata, so every entry is
+//! stamped uniformly (see that impl's comment). Selected by zyvor-fabricd's
 //! `driver = "machinectl" | "ephemera"` config flag.
+//!
+//! **Known gap as of Ephemera v0.1.0**: `ephemera-client`'s wire types are a
+//! hand-synced mirror of `ephemera-core::model` (see that crate's own doc
+//! comment for why), and haven't yet picked up several fields/capabilities
+//! Ephemera has since grown — `CreateVmRequest.storage` (LVM thin/NBD/Ceph
+//! RBD backends), `NetworkSpec::Tap.netns` (per-VM network namespaces), and
+//! `VmRecord`'s `jail_path`/`vsock_socket`/`lvm_lv`/`nbd_pid` fields. Every
+//! VM created through this driver still gets Ephemera's default qcow2/raw
+//! storage and shared-bridge networking — those newer per-VM choices simply
+//! aren't reachable through `driver-core` yet. Also orthogonal to this
+//! driver entirely: Ephemera's `ephemera-kube` Kubernetes CRD/operator and
+//! `ephemera-agent` distributed fleet registry are separate ways to run
+//! Ephemera, not something this REST-client-based driver consumes.
 
 mod images;
 mod lifecycle;

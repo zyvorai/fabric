@@ -21,6 +21,15 @@
 //! it, and stays a no-op against a deployment that leaves `auth.tokens`
 //! empty (auth off — today's default posture, see the migration plan's
 //! "Auth boundary" note).
+//!
+//! As of Ephemera v0.1.0, `CreateVmRequest`/`VmRecord` here are missing the
+//! fields behind its newer per-VM storage backends (`storage`: LVM thin/NBD/
+//! Ceph RBD), per-VM network namespaces (`NetworkSpec::Tap.netns`), and the
+//! Firecracker-jailer/vsock-proxy bookkeeping (`jail_path`, `vsock_socket`,
+//! `lvm_lv`, `nbd_pid`) — see `ephemera-driver`'s crate doc comment for the
+//! full gap list. Every VM created through this client still gets Ephemera's
+//! default qcow2/raw storage and shared-bridge networking until those fields
+//! are added here.
 
 use std::path::PathBuf;
 

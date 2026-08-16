@@ -8,6 +8,7 @@ Private cloud control plane with a pluggable VM driver (systemd-machined/systemd
 |------|----------|
 | Main README | [README.md](../README.md) |
 | **User journeys & acceptance criteria** | [User Stories](USER_STORIES.md) |
+| **Ephemera VM driver** — config, capability matrix, known gaps | [guides/vm-drivers/ephemera.md](guides/vm-drivers/ephemera.md) |
 
 ## User Stories
 
@@ -30,6 +31,7 @@ Part of the [Zyvor / HyperSDK platform stack](https://zyvor.dev):
 | **zeus-os (v9s)** | Cloud / KubeVirt control plane |
 | **forge** | AI infrastructure on K8s |
 | **hypersdk / hyper2kvm** | VM migration |
+| **ephemera** | Disposable-VM control plane — optional VM driver backend (see [above](guides/vm-drivers/ephemera.md)) |
 | **guestkit** | Offline VM assurance |
 | **packetwolf** | Network intelligence |
 | **Aether** | Runtime portability |

@@ -1028,12 +1028,16 @@ name = "fault-tolerance"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
  "uuid",
+ "vm-model",
+ "zyvor-fabric-driver-core",
 ]
 
 [[package]]
@@ -1865,6 +1869,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+ "zyvor-fabric-driver-core",
 ]
 
 [[package]]
@@ -3127,12 +3132,16 @@ name = "site-recovery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
  "uuid",
+ "vm-model",
+ "zyvor-fabric-driver-core",
 ]
 
 [[package]]
@@ -3969,6 +3978,7 @@ dependencies = [
  "zbus",
  "zyvor-fabric-cgroup",
  "zyvor-fabric-driver-core",
+ "zyvor-fabric-vm-driver",
 ]
 
 [[package]]
@@ -4000,10 +4010,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "networking",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
  "uuid",
 ]
@@ -4573,6 +4585,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "zyvor-fabric-dnsmasq-manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "zyvor-fabric-driver-core"
 version = "0.1.0"
 dependencies = [
@@ -4590,11 +4611,14 @@ name = "zyvor-fabric-ephemera-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "chrono",
+ "futures",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
@@ -4605,6 +4629,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
+ "futures",
  "tokio",
  "tracing",
  "vm-model",
@@ -4735,6 +4761,7 @@ dependencies = [
  "sha2",
  "site-recovery",
  "state-store",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "tokio-stream",
@@ -4752,6 +4779,7 @@ dependencies = [
  "vmspawnd-machinectl-driver",
  "vnc-proxy",
  "vpn-mesh",
+ "zyvor-fabric-dnsmasq-manager",
  "zyvor-fabric-driver-core",
  "zyvor-fabric-ephemera-driver",
  "zyvor-fabric-lock-manager",

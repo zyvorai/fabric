@@ -32,7 +32,7 @@ sudo systemctl enable --now zyvor-fabricd
 
 ### 1. Pluggable VM Driver (Not a Custom Hypervisor)
 
-Zyvor Fabric defaults to systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution with systemd — and can also run entirely without systemd via Ephemera, its own disposable-VM engine. This means:
+Zyvor Fabric defaults to systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution with systemd — and can also run entirely without systemd via Ephemera, its own disposable-VM engine (see [the Ephemera driver guide](guides/vm-drivers/ephemera.md) for what's wired up and what isn't yet). This means:
 
 - No custom kernel modules or hypervisor patches
 - On the `machinectl` backend, VMs are first-class systemd units with journal logging
