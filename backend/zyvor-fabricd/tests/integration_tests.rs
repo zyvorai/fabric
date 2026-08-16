@@ -230,7 +230,10 @@ async fn test_list_vms() {
 
 // ─── Networkd API ────────────────────────────────────────────────────────────
 
-#[tokio::test]
+// `block_in_place` (used by `networking`'s netlink calls) requires a
+// multi-threaded runtime — the default `#[tokio::test]` flavor is
+// current-thread and panics on it.
+#[tokio::test(flavor = "multi_thread")]
 async fn test_networkd_bridge_lifecycle() {
     let app = common::create_test_app().await;
 

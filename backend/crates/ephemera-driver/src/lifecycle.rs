@@ -214,7 +214,12 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         cloud_init: None,
         ttl_seconds: None,
         extra_args: vec![],
-        agent: None,
+        // Enabled by default: needed for ShellDriver::shell, ConsoleDriver,
+        // and file copy to work on any VM without a separate opt-in. Was
+        // gated off pending a real, live-verified fix for an intermittent
+        // guest-agent vsock listener bug — see Ephemera's README
+        // ("Interactive console" section) and docs/guides/vm-drivers/ephemera.md.
+        agent: Some(zyvor_fabric_ephemera_client::AgentSpec { enabled: true, ..Default::default() }),
         shared_folders: opts
             .bind_mounts
             .iter()

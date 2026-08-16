@@ -16,7 +16,7 @@ See [Ephemera's own README](https://github.com/hypersdk/ephemera#readme) for run
 
 ## What's wired today
 
-The `ephemera-driver`/`ephemera-client` crates (`backend/crates/`) implement `driver-core`'s trait family against Ephemera's REST API:
+The `ephemera-driver`/`ephemera-client` crates (`backend/crates/`) implement `driver-core`'s trait family against Ephemera's REST API. Every VM this driver creates requests Ephemera's vsock guest agent (`CreateVmRequest.agent.enabled: true`) by default, so shell exec, console, and file copy below work without any extra opt-in — Ephemera bakes in the agent and its auth token at create time, transparent to the caller.
 
 | Capability | `driver-core` trait | Ephemera endpoint(s) |
 | --- | --- | --- |
