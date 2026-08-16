@@ -205,6 +205,21 @@ pub enum DisplayType {
     None,
 }
 
+/// A single host-port -> guest-port forward for user-mode (SLIRP)
+/// networking — the cheap way to reach one VM's SSH/service from outside
+/// the host without bridged networking + nftables floating IPs. Ignored
+/// by backends/options that use `network_tap` instead.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PortForwardSpec {
+    pub host_port: u16,
+    pub guest_port: u16,
+    #[serde(default = "default_port_forward_protocol")]
+    pub protocol: String,
+}
+fn default_port_forward_protocol() -> String {
+    "tcp".to_string()
+}
+
 /// Options for starting a VM via systemd-vmspawn
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct VMStartOptions {
@@ -250,6 +265,10 @@ pub struct VMStartOptions {
     /// Use user mode networking
     #[serde(default)]
     pub network_user_mode: bool,
+    /// Host-port -> guest-port forwards for user-mode networking. Ignored
+    /// when `network_tap` is set.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub port_forwards: Vec<PortForwardSpec>,
     /// Firmware definition file path
     #[serde(skip_serializing_if = "Option::is_none")]
     pub firmware: Option<String>,
@@ -725,6 +744,27 @@ impl VMStartOptions {
             }
         }
 
+        {
+            let mut seen_host_ports = std::collections::HashSet::new();
+            for (i, fwd) in self.port_forwards.iter().enumerate() {
+                if fwd.host_port == 0 || fwd.guest_port == 0 {
+                    errors.push(format!("port_forwards[{}]: ports must be non-zero", i));
+                }
+                if !matches!(fwd.protocol.as_str(), "tcp" | "udp") {
+                    errors.push(format!(
+                        "port_forwards[{}].protocol must be 'tcp' or 'udp', got '{}'",
+                        i, fwd.protocol
+                    ));
+                }
+                if !seen_host_ports.insert(fwd.host_port) {
+                    errors.push(format!(
+                        "port_forwards[{}]: host_port {} is forwarded more than once",
+                        i, fwd.host_port
+                    ));
+                }
+            }
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -994,6 +1034,7 @@ mod tests {
             initrd: vec!["/boot/initrd.img".into()],
             network_tap: true,
             network_user_mode: false,
+            port_forwards: vec![PortForwardSpec { host_port: 2222, guest_port: 22, protocol: "tcp".into() }],
             firmware: Some("/usr/share/ovmf/OVMF.fd".into()),
             discard_disk: Some(true),
             grow_image: Some("50G".into()),

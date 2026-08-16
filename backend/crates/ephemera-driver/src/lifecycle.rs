@@ -9,7 +9,7 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
-use zyvor_fabric_ephemera_client::{BackendKind, CreateVmRequest, NetworkSpec, VmRecord, VmStatus};
+use zyvor_fabric_ephemera_client::{BackendKind, CreateVmRequest, NetworkSpec, PortForward, VmRecord, VmStatus};
 
 use crate::EphemeraDriver;
 
@@ -200,7 +200,17 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         let mac = vm.mac_address.clone().unwrap_or_else(generate_mac_address);
         NetworkSpec::Tap { tap_name: None, bridge: None, mac: Some(mac) }
     } else {
-        NetworkSpec::User { forwards: vec![] }
+        NetworkSpec::User {
+            forwards: opts
+                .port_forwards
+                .iter()
+                .map(|f| PortForward {
+                    host_port: f.host_port,
+                    guest_port: f.guest_port,
+                    protocol: f.protocol.clone(),
+                })
+                .collect(),
+        }
     };
 
     Ok(CreateVmRequest {
