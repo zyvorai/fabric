@@ -277,6 +277,8 @@ pub struct CatalogEntry {
     pub signature: Option<String>,
     #[serde(default)]
     pub signature_valid: Option<bool>,
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -304,6 +306,16 @@ struct CloneCatalogEntryRequest {
 #[derive(Debug, Serialize)]
 struct ExportCatalogEntryRequest {
     path: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+struct SetCatalogReadOnlyRequest {
+    read_only: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct CleanCatalogResponse {
+    removed: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -604,6 +616,27 @@ impl EphemeraClient {
             .send()
             .await?;
         Self::expect_no_content(resp).await
+    }
+
+    /// `POST /v1/images/catalog/{name}/read-only`
+    pub async fn set_catalog_read_only(&self, name: &str, read_only: bool) -> Result<CatalogEntry> {
+        let req = SetCatalogReadOnlyRequest { read_only };
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/read-only"))?))
+            .json(&req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/images/catalog/clean` — returns the filenames removed.
+    pub async fn clean_catalog(&self) -> Result<Vec<String>> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/images/catalog/clean")?))
+            .send()
+            .await?;
+        let body: CleanCatalogResponse = Self::parse(resp).await?;
+        Ok(body.removed)
     }
 
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {

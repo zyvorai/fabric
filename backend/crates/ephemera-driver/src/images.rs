@@ -27,9 +27,7 @@ impl ImageDriver for EphemeraDriver {
             .map(|e| ImageInfo {
                 name: e.name,
                 image_type: e.format,
-                // The catalog has no mutable read-only flag on an entry —
-                // see set_image_read_only.
-                read_only: false,
+                read_only: e.read_only,
                 // No cheap way to report a size for a remote catalog entry
                 // (it may not even be fetched to this host yet) — matches
                 // machinectl's own loosely-typed `size: String` by leaving
@@ -51,11 +49,8 @@ impl ImageDriver for EphemeraDriver {
         self.client.remove_catalog_entry(name).await
     }
 
-    async fn set_image_read_only(&self, _name: &str, _read_only: bool) -> Result<()> {
-        Err(unsupported(
-            "set_image_read_only",
-            "catalog entries are metadata records, not mounted objects with a mutable read-only flag",
-        ))
+    async fn set_image_read_only(&self, name: &str, read_only: bool) -> Result<()> {
+        self.client.set_catalog_read_only(name, read_only).await.map(|_| ())
     }
 
     async fn pull_raw_image(&self, url: &str, name: &str, verify: bool) -> Result<()> {
@@ -101,9 +96,12 @@ impl ImageDriver for EphemeraDriver {
     }
 
     async fn clean_images(&self, _all: bool) -> Result<()> {
-        Err(unsupported(
-            "clean_images",
-            "machined's hidden/cached-image concept doesn't map onto catalog entries",
-        ))
+        // machinectl's "hidden/cached image" concept doesn't map onto
+        // catalog entries themselves, but the catalog does accumulate one
+        // real analog: cached URL downloads no longer referenced by any
+        // entry (e.g. after a rename or remove). Clean those.
+        let removed = self.client.clean_catalog().await?;
+        tracing::info!("ephemera clean_images: removed {} orphaned download(s)", removed.len());
+        Ok(())
     }
 }
