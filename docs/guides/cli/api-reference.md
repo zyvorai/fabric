@@ -1669,6 +1669,201 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/shell \
 
 ---
 
+### GET /api/machines/images
+
+List images known to the active VM driver (`/var/lib/machines` for `machinectl`, the image catalog for `ephemera`).
+
+**Auth level:** Viewer+
+
+**Response (200):**
+
+```json
+[
+  {
+    "name": "debian-13-base",
+    "image_type": "raw",
+    "read_only": true,
+    "size": "1.2G"
+  }
+]
+```
+
+**curl example:**
+
+```bash
+curl -s http://localhost:3000/api/machines/images \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+---
+
+### POST /api/machines/images/:name/clone
+
+Clone an existing image under a new name. Both backends.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "target_name": "debian-13-web"
+}
+```
+
+**Response (201):** OK
+
+---
+
+### POST /api/machines/images/:name/rename
+
+Rename an image. Both backends.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "new_name": "debian-13-base-v2"
+}
+```
+
+**Response (200):** OK
+
+---
+
+### DELETE /api/machines/images/:name
+
+Remove an image. Both backends.
+
+**Auth level:** Admin only
+
+**Response (204):** No Content
+
+---
+
+### POST /api/machines/images/:name/read-only
+
+Toggle an image's read-only flag. `machinectl` backend only.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "read_only": true
+}
+```
+
+**Response (200):** OK
+
+---
+
+### POST /api/machines/images/pull-raw
+
+Pull a raw disk image from a URL and register it under `name`. Both backends. On the `ephemera` backend, `verify: true` is rejected — catalog signature verification is a separate offline signing flow, not something a pull-time checksum can satisfy.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "url": "https://example.com/images/debian-13.raw",
+  "name": "debian-13-base",
+  "verify": false
+}
+```
+
+**Response (202):** Accepted
+
+---
+
+### POST /api/machines/images/pull-tar
+
+Pull a tar-formatted image from a URL and register it under `name`. `machinectl` backend only.
+
+**Auth level:** Admin only
+
+**Request body:** Same shape as `pull-raw` above.
+
+**Response (202):** Accepted
+
+---
+
+### POST /api/machines/images/import-raw
+
+Import a raw disk image already present on the host filesystem. Both backends.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "path": "/tmp/debian-13.raw",
+  "name": "debian-13-base"
+}
+```
+
+**Response (202):** Accepted
+
+---
+
+### POST /api/machines/images/import-tar
+
+Import a tar-formatted image already present on the host filesystem. `machinectl` backend only.
+
+**Auth level:** Admin only
+
+**Request body:** Same shape as `import-raw` above.
+
+**Response (202):** Accepted
+
+---
+
+### POST /api/machines/images/:name/export-raw
+
+Export an image to a raw file at the given host path. Both backends.
+
+**Auth level:** Admin only
+
+**Request body:**
+
+```json
+{
+  "path": "/tmp/debian-13-export.raw"
+}
+```
+
+**Response (200):** OK
+
+---
+
+### POST /api/machines/images/:name/export-tar
+
+Export an image to a tar file at the given host path. `machinectl` backend only.
+
+**Auth level:** Admin only
+
+**Request body:** Same shape as `export-raw` above.
+
+**Response (200):** OK
+
+---
+
+### POST /api/machines/images/clean
+
+Clean hidden/cached images. `machinectl` backend only.
+
+**Auth level:** Admin only
+
+**Response (200):** OK
+
+---
+
 ### GET /api/machines/:name/ssh
 
 Get SSH connection information for a machine. `machinectl` backend only.

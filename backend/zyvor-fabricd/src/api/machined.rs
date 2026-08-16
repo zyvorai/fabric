@@ -394,7 +394,7 @@ pub async fn bind_machine(
 }
 
 // ============================================================================
-// Image management (still CLI-based — import1 uses FD passing)
+// Image management (routed through state.driver — driver_core::ImageDriver)
 // ============================================================================
 
 /// GET /api/machines/images - List images from /var/lib/machines
@@ -532,7 +532,8 @@ pub async fn set_image_read_only(
 }
 
 // ============================================================================
-// Image transfer (pull/import/export — still CLI-based)
+// Image transfer (pull/import/export — routed through state.driver;
+// tar variants and read-only/clean are machinectl-only, see ImageDriver)
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
