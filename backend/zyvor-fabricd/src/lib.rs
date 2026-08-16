@@ -10,5 +10,6 @@ pub mod qmp;
 pub mod routes;
 pub mod schedulers;
 pub mod server;
+pub mod tls;
 pub mod validation;
 pub mod websocket;

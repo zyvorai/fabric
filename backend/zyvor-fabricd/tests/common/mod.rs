@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 
 use zyvor_fabricd::config::{
     AuthConfig, Config, ControllerConfig, DaemonConfig, DriverConfig, NetworkConfig, StorageConfig,
+    TlsConfig,
 };
 use zyvor_fabricd::server::{AppState, QuotaCache};
 
@@ -57,6 +58,7 @@ pub async fn create_test_app() -> Router {
             ..AuthConfig::default()
         },
         driver: DriverConfig::default(),
+        tls: TlsConfig { enabled: false, ..TlsConfig::default() },
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -142,6 +144,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
             ..AuthConfig::default()
         },
         driver: DriverConfig::default(),
+        tls: TlsConfig { enabled: false, ..TlsConfig::default() },
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();

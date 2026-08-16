@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::{
     routing::{delete, get, post, put},
     Router,
@@ -174,9 +174,19 @@ impl Server {
         let app = build_router(self.state.clone());
 
         let addr: std::net::SocketAddr = self.state.config.daemon.listen.parse()?;
-        let listener = tokio::net::TcpListener::bind(&addr).await?;
-
-        tracing::info!("Listening on {}", addr);
+        let tls_config = if self.state.config.tls.enabled {
+            let tls = &self.state.config.tls;
+            crate::tls::ensure_self_signed_cert(&tls.cert_path, &tls.key_path)?;
+            let rustls_config =
+                axum_server::tls_rustls::RustlsConfig::from_pem_file(&tls.cert_path, &tls.key_path)
+                    .await
+                    .with_context(|| format!("loading TLS cert {} / key {}", tls.cert_path, tls.key_path))?;
+            tracing::info!("Listening on https://{}", addr);
+            Some(rustls_config)
+        } else {
+            tracing::info!("Listening on http://{} (TLS disabled)", addr);
+            None
+        };
 
         let mut bg_tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
         let shutdown = self.state.shutdown.clone();
@@ -239,9 +249,27 @@ impl Server {
         spawn_bg!(self.state, "backup_scheduler", crate::schedulers::run_backup_scheduler);
         spawn_bg!(self.state, "cleanup_scheduler", crate::schedulers::run_cleanup_scheduler);
 
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
+        let handle = axum_server::Handle::new();
+        let shutdown_handle = handle.clone();
+        tokio::spawn(async move {
+            shutdown_signal().await;
+            shutdown_handle.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
+        });
+
+        match tls_config {
+            Some(rustls_config) => {
+                axum_server::bind_rustls(addr, rustls_config)
+                    .handle(handle)
+                    .serve(app.into_make_service())
+                    .await?;
+            }
+            None => {
+                axum_server::bind(addr)
+                    .handle(handle)
+                    .serve(app.into_make_service())
+                    .await?;
+            }
+        }
 
         tracing::info!("Shutdown signal received, cancelling background tasks");
         shutdown.cancel();

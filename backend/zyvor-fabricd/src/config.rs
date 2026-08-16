@@ -17,6 +17,42 @@ pub struct Config {
     pub auth: AuthConfig,
     #[serde(default)]
     pub driver: DriverConfig,
+    #[serde(default)]
+    pub tls: TlsConfig,
+}
+
+/// Native TLS, on by default. Deliberately not a reverse-proxy config
+/// (nginx/Caddy in front) — this is the daemon's own listening socket, so
+/// the exact same behavior applies whether run bare-metal, in a VM, or in
+/// a Kubernetes pod (a cert-manager-issued cert just gets mounted at the
+/// same `cert_path`/`key_path`, no cluster-specific ingress dependency).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsConfig {
+    #[serde(default = "default_tls_enabled")]
+    pub enabled: bool,
+    /// If missing at startup and `enabled`, a self-signed cert is
+    /// generated here automatically — matches the path
+    /// `zyvor-fabricd-ctl tls` already writes to.
+    #[serde(default = "default_tls_cert_path")]
+    pub cert_path: String,
+    #[serde(default = "default_tls_key_path")]
+    pub key_path: String,
+}
+
+impl Default for TlsConfig {
+    fn default() -> Self {
+        Self { enabled: default_tls_enabled(), cert_path: default_tls_cert_path(), key_path: default_tls_key_path() }
+    }
+}
+
+fn default_tls_enabled() -> bool {
+    true
+}
+fn default_tls_cert_path() -> String {
+    "/etc/zyvor-fabricd/tls/server.crt".to_string()
+}
+fn default_tls_key_path() -> String {
+    "/etc/zyvor-fabricd/tls/server.key".to_string()
 }
 
 /// Configures the `driver-core::VmDriver` (`Arc<dyn VmDriver>`) that
@@ -305,6 +341,7 @@ impl Config {
             controller: ControllerConfig::default(),
             auth: AuthConfig::default(),
             driver: DriverConfig::default(),
+            tls: TlsConfig::default(),
         })
     }
 
