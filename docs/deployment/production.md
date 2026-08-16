@@ -45,17 +45,16 @@ hardening, backup strategy, and monitoring setup.
 | PAM                 | System default  | Required for PAM authentication          |
 | SQLite              | 3.35+           | Bundled via rusqlite                     |
 
-zyvor-fabricd's VM driver is pluggable (`driver.backend` in
-`zyvor-fabricd.toml`), so the systemd requirement below depends on which
-backend you use:
+zyvor-fabricd's VM lifecycle runs entirely through
+[Ephemera](https://github.com/hypersdk/ephemera) (`driver.ephemera_url` in
+`zyvor-fabricd.toml`), which has no systemd dependency of its own:
 
 | Component           | Minimum Version | Notes                                   |
 |---------------------|-----------------|-----------------------------------------|
-| systemd + systemd-vmspawn | 254+      | Only for `driver.backend = "machinectl"` (the default) |
-| [Ephemera](https://github.com/hypersdk/ephemera) | latest | Only for `driver.backend = "ephemera"` — no systemd dependency at all |
+| Ephemera             | latest          | See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` |
 
 zyvor-fabricd itself (the daemon) has no hard systemd dependency either
-way — it runs fine as a plain process or under systemd, your choice (see
+— it runs fine as a plain process or under systemd, your choice (see
 [systemd-service.md](systemd-service.md)).
 
 ### Kernel Modules
@@ -83,13 +82,9 @@ grep -cE '(vmx|svm)' /proc/cpuinfo
 # 2. Verify KVM is available
 ls -la /dev/kvm
 
-# 3. If using driver.backend = "machinectl" (the default), verify
-#    systemd-vmspawn is installed and systemd-machined is running:
-which systemd-vmspawn
-systemctl status systemd-machined
-#    If using driver.backend = "ephemera" instead, verify the `ephemera`
-#    binary is installed and reachable at the URL configured in
-#    zyvor-fabricd.toml — neither of the above applies.
+# 3. Verify the `ephemera` binary is installed and reachable at the URL
+#    configured in zyvor-fabricd.toml (driver.ephemera_url):
+curl -sf "$(grep ephemera_url /etc/zyvor-fabricd/zyvor-fabricd.toml | cut -d'"' -f2)/healthz"
 
 # 4. Create the zyvor-fabricd system user (optional, for non-root operation)
 sudo useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin zyvor-fabricd

@@ -1,11 +1,10 @@
 # Zyvor Fabric System Architecture
 
 This document describes the architecture of Zyvor Fabric, a comprehensive virtual machine
-management platform built on the Linux KVM hypervisor with a pluggable VM driver:
-`machinectl` (systemd-vmspawn + systemd-machined via D-Bus, the default) or `ephemera`
-(a disposable-VM engine with no systemd dependency, opt-in via `driver.backend`).
-Zyvor Fabric provides a production-grade REST API, web UI, and CLI for
-managing the full lifecycle of virtual machines.
+management platform built on the Linux KVM hypervisor, with VM lifecycle owned by
+[Ephemera](https://github.com/hypersdk/ephemera) -- a disposable-VM engine with no
+systemd dependency of its own. Zyvor Fabric provides a production-grade REST API,
+web UI, and CLI for managing the full lifecycle of virtual machines.
 
 ---
 
@@ -65,13 +64,11 @@ managing the full lifecycle of virtual machines.
               +---------------+     |     +---------------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
-   |  VM Driver (plug.)   |  | State Store |  | networking (netlink)  |
-   |  machinectl|ephemera |  | (JSON/FS)   |  | (Network management)  |
+   |  VM Driver (Ephemera) |  | State Store |  | networking (netlink)  |
    +----------+-----------+  +------+------+  +-----------+-----------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
-   |  systemd-machined /  |  | SQLite      |  | Linux Kernel          |
-   |  Ephemera (registry) |  | (User DB)   |  | (KVM / bridge / tap)  |
+   |  Ephemera (registry) |  | SQLite      |  | Linux Kernel          |
    +----------+-----------+  +------+------+  +-----------+-----------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
@@ -124,7 +121,7 @@ structured as an Axum web server running on Tokio with the following subsystems:
 | Subsystem         | Description                                                |
 |-------------------|------------------------------------------------------------|
 | REST API          | 480+ endpoints across 53 API modules                       |
-| WebSocket         | Real-time VM console access via machinectl shell           |
+| WebSocket         | Real-time VM console access via Ephemera's vsock guest agent |
 | SSE Events        | Server-Sent Events for real-time VM state change delivery  |
 | Auth Middleware    | JWT token validation with RBAC (Admin/User/Viewer)         |
 | Background Tasks  | 20+ spawned tasks for reconciliation, monitoring, healing  |
@@ -169,62 +166,59 @@ VM
 
 ### VMStartOptions
 
-The `VMStartOptions` struct maps to the full `systemd-vmspawn(1)` v260 interface:
+The `VMStartOptions` struct's field names still echo its origin as a mirror of
+`systemd-vmspawn(1)`'s option set, but launch options are now translated into an
+Ephemera `CreateVmRequest` rather than a `systemd-vmspawn` CLI invocation:
 
-- Manager scope (system/user)
 - Image source (directory, image file, raw disk)
 - Hardware: CPUs, RAM, KVM toggle, vSock CID
 - Firmware: UEFI, Secure Boot, SMBIOS, TPM
-- Storage: bind mounts, extra drives
+- Storage: bind mounts (translated into virtiofs shares, auto-mounted in the guest via a
+  generated cloud-init entry -- see `ephemera-driver::lifecycle`), extra drives
 - Networking: user/TAP mode, MAC address
-- Security: register policy, Linux capabilities
 - Credentials and SSH key injection
 - Pass-through environment variables
 
 ### Driver Architecture
 
-The driver layer is a pluggable trait boundary (`VmDriver`, in `driver-core`) between the
-API handlers and whichever VM backend is configured -- `AppState.driver` is one
-`Arc<dyn VmDriver>`, selected at startup by `driver.backend` in `zyvor-fabricd.toml`
-(`"machinectl"`, the default, or `"ephemera"`). `VmDriver` is a blanket implementation
-over several component traits, so a backend only needs to implement the traits it
-actually supports:
+The driver layer is a trait boundary (`VmDriver`, in `driver-core`) between the API
+handlers and Ephemera, the sole VM backend -- `AppState.driver` is one
+`Arc<dyn VmDriver>`, backed by `EphemeraDriver` and configured via `driver.ephemera_url`/
+`driver.ephemera_token` in `zyvor-fabricd.toml`. `VmDriver` is a blanket implementation
+over several component traits:
 
 ```
 +-- VmDriver (driver-core) — blanket-impl'd over: --------------+
 |  VMDriver           start/poweroff/terminate/reboot/get_state/|
 |                      list_machines/get_properties/enable/     |
 |                      disable/start_with_options/               |
-|                      get_control_socket                        |
+|                      get_control_socket/get_mac_address        |
 |  ResourceControlDriver  set_cpu_quota/set_memory_max/           |
 |                      set_io_weight/freeze/thaw/is_frozen/       |
-|                      set_pids_max/set_cpuset                    |
+|                      set_pids_max/set_cpuset/get_cpuset         |
 |  ResourceStatsDriver    get_metrics/get_pressure                |
 |  LogDriver           stream_logs                                |
 |  ImageDriver         list/clone/rename/remove/pull/import/      |
 |                      export/clean images                        |
-|  ShellDriver         shell(name, command)                       |
+|  ShellDriver         shell/copy_to/copy_from                    |
+|  ConsoleDriver       open_console (interactive shell)           |
 |  CapabilityProvider  backend_name/has_resource_control           |
 +------------------------------------------------------------------+
-           |                                    |
-           v                                    v
-+-- MachinectlDriver ---------------+  +-- EphemeraDriver -----------------+
-|  D-Bus (zbus) to systemd-machined  |  |  REST client to Ephemera          |
-|  for lifecycle/properties; the     |  |  (github.com/hypersdk/ephemera)   |
-|  zyvor-fabric-vm-driver crate      |  |  No systemd dependency. Some      |
-|  builds systemd-vmspawn CLI        |  |  ImageDriver/other operations     |
-|  commands for start_with_options   |  |  intentionally error clearly      |
-|  cgroup v2 files directly for      |  |  rather than fake an equivalent   |
-|  resource control                  |  |  Ephemera doesn't have yet        |
-+-------------------------------------+  +------------------------------------+
+           |
+           v
++-- EphemeraDriver ------------------------------------------------+
+|  REST client to Ephemera (github.com/hypersdk/ephemera), plus a  |
+|  WebSocket dial for ConsoleDriver and a vsock-backed guest agent |
+|  (via Ephemera) for shell/copy_to/copy_from. No systemd           |
+|  dependency. A few ImageDriver operations (tar-format images)    |
+|  intentionally error clearly -- a tar rootfs isn't a bootable    |
+|  disk image for a real hardware VM, so there's no equivalent to  |
+|  fake.                                                            |
++--------------------------------------------------------------------+
 ```
 
-Everything under `VMDriver`/`ResourceControlDriver`/`ResourceStatsDriver`/`LogDriver`/
-`ImageDriver`/`ShellDriver` works on both backends. A handful of operations remain
-`machinectl`-only where Ephemera has no real equivalent yet (interactive shell
-copy-to/copy-from, bind-mount into a running VM, SSH connection info, tar-format image
-import/export) -- those still shell out to `machinectl` directly rather than going
-through `state.driver`.
+There is no live bind-mount-into-a-running-VM operation and no `machinectl`-only
+fallback path anymore -- everything above goes through `state.driver`.
 
 ### Security Crate
 
@@ -257,18 +251,15 @@ See [crate-map.md](crate-map.md) for the complete listing.
                  |                   |                   |
          +-------+-------+    +-----+------+    +-------+-------+
          |       |       |    |     |      |    |       |       |
-      vm-model  state  security  driver  machined  networking  storage
+      vm-model  state  security  driver  ephemera  networking  storage
                store            core    driver              manager
-                                  |
-                            zyvor-fabric-vm-driver
-                            (systemd-vmspawn CLI)
 ```
 
 ### Domain Groups
 
 **Core** (5 crates): `Zyvor Fabric`, `vm-model`, `state-store`, `security`, `Zyvor Fabric-vm`
 
-**Drivers** (6 crates): `zyvor-fabric-vm-driver`, `zyvor-fabric-driver-core`, `vmspawnd-machinectl-driver`, `vmspawnd-machined-dbus`, `zyvor-fabric-ephemera-client`, `zyvor-fabric-ephemera-driver`
+**Drivers** (4 crates): `zyvor-fabric-vm-driver` (mkosi image building only), `zyvor-fabric-driver-core`, `zyvor-fabric-ephemera-client`, `zyvor-fabric-ephemera-driver`
 
 **Networking** (10 crates): `networking`, `network-policy`, `service-mesh`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`
 
@@ -405,14 +396,10 @@ State transitions:
 1. Client POSTs to /api/v1/vms/{name}/start
 2. Handler acquires per-VM mutex lock
 3. State set to Starting, persisted
-4. state.driver.start(name) -- dispatches to whichever backend is configured:
-     machinectl: zyvor-fabric-vm-driver builds a systemd-vmspawn command
-       (--image=... --cpus={n} --ram={m}M [--kvm=yes] [--tpm=yes] ...),
-       executed via tokio::task::spawn_blocking; machine registered with
-       systemd-machined
-     ephemera: EphemeraClient issues a REST call to the configured
-       `ephemera serve` instance, which launches the VMM directly
-5. PID captured either way
+4. state.driver.start(name) -- EphemeraClient issues a REST call to the
+     configured `ephemera serve` instance, which launches the VMM
+     (QEMU/Cloud Hypervisor/Firecracker) directly
+5. PID captured
 6. State set to Running, PID stored, persisted
 7. Prometheus gauges updated
 8. SSE event emitted: { type: "vm_started", name: "..." }

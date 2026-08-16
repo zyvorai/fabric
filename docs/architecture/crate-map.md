@@ -34,18 +34,14 @@ These crates form the foundation of the Zyvor Fabric platform.
 
 ## Drivers
 
-These crates implement the pluggable `VmDriver` trait boundary between Zyvor Fabric and
-the underlying VM backend, selected at startup via `driver.backend` in
-`zyvor-fabricd.toml` (`"machinectl"`, the default, or `"ephemera"`).
+Zyvor Fabric's VM lifecycle is entirely owned by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency of its own, reached over its REST API. `driver-core` defines the trait boundary (`VmDriver`) between the daemon and that backend; there is no other backend to select — the systemd-machined/systemd-vmspawn driver (`machinectl-driver`/`machined-dbus`) that used to fill this role has been deleted.
 
 | Crate                        | Path                              | Description                                              |
 |------------------------------|-----------------------------------|----------------------------------------------------------|
-| `zyvor-fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions every backend implements: `VMDriver` (lifecycle), `ResourceControlDriver`/`ResourceStatsDriver` (cgroup quotas, freeze/thaw, metrics, PSI pressure), `LogDriver` (log streaming), `ImageDriver` (image registry CRUD), `ShellDriver` (exec), `CapabilityProvider`. Blanket-impl'd as `VmDriver`. |
-| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Process-based helper used by the `machinectl` backend. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
-| `vmspawnd-machinectl-driver` | `backend/crates/machinectl-driver`| Default `VmDriver` implementation. D-Bus (`zbus`) to `systemd-machined` for lifecycle/properties, cgroup v2 files directly for resource control, `zyvor-fabric-vm-driver` for `systemd-vmspawn` CLI invocation. |
-| `vmspawnd-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. Used by the `machinectl` backend. |
-| `zyvor-fabric-ephemera-client`   | `backend/crates/ephemera-client`  | REST client for [Ephemera](https://github.com/hypersdk/ephemera)'s API -- hand-maintained DTO mirror, since the integration is out-of-process REST rather than a Cargo dependency on Ephemera's own crates. |
-| `zyvor-fabric-ephemera-driver`   | `backend/crates/ephemera-driver`  | `VmDriver` implementation backed by Ephemera -- a disposable-VM engine with no systemd dependency. Some `ImageDriver`/shell/copy operations intentionally error rather than fake an Ephemera equivalent that doesn't exist yet. |
+| `zyvor-fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions the driver implements: `VMDriver` (lifecycle), `ResourceControlDriver`/`ResourceStatsDriver` (cgroup quotas, freeze/thaw, metrics, PSI pressure), `LogDriver` (log streaming), `ImageDriver` (image registry CRUD), `ShellDriver` (exec/copy), `ConsoleDriver` (interactive console), `CapabilityProvider`. Blanket-impl'd as `VmDriver`. |
+| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Builds VM disk images via `mkosi` (an offline OS-image-building tool) -- unrelated to VM lifecycle, which is entirely Ephemera's job. |
+| `zyvor-fabric-ephemera-client`   | `backend/crates/ephemera-client`  | REST client for Ephemera's API -- hand-maintained DTO mirror, since the integration is out-of-process REST rather than a Cargo dependency on Ephemera's own crates. |
+| `zyvor-fabric-ephemera-driver`   | `backend/crates/ephemera-driver`  | `VmDriver` implementation backed by Ephemera. A few `ImageDriver` operations (tar-format images) intentionally error rather than fake an equivalent that can't exist -- a tar rootfs isn't a bootable disk image for a real hardware VM. |
 
 ## Networking
 
@@ -145,7 +141,6 @@ Enterprise management features for large-scale VM deployments.
 | `serde` / `serde_json` | 1.0     | All crates        | Serialization                    |
 | `anyhow` / `thiserror` | 1.0/2.0 | All crates        | Error handling                   |
 | `tracing`              | 0.1     | All crates        | Structured logging               |
-| `zbus`                 | 4       | machined-dbus     | D-Bus client (async)             |
 | `tower-http`           | 0.6     | Zyvor Fabric          | CORS, file serving, tracing      |
 | `reqwest`              | 0.12    | Zyvor Fabric          | HTTP client for webhooks         |
 | `lettre`               | 0.11    | Zyvor Fabric          | SMTP email notifications         |
@@ -172,9 +167,8 @@ Zyvor Fabric (main binary)
   |-- vm-model
   |-- state-store --> vm-model
   |-- security
-  |-- zyvor-fabric-vm-driver --> vm-model
+  |-- zyvor-fabric-vm-driver
   |-- zyvor-fabric-driver-core --> vm-model
-  |-- vmspawnd-machinectl-driver --> zyvor-fabric-driver-core, vmspawnd-machined-dbus, zyvor-fabric-vm-driver
   |-- zyvor-fabric-ephemera-client
   |-- zyvor-fabric-ephemera-driver --> zyvor-fabric-driver-core, zyvor-fabric-ephemera-client
   |-- Zyvor Fabric-storage

@@ -250,10 +250,9 @@ cargo test -- --test-threads=1
 # Run integration tests for the main daemon
 cargo test -p zyvor-fabricd --test '*'
 
-# Note: Some integration tests may require root access for
-# KVM, network bridge, and VM driver operations (systemd-machined for
-# driver.backend = "machinectl", or a running `ephemera serve` for
-# driver.backend = "ephemera").
+# Note: Some integration tests may require root access for KVM and
+# network bridge operations, plus a running `ephemera serve` instance
+# for VM driver operations.
 ```
 
 ---

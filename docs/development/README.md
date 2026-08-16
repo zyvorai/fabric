@@ -48,10 +48,9 @@ zyvor-fabric/
   |   +-- vm-model/            # Core data structures
   |   +-- state-store/         # Persistent state storage
   |   +-- security/            # Auth, JWT, PAM, RBAC
-  |   +-- crates/driver-core/  # VmDriver trait family (pluggable backend)
-  |   +-- crates/machinectl-driver/ # systemd-machined/vmspawn backend (default)
-  |   +-- crates/ephemera-driver/   # Ephemera backend (no systemd dependency)
-  |   +-- zyvor-fabric-vm-driver/   # systemd-vmspawn CLI wrapper (used by machinectl-driver + host-agent)
+  |   +-- crates/driver-core/  # VmDriver trait family
+  |   +-- crates/ephemera-driver/   # Ephemera backend (no systemd dependency) -- the only VmDriver implementation
+  |   +-- zyvor-fabric-vm-driver/   # mkosi image building (unrelated to VM lifecycle)
   |   +-- cloud-init/          # cloud-init ISO generation
   |   +-- prometheus-exporter/ # Prometheus metrics
   |   +-- vnc-proxy/           # WebSocket-to-VNC proxy
@@ -81,8 +80,8 @@ zyvor-fabric/
   |   +-- tpm-support/         # TPM 2.0 support
   |   +-- crates/
   |   |   +-- driver-core/     # Driver trait definitions
-  |   |   +-- machinectl-driver/ # D-Bus machined driver
-  |   |   +-- machined-dbus/   # D-Bus proxy types
+  |   |   +-- ephemera-driver/ # Ephemera VmDriver implementation
+  |   |   +-- ephemera-client/ # REST client for Ephemera's API
   |   |   +-- storage/         # Storage pool management
   |   |   +-- system/          # System resource management
   |   |   +-- vm/              # VM-level utilities
@@ -131,16 +130,16 @@ launched via the `spawn_bg!` macro and participate in graceful shutdown.
 ### Driver Abstraction
 
 `VmDriver` (an umbrella over `VMDriver`, `ResourceControlDriver`,
-`ResourceStatsDriver`, `LogDriver`, `ImageDriver`, `ShellDriver`, and
-`CapabilityProvider`) in `driver-core` defines the interface for VM
-lifecycle, cgroup resource control, log streaming, image management, and
-shell exec. It has two concrete implementations, selected at startup by
-`driver.backend` in `zyvor-fabricd.toml`:
+`ResourceStatsDriver`, `LogDriver`, `ImageDriver`, `ShellDriver`,
+`ConsoleDriver`, and `CapabilityProvider`) in `driver-core` defines the
+interface for VM lifecycle, cgroup resource control, log streaming, image
+management, shell exec, and the interactive console. `EphemeraDriver` is
+the only implementation — it talks to a separate
+[Ephemera](https://github.com/hypersdk/ephemera) process over its REST
+API (`driver.ephemera_url` in `zyvor-fabricd.toml`); no systemd
+dependency at all.
 
-- `MachinectlDriver` (default) — uses D-Bus to talk to `systemd-machined`,
-  plus `systemd-vmspawn` for VM launch.
-- `EphemeraDriver` — talks to a separate [Ephemera](https://github.com/hypersdk/ephemera)
-  process over its REST API; no systemd dependency at all.
-
-This separation is what makes testing with mock drivers possible, and is
-also the actual production mechanism for running without systemd.
+This trait boundary is what makes testing with mock drivers possible.
+It's also the reason the systemd-machined/systemd-vmspawn backend that
+used to sit here (`MachinectlDriver`) could be deleted cleanly once
+Ephemera covered every capability it provided.

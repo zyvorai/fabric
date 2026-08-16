@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM for virtual machine execution. Zyvor Fabric's VM driver is pluggable (`driver.backend` in `zyvor-fabricd.toml`): the default, `"machinectl"`, needs a modern Linux distribution with systemd 256+ (for `systemd-vmspawn`); the alternative, `"ephemera"`, has no systemd version requirement at all — see [Ephemera](https://github.com/hypersdk/ephemera). The rest of this guide assumes the default `machinectl` backend unless noted otherwise. Zyvor Fabric itself (the daemon) doesn't require systemd either way — it can run under systemd or as a plain process.
+This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM for virtual machine execution. Zyvor Fabric's VM lifecycle is entirely owned by [Ephemera](https://github.com/hypersdk/ephemera) (`driver.ephemera_url` in `zyvor-fabricd.toml`), which has no systemd version requirement at all. Zyvor Fabric itself (the daemon) doesn't require systemd either — it can run under systemd or as a plain process.
 
 ---
 
@@ -20,21 +20,13 @@ This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM
 | Requirement | Minimum Version | Notes |
 |-------------|-----------------|-------|
 | Linux kernel | 5.15+ | x86_64 architecture |
-| systemd | 256+ | Only needed for `driver.backend = "machinectl"` (the default) — see note above |
+| Ephemera | latest | See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` |
 | QEMU | 8.0+ | KVM acceleration recommended |
 | Rust | 1.75+ | Only for building from source |
 
 ### Supported Distributions
 
-| Distribution | Version | systemd Version | Status |
-|--------------|---------|-----------------|--------|
-| Fedora | 41+ | 256+ | Fully supported |
-| Ubuntu | 24.10+ | 256+ | Fully supported |
-| Debian | Testing/Sid | 256+ | Supported |
-| RHEL / CentOS Stream | 10+ | 256+ | Supported |
-| openSUSE Tumbleweed | Rolling | 256+ | Supported |
-
-> **Note:** The table above is for the default `machinectl` driver backend. Distributions with systemd versions below 256 don't include `systemd-vmspawn`, so they can't use that backend — but they can still run Zyvor Fabric with `driver.backend = "ephemera"` instead, which has no systemd version requirement.
+Since VM lifecycle has no systemd version requirement, any current Linux distribution with kernel 5.15+ and KVM support works — there's no systemd-version floor to check anymore.
 
 ---
 
@@ -48,7 +40,6 @@ Fedora 41 and later ship with systemd 256+ and have full support for Zyvor Fabri
 sudo dnf install -y \
     qemu-kvm \
     qemu-img \
-    systemd-container \
     swtpm \
     swtpm-tools \
     edk2-ovmf \
@@ -58,13 +49,13 @@ sudo dnf install -y \
     nftables
 ```
 
-### 2. Verify systemd-vmspawn (only if using `driver.backend = "machinectl"`, the default)
+### 2. Verify Ephemera is reachable
 
 ```bash
-systemd-vmspawn --version
+curl -sf http://127.0.0.1:7788/healthz
 ```
 
-The output should show version 256 or later. Skip this step entirely if you're using `driver.backend = "ephemera"` instead.
+See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` if this doesn't succeed yet.
 
 ### 3. Enable KVM
 
@@ -103,8 +94,6 @@ This command will:
 
 ## Ubuntu / Debian Installation
 
-Ubuntu 24.10+ and Debian Testing/Sid include systemd 256+.
-
 ### 1. Install Dependencies
 
 ```bash
@@ -112,7 +101,6 @@ sudo apt update
 sudo apt install -y \
     qemu-kvm \
     qemu-utils \
-    systemd-container \
     swtpm \
     swtpm-tools \
     ovmf \
@@ -122,13 +110,13 @@ sudo apt install -y \
     nftables
 ```
 
-### 2. Verify systemd-vmspawn (only if using `driver.backend = "machinectl"`, the default)
+### 2. Verify Ephemera is reachable
 
 ```bash
-systemd-vmspawn --version
+curl -sf http://127.0.0.1:7788/healthz
 ```
 
-Skip this step entirely if you're using `driver.backend = "ephemera"` instead.
+See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` if this doesn't succeed yet.
 
 ### 3. Enable KVM
 
@@ -304,17 +292,15 @@ This performs a deep check of API availability, disk space, database integrity, 
 
 ## Troubleshooting
 
-### systemd-vmspawn not found
+### Cannot connect to Ephemera
 
-This only matters if you're using `driver.backend = "machinectl"` (the default) — if you're using `driver.backend = "ephemera"` instead, this doesn't apply at all.
-
-Otherwise, your systemd version is too old. Check with:
+VM operations will fail if `ephemera serve` isn't running or isn't reachable at the URL configured in `zyvor-fabricd.toml` (`driver.ephemera_url`, default `http://127.0.0.1:7788`):
 
 ```bash
-systemctl --version
+curl -sf http://127.0.0.1:7788/healthz
 ```
 
-You need systemd 256 or later, or switch to `driver.backend = "ephemera"`.
+If that fails, see [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for starting it.
 
 ### KVM not available
 
@@ -345,14 +331,6 @@ listen = "127.0.0.1:8080"
 EOF
 
 sudo systemctl restart zyvor-fabricd
-```
-
-### Cannot connect to D-Bus
-
-This only applies to `driver.backend = "machinectl"` (the default), which needs access to the system D-Bus for `systemd-machined` integration. Ensure D-Bus is running:
-
-```bash
-sudo systemctl status dbus
 ```
 
 ---

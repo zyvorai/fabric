@@ -33,11 +33,10 @@ below is illustrative and close to it, with commentary added:
 [Unit]
 Description=zyvor-fabricd - Virtual Machine Management Daemon
 Documentation=https://github.com/ssahani/zyvor-fabric
-# systemd-machined.service is only relevant when driver.backend =
-# "machinectl" (the default) — it's not required when driver.backend =
-# "ephemera". Ordering only (After=), not a hard Requires=, since machined
-# D-Bus-activates on demand.
-After=network-online.target systemd-machined.service systemd-networkd.service
+# VM lifecycle is entirely Ephemera's job (driver.ephemera_url) — nothing
+# here depends on systemd-machined or systemd-networkd, so there's nothing
+# service-specific to order After= beyond basic network availability.
+After=network-online.target
 Wants=network-online.target
 
 # Restart on failure with backoff
