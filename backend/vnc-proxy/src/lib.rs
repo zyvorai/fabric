@@ -45,10 +45,18 @@ where
         StatusCode::UNAUTHORIZED
     })?;
 
-    jwt_config.validate_token(token).map_err(|e| {
+    let claims = jwt_config.validate_token(token).map_err(|e| {
         tracing::warn!("VNC auth failed for VM '{}': {}", vm_name, e);
         StatusCode::UNAUTHORIZED
     })?;
+
+    if !claims.role.can_write() {
+        tracing::warn!(
+            "VNC connection rejected: user '{}' has insufficient permissions",
+            claims.sub
+        );
+        return Err(StatusCode::FORBIDDEN);
+    }
 
     let socket_path = state
         .driver()

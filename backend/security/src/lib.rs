@@ -158,6 +158,46 @@ pub async fn auth_middleware(
     Ok(next.run(req).await)
 }
 
+/// Same as `auth_middleware`, but also accepts the token as a `?token=`
+/// query parameter when there's no `Authorization` header. Browsers'
+/// native `WebSocket` constructor can't set arbitrary headers on the
+/// upgrade request, so this is the only way a bearer-token-authenticated
+/// browser client can authenticate a WebSocket handshake at all — use this
+/// (never `auth_middleware`) on WebSocket routes specifically, not on
+/// regular HTTP API routes, to keep tokens-in-URLs scoped to the one case
+/// that needs it.
+pub async fn ws_auth_middleware(
+    State(jwt_config): State<Arc<JwtConfig>>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let header_token = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .map(str::to_string);
+
+    let query_token = header_token.is_none().then(|| {
+        req.uri().query().and_then(|query| {
+            query.split('&').find_map(|pair| {
+                let (key, value) = pair.split_once('=')?;
+                (key == "token").then(|| value.to_string())
+            })
+        })
+    }).flatten();
+
+    let token = header_token.or(query_token).ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let claims = jwt_config
+        .validate_token(&token)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    req.extensions_mut().insert(claims);
+
+    Ok(next.run(req).await)
+}
+
 // ============================================================================
 // Role-based authorization extractors
 // ============================================================================

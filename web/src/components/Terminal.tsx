@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
+import { getToken } from '../api/client'
 
 interface TerminalProps {
   vmName: string
@@ -34,7 +35,8 @@ export default function Terminal({ vmName }: TerminalProps) {
 
     // Connect WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/console/${vmName}`
+    const token = getToken()
+    const wsUrl = `${protocol}//${window.location.host}/ws/console/${vmName}${token ? `?token=${encodeURIComponent(token)}` : ''}`
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {

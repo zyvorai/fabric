@@ -3,6 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useEffect, useRef } from 'react'
+import { getToken } from '../api/client'
 
 interface VNCViewerProps {
   vmName: string
@@ -17,7 +18,8 @@ export default function VNCViewer({ vmName }: VNCViewerProps) {
 
     // Connect to VNC WebSocket proxy
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${vmName}`
+    const token = getToken()
+    const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${vmName}${token ? `?token=${encodeURIComponent(token)}` : ''}`
     const ws = new WebSocket(wsUrl)
 
     ws.binaryType = 'arraybuffer'

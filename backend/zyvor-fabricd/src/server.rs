@@ -2059,11 +2059,13 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/vnc/{name}", get(vnc_proxy::vnc_handler::<AppState>))
         .with_state(state.clone());
 
-    // Apply auth middleware to WebSocket routes if enabled
+    // Browsers' native WebSocket constructor can't set an Authorization
+    // header on the upgrade request, so WS routes use the query-param-
+    // accepting variant instead of the header-only one API routes use.
     if let Some(ref jwt_config) = state.jwt_config {
         ws_routes = ws_routes.route_layer(axum::middleware::from_fn_with_state(
             jwt_config.clone(),
-            security::auth_middleware,
+            security::ws_auth_middleware,
         ));
     }
 
