@@ -1,6 +1,6 @@
 # Zyvor Fabric — Product Positioning
 
-**Zyvor Fabric** is the Linux control plane for private cloud infrastructure: clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support — built on systemd-vmspawn and systemd-machined.
+**Zyvor Fabric** is the Linux control plane for private cloud infrastructure: clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support — with a pluggable VM driver (systemd-vmspawn/systemd-machined by default, or [Ephemera](https://github.com/hypersdk/ephemera) — no systemd dependency — opt-in).
 
 It is **not** positioned as a basic VM manager. It is a **VM operations fabric** and **private cloud control plane** — closer to Proxmox + KubeVirt UX, without the heavyweight multi-package stack.
 
@@ -12,9 +12,9 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 
 | Dimension | Positioning |
 |-----------|-------------|
-| **Category** | Systemd-native virtualization platform / private cloud control plane |
+| **Category** | Pluggable virtualization platform / private cloud control plane |
 | **Analogy** | Proxmox-class UX + KubeVirt-style operations, single Rust daemon |
-| **Runtime** | `zyvor-fabricd` — one binary, one config, one systemd unit |
+| **Runtime** | `zyvor-fabricd` — one binary, one config; runs under systemd (still fully supported) or standalone |
 | **Scope** | VMs, network fabric, security policy, storage, HA, migration, observability |
 | **Interfaces** | CLI (`zyvorctl`), TUI (`zyvorctl-tui`), Web UI, K8s operator, Terraform provider |
 
@@ -42,7 +42,7 @@ Keeping `zyvor-fabricd` as the daemon name avoids breaking installs, Ansible rol
 ### vs. Proxmox / VMware / OpenStack
 
 - **Lighter** — single binary vs. hundreds of packages
-- **systemd-native** — VMs are first-class units with journal, watchdog, socket activation
+- **Pluggable VM driver** — systemd-vmspawn/systemd-machined by default (VMs as first-class systemd units with journal integration), or Ephemera with zero systemd dependency for environments that don't run it
 - **Rust control plane** — memory-safe, sub-ms API latency, ~20MB RSS
 - **API-first** — 480+ REST endpoints, 3 WebSocket channels, full automation surface
 
@@ -112,7 +112,7 @@ Zyvor Fabric roadmap continues independently: HA, networking depth, operator mat
 
 ### Say
 
-- “Zyvor Fabric — systemd-native private cloud control plane”
+- “Zyvor Fabric — private cloud control plane for Linux, with a pluggable VM driver”
 - “VM operations fabric for Linux”
 - “Proxmox-class capabilities, single-daemon simplicity”
 - “Part of the Zyvor product family”

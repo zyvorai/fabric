@@ -70,13 +70,16 @@ origins can make API requests. Configured via `daemon.cors_origins`.
 ## D
 
 **D-Bus**: A message bus system used for inter-process communication on Linux.
-Zyvor Fabric uses D-Bus (via `zbus`) to communicate with `systemd-machined`.
+Zyvor Fabric's `machinectl` VM driver backend (the default) uses D-Bus (via
+`zbus`) to communicate with `systemd-machined`; the `ephemera` backend has no
+D-Bus dependency.
 
 **Datacenter**: The top level of the Zyvor Fabric organizational hierarchy, containing
 one or more clusters.
 
-**DHCP Server**: Dynamic Host Configuration Protocol server managed via
-systemd-networkd for automatic VM IP address assignment.
+**DHCP Server**: Dynamic Host Configuration Protocol server for automatic VM IP
+address assignment, run as a directly-managed `dnsmasq` process (not
+systemd-networkd's built-in DHCP server).
 
 **Disk Image**: A file containing the contents of a virtual disk. Common formats
 include raw (`.raw`), QCOW2 (`.qcow2`), VMDK, and VDI.
@@ -90,10 +93,18 @@ clusters based on capacity and I/O load.
 **DNS Policy**: Per-VM DNS configuration including zone assignments, custom
 records, and resolution policies.
 
-**Driver**: An abstraction layer between Zyvor Fabric and the underlying hypervisor
-tooling. The `VMDriver` trait defines lifecycle operations (start, stop, etc.).
+**Driver**: An abstraction layer between Zyvor Fabric and the underlying VM
+lifecycle tooling. The `VmDriver` trait family defines lifecycle, resource
+control, logs, images, and shell operations. Pluggable via `driver.backend` in
+`zyvor-fabricd.toml`: `machinectl` (systemd-machined/D-Bus, the default) or
+`ephemera` (see "Ephemera").
 
 ## E
+
+**Ephemera**: A disposable-VM engine ([github.com/hypersdk/ephemera](https://github.com/hypersdk/ephemera))
+with no systemd dependency. Selectable as Zyvor Fabric's VM driver backend via
+`driver.backend = "ephemera"` -- an alternative to the default `machinectl`
+backend for environments that don't want a systemd dependency.
 
 **Encryption**: VM disk encryption using key management providers. Supports
 per-VM encryption policies and key rotation.
@@ -359,7 +370,8 @@ with an in-memory cache.
 **systemd-machined**: See "Machined".
 
 **systemd-networkd**: A systemd service that manages network configuration on
-Linux. Zyvor Fabric generates networkd config files for VM networking.
+Linux. Zyvor Fabric does not depend on it -- host networking (bridges, VLANs,
+bonds, VXLAN, etc.) is applied directly via netlink calls.
 
 **systemd-vmspawn**: A systemd tool for spawning and managing virtual machines
 using QEMU/KVM with tight systemd integration.
@@ -400,7 +412,7 @@ accounts, password hashes, and roles.
 the hypervisor.
 
 **VLAN (Virtual LAN)**: A logical network partition at the data link layer
-(IEEE 802.1Q). Zyvor Fabric can create VLAN devices via systemd-networkd.
+(IEEE 802.1Q). Zyvor Fabric can create VLAN devices directly via netlink.
 
 **VM (Virtual Machine)**: An isolated computing environment with its own virtual
 hardware (CPU, memory, disk, network), running its own operating system.
@@ -445,8 +457,8 @@ mesh networking between VMs.
 
 ## Z
 
-**zbus**: A Rust crate for D-Bus communication. Zyvor Fabric uses zbus for async
-communication with systemd-machined.
+**zbus**: A Rust crate for D-Bus communication. Zyvor Fabric's `machinectl` VM
+driver backend uses zbus for async communication with systemd-machined.
 
 **Zone (Availability)**: A logical or physical grouping of hosts within a
 datacenter, used for fault isolation and placement decisions.

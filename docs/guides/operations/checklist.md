@@ -17,11 +17,12 @@ Complete these items before deploying Zyvor Fabric to production.
 
 ### Host Requirements
 
-- [ ] **OS version** -- Linux distribution with systemd 256+ (Fedora 41+, Ubuntu 24.10+, or equivalent)
+`zyvor-fabricd` itself has no systemd dependency -- these requirements apply to the `machinectl` VM driver backend (the default, `driver.backend = "machinectl"`). Deploying with `driver.backend = "ephemera"` instead drops the systemd-vmspawn/machined/networkd requirements below entirely; see [Ephemera](https://github.com/hypersdk/ephemera).
+
+- [ ] **OS version** -- a modern Linux distribution (Fedora 41+, Ubuntu 24.10+, or equivalent); systemd 256+ only if using the `machinectl` driver backend
 - [ ] **Kernel** -- Linux 6.x with KVM support (`/dev/kvm` exists and is accessible)
-- [ ] **systemd-vmspawn** -- v260+ installed (`systemd-vmspawn --version`)
-- [ ] **systemd-machined** -- Running (`systemctl is-active systemd-machined`)
-- [ ] **systemd-networkd** -- Running if using managed networking (`systemctl is-active systemd-networkd`)
+- [ ] **systemd-vmspawn** -- v260+ installed (`systemd-vmspawn --version`) -- `machinectl` backend only
+- [ ] **systemd-machined** -- Running (`systemctl is-active systemd-machined`) -- `machinectl` backend only
 - [ ] **CPU virtualization** -- Enabled in BIOS/UEFI (`grep -c vmx /proc/cpuinfo` or `grep -c svm /proc/cpuinfo`)
 - [ ] **Memory** -- Sufficient RAM for host + all planned VMs (2 GB minimum for host overhead)
 - [ ] **Disk space** -- Storage pools provisioned with adequate capacity for VM images and backups
@@ -32,7 +33,7 @@ Complete these items before deploying Zyvor Fabric to production.
 - [ ] **qemu-img** -- Installed for disk operations (`qemu-img --version`)
 - [ ] **nftables** -- Installed if using port forwarding or firewall rules (`nft --version`)
 - [ ] **PAM** -- System PAM configured for user authentication
-- [ ] **machinectl** -- Available for machine management (`machinectl --version`)
+- [ ] **machinectl** -- Available for machine management (`machinectl --version`) -- `machinectl` backend only; not needed with `driver.backend = "ephemera"`
 
 ### Network Configuration
 
@@ -57,10 +58,10 @@ Initial setup tasks after deploying Zyvor Fabric.
 
 ```bash
 # Enable and start Zyvor Fabric
-sudo systemctl enable --now Zyvor Fabric
+sudo systemctl enable --now zyvor-fabricd
 
 # Verify it is running
-systemctl status Zyvor Fabric
+systemctl status zyvor-fabricd
 
 # Check API health
 curl -s http://localhost:3000/health | jq
@@ -269,7 +270,7 @@ See the [Backup Strategy Guide](backup-strategy.md) for detailed procedures.
 ### Updates
 
 - [ ] **Zyvor Fabric updates** -- Test new versions in a staging environment before production
-- [ ] **systemd updates** -- Verify compatibility when upgrading systemd (Zyvor Fabric requires v260+)
+- [ ] **systemd updates** -- Only relevant if using the `machinectl` driver backend; verify compatibility when upgrading systemd (requires v260+ for systemd-vmspawn)
 - [ ] **Image maintenance** -- Rebuild base images monthly to include OS security patches
 - [ ] **Certificate rotation** -- Rotate TLS certificates on the reverse proxy before expiration
 
@@ -293,26 +294,27 @@ See the [Backup Strategy Guide](backup-strategy.md) for detailed procedures.
 
 ### Scenario 1: Zyvor Fabric Service Failure
 
-**Symptoms:** API returns connection refused; systemd reports Zyvor Fabric as failed.
+**Symptoms:** API returns connection refused; systemd reports `zyvor-fabricd` as failed (if running under systemd).
 
 **Recovery:**
 
 ```bash
-# 1. Check service status and logs
-systemctl status Zyvor Fabric
-journalctl -u Zyvor Fabric --since "30 min ago" --no-pager
+# 1. Check service status and logs (if running under systemd)
+systemctl status zyvor-fabricd
+journalctl -u zyvor-fabricd --since "30 min ago" --no-pager
 
 # 2. Restart the service
-sudo systemctl restart Zyvor Fabric
+sudo systemctl restart zyvor-fabricd
 
-# 3. Verify health
-curl -s http://localhost:3000/health | jq
+# 3. Verify health (works regardless of how the daemon is supervised)
+curl -s http://localhost:9095/health
 
-# 4. Check VMs are running (VMs persist independently of Zyvor Fabric)
-machinectl list
+# 4. Check VMs are running (VMs persist independently of zyvor-fabricd)
+machinectl list   # machinectl backend
+# or: curl -s http://127.0.0.1:7788/v1/vms   # ephemera backend
 ```
 
-VMs continue running even if Zyvor Fabric restarts. The daemon reconstructs state from systemd-machined and the state store on startup.
+VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs state from the active VM driver (systemd-machined, or Ephemera) and the state store on startup.
 
 ---
 
@@ -348,7 +350,7 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/start \
 
 ```bash
 # 1. Ensure Zyvor Fabric starts automatically
-sudo systemctl enable Zyvor Fabric
+sudo systemctl enable zyvor-fabricd
 
 # 2. After reboot, check which machines have auto-start enabled
 machinectl list-images
@@ -441,22 +443,18 @@ curl -s http://localhost:3000/api/vms/my-vm \
 **Recovery:**
 
 ```bash
-# 1. Check systemd-networkd status
-systemctl status systemd-networkd
-
-# 2. Verify bridge interface is up
+# 1. Verify bridge interface is up (host networking is managed via direct
+#    netlink calls, not systemd-networkd -- no separate service to check,
+#    and no reload step: changes apply immediately)
 ip link show br0
 ip addr show br0
 
-# 3. Check nftables rules
+# 2. Check nftables rules
 sudo nft list ruleset
 
-# 4. Verify network configurations managed by Zyvor Fabric
+# 3. Verify network configurations managed by Zyvor Fabric
 curl -s http://localhost:3000/api/networkd/bridges \
   -H "Authorization: Bearer $TOKEN" | jq
-
-# 5. Reload networkd if configuration was changed
-sudo networkctl reload
 ```
 
 ---

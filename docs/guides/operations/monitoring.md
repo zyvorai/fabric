@@ -53,7 +53,7 @@ modules:
 
 # Target
 - targets:
-  - http://Zyvor Fabric-host:3000/health
+  - http://zyvor-fabricd-host:3000/health
 ```
 
 **Load balancer health check:**
@@ -66,7 +66,7 @@ upstream Zyvor Fabric {
 }
 
 location /health {
-    proxy_pass http://Zyvor Fabric;
+    proxy_pass http://zyvor-fabricd;
     proxy_connect_timeout 2s;
     proxy_read_timeout 2s;
 }
@@ -127,12 +127,12 @@ AUTH="Authorization: Bearer $TOKEN"
 
 # Host stats
 curl -s "$HOST/api/system/resource-stats" -H "$AUTH" \
-  >> /var/log/Zyvor Fabric/host-metrics.jsonl
+  >> /var/log/zyvor-fabricd/host-metrics.jsonl
 
 # Per-VM stats
 for vm in $(curl -s "$HOST/api/vms" -H "$AUTH" | jq -r '.items[].name'); do
   echo "{\"timestamp\":\"$(date -Is)\",\"vm\":\"$vm\",\"metrics\":$(curl -s "$HOST/api/vms/$vm/metrics" -H "$AUTH")}" \
-    >> /var/log/Zyvor Fabric/vm-metrics.jsonl
+    >> /var/log/zyvor-fabricd/vm-metrics.jsonl
 done
 ```
 

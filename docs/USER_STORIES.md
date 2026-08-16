@@ -1,6 +1,6 @@
 # zyvor-fabric User Stories
 
-**Product:** systemd-native private cloud control plane
+**Product:** private cloud control plane with a pluggable VM driver (systemd-machined/vmspawn by default, or Ephemera)
 
 Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
@@ -8,7 +8,7 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 | Persona | Name | Focus |
 |---------|------|-------|
-| Private Cloud Admin | Alex | VM lifecycle on systemd-vmspawn |
+| Private Cloud Admin | Alex | VM lifecycle via the active driver (systemd-vmspawn by default, or Ephemera) |
 | Platform Engineer | Morgan | K8s operator and Terraform |
 | Developer | Jordan | CLI/TUI/API for VM operations |
 

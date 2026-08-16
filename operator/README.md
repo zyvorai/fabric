@@ -20,8 +20,8 @@ Manage virtual machines as native Kubernetes resources. The operator watches `Vi
 kubectl apply -f https://raw.githubusercontent.com/ssahani/zyvor-fabric/main/operator/crd.yaml
 
 # Install operator via Helm
-helm repo add Zyvor Fabric https://ssahani.github.io/Zyvor Fabric
-helm install Zyvor Fabric-operator Zyvor Fabric/Zyvor Fabric-operator
+helm repo add zyvor-fabric https://ssahani.github.io/zyvor-fabric
+helm install zyvor-fabricd-operator zyvor-fabric/zyvor-fabricd-operator
 ```
 
 ### Create a VM
@@ -105,7 +105,7 @@ The operator is configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ZYVOR_FABRICD_URL` | `http://Zyvor Fabric:8080` | URL of the Zyvor Fabric API |
+| `ZYVOR_FABRICD_URL` | `http://zyvor-fabricd:8080` | URL of the zyvor-fabricd API |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 
 ## Development
@@ -119,7 +119,7 @@ cargo build --release
 cargo run
 
 # Build Docker image
-docker build -t Zyvor Fabric-operator:latest .
+docker build -t zyvor-fabricd-operator:latest .
 
 # Run tests
 cargo test

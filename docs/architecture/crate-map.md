@@ -27,21 +27,25 @@ These crates form the foundation of the Zyvor Fabric platform.
 
 | Crate          | Path                    | Description                                              |
 |----------------|-------------------------|----------------------------------------------------------|
-| `Zyvor Fabric`     | `backend/Zyvor Fabric`      | Main daemon binary. Axum HTTP server, 480+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
+| `zyvor-fabricd`    | `backend/zyvor-fabricd`     | Main daemon binary. Axum HTTP server, 480+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
 | `vm-model`     | `backend/vm-model`      | Core data structures: `VM`, `VMState`, `CreateVMRequest`, `VMStartOptions`, `VMMetrics`. Shared across all crates. |
 | `state-store`  | `backend/state-store`   | File-based persistent storage. Atomic JSON writes, in-memory VM cache, paginated queries, path traversal protection. |
 | `security`     | `backend/security`      | Authentication and authorization. JWT token management, PAM integration, RBAC (Admin/User/Viewer), user database (SQLite), audit logging, Axum extractors. |
 
 ## Drivers
 
-These crates abstract the interface between Zyvor Fabric and the underlying hypervisor tooling.
+These crates implement the pluggable `VmDriver` trait boundary between Zyvor Fabric and
+the underlying VM backend, selected at startup via `driver.backend` in
+`zyvor-fabricd.toml` (`"machinectl"`, the default, or `"ephemera"`).
 
 | Crate                        | Path                              | Description                                              |
 |------------------------------|-----------------------------------|----------------------------------------------------------|
-| `Zyvor Fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions: `VMDriver` (lifecycle operations), `ResourceStatsDriver` (metrics). Defines `MachineInfo`, `LogEntry`, `LogStream`. |
-| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Process-based driver. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
-| `Zyvor Fabric-machinectl-driver` | `backend/crates/machinectl-driver`| D-Bus driver implementing `VMDriver` trait. Communicates with `systemd-machined` via `zbus` for machine lifecycle, properties, and log streaming. |
-| `Zyvor Fabric-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. |
+| `zyvor-fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions every backend implements: `VMDriver` (lifecycle), `ResourceControlDriver`/`ResourceStatsDriver` (cgroup quotas, freeze/thaw, metrics, PSI pressure), `LogDriver` (log streaming), `ImageDriver` (image registry CRUD), `ShellDriver` (exec), `CapabilityProvider`. Blanket-impl'd as `VmDriver`. |
+| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Process-based helper used by the `machinectl` backend. Builds `systemd-vmspawn` CLI commands from `VMStartOptions`. Manages QEMU subprocess execution. |
+| `vmspawnd-machinectl-driver` | `backend/crates/machinectl-driver`| Default `VmDriver` implementation. D-Bus (`zbus`) to `systemd-machined` for lifecycle/properties, cgroup v2 files directly for resource control, `zyvor-fabric-vm-driver` for `systemd-vmspawn` CLI invocation. |
+| `vmspawnd-machined-dbus`     | `backend/crates/machined-dbus`    | Low-level D-Bus proxy types for the `org.freedesktop.machine1` interface. Auto-generated zbus proxy bindings. Used by the `machinectl` backend. |
+| `zyvor-fabric-ephemera-client`   | `backend/crates/ephemera-client`  | REST client for [Ephemera](https://github.com/hypersdk/ephemera)'s API -- hand-maintained DTO mirror, since the integration is out-of-process REST rather than a Cargo dependency on Ephemera's own crates. |
+| `zyvor-fabric-ephemera-driver`   | `backend/crates/ephemera-driver`  | `VmDriver` implementation backed by Ephemera -- a disposable-VM engine with no systemd dependency. Some `ImageDriver`/shell/copy operations intentionally error rather than fake an Ephemera equivalent that doesn't exist yet. |
 
 ## Networking
 
@@ -49,7 +53,7 @@ Ten crates provide a full-featured software-defined networking stack.
 
 | Crate            | Path                         | Description                                              |
 |------------------|------------------------------|----------------------------------------------------------|
-| `networking`     | `backend/networking`         | Base networking utilities. Bridge and TAP device setup, interface enumeration, networkd configuration file generation. |
+| `networking`     | `backend/networking`         | Base networking utilities. Bridge, VLAN, TAP, bond, and VXLAN setup via direct netlink (`rtnetlink`) calls -- no config-file/reload step, no systemd-networkd dependency. |
 | `network-policy` | `backend/network-policy`     | L3/L4 network access control. Policy engine for identity-based traffic rules. Integrates with nftables for enforcement. |
 | `service-mesh`   | `backend/service-mesh`       | Service discovery and load balancing. Service registration, backend health checking, traffic routing. |
 | `traffic-shaping`| `backend/traffic-shaping`    | Quality of Service (QoS) management. Bandwidth limits, priority queuing via Linux `tc` (traffic control). |
@@ -59,6 +63,7 @@ Ten crates provide a full-featured software-defined networking stack.
 | `packet-mirror`  | `backend/packet-mirror`      | Traffic mirroring. Mirror session management for network debugging and analysis. |
 | `nat-gateway`    | `backend/nat-gateway`        | NAT gateway management. SNAT/DNAT rules, NAT pools, gateway lifecycle. |
 | `net-monitor`    | `backend/net-monitor`        | Network monitoring. Per-VM bandwidth metrics collection, alerting policies, threshold-based notifications. |
+| `zyvor-fabric-dnsmasq-manager` | `backend/crates/dnsmasq-manager` | Per-bridge DHCP server: spawns and supervises a `dnsmasq` process directly, replacing systemd-networkd's built-in `[DHCPServer]`. |
 
 ## Storage
 
@@ -168,14 +173,17 @@ Zyvor Fabric (main binary)
   |-- state-store --> vm-model
   |-- security
   |-- zyvor-fabric-vm-driver --> vm-model
-  |-- Zyvor Fabric-driver-core --> vm-model
-  |-- Zyvor Fabric-machinectl-driver --> Zyvor Fabric-driver-core, Zyvor Fabric-machined-dbus
+  |-- zyvor-fabric-driver-core --> vm-model
+  |-- vmspawnd-machinectl-driver --> zyvor-fabric-driver-core, vmspawnd-machined-dbus, zyvor-fabric-vm-driver
+  |-- zyvor-fabric-ephemera-client
+  |-- zyvor-fabric-ephemera-driver --> zyvor-fabric-driver-core, zyvor-fabric-ephemera-client
   |-- Zyvor Fabric-storage
   |-- Zyvor Fabric-system
   |-- Zyvor Fabric-vm
   |-- Zyvor Fabric-lock-manager
   |-- Zyvor Fabric-cgroup
   |-- networking
+  |-- zyvor-fabric-dnsmasq-manager
   |-- network-policy
   |-- service-mesh
   |-- traffic-shaping

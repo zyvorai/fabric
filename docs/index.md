@@ -114,7 +114,7 @@ Detailed documentation for each major feature area.
 | Document | Description |
 |----------|-------------|
 | [Networking Overview](networking.md) | Network architecture and configuration |
-| systemd-networkd Integration | Bridges, VLANs, bonds, taps, macvtaps, VXLANs, SR-IOV |
+| Networking (netlink) | Bridges, VLANs, bonds, taps, macvtaps, VXLANs, SR-IOV |
 | Network Policies | Cilium-style label-based ingress/egress rules |
 | VM Firewall | Per-VM firewall profiles and zones via nftables |
 | Service Mesh | Virtual IP load balancing (round-robin, least-conn, IP-hash) |
@@ -125,7 +125,7 @@ Detailed documentation for each major feature area.
 | Packet Mirror | Traffic capture and debugging |
 | Network Monitor | Per-VM bandwidth tracking with threshold alerts |
 | Floating IPs | Virtual IP allocation and VM assignment |
-| DHCP Servers | systemd-networkd DHCP server management |
+| DHCP Servers | Per-bridge dnsmasq-managed DHCP servers |
 | DHCP Server | Built-in DHCP server on bridge interfaces |
 | Port Forwarding | NAT-based port forwarding rules |
 
@@ -228,11 +228,11 @@ Detailed documentation for each major feature area.
 | [API Overview](api.md) | Authentication, pagination, error format |
 | VM Endpoints | CRUD, lifecycle, metrics, cloud-init |
 | Storage Endpoints | Pool and volume management |
-| Network Endpoints | systemd-networkd, policies, firewall, mesh |
+| Network Endpoints | Bridges/VLANs/bonds via netlink, policies, firewall, mesh |
 | Security Endpoints | Auth, audit, encryption, tenants |
 | System Endpoints | CPU topology, NUMA, memory, firmware |
 | Enterprise Endpoints | Datacenters, clusters, hosts, DRS |
-| Machine Endpoints | systemd-machined integration |
+| Machine Endpoints | Pluggable VM driver (systemd-machined by default, or Ephemera) |
 | Monitoring Endpoints | Analytics, events, notifications, schedules |
 | Backup Endpoints | Backup CRUD, policies, restore |
 | Billing Endpoints | Usage tracking, pricing, and invoicing |
@@ -312,7 +312,7 @@ Detailed documentation for each major feature area.
 | Crate Map | 40 crates and their dependencies |
 | Adding an API Endpoint | Step-by-step guide for new endpoints |
 | Adding a Storage Backend | Driver trait implementation guide |
-| Adding a Network Feature | Integration with systemd-networkd |
+| Adding a Network Feature | Integration with the netlink-based networking crate |
 | Code Style | Formatting, naming, error handling conventions |
 | Security Guidelines | Input validation, path traversal prevention, audit |
 
@@ -334,7 +334,7 @@ The REST API is organized into the following endpoint groups:
 | Storage Pools | `/api/storage/pools/` | 14 | Pool CRUD, health, stats, refresh |
 | Volumes | `/api/storage/pools/{name}/volumes/` | 6 | Volume CRUD, resize, attach, detach |
 | Distributed Storage | `/api/distributed-storage/` | 18 | Cross-node pools, migrations, policies |
-| systemd-networkd | `/api/networkd/` | 35+ | Bridges, VLANs, bonds, taps, VXLANs, SR-IOV |
+| Networking | `/api/networkd/` | 35+ | Bridges, VLANs, bonds, taps, VXLANs, SR-IOV (netlink-based) |
 | Network Policies | `/api/network-policies/` | 5 | Cilium-style ingress/egress rules |
 | VM Firewall | `/api/vm-firewall/` | 8+ | Per-VM firewall profiles and zones |
 | Service Mesh | `/api/service-mesh/` | 10+ | Virtual IP and load balancing |
@@ -345,7 +345,7 @@ The REST API is organized into the following endpoint groups:
 | Packet Mirror | `/api/packet-mirror/` | 4+ | Traffic capture |
 | Net Monitor | `/api/net-monitor/` | 4+ | Bandwidth tracking and alerts |
 | Floating IPs | `/api/floating-ips/` | 4 | Virtual IP allocation |
-| DHCP | `/api/dhcp-servers/` | 2 | systemd-networkd DHCP servers |
+| DHCP | `/api/dhcp-servers/` | 2 | Per-bridge dnsmasq-managed DHCP servers |
 | DNS | `/api/dns/` | 4 | DNS configuration |
 | Encryption | `/api/encryption/` | 11 | Key providers, policies, VM encryption |
 | Backups | `/api/backups/` | 11 | Backup CRUD, policies, restore, stats |
@@ -368,7 +368,7 @@ The REST API is organized into the following endpoint groups:
 | Resource Pools | `/api/resource-pools/` | 7 | Resource pool management |
 | Zones | `/api/zones/` | 3 | Availability zones |
 | Spot Instances | `/api/spot-instances/` | 3 | Spot VM management |
-| Machines | `/api/machines/` | 20 | systemd-machined integration |
+| Machines | `/api/machines/` | 20 | Pluggable VM driver (systemd-machined by default, or Ephemera) |
 | Tenants | `/api/tenants/` | varies | Multi-tenancy and projects |
 | Settings | `/api/settings` | 2 | Global settings |
 | Plugins | `/api/plugins` | 1 | Plugin registry |

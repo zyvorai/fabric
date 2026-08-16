@@ -1,6 +1,6 @@
 # Zyvor Fabric
 
-**A systemd-native private cloud control plane.**
+**A private cloud control plane with a pluggable VM driver.**
 
 
 ## 📖 Feature Guide
@@ -17,7 +17,7 @@ Clustering, networking, security, storage, operators, Terraform, monitoring, HA,
 ├──────────────────────────────────────────────────────────────┤
 │  Daemon       Zyvor Fabric — 480+ REST endpoints · WebSocket │
 ├──────────────────────────────────────────────────────────────┤
-│  Runtime      systemd-vmspawn · systemd-machined · KVM       │
+│  Runtime      systemd-machined (default) or Ephemera · KVM   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -29,7 +29,7 @@ Part of the [Zyvor](https://zyvor.dev) product family.
 
 | Problem | Zyvor Fabric answer |
 |---------|---------------------|
-| Private cloud = heavy hypervisor stack | systemd-native VMs via vmspawn |
+| Private cloud = heavy hypervisor stack | Lightweight VM driver — systemd-vmspawn/machinectl by default, or Ephemera (no systemd dependency) |
 | No unified API across interfaces | 480+ REST endpoints, 3 WebSocket channels |
 | Scripting vs GUI is either/or | CLI + TUI + web + Terraform + K8s operator |
 | Enterprise needs RBAC + audit | JWT, roles, audit export, encryption at rest |
@@ -63,7 +63,9 @@ zyvorctl vm create --name web-01 --cpus 2 --memory 4G
 zyvorctl-tui
 
 # Web UI → https://localhost:8443
-sudo systemctl start zyvor-fabric
+sudo zyvor-fabricd                   # run directly (no systemd required)
+# — or, if you'd rather run it under systemd (optional, not required):
+sudo systemctl start zyvor-fabricd
 ```
 
 | Scenario | Path |
@@ -84,7 +86,9 @@ flowchart TB
   Web[Web UI] --> Daemon
   TF[Terraform] --> Daemon
   Op[K8s Operator] --> Daemon
-  Daemon --> VS[systemd-vmspawn]
+  Daemon --> Driver{VM driver}
+  Driver --> VS[systemd-vmspawn / machinectl]
+  Driver --> Eph[Ephemera]
 ```
 
 ---
@@ -112,7 +116,7 @@ flowchart TB
 | **Aether** | Universal runtime portability |
 | **Veyron** | KubeVirt VM command center |
 | **IronWolf** | Metal3 bare-metal automation |
-| **zyvor-fabric** | systemd-native private cloud |
+| **zyvor-fabric** | Private cloud with a pluggable VM driver |
 
 → [zyvor.dev](https://zyvor.dev)
 

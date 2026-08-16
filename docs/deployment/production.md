@@ -39,13 +39,24 @@ hardening, backup strategy, and monitoring setup.
 | Component           | Minimum Version | Notes                                   |
 |---------------------|-----------------|-----------------------------------------|
 | Linux Kernel        | 5.15+           | 6.x recommended for best KVM support    |
-| systemd             | 254+            | 260+ for full Zyvor Fabric feature support    |
-| systemd-vmspawn     | 254+            | Included with systemd                    |
 | QEMU                | 7.0+            | 8.x+ recommended                        |
 | KVM                 | Kernel built-in | Verify with `lsmod | grep kvm`          |
 | Rust                | 1.75+           | For building from source                 |
 | PAM                 | System default  | Required for PAM authentication          |
 | SQLite              | 3.35+           | Bundled via rusqlite                     |
+
+zyvor-fabricd's VM driver is pluggable (`driver.backend` in
+`zyvor-fabricd.toml`), so the systemd requirement below depends on which
+backend you use:
+
+| Component           | Minimum Version | Notes                                   |
+|---------------------|-----------------|-----------------------------------------|
+| systemd + systemd-vmspawn | 254+      | Only for `driver.backend = "machinectl"` (the default) |
+| [Ephemera](https://github.com/hypersdk/ephemera) | latest | Only for `driver.backend = "ephemera"` — no systemd dependency at all |
+
+zyvor-fabricd itself (the daemon) has no hard systemd dependency either
+way — it runs fine as a plain process or under systemd, your choice (see
+[systemd-service.md](systemd-service.md)).
 
 ### Kernel Modules
 
@@ -72,17 +83,19 @@ grep -cE '(vmx|svm)' /proc/cpuinfo
 # 2. Verify KVM is available
 ls -la /dev/kvm
 
-# 3. Verify systemd-vmspawn is installed
+# 3. If using driver.backend = "machinectl" (the default), verify
+#    systemd-vmspawn is installed and systemd-machined is running:
 which systemd-vmspawn
-
-# 4. Verify systemd-machined is running
 systemctl status systemd-machined
+#    If using driver.backend = "ephemera" instead, verify the `ephemera`
+#    binary is installed and reachable at the URL configured in
+#    zyvor-fabricd.toml — neither of the above applies.
 
-# 5. Create the Zyvor Fabric system user (optional, for non-root operation)
+# 4. Create the zyvor-fabricd system user (optional, for non-root operation)
 sudo useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin zyvor-fabricd
 
-# 6. Ensure the user has access to KVM
-sudo usermod -aG kvm Zyvor Fabric
+# 5. Ensure the user has access to KVM
+sudo usermod -aG kvm zyvor-fabricd
 ```
 
 ---
@@ -102,12 +115,12 @@ sudo apt install -y build-essential libssl-dev libpam0g-dev libsystemd-dev libsq
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/example/Zyvor Fabric.git
+git clone https://github.com/ssahani/zyvor-fabric.git
 cd backend
 cargo build --release
 
 # Install binaries
-sudo install -m 755 target/release/Zyvor Fabric /usr/local/bin/
+sudo install -m 755 target/release/zyvor-fabricd /usr/local/bin/
 sudo install -m 755 target/release/zyvorctl /usr/local/bin/
 ```
 
@@ -117,11 +130,11 @@ sudo install -m 755 target/release/zyvorctl /usr/local/bin/
 # Create required directories
 sudo mkdir -p /var/lib/zyvor-fabricd/{images,storage,vms,snapshots,backups,cloud-init,certificates}
 sudo mkdir -p /etc/zyvor-fabricd
-sudo mkdir -p /var/log/Zyvor Fabric
+sudo mkdir -p /var/log/zyvor-fabricd
 
-# Set ownership (if running as Zyvor Fabric user)
+# Set ownership (if running as the zyvor-fabricd user)
 sudo chown -R zyvor-fabricd:zyvor-fabricd /var/lib/zyvor-fabricd
-sudo chown -R Zyvor Fabric:Zyvor Fabric /var/log/Zyvor Fabric
+sudo chown -R zyvor-fabricd:zyvor-fabricd /var/log/zyvor-fabricd
 ```
 
 ---
@@ -141,7 +154,7 @@ listen = "127.0.0.1:9095"
 
 # CORS origins allowed for the web UI.
 # In production, restrict to the actual domain(s) serving the UI.
-cors_origins = ["https://Zyvor Fabric.example.com"]
+cors_origins = ["https://zyvor-fabric.example.com"]
 
 [storage]
 # Root directory for all persistent state.
@@ -154,11 +167,11 @@ image_path = "/var/lib/zyvor-fabricd/images"
 # Default bridge for VM networking.
 bridge = "br0"
 
-# Directory for generated systemd-networkd configuration files.
-networkd_config_dir = "/etc/systemd/network"
-
-# Prefix for generated network config file names.
-networkd_file_prefix = "50-Zyvor Fabric-"
+# `networkd_config_dir`/`networkd_file_prefix` are legacy config fields —
+# host networking (bridges/VLANs/bonds/VXLAN, WireGuard mesh) now goes
+# through netlink directly rather than writing systemd-networkd
+# .netdev/.network files, so these no longer affect anything and can be
+# left at their defaults.
 
 [auth]
 # Enable authentication (strongly recommended for production).
@@ -237,7 +250,7 @@ curl -s http://127.0.0.1:9095/api/v1/auth/users \
 Zyvor Fabric can authenticate against the system PAM stack. Create a PAM service file:
 
 ```bash
-sudo tee /etc/pam.d/Zyvor Fabric << 'EOF'
+sudo tee /etc/pam.d/zyvor-fabricd << 'EOF'
 auth    required    pam_unix.so
 account required    pam_unix.so
 EOF
@@ -255,22 +268,22 @@ Zyvor Fabric does not terminate TLS directly. Use a reverse proxy for TLS termin
 ### nginx Configuration
 
 ```nginx
-upstream Zyvor Fabric {
+upstream zyvor_fabricd {
     server 127.0.0.1:9095;
 }
 
 server {
     listen 443 ssl http2;
-    server_name Zyvor Fabric.example.com;
+    server_name zyvor-fabric.example.com;
 
-    ssl_certificate     /etc/ssl/certs/Zyvor Fabric.crt;
-    ssl_certificate_key /etc/ssl/private/Zyvor Fabric.key;
+    ssl_certificate     /etc/ssl/certs/zyvor-fabricd.crt;
+    ssl_certificate_key /etc/ssl/private/zyvor-fabricd.key;
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
     # REST API and static web UI
     location / {
-        proxy_pass http://Zyvor Fabric;
+        proxy_pass http://zyvor_fabricd;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -279,7 +292,7 @@ server {
 
     # WebSocket console
     location /api/v1/ws/ {
-        proxy_pass http://Zyvor Fabric;
+        proxy_pass http://zyvor_fabricd;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -290,7 +303,7 @@ server {
 
     # SSE event stream
     location /api/v1/events/stream {
-        proxy_pass http://Zyvor Fabric;
+        proxy_pass http://zyvor_fabricd;
         proxy_set_header Connection '';
         proxy_http_version 1.1;
         proxy_buffering off;
@@ -302,14 +315,14 @@ server {
 
 ---
 
-## Systemd Service Setup
+## Systemd Service Setup (Optional)
 
-See [systemd-service.md](systemd-service.md) for the complete unit file. Quick setup:
+zyvor-fabricd doesn't require systemd — packages ship `zyvor-fabricd.service` but don't enable or start it automatically. If you want to run it under systemd, see [systemd-service.md](systemd-service.md) for the complete unit file. Quick setup:
 
 ```bash
-sudo install -m 644 docs/deployment/Zyvor Fabric.service /etc/systemd/system/
+sudo install -m 644 systemd/zyvor-fabricd.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now Zyvor Fabric
+sudo systemctl enable --now zyvor-fabricd
 ```
 
 ---
@@ -432,11 +445,11 @@ sudo nft add rule inet filter input tcp dport 9095 drop
 # Zyvor Fabric-backup.sh - Daily backup script
 set -euo pipefail
 
-BACKUP_DIR="/backup/Zyvor Fabric/$(date +%Y-%m-%d)"
+BACKUP_DIR="/backup/zyvor-fabricd/$(date +%Y-%m-%d)"
 mkdir -p "$BACKUP_DIR"
 
 # Stop the daemon briefly for consistent backup (optional)
-# sudo systemctl stop Zyvor Fabric
+# sudo systemctl stop zyvor-fabricd
 
 # Back up configuration and state
 sudo tar czf "$BACKUP_DIR/config.tar.gz" /etc/zyvor-fabricd/
@@ -451,10 +464,10 @@ sudo tar czf "$BACKUP_DIR/state.tar.gz" \
 sudo rsync -a --delete /var/lib/zyvor-fabricd/images/ "$BACKUP_DIR/images/"
 
 # Restart if stopped
-# sudo systemctl start Zyvor Fabric
+# sudo systemctl start zyvor-fabricd
 
 # Retain 30 days of backups
-find /backup/Zyvor Fabric/ -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
+find /backup/zyvor-fabricd/ -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
 
 echo "Backup completed: $BACKUP_DIR"
 ```
@@ -554,7 +567,7 @@ groups:
 
 ```bash
 # Graceful restart (in-flight requests complete, background tasks shut down)
-sudo systemctl restart Zyvor Fabric
+sudo systemctl restart zyvor-fabricd
 ```
 
 ### Upgrading
@@ -564,19 +577,19 @@ sudo systemctl restart Zyvor Fabric
 cd backend && cargo build --release
 
 # 2. Stop the daemon
-sudo systemctl stop Zyvor Fabric
+sudo systemctl stop zyvor-fabricd
 
 # 3. Back up state
 sudo tar czf /tmp/zyvor-fabricd-pre-upgrade.tar.gz /var/lib/zyvor-fabricd/
 
 # 4. Install new binary
-sudo install -m 755 target/release/Zyvor Fabric /usr/local/bin/
+sudo install -m 755 target/release/zyvor-fabricd /usr/local/bin/
 
 # 5. Start the daemon
-sudo systemctl start Zyvor Fabric
+sudo systemctl start zyvor-fabricd
 
 # 6. Verify
-journalctl -u Zyvor Fabric -n 20
+journalctl -u zyvor-fabricd -n 20
 curl -sf http://127.0.0.1:9095/api/v1/vms | jq .total
 ```
 
@@ -585,7 +598,7 @@ curl -sf http://127.0.0.1:9095/api/v1/vms | jq .total
 The SQLite user database requires minimal maintenance. To compact it:
 
 ```bash
-sudo systemctl stop Zyvor Fabric
+sudo systemctl stop zyvor-fabricd
 sudo sqlite3 /var/lib/zyvor-fabricd/auth.db "VACUUM;"
-sudo systemctl start Zyvor Fabric
+sudo systemctl start zyvor-fabricd
 ```

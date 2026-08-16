@@ -91,7 +91,7 @@ The scan runs asynchronously. Use the scan ID or the results endpoint to check p
 ### Scan Prerequisites
 
 - The VM must be **running**. Stopped VMs cannot be scanned.
-- The scan connects to the VM via the machine shell interface. Ensure the VM is accessible via `systemd-machined`.
+- The scan connects to the VM via the machine shell interface (`machinectl shell` on the default backend, or the vsock guest agent on the `ephemera` backend). Ensure the VM is accessible through the active VM driver.
 - Only one scan can run against a given VM at a time.
 
 ---
@@ -188,7 +188,7 @@ Add to cron for daily execution:
 
 ```bash
 # Run compliance scan daily at 2:00 AM
-0 2 * * * /usr/local/bin/compliance-scan.sh >> /var/log/Zyvor Fabric/compliance.log 2>&1
+0 2 * * * /usr/local/bin/compliance-scan.sh >> /var/log/zyvor-fabricd/compliance.log 2>&1
 ```
 
 ### Alerting on Failures

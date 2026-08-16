@@ -18,7 +18,7 @@ project, from setting up your development environment to submitting pull request
 
 ```bash
 # Clone the repository
-git clone https://github.com/example/Zyvor Fabric.git
+git clone https://github.com/ssahani/zyvor-fabric.git
 cd zyvor-fabric
 
 # Build all backend crates
@@ -31,7 +31,7 @@ cargo test
 cd ../web && npm install && npm run build
 
 # Run the daemon locally (needs root for KVM/network access)
-sudo ./backend/target/debug/Zyvor Fabric
+sudo ./backend/target/debug/zyvor-fabricd
 ```
 
 ---
@@ -39,16 +39,19 @@ sudo ./backend/target/debug/Zyvor Fabric
 ## Repository Structure
 
 ```
-Zyvor Fabric/
+zyvor-fabric/
   |
-  +-- backend/                 # Rust workspace (46 crates)
-  |   +-- Zyvor Fabric/            # Main daemon binary
+  +-- backend/                 # Rust workspace
+  |   +-- zyvor-fabricd/          # Main daemon binary
   |   +-- zyvorctl/               # CLI client
   |   +-- zyvorctl-tui/           # Terminal UI client
   |   +-- vm-model/            # Core data structures
   |   +-- state-store/         # Persistent state storage
   |   +-- security/            # Auth, JWT, PAM, RBAC
-  |   +-- zyvor-fabric-vm-driver/      # systemd-vmspawn process driver
+  |   +-- crates/driver-core/  # VmDriver trait family (pluggable backend)
+  |   +-- crates/machinectl-driver/ # systemd-machined/vmspawn backend (default)
+  |   +-- crates/ephemera-driver/   # Ephemera backend (no systemd dependency)
+  |   +-- zyvor-fabric-vm-driver/   # systemd-vmspawn CLI wrapper (used by machinectl-driver + host-agent)
   |   +-- cloud-init/          # cloud-init ISO generation
   |   +-- prometheus-exporter/ # Prometheus metrics
   |   +-- vnc-proxy/           # WebSocket-to-VNC proxy
@@ -127,7 +130,17 @@ launched via the `spawn_bg!` macro and participate in graceful shutdown.
 
 ### Driver Abstraction
 
-The `VMDriver` trait in `Zyvor Fabric-driver-core` defines the interface for VM
-lifecycle operations. The concrete implementation (`MachinectlDriver`) uses
-D-Bus to communicate with `systemd-machined`. This separation allows testing
-with mock drivers.
+`VmDriver` (an umbrella over `VMDriver`, `ResourceControlDriver`,
+`ResourceStatsDriver`, `LogDriver`, `ImageDriver`, `ShellDriver`, and
+`CapabilityProvider`) in `driver-core` defines the interface for VM
+lifecycle, cgroup resource control, log streaming, image management, and
+shell exec. It has two concrete implementations, selected at startup by
+`driver.backend` in `zyvor-fabricd.toml`:
+
+- `MachinectlDriver` (default) — uses D-Bus to talk to `systemd-machined`,
+  plus `systemd-vmspawn` for VM launch.
+- `EphemeraDriver` — talks to a separate [Ephemera](https://github.com/hypersdk/ephemera)
+  process over its REST API; no systemd dependency at all.
+
+This separation is what makes testing with mock drivers possible, and is
+also the actual production mechanism for running without systemd.

@@ -200,7 +200,7 @@ Zyvor Fabric authenticates against the system's PAM stack. This means:
 
 ### PAM Service Configuration
 
-The PAM authentication call uses the service name configured in the Zyvor Fabric binary (typically `Zyvor Fabric` or `login`). Ensure the PAM service file exists at `/etc/pam.d/Zyvor Fabric` or that the fallback service (`/etc/pam.d/other`) is permissive enough for your use case.
+The PAM authentication call uses the service name configured in the zyvor-fabricd binary (typically `zyvor-fabricd` or `login`). Ensure the PAM service file exists at `/etc/pam.d/zyvor-fabricd` or that the fallback service (`/etc/pam.d/other`) is permissive enough for your use case.
 
 ### Security Notes
 
@@ -293,7 +293,7 @@ curl -s -X POST http://localhost:3000/api/auth/2fa/setup \
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "provisioning_uri": "otpauth://totp/Zyvor Fabric:admin?secret=JBSWY3DPEHPK3PXP&issuer=Zyvor Fabric",
+  "provisioning_uri": "otpauth://totp/zyvor-fabricd:admin?secret=JBSWY3DPEHPK3PXP&issuer=zyvor-fabricd",
   "qr_code": "data:image/png;base64,..."
 }
 ```

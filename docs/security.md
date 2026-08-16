@@ -38,7 +38,7 @@ To set a custom admin password before first startup:
 ```bash
 # Option 1: Environment variable
 export ZYVOR_FABRICD_ADMIN_PASSWORD="your-strong-password"
-sudo systemctl start Zyvor Fabric
+sudo systemctl start zyvor-fabricd
 
 # Option 2: Config file
 # Add to /etc/zyvor-fabricd/zyvor-fabricd.toml:

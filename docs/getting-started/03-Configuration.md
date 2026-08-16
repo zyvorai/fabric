@@ -270,7 +270,7 @@ Environment variables override config file values for sensitive settings.
 Set environment variables in the systemd service unit for production:
 
 ```bash
-sudo systemctl edit Zyvor Fabric
+sudo systemctl edit zyvor-fabricd
 ```
 
 Add:
@@ -285,7 +285,7 @@ Then reload and restart:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart Zyvor Fabric
+sudo systemctl restart zyvor-fabricd
 ```
 
 ---

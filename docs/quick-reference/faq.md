@@ -8,26 +8,46 @@
 
 Zyvor Fabric is an open-source virtual machine management platform built in Rust. It
 provides a REST API, web UI, and CLI for managing the full lifecycle of virtual
-machines on Linux hosts using systemd-vmspawn, systemd-machined, QEMU, and KVM.
+machines on Linux hosts, using QEMU and KVM via a pluggable VM driver
+(systemd-vmspawn/systemd-machined by default, or Ephemera -- see "What VM driver
+backends are available?" below).
 
 ### How is Zyvor Fabric different from libvirt/virt-manager?
 
-Zyvor Fabric is built natively on systemd's machine management infrastructure rather
-than libvirt. It uses `systemd-vmspawn` for VM execution, `systemd-machined` for
-machine registration, and `systemd-networkd` for network configuration. This
-provides tighter systemd integration, journald logging, and cgroup-based resource
-management without the libvirt abstraction layer.
+By default, Zyvor Fabric is built on systemd's machine management infrastructure
+rather than libvirt: `systemd-vmspawn` for VM execution, `systemd-machined` for
+machine registration, journald logging, and cgroup-based resource management,
+without the libvirt abstraction layer. Host networking always uses direct
+netlink calls rather than systemd-networkd. Zyvor Fabric also supports a
+systemd-free VM driver (Ephemera) behind the same REST API, for environments
+that don't want the systemd dependency at all.
+
+### What VM driver backends are available?
+
+Set `driver.backend` in `zyvor-fabricd.toml`:
+- `"machinectl"` (default) -- systemd-machined via D-Bus, VMs launched with
+  `systemd-vmspawn`.
+- `"ephemera"` -- [Ephemera](https://github.com/hypersdk/ephemera), a
+  disposable-VM engine with no systemd dependency.
+
+Both support VM lifecycle, cgroup resource control, log streaming, hotplug,
+image management, and shell exec through the same API. A few operations
+(interactive shell copy-to/copy-from, bind-mounts, SSH connection info, tar
+image formats) are currently `machinectl`-only.
 
 ### What hypervisor does Zyvor Fabric use?
 
 Zyvor Fabric uses QEMU with KVM hardware acceleration. VMs are launched via
-`systemd-vmspawn`, which handles the QEMU process lifecycle, resource allocation,
-and systemd integration.
+`systemd-vmspawn` (the `machinectl` driver backend, which handles the QEMU
+process lifecycle, resource allocation, and systemd integration) or via
+Ephemera's own QEMU/Cloud Hypervisor/Firecracker launch path (the `ephemera`
+backend).
 
 ### What operating systems can Zyvor Fabric manage?
 
 Zyvor Fabric can run any operating system that QEMU/KVM supports, including Linux,
-Windows, FreeBSD, and others. The host must be Linux with systemd 254 or later.
+Windows, FreeBSD, and others. The host must be Linux; systemd 254+ is only
+required when using the default `machinectl` driver backend.
 
 ### How many VMs can Zyvor Fabric manage?
 
@@ -58,16 +78,20 @@ concurrent VM operations, network configuration, and real-time event streaming.
 ### What is the role of systemd-machined?
 
 `systemd-machined` is a systemd service that maintains a registry of locally
-running virtual machines and containers. Zyvor Fabric uses it (via D-Bus) to query
-VM state, list machines, access properties, and manage machine lifecycle. The
-`MachinectlDriver` crate implements the `VMDriver` trait using this interface.
+running virtual machines and containers. On the default `machinectl` driver
+backend, Zyvor Fabric uses it (via D-Bus) to query VM state, list machines,
+access properties, and manage machine lifecycle. The `MachinectlDriver` crate
+implements the `VMDriver` trait using this interface. The `ephemera` backend
+has no equivalent dependency.
 
 ### What is the role of systemd-vmspawn?
 
 `systemd-vmspawn` is a systemd tool that launches QEMU virtual machines with
 proper systemd integration: cgroup placement, journal logging, machine
-registration, and resource management. Zyvor Fabric's `zyvor-fabric-vm-driver` crate builds
-the command-line invocation with all supported options from systemd v260.
+registration, and resource management. On the `machinectl` driver backend,
+`zyvor-fabric-vm-driver` builds the command-line invocation with all supported
+options from systemd v260. The `ephemera` backend launches VMs through its own
+QEMU/Cloud Hypervisor/Firecracker path instead.
 
 ### Why are there 46 crates?
 
@@ -304,7 +328,8 @@ curl -s http://127.0.0.1:9095/api/v1/secrets \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-Secrets can be injected into VMs via cloud-init or systemd credentials using
+Secrets can be injected into VMs via cloud-init (both driver backends) or
+systemd credentials (`machinectl` backend only) using
 `POST /api/v1/vms/{name}/secrets`.
 
 ### How do I scan for compliance?
@@ -362,7 +387,8 @@ curl -s "http://127.0.0.1:9095/api/v1/logs?query=error&limit=50" \
 
 Logs can also be streamed in real-time via SSE at
 `GET /api/v1/logs/{vm_name}/stream`. Logs are sourced from the systemd journal
-for each VM's machine scope.
+for each VM's machine scope (`machinectl` backend), or from Ephemera's
+captured console output (`ephemera` backend).
 
 ### How do I connect iSCSI storage?
 
@@ -447,7 +473,7 @@ For external access, always use a reverse proxy with TLS termination.
 Set `daemon.cors_origins` in `zyvor-fabricd.toml`:
 ```toml
 [daemon]
-cors_origins = ["https://Zyvor Fabric.example.com", "http://localhost:5173"]
+cors_origins = ["https://zyvor-fabric.example.com", "http://localhost:5173"]
 ```
 
 ---
@@ -456,10 +482,13 @@ cors_origins = ["https://Zyvor Fabric.example.com", "http://localhost:5173"]
 
 ### Zyvor Fabric fails to start with "Failed to initialize machined D-Bus driver"
 
+This only happens with the default `driver.backend = "machinectl"`. It means
 `systemd-machined` is not running or not installed. Start it:
 ```bash
 sudo systemctl start systemd-machined
 ```
+Alternatively, switch to the systemd-free `ephemera` driver backend (see "What
+VM driver backends are available?" above), which has no D-Bus dependency.
 
 ### VMs fail to start with permission errors
 
@@ -484,8 +513,10 @@ If using the Vite dev server, add `http://localhost:5173`.
 
 ### VM state shows "Unknown"
 
-The VM may have been started outside of Zyvor Fabric, or `systemd-machined` may have
-lost track of it. Check with `machinectl list` and verify the VM is registered.
+The VM may have been started outside of Zyvor Fabric, or the active VM driver
+may have lost track of it. Check with `machinectl list` (`machinectl` backend)
+or `curl http://127.0.0.1:7788/v1/vms` (`ephemera` backend) and verify the VM
+is registered.
 
 ### High memory usage from Zyvor Fabric process
 

@@ -96,7 +96,9 @@ Content-Type: application/json
 
 ### Start a VM with Options
 
-The `POST /vms/:name/start` endpoint accepts an optional JSON body with `VMStartOptions` to control how `systemd-vmspawn` launches the VM. All fields are optional and default sensibly when omitted.
+The `POST /vms/:name/start` endpoint accepts an optional JSON body with `VMStartOptions` to control how the active VM driver launches the VM. All fields are optional and default sensibly when omitted.
+
+With `driver.backend = "machinectl"` (default) this maps directly to `systemd-vmspawn(1)` options, as documented below. With `driver.backend = "ephemera"`, `VMStartOptions` only applies to a VM's first launch (translated into an Ephemera `CreateVmRequest`) and these fields have no equivalent yet — a request setting any of them fails with a clear error rather than silently ignoring it: `tpm`, `secure_boot`, `vsock`, `bind_mounts`, `extra_drives`, `bind_users`, `credentials`/`load_credentials`, `smbios11`, `directory`. Everything else (cpus/memory from the VM record, `network_tap`/`network_user_mode`, `linux`/`initrd`/`firmware`, `extra_args`) is honored on both backends.
 
 ```
 POST /api/vms/myvm/start
@@ -195,7 +197,7 @@ Content-Type: application/json
 
 **LoadCredential object:** `{ "id": string, "path": string }` — `path` is the file to load the credential from (`"value"` is accepted as an alias for backward compatibility)
 
-All fields map directly to `systemd-vmspawn(1)` options (systemd v260).
+On the `machinectl` backend, all fields map directly to `systemd-vmspawn(1)` options (systemd v260) — see the backend note above for the `ephemera` backend's subset.
 
 ## Snapshots
 

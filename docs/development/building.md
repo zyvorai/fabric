@@ -248,10 +248,12 @@ cargo test -- --test-threads=1
 
 ```bash
 # Run integration tests for the main daemon
-cargo test -p Zyvor Fabric --test '*'
+cargo test -p zyvor-fabricd --test '*'
 
 # Note: Some integration tests may require root access for
-# KVM, network bridge, and systemd-machined operations.
+# KVM, network bridge, and VM driver operations (systemd-machined for
+# driver.backend = "machinectl", or a running `ephemera serve` for
+# driver.backend = "ephemera").
 ```
 
 ---
@@ -313,12 +315,12 @@ frontend:
 cd backend
 
 # Option A: Manual rebuild
-cargo build && sudo ./target/debug/Zyvor Fabric
+cargo build && sudo ./target/debug/zyvor-fabricd
 
 # Option B: Auto-rebuild with cargo-watch
 cargo watch -x build
 # Then in another terminal:
-sudo ./target/debug/Zyvor Fabric
+sudo ./target/debug/zyvor-fabricd
 ```
 
 ### Terminal 2: Frontend
@@ -339,8 +341,8 @@ listen = "127.0.0.1:9095"
 cors_origins = ["http://127.0.0.1:9095", "http://localhost:5173"]
 
 [storage]
-path = "/tmp/Zyvor Fabric-dev"
-image_path = "/tmp/Zyvor Fabric-dev/images"
+path = "/tmp/zyvor-fabricd-dev"
+image_path = "/tmp/zyvor-fabricd-dev/images"
 
 [network]
 bridge = "br0"

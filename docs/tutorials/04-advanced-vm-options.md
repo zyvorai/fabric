@@ -4,6 +4,16 @@ Fine-tune VM behavior with VMStartOptions, CPU and memory hotplug, online disk
 resize, cloud-init customization, bind mounts, and credentials. This tutorial
 covers the full surface area of systemd-vmspawn options exposed through the API.
 
+> **Backend note:** `driver.backend` in `zyvor-fabricd.toml` selects the VM
+> driver — `"machinectl"` (default, described in full below) or `"ephemera"`
+> (an alternative disposable-VM engine with no systemd dependency). On the
+> Ephemera backend, VMStartOptions is only honored for a first launch and a
+> handful of options have no equivalent yet and are rejected with a clear
+> error rather than silently ignored: TPM, SecureBoot, VSOCK passthrough,
+> bind mounts, extra drives, systemd credentials, and SMBIOS injection.
+> Everything else in this tutorial (CPU/memory, networking mode, kernel/
+> initrd/firmware, extra kernel args) works on both.
+
 **Level:** Intermediate
 **Time:** 40 minutes
 **Prerequisites:** Completed [Tutorial 01](01-first-vm.md)

@@ -8,35 +8,35 @@ Organizations running Linux infrastructure need a unified control plane for virt
 - **Too basic** — Manual QEMU/KVM management with shell scripts doesn't scale and lacks security, monitoring, or multi-user access
 - **Too locked-in** — Cloud-only solutions (AWS, Azure, GCP) create vendor dependency with unpredictable costs
 
-**Zyvor Fabric fills the gap** — a systemd-native VM operations fabric that runs on any Linux server with systemd, providing enterprise features without enterprise complexity.
+**Zyvor Fabric fills the gap** — a VM operations fabric that runs on any Linux server, with or without systemd, providing enterprise features without enterprise complexity.
 
 ---
 
 ## What Is Zyvor Fabric?
 
-Zyvor Fabric is a production-grade private cloud control plane built in Rust. It wraps systemd-vmspawn and systemd-machined with a complete management layer:
+Zyvor Fabric is a production-grade private cloud control plane built in Rust. It provides a complete management layer over a pluggable VM driver — `machinectl` (systemd-vmspawn + systemd-machined, the default) or `ephemera` (a disposable-VM engine with no systemd dependency):
 
-- **One binary, one config file, one systemd service** — deploys in under 5 minutes (`Zyvor Fabric`)
+- **One binary, one config file** — deploys in under 5 minutes (`zyvor-fabricd`), with systemd support built in but not required
 - **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
 - **5 management interfaces** — CLI, terminal UI, web dashboard, Kubernetes operator, Terraform provider
 - **Enterprise features** — HA clustering, live migration, GPU passthrough, backup/restore, network policies
 
 ```
-sudo systemctl enable --now Zyvor Fabric
-# That's it. Zyvor Fabric is running.
+sudo systemctl enable --now zyvor-fabricd
+# Or just run the binary directly -- systemd is optional. Either way, Zyvor Fabric is running.
 ```
 
 ---
 
 ## Key Differentiators
 
-### 1. Built on systemd (Not a Custom Hypervisor)
+### 1. Pluggable VM Driver (Not a Custom Hypervisor)
 
-Zyvor Fabric leverages systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution. This means:
+Zyvor Fabric defaults to systemd-vmspawn and systemd-machined — the VM management tools built into every modern Linux distribution with systemd — and can also run entirely without systemd via Ephemera, its own disposable-VM engine. This means:
 
 - No custom kernel modules or hypervisor patches
-- VMs are first-class systemd units with journal logging, socket activation, and watchdog support
-- Works on Fedora, Ubuntu, Debian, RHEL, SUSE — any distro with systemd 256+
+- On the `machinectl` backend, VMs are first-class systemd units with journal logging
+- Works on Fedora, Ubuntu, Debian, RHEL, SUSE, and systemd-free environments alike
 - Upstream-maintained VM lifecycle, not a fork
 
 ### 2. Single Binary, Zero Dependencies
@@ -238,7 +238,7 @@ resource "zyvor_fabric_vm" "web" {
            | Provider  |         |    |    |    |    |
            +-----------+         |    |    |    |    |
                                   v    v    v    v    v
-                           systemd-vmspawn + systemd-machined
+                        VM Driver (pluggable: machinectl | ephemera)
 ```
 
 ---
@@ -249,7 +249,7 @@ resource "zyvor_fabric_vm" "web" {
 
 One Linux server running Zyvor Fabric with local storage. Suitable for development, testing, small teams, and edge deployments.
 
-**Requirements:** Linux with systemd 256+, 4GB RAM minimum
+**Requirements:** Linux, KVM, 4GB RAM minimum. systemd 256+ if using the default `machinectl` driver backend; not required with the `ephemera` backend.
 
 ### Multi-Node Cluster
 
@@ -304,8 +304,8 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Web Framework | Axum 0.8 |
 | Terminal UI | ratatui + crossterm |
 | Web UI | React 18 + TypeScript + Vite + TailwindCSS |
-| VM Backend | systemd-vmspawn + systemd-machined |
-| D-Bus | zbus 4 |
+| VM Backend | Pluggable: systemd-vmspawn + systemd-machined (default), or Ephemera (no systemd) |
+| D-Bus | zbus 4 (machinectl backend only) |
 | Monitoring | Prometheus |
 
 ---

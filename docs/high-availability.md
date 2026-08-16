@@ -85,7 +85,7 @@ leader_election = true
 Restart Zyvor Fabric on each node:
 
 ```bash
-sudo systemctl restart Zyvor Fabric
+sudo systemctl restart zyvor-fabricd
 ```
 
 ---

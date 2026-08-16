@@ -10,9 +10,9 @@ This section provides operational procedures for deploying, monitoring, and main
 
 ## Operational Philosophy
 
-Zyvor Fabric is designed for systemd-native environments and follows these operational principles:
+Zyvor Fabric follows these operational principles:
 
-1. **Systemd-first** -- Zyvor Fabric runs as a systemd service. Use `systemctl` for lifecycle management. VM processes are managed through systemd-machined.
+1. **systemd-optional** -- `zyvor-fabricd` can run as a systemd service (use `systemctl` for lifecycle management if so) or under any other supervisor, or in the foreground -- nothing in packaging requires systemd. VM processes are managed through the active VM driver (`driver.backend` in `zyvor-fabricd.toml`): `machinectl` (systemd-machined, the default) or `ephemera` (no systemd dependency).
 2. **API-driven** -- All operations are available through the REST API. The web UI and CLI are thin clients over the same API surface.
 3. **Event-driven observability** -- Real-time SSE event streams and configurable notification channels (Email, Slack, Webhook, Teams) provide immediate visibility into VM lifecycle changes.
 4. **Policy-based automation** -- Backup policies, resource quotas, autoscaling rules, and network policies reduce manual intervention.
@@ -20,8 +20,10 @@ Zyvor Fabric is designed for systemd-native environments and follows these opera
 ## Quick Health Check
 
 ```bash
-# Check daemon status
-systemctl status Zyvor Fabric
+# Check daemon status (if running under systemd)
+systemctl status zyvor-fabricd
+# Or, regardless of how it's supervised:
+curl -s http://localhost:9095/health
 
 # API health endpoint
 curl -s http://localhost:3000/health | jq

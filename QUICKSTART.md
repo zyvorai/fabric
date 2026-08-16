@@ -4,7 +4,7 @@
 
 - Rust 1.70+ (`rustup`)
 - Node.js 18+ and npm
-- systemd-vmspawn (optional, for actual VM management)
+- A VM driver backend: systemd-vmspawn/machinectl (default), or [Ephemera](https://github.com/hypersdk/ephemera) for a systemd-free setup — either is optional for building/running the daemon itself, but one is needed for actual VM management
 
 ## Build Everything
 
@@ -83,7 +83,7 @@ Access the web UI at `http://localhost:3000`
 ./scripts/install.sh
 
 # Enable and start daemon
-sudo systemctl enable --now Zyvor Fabric
+sudo systemctl enable --now zyvor-fabricd
 
 # Use CLI
 zyvorctl list
@@ -166,14 +166,15 @@ Zyvor Fabric/
 │   ├── Zyvor Fabric/         # Main daemon with REST API + WebSocket
 │   ├── zyvorctl/            # CLI tool (JSON/YAML output, 15+ subcommand groups)
 │   ├── zyvorctl-tui/        # Terminal UI (8 views incl. Net Security)
-│   ├── zyvor-fabric-vm-driver/   # VM driver (systemd-vmspawn integration)
+│   ├── zyvor-fabric-vm-driver/   # systemd-vmspawn/machinectl VM driver (default backend)
+│   ├── crates/ephemera-driver/  # Ephemera VM driver (systemd-free backend, opt-in)
 │   ├── crates/           # Shared libraries (storage with Ceph/RBD, system, vm)
 │   └── ...               # 34 more feature crates (networking, security, ha, migration, etc.)
 ├── web/                  # React web UI
 ├── operator/             # Kubernetes operator
 ├── terraform-provider/   # Terraform provider
 ├── docs/                 # Documentation
-├── systemd/              # systemd service files
+├── systemd/              # Optional systemd unit files (not required to run)
 ├── configs/              # Configuration files
 ├── scripts/              # Installation and utility scripts
 ├── monitoring/           # Monitoring configuration
@@ -217,5 +218,5 @@ curl http://localhost:9095/health
 Zyvor Fabric requires root privileges to manage VMs:
 
 ```bash
-sudo ./backend/target/release/Zyvor Fabric
+sudo ./backend/target/release/zyvor-fabricd
 ```

@@ -700,7 +700,7 @@ Expected response:
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "provisioning_uri": "otpauth://totp/Zyvor Fabric:admin?secret=JBSWY3DPEHPK3PXP&issuer=Zyvor Fabric",
+  "provisioning_uri": "otpauth://totp/zyvor-fabricd:admin?secret=JBSWY3DPEHPK3PXP&issuer=zyvor-fabricd",
   "qr_code_url": "data:image/png;base64,..."
 }
 ```

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider -- all backed by systemd-vmspawn and systemd-machined.
+Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider, backed by a pluggable VM driver: `machinectl` (systemd-vmspawn + systemd-machined via D-Bus, the default) or `ephemera` (a disposable-VM engine with no systemd dependency, opt-in via `driver.backend` in `zyvor-fabricd.toml`). systemd itself is optional for the daemon's own packaging/init too -- it runs fine under systemd or any other supervisor.
 
 ## System Diagram
 
@@ -34,8 +34,8 @@ Zyvor Fabric is a virtual machine management platform built in Rust. It provides
         +---------+      +------+  |  +------+  +---------+
                                     v
                         +-----------+-----------+
-                        |   systemd-vmspawn     |
-                        |   systemd-machined    |
+                        |   VM Driver (pluggable)|
+                        |  machinectl | ephemera |
                         +-----------------------+
 ```
 
@@ -47,8 +47,8 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 
 | Crate | Purpose |
 |-------|---------|
-| `Zyvor Fabric` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
-| `zyvor-fabric-vm-driver` | systemd-vmspawn integration for VM creation and management |
+| `zyvor-fabricd` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
+| `zyvor-fabric-vm-driver` | systemd-vmspawn CLI integration used by the `machinectl` driver backend for VM creation/start options |
 | `vm-model` | Core data structures: VM definitions, state enums, request/response types |
 | `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
 | `zyvorctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
@@ -58,14 +58,17 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 
 | Crate | Purpose |
 |-------|---------|
-| `Zyvor Fabric-cgroup` | cgroup v2 resource management |
-| `Zyvor Fabric-system` | System integration utilities |
-| `Zyvor Fabric-vm` | VM model and type definitions |
-| `Zyvor Fabric-storage` | Storage backend abstraction |
-| `Zyvor Fabric-driver-core` | Driver core functionality |
-| `Zyvor Fabric-machinectl-driver` | machinectl/systemd-machined integration via D-Bus |
-| `Zyvor Fabric-machined-dbus` | systemd-machined D-Bus bindings (zbus) |
-| `Zyvor Fabric-lock-manager` | Distributed lock management |
+| `zyvor-fabric-cgroup` | cgroup v2 resource management |
+| `zyvor-fabric-system` | System integration utilities |
+| `zyvor-fabric-vm` | VM model and type definitions |
+| `zyvor-fabric-storage` | Storage backend abstraction |
+| `zyvor-fabric-driver-core` | Pluggable `VmDriver` trait (lifecycle, resource control, logs, images, shell, capabilities) both backends implement |
+| `vmspawnd-machinectl-driver` | `machinectl`/systemd-machined driver backend (D-Bus + systemd-vmspawn CLI) -- the default |
+| `vmspawnd-machined-dbus` | systemd-machined D-Bus bindings (zbus), used by the machinectl backend |
+| `zyvor-fabric-ephemera-client` | REST client for Ephemera's API |
+| `zyvor-fabric-ephemera-driver` | `ephemera` driver backend implementing `VmDriver` against Ephemera -- no systemd dependency |
+| `zyvor-fabric-dnsmasq-manager` | Per-bridge DHCP via a directly-managed `dnsmasq` process (replaces systemd-networkd's built-in DHCP server) |
+| `zyvor-fabric-lock-manager` | Distributed lock management |
 
 ### Networking
 
@@ -162,13 +165,17 @@ User --> CLI / TUI / Web UI / K8s Operator / Terraform Provider
               REST API / WebSocket (Axum + Tokio)
                       |
                       v
-               Core Daemon (Zyvor Fabric)
+               Core Daemon (zyvor-fabricd)
                  /          \
                 v            v
-          VM Drivers     State Store (/var/lib/zyvor-fabricd/)
+          VM Driver      State Store (/var/lib/zyvor-fabricd/)
+       (pluggable: driver.backend)
               |
-              v
-        systemd-vmspawn --> Virtual Machines
+        +-----+------+
+        v             v
+  machinectl      ephemera --> Virtual Machines
+  (systemd-vmspawn/
+   machined)
 ```
 
 ## Storage Layout
@@ -185,23 +192,19 @@ VM state and artifacts are stored under `/var/lib/zyvor-fabricd/`:
   state/              Persistent daemon state
 ```
 
-## systemd Integration
+## systemd Integration (optional)
+
+systemd is no longer required to install or run zyvor-fabricd -- packaging has no hard `Requires: systemd`, no sysusers.d/tmpfiles.d/preset (the daemon creates its own runtime directories at startup), and the backup/cleanup jobs that used to be systemd timers now run from an in-process tokio scheduler. The units below are still shipped for operators who choose to run under systemd anyway; nothing in packaging auto-enables or auto-starts them.
 
 | Unit | Purpose |
 |------|---------|
-| `Zyvor Fabric.service` | Main daemon (Type=notify, WatchdogSec=60s) |
-| `Zyvor Fabric.socket` | Socket activation on 0.0.0.0:8080 |
-| `vm@.service` | Per-VM service template |
-| `Zyvor Fabric.sysusers` | System group creation |
-| `Zyvor Fabric.tmpfiles` | Directory creation |
-| `Zyvor Fabric.preset` | Default enable state |
-
-The daemon runs with systemd hardening: `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, and capability bounding.
+| `zyvor-fabricd.service` | Main daemon (`Type=simple`; systemd hardening via `ProtectSystem=strict`, capability bounding -- no socket activation, no watchdog) |
+| `vm@.service` | Per-VM service template (machinectl driver backend only) |
 
 ## Security Model
 
 - Runs as root (required for VM management and networking)
-- systemd hardening directives restrict filesystem and network access
+- When run under systemd, its hardening directives further restrict filesystem and network access -- not required when run another way
 - JWT-based API authentication with SQLite user store
 - Auto-generated JWT secret persisted to `/var/lib/zyvor-fabricd/.jwt_secret` (mode `0600`)
 - Auto-generated admin password written to `/var/lib/zyvor-fabricd/.admin_password` (mode `0600`) on first startup

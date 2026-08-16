@@ -19,8 +19,8 @@
 - Create, start, stop, restart, delete, clone VMs
 - VM templates
 - VM state persistence
-- Full systemd-vmspawn(1) v260 integration (all CLI options supported)
-- systemd-machined integration via machinectl
+- Pluggable VM driver: full systemd-vmspawn(1) v260 + systemd-machined integration via machinectl (default), or Ephemera for a systemd-free backend (`driver.backend = "machinectl" | "ephemera"`)
+- The systemd-vmspawn-specific flags below (`--kvm` through `--console`) apply to the machinectl backend; core VM lifecycle, cgroup resource control, log streaming, CPU/memory hotplug, image management, and shell exec are available on both backends
 - CPU and memory configuration (`--cpus`, `--ram`)
 - KVM acceleration and Secure Boot (`--kvm`, `--secure-boot`)
 - VSock networking with CID assignment (`--vsock`, `--vsock-cid`)
@@ -353,7 +353,7 @@
 ### Installation
 
 - Build from source
-- systemd service
+- Optional systemd service (not required — the daemon runs fine under any supervisor, or in the foreground)
 - Make install script
 - Helm charts (for operator)
 

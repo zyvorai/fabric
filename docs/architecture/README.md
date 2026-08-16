@@ -1,8 +1,10 @@
 # Zyvor Fabric System Architecture
 
 This document describes the architecture of Zyvor Fabric, a comprehensive virtual machine
-management platform built on systemd-vmspawn, systemd-machined, and the Linux KVM
-hypervisor. Zyvor Fabric provides a production-grade REST API, web UI, and CLI for
+management platform built on the Linux KVM hypervisor with a pluggable VM driver:
+`machinectl` (systemd-vmspawn + systemd-machined via D-Bus, the default) or `ephemera`
+(a disposable-VM engine with no systemd dependency, opt-in via `driver.backend`).
+Zyvor Fabric provides a production-grade REST API, web UI, and CLI for
 managing the full lifecycle of virtual machines.
 
 ---
@@ -63,13 +65,13 @@ managing the full lifecycle of virtual machines.
               +---------------+     |     +---------------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
-   |  systemd-vmspawn     |  | State Store |  | systemd-networkd      |
-   |  (VM execution)      |  | (JSON/FS)   |  | (Network management)  |
+   |  VM Driver (plug.)   |  | State Store |  | networking (netlink)  |
+   |  machinectl|ephemera |  | (JSON/FS)   |  | (Network management)  |
    +----------+-----------+  +------+------+  +-----------+-----------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
-   |  systemd-machined    |  | SQLite      |  | Linux Kernel          |
-   |  (Machine registry)  |  | (User DB)   |  | (KVM / bridge / tap)  |
+   |  systemd-machined /  |  | SQLite      |  | Linux Kernel          |
+   |  Ephemera (registry) |  | (User DB)   |  | (KVM / bridge / tap)  |
    +----------+-----------+  +------+------+  +-----------+-----------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
@@ -92,7 +94,7 @@ Client Request
     v
 +-- Handler Function ---------+     +-- AppState (Arc) -------+
 |  Extract Path/Query/Body    | --> |  store: StateStore       |
-|  Validate input             |     |  driver: MachinectlDriver|
+|  Validate input             |     |  driver: Arc<dyn VmDriver>|
 |  Acquire per-VM lock        |     |  config: Config          |
 |  Call driver / state store  |     |  storage_manager         |
 |  Emit audit log             |     |  policy_engine           |
@@ -181,38 +183,48 @@ The `VMStartOptions` struct maps to the full `systemd-vmspawn(1)` v260 interface
 
 ### Driver Architecture
 
+The driver layer is a pluggable trait boundary (`VmDriver`, in `driver-core`) between the
+API handlers and whichever VM backend is configured -- `AppState.driver` is one
+`Arc<dyn VmDriver>`, selected at startup by `driver.backend` in `zyvor-fabricd.toml`
+(`"machinectl"`, the default, or `"ephemera"`). `VmDriver` is a blanket implementation
+over several component traits, so a backend only needs to implement the traits it
+actually supports:
+
 ```
-+-- VMDriver trait (driver-core) --------+
-|  start(name)                           |
-|  poweroff(name)                        |
-|  terminate(name)                       |
-|  reboot(name)                          |
-|  get_state(name) -> VMState            |
-|  list_machines() -> Vec<MachineInfo>   |
-|  get_properties(name) -> HashMap       |
-|  get_logs(name) -> LogStream           |
-+----------------------------------------+
-           |
-           v
-+-- MachinectlDriver (D-Bus) -----------+
-|  Communicates with systemd-machined    |
-|  via zbus (async D-Bus client)         |
-|  Manages machine lifecycle             |
-+----------------------------------------+
-           |
-           v
-+-- zyvor-fabric-vm-driver (Process) -----------+
-|  Builds systemd-vmspawn CLI commands   |
-|  Passes VMStartOptions flags           |
-|  Launches QEMU via systemd-vmspawn     |
-+----------------------------------------+
++-- VmDriver (driver-core) — blanket-impl'd over: --------------+
+|  VMDriver           start/poweroff/terminate/reboot/get_state/|
+|                      list_machines/get_properties/enable/     |
+|                      disable/start_with_options/               |
+|                      get_control_socket                        |
+|  ResourceControlDriver  set_cpu_quota/set_memory_max/           |
+|                      set_io_weight/freeze/thaw/is_frozen/       |
+|                      set_pids_max/set_cpuset                    |
+|  ResourceStatsDriver    get_metrics/get_pressure                |
+|  LogDriver           stream_logs                                |
+|  ImageDriver         list/clone/rename/remove/pull/import/      |
+|                      export/clean images                        |
+|  ShellDriver         shell(name, command)                       |
+|  CapabilityProvider  backend_name/has_resource_control           |
++------------------------------------------------------------------+
+           |                                    |
+           v                                    v
++-- MachinectlDriver ---------------+  +-- EphemeraDriver -----------------+
+|  D-Bus (zbus) to systemd-machined  |  |  REST client to Ephemera          |
+|  for lifecycle/properties; the     |  |  (github.com/hypersdk/ephemera)   |
+|  zyvor-fabric-vm-driver crate      |  |  No systemd dependency. Some      |
+|  builds systemd-vmspawn CLI        |  |  ImageDriver/other operations     |
+|  commands for start_with_options   |  |  intentionally error clearly      |
+|  cgroup v2 files directly for      |  |  rather than fake an equivalent   |
+|  resource control                  |  |  Ephemera doesn't have yet        |
++-------------------------------------+  +------------------------------------+
 ```
 
-The driver layer provides a clean trait boundary (`VMDriver`, `ResourceStatsDriver`)
-between the API handlers and the underlying systemd tooling. The `MachinectlDriver`
-uses D-Bus via the `zbus` crate to communicate asynchronously with `systemd-machined`.
-The `zyvor-fabric-vm-driver` constructs and executes `systemd-vmspawn` commands with the full
-set of options supported by systemd v260.
+Everything under `VMDriver`/`ResourceControlDriver`/`ResourceStatsDriver`/`LogDriver`/
+`ImageDriver`/`ShellDriver` works on both backends. A handful of operations remain
+`machinectl`-only where Ephemera has no real equivalent yet (interactive shell
+copy-to/copy-from, bind-mount into a running VM, SSH connection info, tar-format image
+import/export) -- those still shell out to `machinectl` directly rather than going
+through `state.driver`.
 
 ### Security Crate
 
@@ -256,7 +268,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 **Core** (5 crates): `Zyvor Fabric`, `vm-model`, `state-store`, `security`, `Zyvor Fabric-vm`
 
-**Drivers** (4 crates): `zyvor-fabric-vm-driver`, `Zyvor Fabric-driver-core`, `Zyvor Fabric-machinectl-driver`, `Zyvor Fabric-machined-dbus`
+**Drivers** (6 crates): `zyvor-fabric-vm-driver`, `zyvor-fabric-driver-core`, `vmspawnd-machinectl-driver`, `vmspawnd-machined-dbus`, `zyvor-fabric-ephemera-client`, `zyvor-fabric-ephemera-driver`
 
 **Networking** (10 crates): `networking`, `network-policy`, `service-mesh`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`
 
@@ -393,15 +405,17 @@ State transitions:
 1. Client POSTs to /api/v1/vms/{name}/start
 2. Handler acquires per-VM mutex lock
 3. State set to Starting, persisted
-4. zyvor-fabric-vm-driver builds systemd-vmspawn command:
-   - systemd-vmspawn --image=/var/lib/zyvor-fabricd/images/{image}
-     --cpus={n} --ram={m}M [--kvm=yes] [--tpm=yes] ...
-5. Command executed via tokio::task::spawn_blocking
-6. PID captured from spawned process
-7. State set to Running, PID stored, persisted
-8. Machine registered with systemd-machined
-9. Prometheus gauges updated
-10. SSE event emitted: { type: "vm_started", name: "..." }
+4. state.driver.start(name) -- dispatches to whichever backend is configured:
+     machinectl: zyvor-fabric-vm-driver builds a systemd-vmspawn command
+       (--image=... --cpus={n} --ram={m}M [--kvm=yes] [--tpm=yes] ...),
+       executed via tokio::task::spawn_blocking; machine registered with
+       systemd-machined
+     ephemera: EphemeraClient issues a REST call to the configured
+       `ephemera serve` instance, which launches the VMM directly
+5. PID captured either way
+6. State set to Running, PID stored, persisted
+7. Prometheus gauges updated
+8. SSE event emitted: { type: "vm_started", name: "..." }
 ```
 
 ---
@@ -437,11 +451,10 @@ State transitions:
 
 /etc/zyvor-fabricd/
   +-- zyvor-fabricd.toml            # Primary configuration file
-
-/etc/systemd/network/
-  +-- 50-Zyvor Fabric-*.network    # Generated networkd configs
-  +-- 50-Zyvor Fabric-*.netdev     # Generated netdev configs
 ```
+
+Host networking (bridges, VLANs, taps, bonds, VXLANs) is applied directly via netlink,
+not written to config files -- see [Networking Stack](#networking-stack).
 
 ### Storage Pools
 
@@ -513,16 +526,18 @@ Zyvor Fabric includes a comprehensive networking stack spread across 10 crates:
 +------------------------------------------------------+
 |                    Kernel Layer                       |
 |                                                       |
-|  systemd-networkd  |  nftables  |  tc (qdisc)        |
-|  bridge / tap      |  WireGuard |  netlink            |
+|  netlink (rtnetlink)  |  nftables  |  tc (qdisc)     |
+|  bridge / tap / dnsmasq |  WireGuard                 |
 +------------------------------------------------------+
 ```
 
-### Network Configuration via systemd-networkd
+### Network Configuration via netlink
 
-The `networkd` API module generates and manages systemd-networkd configuration files:
+The `networking` crate manages host networking with direct `rtnetlink` calls
+(no systemd-networkd dependency -- configuration takes effect immediately, there's no
+config-file-then-reload step):
 
-- **Bridges**: `.netdev` + `.network` files for virtual bridges
+- **Bridges**: created/deleted directly via netlink
 - **VLANs**: 802.1Q VLAN devices
 - **TAP devices**: For VM network interfaces
 - **macvtap**: Direct hardware passthrough
@@ -530,9 +545,14 @@ The `networkd` API module generates and manages systemd-networkd configuration f
 - **VXLANs**: Overlay tunnels for multi-host networking
 - **SR-IOV**: Hardware-assisted virtual functions
 - **Port forwards**: NAT-based port forwarding rules
+- **DHCP**: a per-bridge `dnsmasq` process the daemon spawns and supervises directly
+  (`zyvor-fabric-dnsmasq-manager`), replacing systemd-networkd's built-in DHCP server
+- **WireGuard mesh** (`vpn-mesh`): same netlink-based approach, plus `wg` CLI for key/peer
+  configuration
 
-All configuration files are written to `/etc/systemd/network/` with the
-`50-Zyvor Fabric-` prefix and can be reloaded via `networkctl reload`.
+Desired topology is persisted in the state store and replayed idempotently on daemon
+startup, which is what previously relying on `.netdev`/`.network` files surviving a
+reboot provided.
 
 ### Background Reconciliation
 

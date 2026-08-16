@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers installing Zyvor Fabric on a Linux system. Zyvor Fabric requires a modern Linux distribution with systemd 256 or later and QEMU/KVM for virtual machine execution.
+This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM for virtual machine execution. Zyvor Fabric's VM driver is pluggable (`driver.backend` in `zyvor-fabricd.toml`): the default, `"machinectl"`, needs a modern Linux distribution with systemd 256+ (for `systemd-vmspawn`); the alternative, `"ephemera"`, has no systemd version requirement at all — see [Ephemera](https://github.com/hypersdk/ephemera). The rest of this guide assumes the default `machinectl` backend unless noted otherwise. Zyvor Fabric itself (the daemon) doesn't require systemd either way — it can run under systemd or as a plain process.
 
 ---
 
@@ -20,7 +20,7 @@ This guide covers installing Zyvor Fabric on a Linux system. Zyvor Fabric requir
 | Requirement | Minimum Version | Notes |
 |-------------|-----------------|-------|
 | Linux kernel | 5.15+ | x86_64 architecture |
-| systemd | 256+ | Required for systemd-vmspawn |
+| systemd | 256+ | Only needed for `driver.backend = "machinectl"` (the default) — see note above |
 | QEMU | 8.0+ | KVM acceleration recommended |
 | Rust | 1.75+ | Only for building from source |
 
@@ -34,7 +34,7 @@ This guide covers installing Zyvor Fabric on a Linux system. Zyvor Fabric requir
 | RHEL / CentOS Stream | 10+ | 256+ | Supported |
 | openSUSE Tumbleweed | Rolling | 256+ | Supported |
 
-> **Note:** Distributions with systemd versions below 256 do not include `systemd-vmspawn` and are not supported.
+> **Note:** The table above is for the default `machinectl` driver backend. Distributions with systemd versions below 256 don't include `systemd-vmspawn`, so they can't use that backend — but they can still run Zyvor Fabric with `driver.backend = "ephemera"` instead, which has no systemd version requirement.
 
 ---
 
@@ -58,13 +58,13 @@ sudo dnf install -y \
     nftables
 ```
 
-### 2. Verify systemd-vmspawn
+### 2. Verify systemd-vmspawn (only if using `driver.backend = "machinectl"`, the default)
 
 ```bash
 systemd-vmspawn --version
 ```
 
-The output should show version 256 or later.
+The output should show version 256 or later. Skip this step entirely if you're using `driver.backend = "ephemera"` instead.
 
 ### 3. Enable KVM
 
@@ -122,11 +122,13 @@ sudo apt install -y \
     nftables
 ```
 
-### 2. Verify systemd-vmspawn
+### 2. Verify systemd-vmspawn (only if using `driver.backend = "machinectl"`, the default)
 
 ```bash
 systemd-vmspawn --version
 ```
+
+Skip this step entirely if you're using `driver.backend = "ephemera"` instead.
 
 ### 3. Enable KVM
 
@@ -201,7 +203,7 @@ All tests must pass with zero warnings before deployment.
 
 ```bash
 # Install the daemon
-sudo cp backend/target/release/Zyvor Fabric /usr/local/bin/
+sudo cp backend/target/release/zyvor-fabricd /usr/local/bin/
 
 # Install the CLI
 sudo cp backend/target/release/zyvorctl /usr/local/bin/
@@ -215,12 +217,15 @@ sudo mkdir -p /var/lib/zyvor-fabricd/storage
 sudo mkdir -p /var/lib/zyvor-fabricd/cloud-init
 ```
 
-### 6. Install the systemd Service
+### 6. Install the systemd Service (Optional)
 
-Create the service unit file:
+Zyvor Fabric doesn't require systemd — you can run the binary directly, or
+under any other supervisor. If you'd rather run it under systemd, create
+the service unit file (the repo also ships one at `systemd/zyvor-fabricd.service`
+you can install as-is instead of typing this out):
 
 ```bash
-sudo tee /etc/systemd/system/Zyvor Fabric.service > /dev/null << 'EOF'
+sudo tee /etc/systemd/system/zyvor-fabricd.service > /dev/null << 'EOF'
 [Unit]
 Description=Zyvor Fabric VM Management Daemon
 After=network-online.target
@@ -228,7 +233,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/Zyvor Fabric
+ExecStart=/usr/local/bin/zyvor-fabricd
 Restart=on-failure
 RestartSec=5
 
@@ -241,7 +246,7 @@ Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now Zyvor Fabric
+sudo systemctl enable --now zyvor-fabricd
 ```
 
 ---
@@ -250,11 +255,14 @@ sudo systemctl enable --now Zyvor Fabric
 
 ### 1. Check Service Status
 
+If you're running it under systemd (step 6 above):
+
 ```bash
-sudo systemctl status Zyvor Fabric
+sudo systemctl status zyvor-fabricd
 ```
 
-You should see `active (running)`.
+You should see `active (running)`. If you're running it directly or under
+another supervisor, check that with whatever you're using instead.
 
 ### 2. Check the API
 
@@ -290,7 +298,7 @@ This runs automated checks against the API, authentication, VM CRUD operations, 
 ./zyvor-fabricd-ctl health
 ```
 
-This performs a deep check of API availability, disk space, database integrity, credential files, systemd timers, memory, and KVM support.
+This performs a deep check of API availability, disk space, database integrity, credential files, the scheduled backup/cleanup task, memory, and KVM support.
 
 ---
 
@@ -298,13 +306,15 @@ This performs a deep check of API availability, disk space, database integrity, 
 
 ### systemd-vmspawn not found
 
-Your systemd version is too old. Check with:
+This only matters if you're using `driver.backend = "machinectl"` (the default) — if you're using `driver.backend = "ephemera"` instead, this doesn't apply at all.
+
+Otherwise, your systemd version is too old. Check with:
 
 ```bash
 systemctl --version
 ```
 
-You need systemd 256 or later.
+You need systemd 256 or later, or switch to `driver.backend = "ephemera"`.
 
 ### KVM not available
 
@@ -334,12 +344,12 @@ sudo tee /etc/zyvor-fabricd/zyvor-fabricd.toml > /dev/null << 'EOF'
 listen = "127.0.0.1:8080"
 EOF
 
-sudo systemctl restart Zyvor Fabric
+sudo systemctl restart zyvor-fabricd
 ```
 
 ### Cannot connect to D-Bus
 
-Zyvor Fabric requires access to the system D-Bus for `systemd-machined` integration. Ensure D-Bus is running:
+This only applies to `driver.backend = "machinectl"` (the default), which needs access to the system D-Bus for `systemd-machined` integration. Ensure D-Bus is running:
 
 ```bash
 sudo systemctl status dbus

@@ -51,7 +51,7 @@ Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format
 |------|------------|
 | `operation_failed` | The operation failed on the server |
 | `not_found` | The requested resource was not found |
-| `machined_connection` | Could not connect to systemd-machined |
+| `machined_connection` | Could not reach the VM driver backend (systemd-machined, or Ephemera if `driver.backend = "ephemera"`) |
 | `invalid_request` | The request was invalid |
 | `forbidden` | You do not have permission |
 | `unauthorized` | Authentication required or session expired |

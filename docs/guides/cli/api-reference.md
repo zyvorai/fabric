@@ -13,7 +13,7 @@ Complete reference for the Zyvor Fabric REST API, organized by functional catego
 - [Backups](#backups)
 - [Networking](#networking)
 - [Storage](#storage)
-- [Machined (systemd-machined)](#machined)
+- [Machined (VM driver)](#machined)
 - [Events](#events)
 - [System](#system)
 - [Cloud-init](#cloud-init)
@@ -259,7 +259,7 @@ Start a VM. Returns immediately with `202 Accepted`; the VM transitions through 
 }
 ```
 
-When a body is provided, the VM is started via `systemd-vmspawn` with the specified options. Without a body, the default machined D-Bus driver is used.
+When a body is provided, the VM is started with the specified low-level options (only supported on the `machinectl` driver backend, via `systemd-vmspawn`). Without a body, the active VM driver is used — `machinectl` (systemd-machined/D-Bus, the default) or `ephemera` (no systemd dependency), selected by `driver.backend` in `zyvor-fabricd.toml`.
 
 **Response (202):**
 
@@ -291,7 +291,7 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/start \
 
 ### POST /api/vms/:name/stop
 
-Gracefully power off a VM via machined.
+Gracefully power off a VM via the active VM driver.
 
 **Auth level:** User+
 
@@ -1074,7 +1074,7 @@ curl -s http://localhost:3000/api/networkd/bridges \
 
 #### POST /api/networkd/bridges
 
-Create a new bridge interface via systemd-networkd.
+Create a new bridge interface via direct netlink calls (no systemd-networkd dependency).
 
 **Auth level:** User+
 
@@ -1358,7 +1358,7 @@ Remove SR-IOV configuration.
 
 #### POST /api/networkd/link-files
 
-Create a systemd-networkd link file for interface naming or property overrides.
+Set interface naming/property overrides (applied directly via netlink, not written as systemd-networkd `.link` files).
 
 **Auth level:** Admin only
 
@@ -1368,7 +1368,7 @@ Create a systemd-networkd link file for interface naming or property overrides.
 
 #### POST /api/networkd/network-files
 
-Create a systemd-networkd network file for address and routing configuration.
+Set address/routing configuration for an interface (applied directly via netlink, not written as systemd-networkd `.network` files).
 
 **Auth level:** Admin only
 
@@ -1536,11 +1536,11 @@ Delete a storage pool.
 
 ## Machined
 
-Endpoints for interacting with `systemd-machined` via D-Bus. These operate on running machine instances.
+Endpoints for machine-level lifecycle and management, routed through the active VM driver (`driver.backend` in `zyvor-fabricd.toml`): `machinectl` (systemd-machined via D-Bus, the default) or `ephemera`. Image management (list/clone/rename/remove/pull-raw/import-raw/export-raw) and shell exec work on both backends; SSH info, file copy, and bind-mounts are currently `machinectl`-only.
 
 ### GET /api/machines
 
-List all running machines known to systemd-machined.
+List all running machines known to the active VM driver.
 
 **Auth level:** Viewer+
 
@@ -1636,7 +1636,7 @@ Disable auto-start at boot for a machine.
 
 ### POST /api/machines/:name/shell
 
-Execute a command inside a running machine. Shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `>`, `<`, etc.) are rejected for security.
+Execute a command inside a running machine, via `machinectl shell` (machinectl backend) or the vsock guest agent's `Exec` op (ephemera backend — requires the VM to have been created with the agent enabled). Shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `>`, `<`, etc.) are rejected for security.
 
 **Auth level:** Admin only
 
@@ -1671,7 +1671,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/shell \
 
 ### GET /api/machines/:name/ssh
 
-Get SSH connection information for a machine.
+Get SSH connection information for a machine. `machinectl` backend only.
 
 **Auth level:** Viewer+
 
@@ -1696,7 +1696,7 @@ curl -s http://localhost:3000/api/machines/my-vm/ssh \
 
 ### POST /api/machines/:name/copy-to
 
-Copy a file from the host into a running machine.
+Copy a file from the host into a running machine. `machinectl` backend only.
 
 **Auth level:** Admin only
 
@@ -1724,7 +1724,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/copy-to \
 
 ### POST /api/machines/:name/copy-from
 
-Copy a file from a running machine to the host.
+Copy a file from a running machine to the host. `machinectl` backend only.
 
 **Auth level:** Admin only
 
@@ -2273,7 +2273,7 @@ Set up TOTP 2FA for the current user. Returns a TOTP secret and provisioning URI
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "provisioning_uri": "otpauth://totp/Zyvor Fabric:admin?secret=JBSWY3DPEHPK3PXP&issuer=Zyvor Fabric",
+  "provisioning_uri": "otpauth://totp/zyvor-fabricd:admin?secret=JBSWY3DPEHPK3PXP&issuer=zyvor-fabricd",
   "qr_code": "data:image/png;base64,..."
 }
 ```
@@ -2475,11 +2475,11 @@ curl -s -X DELETE http://localhost:3000/api/secrets/550e8400-e29b-41d4-a716-4466
 
 ## Log Aggregation
 
-Query journal logs from individual VMs or from the host system. Logs are retrieved via `journalctl` on the backend.
+Query logs from individual VMs or from the host system. Host system logs (`/api/logs`) are always retrieved via `journalctl`. Per-VM logs (`/api/vms/:name/logs`) go through the active VM driver: `journalctl` on the `machinectl` backend, or Ephemera's captured console output on the `ephemera` backend — both are drained through the same bounded-wait read, so this stays a one-shot fetch rather than a live tail.
 
 ### GET /api/vms/:name/logs
 
-Get journal logs for a specific VM.
+Get recent logs for a specific VM.
 
 **Auth level:** Viewer+
 
@@ -2544,7 +2544,7 @@ Get system-wide journal logs from the host.
     {
       "timestamp": "2026-04-12T10:00:00Z",
       "priority": 6,
-      "unit": "Zyvor Fabric.service",
+      "unit": "zyvor-fabricd.service",
       "message": "Listening on 0.0.0.0:3000"
     }
   ],

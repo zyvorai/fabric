@@ -455,8 +455,9 @@ image_path = "/var/lib/zyvor-fabricd/images"  # VM images
 
 [network]
 bridge = "br0"                   # Default bridge
-networkd_config_dir = "/etc/systemd/network"
-networkd_file_prefix = "50-Zyvor Fabric-"
+# networkd_config_dir/networkd_file_prefix still exist as config fields but
+# are now vestigial -- host networking is applied directly via netlink
+# calls, not by writing systemd-networkd config files
 
 [auth]
 enabled = true                   # Enable authentication
@@ -487,9 +488,10 @@ mode = "standalone"              # or "controller"
 # Check for port conflicts
 ss -tlnp | grep 9095
 
-# Check systemd service status
-sudo systemctl status Zyvor Fabric
-journalctl -u Zyvor Fabric -n 50
+# Check systemd service status (if running under systemd -- optional,
+# zyvor-fabricd has no hard systemd dependency)
+sudo systemctl status zyvor-fabricd
+journalctl -u zyvor-fabricd -n 50
 
 # Check config file syntax
 cat /etc/zyvor-fabricd/zyvor-fabricd.toml | toml-lint  # or just try to start
@@ -501,15 +503,15 @@ cat /etc/zyvor-fabricd/zyvor-fabricd.toml | toml-lint  # or just try to start
 # Check KVM availability
 ls -la /dev/kvm
 
-# Check systemd-machined
+# Check systemd-machined (machinectl driver backend only)
 systemctl status systemd-machined
 
 # Check the VM state and last error
 curl -s http://127.0.0.1:9095/api/v1/vms/my-vm \
   -H "Authorization: Bearer $TOKEN" | jq '.last_error'
 
-# Check systemd journal for Zyvor Fabric errors
-journalctl -u Zyvor Fabric --since "5 min ago" | grep -i error
+# Check systemd journal for Zyvor Fabric errors (if running under systemd)
+journalctl -u zyvor-fabricd --since "5 min ago" | grep -i error
 ```
 
 ### Authentication failures
@@ -528,11 +530,9 @@ grep -A5 '\[auth\]' /etc/zyvor-fabricd/zyvor-fabricd.toml
 ### Network issues
 
 ```bash
-# Check bridge exists
+# Check bridge exists (managed via direct netlink calls, not
+# systemd-networkd -- no networkctl/reload step)
 ip link show br0
-
-# Check systemd-networkd status
-networkctl status
 
 # List managed network files
 curl -s http://127.0.0.1:9095/api/v1/networkd/files \

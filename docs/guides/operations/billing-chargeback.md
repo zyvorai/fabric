@@ -227,7 +227,7 @@ Add to cron:
 
 ```bash
 # Generate invoices on the 1st of each month at midnight
-0 0 1 * * /usr/local/bin/generate-invoices.sh >> /var/log/Zyvor Fabric/billing.log 2>&1
+0 0 1 * * /usr/local/bin/generate-invoices.sh >> /var/log/zyvor-fabricd/billing.log 2>&1
 ```
 
 ### Cost Monitoring

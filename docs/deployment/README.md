@@ -78,7 +78,7 @@ bridge = "br0"
 EOF
 
 # 4. Run
-sudo ./target/release/Zyvor Fabric
+sudo ./target/release/zyvor-fabricd
 ```
 
 The daemon will start listening on `127.0.0.1:9095`. Authentication is enabled

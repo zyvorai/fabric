@@ -29,8 +29,8 @@ path = "/var/lib/zyvor-fabricd/volumes"
 [storage]
 backend = "nfs"
 server = "nfs.example.com"
-export = "/exports/Zyvor Fabric"
-mount_point = "/mnt/Zyvor Fabric"
+export = "/exports/zyvor-fabricd"
+mount_point = "/mnt/zyvor-fabricd"
 
 # Ceph/RBD
 [storage]

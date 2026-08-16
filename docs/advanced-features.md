@@ -158,7 +158,7 @@ spec:
 
 ```bash
 kubectl apply -f operator/crd.yaml
-helm install Zyvor Fabric-operator operator/charts/Zyvor Fabric-operator
+helm install zyvor-fabricd-operator operator/charts/zyvor-fabricd-operator
 ```
 
 ### Usage

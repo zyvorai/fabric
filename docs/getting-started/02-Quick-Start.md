@@ -9,7 +9,7 @@ Create your first virtual machine in 5 minutes. This guide assumes you have alre
 If Zyvor Fabric is not already running:
 
 ```bash
-sudo systemctl start Zyvor Fabric
+sudo systemctl start zyvor-fabricd
 ```
 
 Verify it is listening:
@@ -236,7 +236,7 @@ Returns `204 No Content` on success.
 1. Started the zyvor-fabricd daemon
 2. Authenticated and obtained a JWT token
 3. Created a VM with specified resources
-4. Started the VM using systemd-vmspawn
+4. Started the VM via the configured VM driver (`systemd-vmspawn` by default, or Ephemera if `driver.backend = "ephemera"`)
 5. Accessed the web dashboard
 6. Connected to the VM console
 7. Viewed real-time metrics
