@@ -627,23 +627,15 @@ pub async fn optimize_vm(
                     .collect::<Vec<_>>()
                     .join(",");
 
-                let service_name = format!("systemd-vmspawn@{}.service", vm_name);
-                let output = Command::new("systemctl")
-                    .arg("set-property")
-                    .arg(&service_name)
-                    .arg(format!("CPUAffinity={}", cpu_list))
-                    .output()
-                    .await;
-
-                match output {
-                    Ok(o) if o.status.success() => {
+                match state.driver.set_cpuset(&vm_name, &placement.cpu_affinity).await {
+                    Ok(()) => {
                         applied.push(format!(
                             "CPU pinning to NUMA node {} (cores: {})",
                             placement.numa_node, cpu_list
                         ));
                     }
-                    _ => {
-                        skipped.push("CPU pinning: failed to apply via systemctl".to_string());
+                    Err(e) => {
+                        skipped.push(format!("CPU pinning: failed to apply: {e}"));
                     }
                 }
             } else {

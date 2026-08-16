@@ -6,6 +6,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
+use zyvor_fabric_driver_core::VmDriver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationConfig {
@@ -38,13 +40,18 @@ pub enum MigrationState {
 pub struct MigrationManager {
     #[allow(dead_code)]
     workspace_dir: PathBuf,
+    /// Drives the *source* (local) VM's pause-for-final-sync step — see
+    /// `live_sync`. The target node's own start is still a raw SSH+CLI
+    /// call (see `live_sync`'s doc comment) since it's a different host,
+    /// outside what a local `Arc<dyn VmDriver>` can reach.
+    driver: Arc<dyn VmDriver>,
 }
 
 impl MigrationManager {
-    pub fn new<P: AsRef<Path>>(workspace_dir: P) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(workspace_dir: P, driver: Arc<dyn VmDriver>) -> Result<Self> {
         let workspace_dir = workspace_dir.as_ref().to_path_buf();
         std::fs::create_dir_all(&workspace_dir)?;
-        Ok(Self { workspace_dir })
+        Ok(Self { workspace_dir, driver })
     }
 
     /// Start VM migration
@@ -146,7 +153,17 @@ impl MigrationManager {
         Ok(())
     }
 
-    /// Perform live synchronization using iterative rsync + final cutover
+    /// Perform live synchronization using iterative rsync + final cutover.
+    ///
+    /// The source (local) VM's pause-for-final-sync goes through the
+    /// active `VmDriver` (machinectl or Ephemera, whichever this host is
+    /// configured for). Starting the VM on the *target* node still shells
+    /// `ssh <target> machinectl start ...` directly — a local
+    /// `Arc<dyn VmDriver>` only ever talks to this host's own D-Bus/
+    /// Ephemera instance, not a remote one, so backend-aware cross-host
+    /// VM control would need either an HTTP call to the target's own
+    /// zyvor-fabricd API or an SSH-executed `zyvorctl`, neither of which
+    /// this crate currently has the cluster/fleet context to do safely.
     async fn live_sync(&self, config: &MigrationConfig) -> Result<()> {
         tracing::info!("Starting live synchronization for VM '{}'", config.vm_name);
 
@@ -185,10 +202,9 @@ impl MigrationManager {
         // Final cutover: pause VM, do final sync, start on target
         tracing::info!("Pausing VM '{}' for final sync", config.vm_name);
 
-        // Pause the VM using cgroup freezer
-        let _ = Command::new("machinectl")
-            .args(["stop", &config.vm_name])
-            .output();
+        if let Err(e) = self.driver.poweroff(&config.vm_name).await {
+            tracing::warn!("Failed to stop source VM '{}' for final sync: {e:#}", config.vm_name);
+        }
 
         // Final rsync pass (very fast — only changed blocks since last iteration)
         let mut cmd = Command::new("rsync");

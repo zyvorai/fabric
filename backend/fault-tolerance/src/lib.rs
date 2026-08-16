@@ -784,6 +784,13 @@ mod tests {
         async fn start(&self, _name: &str) -> Result<()> {
             Ok(())
         }
+        async fn start_with_options(
+            &self,
+            _vm: &vm_model::VM,
+            _opts: &vm_model::VMStartOptions,
+        ) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
         async fn poweroff(&self, _name: &str) -> Result<()> {
             Ok(())
         }
@@ -857,6 +864,58 @@ mod tests {
     #[async_trait::async_trait]
     impl zyvor_fabric_driver_core::LogDriver for MockDriver {
         async fn stream_logs(&self, _name: &str, _lines: u32) -> Result<zyvor_fabric_driver_core::LogStream> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::ImageDriver for MockDriver {
+        async fn list_images(&self) -> Result<Vec<zyvor_fabric_driver_core::ImageInfo>> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn clone_image(&self, _source: &str, _target: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn rename_image(&self, _old_name: &str, _new_name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn remove_image(&self, _name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn set_image_read_only(&self, _name: &str, _read_only: bool) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn pull_raw_image(&self, _url: &str, _name: &str, _verify: bool) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn pull_tar_image(&self, _url: &str, _name: &str, _verify: bool) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn import_raw_image(&self, _path: &str, _name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn import_tar_image(&self, _path: &str, _name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn export_raw_image(&self, _name: &str, _path: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn export_tar_image(&self, _name: &str, _path: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn clean_images(&self, _all: bool) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::ShellDriver for MockDriver {
+        async fn shell(
+            &self,
+            _name: &str,
+            _command: &str,
+            _timeout_seconds: Option<u64>,
+        ) -> Result<zyvor_fabric_driver_core::ShellOutput> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
     }

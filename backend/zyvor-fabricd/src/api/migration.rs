@@ -347,7 +347,7 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
     };
 
     let workspace = "/var/lib/zyvor-fabricd/migrations";
-    let manager = match migration::MigrationManager::new(workspace) {
+    let manager = match migration::MigrationManager::new(workspace, state.driver.clone()) {
         Ok(m) => m,
         Err(e) => {
             update_status(

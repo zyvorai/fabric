@@ -99,22 +99,14 @@ pub async fn hibernate_vm(
         tracing::info!("VM '{}' hibernated with snapshot '{}'", vm_name, snap_name);
         Ok(Json(json!({"status": "hibernated", "snapshot": snap_name})))
     } else {
-        // Fallback: stop VM via machinectl
-        let output = tokio::process::Command::new("machinectl")
-            .args(["poweroff", &vm_name])
-            .output()
-            .await
-            .map_err(|e| {
-                crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            })?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(crate::api_error::json_error(
+        // Fallback: no QMP socket available (or the ephemera backend, which
+        // has no QMP savevm equivalent) — just power off via the driver.
+        state.driver.poweroff(&vm_name).await.map_err(|e| {
+            crate::api_error::json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("machinectl poweroff failed: {}", stderr),
-            ));
-        }
+                format!("Failed to power off VM: {e:#}"),
+            )
+        })?;
 
         if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
             vm.state = vm_model::VMState::Stopped;

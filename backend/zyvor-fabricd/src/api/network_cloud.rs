@@ -394,7 +394,7 @@ fn default_max_lease_time() -> u32 {
     7200
 }
 
-/// POST /api/dhcp-servers - Enable DHCP server on a bridge via systemd-networkd (Admin only)
+/// POST /api/dhcp-servers - Enable DHCP server on a bridge via dnsmasq (Admin only)
 pub async fn create_dhcp_server(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,

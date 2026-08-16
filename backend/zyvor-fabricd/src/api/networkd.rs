@@ -2119,7 +2119,13 @@ pub struct DhcpServerConfig {
     pub lease_time_sec: Option<u32>,
 }
 
-/// POST /api/networkd/dhcp - Configure DHCP server on a bridge via systemd-networkd
+/// POST /api/networkd/dhcp - Configure a per-bridge DHCP server via
+/// dnsmasq (replaces the old systemd-networkd `[DHCPServer]` file-write +
+/// `networkctl reload` — see api/network_cloud.rs::create_dhcp_server,
+/// which this now shares a backend with; that endpoint's request shape
+/// takes an explicit gateway + pool_offset/pool_size, this one takes a
+/// pool_start/pool_end IP range instead, so the two aren't simply
+/// duplicates of each other despite doing the same underlying thing).
 pub async fn configure_dhcp_server(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
@@ -2138,43 +2144,59 @@ pub async fn configure_dhcp_server(
         return crate::api_error::json_error(StatusCode::BAD_REQUEST, e).into_response();
     }
 
+    let (start, end): (std::net::Ipv4Addr, std::net::Ipv4Addr) =
+        match (req.pool_start.parse(), req.pool_end.parse()) {
+            (Ok(s), Ok(e)) => (s, e),
+            _ => {
+                return crate::api_error::json_error(
+                    StatusCode::BAD_REQUEST,
+                    "pool_start/pool_end must be IPv4 addresses",
+                )
+                .into_response()
+            }
+        };
+    if start.octets()[..3] != end.octets()[..3] {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "pool_start and pool_end must be in the same /24 (dnsmasq is configured per-subnet)",
+        )
+        .into_response();
+    }
+    let pool_offset = start.octets()[3] as u32;
+    let pool_size = (end.octets()[3] as u32).saturating_sub(pool_offset) + 1;
+    // dnsmasq-manager derives the pool/netmask from the bridge's own
+    // gateway address assuming a /24 — this endpoint doesn't collect one
+    // explicitly, so use the pool's own network base .1, the same
+    // convention the old systemd-networkd config generator assumed.
+    let gateway = std::net::Ipv4Addr::new(
+        start.octets()[0],
+        start.octets()[1],
+        start.octets()[2],
+        1,
+    );
+
     let lease_time = req.lease_time_sec.unwrap_or(3600);
-    let dns = req
-        .dns_servers
-        .as_ref()
-        .map(|d| d.join(" "))
-        .unwrap_or_else(|| "1.1.1.1 8.8.8.8".to_string());
+    let dhcp_cfg = zyvor_fabric_dnsmasq_manager::DhcpConfig {
+        bridge: req.bridge_name.clone(),
+        gateway,
+        pool_offset,
+        pool_size,
+        default_lease_time_sec: lease_time,
+        dns_servers: req.dns_servers.clone().unwrap_or_default(),
+        domain: None,
+    };
 
-    // Generate networkd config with DHCPServer section
-    let config = format!(
-        "[DHCPServer]\nPoolOffset={}\nPoolSize=100\nDNS={}\nDefaultLeaseTimeSec={}\nMaxLeaseTimeSec={}\n",
-        req.pool_start, dns, lease_time, lease_time * 2
-    );
-
-    let config_path = format!(
-        "{}/{}dhcp-{}.network",
-        state.config.network.networkd_config_dir,
-        state.config.network.networkd_file_prefix,
-        req.bridge_name
-    );
-
-    match tokio::fs::write(&config_path, &config).await {
-        Ok(_) => {
-            // Reload networkd
-            let _ = tokio::process::Command::new("networkctl")
-                .args(["reload"])
-                .output()
-                .await;
-            Json(serde_json::json!({
-                "status": "configured",
-                "bridge": req.bridge_name,
-                "config_path": config_path
-            }))
-            .into_response()
-        }
+    match state.dnsmasq_manager.start(&dhcp_cfg).await {
+        Ok(()) => Json(serde_json::json!({
+            "status": "configured",
+            "bridge": req.bridge_name,
+            "pool_offset": pool_offset,
+            "pool_size": pool_size,
+        }))
+        .into_response(),
         Err(e) => crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to write config: {}", e),
+            format!("Failed to start DHCP server: {e:#}"),
         )
         .into_response(),
     }

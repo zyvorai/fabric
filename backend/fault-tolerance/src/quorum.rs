@@ -3,6 +3,8 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use anyhow::Result;
+use std::sync::Arc;
+use zyvor_fabric_driver_core::VmDriver;
 
 /// Check if quorum is held by writing/reading a heartbeat file on shared storage.
 pub fn check_quorum(quorum_path: &str, host_id: &str) -> Result<bool> {
@@ -41,20 +43,16 @@ pub fn check_quorum(quorum_path: &str, host_id: &str) -> Result<bool> {
     Ok(has_quorum)
 }
 
-/// Self-fence: stop all FT-protected VMs when quorum is lost.
-pub fn self_fence() -> Result<()> {
+/// Self-fence: stop all FT-protected VMs when quorum is lost, via the
+/// active `VmDriver` (machinectl or Ephemera) rather than shelling out to
+/// machinectl directly.
+pub async fn self_fence(driver: &Arc<dyn VmDriver>) -> Result<()> {
     tracing::error!("QUORUM LOST: self-fencing - stopping all FT VMs");
-    let output = std::process::Command::new("machinectl")
-        .args(["list", "--no-legend", "--no-pager"])
-        .output()?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        if let Some(name) = line.split_whitespace().next() {
-            tracing::warn!("Self-fence: stopping VM '{}'", name);
-            let _ = std::process::Command::new("machinectl")
-                .args(["poweroff", name])
-                .output();
+    let machines = driver.list_machines().await?;
+    for machine in machines {
+        tracing::warn!("Self-fence: stopping VM '{}'", machine.name);
+        if let Err(e) = driver.poweroff(&machine.name).await {
+            tracing::warn!("Self-fence: failed to stop VM '{}': {e:#}", machine.name);
         }
     }
     Ok(())
