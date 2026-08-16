@@ -1,6 +1,6 @@
 # Zyvor Fabric — Customer Documentation
 
-Systemd-native private cloud control plane — vCenter-style VM ops, DRS, FT, replication, and distributed storage.
+Private cloud control plane with no systemd dependency — vCenter-style VM ops, DRS, FT, replication, and distributed storage.
 
 | You want to… | Open |
 |--------------|------|
@@ -29,7 +29,7 @@ Output lands in [`pdf/`](pdf/):
 
 ## Product at a glance
 
-Systemd-native private cloud control plane — vCenter-style VM ops, DRS, FT, replication, and distributed storage.
+Private cloud control plane with no systemd dependency — vCenter-style VM ops, DRS, FT, replication, and distributed storage.
 
 ## Support surfaces (quick map)
 
