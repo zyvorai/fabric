@@ -364,22 +364,48 @@ pub async fn get_containers(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
     let machines = state.driver.list_machines().await.unwrap_or_default();
-    let containers: Vec<serde_json::Value> = machines
-        .iter()
-        .map(|m| {
-            serde_json::json!({
-                "id": m.name,
-                "name": m.name,
-                "state": format!("{:?}", m.state).to_lowercase(),
-                "image": "",
-            })
-        })
-        .collect();
+    let mut containers = Vec::with_capacity(machines.len());
+    let mut total_cpu = 0.0;
+    let mut total_memory = 0u64;
+    for m in &machines {
+        // Metrics collection is best-effort per machine (e.g. a machine
+        // that just stopped mid-scan) -- fall back to zeroed stats rather
+        // than dropping the whole row, matching list_machines' own
+        // unwrap_or_default() above.
+        let metrics = state.driver.get_metrics(&m.name).await.unwrap_or(vm_model::VMMetrics {
+            cpu_usage: 0.0,
+            memory_usage: 0,
+            disk_usage: 0,
+            network_rx: 0,
+            network_tx: 0,
+        });
+        let memory_limit = state
+            .store
+            .get_vm(&m.name)
+            .ok()
+            .flatten()
+            .map(|vm| vm.memory * 1024 * 1024);
+        total_cpu += metrics.cpu_usage;
+        total_memory += metrics.memory_usage;
+        containers.push(serde_json::json!({
+            "id": m.name,
+            "name": m.name,
+            "state": format!("{:?}", m.state).to_lowercase(),
+            "image": "",
+            "cpu_percent": metrics.cpu_usage,
+            "memory_bytes": metrics.memory_usage,
+            "memory_limit": memory_limit,
+            "net_rx": metrics.network_rx,
+            "net_tx": metrics.network_tx,
+        }));
+    }
     let running = machines.iter().filter(|m| matches!(m.state, vm_model::VMState::Running)).count();
     Json(serde_json::json!({
         "summary": {
             "total": containers.len(),
-            "running": running
+            "running": running,
+            "total_cpu": total_cpu,
+            "total_memory": total_memory
         },
         "containers": containers
     }))
