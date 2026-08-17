@@ -324,6 +324,7 @@ pub async fn add_port_forward(
         let opts = vm_model::VMStartOptions {
             port_forwards: vm.port_forwards.clone(),
             network_tap: vm.network_tap,
+            network_static_ip: vm.network_static_ip,
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -457,6 +458,7 @@ pub async fn start_vm(
         let opts = start_opts.unwrap_or_else(|| vm_model::VMStartOptions {
             port_forwards: vm.port_forwards.clone(),
             network_tap: vm.network_tap,
+            network_static_ip: vm.network_static_ip,
             ..Default::default()
         });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;

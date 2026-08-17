@@ -138,6 +138,12 @@ pub struct CloudInitSpec {
     pub packages: Vec<String>,
     #[serde(default)]
     pub runcmd: Vec<String>,
+    /// Configure the guest's network address statically via cloud-init
+    /// instead of DHCP -- only meaningful for `NetworkSpec::Tap { netns:
+    /// true, .. }`. Mirrors `ephemera_core::model::CloudInitSpec.
+    /// static_network`.
+    #[serde(default)]
+    pub static_network: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

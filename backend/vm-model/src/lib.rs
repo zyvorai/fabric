@@ -49,6 +49,11 @@ pub struct VM {
     /// creation-time limitation `port_forwards` has under NAT).
     #[serde(default)]
     pub network_tap: bool,
+    /// Only meaningful when `network_tap` is set: configure the guest's
+    /// address statically via cloud-init instead of relying on its own
+    /// DHCP client (which not every image runs automatically on boot).
+    #[serde(default)]
+    pub network_static_ip: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -81,6 +86,8 @@ pub struct CreateVMRequest {
     pub port_forwards: Vec<PortForwardSpec>,
     #[serde(default)]
     pub network_tap: bool,
+    #[serde(default)]
+    pub network_static_ip: bool,
 }
 
 fn default_disk_size() -> u64 {
@@ -280,6 +287,10 @@ pub struct VMStartOptions {
     /// Create a TAP device for networking
     #[serde(default)]
     pub network_tap: bool,
+    /// Only meaningful when `network_tap` is set: configure the guest's
+    /// address statically via cloud-init instead of DHCP.
+    #[serde(default)]
+    pub network_static_ip: bool,
     /// Use user mode networking
     #[serde(default)]
     pub network_user_mode: bool,
@@ -854,6 +865,7 @@ impl VM {
             last_error: None,
             port_forwards: Vec::new(),
             network_tap: false,
+            network_static_ip: false,
         }
     }
 
@@ -877,6 +889,7 @@ impl VM {
             last_error: None,
             port_forwards: req.port_forwards.clone(),
             network_tap: req.network_tap,
+            network_static_ip: req.network_static_ip,
         }
     }
 }
@@ -918,6 +931,7 @@ mod tests {
             labels: Some(labels.clone()),
             port_forwards: Vec::new(),
             network_tap: false,
+            network_static_ip: false,
         };
         let vm = VM::from_request(&req);
         assert_eq!(vm.name, "web-01");
@@ -1057,6 +1071,7 @@ mod tests {
             linux: Some("/boot/vmlinuz".into()),
             initrd: vec!["/boot/initrd.img".into()],
             network_tap: true,
+            network_static_ip: false,
             network_user_mode: false,
             port_forwards: vec![PortForwardSpec { host_port: 2222, guest_port: 22, protocol: "tcp".into() }],
             firmware: Some("/usr/share/ovmf/OVMF.fd".into()),

@@ -243,7 +243,13 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         firmware: opts.firmware.clone().map(PathBuf::from),
         kernel_args: if opts.extra_args.is_empty() { None } else { Some(opts.extra_args.join(" ")) },
         network,
-        cloud_init: None,
+        // Only meaningful (and only ever set) alongside netns tap
+        // networking above -- static_network needs a reserved address to
+        // inject, which only that mode has (see Ephemera's
+        // ephemera_network::netns::NetnsHandle).
+        cloud_init: (opts.network_tap && opts.network_static_ip).then(|| {
+            zyvor_fabric_ephemera_client::CloudInitSpec { static_network: true, ..Default::default() }
+        }),
         ttl_seconds: None,
         extra_args: vec![],
         // Enabled by default: needed for ShellDriver::shell, ConsoleDriver,
