@@ -310,28 +310,26 @@ pub async fn start_sync(
         .map(|s| s.address.clone())
         .unwrap_or_else(|| repl.target_site_id.clone());
 
-    // Perform the actual sync in a background task
+    // Perform the actual sync in a background task. Resolve the VM's
+    // actual, live disk (a single qcow2 file, not a naming-convention
+    // guess at a directory) via the driver -- real (Ephemera-managed) VMs
+    // are almost never stored at /var/lib/zyvor-fabricd/images/<name>, so
+    // the old guess found nothing for virtually every real VM, and even
+    // when something existed there it was treated as a directory
+    // (read_dir) when disks are files.
     let repl_id = repl.id.clone();
     let vm_name = repl.vm_name.clone();
     let compression = repl.compression_enabled;
     let bandwidth_limit = repl.bandwidth_limit_mbps;
     let store = state.store.clone();
+    let disk_path = state.driver.get_disk_path(&vm_name).await.ok();
 
     tokio::task::spawn_blocking(move || {
-        let source_path = format!("/var/lib/zyvor-fabricd/images/{}", vm_name);
-        let mut bytes_synced: u64 = 0;
+        let bytes_synced: u64;
 
-        if std::path::Path::new(&source_path).exists() {
-            // Compute source data size
-            bytes_synced = std::fs::read_dir(&source_path)
-                .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .filter_map(|e| e.metadata().ok())
-                        .map(|m| m.len())
-                        .sum()
-                })
-                .unwrap_or(0);
+        if let Some(source_path) = disk_path.as_ref().filter(|p| p.exists()) {
+            let source_path = source_path.display().to_string();
+            bytes_synced = std::fs::metadata(&source_path).map(|m| m.len()).unwrap_or(0);
 
             let mut rsync_args = vec!["-a".to_string(), "--partial".to_string()];
             if compression {
@@ -340,14 +338,9 @@ pub async fn start_sync(
             if let Some(bw) = bandwidth_limit {
                 rsync_args.push(format!("--bwlimit={}", bw * 1024));
             }
-            let source_with_slash = if source_path.ends_with('/') {
-                source_path.clone()
-            } else {
-                format!("{}/", source_path)
-            };
-            rsync_args.push(source_with_slash);
+            rsync_args.push(source_path.clone());
             rsync_args.push(format!(
-                "{}:/var/lib/zyvor-fabricd/images/{}/",
+                "{}:/var/lib/zyvor-fabricd/images/{}.qcow2",
                 target_address, vm_name
             ));
 
@@ -371,11 +364,12 @@ pub async fn start_sync(
                 }
             }
         } else {
-            tracing::debug!(
-                "Source path '{}' not found for VM '{}', metadata-only sync",
-                source_path,
-                vm_name
+            tracing::warn!(
+                "No disk found for VM '{}', skipping sync for replication {}",
+                vm_name,
+                repl_id
             );
+            return;
         }
 
         // Update the replication last_sync timestamp and record metrics

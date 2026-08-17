@@ -227,7 +227,11 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
         }
     }
 
-    let allowed_prefixes = ["/var/lib/machines", "/var/lib/zyvor-fabricd"];
+    let allowed_prefixes = [
+        "/var/lib/machines",
+        "/var/lib/zyvor-fabricd",
+        "/var/lib/ephemera",
+    ];
 
     // Try to canonicalize to resolve symlinks. If the file doesn't exist yet,
     // canonicalize the parent directory to prevent symlink-based traversal.

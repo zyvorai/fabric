@@ -60,10 +60,19 @@ pub async fn export_vm(
             )
         })?;
 
-    // Determine disk path — validate against allowed prefixes
-    let disk_path = req
-        .disk_path
-        .unwrap_or_else(|| format!("/var/lib/machines/{}.qcow2", vm_name));
+    // Determine disk path — the VM's actual, live disk (not a guess at a
+    // stale pre-Ephemera-migration path -- /var/lib/machines hasn't
+    // existed since the systemd-machined removal) unless the caller
+    // explicitly overrides it.
+    let disk_path = match req.disk_path {
+        Some(p) => p,
+        None => state.driver.get_disk_path(&vm_name).await.map_err(|e| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": format!("No disk image found for VM '{}': {}", vm_name, e)})),
+            )
+        })?.display().to_string(),
+    };
     crate::validation::validate_host_path(&disk_path)
         .map_err(|(s, m)| (s, Json(serde_json::json!({"error": m}))))?;
 

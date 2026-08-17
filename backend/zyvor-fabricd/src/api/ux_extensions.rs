@@ -384,11 +384,11 @@ pub async fn vm_healthcheck(
         "status": if mem_ok { "pass" } else { "warning" },
         "message": format!("{} MB allocated", vm.memory),
     }));
-    let image_path = format!("/var/lib/machines/{}.raw", vm.name);
-    let image_exists = tokio::fs::metadata(&image_path).await.is_ok()
-        || tokio::fs::metadata(format!("/var/lib/machines/{}.qcow2", vm.name))
-            .await
-            .is_ok();
+    // The VM's actual, live disk (not a guess at the dead
+    // /var/lib/machines convention, which hasn't existed since the
+    // systemd-machined removal and made this check report "warning" for
+    // virtually every real VM regardless of whether its disk was fine).
+    let image_exists = state.driver.get_disk_path(&vm.name).await.is_ok();
     checks.push(json!({
         "name": "Disk image",
         "status": if image_exists { "pass" } else { "warning" },

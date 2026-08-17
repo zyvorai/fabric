@@ -268,45 +268,27 @@ pub async fn encrypt_vm(
         }
     };
     let key_id = Uuid::new_v4().to_string();
-    let status = VmEncryptionStatus {
-        vm_name: req.vm_name.clone(),
-        encrypted: true,
-        policy_id: Some(req.policy_id),
-        key_id: Some(key_id.clone()),
-        algorithm: Some(policy.algorithm),
-        vmotion_encrypted: policy.encrypt_vmotion,
-        last_key_rotation: None,
-    };
-    if let Err(e) = state
-        .store
-        .save_entity("vm_encryption", &req.vm_name, &status)
-    {
-        tracing::error!("Failed to save encryption status: {}", e);
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response();
-    }
 
-    // Attempt actual disk encryption using qemu-img LUKS.
+    // Resolve the VM's actual, live disk (not a naming-convention guess --
+    // almost every real VM is created from a shared base image not named
+    // after itself, so the old guess silently never matched anything) and
+    // run the qemu-img LUKS conversion BEFORE persisting or reporting
+    // encrypted:true. The old code saved encrypted:true unconditionally and
+    // then ran the actual encryption in a fire-and-forget spawn_blocking it
+    // never awaited, so the API/dashboard reported success regardless of
+    // whether encryption even started.
     let vm_name = req.vm_name.clone();
-    let key_for_encrypt = key_id;
-    tokio::task::spawn_blocking(move || {
-        let image_path = format!("/var/lib/zyvor-fabricd/images/{}.qcow2", vm_name);
-        if !std::path::Path::new(&image_path).exists() {
-            tracing::debug!(
-                "No disk image at '{}', skipping disk encryption",
-                image_path
-            );
-            return;
-        }
+    let key_for_encrypt = key_id.clone();
+    let disk_path = state.driver.get_disk_path(&vm_name).await;
+    let encrypt_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let image_path = disk_path
+            .map_err(|e| format!("No disk image found for VM '{}': {}", vm_name, e))?
+            .display()
+            .to_string();
         let encrypted_path = format!("{}.encrypted", image_path);
         let secret_file = format!("/tmp/zyvor-fabricd-encrypt-{}", Uuid::new_v4().simple());
-        if let Err(e) = std::fs::write(&secret_file, &key_for_encrypt) {
-            tracing::error!("Failed to write secret file: {}", e);
-            return;
-        }
+        std::fs::write(&secret_file, &key_for_encrypt)
+            .map_err(|e| format!("Failed to write secret file: {}", e))?;
         let output = std::process::Command::new("qemu-img")
             .args([
                 "convert",
@@ -325,24 +307,66 @@ pub async fn encrypt_vm(
         let _ = std::fs::remove_file(&secret_file);
         match output {
             Ok(out) if out.status.success() => {
-                if let Err(e) = std::fs::rename(&encrypted_path, &image_path) {
-                    tracing::error!("Failed to replace with encrypted disk: {}", e);
-                } else {
-                    tracing::info!("Encrypted disk image for VM '{}'", vm_name);
-                }
+                std::fs::rename(&encrypted_path, &image_path)
+                    .map_err(|e| format!("Failed to replace with encrypted disk: {}", e))?;
+                tracing::info!("Encrypted disk image for VM '{}'", vm_name);
+                Ok(())
             }
             Ok(out) => {
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                tracing::error!(
-                    "qemu-img encryption failed for VM '{}': {}",
-                    vm_name,
-                    stderr
-                );
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
                 let _ = std::fs::remove_file(&encrypted_path);
+                Err(format!("qemu-img encryption failed: {}", stderr))
             }
-            Err(e) => tracing::error!("Failed to run qemu-img: {}", e),
+            Err(e) => Err(format!("Failed to run qemu-img: {}", e)),
         }
-    });
+    })
+    .await;
+
+    let encrypted = match &encrypt_result {
+        Ok(Ok(())) => true,
+        Ok(Err(e)) => {
+            tracing::error!("Disk encryption failed for VM '{}': {}", req.vm_name, e);
+            false
+        }
+        Err(e) => {
+            tracing::error!("Encryption task failed for VM '{}': {}", req.vm_name, e);
+            false
+        }
+    };
+
+    let status = VmEncryptionStatus {
+        vm_name: req.vm_name.clone(),
+        encrypted,
+        policy_id: Some(req.policy_id),
+        key_id: Some(key_id),
+        algorithm: Some(policy.algorithm),
+        vmotion_encrypted: policy.encrypt_vmotion,
+        last_key_rotation: None,
+    };
+    if let Err(e) = state
+        .store
+        .save_entity("vm_encryption", &req.vm_name, &status)
+    {
+        tracing::error!("Failed to save encryption status: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
+    }
+
+    if !encrypted {
+        let msg = match &encrypt_result {
+            Ok(Err(e)) => e.clone(),
+            Err(e) => e.to_string(),
+            Ok(Ok(())) => unreachable!(),
+        };
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Encryption failed: {}", msg)})),
+        )
+            .into_response();
+    }
 
     (StatusCode::OK, Json(status)).into_response()
 }
