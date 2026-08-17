@@ -68,6 +68,16 @@ export default function VNCViewer({ vmName }: VNCViewerProps) {
           {status === 'error' && (errorMsg || 'Connection failed')}
         </div>
       )}
+      {status === 'connected' && (
+        // A black canvas alone is indistinguishable from a dead connection
+        // -- the guest's VGA framebuffer stays blank on any image whose
+        // console output goes entirely to a serial tty, which is common.
+        // This badge is the only signal the socket is actually live.
+        <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 text-emerald-400 text-xs pointer-events-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          Connected
+        </div>
+      )}
     </div>
   )
 }
