@@ -201,11 +201,34 @@ pub struct DrDashboard {
     pub total_plans: u32,
     pub ready_plans: u32,
     pub failed_plans: u32,
+    #[serde(rename = "total_protected_vms")]
     pub protected_vms: u32,
+    #[serde(rename = "total_unprotected_vms")]
     pub unprotected_vms: u32,
     pub rpo_violations: u32,
     pub last_test_results: Vec<TestResult>,
     pub overall_health: DrHealth,
+    /// Count of plans with at least one recorded test run (`last_tested`).
+    pub plans_tested: u32,
+    pub plans_untested: u32,
+    /// Average of each plan's `rto_minutes` target, in seconds (the unit
+    /// the frontend's RTO gauge displays), across plans that set one.
+    pub avg_rto_seconds: f64,
+    /// RPO is a replication-layer concept (see `replication::ReplicationHealthSummary`)
+    /// with no equivalent on a recovery plan — always 0 here rather than a
+    /// fabricated number until site-recovery plans track their own RPO target.
+    pub avg_rpo_minutes: f64,
+    pub sites: Vec<DrSiteHealth>,
+    pub recent_executions: Vec<RecoveryExecution>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DrSiteHealth {
+    pub site_id: String,
+    pub site_name: String,
+    pub status: String,
+    pub protected_vms: u32,
+    pub plans: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -1105,6 +1128,14 @@ impl SiteRecoveryManager {
             DrHealth::Healthy
         };
 
+        let plans_tested = plans.values().filter(|p| p.last_tested.is_some()).count() as u32;
+        let rto_targets: Vec<u32> = plans.values().filter_map(|p| p.rto_minutes).collect();
+        let avg_rto_seconds = if rto_targets.is_empty() {
+            0.0
+        } else {
+            (rto_targets.iter().sum::<u32>() as f64 / rto_targets.len() as f64) * 60.0
+        };
+
         DrDashboard {
             total_plans,
             ready_plans,
@@ -1114,6 +1145,12 @@ impl SiteRecoveryManager {
             rpo_violations,
             last_test_results: results.clone(),
             overall_health,
+            plans_tested,
+            plans_untested: total_plans - plans_tested,
+            avg_rto_seconds,
+            avg_rpo_minutes: 0.0,
+            sites: Vec::new(),
+            recent_executions: Vec::new(),
         }
     }
 

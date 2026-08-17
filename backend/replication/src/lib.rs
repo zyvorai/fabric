@@ -132,11 +132,23 @@ pub struct SyncEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplicationHealthSummary {
+    #[serde(rename = "total_replications")]
     pub total: u32,
     pub active: u32,
     pub paused: u32,
     pub error: u32,
     pub rpo_violations: u32,
+    pub avg_rpo_minutes: f64,
+    pub total_bytes_transferred_24h: u64,
+    pub sites: Vec<SiteHealth>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SiteHealth {
+    pub site_id: String,
+    pub site_name: String,
+    pub replication_count: u32,
+    pub health: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -745,12 +757,17 @@ impl ReplicationManager {
             paused: 0,
             error: 0,
             rpo_violations: 0,
+            avg_rpo_minutes: 0.0,
+            total_bytes_transferred_24h: 0,
+            sites: Vec::new(),
         };
 
+        let mut active_rpo_sum = 0u64;
         for r in replications.values() {
             match r.status {
                 ReplicationStatus::Active => {
                     summary.active += 1;
+                    active_rpo_sum += r.rpo_minutes as u64;
                     // Check for RPO violation
                     let violated = match r.last_sync {
                         Some(last) => (now - last).num_minutes() as u32 > r.rpo_minutes,
@@ -764,6 +781,9 @@ impl ReplicationManager {
                 ReplicationStatus::Error => summary.error += 1,
                 _ => {}
             }
+        }
+        if summary.active > 0 {
+            summary.avg_rpo_minutes = active_rpo_sum as f64 / summary.active as f64;
         }
 
         summary

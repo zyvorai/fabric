@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::server::AppState;
 use replication::{
     ReplicationConfig, ReplicationHealthSummary, ReplicationInstance, ReplicationMetrics,
-    ReplicationSite, ReplicationStatus,
+    ReplicationSite, ReplicationStatus, SiteHealth,
 };
 use security::{RequireAdmin, RequireRead, RequireWrite};
 
@@ -471,11 +471,16 @@ pub async fn get_replication_health(
         paused: 0,
         error: 0,
         rpo_violations: 0,
+        avg_rpo_minutes: 0.0,
+        total_bytes_transferred_24h: 0,
+        sites: Vec::new(),
     };
+    let mut active_rpo_sum = 0u64;
     for r in &replications {
         match r.status {
             ReplicationStatus::Active => {
                 summary.active += 1;
+                active_rpo_sum += r.rpo_minutes as u64;
                 if r.last_sync.map_or(true, |last| {
                     (now - last).num_minutes() as u32 > r.rpo_minutes
                 }) {
@@ -487,6 +492,43 @@ pub async fn get_replication_health(
             _ => {}
         }
     }
+    if summary.active > 0 {
+        summary.avg_rpo_minutes = active_rpo_sum as f64 / summary.active as f64;
+    }
+
+    let sites: Vec<ReplicationSite> = state
+        .store
+        .list_entities("replication_sites")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
+    summary.sites = sites
+        .into_iter()
+        .map(|s| {
+            let site_replications: Vec<&ReplicationConfig> = replications
+                .iter()
+                .filter(|r| r.target_site_id == s.id || r.source_site_id == s.id)
+                .collect();
+            let health = if site_replications.iter().any(|r| r.status == ReplicationStatus::Error) {
+                "critical"
+            } else if site_replications.iter().any(|r| {
+                r.status == ReplicationStatus::Active
+                    && r.last_sync.map_or(true, |last| (now - last).num_minutes() as u32 > r.rpo_minutes)
+            }) {
+                "degraded"
+            } else {
+                "healthy"
+            };
+            SiteHealth {
+                site_id: s.id,
+                site_name: s.name,
+                replication_count: site_replications.len() as u32,
+                health: health.to_string(),
+            }
+        })
+        .collect();
+
     Json(summary)
 }
 

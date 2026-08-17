@@ -121,6 +121,12 @@ export default function SiteRecovery() {
       </div>
 
       {/* DR Dashboard */}
+      {activeTab === 'dashboard' && !dashboard && !loading && (
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-8 text-center text-slate-400">
+          No site recovery data available.
+        </div>
+      )}
+
       {activeTab === 'dashboard' && dashboard && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

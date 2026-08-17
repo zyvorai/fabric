@@ -122,6 +122,12 @@ export default function Certificates() {
       </div>
 
       {/* Dashboard */}
+      {activeTab === 'dashboard' && !health && !loading && (
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-8 text-center text-slate-400">
+          No certificate health data available.
+        </div>
+      )}
+
       {activeTab === 'dashboard' && health && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

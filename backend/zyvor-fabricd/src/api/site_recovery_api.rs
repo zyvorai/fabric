@@ -13,10 +13,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::server::AppState;
+use replication::ReplicationSite;
 use security::{RequireAdmin, RequireRead, RequireWrite};
 use site_recovery::{
-    DrDashboard, DrHealth, ExecutionStatus, ExecutionType, PlanStatus, RecoveryExecution,
-    RecoveryPlan, SiteRecoveryManager,
+    DrDashboard, DrHealth, DrSiteHealth, ExecutionStatus, ExecutionType, PlanStatus,
+    RecoveryExecution, RecoveryPlan, SiteRecoveryManager,
 };
 
 // ============================================================================
@@ -387,6 +388,65 @@ pub async fn get_dr_dashboard(
     } else {
         DrHealth::Healthy
     };
+
+    let plans_tested = plans.iter().filter(|p| p.last_tested.is_some()).count() as u32;
+    let rto_targets: Vec<u32> = plans.iter().filter_map(|p| p.rto_minutes).collect();
+    let avg_rto_seconds = if rto_targets.is_empty() {
+        0.0
+    } else {
+        (rto_targets.iter().sum::<u32>() as f64 / rto_targets.len() as f64) * 60.0
+    };
+
+    // Site recovery plans reference sites by id (source_site_id/target_site_id)
+    // from the same site registry replication uses — reuse it for names rather
+    // than maintaining a second, redundant site list.
+    let known_sites: Vec<ReplicationSite> = state
+        .store
+        .list_entities("replication_sites")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
+    let sites: Vec<DrSiteHealth> = known_sites
+        .into_iter()
+        .map(|s| {
+            let site_plans: Vec<&RecoveryPlan> = plans
+                .iter()
+                .filter(|p| p.source_site_id == s.id || p.target_site_id == s.id)
+                .collect();
+            let site_protected_vms: std::collections::HashSet<&str> = site_plans
+                .iter()
+                .flat_map(|p| p.priority_groups.iter())
+                .flat_map(|g| g.vm_names.iter())
+                .map(|v| v.as_str())
+                .collect();
+            let status = if site_plans.iter().any(|p| p.status == PlanStatus::Failed) {
+                "critical"
+            } else if site_plans.is_empty() {
+                "unused"
+            } else {
+                "healthy"
+            };
+            DrSiteHealth {
+                site_id: s.id,
+                site_name: s.name,
+                status: status.to_string(),
+                protected_vms: site_protected_vms.len() as u32,
+                plans: site_plans.len() as u32,
+            }
+        })
+        .collect();
+
+    let mut recent_executions: Vec<RecoveryExecution> = state
+        .store
+        .list_entities("recovery_executions")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
+    recent_executions.sort_by(|a, b| b.started.cmp(&a.started));
+    recent_executions.truncate(5);
+
     let dashboard = DrDashboard {
         total_plans,
         ready_plans,
@@ -396,6 +456,12 @@ pub async fn get_dr_dashboard(
         rpo_violations,
         last_test_results: Vec::new(),
         overall_health,
+        plans_tested,
+        plans_untested: total_plans - plans_tested,
+        avg_rto_seconds,
+        avg_rpo_minutes: 0.0,
+        sites,
+        recent_executions,
     };
     Json(dashboard)
 }
