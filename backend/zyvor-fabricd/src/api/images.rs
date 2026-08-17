@@ -253,7 +253,12 @@ pub async fn list_images(
 
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if matches!(ext, "raw" | "qcow2" | "img") {
-                    let size = entry.metadata().await.map(|m| m.len()).unwrap_or(0);
+                    let metadata = entry.metadata().await.ok();
+                    let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+                    let mod_time = metadata
+                        .and_then(|m| m.modified().ok())
+                        .map(DateTime::<Utc>::from)
+                        .unwrap_or_else(Utc::now);
                     images.push(ImageInfo {
                         name: name.trim_end_matches(&format!(".{}", ext)).to_string(),
                         path: if show_path {
@@ -263,6 +268,7 @@ pub async fn list_images(
                         },
                         format: ext.to_string(),
                         size_bytes: size,
+                        mod_time,
                     });
                 }
             }
@@ -278,6 +284,7 @@ pub struct ImageInfo {
     pub path: String,
     pub format: String,
     pub size_bytes: u64,
+    pub mod_time: DateTime<Utc>,
 }
 
 // ============================================================================

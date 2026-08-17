@@ -47,7 +47,7 @@ export default function DownloadDisk() {
         throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
       }
       const data = await res.json()
-      setImages(data.images || [])
+      setImages(Array.isArray(data) ? data : data.images || [])
     })
   }, [run])
 
