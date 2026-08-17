@@ -87,14 +87,29 @@ pub struct ReplicationConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplicationSite {
+    #[serde(default)]
     pub id: String,
     pub name: String,
+    /// `endpoint` on the wire — matches the frontend's field name; only the
+    /// Rust identifier says "address".
+    #[serde(rename = "endpoint")]
     pub address: String,
     pub site_type: SiteType,
+    #[serde(default = "default_site_status")]
     pub status: SiteStatus,
+    #[serde(default)]
     pub datacenter_id: Option<String>,
+    /// Always overwritten by `register_site`'s handler on create — defaults
+    /// exist only so a client registering a new site doesn't need to
+    /// fabricate values for fields the server owns.
+    #[serde(default = "Utc::now")]
     pub created: DateTime<Utc>,
+    #[serde(default = "Utc::now")]
     pub updated: DateTime<Utc>,
+}
+
+fn default_site_status() -> SiteStatus {
+    SiteStatus::Connected
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
