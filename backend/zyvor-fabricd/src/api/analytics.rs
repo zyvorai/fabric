@@ -418,7 +418,6 @@ pub async fn get_resource_utilization(
 
     let mut total_cpu = 0.0;
     let mut total_memory = 0.0;
-    let mut total_disk = 0.0;
     let mut total_network = 0.0;
     let mut count = 0;
 
@@ -441,8 +440,6 @@ pub async fn get_resource_utilization(
             if let Some(latest_metric) = performance.metrics.last() {
                 total_cpu += latest_metric.cpu_usage;
                 total_memory += latest_metric.memory_usage;
-                total_disk += (latest_metric.disk_io_read + latest_metric.disk_io_write) as f64
-                    / (1024.0 * 1024.0);
                 total_network += (latest_metric.network_rx + latest_metric.network_tx) as f64
                     / (1024.0 * 1024.0);
                 count += 1;
@@ -450,18 +447,25 @@ pub async fn get_resource_utilization(
         }
     }
 
+    // Disk utilization is host storage space used, not VM disk I/O
+    // throughput -- the two are unrelated (a VM with heavy read/write
+    // traffic says nothing about how full the disk actually is).
+    let disk_utilization = host_disk_used_pct(&state.config.storage.path)
+        .await
+        .unwrap_or(0.0);
+
     let utilization = if count > 0 {
         ResourceUtilization {
             cpu_utilization: total_cpu / count as f64,
             memory_utilization: total_memory / count as f64,
-            disk_utilization: (total_disk / count as f64).min(100.0), // Cap at 100%
+            disk_utilization,
             network_utilization: (total_network / count as f64 / 10.0).min(100.0), // Normalize to percentage
         }
     } else {
         ResourceUtilization {
             cpu_utilization: 0.0,
             memory_utilization: 0.0,
-            disk_utilization: 0.0,
+            disk_utilization,
             network_utilization: 0.0,
         }
     };
@@ -695,4 +699,27 @@ Time Range: {}
                 })?
         }
     }
+}
+
+/// Percentage of the filesystem backing `path` currently used, via `df`
+/// (no statvfs binding is in the dependency tree, and this matches the
+/// rest of this file's "shell out for host facts" approach elsewhere).
+async fn host_disk_used_pct(path: &str) -> Option<f64> {
+    let output = tokio::process::Command::new("df")
+        .args(["-B1", "--output=used,size", path])
+        .output()
+        .await
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let data_line = stdout.lines().nth(1)?;
+    let mut fields = data_line.split_whitespace();
+    let used: f64 = fields.next()?.parse().ok()?;
+    let size: f64 = fields.next()?.parse().ok()?;
+    if size <= 0.0 {
+        return None;
+    }
+    Some((used / size * 100.0).min(100.0))
 }
