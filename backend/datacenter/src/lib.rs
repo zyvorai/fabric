@@ -39,9 +39,10 @@ pub enum HostStatus {
     NotResponding,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DrsMode {
+    #[default]
     Manual,
     PartiallyAutomated,
     FullyAutomated,
@@ -127,6 +128,7 @@ pub struct HostHeartbeat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateDatacenterRequest {
     pub name: String,
+    #[serde(default)]
     pub description: String,
 }
 
@@ -140,11 +142,16 @@ pub struct UpdateDatacenterRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateClusterRequest {
     pub name: String,
+    #[serde(default)]
     pub description: String,
     pub datacenter_id: String,
+    #[serde(default)]
     pub ha_enabled: bool,
+    #[serde(default)]
     pub drs_enabled: bool,
+    #[serde(default)]
     pub drs_mode: DrsMode,
+    #[serde(default)]
     pub evc_mode: Option<String>,
 }
 
