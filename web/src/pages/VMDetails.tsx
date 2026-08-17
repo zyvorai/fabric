@@ -181,7 +181,7 @@ export default function VMDetails() {
         <div className="flex items-center gap-2">
           {canWrite && (
             <>
-              {vm.state === 'stopped' ? (
+              {vm.state === 'stopped' || vm.state === 'failed' ? (
                 <ActionBtn onClick={handleStart} color="green" icon={Play} label="Start" />
               ) : vm.state === 'paused' ? (
                 <ActionBtn onClick={handleResume} color="green" icon={Play} label="Resume" />

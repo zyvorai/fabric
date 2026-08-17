@@ -6,7 +6,7 @@ import { apiGet, apiPost, apiPostVoid, apiPutVoid, apiDelete } from './client'
 
 export interface VM {
   name: string
-  state: 'running' | 'stopped' | 'paused' | 'unknown'
+  state: 'running' | 'stopped' | 'paused' | 'starting' | 'stopping' | 'failed' | 'unknown'
   cpus: number
   memory: number
   image: string

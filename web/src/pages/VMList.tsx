@@ -84,7 +84,7 @@ function VMTableRow({ vm, onUpdate, selected, onSelect, canWrite }: { vm: VM; on
       <td className="py-3 px-4">
         {canWrite ? (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {vm.state === 'stopped' ? (
+          {vm.state === 'stopped' || vm.state === 'failed' ? (
             <button onClick={handleStart} className="p-1.5 rounded-md text-green-400 hover:bg-green-400/10 transition-colors" title="Start">
               <Play className="w-3.5 h-3.5" />
             </button>

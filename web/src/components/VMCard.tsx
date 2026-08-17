@@ -160,7 +160,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
         <div className="px-5 py-3 border-t border-slate-700/50 bg-slate-900/50 flex items-center gap-2">
           {canWrite && (
             <>
-              {vm.state === 'stopped' ? (
+              {vm.state === 'stopped' || vm.state === 'failed' ? (
                 <button
                   onClick={handleStart}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/15 text-green-400 hover:bg-green-600/25 rounded-md transition-colors text-sm font-medium"
