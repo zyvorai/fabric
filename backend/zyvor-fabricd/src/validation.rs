@@ -117,11 +117,22 @@ pub fn default_retention() -> u32 {
 // === VM image path helpers ===
 
 /// Allowed base directories for VM images.
-const IMAGE_ALLOWED_PREFIXES: &[&str] = &["/var/lib/machines", "/var/lib/zyvor-fabricd/images"];
+const IMAGE_ALLOWED_PREFIXES: &[&str] = &[
+    "/var/lib/machines",
+    "/var/lib/zyvor-fabricd/images",
+    "/var/lib/ephemera/images",
+];
 
 /// Find the disk image path for a VM by checking common locations.
 /// Returns the path if found, or None if not.
 /// The returned path is validated to be under allowed directories.
+///
+/// NOTE: this only guesses by naming convention (does it exist at
+/// "<dir>/<vm name>.<ext>"?) -- it never consults the VM's actual stored
+/// disk path, so it misses any VM created from an image not named after
+/// the VM itself (e.g. multiple VMs cloned from the same base image).
+/// Fixing that needs the caller's AppState threaded through all 11 call
+/// sites of this function; out of scope for this pass.
 pub fn find_vm_image(name: &str) -> Option<String> {
     let candidates = [
         format!("/var/lib/machines/{}.qcow2", name),
@@ -129,6 +140,8 @@ pub fn find_vm_image(name: &str) -> Option<String> {
         format!("/var/lib/machines/{}/{}.qcow2", name, name),
         format!("/var/lib/zyvor-fabricd/images/{}.qcow2", name),
         format!("/var/lib/zyvor-fabricd/images/{}.raw", name),
+        format!("/var/lib/ephemera/images/{}.qcow2", name),
+        format!("/var/lib/ephemera/images/{}.raw", name),
     ];
 
     for path in &candidates {

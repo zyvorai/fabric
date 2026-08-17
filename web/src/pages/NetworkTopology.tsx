@@ -207,7 +207,7 @@ export default function NetworkTopology() {
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>
-              {networks.length} libvirt network{networks.length !== 1 ? 's' : ''} · {bridges.length} host bridge
+              {networks.length} virtual network{networks.length !== 1 ? 's' : ''} · {bridges.length} host bridge
               {bridges.length !== 1 ? 's' : ''} · {vms.length} VM{vms.length !== 1 ? 's' : ''}
             </span>
           </div>

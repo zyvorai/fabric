@@ -11,7 +11,7 @@ import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
 
-interface DiskImage { name: string; path: string; format: string; size: number; mod_time?: string }
+interface DiskImage { name: string; path: string; format: string; size_bytes: number; mod_time?: string }
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -40,7 +40,7 @@ export default function DiskImages() {
       const res = await apiFetch('/api/images')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      setImages(data.images || data.disk_images || [])
+      setImages(Array.isArray(data) ? data : data.images || data.disk_images || [])
     } catch (err: unknown) {
       const msg = formatUserError(err)
       setError(msg)
@@ -56,7 +56,7 @@ export default function DiskImages() {
     return images.filter(img => img.name.toLowerCase().includes(q) || img.format.toLowerCase().includes(q) || img.path.toLowerCase().includes(q))
   }, [images, search])
 
-  const totalSize = images.reduce((sum, img) => sum + (img.size || 0), 0)
+  const totalSize = images.reduce((sum, img) => sum + (img.size_bytes || 0), 0)
   const toggleSelect = (path: string) => setSelected(prev => { const next = new Set(prev); if (next.has(path)) next.delete(path); else next.add(path); return next })
 
   if (loading) return <div className="flex items-center justify-center h-64 text-slate-400"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />Loading disk images...</div>
@@ -111,7 +111,7 @@ export default function DiskImages() {
                   <td className="px-4 py-3"><input type="checkbox" checked={selected.has(img.path)} onChange={() => toggleSelect(img.path)} className="rounded border-slate-600 bg-slate-700 text-blue-500" /></td>
                   <td className="px-4 py-3 text-white font-medium">{img.name}</td>
                   <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${formatColor[img.format] || 'bg-slate-500/20 text-slate-400'}`}>{img.format}</span></td>
-                  <td className="px-4 py-3 text-slate-300 font-mono text-xs">{formatBytes(img.size)}</td>
+                  <td className="px-4 py-3 text-slate-300 font-mono text-xs">{formatBytes(img.size_bytes)}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs font-mono truncate max-w-[250px]" title={img.path}>{img.path}</td>
                 </tr>
               ))}
