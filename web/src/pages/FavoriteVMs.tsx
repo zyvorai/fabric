@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { Star, Search, Monitor, RefreshCw, Cpu, HardDrive } from 'lucide-react'
 import { Link } from 'react-router'
-import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
@@ -40,10 +40,7 @@ export default function FavoriteVMs() {
   const loadVMs = async () => {
     setLoading(true); setError('')
     try {
-      const res = await apiFetch('/api/vms')
-      if (!res.ok) throw new Error('Could not retrieve VM list.')
-      const data = await res.json()
-      setVMs(Array.isArray(data) ? data : data.vms || [])
+      setVMs(await listVMs())
     } catch (e: unknown) {
       const msg = formatUserError(e)
       setError(msg)
