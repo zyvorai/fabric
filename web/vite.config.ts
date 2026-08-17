@@ -8,6 +8,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Default target predates top-level await, which @novnc/novnc's ESM
+  // build uses -- es2022 is baseline-supported by every browser this
+  // app already requires (native ES modules, CSS nesting, etc).
+  build: {
+    target: 'es2022',
+  },
   server: {
     port: 3000,
     proxy: {
