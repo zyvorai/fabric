@@ -59,6 +59,7 @@ export default function CreateVM() {
   const [wizardStep, setWizardStep] = useState(0)
   const [imagesReload, setImagesReload] = useState(0)
   const [networkMode, setNetworkMode] = useState<'nat' | 'bridged'>('nat')
+  const [staticIp, setStaticIp] = useState(false)
   const [portForwards, setPortForwards] = useState<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }[]>([])
 
   const addPortForwardRow = (guestPort = '', hostPort = '') => {
@@ -173,6 +174,7 @@ export default function CreateVM() {
       await createVM({
         name, image, cpus, memory, disk: diskGb,
         network_tap: networkMode === 'bridged',
+        network_static_ip: networkMode === 'bridged' && staticIp,
         ...(port_forwards.length ? { port_forwards } : {}),
       })
       if (showAdvanced) {
@@ -487,7 +489,25 @@ export default function CreateVM() {
                       <p className="text-xs text-slate-500 mt-2">
                         {networkMode === 'nat'
                           ? 'No host-routable IP — reach anything inside this VM (like SSH) by forwarding a port below.'
-                          : 'This VM gets its own real IP via DHCP (visible on its Network tab once booted) — no port forwards needed. Takes slightly longer to become reachable while it acquires a lease.'}
+                          : 'This VM gets its own real IP (visible on its Network tab once booted) — no port forwards needed.'}
+                      </p>
+                      {networkMode === 'bridged' && (
+                        <label className="flex items-center gap-2 mt-3 text-sm text-slate-300">
+                          <input
+                            type="checkbox"
+                            checked={staticIp}
+                            onChange={(e) => setStaticIp(e.target.checked)}
+                            className="rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-blue-500/50"
+                          />
+                          Assign the IP statically via cloud-init
+                        </label>
+                      )}
+                      <p className="text-xs text-slate-500 mt-1">
+                        {networkMode === 'bridged' && staticIp
+                          ? 'The address is configured directly at boot — no dependency on the guest running a working DHCP client, but the image must support cloud-init.'
+                          : networkMode === 'bridged'
+                            ? "The guest's own DHCP client requests the address — works without cloud-init, but only if the image actually runs one automatically on boot."
+                            : ''}
                       </p>
                     </div>
 
@@ -595,7 +615,9 @@ export default function CreateVM() {
                 </div>
                 <div className={`flex justify-between gap-4 ${networkMode === 'nat' && portForwards.length ? 'border-b border-slate-700/40 pb-2' : ''}`}>
                   <dt className="text-slate-500">Networking</dt>
-                  <dd className="text-white">{networkMode === 'nat' ? 'NAT' : 'Bridged (DHCP)'}</dd>
+                  <dd className="text-white">
+                    {networkMode === 'nat' ? 'NAT' : staticIp ? 'Bridged (static IP)' : 'Bridged (DHCP)'}
+                  </dd>
                 </div>
                 {networkMode === 'nat' && portForwards.length > 0 && (
                   <div className="flex justify-between gap-4">

@@ -735,8 +735,9 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
       <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
         <h3 className="text-sm font-semibold text-white mb-1">Bridged Networking</h3>
         <p className="text-xs text-slate-500">
-          This VM has its own real, externally-reachable IP via DHCP — see the interface table above once it's
-          booted and leased an address. No port forwards needed.
+          {vm.network_static_ip
+            ? "This VM's IP was configured statically via cloud-init — see the interface table above once it's booted. No port forwards needed."
+            : "This VM has its own real, externally-reachable IP via DHCP — see the interface table above once it's booted and leased an address. No port forwards needed."}
         </p>
       </div>
     )

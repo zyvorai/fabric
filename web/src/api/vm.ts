@@ -21,6 +21,7 @@ export interface VM {
   tags?: string[]
   port_forwards?: PortForwardSpec[]
   network_tap?: boolean
+  network_static_ip?: boolean
 }
 
 export interface CreateVMRequest {
@@ -44,6 +45,12 @@ export interface CreateVMRequest {
    * needing explicit port_forwards.
    */
   network_tap?: boolean
+  /**
+   * Only meaningful when network_tap is set: configure the guest's address
+   * statically via cloud-init instead of relying on its own DHCP client
+   * (not every image runs one automatically on boot).
+   */
+  network_static_ip?: boolean
 }
 
 export interface VMMetrics {
