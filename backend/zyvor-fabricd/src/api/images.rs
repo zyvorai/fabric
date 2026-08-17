@@ -230,13 +230,19 @@ pub async fn list_builds(
 }
 
 /// GET /api/images/list - List available VM images
-pub async fn list_images(RequireRead(claims): RequireRead) -> Json<Vec<ImageInfo>> {
+pub async fn list_images(
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Json<Vec<ImageInfo>> {
     tracing::debug!("images::{}", stringify!(list_images));
     let show_path = claims.role.can_manage();
     let mut images = Vec::new();
 
-    // Scan /var/lib/machines and /var/lib/zyvor-fabricd/images using async read_dir
-    for dir in &["/var/lib/machines", "/var/lib/zyvor-fabricd/images"] {
+    // Scan the configured image directory plus Ephemera's own image store
+    // (VM lifecycle -- and image storage -- is handled entirely by
+    // Ephemera; /var/lib/machines was systemd-machined's directory and no
+    // longer exists post-migration).
+    for dir in &[state.config.storage.image_path.as_str(), "/var/lib/ephemera/images"] {
         let mut entries = match tokio::fs::read_dir(dir).await {
             Ok(e) => e,
             Err(_) => continue,
