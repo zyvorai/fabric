@@ -827,6 +827,12 @@ mod tests {
         async fn get_mac_address(&self, _name: &str) -> Result<Option<String>> {
             Ok(None)
         }
+        async fn get_vnc_socket(&self, _name: &str) -> Result<Option<std::path::PathBuf>> {
+            Ok(None)
+        }
+        async fn get_disk_path(&self, _name: &str) -> Result<std::path::PathBuf> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
     }
 
     #[async_trait::async_trait]

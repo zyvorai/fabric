@@ -119,6 +119,15 @@ pub trait VMDriver: Send + Sync {
     /// no port allocation involved. `None` for a machine with no VNC
     /// server (not currently running, or a backend with no VNC equivalent).
     async fn get_vnc_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
+
+    /// Path to the VM's actual, live disk image -- `EphemeraDriver` returns
+    /// `VmRecord.disk` (the real copy-on-write instance disk Ephemera
+    /// created and is using right now, e.g.
+    /// `/var/lib/ephemera/instances/<uuid>/root.qcow2`), which is *not*
+    /// the same thing as the base image path the VM was created from.
+    /// Callers doing anything disk-level (snapshots, backups, cloning)
+    /// need this, not a naming-convention guess at the base image.
+    async fn get_disk_path(&self, name: &str) -> Result<std::path::PathBuf>;
 }
 
 /// Resource metrics collection from cgroup v2.

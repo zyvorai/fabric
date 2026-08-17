@@ -142,8 +142,13 @@ pub async fn resume_hibernate(
             crate::api_error::json_error(StatusCode::NOT_FOUND, "No hibernation snapshot found")
         })?;
 
-    // Start VM and restore snapshot
-    let image_path = crate::validation::find_vm_image_or_default(&vm_name);
+    // Start VM and restore snapshot -- the VM's real, live disk if
+    // Ephemera still knows about it, falling back to the naming-convention
+    // default only if it doesn't (see VMDriver::get_disk_path).
+    let image_path = match state.driver.get_disk_path(&vm_name).await {
+        Ok(p) => p.display().to_string(),
+        Err(_) => crate::validation::find_vm_image_or_default(&vm_name),
+    };
 
     // Validate the stored snapshot name before passing to command
     if let Err((_, msg)) = crate::validation::validate_snapshot_name(&info.snapshot_name) {
@@ -230,10 +235,15 @@ pub async fn migrate_storage(
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
-    // Find source disk
-    let source_path = crate::validation::find_vm_image(&vm_name).ok_or_else(|| {
-        crate::api_error::json_error(StatusCode::NOT_FOUND, "No disk image found")
+    // The VM's actual, live disk (not a naming-convention guess -- see
+    // VMDriver::get_disk_path's doc comment).
+    let source_path = state.driver.get_disk_path(&vm_name).await.map_err(|e| {
+        crate::api_error::json_error(
+            StatusCode::NOT_FOUND,
+            format!("No disk image found for VM '{}': {}", vm_name, e),
+        )
     })?;
+    let source_path = source_path.display().to_string();
 
     let source_format = std::path::Path::new(&source_path)
         .extension()

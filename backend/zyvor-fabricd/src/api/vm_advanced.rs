@@ -229,8 +229,15 @@ pub async fn create_checkpoint(
         return Err((status, Json(json!({ "error": msg }))));
     }
 
-    // Find the disk image for this VM
-    let image_path = crate::validation::find_vm_image_or_default(&vm_name);
+    // The VM's actual, live disk (not a naming-convention guess -- see
+    // VMDriver::get_disk_path's doc comment).
+    let image_path = state.driver.get_disk_path(&vm_name).await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("No disk image found for VM '{}': {}", vm_name, e) })),
+        )
+    })?;
+    let image_path = image_path.display().to_string();
 
     // Create internal snapshot via qemu-img
     let output = Command::new("qemu-img")
@@ -333,7 +340,13 @@ pub async fn restore_checkpoint(
         ));
     }
 
-    let image_path = crate::validation::find_vm_image_or_default(&vm_name);
+    let image_path = state.driver.get_disk_path(&vm_name).await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("No disk image found for VM '{}': {}", vm_name, e) })),
+        )
+    })?;
+    let image_path = image_path.display().to_string();
 
     // Apply snapshot via qemu-img
     let output = Command::new("qemu-img")
@@ -375,8 +388,8 @@ pub async fn delete_checkpoint(
                 "Corrupted checkpoint name '{}', skipping qemu-img delete",
                 checkpoint.name
             );
-        } else {
-            let image_path = crate::validation::find_vm_image_or_default(&vm_name);
+        } else if let Ok(disk) = state.driver.get_disk_path(&vm_name).await {
+            let image_path = disk.display().to_string();
             if let Err(e) = Command::new("qemu-img")
                 .args(["snapshot", "-d", &checkpoint.name, &image_path])
                 .output()
@@ -451,8 +464,17 @@ pub async fn fork_vm(
         ));
     }
 
-    // Create CoW disk using qemu-img with backing file
-    let source_image = crate::validation::find_vm_image_or_default(&source_name);
+    // Create CoW disk using qemu-img with backing file -- the source VM's
+    // actual, live disk, not a naming-convention guess (see
+    // VMDriver::get_disk_path's doc comment). Getting this wrong here in
+    // particular means forking from the wrong backing file entirely.
+    let source_image = state.driver.get_disk_path(&source_name).await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("No disk image found for source VM '{}': {}", source_name, e) })),
+        )
+    })?;
+    let source_image = source_image.display().to_string();
     let fork_image = format!("/var/lib/zyvor-fabricd/images/{}.qcow2", req.new_name);
 
     if let Some(parent) = std::path::Path::new(&fork_image).parent() {

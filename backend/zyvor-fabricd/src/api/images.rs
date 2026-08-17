@@ -818,12 +818,16 @@ pub async fn resize_disk(
         ));
     }
 
-    let image_path = crate::validation::find_vm_image(&vm_name).ok_or_else(|| {
+    // The VM's actual, live disk (not a naming-convention guess -- see
+    // VMDriver::get_disk_path's doc comment). Getting this wrong here in
+    // particular would resize the wrong file entirely.
+    let image_path = state.driver.get_disk_path(&vm_name).await.map_err(|e| {
         crate::api_error::json_error(
             StatusCode::NOT_FOUND,
-            format!("No disk image found for VM '{}'", vm_name),
+            format!("No disk image found for VM '{}': {}", vm_name, e),
         )
     })?;
+    let image_path = image_path.display().to_string();
 
     // Resize with qemu-img
     let output = tokio::process::Command::new("qemu-img")

@@ -131,8 +131,14 @@ const IMAGE_ALLOWED_PREFIXES: &[&str] = &[
 /// "<dir>/<vm name>.<ext>"?) -- it never consults the VM's actual stored
 /// disk path, so it misses any VM created from an image not named after
 /// the VM itself (e.g. multiple VMs cloned from the same base image).
-/// Fixing that needs the caller's AppState threaded through all 11 call
-/// sites of this function; out of scope for this pass.
+/// Every real call site (snapshots, backups, checkpoints, cloning,
+/// forking, resize, storage migration) has been switched to
+/// `state.driver.get_disk_path(name)` instead, which resolves the VM's
+/// actual live disk through Ephemera. What's left here is only the
+/// fallback path for a target name Ephemera doesn't know about yet
+/// (backup restore to a new VM, hibernate-resume default) -- a genuine
+/// "no live disk to query, so guess the default location" case, not a
+/// bug.
 pub fn find_vm_image(name: &str) -> Option<String> {
     let candidates = [
         format!("/var/lib/machines/{}.qcow2", name),

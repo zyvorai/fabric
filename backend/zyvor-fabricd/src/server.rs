@@ -2224,13 +2224,19 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                 let schedule_action = schedule_clone.action.clone();
                 let schedule_vm = schedule_clone.vm_name.clone();
                 let result = if schedule_action == crate::api::schedules::VMAction::Snapshot {
+                    // Resolved before spawn_blocking: get_disk_path is
+                    // async (goes through the driver, not just a
+                    // filesystem guess). A resolution failure is reported
+                    // as a failed run, not silently swallowed into a
+                    // reported success with no snapshot actually taken.
+                    let image_path = state_clone.driver.get_disk_path(&schedule_vm).await;
                     tokio::task::spawn_blocking(move || {
                         let snap_name = format!("scheduled-{}", Utc::now().format("%Y%m%d-%H%M%S"));
-                        let image_path = crate::validation::find_vm_image(&schedule_vm);
                         match image_path {
-                            Some(ref path) => {
+                            Ok(path) => {
+                                let path = path.display().to_string();
                                 let output = std::process::Command::new("qemu-img")
-                                    .args(["snapshot", "-c", &snap_name, path])
+                                    .args(["snapshot", "-c", &snap_name, &path])
                                     .output();
                                 match output {
                                     Ok(o) if o.status.success() => Ok(()),
@@ -2241,10 +2247,10 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                                     Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
                                 }
                             }
-                            None => {
-                                tracing::warn!("No disk image found for VM '{}'", schedule_vm);
-                                Ok(())
-                            }
+                            Err(e) => Err(anyhow::anyhow!(
+                                "No disk image found for VM '{}': {}",
+                                schedule_vm, e
+                            )),
                         }
                     })
                     .await
@@ -2388,11 +2394,13 @@ async fn run_snapshot_retention(state: Arc<AppState>) {
 
             let to_remove = snapshots.len() - retention as usize;
             for snap in snapshots.iter().take(to_remove) {
-                // Delete from qemu-img
-                if let Some(ref path) = crate::validation::find_vm_image(&vm.name) {
+                // Delete from qemu-img -- the VM's actual, live disk, not
+                // a naming-convention guess (see VMDriver::get_disk_path).
+                if let Ok(disk) = state.driver.get_disk_path(&vm.name).await {
+                    let path = disk.display().to_string();
                     if crate::validation::validate_snapshot_name(&snap.name).is_ok() {
                         let _ = std::process::Command::new("qemu-img")
-                            .args(["snapshot", "-d", &snap.name, path])
+                            .args(["snapshot", "-d", &snap.name, &path])
                             .output();
                     }
                 }

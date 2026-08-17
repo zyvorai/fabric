@@ -68,13 +68,16 @@ pub async fn create_snapshot(
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
-    // Find the VM's disk image path
-    let image_path = match crate::validation::find_vm_image(&vm_name) {
-        Some(p) => p,
-        None => {
+    // The VM's actual, live disk (Ephemera's copy-on-write instance disk,
+    // not a naming-convention guess at its base image -- see
+    // VMDriver::get_disk_path's doc comment for why that distinction
+    // matters).
+    let image_path = match state.driver.get_disk_path(&vm_name).await {
+        Ok(p) => p.display().to_string(),
+        Err(e) => {
             return crate::api_error::json_error(
                 StatusCode::NOT_FOUND,
-                format!("No disk image found for VM '{}'", vm_name),
+                format!("No disk image found for VM '{}': {}", vm_name, e),
             )
             .into_response();
         }
@@ -208,9 +211,10 @@ pub async fn delete_snapshot(
     if let Ok(Some(snapshot)) = state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         if crate::validation::validate_snapshot_name(&snapshot.name).is_err() {
             tracing::error!("Corrupted snapshot name in store, skipping qemu-img delete");
-        } else if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
+        } else if let Ok(disk) = state.driver.get_disk_path(&vm_name).await {
+            let path = disk.display().to_string();
             if let Err(e) = Command::new("qemu-img")
-                .args(["snapshot", "-d", &snapshot.name, path])
+                .args(["snapshot", "-d", &snapshot.name, &path])
                 .output()
                 .await
             {
@@ -270,31 +274,43 @@ pub async fn revert_snapshot(
         }
     }
 
-    // VM should be stopped before reverting
-    if let Some(ref path) = crate::validation::find_vm_image(&vm_name) {
-        let output = Command::new("qemu-img")
-            .args(["snapshot", "-a", &snapshot.name, path])
-            .output()
-            .await;
-
-        match output {
-            Ok(o) if !o.status.success() => {
-                let stderr = String::from_utf8_lossy(&o.stderr);
-                return crate::api_error::json_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Revert failed: {}. Ensure VM is stopped.", stderr),
-                )
-                .into_response();
-            }
-            Err(e) => {
-                return crate::api_error::json_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to run qemu-img: {}", e),
-                )
-                .into_response();
-            }
-            _ => {}
+    // VM should be stopped before reverting. Resolving the disk path is
+    // not optional here: silently skipping the qemu-img call on failure
+    // (the previous behavior) reported "reverted" success below without
+    // actually reverting anything.
+    let disk = match state.driver.get_disk_path(&vm_name).await {
+        Ok(d) => d,
+        Err(e) => {
+            return crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                format!("No disk image found for VM '{}': {}", vm_name, e),
+            )
+            .into_response();
         }
+    };
+    let path = disk.display().to_string();
+    let output = Command::new("qemu-img")
+        .args(["snapshot", "-a", &snapshot.name, &path])
+        .output()
+        .await;
+
+    match output {
+        Ok(o) if !o.status.success() => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            return crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Revert failed: {}. Ensure VM is stopped.", stderr),
+            )
+            .into_response();
+        }
+        Err(e) => {
+            return crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to run qemu-img: {}", e),
+            )
+            .into_response();
+        }
+        _ => {}
     }
 
     crate::api::events::record_event(

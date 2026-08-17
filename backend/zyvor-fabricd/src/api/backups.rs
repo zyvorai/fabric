@@ -786,19 +786,18 @@ async fn process_backup_job(
 
     tracing::info!("Creating backup at: {}", backup_path.display());
 
-    // Find the VM's disk image
-    let image_path = crate::validation::find_vm_image(&vm_name);
-
-    let src_path = match image_path {
-        Some(p) => p,
-        None => {
+    // The VM's actual, live disk (not a naming-convention guess -- see
+    // VMDriver::get_disk_path's doc comment).
+    let src_path = match state.driver.get_disk_path(&vm_name).await {
+        Ok(p) => p.display().to_string(),
+        Err(e) => {
             // Fall back to the image field from the VM record
             let candidate = &vm.image;
             let p = std::path::Path::new(candidate);
             if p.exists() {
                 candidate.clone()
             } else {
-                let msg = format!("No disk image found for VM '{}'", vm_name);
+                let msg = format!("No disk image found for VM '{}': {}", vm_name, e);
                 tracing::error!("{}", msg);
                 return Err(msg);
             }
@@ -939,8 +938,14 @@ async fn process_restore_job(
     crate::validation::validate_vm_name(&target_vm)
         .map_err(|(_, msg)| format!("Invalid target VM name: {}", msg))?;
 
-    // Determine destination path for the VM's disk
-    let dest_path = crate::validation::find_vm_image_or_default(&target_vm);
+    // Destination for the restored disk: if target_vm already exists,
+    // restore onto its real, live disk location (not a naming-convention
+    // guess); if it's a brand new name Ephemera has never heard of, fall
+    // back to the default path a VM by that name would use.
+    let dest_path = match state.driver.get_disk_path(&target_vm).await {
+        Ok(p) => p.display().to_string(),
+        Err(_) => crate::validation::find_vm_image_or_default(&target_vm),
+    };
 
     // Ensure the parent directory exists
     if let Some(parent) = std::path::Path::new(&dest_path).parent() {

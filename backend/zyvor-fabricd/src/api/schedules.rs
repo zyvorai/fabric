@@ -579,13 +579,17 @@ pub async fn run_schedule_now(
 
     let vm_name_clone = schedule.vm_name.clone();
     let result = if schedule.action == VMAction::Snapshot {
+        // Resolved before spawn_blocking: get_disk_path is async (goes
+        // through the driver, not just a filesystem guess), but the
+        // qemu-img call itself is fine to run as a blocking subprocess.
+        let image_path = state.driver.get_disk_path(&vm_name_clone).await;
         tokio::task::spawn_blocking(move || {
             let snap_name = format!("scheduled-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
-            let image_path = crate::validation::find_vm_image(&vm_name_clone);
             match image_path {
-                Some(ref path) => {
+                Ok(path) => {
+                    let path = path.display().to_string();
                     let output = std::process::Command::new("qemu-img")
-                        .args(["snapshot", "-c", &snap_name, path])
+                        .args(["snapshot", "-c", &snap_name, &path])
                         .output();
                     match output {
                         Ok(o) if o.status.success() => Ok(()),
@@ -596,9 +600,9 @@ pub async fn run_schedule_now(
                         Err(e) => Err(anyhow::anyhow!("Failed to run qemu-img: {}", e)),
                     }
                 }
-                None => Err(anyhow::anyhow!(
-                    "No disk image found for VM '{}'",
-                    vm_name_clone
+                Err(e) => Err(anyhow::anyhow!(
+                    "No disk image found for VM '{}': {}",
+                    vm_name_clone, e
                 )),
             }
         })

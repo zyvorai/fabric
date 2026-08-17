@@ -116,6 +116,10 @@ impl VMDriver for EphemeraDriver {
     async fn get_vnc_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
         Ok(Some(self.resolve(name).await?.workspace.join("vnc.sock")))
     }
+
+    async fn get_disk_path(&self, name: &str) -> Result<std::path::PathBuf> {
+        Ok(self.resolve(name).await?.disk)
+    }
 }
 
 fn map_status(status: VmStatus) -> VMState {

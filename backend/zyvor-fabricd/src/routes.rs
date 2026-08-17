@@ -743,13 +743,16 @@ pub async fn clone_vm(
         return json_error(StatusCode::CONFLICT, "Target VM name already exists").into_response();
     }
 
-    // Find source disk image — fail if not found
-    let src_path = match crate::validation::find_vm_image(&source_name) {
-        Some(p) => p,
-        None => {
+    // The source VM's actual, live disk (not a naming-convention guess --
+    // see VMDriver::get_disk_path's doc comment). This is exactly the case
+    // that guessing gets wrong: a VM cloned from a shared base image isn't
+    // named after its own disk file.
+    let src_path = match state.driver.get_disk_path(&source_name).await {
+        Ok(p) => p.display().to_string(),
+        Err(e) => {
             return json_error(
                 StatusCode::NOT_FOUND,
-                format!("No disk image found for source VM '{}'", source_name),
+                format!("No disk image found for source VM '{}': {}", source_name, e),
             )
             .into_response();
         }
