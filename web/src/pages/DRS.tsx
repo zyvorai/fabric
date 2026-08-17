@@ -170,6 +170,12 @@ export default function DRS() {
       </div>
 
       {/* Balance Tab */}
+      {activeTab === 'balance' && !balance && !loading && (
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-8 text-center text-slate-400">
+          No cluster balance data available. Balance analysis needs at least one cluster with hosts registered.
+        </div>
+      )}
+
       {activeTab === 'balance' && balance && (
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
