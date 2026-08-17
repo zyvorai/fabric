@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, Play, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Plus, Trash2, Play, AlertTriangle, CheckCircle } from 'lucide-react'
 import {
   listFtVms,
   enableFt,
@@ -114,15 +114,10 @@ export default function FaultTolerance() {
         refreshing={loading}
         title="Fault Tolerance"
         actions={
-          <>
-            <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-              <RefreshCw className="w-4 h-4" /> Refresh
-            </button>
-            <button onClick={() => setShowEnableFT(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Enable FT
-            </button>
-          </>
+          <button onClick={() => setShowEnableFT(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Enable FT
+          </button>
         }
       />
 

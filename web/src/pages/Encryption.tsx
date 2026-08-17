@@ -90,11 +90,6 @@ export default function Encryption() {
         onRefresh={() => void loadData()}
         refreshing={loading}
         title="Encryption"
-        actions={
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
-        }
       />
 
       <PageLoadBanner title="Could not load encryption data" headline={loadError} onRetry={() => void loadData()} />

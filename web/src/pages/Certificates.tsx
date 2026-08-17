@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, RefreshCw, Check, Shield } from 'lucide-react'
+import { Plus, Check, Shield } from 'lucide-react'
 import {
   listCas,
   createCa,
@@ -101,11 +101,6 @@ export default function Certificates() {
         onRefresh={() => void loadData()}
         refreshing={loading}
         title="Certificates & Security"
-        actions={
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
-        }
       />
 
       <PageLoadBanner title="Could not load certificates" headline={loadError} onRetry={() => void loadData()} />
