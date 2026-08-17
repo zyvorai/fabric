@@ -25,7 +25,6 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
-import Breadcrumb from '../components/Breadcrumb'
 
 export default function StoragePools() {
   const { confirmState, confirm, cancel } = useConfirm()
@@ -181,7 +180,6 @@ export default function StoragePools() {
 
   return (
     <div className="p-8">
-      <Breadcrumb />
       {loadError && (
         <ErrorBanner
           title="Could not load storage pools"

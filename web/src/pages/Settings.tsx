@@ -7,7 +7,6 @@ import { Settings as SettingsIcon, Save, RotateCcw, Bell, Globe, Shield, Databas
 import { useToastContext } from '../contexts/ToastContext'
 import { apiGet, apiPut } from '../api/client'
 import { listStoragePools } from '../api/storage'
-import Breadcrumb from '../components/Breadcrumb'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
@@ -125,7 +124,6 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
       {loadError && (
         <ErrorBanner
           title="Could not load settings"

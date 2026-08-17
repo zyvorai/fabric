@@ -5,7 +5,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { History } from 'lucide-react'
 import { apiFetch } from '../api/client'
-import Breadcrumb from '../components/Breadcrumb'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, EmptyState } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -73,7 +72,6 @@ export default function MigrationHistory() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
       <PageHeader
         title="Migration History"
         description="Completed and failed migration jobs"

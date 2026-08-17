@@ -5,7 +5,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { FileText } from 'lucide-react'
 import { apiFetch } from '../api/client'
-import Breadcrumb from '../components/Breadcrumb'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, EmptyState } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -103,7 +102,6 @@ export default function MigrationReport() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
       <PageHeader
         title="Migration Report"
         description="Summary and details for all migration jobs"

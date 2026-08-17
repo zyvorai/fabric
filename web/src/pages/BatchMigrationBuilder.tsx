@@ -4,7 +4,6 @@
 
 import { useState } from 'react'
 import { Plus, Trash2, Download, Copy, Check, ChevronDown, ChevronUp, Layers } from 'lucide-react'
-import Breadcrumb from '../components/Breadcrumb'
 
 interface MigrationEntry { id: number; name: string; source: string; target_format: string; cpus: number; memory: number; expanded: boolean }
 
@@ -31,7 +30,6 @@ export default function BatchMigrationBuilder() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <Breadcrumb />
       <PageHeader
         title="Batch Migration Builder"
         description="Configure multiple VM migrations with JSON export"

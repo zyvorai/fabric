@@ -4,7 +4,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
-import Breadcrumb from '../components/Breadcrumb'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -77,7 +76,6 @@ export default function MigrationReadiness() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
       <PageHeader
         title="Migration Readiness"
         description="Pre-flight checks before starting a migration"

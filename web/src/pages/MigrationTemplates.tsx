@@ -4,7 +4,6 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Copy, Check } from 'lucide-react'
-import Breadcrumb from '../components/Breadcrumb'
 import { PageHeader } from '../components/ui'
 
 interface MigrationTemplate { id: string; name: string; description: string; format: string; cpus: number; memory: number; network: string; compress: boolean; created_at: string }
@@ -47,7 +46,6 @@ export default function MigrationTemplates() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
       <PageHeader
         title="Migration Templates"
         description="Reusable migration configurations"
