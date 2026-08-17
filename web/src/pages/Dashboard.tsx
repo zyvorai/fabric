@@ -16,6 +16,7 @@ import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { PageHeader } from '../components/ui/PageHeader'
+import { GettingStarted } from '../components/GettingStarted'
 import { usePlatformInfo } from '../contexts/PlatformInfoContext'
 import type { SubsystemPhase } from '../api/capabilities'
 
@@ -311,7 +312,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* VM Table */}
+      {/* VM Table / first-run onboarding */}
+      {vms.length === 0 ? (
+        <GettingStarted />
+      ) : (
       <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -327,41 +331,34 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
-        {vms.length === 0 ? (
-          <div className="p-10 text-center">
-            <Server className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">No virtual machines yet</p>
-            <Link to="/create" className="text-sm text-blue-400 hover:text-blue-300 mt-2 inline-block">Create your first VM</Link>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">CPU</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Memory</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700/50">
+                <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">CPU</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Memory</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/30">
+              {vms.slice(0, 8).map((vm) => (
+                <tr key={vm.name} className="table-row-hover transition-colors">
+                  <td className="px-5 py-3">
+                    <Link to={`/vms/${vm.name}`} className="font-medium text-white hover:text-blue-400 transition-colors">{vm.name}</Link>
+                  </td>
+                  <td className="px-4 py-3"><StatusBadge status={vm.state} /></td>
+                  <td className="px-4 py-3 text-slate-400 tabular-nums">{vm.cpus} vCPU</td>
+                  <td className="px-4 py-3 text-slate-400 tabular-nums">{vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}</td>
+                  <td className="px-4 py-3 text-slate-500 font-mono text-xs">{vm.ip || '-'}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/30">
-                {vms.slice(0, 8).map((vm) => (
-                  <tr key={vm.name} className="table-row-hover transition-colors">
-                    <td className="px-5 py-3">
-                      <Link to={`/vms/${vm.name}`} className="font-medium text-white hover:text-blue-400 transition-colors">{vm.name}</Link>
-                    </td>
-                    <td className="px-4 py-3"><StatusBadge status={vm.state} /></td>
-                    <td className="px-4 py-3 text-slate-400 tabular-nums">{vm.cpus} vCPU</td>
-                    <td className="px-4 py-3 text-slate-400 tabular-nums">{vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}</td>
-                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">{vm.ip || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+      )}
     </div>
   )
 }
