@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -182,6 +182,36 @@ pub async fn scan_host_compliance(
         )
             .into_response(),
     }
+}
+
+#[derive(serde::Deserialize)]
+pub struct ComplianceQuery {
+    pub baseline_id: Option<String>,
+    pub host_id: Option<String>,
+}
+
+/// `GET /lifecycle/compliance` — list compliance results across all hosts,
+/// optionally filtered by baseline/host via query params. The path-scoped
+/// `get_compliance_status` (below) is for a single known host.
+pub async fn list_compliance_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<ComplianceQuery>,
+) -> impl IntoResponse {
+    tracing::debug!("lifecycle::{}", stringify!(list_compliance_status));
+    let items: Vec<HostComplianceStatus> = state
+        .store
+        .list_entities("compliance_results")
+        .unwrap_or_else(|e| {
+            tracing::error!("Storage error: {}", e);
+            Vec::new()
+        });
+    let filtered: Vec<_> = items
+        .into_iter()
+        .filter(|s| q.baseline_id.as_ref().is_none_or(|b| &s.baseline_id == b))
+        .filter(|s| q.host_id.as_ref().is_none_or(|h| &s.host_id == h))
+        .collect();
+    Json(filtered)
 }
 
 pub async fn get_compliance_status(

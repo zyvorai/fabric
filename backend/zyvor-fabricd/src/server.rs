@@ -1768,6 +1768,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                 .delete(api::lifecycle::delete_baseline),
         )
         .route(
+            "/lifecycle/compliance",
+            get(api::lifecycle::list_compliance_status),
+        )
+        .route(
             "/lifecycle/compliance/scan",
             post(api::lifecycle::scan_host_compliance),
         )
