@@ -92,7 +92,10 @@ function DesktopNavDropdown({
   }
 
   const handleLeave = () => {
-    closeTimer.current = setTimeout(onClose, 150)
+    // 150ms wasn't enough time for a real (non-teleporting) mouse to travel
+    // from the 36px trigger icon down into the panel below it -- live user
+    // report: the dropdown was closing before they could reach an item.
+    closeTimer.current = setTimeout(onClose, 400)
   }
 
   return (
