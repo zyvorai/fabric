@@ -63,8 +63,15 @@ pub enum RotationStatus {
 // ---------------------------------------------------------------------------
 
 /// An encryption policy that can be applied to one or more VMs.
+///
+/// `id`/`created`/`updated` are always overwritten by create_policy
+/// regardless of what the client sends, so they're #[serde(default)] --
+/// requiring the client to pre-supply values it has no legitimate way to
+/// know (a UUID, a timestamp) just to satisfy deserialization was pure
+/// friction with no purpose.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptionPolicy {
+    #[serde(default)]
     pub id: String,
     pub name: String,
     pub description: Option<String>,
@@ -72,19 +79,27 @@ pub struct EncryptionPolicy {
     pub key_provider_id: String,
     pub encrypt_vmotion: bool,
     pub auto_rotate_days: Option<u32>,
+    #[serde(default)]
     pub created: DateTime<Utc>,
+    #[serde(default)]
     pub updated: DateTime<Utc>,
 }
 
 /// A key-management provider (local or remote KMS).
+///
+/// `id`/`created`/`updated` are always overwritten by register_provider;
+/// see `EncryptionPolicy` above for why they're #[serde(default)].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyProvider {
+    #[serde(default)]
     pub id: String,
     pub name: String,
     pub provider_type: KeyProviderType,
     pub endpoint: Option<String>,
     pub status: KeyProviderStatus,
+    #[serde(default)]
     pub created: DateTime<Utc>,
+    #[serde(default)]
     pub updated: DateTime<Utc>,
 }
 

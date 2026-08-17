@@ -8,10 +8,8 @@ export interface KeyProvider {
   id: string
   name: string
   provider_type: string
-  endpoint: string
+  endpoint?: string
   status: string
-  key_count: number
-  default_provider: boolean
   created: string
   updated?: string
 }
@@ -20,26 +18,21 @@ export interface EncryptionPolicy {
   id: string
   name: string
   description?: string
-  provider_id: string
+  key_provider_id: string
   algorithm: string
-  key_size: number
-  auto_rotate: boolean
-  rotation_interval_days?: number
-  enabled: boolean
+  encrypt_vmotion: boolean
+  auto_rotate_days?: number
   created: string
   updated?: string
 }
 
 export interface VmEncryptionStatus {
-  vm_id: string
   vm_name: string
   encrypted: boolean
   policy_id?: string
-  policy_name?: string
-  provider_id?: string
   algorithm?: string
   key_id?: string
-  encrypted_at?: string
+  vmotion_encrypted: boolean
   last_key_rotation?: string
 }
 
@@ -55,9 +48,8 @@ export async function registerProvider(req: {
   name: string
   provider_type: string
   endpoint: string
-  default_provider?: boolean
 }): Promise<KeyProvider> {
-  return apiPost<KeyProvider>(`${API_BASE}/encryption/providers`, req)
+  return apiPost<KeyProvider>(`${API_BASE}/encryption/providers`, { ...req, status: 'connected' })
 }
 
 export async function removeProvider(id: string): Promise<void> {
@@ -73,34 +65,32 @@ export async function listEncryptionPolicies(): Promise<EncryptionPolicy[]> {
 export async function createEncryptionPolicy(req: {
   name: string
   description?: string
-  provider_id: string
+  key_provider_id: string
   algorithm: string
-  key_size: number
-  auto_rotate?: boolean
-  rotation_interval_days?: number
-  enabled?: boolean
+  encrypt_vmotion?: boolean
+  auto_rotate_days?: number
 }): Promise<EncryptionPolicy> {
-  return apiPost<EncryptionPolicy>(`${API_BASE}/encryption/policies`, req)
+  return apiPost<EncryptionPolicy>(`${API_BASE}/encryption/policies`, { encrypt_vmotion: false, ...req })
 }
 
 // VM encryption operations
 
-export async function encryptVm(vmId: string, policyId: string): Promise<void> {
-  return apiPostVoid(`${API_BASE}/encryption/vms/${vmId}/encrypt`, { policy_id: policyId })
+export async function encryptVm(vmName: string, policyId: string): Promise<void> {
+  return apiPostVoid(`${API_BASE}/encryption/vms/${vmName}/encrypt`, { vm_name: vmName, policy_id: policyId })
 }
 
-export async function decryptVm(vmId: string): Promise<void> {
-  return apiPostVoid(`${API_BASE}/encryption/vms/${vmId}/decrypt`)
+export async function decryptVm(vmName: string): Promise<void> {
+  return apiPostVoid(`${API_BASE}/encryption/vms/${vmName}/decrypt`, { vm_name: vmName })
 }
 
-export async function getVmEncryptionStatus(vmId: string): Promise<VmEncryptionStatus> {
-  return apiGet<VmEncryptionStatus>(`${API_BASE}/encryption/vms/${vmId}/status`)
+export async function getVmEncryptionStatus(vmName: string): Promise<VmEncryptionStatus> {
+  return apiGet<VmEncryptionStatus>(`${API_BASE}/encryption/vms/${vmName}/status`)
 }
 
 export async function listEncryptedVms(): Promise<VmEncryptionStatus[]> {
   return apiGet<VmEncryptionStatus[]>(`${API_BASE}/encryption/vms`)
 }
 
-export async function rotateVmKey(vmId: string): Promise<void> {
-  return apiPostVoid(`${API_BASE}/encryption/vms/${vmId}/rotate-key`)
+export async function rotateVmKey(vmName: string): Promise<void> {
+  return apiPostVoid(`${API_BASE}/encryption/vms/${vmName}/rotate-key`)
 }

@@ -115,9 +115,9 @@ export default function Encryption() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-slate-400 text-sm mb-1">Total Keys</div>
+          <div className="text-slate-400 text-sm mb-1">Connected Providers</div>
           <div className="text-2xl font-bold">
-            {providers.reduce((s, p) => s + p.key_count, 0)}
+            {providers.filter(p => p.status === 'connected').length}
           </div>
         </div>
       </div>
@@ -149,14 +149,12 @@ export default function Encryption() {
                   <th className="p-4">Type</th>
                   <th className="p-4">Endpoint</th>
                   <th className="p-4">Status</th>
-                  <th className="p-4">Keys</th>
-                  <th className="p-4">Default</th>
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {providers.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No key providers registered.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No key providers registered.</td></tr>
                 ) : providers.map(prov => (
                   <tr key={prov.id} className="hover:bg-slate-900">
                     <td className="p-4 font-medium">{prov.name}</td>
@@ -167,8 +165,6 @@ export default function Encryption() {
                         {prov.status}
                       </span>
                     </td>
-                    <td className="p-4 text-sm">{prov.key_count}</td>
-                    <td className="p-4 text-sm">{prov.default_provider ? 'Yes' : 'No'}</td>
                     <td className="p-4">
                       <button onClick={() => handleRemoveProvider(prov.id)} className="text-red-600 hover:text-red-800">
                         <Trash2 className="w-4 h-4" />
@@ -198,31 +194,23 @@ export default function Encryption() {
                   <th className="p-4">Name</th>
                   <th className="p-4">Provider</th>
                   <th className="p-4">Algorithm</th>
-                  <th className="p-4">Key Size</th>
+                  <th className="p-4">Encrypt vMotion</th>
                   <th className="p-4">Auto Rotate</th>
-                  <th className="p-4">Rotation Interval</th>
-                  <th className="p-4">Enabled</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {policies.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No encryption policies.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No encryption policies.</td></tr>
                 ) : policies.map(pol => (
                   <tr key={pol.id} className="hover:bg-slate-900">
                     <td className="p-4">
                       <div className="font-medium">{pol.name}</div>
                       {pol.description && <div className="text-xs text-slate-400">{pol.description}</div>}
                     </td>
-                    <td className="p-4 text-sm text-slate-400">{pol.provider_id}</td>
+                    <td className="p-4 text-sm text-slate-400">{providers.find(p => p.id === pol.key_provider_id)?.name || pol.key_provider_id}</td>
                     <td className="p-4 text-sm font-mono">{pol.algorithm}</td>
-                    <td className="p-4 text-sm">{pol.key_size} bits</td>
-                    <td className="p-4 text-sm">{pol.auto_rotate ? 'Yes' : 'No'}</td>
-                    <td className="p-4 text-sm">{pol.rotation_interval_days ? `${pol.rotation_interval_days} days` : '-'}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${pol.enabled ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>
-                        {pol.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </td>
+                    <td className="p-4 text-sm">{pol.encrypt_vmotion ? 'Yes' : 'No'}</td>
+                    <td className="p-4 text-sm">{pol.auto_rotate_days ? `Every ${pol.auto_rotate_days} days` : 'No'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -249,21 +237,21 @@ export default function Encryption() {
               {encryptedVMs.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-slate-400">No encrypted VMs.</td></tr>
               ) : encryptedVMs.map(vm => (
-                <tr key={vm.vm_id} className="hover:bg-slate-900">
+                <tr key={vm.vm_name} className="hover:bg-slate-900">
                   <td className="p-4 font-medium">{vm.vm_name}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${vm.encrypted ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>
                       {vm.encrypted ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td className="p-4 text-sm text-slate-400">{vm.policy_name || '-'}</td>
+                  <td className="p-4 text-sm text-slate-400">{policies.find(p => p.id === vm.policy_id)?.name || vm.policy_id || '-'}</td>
                   <td className="p-4 text-sm font-mono">{vm.algorithm || '-'}</td>
                   <td className="p-4 text-sm text-slate-400">
                     {vm.last_key_rotation ? new Date(vm.last_key_rotation).toLocaleDateString() : 'Never'}
                   </td>
                   <td className="p-4">
                     {vm.encrypted && (
-                      <button onClick={() => handleRotateKey(vm.vm_id)}
+                      <button onClick={() => handleRotateKey(vm.vm_name)}
                         className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm">
                         <RefreshCw className="w-3 h-3" /> Rotate Key
                       </button>
@@ -305,7 +293,7 @@ export default function Encryption() {
 function CreateProviderModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const toast = useToastContext()
   const [name, setName] = useState('')
-  const [providerType, setProviderType] = useState('KMIP')
+  const [providerType, setProviderType] = useState('kmip')
   const [endpoint, setEndpoint] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -330,9 +318,9 @@ function CreateProviderModal({ onClose, onCreated }: { onClose: () => void; onCr
             <label className="block text-sm font-medium mb-1">Type</label>
             <select value={providerType} onChange={e => setProviderType(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
-              <option value="KMIP">KMIP</option>
-              <option value="Native">Native</option>
-              <option value="Cloud">Cloud</option>
+              <option value="kmip">KMIP</option>
+              <option value="local">Local (software-based)</option>
+              <option value="vault_transit">HashiCorp Vault (Transit)</option>
             </select>
           </div>
           <div>
@@ -355,9 +343,9 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
   const toast = useToastContext()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [providerId, setProviderId] = useState(providers[0]?.id || '')
-  const [algorithm, setAlgorithm] = useState('AES-256-XTS')
-  const [keySize, setKeySize] = useState(256)
+  const [keyProviderId, setKeyProviderId] = useState(providers[0]?.id || '')
+  const [algorithm, setAlgorithm] = useState('aes256_xts')
+  const [encryptVmotion, setEncryptVmotion] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
   const [rotationDays, setRotationDays] = useState(90)
 
@@ -365,9 +353,9 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
     e.preventDefault()
     try {
       await createEncryptionPolicy({
-        name, description: description || undefined, provider_id: providerId,
-        algorithm, key_size: keySize, auto_rotate: autoRotate,
-        rotation_interval_days: autoRotate ? rotationDays : undefined,
+        name, description: description || undefined, key_provider_id: keyProviderId,
+        algorithm, encrypt_vmotion: encryptVmotion,
+        auto_rotate_days: autoRotate ? rotationDays : undefined,
       })
       onCreated()
     } catch { toast.error('Failed to create policy') }
@@ -390,30 +378,24 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Key Provider</label>
-            <select value={providerId} onChange={e => setProviderId(e.target.value)}
+            <select value={keyProviderId} onChange={e => setKeyProviderId(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
               {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Algorithm</label>
-              <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
-                <option value="AES-256-XTS">AES-256-XTS</option>
-                <option value="AES-128-XTS">AES-128-XTS</option>
-                <option value="AES-256-CBC">AES-256-CBC</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Key Size</label>
-              <select value={keySize} onChange={e => setKeySize(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
-                <option value={128}>128 bits</option>
-                <option value={256}>256 bits</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Algorithm</label>
+            <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+              <option value="aes256_xts">AES-256-XTS</option>
+              <option value="aes256_cbc">AES-256-CBC</option>
+              <option value="cha_cha20_poly1305">ChaCha20-Poly1305</option>
+            </select>
           </div>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={encryptVmotion} onChange={e => setEncryptVmotion(e.target.checked)} />
+            <span className="text-sm">Encrypt vMotion traffic</span>
+          </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={autoRotate} onChange={e => setAutoRotate(e.target.checked)} />
             <span className="text-sm">Auto-rotate keys</span>
