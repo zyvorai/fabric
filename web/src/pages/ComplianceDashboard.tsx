@@ -103,7 +103,11 @@ export default function ComplianceDashboard() {
   const runScan = async () => {
     setScanning(true)
     try {
-      await apiFetch('/api/system/compliance/scan', { method: 'POST' })
+      const res = await apiFetch('/api/system/compliance/scan', { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       await fetchCompliance()
     } catch (err) {
       toastFailure(toast, 'Compliance scan failed', err)
