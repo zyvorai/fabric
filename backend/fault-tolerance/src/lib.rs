@@ -797,6 +797,9 @@ mod tests {
         async fn terminate(&self, _name: &str) -> Result<()> {
             Ok(())
         }
+        async fn delete(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
         async fn reboot(&self, _name: &str) -> Result<()> {
             Ok(())
         }

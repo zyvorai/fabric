@@ -180,12 +180,27 @@ pub async fn delete_vm(
         }
     }
 
-    // Clean up disk image before removing from store
-    if let Some(image_path) = crate::validation::find_vm_image(&name) {
-        if let Err(e) = tokio::fs::remove_file(&image_path).await {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                tracing::warn!("Failed to delete disk image for VM '{}': {}", name, e);
-            }
+    // Tell the driver to actually destroy the machine -- it stops the VM
+    // if still running and reclaims its real disk/storage (LVM thin
+    // snapshot, qemu-nbd export, Ceph RBD clone, ...). Previously this only
+    // removed zyvor-fabricd's own store record and guessed at a disk file
+    // to unlink by naming convention, which never reached Ephemera at all:
+    // every deleted VM left its full instance (disk, and if it was still
+    // running, the live QEMU process) permanently orphaned. A VM that was
+    // created here but never started has no Ephemera-side counterpart yet
+    // ("no VM named ... known to Ephemera") -- that's fine, there's nothing
+    // to destroy. Any other failure (including Ephemera's own safety
+    // refusal when a process won't die) must block the delete, or we'd
+    // recreate the exact leak this fixes by dropping the record anyway.
+    if let Err(e) = state.driver.delete(&name).await {
+        let msg = e.to_string();
+        if !msg.contains("known to Ephemera") {
+            audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "FAILED");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to destroy VM '{}': {}", name, msg),
+            )
+            .into_response();
         }
     }
 

@@ -74,6 +74,14 @@ pub trait VMDriver: Send + Sync {
     /// Force terminate.
     async fn terminate(&self, name: &str) -> Result<()>;
 
+    /// Permanently destroy a machine: stop it if still running, then
+    /// reclaim its disk and any backend-specific storage (LVM thin
+    /// snapshot, qemu-nbd export, Ceph RBD clone, ...). Callers must call
+    /// this instead of removing their own bookkeeping record and guessing
+    /// at a disk path to unlink -- the backend is the only thing that
+    /// knows where a given machine's real storage actually lives.
+    async fn delete(&self, name: &str) -> Result<()>;
+
     /// Reboot a machine.
     async fn reboot(&self, name: &str) -> Result<()>;
 

@@ -52,6 +52,11 @@ impl VMDriver for EphemeraDriver {
         self.client.stop_vm(vm.id).await.map(|_| ())
     }
 
+    async fn delete(&self, name: &str) -> Result<()> {
+        let vm = self.resolve(name).await?;
+        self.client.delete_vm(vm.id).await
+    }
+
     async fn reboot(&self, name: &str) -> Result<()> {
         // Ephemera has no reboot endpoint yet (would need a per-backend QMP
         // `system_reset`/`ch-remote` call — see the migration plan). Stop
