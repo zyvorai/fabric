@@ -249,7 +249,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
           {/* Time */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Time <span className="text-red-500">*</span>
+              Time (UTC) <span className="text-red-500">*</span>
             </label>
             <input
               type="time"
@@ -258,7 +258,9 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
               className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
               required
             />
-            <p className="text-xs text-slate-400 mt-1">24-hour format (HH:MM)</p>
+            <p className="text-xs text-slate-400 mt-1">
+              24-hour format (HH:MM), UTC -- not your browser's local time
+            </p>
           </div>
 
           {/* Current Status (edit mode only) */}
