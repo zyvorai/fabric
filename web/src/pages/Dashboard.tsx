@@ -81,10 +81,18 @@ export default function Dashboard() {
         setMetricsHistory((prev) => [...prev.slice(-29), { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), cpu: 0, memory: 0 }])
         return
       }
-      const results = await Promise.allSettled(running.map((vm) => getMetrics(vm.name)))
-      const metrics = results.filter((r): r is PromiseFulfilledResult<VMMetrics> => r.status === 'fulfilled').map((r) => r.value)
-      const avgCpu = metrics.length > 0 ? metrics.reduce((s, m) => s + m.cpu_usage, 0) / metrics.length : 0
-      const avgMem = metrics.length > 0 ? metrics.reduce((s, m) => s + m.memory_usage, 0) / metrics.length : 0
+      const results = await Promise.allSettled(running.map((vm) => getMetrics(vm.name).then((m) => ({ vm, m }))))
+      const metrics = results
+        .filter((r): r is PromiseFulfilledResult<{ vm: VM; m: VMMetrics }> => r.status === 'fulfilled')
+        .map((r) => r.value)
+      const avgCpu = metrics.length > 0 ? metrics.reduce((s, { m }) => s + m.cpu_usage, 0) / metrics.length : 0
+      // memory_usage is raw bytes, not a percentage (unlike cpu_usage) — express it
+      // as a percentage of each VM's own allocated memory (`vm.memory`, in MiB) so
+      // it's on the same 0-100 scale as the CPU gauge next to it.
+      const memPercents = metrics
+        .filter(({ vm }) => vm.memory > 0)
+        .map(({ vm, m }) => (m.memory_usage / (vm.memory * 1024 * 1024)) * 100)
+      const avgMem = memPercents.length > 0 ? memPercents.reduce((s, p) => s + p, 0) / memPercents.length : 0
       setMetricsHistory((prev) => [...prev.slice(-29), { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), cpu: parseFloat(avgCpu.toFixed(1)), memory: parseFloat(avgMem.toFixed(1)) }])
     } catch (err) { toastFailure(toast, 'Failed to load metrics', err) }
   }, [toast])
