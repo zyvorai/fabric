@@ -38,13 +38,21 @@ export default function Terminal({ vmName }: TerminalProps) {
     const token = getToken()
     const wsUrl = `${protocol}//${window.location.host}/ws/console/${vmName}${token ? `?token=${encodeURIComponent(token)}` : ''}`
     const ws = new WebSocket(wsUrl)
+    // The backend streams raw PTY bytes as binary frames (not guaranteed
+    // valid UTF-8) — without this, event.data below is a Blob, which
+    // xterm's write() silently ignores, so nothing ever renders.
+    ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
       term.write('Connected to VM console\r\n')
     }
 
     ws.onmessage = (event) => {
-      term.write(event.data)
+      if (event.data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(event.data))
+      } else {
+        term.write(event.data)
+      }
     }
 
     ws.onerror = (error) => {
