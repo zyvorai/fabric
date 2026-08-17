@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { HardDrive, Plus, Trash2, Copy, RefreshCw, Database } from 'lucide-react'
 import { apiGet, apiDelete } from '../api/client'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
@@ -37,6 +39,7 @@ interface Volume {
 
 export default function Storage() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<StoragePool[]>([])
   const [volumes, setVolumes] = useState<Volume[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,7 +76,7 @@ export default function Storage() {
   }, [loadData])
 
   const handleDeleteVolume = async (pool: string, volumeId: string) => {
-    if (!confirm('Delete this volume?')) return
+    if (!await confirm('Delete Volume', 'Delete this volume?', { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
       await apiDelete(`/api/storage/pools/${pool}/volumes/${volumeId}`)
       await loadData()
@@ -325,6 +328,17 @@ export default function Storage() {
           <p className="text-sm text-slate-400">Clone an existing disk image</p>
         </div>
       </div>
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }

@@ -12,6 +12,8 @@ import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface Snapshot {
   name: string
@@ -28,6 +30,7 @@ async function parseApiError(res: Response): Promise<never> {
 
 export default function SnapshotManager() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [vms, setVMs] = useState<string[]>([])
   const [selectedVM, setSelectedVM] = useState('')
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
@@ -110,7 +113,7 @@ export default function SnapshotManager() {
   }
 
   const handleRevert = async (snapName: string) => {
-    if (!confirm(`Revert VM "${selectedVM}" to snapshot "${snapName}"?`)) return
+    if (!await confirm('Revert Snapshot', `Revert VM "${selectedVM}" to snapshot "${snapName}"?`, { variant: 'warning', confirmLabel: 'Revert' })) return
     setActionError(null)
     try {
       const res = await apiFetch(`/api/vms/${selectedVM}/snapshots/${snapName}/revert`, { method: 'POST' })
@@ -126,7 +129,7 @@ export default function SnapshotManager() {
   }
 
   const handleDelete = async (snapName: string) => {
-    if (!confirm(`Delete snapshot "${snapName}"?`)) return
+    if (!await confirm('Delete Snapshot', `Delete snapshot "${snapName}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
     setActionError(null)
     try {
       const res = await apiFetch(`/api/vms/${selectedVM}/snapshots/${snapName}`, { method: 'DELETE' })
@@ -306,6 +309,17 @@ export default function SnapshotManager() {
             description="Choose a virtual machine to manage snapshots"
           />
         </div>
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

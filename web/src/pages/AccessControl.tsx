@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Users, Plus, Trash2, Loader2, CheckCircle } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import { useToastContext } from '../contexts/ToastContext'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -28,6 +30,7 @@ const MIN_PASSWORD_LENGTH = 8
 
 export default function AccessControl() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [users, setUsers] = useState<UserAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -79,7 +82,7 @@ export default function AccessControl() {
   }
 
   const handleDelete = async (id: string, username: string) => {
-    if (!confirm(`Delete user "${username}"?`)) return
+    if (!await confirm('Delete User', `Delete user "${username}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
       await apiFetch(`/api/users/${id}`, { method: 'DELETE' })
       setUsers(prev => prev.filter(u => u.id !== id))
@@ -217,6 +220,17 @@ export default function AccessControl() {
       )}
         </>
       ) : null}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          variant={confirmState.variant ?? 'danger'}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }
