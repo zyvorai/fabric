@@ -301,7 +301,7 @@ export default function Machines() {
                   </tr>
                 ))}
                 {images.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No images found in /var/lib/machines</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No images found. Pull one above to get started.</td></tr>
                 )}
               </tbody>
             </table>

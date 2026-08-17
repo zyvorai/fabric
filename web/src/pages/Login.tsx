@@ -213,7 +213,7 @@ export default function Login() {
           </h2>
           <p className="login-fade-in login-fade-in-d2 text-lg text-slate-300/90 max-w-lg leading-relaxed">
             Clustering, networking, security, storage, operators, Terraform, and monitoring — built on
-            systemd-vmspawn and systemd-machined.
+            Ephemera, a disposable-VM engine with no systemd dependency.
           </p>
           <div className="login-fade-in login-fade-in-d3 flex flex-wrap gap-2 mt-6">
             <span className="login-stat-pill login-stat-pill-glow">

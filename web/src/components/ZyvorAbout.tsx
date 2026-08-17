@@ -74,7 +74,7 @@ export default function ZyvorAbout({ className = '' }: { className?: string }) {
             {ZYVOR_BRAND}
           </a>{' '}
           product family — clustering, networking, security, storage, HA, GPU passthrough, and
-          operators on systemd-vmspawn and systemd-machined. Daemon:{' '}
+          operators on Ephemera, a disposable-VM engine with no systemd dependency. Daemon:{' '}
           <span className="font-mono text-slate-400">{ZYVOR_FABRIC_DAEMON}</span>.
         </p>
         <p className="text-xs text-slate-500 leading-relaxed">
