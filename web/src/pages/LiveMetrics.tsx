@@ -44,6 +44,11 @@ export default function LiveMetrics() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const pausedRef = useRef(false)
+  // net_rx_bytes/net_tx_bytes from the API are cumulative counters (raw
+  // /proc/net/dev totals since the interface came up), not a per-second
+  // rate -- track the previous raw sample so we can derive an actual
+  // rate from the delta instead of displaying the ever-growing total.
+  const prevNetRef = useRef<{ rx: number; tx: number; t: number } | null>(null)
 
   const fetchMetrics = useCallback(async () => {
     if (pausedRef.current) return
@@ -54,14 +59,22 @@ export default function LiveMetrics() {
         throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
       }
       const data = await res.json()
+      const now = Date.now()
+      const rawRx = data.net_rx_bytes ?? 0
+      const rawTx = data.net_tx_bytes ?? 0
+      const prev = prevNetRef.current
+      const elapsedSec = prev ? (now - prev.t) / 1000 : 0
+      const netRxRate = prev && elapsedSec > 0 ? Math.max(0, rawRx - prev.rx) / elapsedSec : 0
+      const netTxRate = prev && elapsedSec > 0 ? Math.max(0, rawTx - prev.tx) / elapsedSec : 0
+      prevNetRef.current = { rx: rawRx, tx: rawTx, t: now }
       const point: MetricPoint = {
-        timestamp: Date.now(),
+        timestamp: now,
         cpu: data.cpu_percent ?? data.cpu ?? 0,
         memory: data.memory_percent ?? data.memory ?? 0,
         disk_read: data.disk_read_bytes ?? 0,
         disk_write: data.disk_write_bytes ?? 0,
-        net_rx: data.net_rx_bytes ?? 0,
-        net_tx: data.net_tx_bytes ?? 0,
+        net_rx: netRxRate,
+        net_tx: netTxRate,
       }
       setHistory((prev) => {
         setLoadError(null)
