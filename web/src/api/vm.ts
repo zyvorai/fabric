@@ -20,6 +20,7 @@ export interface VM {
   pid?: number
   tags?: string[]
   port_forwards?: PortForwardSpec[]
+  network_tap?: boolean
 }
 
 export interface CreateVMRequest {
@@ -36,6 +37,13 @@ export interface CreateVMRequest {
    * add a forward to an already-running instance.
    */
   port_forwards?: PortForwardSpec[]
+  /**
+   * Use bridged (tap + private network namespace + DHCP) networking
+   * instead of the default NAT networking. A bridged VM gets a real,
+   * externally-reachable IP (visible on its Network tab) instead of
+   * needing explicit port_forwards.
+   */
+  network_tap?: boolean
 }
 
 export interface VMMetrics {

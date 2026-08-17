@@ -58,6 +58,7 @@ export default function CreateVM() {
   const [advanced, setAdvanced] = useState<AdvancedOptions>(defaultAdvanced)
   const [wizardStep, setWizardStep] = useState(0)
   const [imagesReload, setImagesReload] = useState(0)
+  const [networkMode, setNetworkMode] = useState<'nat' | 'bridged'>('nat')
   const [portForwards, setPortForwards] = useState<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }[]>([])
 
   const addPortForwardRow = (guestPort = '', hostPort = '') => {
@@ -116,7 +117,7 @@ export default function CreateVM() {
       if (cpus < 1 || cpus > 32) return 'vCPUs must be between 1 and 32'
       if (memory < 256) return 'Memory must be at least 256 MB'
       const hostPorts = new Set<string>()
-      for (const row of portForwards) {
+      for (const row of networkMode === 'nat' ? portForwards : []) {
         const h = parseInt(row.hostPort)
         const g = parseInt(row.guestPort)
         if (!row.hostPort || !Number.isInteger(h) || h < 1 || h > 65535) {
@@ -162,12 +163,18 @@ export default function CreateVM() {
     setSubmitError(null)
 
     try {
-      const port_forwards: PortForwardSpec[] = portForwards.map((row) => ({
-        host_port: parseInt(row.hostPort),
-        guest_port: parseInt(row.guestPort),
-        protocol: row.protocol,
-      }))
-      await createVM({ name, image, cpus, memory, disk: diskGb, ...(port_forwards.length ? { port_forwards } : {}) })
+      const port_forwards: PortForwardSpec[] = networkMode === 'nat'
+        ? portForwards.map((row) => ({
+            host_port: parseInt(row.hostPort),
+            guest_port: parseInt(row.guestPort),
+            protocol: row.protocol,
+          }))
+        : []
+      await createVM({
+        name, image, cpus, memory, disk: diskGb,
+        network_tap: networkMode === 'bridged',
+        ...(port_forwards.length ? { port_forwards } : {}),
+      })
       if (showAdvanced) {
         try {
           await applyCreateAdvancedOptions(name, advanced)
@@ -451,6 +458,43 @@ export default function CreateVM() {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
                         <Network className="w-4 h-4 text-slate-500" />
+                        Networking
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNetworkMode('nat')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            networkMode === 'nat'
+                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          NAT (default)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNetworkMode('bridged')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            networkMode === 'bridged'
+                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          Bridged (DHCP)
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">
+                        {networkMode === 'nat'
+                          ? 'No host-routable IP — reach anything inside this VM (like SSH) by forwarding a port below.'
+                          : 'This VM gets its own real IP via DHCP (visible on its Network tab once booted) — no port forwards needed. Takes slightly longer to become reachable while it acquires a lease.'}
+                      </p>
+                    </div>
+
+                    {networkMode === 'nat' && (
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                        <Network className="w-4 h-4 text-slate-500" />
                         Expose ports (host port → guest port)
                       </label>
                       <p className="text-xs text-slate-500 mb-2">
@@ -516,6 +560,7 @@ export default function CreateVM() {
                         Add port forward
                       </button>
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -544,11 +589,15 @@ export default function CreateVM() {
                     {memory} MB ({(memory / 1024).toFixed(1)} GB)
                   </dd>
                 </div>
-                <div className={`flex justify-between gap-4 ${portForwards.length ? 'border-b border-slate-700/40 pb-2' : ''}`}>
+                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
                   <dt className="text-slate-500">Root disk</dt>
                   <dd className="text-white">{diskGb} GB</dd>
                 </div>
-                {portForwards.length > 0 && (
+                <div className={`flex justify-between gap-4 ${networkMode === 'nat' && portForwards.length ? 'border-b border-slate-700/40 pb-2' : ''}`}>
+                  <dt className="text-slate-500">Networking</dt>
+                  <dd className="text-white">{networkMode === 'nat' ? 'NAT' : 'Bridged (DHCP)'}</dd>
+                </div>
+                {networkMode === 'nat' && portForwards.length > 0 && (
                   <div className="flex justify-between gap-4">
                     <dt className="text-slate-500">Exposed ports</dt>
                     <dd className="text-white text-right">
