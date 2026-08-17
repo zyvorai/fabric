@@ -11,6 +11,7 @@ import { formatHttpErrorBody } from '../utils/apiError'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
+import CopyButton from '../components/CopyButton'
 
 interface Webhook {
   id: string
@@ -222,6 +223,7 @@ export default function Webhooks() {
                   <div className="flex items-center gap-2 mb-1.5">
                     <Globe className="w-4 h-4 text-slate-500 flex-shrink-0" />
                     <span className="text-sm text-slate-200 font-mono truncate">{wh.url}</span>
+                    <CopyButton text={wh.url} iconOnly successMessage="Webhook URL copied" />
                   </div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded capitalize ${

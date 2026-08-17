@@ -28,6 +28,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import RelativeTime from '../components/RelativeTime'
 
 export default function Certificates() {
   const toast = useToastContext()
@@ -289,7 +290,7 @@ export default function Certificates() {
                   <td className="p-4 text-sm">{csr.requestor}</td>
                   <td className="p-4 text-sm">{csr.cert_type}</td>
                   <td className="p-4 text-sm">{csr.key_size} bits</td>
-                  <td className="p-4 text-sm text-slate-400">{new Date(csr.submitted_at).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-slate-400"><RelativeTime date={csr.submitted_at} /></td>
                   <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(csr.status)}`}>{csr.status}</span></td>
                   <td className="p-4">
                     {csr.status === 'pending' && (
@@ -341,7 +342,7 @@ export default function Certificates() {
                     </span>
                   </td>
                   <td className="p-4 text-sm">{att.secure_boot_enabled ? 'Enabled' : 'Disabled'}</td>
-                  <td className="p-4 text-sm text-slate-400">{att.last_attestation ? new Date(att.last_attestation).toLocaleString() : 'Never'}</td>
+                  <td className="p-4 text-sm text-slate-400">{att.last_attestation ? <RelativeTime date={att.last_attestation} /> : 'Never'}</td>
                 </tr>
               ))}
             </tbody>

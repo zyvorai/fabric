@@ -23,6 +23,9 @@ import { PageHeader } from '../components/ui'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
+import RelativeTime from '../components/RelativeTime'
+import TableSearch from '../components/TableSearch'
+import { useTableFilter } from '../hooks/useTableFilter'
 
 export default function Backups() {
   const toast = useToastContext()
@@ -130,6 +133,8 @@ export default function Backups() {
     }
   }
 
+  const { query, setQuery, filtered: filteredBackups } = useTableFilter(backups, (b) => [b.vm_name, b.backup_type, b.status])
+
   if (loading) {
     return <div className="text-center py-8">Loading backups...</div>
   }
@@ -231,8 +236,11 @@ export default function Backups() {
 
       {/* Backups List */}
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-        <div className="p-4 border-b border-slate-700/50">
-          <h2 className="text-lg font-bold">Available Backups</h2>
+        <div className="p-4 border-b border-slate-700/50 flex items-center justify-between gap-4">
+          <h2 className="text-lg font-bold shrink-0">Available Backups</h2>
+          {backups.length > 0 && (
+            <TableSearch value={query} onChange={setQuery} placeholder="Search by VM, type, status..." resultCount={filteredBackups.length} totalCount={backups.length} className="w-full max-w-sm" />
+          )}
         </div>
         {backups.length === 0 ? (
           <div className="text-center py-12">
@@ -262,7 +270,14 @@ export default function Backups() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
-                {backups.map((backup) => (
+                {filteredBackups.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                      No backups match "{query}"
+                    </td>
+                  </tr>
+                )}
+                {filteredBackups.map((backup) => (
                   <tr key={backup.id} className="hover:bg-slate-900">
                     <td className="px-4 py-3 text-sm font-medium">{backup.vm_name}</td>
                     <td className="px-4 py-3">
@@ -274,10 +289,10 @@ export default function Backups() {
                     </td>
                     <td className="px-4 py-3 text-sm">{formatBytes(backup.size_bytes)}</td>
                     <td className="px-4 py-3 text-sm text-slate-400">
-                      {new Date(backup.created).toLocaleString()}
+                      <RelativeTime date={backup.created} />
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">
-                      {backup.expires_at ? new Date(backup.expires_at).toLocaleDateString() : 'Never'}
+                      {backup.expires_at ? <RelativeTime date={backup.expires_at} /> : 'Never'}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${

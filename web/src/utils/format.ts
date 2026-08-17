@@ -22,20 +22,23 @@ export function formatDateTime(date: string | Date): string {
 }
 
 /**
- * Format a date string or Date object into a relative time string (e.g., "5 minutes ago")
+ * Format a date string or Date object into a relative time string. Handles both
+ * the past ("5m ago") and the future ("in 5m") — callers pass expiry/next-run
+ * dates as often as they pass creation dates, and those are ahead of `now`.
  */
 export function formatRelativeTime(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date
   const now = new Date()
   const diffMs = now.getTime() - d.getTime()
-  const diffSec = Math.floor(diffMs / 1000)
-  const diffMin = Math.floor(diffSec / 60)
-  const diffHour = Math.floor(diffMin / 60)
-  const diffDay = Math.floor(diffHour / 24)
+  const future = diffMs < 0
+  const absSec = Math.floor(Math.abs(diffMs) / 1000)
+  const absMin = Math.floor(absSec / 60)
+  const absHour = Math.floor(absMin / 60)
+  const absDay = Math.floor(absHour / 24)
 
-  if (diffSec < 60) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffHour < 24) return `${diffHour}h ago`
-  if (diffDay < 30) return `${diffDay}d ago`
-  return formatDateTime(d)
+  if (absSec < 60) return 'just now'
+  if (absDay >= 30) return formatDateTime(d)
+
+  const value = absDay >= 1 ? `${absDay}d` : absHour >= 1 ? `${absHour}h` : `${absMin}m`
+  return future ? `in ${value}` : `${value} ago`
 }

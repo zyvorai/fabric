@@ -17,6 +17,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
+import RelativeTime from '../components/RelativeTime'
 
 export default function Snapshots() {
   const { confirmState, confirm, cancel } = useConfirm()
@@ -152,7 +153,7 @@ export default function Snapshots() {
                     <td className="p-4 text-sm text-slate-400">{snap.snapshot_type}</td>
                     <td className="p-4 text-sm text-slate-400">{snap.description || '-'}</td>
                     <td className="p-4 text-sm text-slate-400">
-                      {new Date(snap.created).toLocaleString()}
+                      <RelativeTime date={snap.created} />
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">

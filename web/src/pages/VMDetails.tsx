@@ -74,7 +74,7 @@ export default function VMDetails() {
   }
 
   const { handleStart, handleStop, handleRestart, handlePause, handleResume } = useVMActions(name ?? '', loadVM)
-  const { pending: pendingDelete, run: runDelete, undo: undoDelete } = useUndoableAction(5)
+  const { pending: pendingDelete, run: runDelete, undo: undoDelete } = useUndoableAction(8)
 
   const confirmDelete = useCallback(() => {
     if (!name) return

@@ -25,6 +25,9 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import CopyButton from '../components/CopyButton'
+import TableSearch from '../components/TableSearch'
+import { useTableFilter } from '../hooks/useTableFilter'
 
 export default function StoragePools() {
   const { confirmState, confirm, cancel } = useConfirm()
@@ -35,6 +38,7 @@ export default function StoragePools() {
   const [nfsHealth, setNfsHealth] = useState<Map<string, NfsHealth>>(new Map())
   const [cephHealth, setCephHealth] = useState<Map<string, { status: string; detail: string }>>(new Map())
   const [loadError, setLoadError] = useState<string | null>(null)
+  const { query: poolQuery, setQuery: setPoolQuery, filtered: filteredPools } = useTableFilter(pools, (p) => [p.name, p.path, p.state])
 
   useEffect(() => {
     loadPools()
@@ -230,6 +234,18 @@ export default function StoragePools() {
 
       {/* Pools List */}
       <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+        {pools.length > 0 && (
+          <div className="p-4 border-b border-slate-700/50">
+            <TableSearch
+              value={poolQuery}
+              onChange={setPoolQuery}
+              placeholder="Search by name, path, state..."
+              resultCount={filteredPools.length}
+              totalCount={pools.length}
+              className="max-w-sm"
+            />
+          </div>
+        )}
         <table className="w-full">
           <thead className="bg-slate-900">
             <tr className="text-left text-slate-400 text-sm">
@@ -251,8 +267,14 @@ export default function StoragePools() {
                   No storage pools configured. Create one to get started.
                 </td>
               </tr>
+            ) : filteredPools.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="p-8 text-center text-slate-400">
+                  No storage pools match "{poolQuery}"
+                </td>
+              </tr>
             ) : (
-              pools.map((pool) => {
+              filteredPools.map((pool) => {
                 const usagePercent =
                   pool.capacity > 0 ? ((pool.capacity - pool.available) / pool.capacity) * 100 : 0
 
@@ -269,7 +291,12 @@ export default function StoragePools() {
                       </div>
                     </td>
                     <td className="p-4 text-sm text-slate-400">{getPoolTypeDisplay(pool)}</td>
-                    <td className="p-4 text-sm text-slate-400 font-mono">{pool.path}</td>
+                    <td className="p-4 text-sm text-slate-400 font-mono">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate max-w-[16rem]">{pool.path}</span>
+                        <CopyButton text={pool.path} iconOnly successMessage="Path copied" />
+                      </div>
+                    </td>
                     <td className="p-4 text-sm">{formatBytes(pool.capacity)}</td>
                     <td className="p-4 text-sm">{formatBytes(pool.available)}</td>
                     <td className="p-4">

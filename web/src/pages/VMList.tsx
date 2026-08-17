@@ -20,6 +20,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import ReadOnlyNotice from '../components/ReadOnlyNotice'
 import { usePermissions } from '../hooks/usePermissions'
 import ConfirmDialog from '../components/ConfirmDialog'
+import CopyButton from '../components/CopyButton'
 
 type ViewMode = 'grid' | 'table'
 
@@ -37,12 +38,15 @@ function VMTableRow({ vm, onUpdate, selected, onSelect, canWrite }: { vm: VM; on
         />
       </td>
       <td className="py-3 px-4">
-        <Link
-          to={`/vms/${vm.name}`}
-          className="font-medium text-white hover:text-blue-400 transition-colors"
-        >
-          {vm.name}
-        </Link>
+        <div className="flex items-center gap-1 group/name">
+          <Link
+            to={`/vms/${vm.name}`}
+            className="font-medium text-white hover:text-blue-400 transition-colors"
+          >
+            {vm.name}
+          </Link>
+          <CopyButton text={vm.name} iconOnly className="opacity-0 group-hover/name:opacity-100" successMessage="VM name copied" />
+        </div>
       </td>
       <td className="py-3 px-4">
         <StatusBadge status={vm.state} />

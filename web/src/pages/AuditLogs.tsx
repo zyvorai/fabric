@@ -18,6 +18,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import RelativeTime from '../components/RelativeTime'
 
 export default function AuditLogs() {
   const toast = useToastContext()
@@ -321,7 +322,7 @@ export default function AuditLogs() {
                 {filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-900">
                     <td className="px-4 py-3 text-sm text-slate-400">
-                      {new Date(log.timestamp).toLocaleString()}
+                      <RelativeTime date={log.timestamp} />
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">{log.user}</td>
                     <td className="px-4 py-3">

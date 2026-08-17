@@ -23,6 +23,9 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import RelativeTime from '../components/RelativeTime'
+import TableSearch from '../components/TableSearch'
+import { useTableFilter } from '../hooks/useTableFilter'
 
 export default function Schedules() {
   const toast = useToastContext()
@@ -34,6 +37,7 @@ export default function Schedules() {
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const { query: scheduleQuery, setQuery: setScheduleQuery, filtered: filteredSchedules } = useTableFilter(schedules, (s) => [s.name, s.vm_name, s.action])
 
   useEffect(() => {
     loadData()
@@ -185,7 +189,18 @@ export default function Schedules() {
             </div>
           ) : (
             <div className="space-y-4">
-              {schedules.map((schedule) => (
+              <TableSearch
+                value={scheduleQuery}
+                onChange={setScheduleQuery}
+                placeholder="Search by name, VM, action..."
+                resultCount={filteredSchedules.length}
+                totalCount={schedules.length}
+                className="max-w-sm"
+              />
+              {filteredSchedules.length === 0 && (
+                <p className="text-sm text-slate-500 py-8 text-center">No schedules match "{scheduleQuery}"</p>
+              )}
+              {filteredSchedules.map((schedule) => (
                 <div
                   key={schedule.id}
                   className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6"
@@ -216,12 +231,12 @@ export default function Schedules() {
                       </p>
                       {schedule.next_run && (
                         <p className="text-sm text-blue-400">
-                          Next run: {new Date(schedule.next_run).toLocaleString()}
+                          Next run: <RelativeTime date={schedule.next_run} />
                         </p>
                       )}
                       {schedule.last_run && (
                         <p className="text-xs text-slate-500">
-                          Last run: {new Date(schedule.last_run).toLocaleString()}
+                          Last run: <RelativeTime date={schedule.last_run} />
                         </p>
                       )}
                     </div>
@@ -317,7 +332,7 @@ export default function Schedules() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-400">
-                        {new Date(item.executed_at).toLocaleString()}
+                        <RelativeTime date={item.executed_at} />
                       </td>
                       <td className="px-4 py-3">
                         <span

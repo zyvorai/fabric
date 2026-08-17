@@ -26,6 +26,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import RelativeTime from '../components/RelativeTime'
 
 export default function Notifications() {
   const toast = useToastContext()
@@ -329,7 +330,7 @@ export default function Notifications() {
                       <div className="flex gap-2 text-xs text-slate-400">
                         <span>Triggered: {rule.triggered_count} times</span>
                         {rule.last_triggered && (
-                          <span>• Last: {new Date(rule.last_triggered).toLocaleString()}</span>
+                          <span>• Last: <RelativeTime date={rule.last_triggered} /></span>
                         )}
                       </div>
                     </div>
@@ -404,7 +405,7 @@ export default function Notifications() {
                     {history.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-900">
                         <td className="px-4 py-3 text-sm text-slate-400">
-                          {new Date(item.sent_at).toLocaleString()}
+                          <RelativeTime date={item.sent_at} />
                         </td>
                         <td className="px-4 py-3 text-sm">{item.rule_name}</td>
                         <td className="px-4 py-3">
