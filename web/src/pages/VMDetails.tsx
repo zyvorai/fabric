@@ -21,6 +21,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import CloneVMDialog from '../components/CloneVMDialog'
 import ErrorBanner from '../components/ErrorBanner'
 import CopyButton from '../components/CopyButton'
+import UndoBar from '../components/UndoBar'
+import { useUndoableAction } from '../hooks/useUndoableAction'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -72,18 +74,21 @@ export default function VMDetails() {
   }
 
   const { handleStart, handleStop, handleRestart, handlePause, handleResume } = useVMActions(name ?? '', loadVM)
+  const { pending: pendingDelete, run: runDelete, undo: undoDelete } = useUndoableAction(5)
 
-  const confirmDelete = useCallback(async () => {
+  const confirmDelete = useCallback(() => {
     if (!name) return
     setShowDeleteConfirm(false)
-    try {
-      await deleteVM(name)
-      toast.success(`VM '${name}' deleted successfully`)
-      navigate('/vms')
-    } catch (error) {
-      toastFailure(toast, `Failed to delete VM '${name}'`, error)
-    }
-  }, [name, toast, navigate])
+    runDelete(`Deleting VM '${name}'…`, async () => {
+      try {
+        await deleteVM(name)
+        toast.success(`VM '${name}' deleted successfully`)
+        navigate('/vms')
+      } catch (error) {
+        toastFailure(toast, `Failed to delete VM '${name}'`, error)
+      }
+    })
+  }, [name, toast, navigate, runDelete])
 
   if (loading) {
     return (
@@ -258,13 +263,14 @@ export default function VMDetails() {
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete Virtual Machine"
-          message={`Are you sure you want to delete VM '${name}'? This action cannot be undone.`}
+          message={`Are you sure you want to delete VM '${name}'? You'll have a few seconds to undo before it's gone for good.`}
           confirmLabel="Delete"
           variant="danger"
           onConfirm={confirmDelete}
           onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
+      <UndoBar pending={pendingDelete} onUndo={undoDelete} />
       {showCloneDialog && name && (
         <CloneVMDialog
           vmName={name}
