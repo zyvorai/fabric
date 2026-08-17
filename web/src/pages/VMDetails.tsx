@@ -20,7 +20,6 @@ import { StatusBadge } from '../components/ui'
 import ConfirmDialog from '../components/ConfirmDialog'
 import CloneVMDialog from '../components/CloneVMDialog'
 import ErrorBanner from '../components/ErrorBanner'
-import Breadcrumb from '../components/Breadcrumb'
 import CopyButton from '../components/CopyButton'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
@@ -146,7 +145,6 @@ export default function VMDetails() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
       {!canWrite && <ReadOnlyNotice />}
 
       {/* Header */}
@@ -362,10 +360,14 @@ function MetricsTab({ vm }: { vm: VM }) {
       try {
         const m = await getMetrics(vm.name)
         setLatest(m)
+        // memory_usage is raw bytes, not a percentage (unlike cpu_usage) —
+        // express it as a percentage of this VM's own allocated memory
+        // (vm.memory, in MiB) so it's on the same 0-100 chart scale as CPU.
+        const memoryPct = vm.memory > 0 ? (m.memory_usage / (vm.memory * 1024 * 1024)) * 100 : 0
         setHistory((prev) => [...prev.slice(-29), {
           time: new Date().toLocaleTimeString(),
           cpu: parseFloat(m.cpu_usage.toFixed(1)),
-          memory: parseFloat(m.memory_usage.toFixed(1)),
+          memory: parseFloat(memoryPct.toFixed(1)),
           disk_read: m.disk_usage,
           disk_write: m.disk_usage,
           net_rx: m.network_rx,
@@ -399,7 +401,7 @@ function MetricsTab({ vm }: { vm: VM }) {
       {/* Quick stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricStat label="CPU" value={latest ? `${latest.cpu_usage.toFixed(1)}%` : '--'} color="blue" />
-        <MetricStat label="Memory" value={latest ? `${latest.memory_usage.toFixed(1)}%` : '--'} color="emerald" />
+        <MetricStat label="Memory" value={latest && vm.memory > 0 ? `${((latest.memory_usage / (vm.memory * 1024 * 1024)) * 100).toFixed(1)}%` : '--'} color="emerald" />
         <MetricStat label="Net RX" value={latest ? `${(latest.network_rx / 1024).toFixed(1)} KB/s` : '--'} color="purple" />
         <MetricStat label="Net TX" value={latest ? `${(latest.network_tx / 1024).toFixed(1)} KB/s` : '--'} color="orange" />
       </div>

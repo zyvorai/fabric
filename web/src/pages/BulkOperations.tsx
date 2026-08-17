@@ -19,6 +19,7 @@ import {
   Play,
 } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, EmptyState } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -57,13 +58,7 @@ export default function BulkOperations() {
     setLoading(true)
     setLoadError(null)
     try {
-      const res = await apiFetch('/api/vms')
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
-      }
-      const data = await res.json()
-      setVMs(Array.isArray(data) ? data : data.vms || [])
+      setVMs(await listVMs())
     } catch (err) {
       const msg = formatUserError(err)
       setLoadError(msg)
@@ -309,7 +304,7 @@ export default function BulkOperations() {
                     </td>
                     <td className="px-4 py-3 text-slate-400 hidden md:table-cell">{vm.cpus ?? '-'}</td>
                     <td className="px-4 py-3 text-slate-400 hidden md:table-cell">
-                      {vm.memory ? `${(vm.memory / 1024 / 1024).toFixed(0)} MB` : '-'}
+                      {vm.memory ? `${vm.memory} MB` : '-'}
                     </td>
                   </tr>
                 )
