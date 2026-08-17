@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
-import { getVM, getMetrics, deleteVM, VM, VMMetrics } from '../api/vm'
+import { getVM, getMetrics, deleteVM, addPortForward, VM, VMMetrics } from '../api/vm'
 import { listSnapshots, createSnapshot, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
 import { listAuditLogs, AuditLog } from '../api/audit'
 import { getMachineProperties } from '../api/machines'
@@ -247,7 +247,7 @@ export default function VMDetails() {
         {activeTab === 'overview' && <OverviewTab vm={vm} />}
         {activeTab === 'metrics' && <MetricsTab vm={vm} />}
         {activeTab === 'disks' && <DisksTab vm={vm} />}
-        {activeTab === 'network' && <NetworkTab vm={vm} />}
+        {activeTab === 'network' && <NetworkTab vm={vm} onUpdated={loadVM} />}
         {activeTab === 'snapshots' && <SnapshotsTab vm={vm} />}
         {activeTab === 'hotplug' && <HotplugTab vm={vm} />}
         {activeTab === 'devices' && <DevicesTab vm={vm} />}
@@ -560,7 +560,7 @@ function DisksTab({ vm }: { vm: VM }) {
   )
 }
 
-function NetworkTab({ vm }: { vm: VM }) {
+function NetworkTab({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
   const [properties, setProperties] = useState<Record<string, string> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -591,14 +591,33 @@ function NetworkTab({ vm }: { vm: VM }) {
   }
 
   if (error) {
+    // Only live interface info (driver properties) failed to load -- the
+    // VM's own stored config (port forwards) is independent of that and
+    // should still be manageable, e.g. for a never-started VM with no
+    // Ephemera-side instance yet to query properties from.
     return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <AlertCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400 text-sm">{error}</p>
+      <div className="space-y-6">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
+          <AlertCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+        <PortForwardsSection vm={vm} onUpdated={onUpdated} />
       </div>
     )
   }
 
+  return <NetworkTabContent vm={vm} properties={properties} onUpdated={onUpdated} />
+}
+
+function NetworkTabContent({
+  vm,
+  properties,
+  onUpdated,
+}: {
+  vm: VM
+  properties: Record<string, string> | null
+  onUpdated: () => void
+}) {
   interface NetworkInterface {
     name: string
     mac: string
@@ -624,17 +643,13 @@ function NetworkTab({ vm }: { vm: VM }) {
     })
   }
 
-  if (interfaces.length === 0) {
-    return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <Network className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-500 text-sm">No network information available</p>
-        <p className="text-slate-600 text-xs mt-2">VM is not running or has no network interfaces configured</p>
-      </div>
-    )
-  }
-
-  return (
+  const interfacesSection = interfaces.length === 0 ? (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
+      <Network className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+      <p className="text-slate-500 text-sm">No network information available</p>
+      <p className="text-slate-600 text-xs mt-2">VM is not running or has no network interfaces configured</p>
+    </div>
+  ) : (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
@@ -660,6 +675,162 @@ function NetworkTab({ vm }: { vm: VM }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {interfacesSection}
+      <PortForwardsSection vm={vm} onUpdated={onUpdated} />
+    </div>
+  )
+}
+
+function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
+  const toast = useToastContext()
+  const { canWrite } = usePermissions()
+  const [showForm, setShowForm] = useState(false)
+  const [hostPort, setHostPort] = useState('')
+  const [guestPort, setGuestPort] = useState('22')
+  const [protocol, setProtocol] = useState<'tcp' | 'udp'>('tcp')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const forwards = vm.port_forwards ?? []
+
+  const handleAdd = async () => {
+    const h = parseInt(hostPort)
+    const g = parseInt(guestPort)
+    if (!hostPort || !Number.isInteger(h) || h < 1 || h > 65535) {
+      setFormError('Host port must be between 1 and 65535')
+      return
+    }
+    if (!guestPort || !Number.isInteger(g) || g < 1 || g > 65535) {
+      setFormError('Guest port must be between 1 and 65535')
+      return
+    }
+    setSubmitting(true)
+    setFormError('')
+    try {
+      await addPortForward(vm.name, { hostPort: h, guestPort: g, protocol })
+      toast.success(
+        vm.state === 'running'
+          ? `Port ${h} → ${g}/${protocol} exposed — VM restarted to apply it`
+          : `Port ${h} → ${g}/${protocol} will be exposed on next start`,
+      )
+      setShowForm(false)
+      setHostPort('')
+      setGuestPort('22')
+      onUpdated()
+    } catch (err) {
+      setFormError(formatUserError(err))
+      toastFailure(toast, 'Failed to expose port', err)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Exposed Ports</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            This VM uses NAT networking — forwards here are the only way to reach it (e.g. SSH) from outside the host.
+          </p>
+        </div>
+        {canWrite && !showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+          >
+            <Plug className="w-3.5 h-3.5" />
+            Expose Port
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="p-5 border-b border-slate-700/50 bg-slate-900/40 space-y-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={hostPort}
+              onChange={(e) => setHostPort(e.target.value)}
+              placeholder="Host port"
+              min={1}
+              max={65535}
+              className="w-28 px-2.5 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+            />
+            <span className="text-slate-500 text-sm">→</span>
+            <input
+              type="number"
+              value={guestPort}
+              onChange={(e) => setGuestPort(e.target.value)}
+              placeholder="Guest port"
+              min={1}
+              max={65535}
+              className="w-28 px-2.5 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+            />
+            <select
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value as 'tcp' | 'udp')}
+              className="px-2 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-slate-300"
+            >
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+            </select>
+          </div>
+          {vm.state === 'running' && (
+            <p className="text-xs text-amber-400/80">
+              This VM is running — adding a forward requires restarting it to apply.
+            </p>
+          )}
+          {formError && <p className="text-red-400 text-sm">{formError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={handleAdd}
+              disabled={submitting}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+            >
+              {submitting ? 'Applying…' : 'Add'}
+            </button>
+            <button
+              onClick={() => { setShowForm(false); setFormError('') }}
+              className="px-4 py-1.5 bg-slate-800 border border-slate-700/50 text-slate-300 text-sm rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {forwards.length === 0 ? (
+        <div className="p-8 text-center text-slate-500 text-sm">No ports exposed.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
+              <th className="py-3 px-5">Host Port</th>
+              <th className="py-3 px-4">Guest Port</th>
+              <th className="py-3 px-4">Protocol</th>
+            </tr>
+          </thead>
+          <tbody>
+            {forwards.map((f, i) => (
+              <tr key={i} className="border-t border-slate-700/50 hover:bg-white/[0.02] transition-colors">
+                <td className="py-3 px-5 font-mono text-white">{f.host_port}</td>
+                <td className="py-3 px-4 font-mono text-slate-300">{f.guest_port}</td>
+                <td className="py-3 px-4">
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                    {f.protocol}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

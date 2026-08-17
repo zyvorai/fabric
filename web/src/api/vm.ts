@@ -4,6 +4,12 @@
 
 import { apiGet, apiPost, apiPostVoid, apiPutVoid, apiDelete } from './client'
 
+export interface PortForwardSpec {
+  host_port: number
+  guest_port: number
+  protocol: 'tcp' | 'udp'
+}
+
 export interface VM {
   name: string
   state: 'running' | 'stopped' | 'paused' | 'starting' | 'stopping' | 'failed' | 'unknown'
@@ -13,6 +19,7 @@ export interface VM {
   ip?: string
   pid?: number
   tags?: string[]
+  port_forwards?: PortForwardSpec[]
 }
 
 export interface CreateVMRequest {
@@ -22,6 +29,13 @@ export interface CreateVMRequest {
   memory: number
   /** Disk size in GB (daemon default: 20). */
   disk?: number
+  /**
+   * Host-port -> guest-port forwards for this VM's usermode networking
+   * (e.g. exposing guest port 22 for SSH). Only applied on the VM's next
+   * (re)creation in Ephemera -- usermode/slirp networking has no way to
+   * add a forward to an already-running instance.
+   */
+  port_forwards?: PortForwardSpec[]
 }
 
 export interface VMMetrics {
@@ -73,6 +87,23 @@ export async function resumeVM(name: string): Promise<void> {
 
 export async function getMetrics(name: string): Promise<VMMetrics> {
   return apiGet<VMMetrics>(`${API_BASE}/vms/${name}/metrics`)
+}
+
+/**
+ * Expose a guest port on this VM's usermode networking. If the VM is
+ * currently running, the backend destroys and relaunches it (usermode
+ * networking can't add a forward live) -- expect this to take a few
+ * seconds and briefly show the VM as starting again.
+ */
+export async function addPortForward(
+  name: string,
+  forward: { hostPort: number; guestPort: number; protocol?: 'tcp' | 'udp' },
+): Promise<VM> {
+  return apiPost<VM>(`${API_BASE}/vms/${name}/port-forwards`, {
+    host_port: forward.hostPort,
+    guest_port: forward.guestPort,
+    protocol: forward.protocol ?? 'tcp',
+  })
 }
 
 export async function cloneVM(sourceName: string, targetName: string, options?: {

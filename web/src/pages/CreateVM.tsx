@@ -5,9 +5,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { createVM } from '../api/vm'
+import type { PortForwardSpec } from '../api/vm'
 import { apiGet } from '../api/client'
 import { applyCreateAdvancedOptions } from '../utils/applyCreateAdvancedOptions'
-import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor, Plus, X, Network } from 'lucide-react'
 import WizardStepper from '../components/WizardStepper'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -57,6 +58,17 @@ export default function CreateVM() {
   const [advanced, setAdvanced] = useState<AdvancedOptions>(defaultAdvanced)
   const [wizardStep, setWizardStep] = useState(0)
   const [imagesReload, setImagesReload] = useState(0)
+  const [portForwards, setPortForwards] = useState<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }[]>([])
+
+  const addPortForwardRow = (guestPort = '', hostPort = '') => {
+    setPortForwards((rows) => [...rows, { hostPort, guestPort, protocol: 'tcp' }])
+  }
+  const updatePortForwardRow = (index: number, patch: Partial<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }>) => {
+    setPortForwards((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  }
+  const removePortForwardRow = (index: number) => {
+    setPortForwards((rows) => rows.filter((_, i) => i !== index))
+  }
 
   useEffect(() => {
     if (wizardStep !== 0) return
@@ -103,6 +115,21 @@ export default function CreateVM() {
     if (step === 1) {
       if (cpus < 1 || cpus > 32) return 'vCPUs must be between 1 and 32'
       if (memory < 256) return 'Memory must be at least 256 MB'
+      const hostPorts = new Set<string>()
+      for (const row of portForwards) {
+        const h = parseInt(row.hostPort)
+        const g = parseInt(row.guestPort)
+        if (!row.hostPort || !Number.isInteger(h) || h < 1 || h > 65535) {
+          return 'Each port forward needs a host port between 1 and 65535'
+        }
+        if (!row.guestPort || !Number.isInteger(g) || g < 1 || g > 65535) {
+          return 'Each port forward needs a guest port between 1 and 65535'
+        }
+        if (hostPorts.has(row.hostPort)) {
+          return `Host port ${row.hostPort} is used by more than one port forward`
+        }
+        hostPorts.add(row.hostPort)
+      }
     }
     return null
   }
@@ -135,7 +162,12 @@ export default function CreateVM() {
     setSubmitError(null)
 
     try {
-      await createVM({ name, image, cpus, memory, disk: diskGb })
+      const port_forwards: PortForwardSpec[] = portForwards.map((row) => ({
+        host_port: parseInt(row.hostPort),
+        guest_port: parseInt(row.guestPort),
+        protocol: row.protocol,
+      }))
+      await createVM({ name, image, cpus, memory, disk: diskGb, ...(port_forwards.length ? { port_forwards } : {}) })
       if (showAdvanced) {
         try {
           await applyCreateAdvancedOptions(name, advanced)
@@ -415,6 +447,75 @@ export default function CreateVM() {
                         ))}
                       </div>
                     </div>
+
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+                        <Network className="w-4 h-4 text-slate-500" />
+                        Expose ports (host port → guest port)
+                      </label>
+                      <p className="text-xs text-slate-500 mb-2">
+                        This VM uses NAT networking with no host-routable IP — a port must be forwarded here to
+                        reach anything inside it (like SSH) from outside the host.
+                      </p>
+                      {portForwards.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => addPortForwardRow('22')}
+                          className="mb-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+                        >
+                          + Expose SSH (22)
+                        </button>
+                      )}
+                      <div className="space-y-2">
+                        {portForwards.map((row, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={row.hostPort}
+                              onChange={(e) => updatePortForwardRow(i, { hostPort: e.target.value })}
+                              placeholder="Host port"
+                              min={1}
+                              max={65535}
+                              className="w-28 px-2.5 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+                            />
+                            <span className="text-slate-500 text-sm">→</span>
+                            <input
+                              type="number"
+                              value={row.guestPort}
+                              onChange={(e) => updatePortForwardRow(i, { guestPort: e.target.value })}
+                              placeholder="Guest port"
+                              min={1}
+                              max={65535}
+                              className="w-28 px-2.5 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+                            />
+                            <select
+                              value={row.protocol}
+                              onChange={(e) => updatePortForwardRow(i, { protocol: e.target.value as 'tcp' | 'udp' })}
+                              className="px-2 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-slate-300"
+                            >
+                              <option value="tcp">TCP</option>
+                              <option value="udp">UDP</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removePortForwardRow(i)}
+                              className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                              title="Remove"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addPortForwardRow()}
+                        className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add port forward
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -443,10 +544,22 @@ export default function CreateVM() {
                     {memory} MB ({(memory / 1024).toFixed(1)} GB)
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
+                <div className={`flex justify-between gap-4 ${portForwards.length ? 'border-b border-slate-700/40 pb-2' : ''}`}>
                   <dt className="text-slate-500">Root disk</dt>
                   <dd className="text-white">{diskGb} GB</dd>
                 </div>
+                {portForwards.length > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-500">Exposed ports</dt>
+                    <dd className="text-white text-right">
+                      {portForwards.map((row, i) => (
+                        <div key={i} className="font-mono text-xs">
+                          {row.hostPort} → {row.guestPort}/{row.protocol}
+                        </div>
+                      ))}
+                    </dd>
+                  </div>
+                )}
               </dl>
             </div>
           )}
