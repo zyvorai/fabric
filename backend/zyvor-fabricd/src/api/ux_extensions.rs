@@ -798,7 +798,6 @@ pub async fn cost_estimate(
 
     let multiplier = if req.include_snapshots { 1.5 } else { 1.0 };
     let total_gb = req.vm_count as f64 * req.avg_size_gb * multiplier;
-    let storage_monthly = total_gb * pricing.storage_gb_per_hour * 720.0;
 
     let providers = [
         ("AWS S3", 0.023, "bg-orange-500"),
@@ -820,10 +819,16 @@ pub async fn cost_estimate(
         })
         .collect();
 
+    // Flat $0.10/GB/month baseline — matches the rate the UI labels this
+    // figure with. This estimates on-premises hardware TCO, which has
+    // nothing to do with the tenant's own configured cloud storage billing
+    // rate (pricing.storage_gb_per_hour): mixing the two in previously via
+    // max() let a tenant's own billing rate silently outweigh the labeled
+    // $0.10/GB/mo figure, showing a number the label didn't match.
     let on_prem = total_gb * 0.10;
     Ok(Json(json!({
         "estimates": estimates,
-        "on_prem_monthly": on_prem.max(storage_monthly),
+        "on_prem_monthly": on_prem,
         "pricing_source": pricing.name,
         "currency": pricing.currency
     })))
