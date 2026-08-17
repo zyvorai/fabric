@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Camera, Plus, RotateCcw, Trash2, Loader2, RefreshCw } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, EmptyState } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -42,10 +43,7 @@ export default function SnapshotManager() {
     setLoading(true)
     setLoadError(null)
     try {
-      const res = await apiFetch('/api/vms')
-      if (!res.ok) await parseApiError(res)
-      const data = await res.json()
-      setVMs((Array.isArray(data) ? data : data.vms || []).map((v: { name: string }) => v.name))
+      setVMs((await listVMs()).map((v) => v.name))
     } catch (err) {
       const msg = formatUserError(err)
       setLoadError(msg)

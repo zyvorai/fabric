@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, TrendingDown, Cpu, HardDrive, Database, AlertTriangle } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
 import { usePageLoader } from '../hooks/usePageLoader'
@@ -28,7 +29,7 @@ export default function CapacityPlanning() {
     return run(async () => {
       const [sysRes, vmRes] = await Promise.allSettled([
         apiFetch('/api/system/capacity'),
-        apiFetch('/api/vms'),
+        listVMs(),
       ])
 
       if (sysRes.status === 'fulfilled' && sysRes.value.ok) {
@@ -46,10 +47,8 @@ export default function CapacityPlanning() {
         }
       }
 
-      if (vmRes.status === 'fulfilled' && vmRes.value.ok) {
-        const data = await vmRes.value.json()
-        const vms = Array.isArray(data) ? data : data.vms || []
-        setVmCount(vms.length)
+      if (vmRes.status === 'fulfilled') {
+        setVmCount(vmRes.value.length)
       }
     })
   }, [run])

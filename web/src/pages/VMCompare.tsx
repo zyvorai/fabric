@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GitCompare } from 'lucide-react'
 import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -46,17 +47,7 @@ export default function VMCompare() {
     setLoadingVMs(true)
     setLoadError(null)
     try {
-      const res = await apiFetch('/api/vms')
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
-      }
-      const data = await res.json()
-      const vmList = Array.isArray(data) ? data : data.vms || []
-      setVMs(vmList.map((vm: { name?: string; Name?: string; state?: string }) => ({
-        name: vm.name || vm.Name || '',
-        state: vm.state,
-      })))
+      setVMs((await listVMs()).map((vm) => ({ name: vm.name, state: vm.state })))
     } catch (err) {
       const msg = formatUserError(err)
       setLoadError(msg)

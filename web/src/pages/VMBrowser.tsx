@@ -5,10 +5,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Search, Monitor, Cpu, HardDrive } from 'lucide-react'
 import { Link } from 'react-router'
-import { apiFetch } from '../api/client'
+import { listVMs, VM } from '../api/vm'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
-import { formatHttpErrorBody } from '../utils/apiError'
 import { usePageLoader } from '../hooks/usePageLoader'
 
 function stateColor(state: string): string {
@@ -19,27 +18,21 @@ function stateColor(state: string): string {
   return 'bg-slate-500/10 text-slate-400'
 }
 
-function fmtMem(bytes: number): string {
-  if (!bytes) return '0'
-  if (bytes > 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
-  if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)} MB`
-  return `${(bytes / 1024).toFixed(0)} KB`
+/** `mib` is a VM's allocated memory in MiB (`VM.memory`'s actual unit). */
+function fmtMem(mib: number): string {
+  if (!mib) return '0'
+  if (mib >= 1024) return `${(mib / 1024).toFixed(1)} GB`
+  return `${mib.toFixed(0)} MB`
 }
 
 export default function VMBrowser() {
-  const [vms, setVMs] = useState<any[]>([])
+  const [vms, setVMs] = useState<VM[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load VMs')
   const [search, setSearch] = useState('')
 
   const loadVMs = useCallback(() => {
     return run(async () => {
-      const res = await apiFetch('/api/vms')
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
-      }
-      const data = await res.json()
-      setVMs(Array.isArray(data) ? data : data.vms || [])
+      setVMs(await listVMs())
     })
   }, [run])
 

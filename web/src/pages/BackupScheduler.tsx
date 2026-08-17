@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
@@ -47,13 +48,7 @@ export default function BackupScheduler() {
 
   const fetchVMs = useCallback(async () => {
     try {
-      const resp = await apiFetch('/api/vms')
-      if (!resp.ok) {
-        const body = await resp.text()
-        throw new Error(formatHttpErrorBody(resp.status, resp.statusText, body))
-      }
-      const data = await resp.json()
-      setVMs(Array.isArray(data) ? data : data.vms || [])
+      setVMs(await listVMs())
     } catch (err) {
       setVMs([])
       throw err

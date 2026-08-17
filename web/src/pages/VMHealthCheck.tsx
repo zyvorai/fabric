@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
+import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
@@ -31,14 +32,7 @@ export default function VMHealthCheck() {
 
   const fetchVMs = useCallback(() => {
     return run(async () => {
-      const res = await apiFetch('/api/vms')
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
-      }
-      const data = await res.json()
-      const vmList = Array.isArray(data) ? data : data.vms || []
-      setVMs(vmList.map((vm: any) => ({ name: vm.name, state: vm.state })))
+      setVMs((await listVMs()).map((vm) => ({ name: vm.name, state: vm.state })))
     })
   }, [run])
 
