@@ -126,15 +126,15 @@ export async function deletePlan(id: string): Promise<void> {
 // Plan executions
 
 export async function executePlannedMigration(planId: string): Promise<RecoveryExecution> {
-  return apiPost<RecoveryExecution>(`${API_BASE}/site-recovery/plans/${planId}/execute`, { execution_type: 'planned_migration' })
+  return apiPost<RecoveryExecution>(`${API_BASE}/site-recovery/plans/${planId}/planned-migration`)
 }
 
 export async function executeDisasterRecovery(planId: string): Promise<RecoveryExecution> {
-  return apiPost<RecoveryExecution>(`${API_BASE}/site-recovery/plans/${planId}/execute`, { execution_type: 'disaster_recovery' })
+  return apiPost<RecoveryExecution>(`${API_BASE}/site-recovery/plans/${planId}/disaster-recovery`)
 }
 
 export async function executeTestFailover(planId: string): Promise<RecoveryExecution> {
-  return apiPost<RecoveryExecution>(`${API_BASE}/site-recovery/plans/${planId}/execute`, { execution_type: 'test_failover' })
+  return apiPost<RecoveryExecution>(`${API_BASE}/site-recovery/plans/${planId}/test-failover`)
 }
 
 export async function listExecutions(planId?: string): Promise<RecoveryExecution[]> {

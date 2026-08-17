@@ -97,6 +97,86 @@ pub async fn get_vm(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AddTagRequest {
+    pub tag: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateTagsRequest {
+    pub tags: Vec<String>,
+}
+
+/// POST /api/vms/:name/tags - Add a tag to a VM
+pub async fn add_tag(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<AddTagRequest>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+    let tags = vm.tags.get_or_insert_with(Vec::new);
+    if !tags.contains(&req.tag) {
+        tags.push(req.tag);
+    }
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
+/// DELETE /api/vms/:name/tags/:tag - Remove a tag from a VM
+pub async fn remove_tag(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, tag)): Path<(String, String)>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+    if let Some(tags) = vm.tags.as_mut() {
+        tags.retain(|t| t != &tag);
+    }
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
+/// PUT /api/vms/:name/tags - Replace a VM's full tag set
+pub async fn update_tags(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<UpdateTagsRequest>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+    vm.tags = Some(req.tags);
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
 pub async fn create_vm(
     RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,

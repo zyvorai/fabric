@@ -99,10 +99,9 @@ export async function unassignVm(poolId: string, vmId: string): Promise<void> {
 }
 
 export async function moveVm(vmId: string, fromPoolId: string, toPoolId: string): Promise<void> {
-  return apiPostVoid(`${API_BASE}/resource-pools/move-vm`, {
-    vm_id: vmId,
-    from_pool_id: fromPoolId,
-    to_pool_id: toPoolId,
+  return apiPostVoid(`${API_BASE}/resource-pools/${fromPoolId}/vms/move`, {
+    vm_name: vmId,
+    target_pool_id: toPoolId,
   })
 }
 
@@ -112,5 +111,8 @@ export async function checkAdmission(poolId: string, req: {
   cpu: number
   memory_mb: number
 }): Promise<AdmissionControlResult> {
-  return apiPost<AdmissionControlResult>(`${API_BASE}/resource-pools/${poolId}/check-admission`, req)
+  return apiPost<AdmissionControlResult>(`${API_BASE}/resource-pools/${poolId}/admission`, {
+    cpu_mhz: req.cpu,
+    memory_mb: req.memory_mb,
+  })
 }

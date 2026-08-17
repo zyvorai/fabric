@@ -80,5 +80,7 @@ pub mod webhook_retry;
 pub mod compliance;
 pub mod host_insight;
 pub mod processes;
+pub mod pci;
 pub mod usb;
+pub mod vm_advanced_config;
 pub mod ux_extensions;

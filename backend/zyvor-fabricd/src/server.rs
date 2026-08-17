@@ -333,6 +333,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/vms/compare", get(api::ux_extensions::compare_vms))
         .route("/vms/{name}", get(routes::get_vm).delete(routes::delete_vm))
         .route(
+            "/vms/{name}/tags",
+            post(routes::add_tag).put(routes::update_tags),
+        )
+        .route("/vms/{name}/tags/{tag}", delete(routes::remove_tag))
+        .route(
             "/vms/{name}/healthcheck",
             get(api::ux_extensions::vm_healthcheck),
         )
@@ -1022,7 +1027,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/resource-pools/{id}/vms",
-            post(api::resource_pools::assign_vm).delete(api::resource_pools::unassign_vm),
+            post(api::resource_pools::assign_vm),
+        )
+        .route(
+            "/resource-pools/{id}/vms/{vm_name}",
+            delete(api::resource_pools::unassign_vm),
         )
         .route(
             "/resource-pools/{id}/vms/move",
@@ -1577,6 +1586,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/bandwidth-alerts",
             get(api::net_monitor::get_bandwidth_alerts),
         )
+        .route(
+            "/bandwidth-alerts/{id}/acknowledge",
+            post(api::net_monitor::acknowledge_bandwidth_alert),
+        )
         // Fault tolerance routes
         .route("/ft/enable", post(api::fault_tolerance::enable_ft))
         .route("/ft/vms", get(api::fault_tolerance::list_ft_vms))
@@ -2033,7 +2046,41 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::storage::list_iscsi_sessions),
         )
         // USB passthrough routes
-        .route("/system/usb", get(api::usb::list_usb_devices))
+        .route("/system/usb-devices", get(api::usb::list_usb_devices))
+        .route(
+            "/vms/{name}/devices/usb",
+            post(api::usb::attach_usb),
+        )
+        .route(
+            "/vms/{name}/devices/usb/{ids}",
+            delete(api::usb::detach_usb),
+        )
+        // PCI passthrough routes
+        .route("/system/pci-devices", get(api::pci::list_pci_devices))
+        .route(
+            "/vms/{name}/devices/pci",
+            post(api::pci::attach_pci),
+        )
+        .route(
+            "/vms/{name}/devices/pci/{address}",
+            delete(api::pci::detach_pci),
+        )
+        // VM advanced-options config (Create VM wizard's boot/display/CPU settings)
+        .route(
+            "/vms/{name}/boot",
+            get(api::vm_advanced_config::get_boot_config)
+                .post(api::vm_advanced_config::update_boot_config),
+        )
+        .route(
+            "/vms/{name}/display",
+            get(api::vm_advanced_config::get_display)
+                .post(api::vm_advanced_config::update_display),
+        )
+        .route(
+            "/vms/{name}/cpu-model",
+            get(api::vm_advanced_config::get_cpu_config)
+                .post(api::vm_advanced_config::update_cpu_config),
+        )
         // DHCP server config
         .route("/networkd/dhcp", post(api::networkd::configure_dhcp_server))
         // Compliance scanning routes

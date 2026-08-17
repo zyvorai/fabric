@@ -92,11 +92,11 @@ const API_BASE = '/api'
 // DRS configuration
 
 export async function configureDrs(req: Partial<DrsConfig> & { cluster_id: string }): Promise<DrsConfig> {
-  return apiPut<DrsConfig>(`${API_BASE}/drs/config`, req)
+  return apiPost<DrsConfig>(`${API_BASE}/drs/config`, req)
 }
 
 export async function getDrsConfig(clusterId: string): Promise<DrsConfig> {
-  return apiGet<DrsConfig>(`${API_BASE}/drs/config?cluster_id=${clusterId}`)
+  return apiGet<DrsConfig>(`${API_BASE}/drs/config/${clusterId}`)
 }
 
 // Placement
@@ -108,20 +108,17 @@ export async function computePlacement(req: PlacementRequest): Promise<Placement
 // Balance analysis
 
 export async function analyzeBalance(clusterId: string): Promise<ClusterBalance> {
-  return apiGet<ClusterBalance>(`${API_BASE}/drs/balance?cluster_id=${clusterId}`)
+  return apiGet<ClusterBalance>(`${API_BASE}/drs/balance/${clusterId}`)
 }
 
 // Migration recommendations
 
 export async function generateRecommendations(clusterId: string): Promise<MigrationRecommendation[]> {
-  return apiPost<MigrationRecommendation[]>(`${API_BASE}/drs/recommendations/generate`, { cluster_id: clusterId })
+  return apiPost<MigrationRecommendation[]>(`${API_BASE}/drs/recommendations`, { cluster_id: clusterId })
 }
 
-export async function listRecommendations(clusterId?: string): Promise<MigrationRecommendation[]> {
-  const url = clusterId
-    ? `${API_BASE}/drs/recommendations?cluster_id=${clusterId}`
-    : `${API_BASE}/drs/recommendations`
-  return apiGet<MigrationRecommendation[]>(url)
+export async function listRecommendations(clusterId: string): Promise<MigrationRecommendation[]> {
+  return apiGet<MigrationRecommendation[]>(`${API_BASE}/drs/recommendations/${clusterId}`)
 }
 
 export async function approveRecommendation(id: string): Promise<void> {

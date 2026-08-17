@@ -195,6 +195,15 @@ impl AlertEvaluator {
         let mut alerts = self.alerts.write().await;
         alerts.retain(|a| a.vm_name != name);
     }
+
+    /// Acknowledge (dismiss) a single active alert by id. Returns `true` if
+    /// an alert with that id was found and removed.
+    pub async fn acknowledge_alert(&self, id: Uuid) -> bool {
+        let mut alerts = self.alerts.write().await;
+        let before = alerts.len();
+        alerts.retain(|a| a.id != id);
+        alerts.len() != before
+    }
 }
 
 #[cfg(test)]

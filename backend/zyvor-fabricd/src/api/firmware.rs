@@ -40,6 +40,45 @@ pub struct FirmwareCapabilities {
     pub tpm_available: bool,
 }
 
+/// Loads a VM's on-disk `config.json`, or synthesizes and persists a
+/// default one if it doesn't exist yet. Every VM created through the
+/// Ephemera driver has no such file -- it owns VM definition itself and
+/// never writes this legacy (pre-Ephemera) location -- so treating a
+/// missing file as 404 blocked every firmware/UEFI operation for the
+/// driver this deployment actually uses. Firmware operations only need a
+/// name and a directory to create real OVMF NVRAM files in, so a
+/// synthesized default is enough to make them work.
+async fn load_or_init_vm_config(
+    config_dir: &str,
+    vm_name: &str,
+) -> Result<zyvor_fabric_vm::VmConfig, (StatusCode, String)> {
+    let vm_dir = std::path::Path::new(config_dir).join(vm_name);
+    let config_path = vm_dir.join("config.json");
+
+    if let Ok(s) = tokio::fs::read_to_string(&config_path).await {
+        return serde_json::from_str(&s)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+
+    tokio::fs::create_dir_all(&vm_dir)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let cfg = zyvor_fabric_vm::VmConfig {
+        name: vm_name.to_string(),
+        cpu: Default::default(),
+        memory: Default::default(),
+        firmware: zyvor_fabric_vm::Firmware::BIOS,
+        disks: Vec::new(),
+        network: Vec::new(),
+    };
+    let body = serde_json::to_string_pretty(&cfg)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tokio::fs::write(&config_path, body)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(cfg)
+}
+
 // API Handlers
 
 /// GET /api/vms/:name/firmware/status - Get firmware status for a VM
@@ -55,24 +94,7 @@ pub async fn get_firmware_status(
 
     let config_dir =
         std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/zyvor-fabricd/vms".to_string());
-    let config_path = std::path::Path::new(&config_dir)
-        .join(&vm_name)
-        .join("config.json");
-
-    if !config_path.exists() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' configuration not found", vm_name),
-        ));
-    }
-
-    // Read VM configuration
-    let config_str = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let vm_config: zyvor_fabric_vm::VmConfig = serde_json::from_str(&config_str)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let vm_config = load_or_init_vm_config(&config_dir, &vm_name).await?;
 
     // Extract firmware status based on configuration
     let status = match vm_config.firmware {
@@ -129,21 +151,7 @@ pub async fn enable_uefi(
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
-
-    if !config_path.exists() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' configuration not found", vm_name),
-        ));
-    }
-
-    // 1. Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let mut vm_config: zyvor_fabric_vm::VmConfig = serde_json::from_str(&config_str)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut vm_config = load_or_init_vm_config(&config_dir, &vm_name).await?;
 
     // 2. Create OvmfConfig with specified settings
     let vm_dir = std::path::Path::new(&config_dir).join(&vm_name);
@@ -206,21 +214,7 @@ pub async fn enable_secureboot(
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
-
-    if !config_path.exists() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' configuration not found", vm_name),
-        ));
-    }
-
-    // Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let mut vm_config: zyvor_fabric_vm::VmConfig = serde_json::from_str(&config_str)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut vm_config = load_or_init_vm_config(&config_dir, &vm_name).await?;
 
     // Update to UEFI with Secure Boot
     vm_config.firmware = zyvor_fabric_vm::Firmware::UEFI { secure_boot: true };
@@ -258,21 +252,7 @@ pub async fn disable_secureboot(
     let config_path = std::path::Path::new(&config_dir)
         .join(&vm_name)
         .join("config.json");
-
-    if !config_path.exists() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' configuration not found", vm_name),
-        ));
-    }
-
-    // Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let mut vm_config: zyvor_fabric_vm::VmConfig = serde_json::from_str(&config_str)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut vm_config = load_or_init_vm_config(&config_dir, &vm_name).await?;
 
     // Update to UEFI without Secure Boot
     vm_config.firmware = zyvor_fabric_vm::Firmware::UEFI { secure_boot: false };
@@ -307,24 +287,7 @@ pub async fn reset_nvram(
     // Reset OVMF NVRAM variables to template defaults
     let config_dir =
         std::env::var("VM_CONFIG_DIR").unwrap_or_else(|_| "/var/lib/zyvor-fabricd/vms".to_string());
-    let config_path = std::path::Path::new(&config_dir)
-        .join(&vm_name)
-        .join("config.json");
-
-    if !config_path.exists() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' configuration not found", vm_name),
-        ));
-    }
-
-    // 1. Load VM config
-    let config_str = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let vm_config: zyvor_fabric_vm::VmConfig = serde_json::from_str(&config_str)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let vm_config = load_or_init_vm_config(&config_dir, &vm_name).await?;
 
     // 2. Get OvmfConfig if using UEFI
     match vm_config.firmware {

@@ -44,7 +44,7 @@ pub struct HotplugNicRequest {
     pub model: Option<String>,
 }
 
-fn not_available_response() -> impl IntoResponse {
+pub(crate) fn not_available_response() -> impl IntoResponse {
     (
         StatusCode::NOT_IMPLEMENTED,
         Json(serde_json::json!({
@@ -58,7 +58,7 @@ fn not_available_response() -> impl IntoResponse {
 /// `VmRecord.control_socket`), returning `None` if the driver has no
 /// socket for it (not running, unknown, or a backend/hypervisor with no
 /// QMP equivalent) — the caller falls back to `not_available_response()`.
-async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpClient> {
+pub(crate) async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpClient> {
     match state.driver.get_control_socket(vm_name).await {
         Ok(Some(path)) => Some(QmpClient::for_socket(path.to_string_lossy().into_owned())),
         Ok(None) => None,

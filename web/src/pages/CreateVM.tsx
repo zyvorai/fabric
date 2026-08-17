@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router'
 import { createVM } from '../api/vm'
 import type { PortForwardSpec } from '../api/vm'
 import { apiGet } from '../api/client'
-import { applyCreateAdvancedOptions } from '../utils/applyCreateAdvancedOptions'
+import { applyCreateAdvancedOptions, AdvancedOptionsError } from '../utils/applyCreateAdvancedOptions'
 import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor, Plus, X, Network } from 'lucide-react'
 import WizardStepper from '../components/WizardStepper'
 import ErrorBanner from '../components/ErrorBanner'
@@ -181,7 +181,10 @@ export default function CreateVM() {
         try {
           await applyCreateAdvancedOptions(name, advanced)
         } catch (advErr) {
-          toastFailure(toast, 'VM created but advanced options could not be applied', advErr)
+          const failed = advErr instanceof AdvancedOptionsError
+            ? advErr.failures.map((f) => f.option).join(', ')
+            : 'some options'
+          toastFailure(toast, `VM created, but ${failed} could not be applied`, advErr)
           navigate(`/vms/${name}`)
           return
         }

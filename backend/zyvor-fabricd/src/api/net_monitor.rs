@@ -364,6 +364,24 @@ pub async fn get_bandwidth_alerts(
     (StatusCode::OK, Json(alerts)).into_response()
 }
 
+/// POST /api/bandwidth-alerts/:id/acknowledge - Dismiss a single active alert
+pub async fn acknowledge_bandwidth_alert(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    tracing::debug!("net_monitor::{}", stringify!(acknowledge_bandwidth_alert));
+    if state.net_monitor.evaluator.acknowledge_alert(id).await {
+        (StatusCode::OK, Json(json!({"status": "ok"}))).into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": format!("Alert '{}' not found", id)})),
+        )
+            .into_response()
+    }
+}
+
 // ── Reconciliation ──────────────────────────────────────────────────
 
 pub async fn reconcile_monitor(state: &AppState) -> anyhow::Result<()> {

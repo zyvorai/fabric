@@ -115,8 +115,8 @@ export async function addLibraryItem(libraryId: string, req: {
   return apiPost<LibraryItem>(`${API_BASE}/content-library/libraries/${libraryId}/items`, req)
 }
 
-export async function deleteLibraryItem(libraryId: string, itemId: string): Promise<void> {
-  return apiDelete(`${API_BASE}/content-library/libraries/${libraryId}/items/${itemId}`)
+export async function deleteLibraryItem(_libraryId: string, itemId: string): Promise<void> {
+  return apiDelete(`${API_BASE}/content-library/items/${itemId}`)
 }
 
 export async function searchItems(query: string, libraryId?: string): Promise<LibraryItem[]> {
