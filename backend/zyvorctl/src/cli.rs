@@ -802,6 +802,7 @@ impl Cli {
                     hostname,
                     tags,
                     labels,
+                    port_forwards: Vec::new(),
                 };
                 let vm: VM = client
                     .post(format!("{}/vms", API_BASE))

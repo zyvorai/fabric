@@ -337,6 +337,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::ux_extensions::vm_healthcheck),
         )
         .route("/vms/{name}/start", post(routes::start_vm))
+        .route("/vms/{name}/port-forwards", post(routes::add_port_forward))
         .route("/vms/{name}/stop", post(routes::stop_vm))
         .route("/vms/{name}/restart", post(routes::restart_vm))
         .route("/vms/{name}/metrics", get(routes::get_metrics))

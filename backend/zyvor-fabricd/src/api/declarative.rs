@@ -328,6 +328,7 @@ pub async fn apply_vm_spec(
                 Some(spec.tags.clone())
             },
             labels: None,
+            port_forwards: Vec::new(),
         };
 
         let vm = vm_model::VM::from_request(&req);

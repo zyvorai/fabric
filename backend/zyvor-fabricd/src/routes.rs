@@ -238,6 +238,104 @@ pub async fn delete_vm(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AddPortForwardRequest {
+    pub host_port: u16,
+    pub guest_port: u16,
+    #[serde(default)]
+    pub protocol: Option<String>,
+}
+
+/// Expose a guest port (e.g. SSH on 22) on this VM's usermode networking.
+/// Usermode/slirp networking only accepts forwards at instance-creation
+/// time -- there is no way to add one to an already-running VM -- so a
+/// running VM gets destroyed and relaunched with its full, updated forward
+/// set; a VM that was never started just picks the forward up naturally on
+/// its next Start (see start_vm's fallback to vm.port_forwards below).
+pub async fn add_port_forward(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<AddPortForwardRequest>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    if req.host_port == 0 || req.guest_port == 0 {
+        return json_error(StatusCode::BAD_REQUEST, "host_port and guest_port must be nonzero")
+            .into_response();
+    }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => {
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
+        }
+    };
+
+    if vm.port_forwards.iter().any(|f| f.host_port == req.host_port) {
+        return json_error(
+            StatusCode::CONFLICT,
+            format!("host port {} is already forwarded on this VM", req.host_port),
+        )
+        .into_response();
+    }
+
+    let was_running = matches!(
+        vm.state,
+        vm_model::VMState::Running | vm_model::VMState::Starting | vm_model::VMState::Paused
+    );
+
+    vm.port_forwards.push(vm_model::PortForwardSpec {
+        host_port: req.host_port,
+        guest_port: req.guest_port,
+        protocol: req.protocol.unwrap_or_else(|| "tcp".to_string()),
+    });
+
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+            .into_response();
+    }
+
+    if was_running {
+        if let Err(e) = state.driver.delete(&name).await {
+            let msg = e.to_string();
+            if !msg.contains("known to Ephemera") {
+                audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+                return json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to recreate VM '{}' with the new port forward: {}", name, msg),
+                )
+                .into_response();
+            }
+        }
+        let opts = vm_model::VMStartOptions {
+            port_forwards: vm.port_forwards.clone(),
+            ..Default::default()
+        };
+        if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
+            audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Added the forward but failed to restart VM '{}': {}", name, e),
+            )
+            .into_response();
+        }
+        vm.state = vm_model::VMState::Running;
+        vm.last_error = None;
+        if let Err(e) = state.store.save_vm(&vm) {
+            tracing::error!("Failed to save VM state after port-forward recreate: {}", e);
+        }
+    }
+
+    audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "SUCCESS");
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
 pub async fn start_vm(
     RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
@@ -331,7 +429,6 @@ pub async fn start_vm(
         // never sends start options. Using opts.unwrap_or_default() here
         // routes that common case through the same lazy-create path as an
         // explicit-options start.
-        let opts = start_opts.unwrap_or_default();
         let vm = match state_clone.store.get_vm(&vm_name) {
             Ok(Some(vm)) => vm,
             Ok(None) => {
@@ -343,6 +440,14 @@ pub async fn start_vm(
                 return;
             }
         };
+        // No explicit start body (the plain Start button): fall back to the
+        // VM's own stored port_forwards (set at Create VM time) rather than
+        // a bare default, so a VM created with an exposed SSH port actually
+        // gets that forward applied on its first real launch in Ephemera.
+        let opts = start_opts.unwrap_or_else(|| vm_model::VMStartOptions {
+            port_forwards: vm.port_forwards.clone(),
+            ..Default::default()
+        });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;
 
         match result {

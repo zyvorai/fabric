@@ -35,6 +35,12 @@ pub struct VM {
     /// Cleared on next successful state transition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
+    /// Host-port -> guest-port forwards for this VM's usermode networking
+    /// (e.g. exposing guest port 22 for SSH). Only takes effect on the VM's
+    /// next (re)creation in Ephemera -- usermode/slirp networking has no
+    /// way to add a forward to an already-running instance.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub port_forwards: Vec<PortForwardSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -63,6 +69,8 @@ pub struct CreateVMRequest {
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub port_forwards: Vec<PortForwardSpec>,
 }
 
 fn default_disk_size() -> u64 {
@@ -834,6 +842,7 @@ impl VM {
             created: Utc::now(),
             updated: None,
             last_error: None,
+            port_forwards: Vec::new(),
         }
     }
 
@@ -855,6 +864,7 @@ impl VM {
             created: Utc::now(),
             updated: None,
             last_error: None,
+            port_forwards: req.port_forwards.clone(),
         }
     }
 }
@@ -894,6 +904,7 @@ mod tests {
             hostname: Some("web-server".to_string()),
             tags: Some(vec!["production".to_string()]),
             labels: Some(labels.clone()),
+            port_forwards: Vec::new(),
         };
         let vm = VM::from_request(&req);
         assert_eq!(vm.name, "web-01");
