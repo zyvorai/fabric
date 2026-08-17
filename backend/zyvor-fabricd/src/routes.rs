@@ -307,24 +307,28 @@ pub async fn start_vm(
             return;
         }
 
-        let result = if let Some(opts) = start_opts {
-            // Use systemd-vmspawn directly with full options
-            let vm = match state_clone.store.get_vm(&vm_name) {
-                Ok(Some(vm)) => vm,
-                Ok(None) => {
-                    tracing::error!("VM '{}' not found in store", vm_name);
-                    return;
-                }
-                Err(e) => {
-                    tracing::error!("Failed to load VM '{}': {}", vm_name, e);
-                    return;
-                }
-            };
-            state_clone.driver.start_with_options(&vm, &opts).await
-        } else {
-            // Default: use machined driver (D-Bus)
-            state_clone.driver.start(&vm_name).await
+        // Always go through start_with_options: Ephemera only learns about a
+        // VM on its first start (see EphemeraDriver::start_with_options's
+        // "First launch" branch, which lazily calls Ephemera's create API).
+        // The plain start() has no such fallback and fails with "not known
+        // to Ephemera" for any VM that was only ever `POST /vms`-created —
+        // which is every VM made through the Create VM wizard, since it
+        // never sends start options. Using opts.unwrap_or_default() here
+        // routes that common case through the same lazy-create path as an
+        // explicit-options start.
+        let opts = start_opts.unwrap_or_default();
+        let vm = match state_clone.store.get_vm(&vm_name) {
+            Ok(Some(vm)) => vm,
+            Ok(None) => {
+                tracing::error!("VM '{}' not found in store", vm_name);
+                return;
+            }
+            Err(e) => {
+                tracing::error!("Failed to load VM '{}': {}", vm_name, e);
+                return;
+            }
         };
+        let result = state_clone.driver.start_with_options(&vm, &opts).await;
 
         match result {
             Ok(_) => {
