@@ -183,14 +183,29 @@ pub struct TrustChain {
 /// Aggregate health dashboard for the certificate infrastructure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CertHealthDashboard {
+    #[serde(rename = "total_certificates")]
     pub total_certs: u32,
     pub active: u32,
     pub expiring_soon: u32,
     pub expired: u32,
     pub revoked: u32,
+    #[serde(rename = "ca_count")]
     pub cas: u32,
     pub pending_requests: u32,
     pub recent_rotations: Vec<CertificateRotation>,
+    /// Percentage of certificates that are `Active` (vs. expired/revoked).
+    /// `100.0` when there are no certificates at all — an empty inventory
+    /// isn't "non-compliant".
+    pub overall_compliance_pct: f64,
+    pub expiring_within_30_days: Vec<ExpiringCertSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExpiringCertSummary {
+    pub cert_id: String,
+    pub subject: String,
+    pub valid_to: DateTime<Utc>,
+    pub days_remaining: i64,
 }
 
 /// Hardware/firmware trust attestation for a host.
@@ -1003,6 +1018,23 @@ impl CertificateManager {
         let recent_rotations: Vec<CertificateRotation> =
             inner.rotations.values().cloned().collect();
 
+        let overall_compliance_pct = if inner.certificates.is_empty() {
+            100.0
+        } else {
+            (active as f64 / inner.certificates.len() as f64) * 100.0
+        };
+        let expiring_within_30_days = inner
+            .certificates
+            .values()
+            .filter(|c| c.status == CertStatus::Active && c.not_after <= expiry_threshold)
+            .map(|c| ExpiringCertSummary {
+                cert_id: c.id.clone(),
+                subject: c.common_name.clone(),
+                valid_to: c.not_after,
+                days_remaining: (c.not_after - now).num_days(),
+            })
+            .collect();
+
         CertHealthDashboard {
             total_certs: inner.certificates.len() as u32,
             active,
@@ -1012,6 +1044,8 @@ impl CertificateManager {
             cas: inner.cas.len() as u32,
             pending_requests,
             recent_rotations,
+            overall_compliance_pct,
+            expiring_within_30_days,
         }
     }
 }

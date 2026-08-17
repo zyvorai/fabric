@@ -868,6 +868,21 @@ pub async fn get_cert_health_dashboard(
         .iter()
         .filter(|r| r.status == certificate_manager::CsrStatus::Pending)
         .count() as u32;
+    let overall_compliance_pct = if certs.is_empty() {
+        100.0
+    } else {
+        (active as f64 / certs.len() as f64) * 100.0
+    };
+    let expiring_within_30_days = certs
+        .iter()
+        .filter(|c| c.status == CertStatus::Active && c.not_after <= expiry_threshold)
+        .map(|c| certificate_manager::ExpiringCertSummary {
+            cert_id: c.id.clone(),
+            subject: c.common_name.clone(),
+            valid_to: c.not_after,
+            days_remaining: (c.not_after - now).num_days(),
+        })
+        .collect();
     let dashboard = CertHealthDashboard {
         total_certs: certs.len() as u32,
         active,
@@ -877,6 +892,8 @@ pub async fn get_cert_health_dashboard(
         cas: cas.len() as u32,
         pending_requests,
         recent_rotations: rotations,
+        overall_compliance_pct,
+        expiring_within_30_days,
     };
     Json(dashboard)
 }
