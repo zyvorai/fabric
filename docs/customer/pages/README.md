@@ -14,15 +14,15 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
-| [Create VM](core/create.md) | Create VM — Core surface. |
+| [Create VM](core/create.md) | Create VM — a three-step wizard (Basics → Resources → Review) for launching a new virtual machine, including how it's networked and whether it's reachable from outside the host. |
 | [Datacenters](core/datacenters.md) | Datacenters — Core surface. |
 | [Favorites](core/favorites.md) | Favorites — Core surface. |
-| [Dashboard](core/home.md) | Dashboard — Core surface. |
+| [Dashboard](core/home.md) | Dashboard — the fabric at a glance: how many VMs exist and in what state, live CPU/memory trends, and whether each backend subsystem is actually reachable. |
 | [Machines](core/machines.md) | Machines — Core surface. |
 | [Profiles](core/profiles.md) | Profiles — Core surface. |
 | [VM Browser](core/vm-browser.md) | VM Browser — Core surface. |
-| [VM Console](core/vms-name-console.md) | VM Console — Core surface. |
-| [Virtual Machines](core/vms.md) | Virtual Machines — Core surface. |
+| [VM Console](core/vms-name-console.md) | VM Console — a real, live console into a running VM, from the browser, without SSH or any other client installed. |
+| [Virtual Machines](core/vms.md) | Virtual Machines — the fleet view of every VM in the fabric, and the starting point for managing any one of them. |
 
 ## Infrastructure
 
@@ -31,7 +31,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Containers](infrastructure/containers.md) | Containers — Infrastructure surface. |
 | [Distributed Storage](infrastructure/distributed-storage.md) | Distributed Storage — Infrastructure surface. |
 | [Net Security](infrastructure/network-security.md) | Net Security — Infrastructure surface. |
-| [Network](infrastructure/network.md) | Network — Infrastructure surface. |
+| [Network](infrastructure/network.md) | Network — day-to-day VM networking: which mode a VM uses, its port forwards, and its assigned address. For the advanced SDN stack (policies, firewalls, VPN mesh, QoS, mirroring), see [Net Security](network-security.md) instead. |
 | [Resource Pools](infrastructure/resource-pools.md) | Resource Pools — Infrastructure surface. |
 | [Storage Pools](infrastructure/storage-pools.md) | Storage Pools — Infrastructure surface. |
 | [Storage](infrastructure/storage.md) | Storage — Infrastructure surface. |

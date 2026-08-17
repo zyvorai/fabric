@@ -2,29 +2,35 @@
 
 ## Purpose
 
-Network — Infrastructure surface.
+Network — day-to-day VM networking: which mode a VM uses, its port forwards, and its assigned address. For the advanced SDN stack (policies, firewalls, VPN mesh, QoS, mirroring), see [Net Security](network-security.md) instead.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To see how a VM is networked and what's reachable from outside the host
+- To add or remove a port forward without recreating the VM
+- To check a VM's assigned IP address
 
 ## How to get there
 
 - Route / id: `/network`
 - Nav: **Infrastructure → Network** (sidebar, command palette, or desktop nav)
+- Per-VM networking is also managed from that VM's own **Network** tab on its detail page
 
 ## What you can do
 
-1. Open `/network` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Review VMs by networking mode:
+   - **NAT** — private, outbound-only by default; individual ports can be exposed with a host→guest port forward (set at creation in the [Create VM](../core/create.md) wizard, or added later from a VM's Network tab).
+   - **Bridged** — the VM has its own address on the local network, either DHCP-assigned or set statically via cloud-init at boot.
+2. Add or remove a port forward for a running or stopped VM — if the VM is running, it restarts automatically to apply the change.
+3. Confirm a forwarded port is actually reachable from another machine on your network, not just from the host itself.
+4. Check a bridged VM's assigned IP address once it's leased (or immediately, if it was assigned statically).
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 
 ## Related pages
 
+- [Net Security](network-security.md)
+- [Create VM](../core/create.md)
+- [Virtual Machines](../core/vms.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

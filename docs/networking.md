@@ -8,9 +8,14 @@ Zyvor Fabric provides comprehensive virtual networking with bridge management, V
 
 | Mode | Description | Configuration |
 |------|-------------|---------------|
-| **NAT** (default) | VMs access the internet via host NAT; not directly reachable from outside | `mode = "nat"` |
-| **Bridged** | VMs get IPs from external DHCP; directly accessible on the LAN | `mode = "bridge"` |
+| **NAT** (default) | VMs access the internet via host NAT; not directly reachable from outside except via an explicit port forward | `mode = "nat"` |
+| **Bridged** | VM gets its own address on the local network via a dedicated network namespace, veth pair, and per-namespace DHCP server (or a static address via cloud-init) | `mode = "bridge"` |
 | **Isolated** | VMs can only communicate with each other | `mode = "isolated"` |
+
+Bridged VMs get an address one of two ways:
+
+- **DHCP** (default) — a per-namespace dnsmasq instance leases the guest an address from a reserved pool, pinned to its MAC via `--dhcp-host`.
+- **Static** — set `network_static_ip: true` on the VM (or check "Assign the IP statically via cloud-init" in the Create VM wizard) to bake a fixed address into the guest's netplan config via cloud-init at boot, instead of depending on a DHCP client running inside the guest.
 
 ```toml
 # /etc/zyvor-fabricd/zyvor-fabricd.toml
@@ -89,6 +94,10 @@ curl -X POST http://localhost:9095/api/vms/myvm/port-forwards \
 # Remove
 curl -X DELETE http://localhost:9095/api/vms/myvm/port-forwards/8080
 ```
+
+Forwards bind `0.0.0.0` on the host, so they're reachable from any client that can reach the host over the network — not just from `localhost` on the host itself. Testing a forward *from the same host that's serving it* will bypass `PREROUTING` and can look broken even when it isn't; test from a separate client.
+
+Forwards can also be set at VM creation time (Create VM wizard → Advanced Options → Expose ports, with a one-click preset for SSH on port 22) rather than added after the fact via the API above. Adding or removing a forward on a VM that's currently running restarts it to apply the change.
 
 ---
 

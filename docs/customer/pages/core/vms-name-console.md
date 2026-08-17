@@ -2,29 +2,33 @@
 
 ## Purpose
 
-VM Console — Core surface.
+VM Console — a real, live console into a running VM, from the browser, without SSH or any other client installed.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To reach a VM that isn't network-reachable yet (no IP assigned, no SSH configured)
+- To watch or interact with boot output, a serial console, or a full graphical desktop
+- To debug a VM that's otherwise unresponsive over the network
 
 ## How to get there
 
 - Route / id: `/vms/:name/console`
-- Nav: **Core → VM Console** (sidebar, command palette, or desktop nav)
+- From a VM's detail page, click **Console** in the header
+- Nav: reached via **Core → Virtual Machines**, not linked directly from the top nav
 
 ## What you can do
 
-1. Open `/vms/:name/console` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+The page has two tabs:
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+1. **Terminal** — a real interactive shell (xterm.js) streamed over the VM's PTY. Type as you would in any terminal; output renders live.
+2. **VNC** — a real graphical framebuffer session (noVNC), for VMs where a text console isn't enough — installers, desktop environments, or anything that draws to the screen. Shows actual rendered pixels, not just a placeholder.
+
+Both are authenticated with your existing session — no separate console password or exposed port.
+
+If the console tab stays black or disconnected, confirm the VM is running and that the host's console/VNC services are reachable — check service health if it persists.
 
 ## Related pages
 
+- [Virtual Machines](vms.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

@@ -50,6 +50,11 @@ This is the customer-facing onboarding guide — how to access the product, your
   1. Hand out addresses: `POST /api/networkd/dhcp` with the bridge name and a pool range.
   1. Expose a guest service with a port-forward: `POST /api/networkd/port-forwards`.
   1. Do the same from the Web Network Security page (9 Cilium-style tabs) or the `zyvorctl-tui` Network / Net Security views.
+- **Make a VM reachable from your laptop, the simple way**
+  1. In the Create VM wizard's Advanced Options, either expose a port under NAT (one click for SSH via the Expose SSH (22) preset, or any custom host→guest mapping — `POST /api/vms/:name` with `port_forwards`), or switch to Bridged mode for a VM with its own address on the LAN.
+  1. Under Bridged, leave it on DHCP for an auto-assigned address, or check "Assign the IP statically via cloud-init" for a fixed address baked in at boot.
+  1. Forwarded ports bind `0.0.0.0`, so they're reachable from any machine on the network — not just the host.
+  1. Add or remove forwards later without recreating the VM: `POST`/`DELETE /api/vms/:name/port-forwards` · Web VM detail Network tab.
 - **Protect a VM with snapshots and backups**
   1. Before a risky change, take a snapshot: `POST /api/vms/web-01/snapshots` (use `snapshot_type: Full` to include memory state).
   1. Roll back if needed: `POST /api/vms/web-01/snapshots//revert`.
@@ -206,7 +211,7 @@ _Five first-class ways to drive the same daemon — pick per task, not per produ
 - **zyvorctl-tui** — k9s-style ratatui terminal dashboard with vim keybindings, sparklines, and live per-VM actions. — _Fleet control from a terminal, no browser required._
   - **How:** Run `zyvorctl-tui` (optionally `--url http://: --refresh-interval N`); 8 views, vim navigation, per-VM `s`/`t`/`r`/`d`, bulk select with `v`/`Space`.
 - **Web Dashboard** — React web UI with 37+ pages, a Ctrl+K command palette, dark theme, live WebSocket updates, and bulk operations. — _Give operators a full GUI without giving up the API._
-  - **How:** Browse to https://localhost:8443 and log in as `admin`; `Ctrl+K` command palette, 37+ pages, bulk ops, and live WebSocket/SSE updates — served by the daemon itself.
+  - **How:** Browse to https://localhost:8443 and log in as `admin`; `Ctrl+K` command palette, 37+ pages, bulk ops, and live WebSocket/SSE updates — served by the daemon itself. A fresh install with no VMs yet shows a "Getting Started" panel instead of an empty table, linking straight to VM creation, templates, the playground, and access control. Deleting a VM is undoable for a few seconds via an Undo bar before the delete actually fires.
 - **Console & VNC** — Browser terminal via xterm.js over WebSocket and graphical VNC via a noVNC proxy, authenticated with the same JWT. — _Reach any VM's console without exposing raw ports._
   - **How:** Web VM Console (xterm.js) / VNC (noVNC) buttons · WebSocket `ws:///api/vms/:name/console?token=` (also `/ws/vnc/:name`) · `websocat` from the CLI.
 - **Kubernetes Operator** — Manage VMs as VirtualMachine CRDs with continuous reconciliation via a Helm-installable operator. — _Define VMs alongside containers in the same GitOps flow._

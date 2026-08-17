@@ -66,6 +66,9 @@
 - Live logs from audit API (no mock data)
 - Storage management with live pool and volume data from API
 - Settings with dynamically populated storage pool dropdown
+- First-run "Getting Started" panel on the dashboard when no VMs exist yet, linking straight to VM creation, templates, the API playground, and access control
+- Search, live relative timestamps ("3m ago"), and one-click copy on IDs/paths/URLs across high-traffic list pages (VMs, backups, schedules, certificates, notifications, audit logs, webhooks, storage pools)
+- Undo window on VM deletion — confirming delete shows a few seconds' grace with an Undo button before the VM is actually removed
 - Dark theme, responsive layout
 - TailwindCSS styling
 
@@ -188,11 +191,16 @@
 
 - TCP and UDP protocol support
 - nftables integration
+- Forwards bind `0.0.0.0`, so they're reachable from any client on the network, not just from the host itself
+- Set at VM creation via the Create VM wizard's "Expose ports" section (with a one-click Expose SSH (22) preset), or added/removed later for a running or stopped VM from its Network tab
+- Adding or removing a forward on a running VM restarts it automatically to apply the change
 
 ### Network Modes
 
-- NAT mode
-- Bridged mode
+- NAT mode (default) — private, outbound-only address; reachability limited to explicit port forwards
+- Bridged mode — VM gets its own address on the local network via a dedicated network namespace, veth pair, and per-namespace dnsmasq DHCP server, instead of sharing the host's NAT
+  - DHCP addressing (default) — the guest leases an address automatically
+  - Static addressing — the address is baked in via a generated cloud-init netplan config at boot, for guests that don't run a DHCP client or need a predictable address before first boot
 - Isolated mode
 - VLAN isolation
 
