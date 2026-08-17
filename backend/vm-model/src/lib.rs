@@ -41,6 +41,14 @@ pub struct VM {
     /// way to add a forward to an already-running instance.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub port_forwards: Vec<PortForwardSpec>,
+    /// Use bridged (tap + private network namespace + DHCP) networking
+    /// instead of the default NAT/usermode networking. A bridged VM gets a
+    /// real, externally-reachable IP (visible on its Network tab) instead
+    /// of needing explicit `port_forwards`, at the cost of the VM needing a
+    /// full recreate in Ephemera to change once set (same one-shot-at-
+    /// creation-time limitation `port_forwards` has under NAT).
+    #[serde(default)]
+    pub network_tap: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -71,6 +79,8 @@ pub struct CreateVMRequest {
     pub labels: Option<HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub port_forwards: Vec<PortForwardSpec>,
+    #[serde(default)]
+    pub network_tap: bool,
 }
 
 fn default_disk_size() -> u64 {
@@ -843,6 +853,7 @@ impl VM {
             updated: None,
             last_error: None,
             port_forwards: Vec::new(),
+            network_tap: false,
         }
     }
 
@@ -865,6 +876,7 @@ impl VM {
             updated: None,
             last_error: None,
             port_forwards: req.port_forwards.clone(),
+            network_tap: req.network_tap,
         }
     }
 }
@@ -905,6 +917,7 @@ mod tests {
             tags: Some(vec!["production".to_string()]),
             labels: Some(labels.clone()),
             port_forwards: Vec::new(),
+            network_tap: false,
         };
         let vm = VM::from_request(&req);
         assert_eq!(vm.name, "web-01");

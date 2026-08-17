@@ -70,6 +70,13 @@ pub enum NetworkSpec {
         bridge: Option<String>,
         #[serde(default)]
         mac: Option<String>,
+        /// Give the VM its own network namespace with a per-namespace
+        /// dnsmasq DHCP server, instead of a tap on a shared host bridge
+        /// (`bridge` is ignored when this is true) — see Ephemera's
+        /// `ephemera_network::netns`. Mirrors `ephemera_core::model::
+        /// NetworkSpec::Tap.netns`.
+        #[serde(default)]
+        netns: bool,
     },
     Macvtap {
         parent: String,
@@ -219,6 +226,16 @@ pub struct VmRecord {
     /// completes cgroup setup, or if cgroup delegation failed for this VM.
     #[serde(default)]
     pub cgroup_path: Option<PathBuf>,
+    /// Set for `NetworkSpec::Tap { netns: true, .. }` — the VM's private
+    /// network namespace name. Mirrors `ephemera_core::model::VmRecord.netns`.
+    #[serde(default)]
+    pub netns: Option<String>,
+    /// The guest's DHCP-leased IP on its own private subnet, resolved by
+    /// Ephemera on every read for `netns: true` VMs — `None` for every
+    /// other networking mode, or until the guest completes a DHCP
+    /// handshake. Mirrors `ephemera_core::model::VmRecord.guest_ip`.
+    #[serde(default)]
+    pub guest_ip: Option<String>,
 }
 
 /// cgroup v2 resource-control settings to apply to a running VM. Mirrors

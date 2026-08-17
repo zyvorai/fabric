@@ -277,6 +277,14 @@ pub async fn add_port_forward(
         }
     };
 
+    if vm.network_tap {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "this VM uses bridged networking and already has its own reachable IP (see its Network tab) -- port forwards only apply to NAT-networked VMs",
+        )
+        .into_response();
+    }
+
     if vm.port_forwards.iter().any(|f| f.host_port == req.host_port) {
         return json_error(
             StatusCode::CONFLICT,
@@ -315,6 +323,7 @@ pub async fn add_port_forward(
         }
         let opts = vm_model::VMStartOptions {
             port_forwards: vm.port_forwards.clone(),
+            network_tap: vm.network_tap,
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -441,11 +450,13 @@ pub async fn start_vm(
             }
         };
         // No explicit start body (the plain Start button): fall back to the
-        // VM's own stored port_forwards (set at Create VM time) rather than
-        // a bare default, so a VM created with an exposed SSH port actually
-        // gets that forward applied on its first real launch in Ephemera.
+        // VM's own stored port_forwards/network_tap (set at Create VM time)
+        // rather than a bare default, so a VM created with an exposed SSH
+        // port or bridged networking actually gets that applied on its
+        // first real launch in Ephemera.
         let opts = start_opts.unwrap_or_else(|| vm_model::VMStartOptions {
             port_forwards: vm.port_forwards.clone(),
+            network_tap: vm.network_tap,
             ..Default::default()
         });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;

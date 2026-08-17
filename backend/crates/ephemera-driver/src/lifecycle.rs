@@ -151,6 +151,13 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
     if let Some(tap) = &vm.tap_name {
         props.insert("TapName".to_string(), tap.clone());
     }
+    // Only ever set for NetworkSpec::Tap { netns: true, .. } VMs (Ephemera
+    // resolves this fresh from the per-namespace DHCP lease file on every
+    // read) -- the frontend's Network tab already reads properties
+    // .IPAddress with no changes needed on that end.
+    if let Some(ip) = &vm.guest_ip {
+        props.insert("IPAddress".to_string(), ip.clone());
+    }
     props
 }
 
@@ -203,7 +210,13 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         // VmRecord, so a later ssh_info lookup (get_mac_address, below)
         // would have nothing to resolve to a DHCP-leased IP.
         let mac = vm.mac_address.clone().unwrap_or_else(generate_mac_address);
-        NetworkSpec::Tap { tap_name: None, bridge: None, mac: Some(mac) }
+        // netns: true rather than a shared host bridge -- gives the VM its
+        // own network namespace with a per-namespace dnsmasq DHCP server
+        // (Ephemera's ephemera_network::netns), so it gets a real,
+        // externally-reachable IP with zero host bridge configuration
+        // needed on this end. `bridge` is ignored by Ephemera when netns
+        // is set.
+        NetworkSpec::Tap { tap_name: None, bridge: None, mac: Some(mac), netns: true }
     } else {
         NetworkSpec::User {
             forwards: opts

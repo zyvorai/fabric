@@ -366,6 +366,7 @@ pub async fn deploy_template(
         tags: Some(template.tags.clone()),
         labels: None,
         port_forwards: Vec::new(),
+        network_tap: false,
     };
 
     let vm = vm_model::VM::from_request(&create_req);
