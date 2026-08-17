@@ -7,6 +7,7 @@ import { Bell, Plus, Trash2, Power, PowerOff, Send, Mail, MessageSquare, Webhook
 import {
   listChannels,
   listRules,
+  createChannel,
   deleteChannel,
   deleteRule,
   enableRule,
@@ -432,24 +433,11 @@ export default function Notifications() {
         </div>
       )}
 
-      {/* Placeholder dialogs */}
       {showCreateChannel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Add Notification Channel</h2>
-            <p className="text-slate-400 mb-4">
-              Configure email, Slack, webhook, or Teams integration
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowCreateChannel(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <CreateChannelModal
+          onClose={() => setShowCreateChannel(false)}
+          onCreated={() => { setShowCreateChannel(false); loadData() }}
+        />
       )}
 
       {showCreateRule && (
@@ -481,6 +469,136 @@ export default function Notifications() {
           onCancel={cancel}
         />
       )}
+    </div>
+  )
+}
+
+type ChannelType = 'email' | 'slack' | 'webhook' | 'teams'
+
+function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const toast = useToastContext()
+  const [name, setName] = useState('')
+  const [type, setType] = useState<ChannelType>('webhook')
+  const [saving, setSaving] = useState(false)
+  // One field set per type -- only the active type's fields are sent as `config`.
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState('')
+  const [teamsWebhookUrl, setTeamsWebhookUrl] = useState('')
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState('587')
+  const [fromAddress, setFromAddress] = useState('')
+  const [toAddress, setToAddress] = useState('')
+
+  const configFor = (t: ChannelType): Record<string, unknown> => {
+    switch (t) {
+      case 'webhook':
+        return { url: webhookUrl }
+      case 'slack':
+        return { webhook_url: slackWebhookUrl }
+      case 'teams':
+        return { webhook_url: teamsWebhookUrl }
+      case 'email':
+        return { smtp_host: smtpHost, smtp_port: Number(smtpPort), from: fromAddress, to: toAddress }
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await createChannel({ name, type, config: configFor(type) })
+      toast.success('Notification channel created')
+      onCreated()
+    } catch (err) {
+      toastFailure(toast, 'Failed to create channel', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
+        <h2 className="text-xl font-bold mb-4">Add Notification Channel</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
+              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="e.g. ops-slack" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Type</label>
+            <select value={type} onChange={(e) => setType(e.target.value as ChannelType)}
+              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2">
+              <option value="webhook">Webhook</option>
+              <option value="slack">Slack</option>
+              <option value="teams">Microsoft Teams</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+
+          {type === 'webhook' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Webhook URL</label>
+              <input type="url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} required
+                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="https://..." />
+            </div>
+          )}
+
+          {type === 'slack' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Slack Webhook URL</label>
+              <input type="url" value={slackWebhookUrl} onChange={(e) => setSlackWebhookUrl(e.target.value)} required
+                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="https://hooks.slack.com/services/..." />
+            </div>
+          )}
+
+          {type === 'teams' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Teams Webhook URL</label>
+              <input type="url" value={teamsWebhookUrl} onChange={(e) => setTeamsWebhookUrl(e.target.value)} required
+                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="https://xxx.webhook.office.com/..." />
+            </div>
+          )}
+
+          {type === 'email' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">SMTP Host</label>
+                  <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} required
+                    className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="smtp.example.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">SMTP Port</label>
+                  <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} required
+                    className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">From Address</label>
+                <input type="email" value={fromAddress} onChange={(e) => setFromAddress(e.target.value)} required
+                  className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="alerts@example.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">To Address</label>
+                <input type="email" value={toAddress} onChange={(e) => setToAddress(e.target.value)} required
+                  className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="oncall@example.com" />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50">
+              {saving ? 'Creating…' : 'Create Channel'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
