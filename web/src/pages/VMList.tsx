@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useState, useMemo, useCallback, type MouseEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { listVMs, startVM, stopVM, deleteVM, VM } from '../api/vm'
 import { createBackup } from '../api/backup'
 import { Search, X, Tag, Layers, Monitor, LayoutGrid, List, Play, Square, Pause, Terminal, MoreVertical, Cpu, HardDrive, CheckSquare, Trash2, Archive } from 'lucide-react'
@@ -26,9 +26,21 @@ type ViewMode = 'grid' | 'table'
 
 function VMTableRow({ vm, onUpdate, selected, onSelect, canWrite }: { vm: VM; onUpdate: () => void; selected: boolean; onSelect: (name: string) => void; canWrite: boolean }) {
   const { handleStart, handleStop, handlePause, handleResume, handleBackup } = useVMActions(vm.name, onUpdate)
+  const navigate = useNavigate()
+
+  // Double-clicking a row jumps straight to the console -- matches the grid
+  // card's same behavior, so it doesn't matter which view someone's in.
+  const handleRowDoubleClick = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('a, button, input')) return
+    navigate(`/vms/${vm.name}/console`)
+  }
 
   return (
-    <tr className={`border-t border-slate-700/50 hover:bg-white/[0.02] transition-colors group ${selected ? 'bg-blue-600/5' : ''}`}>
+    <tr
+      onDoubleClick={handleRowDoubleClick}
+      title="Double-click to open console"
+      className={`border-t border-slate-700/50 hover:bg-white/[0.02] transition-colors group ${selected ? 'bg-blue-600/5' : ''}`}
+    >
       <td className="py-3 px-4 w-10">
         <input
           type="checkbox"

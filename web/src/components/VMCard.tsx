@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router'
+import { useState, useRef, useEffect, type MouseEvent as ReactMouseEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag, MoreVertical, ExternalLink } from 'lucide-react'
 import { VM } from '../api/vm'
 import { useVMActions } from '../hooks/useVMActions'
@@ -27,6 +27,15 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const { canWrite } = usePermissions()
   const { handleStart, handleStop, handlePause, handleResume, handleDelete } = useVMActions(vm.name, onUpdate)
+  const navigate = useNavigate()
+
+  // Double-clicking anywhere on the card that isn't itself a button/link jumps
+  // straight to the console (terminal + VNC tabs) -- someone new to the
+  // product has no reason to know "click the name, then find the console tab."
+  const handleCardDoubleClick = (e: ReactMouseEvent) => {
+    if ((e.target as HTMLElement).closest('a, button')) return
+    navigate(`/vms/${vm.name}/console`)
+  }
 
   // Close menu on outside click
   useEffect(() => {
@@ -48,6 +57,8 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
   return (
     <>
       <div
+        onDoubleClick={handleCardDoubleClick}
+        title="Double-click to open console"
         className={`group bg-slate-800/50 rounded-xl border border-slate-700/50 hover:border-slate-700/50 card-hover gradient-border state-bar state-bar-${vm.state} overflow-hidden`}
       >
         {/* Header */}
