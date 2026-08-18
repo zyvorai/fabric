@@ -475,7 +475,7 @@ function MetricStat({ label, value, color }: { label: string; value: string; col
     orange: 'bg-orange-500/10 text-orange-400',
   }
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 px-4 py-3">
       <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className={`text-xl font-bold tabular-nums ${bgMap[color]?.split(' ')[1] || 'text-white'}`}>{value}</div>
     </div>

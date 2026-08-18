@@ -211,25 +211,25 @@ export default function StoragePools() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-slate-800/50 rounded-lg p-6">
-          <div className="text-slate-400 text-sm mb-2">Total Pools</div>
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3">
+          <div className="text-slate-400 text-sm mb-1">Total Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-6">
-          <div className="text-slate-400 text-sm mb-2">Active Pools</div>
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3">
+          <div className="text-slate-400 text-sm mb-1">Active Pools</div>
           <div className="text-2xl font-bold text-green-500">
             {pools.filter((p) => p.state === 'Active').length}
           </div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-6">
-          <div className="text-slate-400 text-sm mb-2">Total Capacity</div>
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3">
+          <div className="text-slate-400 text-sm mb-1">Total Capacity</div>
           <div className="text-2xl font-bold">
             {formatBytes(pools.reduce((sum, p) => sum + p.capacity, 0))}
           </div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-6">
-          <div className="text-slate-400 text-sm mb-2">Available</div>
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3">
+          <div className="text-slate-400 text-sm mb-1">Available</div>
           <div className="text-2xl font-bold">
             {formatBytes(pools.reduce((sum, p) => sum + p.available, 0))}
           </div>

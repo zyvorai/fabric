@@ -97,10 +97,10 @@ export default function DownloadDisk() {
         <button onClick={() => fetchImages()} className="px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">Refresh</button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4"><p className="text-xs text-slate-400 mb-1">Total Images</p><p className="text-2xl font-bold text-white">{images.length}</p></div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4"><p className="text-xs text-slate-400 mb-1">Total Size</p><p className="text-2xl font-bold text-white">{formatBytes(totalSize)}</p></div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4"><p className="text-xs text-slate-400 mb-1">Formats</p><p className="text-2xl font-bold text-white">{new Set(images.map((i) => i.format)).size}</p></div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3"><p className="text-xs text-slate-400 mb-1">Total Images</p><p className="text-2xl font-bold text-white">{images.length}</p></div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3"><p className="text-xs text-slate-400 mb-1">Total Size</p><p className="text-2xl font-bold text-white">{formatBytes(totalSize)}</p></div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3"><p className="text-xs text-slate-400 mb-1">Formats</p><p className="text-2xl font-bold text-white">{new Set(images.map((i) => i.format)).size}</p></div>
       </div>
 
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
