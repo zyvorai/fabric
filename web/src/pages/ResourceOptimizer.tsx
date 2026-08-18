@@ -110,20 +110,20 @@ export default function ResourceOptimizer() {
       />
       <PageLoadBanner title="Could not load recommendations" headline={loadError} onRetry={() => void fetchRecommendations()} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{optimizations.length}</div>
           <div className="text-xs text-slate-400 mt-1">VMs Analyzed</div>
         </div>
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 p-5 card-glow-purple transition-all hover:scale-[1.02]">
+        <div className="stat-card-purple rounded-xl border border-slate-700/50 px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{totalRecs}</div>
           <div className="text-xs text-slate-400 mt-1">Recommendations</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-red rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{highImpact}</div>
           <div className="text-xs text-slate-400 mt-1">High Impact</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-orange rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{medImpact}</div>
           <div className="text-xs text-slate-400 mt-1">Medium Impact</div>
         </div>

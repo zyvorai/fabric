@@ -100,16 +100,16 @@ export default function Zones() {
 
       <PageLoadBanner title="Could not load availability zones" headline={loadError} onRetry={() => void loadData()} />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-1">Zones</div>
           <div className="text-2xl font-bold">{zones.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-1">Running Spot Instances</div>
           <div className="text-2xl font-bold text-green-400">{spots.filter(s => s.status === 'running').length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
           <div className="text-slate-400 text-sm mb-1">Evicted</div>
           <div className="text-2xl font-bold text-amber-400">{spots.filter(s => s.status === 'evicted').length}</div>
         </div>

@@ -113,7 +113,7 @@ export default function SecurityDashboard() {
       {!loadError && (
         <>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
         <div className="stat-card-red rounded-xl border border-slate-700/50 p-6 flex flex-col items-center justify-center">
           <div className={`w-24 h-24 rounded-full flex items-center justify-center bg-slate-900/50 border-4 ${riskBg(riskScore)}`}>
             <span className={`text-3xl font-bold ${riskColor(riskScore)}`}>{riskScore}</span>
@@ -121,15 +121,15 @@ export default function SecurityDashboard() {
           <span className="text-xs text-slate-400 mt-2">Risk Score</span>
         </div>
 
-        <div className="stat-card-red rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-red rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{alerts.filter((a: any) => (a.severity || '').toLowerCase() === 'critical').length}</div>
           <div className="text-xs text-slate-400 mt-1">Critical Alerts</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-orange rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{alerts.filter((a: any) => (a.severity || '').toLowerCase() === 'warning').length}</div>
           <div className="text-xs text-slate-400 mt-1">Warnings</div>
         </div>
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{failedLogins.length}</div>
           <div className="text-xs text-slate-400 mt-1">Failed Logins</div>
         </div>

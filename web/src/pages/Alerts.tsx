@@ -124,16 +124,16 @@ export default function Alerts() {
 
       {!loadError && (
         <>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
               <div className="text-xs text-slate-400 mb-1">Active Alerts</div>
               <div className="text-2xl font-bold text-white">{activeCount}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
               <div className="text-xs text-slate-400 mb-1">Critical</div>
               <div className="text-2xl font-bold text-red-400">{criticalCount}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
               <div className="text-xs text-slate-400 mb-1">Warning</div>
               <div className="text-2xl font-bold text-amber-400">{warningCount}</div>
             </div>

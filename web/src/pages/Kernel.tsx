@@ -88,20 +88,20 @@ export default function Kernel() {
       ) : !loadError ? (
         <>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 p-5 card-glow-purple transition-all hover:scale-[1.02]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card-purple rounded-xl border border-slate-700/50 px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
           <div className="text-xs text-slate-400 mb-1">Kernel Version</div>
           <div className="text-sm font-bold text-white truncate">{data?.version || data?.kernel_version || '-'}</div>
         </div>
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-xs text-slate-400 mb-1">Hostname</div>
           <div className="text-sm font-bold text-white truncate">{data?.hostname || '-'}</div>
         </div>
-        <div className="stat-card-cyan rounded-xl border border-slate-700/50 p-5 card-glow-cyan transition-all hover:scale-[1.02]">
+        <div className="stat-card-cyan rounded-xl border border-slate-700/50 px-4 py-3 card-glow-cyan transition-all hover:scale-[1.02]">
           <div className="text-xs text-slate-400 mb-1">Architecture</div>
           <div className="text-sm font-bold text-white">{data?.architecture || data?.arch || '-'}</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 p-5 card-glow-green transition-all hover:scale-[1.02]">
+        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
           <div className="text-xs text-slate-400 mb-1">Modules Loaded</div>
           <div className="text-2xl font-bold text-white">{modules.length}</div>
         </div>

@@ -158,26 +158,26 @@ export default function ComplianceDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
         <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 flex flex-col items-center justify-center">
           <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 ${scoreBorder(summary.score)} bg-slate-900/50`}>
             <span className={`text-3xl font-bold ${scoreColor(summary.score)}`}>{summary.score}</span>
           </div>
           <span className="text-xs text-slate-400 mt-2">Compliance Score</span>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 p-5 card-glow-green transition-all hover:scale-[1.02]">
+        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{summary.passed}</div>
           <div className="text-xs text-slate-400 mt-1">Passed</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-orange rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{summary.warnings}</div>
           <div className="text-xs text-slate-400 mt-1">Warnings</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-red rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{summary.failed}</div>
           <div className="text-xs text-slate-400 mt-1">Failed</div>
         </div>
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{summary.total}</div>
           <div className="text-xs text-slate-400 mt-1">Total Checks</div>
         </div>

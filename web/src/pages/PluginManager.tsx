@@ -125,20 +125,20 @@ export default function PluginManager() {
 
       {!loadError && (
       <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{plugins.length}</div>
           <div className="text-xs text-slate-400 mt-1">Total Plugins</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 p-5 card-glow-green transition-all hover:scale-[1.02]">
+        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{runningCount}</div>
           <div className="text-xs text-slate-400 mt-1">Running</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-red rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{errorCount}</div>
           <div className="text-xs text-slate-400 mt-1">Errors</div>
         </div>
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 p-5 card-glow-purple transition-all hover:scale-[1.02]">
+        <div className="stat-card-purple rounded-xl border border-slate-700/50 px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{new Set(plugins.map(p => p.type)).size}</div>
           <div className="text-xs text-slate-400 mt-1">Types</div>
         </div>

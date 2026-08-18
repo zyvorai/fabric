@@ -89,20 +89,20 @@ export default function CapacityPlanning() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{vmCount}</div>
           <div className="text-xs text-slate-400 mt-1">Active VMs</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 p-5 card-glow-green transition-all hover:scale-[1.02]">
+        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{metrics.length}</div>
           <div className="text-xs text-slate-400 mt-1">Resources Tracked</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-orange rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{warningResources.length}</div>
           <div className="text-xs text-slate-400 mt-1">Over 75% Usage</div>
         </div>
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 p-5 card-glow-purple transition-all hover:scale-[1.02]">
+        <div className="stat-card-purple rounded-xl border border-slate-700/50 px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
           <div className="text-2xl font-bold text-white">{metrics.filter(m => m.trend > 0).length}</div>
           <div className="text-xs text-slate-400 mt-1">Growing Resources</div>
         </div>
