@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, ShieldCheck, CheckCircle, XCircle, ArrowRightLeft } from 'lucide-react'
 import {
   listDistributedPools,
   createDistributedPool,
@@ -12,6 +12,7 @@ import {
   createStoragePolicy,
   deleteStoragePolicy,
   listStorageMigrations,
+  startStorageMigration,
   listDatastoreClusters,
   createDatastoreCluster,
   checkCompliance,
@@ -21,6 +22,7 @@ import {
   type DatastoreCluster,
   type ComplianceReport,
 } from '../api/distributedStorage'
+import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -34,25 +36,29 @@ export default function DistributedStorage() {
   const [policies, setPolicies] = useState<StoragePolicy[]>([])
   const [migrations, setMigrations] = useState<StorageMigration[]>([])
   const [dsClusters, setDsClusters] = useState<DatastoreCluster[]>([])
+  const [vms, setVMs] = useState<VM[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load distributed storage')
   const [activeTab, setActiveTab] = useState<'pools' | 'policies' | 'migrations' | 'clusters'>('pools')
   const [showCreatePool, setShowCreatePool] = useState(false)
   const [showCreatePolicy, setShowCreatePolicy] = useState(false)
   const [showCreateCluster, setShowCreateCluster] = useState(false)
+  const [showStartMigration, setShowStartMigration] = useState(false)
   const [complianceModalPolicy, setComplianceModalPolicy] = useState<StoragePolicy | null>(null)
 
   const loadData = useCallback(() => {
     return run(async () => {
-      const [p, pol, mig, cl] = await Promise.all([
+      const [p, pol, mig, cl, vm] = await Promise.all([
         listDistributedPools(),
         listStoragePolicies(),
         listStorageMigrations(),
         listDatastoreClusters(),
+        listVMs(),
       ])
       setPools(p)
       setPolicies(pol)
       setMigrations(mig)
       setDsClusters(cl)
+      setVMs(vm)
     })
   }, [run])
 
@@ -260,7 +266,15 @@ export default function DistributedStorage() {
 
       {/* Migrations Tab */}
       {activeTab === 'migrations' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
+        <div>
+          <div className="flex justify-end mb-4">
+            <button onClick={() => setShowStartMigration(true)} disabled={pools.length < 2 || vms.length === 0}
+              title={pools.length < 2 ? 'Need at least 2 storage pools' : vms.length === 0 ? 'No VMs to migrate' : undefined}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <ArrowRightLeft className="w-4 h-4" /> Start Migration
+            </button>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
           <table className="min-w-full divide-y divide-slate-700/50">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase">
@@ -298,6 +312,7 @@ export default function DistributedStorage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -434,6 +449,48 @@ export default function DistributedStorage() {
         />
       )}
 
+      {/* Start Migration Modal */}
+      {showStartMigration && (
+        <ModalForm title="Start Storage Migration" onClose={() => setShowStartMigration(false)}
+          onSubmit={async (data) => {
+            if (!data.vm_id) { toast.error('Select a VM'); return }
+            if (!data.source_pool_id || !data.target_pool_id) { toast.error('Select source and target pools'); return }
+            if (data.source_pool_id === data.target_pool_id) { toast.error('Source and target pools must differ'); return }
+            await startStorageMigration({
+              vm_id: String(data.vm_id),
+              source_pool_id: String(data.source_pool_id),
+              target_pool_id: String(data.target_pool_id),
+              policy_id: data.policy_id ? String(data.policy_id) : undefined,
+            })
+            toast.success('Migration started')
+            setShowStartMigration(false)
+            loadData()
+          }}
+          fields={[
+            {
+              name: 'vm_id', label: 'VM', type: 'select', required: true,
+              options: vms.map(v => v.name),
+              optionLabels: Object.fromEntries(vms.map(v => [v.name, v.name])),
+            },
+            {
+              name: 'source_pool_id', label: 'Source Pool', type: 'select', required: true,
+              options: pools.map(p => p.id),
+              optionLabels: Object.fromEntries(pools.map(p => [p.id, p.name])),
+            },
+            {
+              name: 'target_pool_id', label: 'Target Pool', type: 'select', required: true,
+              options: pools.map(p => p.id),
+              optionLabels: Object.fromEntries(pools.map(p => [p.id, p.name])),
+            },
+            {
+              name: 'policy_id', label: 'Storage Policy (optional)', type: 'select',
+              options: policies.map(p => p.id),
+              optionLabels: Object.fromEntries(policies.map(p => [p.id, p.name])),
+            },
+          ]}
+        />
+      )}
+
       {complianceModalPolicy && (
         <ComplianceCheckModal policy={complianceModalPolicy} pools={pools} onClose={() => setComplianceModalPolicy(null)} />
       )}
@@ -496,7 +553,7 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
               {f.type === 'select' ? (
                 <select value={values[f.name]} onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))}
                   className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
-                  {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                  {f.options?.map(o => <option key={o} value={o}>{f.optionLabels?.[o] ?? o}</option>)}
                 </select>
               ) : f.type === 'multiselect' ? (
                 f.options && f.options.length > 0 ? (
