@@ -8,8 +8,10 @@ import {
   listTemplates as fetchTemplates,
   deleteTemplate as removeTemplate,
   deployTemplate,
+  createTemplate,
   VMTemplate,
 } from '../api/templates'
+import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -25,8 +27,10 @@ export default function Templates() {
   const { confirmState, confirm, cancel } = useConfirm()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<VMTemplate[]>([])
+  const [vms, setVMs] = useState<VM[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -37,8 +41,9 @@ export default function Templates() {
   const loadTemplates = async () => {
     setLoadError(null)
     try {
-      const data = await fetchTemplates()
+      const [data, vmList] = await Promise.all([fetchTemplates(), listVMs()])
       setTemplates(data)
+      setVMs(vmList)
     } catch (error) {
       const msg = formatUserError(error)
       setLoadError(msg)
@@ -88,8 +93,10 @@ export default function Templates() {
         title="VM Templates"
         actions={
           <button
-            onClick={() => navigate('/vms')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+            onClick={() => setShowSaveTemplate(true)}
+            disabled={vms.length === 0}
+            title={vms.length === 0 ? 'No VMs to create a template from' : undefined}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" />
             Create from VM
@@ -112,10 +119,10 @@ export default function Templates() {
             description="Create a template from an existing VM to get started"
             action={
               <button
-                onClick={() => navigate('/vms')}
+                onClick={() => vms.length === 0 ? navigate('/vms') : setShowSaveTemplate(true)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
               >
-                Go to VMs
+                {vms.length === 0 ? 'Go to VMs' : 'Create from VM'}
               </button>
             }
           />
@@ -143,6 +150,18 @@ export default function Templates() {
           onSuccess={() => {
             toast.success('VM created from template successfully')
             navigate('/vms')
+          }}
+        />
+      )}
+
+      {showSaveTemplate && (
+        <SaveTemplateDialog
+          vms={vms}
+          onClose={() => setShowSaveTemplate(false)}
+          onSuccess={() => {
+            toast.success('Template saved')
+            setShowSaveTemplate(false)
+            loadTemplates()
           }}
         />
       )}
@@ -294,6 +313,77 @@ function CreateVMFromTemplateDialog({
             {isCreating ? 'Creating...' : 'Create VM'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SaveTemplateDialog({ vms, onClose, onSuccess }: { vms: VM[]; onClose: () => void; onSuccess: () => void }) {
+  const toast = useToastContext()
+  const [vmName, setVmName] = useState(vms[0]?.name || '')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      // cpus/memory/disk/image are required by the API shape but ignored by
+      // the backend whenever from_vm is set -- it pulls the real config from
+      // that VM instead.
+      await createTemplate({
+        name,
+        description: description || undefined,
+        from_vm: vmName,
+        cpus: 1,
+        memory: 0,
+        disk: 0,
+        image: '',
+      })
+      onSuccess()
+    } catch (error) {
+      toastFailure(toast, 'Failed to save template', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+          <h2 className="text-xl font-bold">Create Template from VM</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
+            <span className="text-2xl">&times;</span>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Source VM</label>
+            <select value={vmName} onChange={e => setVmName(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500">
+              {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">The template captures this VM's CPU, memory, disk size, image, and tags.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Template Name</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. web-server-baseline"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" required autoFocus />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={submitting}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={submitting}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Template'}</button>
+          </div>
+        </form>
       </div>
     </div>
   )
