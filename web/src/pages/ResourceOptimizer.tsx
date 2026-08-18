@@ -9,6 +9,8 @@ import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody } from '../utils/apiError'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { useToastContext } from '../contexts/ToastContext'
+import { toastFailure } from '../utils/toastError'
 
 interface Recommendation {
   resource: string
@@ -47,6 +49,7 @@ function impactIcon(impact: string) {
 }
 
 export default function ResourceOptimizer() {
+  const toast = useToastContext()
   const [optimizations, setOptimizations] = useState<VMOptimization[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load recommendations')
     const [applying, setApplying] = useState<string | null>(null)
@@ -70,11 +73,14 @@ export default function ResourceOptimizer() {
     setApplying(vmName)
     try {
       const res = await apiFetch(`/api/vms/${vmName}/optimize`, { method: 'POST' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       const result = await res.json()
       setResults(prev => ({ ...prev, [vmName]: result }))
-    } catch (err: any) {
-      setResults(prev => ({ ...prev, [vmName]: { vm_name: vmName, applied: [], skipped: [err.message] } }))
+    } catch (err) {
+      toastFailure(toast, `Failed to optimize ${vmName}`, err)
     } finally { setApplying(null) }
   }
 

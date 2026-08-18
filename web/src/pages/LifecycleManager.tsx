@@ -283,7 +283,9 @@ export default function LifecycleManager() {
         <div className="space-y-4">
           {updates.length === 0 ? (
             <div className="text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No rolling updates.</div>
-          ) : updates.map(update => (
+          ) : updates.map(update => {
+            const updatePct = update.total_hosts > 0 ? (update.completed_hosts / update.total_hosts) * 100 : 0
+            return (
             <div key={update.id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -297,11 +299,11 @@ export default function LifecycleManager() {
               <div className="mb-2">
                 <div className="flex justify-between text-xs text-slate-400 mb-1">
                   <span>{update.current_host ? `Current: ${update.current_host}` : 'Waiting...'}</span>
-                  <span>{((update.completed_hosts / update.total_hosts) * 100).toFixed(0)}%</span>
+                  <span>{updatePct.toFixed(0)}%</span>
                 </div>
                 <div className="w-full bg-slate-800 rounded-full h-3">
                   <div className={`h-3 rounded-full ${update.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'}`}
-                    style={{ width: `${(update.completed_hosts / update.total_hosts) * 100}%` }} />
+                    style={{ width: `${updatePct}%` }} />
                 </div>
               </div>
               <div className="text-xs text-slate-500">
@@ -310,7 +312,7 @@ export default function LifecycleManager() {
                 {update.failed_hosts > 0 && <span className="text-red-400"> | {update.failed_hosts} failed</span>}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 

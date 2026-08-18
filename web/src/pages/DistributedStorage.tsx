@@ -344,10 +344,18 @@ export default function DistributedStorage() {
       {/* Create Pool Modal */}
       {showCreatePool && (
         <ModalForm title="Create Storage Pool" onClose={() => setShowCreatePool(false)}
-          onSubmit={async (data) => { await createDistributedPool(data as any); toast.success('Pool created'); setShowCreatePool(false); loadData() }}
+          onSubmit={async (data) => {
+            const hosts = String(data.hosts || '').split(',').map((h: string) => h.trim()).filter(Boolean)
+            if (hosts.length === 0) { toast.error('At least one host is required'); return }
+            await createDistributedPool({ ...data, hosts } as any)
+            toast.success('Pool created')
+            setShowCreatePool(false)
+            loadData()
+          }}
           fields={[
             { name: 'name', label: 'Pool Name', type: 'text', required: true },
             { name: 'pool_type', label: 'Type', type: 'text', required: true },
+            { name: 'hosts', label: 'Hosts (comma-separated)', type: 'text', required: true },
             { name: 'replication_factor', label: 'Replication Factor', type: 'number', defaultValue: 2 },
           ]}
         />
@@ -374,6 +382,11 @@ export default function DistributedStorage() {
           onSubmit={async (data) => { await createDatastoreCluster(data as any); toast.success('Cluster created'); setShowCreateCluster(false); loadData() }}
           fields={[
             { name: 'name', label: 'Cluster Name', type: 'text', required: true },
+            {
+              name: 'storage_pool_ids', label: 'Storage Pools', type: 'multiselect', required: true,
+              options: pools.map(p => p.id),
+              optionLabels: Object.fromEntries(pools.map(p => [p.id, p.name])),
+            },
             { name: 'space_threshold_pct', label: 'Space Threshold (%)', type: 'number', defaultValue: 80 },
             { name: 'io_latency_threshold_ms', label: 'IO Latency Threshold (ms)', type: 'number', defaultValue: 15 },
           ]}
@@ -396,10 +409,11 @@ export default function DistributedStorage() {
 interface FieldDef {
   name: string
   label: string
-  type: 'text' | 'number' | 'select'
+  type: 'text' | 'number' | 'select' | 'multiselect'
   required?: boolean
-  defaultValue?: string | number
+  defaultValue?: string | number | string[]
   options?: string[]
+  optionLabels?: Record<string, string>
 }
 
 function ModalForm({ title, fields, onClose, onSubmit }: {
@@ -408,12 +422,18 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
   const toast = useToastContext()
   const [values, setValues] = useState<Record<string, any>>(() => {
     const init: Record<string, any> = {}
-    fields.forEach(f => { init[f.name] = f.defaultValue ?? '' })
+    fields.forEach(f => { init[f.name] = f.defaultValue ?? (f.type === 'multiselect' ? [] : '') })
     return init
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    for (const f of fields) {
+      if (f.required && f.type === 'multiselect' && (values[f.name] as string[]).length === 0) {
+        toast.error(`${f.label} requires at least one selection`)
+        return
+      }
+    }
     try {
       await onSubmit(values)
     } catch { toast.error(`Failed: ${title}`) }
@@ -432,6 +452,27 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
                   className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
                   {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
+              ) : f.type === 'multiselect' ? (
+                f.options && f.options.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {f.options.map(o => {
+                      const selected: string[] = values[f.name]
+                      const isSel = selected.includes(o)
+                      return (
+                        <button type="button" key={o}
+                          onClick={() => setValues(v => ({
+                            ...v,
+                            [f.name]: isSel ? selected.filter(x => x !== o) : [...selected, o],
+                          }))}
+                          className={`px-2.5 py-1 rounded text-xs transition ${isSel ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 border border-slate-700/50'}`}>
+                          {f.optionLabels?.[o] ?? o}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">Nothing available to select yet.</p>
+                )
               ) : (
                 <input type={f.type} value={values[f.name]}
                   onChange={e => setValues(v => ({ ...v, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value }))}

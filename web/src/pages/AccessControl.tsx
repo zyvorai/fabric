@@ -84,7 +84,11 @@ export default function AccessControl() {
   const handleDelete = async (id: string, username: string) => {
     if (!await confirm('Delete User', `Delete user "${username}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
-      await apiFetch(`/api/users/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/users/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       setUsers(prev => prev.filter(u => u.id !== id))
       toast.success(`User "${username}" deleted`)
     } catch (err) {
@@ -94,7 +98,11 @@ export default function AccessControl() {
 
   const handleToggle = async (id: string, enabled: boolean) => {
     try {
-      await apiFetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !enabled }) })
+      const res = await apiFetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !enabled }) })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+      }
       setUsers(prev => prev.map(u => u.id === id ? { ...u, enabled: !enabled } : u))
     } catch (err) {
       toastFailure(toast, 'Failed to update user', err)

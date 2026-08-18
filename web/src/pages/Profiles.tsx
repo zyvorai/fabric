@@ -10,9 +10,12 @@ import PageLoadBanner from '../components/PageLoadBanner'
 import { PageHeader } from '../components/ui'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { toastFailure } from '../utils/toastError'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Profiles() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [profiles, setProfiles] = useState<VMProfile[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load profiles')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -29,11 +32,14 @@ export default function Profiles() {
   }, [loadProfiles])
 
   const handleDelete = async (name: string) => {
+    if (!await confirm('Delete Profile', `Delete profile '${name}'?`, { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
       await deleteProfile(name)
       toast.success(`Profile '${name}' deleted`)
       loadProfiles()
-    } catch { toast.error('Cannot delete built-in profiles') }
+    } catch (err) {
+      toastFailure(toast, `Failed to delete profile '${name}'`, err)
+    }
   }
 
   const categoryColors: Record<string, string> = {
@@ -84,6 +90,17 @@ export default function Profiles() {
       )}
 
       {showCreateDialog && <CreateProfileDialog onClose={() => setShowCreateDialog(false)} onSuccess={() => { toast.success('Profile created'); setShowCreateDialog(false); void loadProfiles() }} />}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }

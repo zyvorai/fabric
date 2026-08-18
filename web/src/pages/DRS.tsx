@@ -76,6 +76,8 @@ export default function DRS() {
   }
 
   const handleReject = async (id: string) => {
+    const ok = await confirm('Reject Recommendation', 'Reject this DRS migration recommendation?', { variant: 'danger', confirmLabel: 'Reject' })
+    if (!ok) return
     try {
       await rejectRecommendation(id)
       toast.success('Migration rejected')

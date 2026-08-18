@@ -19,9 +19,12 @@ import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import SubsystemBanner from '../components/SubsystemBanner'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Machines() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [machines, setMachines] = useState<MachineInfo[]>([])
   const [images, setImages] = useState<MachineImage[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +61,7 @@ export default function Machines() {
     if (imagesRes.status === 'fulfilled') {
       setImages(imagesRes.value)
     } else {
+      toastFailure(toast, 'Failed to load machine images', imagesRes.reason)
       setImages([])
     }
     setLoading(false)
@@ -112,6 +116,7 @@ export default function Machines() {
 
   const handlePoweroff = async () => {
     if (!selectedMachine) return
+    if (!await confirm('Power Off Machine', `Force power off '${selectedMachine}'? Unsaved state will be lost.`, { variant: 'danger', confirmLabel: 'Power Off' })) return
     try {
       await poweroffMachine(selectedMachine)
       toast.success('Powering off...')
@@ -123,6 +128,7 @@ export default function Machines() {
 
   const handleTerminate = async () => {
     if (!selectedMachine) return
+    if (!await confirm('Terminate Machine', `Terminate '${selectedMachine}'? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Terminate' })) return
     try {
       await terminateMachine(selectedMachine)
       toast.success('Terminated')
@@ -134,6 +140,7 @@ export default function Machines() {
   }
 
   const handleRemoveImage = async (imageName: string) => {
+    if (!await confirm('Remove Image', `Remove image '${imageName}'? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Remove' })) return
     try {
       await removeMachineImage(imageName)
       toast.success(`Removed '${imageName}'`)
@@ -307,6 +314,17 @@ export default function Machines() {
             </table>
           </div>
         </div>
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )

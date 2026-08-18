@@ -175,7 +175,7 @@ export async function deleteHostProfile(id: string): Promise<void> {
   return apiDelete(`${API_BASE}/content-library/host-profiles/${id}`)
 }
 
-export async function checkHostCompliance(profileId: string, hostId: string): Promise<{
+export async function checkHostCompliance(profileId: string, hostId: string, currentConfig: Record<string, unknown>): Promise<{
   compliant: boolean
   deviations: Array<{
     setting: string
@@ -192,5 +192,5 @@ export async function checkHostCompliance(profileId: string, hostId: string): Pr
       actual: string
     }>
     checked_at: string
-  }>(`${API_BASE}/content-library/host-profiles/${profileId}/check-compliance`, { host_id: hostId })
+  }>(`${API_BASE}/content-library/host-profiles/${profileId}/compliance`, { host_id: hostId, current_config: currentConfig })
 }

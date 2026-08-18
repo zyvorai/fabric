@@ -18,9 +18,12 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Migrations() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [migrations, setMigrations] = useState<MigrationStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [showStartDialog, setShowStartDialog] = useState(false)
@@ -50,6 +53,7 @@ export default function Migrations() {
   }
 
   const handleCancel = async (id: string) => {
+    if (!await confirm('Cancel Migration', 'Cancel this migration in progress? It may leave the VM in a partially-migrated state.', { variant: 'danger', confirmLabel: 'Cancel Migration' })) return
     try {
       await cancelMigration(id)
       toast.success('Migration cancelled')
@@ -178,6 +182,17 @@ export default function Migrations() {
             setShowStartDialog(false)
             loadMigrations()
           }}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
         />
       )}
     </div>

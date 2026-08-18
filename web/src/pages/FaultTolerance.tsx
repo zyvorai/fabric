@@ -135,7 +135,7 @@ export default function FaultTolerance() {
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-slate-400 text-sm mb-1">Needs Attention</div>
-          <div className="text-2xl font-bold text-yellow-400">{ftVMs.filter(v => v.status !== 'Enabled' && v.status !== 'enabled').length}</div>
+          <div className="text-2xl font-bold text-yellow-400">{ftVMs.filter(v => v.status !== 'running').length}</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-slate-400 text-sm mb-1">Failover Events</div>

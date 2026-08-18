@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Copy, Check } from 'lucide-react'
 import { PageHeader } from '../components/ui'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface MigrationTemplate { id: string; name: string; description: string; format: string; cpus: number; memory: number; network: string; compress: boolean; created_at: string }
 
@@ -20,6 +22,7 @@ function loadCustomTemplates(): MigrationTemplate[] { try { return JSON.parse(lo
 function saveCustomTemplates(templates: MigrationTemplate[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(templates)) }
 
 export default function MigrationTemplates() {
+  const { confirmState, confirm, cancel } = useConfirm()
   const [custom, setCustom] = useState<MigrationTemplate[]>(loadCustomTemplates)
   const [showAdd, setShowAdd] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
@@ -37,7 +40,10 @@ export default function MigrationTemplates() {
     setShowAdd(false)
   }
 
-  const handleDelete = (id: string) => { setCustom(prev => prev.filter(t => t.id !== id)) }
+  const handleDelete = async (id: string, name: string) => {
+    if (!await confirm('Delete Template', `Delete migration template '${name}'?`, { variant: 'danger', confirmLabel: 'Delete' })) return
+    setCustom(prev => prev.filter(t => t.id !== id))
+  }
   const handleCopy = (tmpl: MigrationTemplate) => {
     const text = JSON.stringify({ name: tmpl.name, format: tmpl.format, cpus: tmpl.cpus, memory_mb: tmpl.memory, network: tmpl.network, compress: tmpl.compress }, null, 2)
     navigator.clipboard.writeText(text)
@@ -92,7 +98,7 @@ export default function MigrationTemplates() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => handleCopy(tmpl)} title="Copy config" className="p-1.5 text-slate-500 hover:text-slate-300 transition-colors">{copied === tmpl.id ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}</button>
-                  {!isBuiltin && <button onClick={() => handleDelete(tmpl.id)} title="Delete template" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
+                  {!isBuiltin && <button onClick={() => handleDelete(tmpl.id, tmpl.name)} title="Delete template" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </div>
               </div>
               {tmpl.description && <p className="text-xs text-slate-400 mb-3">{tmpl.description}</p>}
@@ -106,6 +112,17 @@ export default function MigrationTemplates() {
           )
         })}
       </div>
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }

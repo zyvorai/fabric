@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { HardDrive, Plus, Trash2, Copy, RefreshCw, Database } from 'lucide-react'
+import { HardDrive, Trash2, RefreshCw, Database } from 'lucide-react'
 import { apiGet, apiDelete } from '../api/client'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
@@ -280,9 +280,6 @@ export default function Storage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <button className="p-2 hover:bg-slate-600 rounded transition" title="Clone">
-                          <Copy className="w-4 h-4" />
-                        </button>
                         <button onClick={() => handleDeleteVolume(volume.pool, volume.id)} className="p-2 hover:bg-red-600 rounded transition" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -294,39 +291,6 @@ export default function Storage() {
             </table>
           </div>
         )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-blue-500 transition cursor-pointer">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-3 bg-blue-500/10 rounded-lg">
-              <Plus className="w-6 h-6 text-blue-400" />
-            </div>
-            <h3 className="font-semibold">Create Volume</h3>
-          </div>
-          <p className="text-sm text-slate-400">Create a new disk image for VMs</p>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-purple-500 transition cursor-pointer">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-3 bg-purple-500/10 rounded-lg">
-              <RefreshCw className="w-6 h-6 text-purple-400" />
-            </div>
-            <h3 className="font-semibold">Create Snapshot</h3>
-          </div>
-          <p className="text-sm text-slate-400">Take a snapshot of existing volume</p>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-green-500 transition cursor-pointer">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-3 bg-green-500/10 rounded-lg">
-              <Copy className="w-6 h-6 text-green-400" />
-            </div>
-            <h3 className="font-semibold">Clone Volume</h3>
-          </div>
-          <p className="text-sm text-slate-400">Clone an existing disk image</p>
-        </div>
       </div>
 
       {confirmState && (

@@ -155,8 +155,8 @@ export async function deleteStoragePolicy(id: string): Promise<void> {
 
 // Compliance
 
-export async function checkCompliance(vmId: string, policyId: string): Promise<ComplianceReport> {
-  return apiPost<ComplianceReport>(`${API_BASE}/distributed-storage/compliance/check`, { vm_id: vmId, policy_id: policyId })
+export async function checkCompliance(policyId: string, vmName: string, poolId: string): Promise<ComplianceReport> {
+  return apiPost<ComplianceReport>(`${API_BASE}/distributed-storage/policies/${policyId}/compliance`, { vm_name: vmName, pool_id: poolId })
 }
 
 // Datastore clusters
