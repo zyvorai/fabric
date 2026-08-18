@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
 import {
   listLibraries,
   createLibrary,
@@ -16,6 +16,7 @@ import {
   listHostProfiles,
   createHostProfile,
   deleteHostProfile,
+  checkHostCompliance,
   type Library,
   type LibraryItem,
   type GuestCustomizationSpec,
@@ -41,6 +42,7 @@ export default function ContentLibrary() {
   const [showCreateLibrary, setShowCreateLibrary] = useState(false)
   const [showCreateSpec, setShowCreateSpec] = useState(false)
   const [showCreateProfile, setShowCreateProfile] = useState(false)
+  const [complianceModalProfile, setComplianceModalProfile] = useState<HostProfile | null>(null)
 
   const loadData = useCallback(() => {
     return run(async () => {
@@ -327,9 +329,14 @@ export default function ContentLibrary() {
                     <td className="p-4 text-sm text-red-400">{profile.non_compliant_hosts}</td>
                     <td className="p-4 text-sm">{profile.status}</td>
                     <td className="p-4">
-                      <button onClick={() => handleDeleteProfile(profile.id)} className="text-red-600 hover:text-red-800">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setComplianceModalProfile(profile)} className="text-blue-400 hover:text-blue-300" title="Check host compliance">
+                          <ShieldCheck className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteProfile(profile.id)} className="text-red-600 hover:text-red-800">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -343,6 +350,7 @@ export default function ContentLibrary() {
       {showCreateLibrary && <CreateLibraryModal onClose={() => setShowCreateLibrary(false)} onCreated={() => { setShowCreateLibrary(false); loadData() }} />}
       {showCreateSpec && <CreateSpecModal onClose={() => setShowCreateSpec(false)} onCreated={() => { setShowCreateSpec(false); loadData() }} />}
       {showCreateProfile && <CreateProfileModal onClose={() => setShowCreateProfile(false)} onCreated={() => { setShowCreateProfile(false); loadData() }} />}
+      {complianceModalProfile && <HostComplianceModal profile={complianceModalProfile} onClose={() => setComplianceModalProfile(null)} />}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -461,6 +469,84 @@ function CreateProfileModal({ onClose, onCreated }: { onClose: () => void; onCre
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function HostComplianceModal({ profile, onClose }: { profile: HostProfile; onClose: () => void }) {
+  const toast = useToastContext()
+  const [hostId, setHostId] = useState('')
+  const [configText, setConfigText] = useState(() => JSON.stringify(profile.settings, null, 2))
+  const [configError, setConfigError] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [result, setResult] = useState<{ compliant: boolean; deviations: Array<{ setting: string; expected: string; actual: string }> } | null>(null)
+
+  const handleCheck = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!hostId.trim()) { toast.error('Host ID is required'); return }
+    let currentConfig: Record<string, unknown>
+    try {
+      currentConfig = JSON.parse(configText)
+    } catch {
+      setConfigError('Current config must be valid JSON')
+      return
+    }
+    setConfigError('')
+    setChecking(true)
+    setResult(null)
+    try {
+      const r = await checkHostCompliance(profile.id, hostId.trim(), currentConfig)
+      setResult(r)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Compliance check failed')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-1">Check Host Compliance</h2>
+        <p className="text-sm text-slate-400 mb-4">Against profile "{profile.name}"</p>
+        <form onSubmit={handleCheck} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Host ID</label>
+            <input value={hostId} onChange={e => setHostId(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="host-01" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Host's current config (JSON)</label>
+            <textarea value={configText} onChange={e => setConfigText(e.target.value)} rows={8}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2 font-mono text-xs" />
+            {configError && <p className="text-xs text-red-400 mt-1">{configError}</p>}
+            <p className="text-xs text-slate-500 mt-1">Pre-filled from the profile's reference settings — edit to reflect what's actually configured on this host.</p>
+          </div>
+
+          {result && (
+            <div className={`rounded-lg border p-3 ${result.compliant ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+              <div className={`flex items-center gap-2 text-sm font-medium ${result.compliant ? 'text-green-400' : 'text-red-400'}`}>
+                {result.compliant ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                {result.compliant ? 'Compliant' : `${result.deviations.length} deviation(s)`}
+              </div>
+              {!result.compliant && (
+                <ul className="mt-2 space-y-1 text-xs text-slate-300">
+                  {result.deviations.map((d, i) => (
+                    <li key={i}><span className="text-amber-400">{d.setting}</span>: expected {d.expected}, got {d.actual}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Close</button>
+            <button type="submit" disabled={checking} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">
+              {checking ? 'Checking…' : 'Check'}
+            </button>
           </div>
         </form>
       </div>

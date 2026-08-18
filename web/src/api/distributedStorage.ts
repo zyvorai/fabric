@@ -4,16 +4,37 @@
 
 import { apiGet, apiPost, apiDelete } from './client'
 
+export interface DiskContribution {
+  disk_id: string
+  path: string
+  capacity_gb: number
+  disk_type: string
+  status: string
+}
+
+export interface StorageHost {
+  host_id: string
+  hostname: string
+  disks: DiskContribution[]
+}
+
+export interface FaultDomain {
+  id: string
+  name: string
+  host_ids: string[]
+}
+
 export interface DistributedStoragePool {
   id: string
   name: string
-  pool_type: string
-  total_capacity_gb: number
-  used_capacity_gb: number
-  available_capacity_gb: number
-  hosts: string[]
+  cluster_id: string
+  hosts: StorageHost[]
   replication_factor: number
   erasure_coding: boolean
+  fault_domains: FaultDomain[]
+  total_capacity_gb: number
+  used_capacity_gb: number
+  free_capacity_gb: number
   status: string
   health: string
   created: string
@@ -23,18 +44,15 @@ export interface DistributedStoragePool {
 export interface StoragePolicy {
   id: string
   name: string
-  description?: string
+  description: string
   replication_factor: number
-  stripe_width: number
-  failure_tolerance: number
-  encryption_enabled: boolean
-  deduplication_enabled: boolean
-  compression_enabled: boolean
-  tier: 'performance' | 'standard' | 'archive'
+  disk_type_required?: 'ssd' | 'hdd' | 'nvme'
+  encryption_required: boolean
   iops_limit?: number
   throughput_limit_mbps?: number
+  tier: 'gold' | 'silver' | 'bronze'
   created: string
-  updated?: string
+  updated: string
 }
 
 export interface StorageMigration {
@@ -58,32 +76,22 @@ export interface StorageMigration {
 export interface DatastoreCluster {
   id: string
   name: string
-  description?: string
-  storage_pool_ids: string[]
-  sdrs_enabled: boolean
+  cluster_id: string
+  datastore_ids: string[]
+  storage_drs_enabled: boolean
   space_threshold_pct: number
-  io_latency_threshold_ms: number
-  total_capacity_gb: number
-  used_capacity_gb: number
-  vm_count: number
-  status: string
+  io_latency_threshold_ms?: number
+  automation_level: 'manual' | 'fully_automated'
   created: string
   updated?: string
 }
 
 export interface ComplianceReport {
-  id: string
-  vm_id: string
   vm_name: string
   policy_id: string
   policy_name: string
   compliant: boolean
-  violations: Array<{
-    rule: string
-    expected: string
-    actual: string
-    severity: 'warning' | 'error'
-  }>
+  violations: string[]
   checked_at: string
 }
 
@@ -97,10 +105,11 @@ export async function listDistributedPools(): Promise<DistributedStoragePool[]> 
 
 export async function createDistributedPool(req: {
   name: string
-  pool_type: string
-  hosts: string[]
-  replication_factor?: number
-  erasure_coding?: boolean
+  cluster_id: string
+  hosts: StorageHost[]
+  replication_factor: number
+  erasure_coding: boolean
+  fault_domains: FaultDomain[]
 }): Promise<DistributedStoragePool> {
   return apiPost<DistributedStoragePool>(`${API_BASE}/distributed-storage/pools`, req)
 }
@@ -135,18 +144,16 @@ export async function listStoragePolicies(): Promise<StoragePolicy[]> {
 
 export async function createStoragePolicy(req: {
   name: string
-  description?: string
+  description: string
   replication_factor: number
-  stripe_width?: number
-  failure_tolerance?: number
-  encryption_enabled?: boolean
-  deduplication_enabled?: boolean
-  compression_enabled?: boolean
-  tier?: 'performance' | 'standard' | 'archive'
+  disk_type_required?: 'ssd' | 'hdd' | 'nvme'
+  encryption_required: boolean
   iops_limit?: number
   throughput_limit_mbps?: number
+  tier: 'gold' | 'silver' | 'bronze'
 }): Promise<StoragePolicy> {
-  return apiPost<StoragePolicy>(`${API_BASE}/distributed-storage/policies`, req)
+  const now = new Date().toISOString()
+  return apiPost<StoragePolicy>(`${API_BASE}/distributed-storage/policies`, { id: '', ...req, created: now, updated: now })
 }
 
 export async function deleteStoragePolicy(id: string): Promise<void> {
@@ -167,11 +174,12 @@ export async function listDatastoreClusters(): Promise<DatastoreCluster[]> {
 
 export async function createDatastoreCluster(req: {
   name: string
-  description?: string
-  storage_pool_ids: string[]
-  sdrs_enabled?: boolean
-  space_threshold_pct?: number
+  cluster_id: string
+  datastore_ids: string[]
+  storage_drs_enabled: boolean
+  space_threshold_pct: number
   io_latency_threshold_ms?: number
+  automation_level: 'manual' | 'fully_automated'
 }): Promise<DatastoreCluster> {
   return apiPost<DatastoreCluster>(`${API_BASE}/distributed-storage/datastore-clusters`, req)
 }
