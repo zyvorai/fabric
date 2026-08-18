@@ -148,23 +148,23 @@ export default function MigrationReport() {
       ) : report && !loadError ? (
         <div className="flex flex-col gap-4 print:gap-2">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
               <div className="text-xs text-slate-400 mb-1">Total</div>
               <div className="text-2xl font-bold text-white">{report.total}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-green-700/30">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-green-700/30">
               <div className="text-xs text-green-400 mb-1">Successful</div>
               <div className="text-2xl font-bold text-green-400">{report.successful}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-red-700/30">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-red-700/30">
               <div className="text-xs text-red-400 mb-1">Failed</div>
               <div className="text-2xl font-bold text-red-400">{report.failed}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-700/30">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-blue-700/30">
               <div className="text-xs text-blue-400 mb-1">Running</div>
               <div className="text-2xl font-bold text-blue-400">{report.running}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
               <div className="text-xs text-slate-400 mb-1">Avg Duration</div>
               <div className="text-xl font-bold text-white">{report.avg_duration || '--'}</div>
             </div>
