@@ -38,6 +38,13 @@ ReadWritePaths=/tmp
 # error, on a disk that was actually mode 644 root:root and unheld by
 # any process).
 ReadWritePaths=/var/lib/ephemera
+# qemu-nbd (used by GuestKit's `doctor`/`agent-inject` guestfs mounting,
+# invoked from ux_extensions.rs's golden-image scoring) writes its lock
+# socket to /var/lock (-> /run/lock) on every mount -- without this,
+# ProtectSystem=strict makes that EROFS and the mount fails outright, even
+# though it doesn't touch any VM disk (found live: "Failed to unlink
+# socket /var/lock/qemu-nbd-nbd0: Read-only file system").
+ReadWritePaths=/run/lock
 StateDirectory=zyvor-fabricd
 ConfigurationDirectory=zyvor-fabricd
 LogsDirectory=zyvor-fabricd
