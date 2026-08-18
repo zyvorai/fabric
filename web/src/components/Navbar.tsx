@@ -208,12 +208,12 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
             <Link
               to="/create"
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition font-medium ${
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium text-sm ${
                 steel
                   ? 'bg-gradient-to-r from-[#5d90f7] to-[#3d6fd0] text-white'
                   : aurora
                     ? 'bg-gradient-to-r from-cyan-500 via-violet-600 to-fuchsia-600 text-white'
-                    : 'bg-gradient-to-r from-blue-600 to-blue-700'
+                    : 'bg-blue-600 hover:bg-blue-500'
               }`}
             >
               <Plus className="w-4 h-4" />

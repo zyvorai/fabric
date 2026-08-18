@@ -4,11 +4,16 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { createVM } from '../api/vm'
-import type { PortForwardSpec } from '../api/vm'
-import { apiGet } from '../api/client'
+import { createVM, listVMs } from '../api/vm'
+import type { PortForwardSpec, VM } from '../api/vm'
+import { listImages, createImageFromVm, getConvertJob, listCloudImages, downloadCloudImage, listDownloads } from '../api/images'
+import type { ImageInfo, CloudImage } from '../api/images'
 import { applyCreateAdvancedOptions, AdvancedOptionsError } from '../utils/applyCreateAdvancedOptions'
-import { ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor, Plus, X, Network } from 'lucide-react'
+import { formatBytes } from '../utils/format'
+import {
+  ArrowLeft, ArrowRight, Cpu, HardDrive, ChevronDown, ChevronUp, Shield, Monitor, Plus, X,
+  Network, Server, Sparkles, Check, Download,
+} from 'lucide-react'
 import WizardStepper from '../components/WizardStepper'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -48,7 +53,7 @@ export default function CreateVM() {
   const [cpus, setCpus] = useState(2)
   const [memory, setMemory] = useState(2048)
   const [diskGb, setDiskGb] = useState(20)
-  const [imageOptions, setImageOptions] = useState<{ name: string; path: string }[]>([])
+  const [imageOptions, setImageOptions] = useState<ImageInfo[]>([])
   const [imagesLoading, setImagesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [validationError, setValidationError] = useState('')
@@ -58,6 +63,8 @@ export default function CreateVM() {
   const [advanced, setAdvanced] = useState<AdvancedOptions>(defaultAdvanced)
   const [wizardStep, setWizardStep] = useState(0)
   const [imagesReload, setImagesReload] = useState(0)
+  const [showGoldenImage, setShowGoldenImage] = useState(false)
+  const [showDownloadImage, setShowDownloadImage] = useState(false)
   const [networkMode, setNetworkMode] = useState<'nat' | 'bridged'>('nat')
   const [staticIp, setStaticIp] = useState(false)
   const [portForwards, setPortForwards] = useState<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }[]>([])
@@ -78,7 +85,7 @@ export default function CreateVM() {
     let cancelled = false
     setImagesLoading(true)
     setImagesError(null)
-    apiGet<{ name: string; path: string }[]>('/api/images')
+    listImages()
       .then((data) => {
         if (cancelled) return
         setImageOptions((Array.isArray(data) ? data : []).filter((i) => i.path))
@@ -214,6 +221,7 @@ export default function CreateVM() {
         <PageHeader
           title="Create Virtual Machine"
           description="Configure and launch a new VM"
+          icon={Server}
         />
 
         <WizardStepper
@@ -272,38 +280,109 @@ export default function CreateVM() {
               </div>
 
             <div>
-              <label htmlFor="vm-image" className="block text-sm font-medium text-slate-300 mb-1.5">
-                Disk image
-              </label>
-              {imageOptions.length > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const opt = imageOptions.find((o) => o.path === e.target.value)
-                    if (opt) setImage(opt.path)
-                  }}
-                  className="w-full mb-2 px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-slate-300 text-sm"
-                >
-                  <option value="">{imagesLoading ? 'Loading images…' : 'Pick from catalog…'}</option>
-                  {imageOptions.map((opt) => (
-                    <option key={opt.path} value={opt.path}>
-                      {opt.name} — {opt.path}
-                    </option>
+              <div className="flex items-center justify-between mb-1.5 gap-3 flex-wrap">
+                <label htmlFor="vm-image" className="block text-sm font-medium text-slate-300">
+                  Disk image
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDownloadImage(true)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download an OS image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGoldenImage(true)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Create golden image from a VM
+                  </button>
+                </div>
+              </div>
+
+              {imagesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-[4.25rem] rounded-lg bg-slate-800/60 animate-pulse" />
                   ))}
-                </select>
+                </div>
+              ) : imageOptions.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                  {imageOptions.map((opt) => {
+                    const selected = image === opt.path
+                    return (
+                      <button
+                        key={opt.path}
+                        type="button"
+                        onClick={() => setImage(opt.path)}
+                        className={`relative text-left p-3 rounded-lg border transition-colors ${
+                          selected
+                            ? 'bg-blue-600/15 border-blue-500/40 ring-1 ring-blue-500/30'
+                            : 'bg-slate-800 border-slate-700/50 hover:border-slate-600'
+                        }`}
+                      >
+                        {selected && (
+                          <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="icon-tile icon-tile-sm icon-tile-blue shrink-0">
+                            <HardDrive className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-sm font-medium text-white truncate">{opt.name}</span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {opt.format.toUpperCase()} · {formatBytes(opt.size_bytes)}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 mb-2">
+                  No catalog images found — enter a path below, or create a golden image from an existing VM.
+                </p>
               )}
+
               <input
                 id="vm-image"
                 type="text"
                 value={image}
                 onChange={(e) => setImage(e.target.value)}
-                placeholder="/var/lib/zyvor-fabricd/images/ubuntu-24.04.qcow2"
+                placeholder="Or enter a path on the host, e.g. /var/lib/zyvor-fabricd/images/ubuntu-24.04.qcow2"
                 className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm font-mono"
                 required
               />
-              <p className="text-xs text-slate-500 mt-1">Choose from the catalog or enter a path on the host.</p>
             </div>
             </div>
+          )}
+
+          {showGoldenImage && (
+            <GoldenImageModal
+              onClose={() => setShowGoldenImage(false)}
+              onCreated={(path) => {
+                setImage(path)
+                setShowGoldenImage(false)
+                setImagesReload((n) => n + 1)
+              }}
+            />
+          )}
+
+          {showDownloadImage && (
+            <DownloadImageModal
+              existingImages={imageOptions}
+              onClose={() => setShowDownloadImage(false)}
+              onDownloaded={(path) => {
+                setImage(path)
+                setShowDownloadImage(false)
+                setImagesReload((n) => n + 1)
+              }}
+            />
           )}
 
           {wizardStep === 1 && (
@@ -676,6 +755,371 @@ export default function CreateVM() {
             )}
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function GoldenImageModal({ onClose, onCreated }: { onClose: () => void; onCreated: (path: string) => void }) {
+  const toast = useToastContext()
+  const [vms, setVms] = useState<VM[]>([])
+  const [vmsLoading, setVmsLoading] = useState(true)
+  const [vmName, setVmName] = useState('')
+  const [name, setName] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listVMs()
+      .then((data) => {
+        if (cancelled) return
+        setVms(data)
+        setVmName((prev) => prev || data[0]?.name || '')
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setVmsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleSubmit = async () => {
+    if (!VM_NAME_REGEX.test(name)) {
+      setError('Image name must start with a letter or number, use only letters, numbers, dots, hyphens, underscores, and be 1–64 characters')
+      return
+    }
+    setError(null)
+    setSubmitting(true)
+    setProgress(0)
+    try {
+      const { job_id } = await createImageFromVm(vmName, name)
+      // Poll until the qemu-img convert job (backend: /images/from-vm/:name)
+      // reaches a terminal state -- disk conversion can take a while for
+      // large or busy VMs, so this isn't a fire-and-forget POST.
+      let settledTicks = 0
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1200))
+        const job = await getConvertJob(job_id)
+        setProgress(job.progress)
+        if (job.status === 'completed') {
+          // The backend certifies the image with GuestKit's offline `doctor`
+          // scoring right after conversion finishes, as a short follow-up
+          // step -- give it a few extra ticks to attach before finalizing,
+          // but don't block forever (e.g. guestkit missing in dev).
+          if (job.boot_score === undefined && settledTicks < 4) {
+            settledTicks += 1
+            continue
+          }
+          const scoreNote = job.boot_score !== undefined
+            ? ` — boot readiness ${Math.round(job.boot_score)}/100`
+            : ''
+          toast.success(`Golden image '${name}' created from '${vmName}'${scoreNote}`)
+          onCreated(job.output_path)
+          return
+        }
+        if (job.status === 'failed') {
+          setError(job.error || 'Image conversion failed')
+          setSubmitting(false)
+          setProgress(null)
+          return
+        }
+      }
+    } catch (err) {
+      toastFailure(toast, 'Failed to start golden image build', err)
+      setError(formatUserError(err))
+      setSubmitting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <div className="icon-tile icon-tile-md icon-tile-purple">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Create Golden Image</h2>
+              <p className="text-xs text-slate-500">Materialize a VM's current disk as a reusable catalog image</p>
+            </div>
+          </div>
+          {!submitting && (
+            <button type="button" onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {/* Not a <form> -- this dialog renders inside the wizard's own outer
+            <form>, and nested <form> elements are invalid HTML (the browser
+            drops the inner tag, so a type="submit" button here would submit
+            the OUTER wizard form and reload the page instead). */}
+        <div className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {vmsLoading ? (
+            <div className="h-10 rounded-lg bg-slate-800 animate-pulse" />
+          ) : vms.length === 0 ? (
+            <p className="text-sm text-slate-400">No VMs exist yet — create a VM first, then come back here to save its disk as a golden image.</p>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Source VM</label>
+                <select
+                  value={vmName}
+                  onChange={(e) => setVmName(e.target.value)}
+                  disabled={submitting}
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                >
+                  {vms.map((v) => (
+                    <option key={v.name} value={v.name}>{v.name} ({v.state})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  The image is an independent copy — the source VM can change or be deleted afterward without affecting it.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Image Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && name && vmName && !submitting) handleSubmit()
+                  }}
+                  placeholder="e.g. web-server-golden"
+                  disabled={submitting}
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                  required
+                  autoFocus
+                />
+              </div>
+              {submitting && progress !== null && (
+                <div>
+                  <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
+                      style={{ width: `${Math.max(5, progress)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">Converting disk image…</p>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting || !name || !vmName}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+                >
+                  {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {submitting ? 'Creating…' : 'Create Image'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const DISTRO_TILE_COLOR: Record<string, 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'cyan'> = {
+  ubuntu: 'orange',
+  fedora: 'blue',
+  debian: 'red',
+  almalinux: 'purple',
+  flatcar: 'cyan',
+}
+
+function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
+  existingImages: ImageInfo[]
+  onClose: () => void
+  onDownloaded: (path: string) => void
+}) {
+  const toast = useToastContext()
+  const [catalog, setCatalog] = useState<CloudImage[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [selected, setSelected] = useState<CloudImage | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [statusLabel, setStatusLabel] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listCloudImages()
+      .then((data) => {
+        if (cancelled) return
+        setCatalog(data)
+        setSelected((prev) => prev || data[0] || null)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(formatUserError(err))
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleDownload = async () => {
+    if (!selected) return
+    setError(null)
+
+    // Already sitting on disk from a previous download -- use it directly
+    // instead of fetching it over the network again.
+    const onDisk = existingImages.find((img) => img.name === selected.name)
+    if (onDisk) {
+      toast.success(`'${selected.name}' is already on disk — using the existing image`)
+      onDownloaded(onDisk.path)
+      return
+    }
+
+    setSubmitting(true)
+    setStatusLabel('Starting download…')
+    try {
+      const job = await downloadCloudImage(selected.name)
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const downloads = await listDownloads()
+        const current = downloads.find((d) => d.id === job.id)
+        if (!current) continue
+        if (current.state === 'completed' && current.output_path) {
+          toast.success(`Downloaded '${selected.name}'`)
+          onDownloaded(current.output_path)
+          return
+        }
+        if (current.state === 'failed') {
+          setError(current.error || 'Download failed')
+          setSubmitting(false)
+          setStatusLabel('')
+          return
+        }
+        setStatusLabel(current.state === 'building' ? 'Downloading…' : 'Starting download…')
+      }
+    } catch (err) {
+      toastFailure(toast, 'Failed to start download', err)
+      setError(formatUserError(err))
+      setSubmitting(false)
+      setStatusLabel('')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <div className="icon-tile icon-tile-md icon-tile-cyan">
+              <Download className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Download an OS Image</h2>
+              <p className="text-xs text-slate-500">Fetch a ready-made distro image straight into the catalog</p>
+            </div>
+          </div>
+          {!submitting && (
+            <button type="button" onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {catalogLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-16 rounded-lg bg-slate-800 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {catalog.map((img) => {
+                const isSelected = selected?.name === img.name
+                const onDisk = existingImages.some((e) => e.name === img.name)
+                return (
+                  <button
+                    key={img.name}
+                    type="button"
+                    onClick={() => setSelected(img)}
+                    disabled={submitting}
+                    className={`relative text-left p-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                      isSelected
+                        ? 'bg-blue-600/15 border-blue-500/40 ring-1 ring-blue-500/30'
+                        : 'bg-slate-800 border-slate-700/50 hover:border-slate-600'
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    )}
+                    <div className={`icon-tile icon-tile-sm icon-tile-${DISTRO_TILE_COLOR[img.distro] || 'blue'} mb-1.5`}>
+                      <Server className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-sm font-medium text-white truncate capitalize">{img.distro}</p>
+                    <p className="text-xs text-slate-500">{img.version} · {img.arch}</p>
+                    {onDisk && (
+                      <p className="text-[10px] font-medium text-emerald-400 mt-1">Already on disk</p>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {submitting && (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="w-3.5 h-3.5 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
+              {statusLabel}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={submitting || !selected}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+            >
+              {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {submitting
+                ? 'Downloading…'
+                : selected && existingImages.some((e) => e.name === selected.name)
+                  ? 'Use Existing'
+                  : 'Download'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

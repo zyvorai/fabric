@@ -171,12 +171,12 @@ export default function NavUtilityBar({
       </div>
       <Link
         to="/create"
-        className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all duration-200 text-sm font-medium shrink-0 whitespace-nowrap ${
+        className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium shrink-0 whitespace-nowrap ${
           steel
-            ? 'bg-gradient-to-r from-[#5d90f7] to-[#3d6fd0] text-white shadow-lg shadow-black/30 hover:brightness-110'
+            ? 'bg-gradient-to-r from-[#5d90f7] to-[#3d6fd0] text-white hover:brightness-110'
             : aurora
-              ? 'bg-gradient-to-r from-cyan-500 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25 hover:brightness-110'
-              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30'
+              ? 'bg-gradient-to-r from-cyan-500 via-violet-600 to-fuchsia-600 text-white hover:brightness-110'
+              : 'bg-blue-600 hover:bg-blue-500'
         }`}
       >
         <Plus className="w-4 h-4 shrink-0" />
