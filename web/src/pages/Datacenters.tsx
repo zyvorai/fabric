@@ -164,20 +164,20 @@ export default function Datacenters() {
       ) : !loadError ? (
       <>
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Datacenters</div>
           <div className="text-2xl font-bold">{datacenters.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Clusters</div>
           <div className="text-2xl font-bold">{clusters.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Hosts</div>
           <div className="text-2xl font-bold">{hosts.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total VMs</div>
           <div className="text-2xl font-bold">
             {hosts.reduce((s, h) => s + h.vm_count, 0)}

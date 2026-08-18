@@ -124,20 +124,20 @@ export default function FaultTolerance() {
       <PageLoadBanner title="Could not load fault tolerance data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Protected VMs</div>
           <div className="text-2xl font-bold">{ftVMs.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Running</div>
           <div className="text-2xl font-bold text-green-400">{ftVMs.filter(v => v.status === 'running').length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Needs Attention</div>
           <div className="text-2xl font-bold text-yellow-400">{ftVMs.filter(v => v.status !== 'running').length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Failover Events</div>
           <div className="text-2xl font-bold">{events.length}</div>
         </div>
