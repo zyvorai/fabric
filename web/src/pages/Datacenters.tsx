@@ -3,14 +3,16 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, ChevronRight, ChevronDown, Trash2, Server, Wrench } from 'lucide-react'
+import { Plus, ChevronRight, ChevronDown, Trash2, Server, Wrench, Pencil } from 'lucide-react'
 import {
   listDatacenters,
   createDatacenter,
+  updateDatacenter,
   deleteDatacenter,
   getDatacenterSummary,
   listClusters,
   createCluster,
+  updateCluster,
   deleteCluster,
   listHosts,
   registerHost,
@@ -28,6 +30,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { toastFailure } from '../utils/toastError'
 
 export default function Datacenters() {
   const toast = useToastContext()
@@ -42,6 +45,8 @@ export default function Datacenters() {
   const [showCreateDC, setShowCreateDC] = useState(false)
   const [showCreateCluster, setShowCreateCluster] = useState<string | null>(null)
   const [showRegisterHost, setShowRegisterHost] = useState<string | null>(null)
+  const [editDC, setEditDC] = useState<Datacenter | null>(null)
+  const [editCluster, setEditCluster] = useState<Cluster | null>(null)
 
   const loadData = useCallback(() => {
     return run(async () => {
@@ -103,6 +108,24 @@ export default function Datacenters() {
       toast.success('Cluster deleted')
       loadData()
     } catch { toast.error('Failed to delete cluster') }
+  }
+
+  const handleSaveDC = async (id: string, name: string, description: string) => {
+    try {
+      await updateDatacenter(id, { name, description: description || undefined })
+      toast.success('Datacenter updated')
+      setEditDC(null)
+      loadData()
+    } catch (err) { toastFailure(toast, 'Failed to update datacenter', err) }
+  }
+
+  const handleSaveCluster = async (id: string, name: string, description: string) => {
+    try {
+      await updateCluster(id, { name, description: description || undefined })
+      toast.success('Cluster updated')
+      setEditCluster(null)
+      loadData()
+    } catch (err) { toastFailure(toast, 'Failed to update cluster', err) }
   }
 
   const handleRemoveHost = async (id: string) => {
@@ -223,6 +246,13 @@ export default function Datacenters() {
                       + Cluster
                     </button>
                     <button
+                      onClick={() => setEditDC(dc)}
+                      className="p-1 text-slate-400 hover:text-white"
+                      title="Edit datacenter"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleDeleteDC(dc.id)}
                       className="text-red-600 hover:text-red-800 p-1"
                     >
@@ -256,6 +286,13 @@ export default function Datacenters() {
                             className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1"
                           >
                             + Host
+                          </button>
+                          <button
+                            onClick={() => setEditCluster(cl)}
+                            className="p-1 text-slate-400 hover:text-white"
+                            title="Edit cluster"
+                          >
+                            <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteCluster(cl.id)}
@@ -382,6 +419,28 @@ export default function Datacenters() {
           clusterId={showRegisterHost}
           onClose={() => setShowRegisterHost(null)}
           onCreated={() => { setShowRegisterHost(null); loadData() }}
+        />
+      )}
+
+      {/* Edit Datacenter Modal */}
+      {editDC && (
+        <EditNameModal
+          title="Edit Datacenter"
+          name={editDC.name}
+          description={editDC.description || ''}
+          onSave={(name, description) => handleSaveDC(editDC.id, name, description)}
+          onClose={() => setEditDC(null)}
+        />
+      )}
+
+      {/* Edit Cluster Modal */}
+      {editCluster && (
+        <EditNameModal
+          title="Edit Cluster"
+          name={editCluster.name}
+          description={editCluster.description || ''}
+          onSave={(name, description) => handleSaveCluster(editCluster.id, name, description)}
+          onClose={() => setEditCluster(null)}
         />
       )}
 
@@ -520,6 +579,42 @@ function RegisterHostModal({ clusterId, onClose, onCreated }: { clusterId: strin
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Register</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function EditNameModal({ title, name: initialName, description: initialDescription, onSave, onClose }: {
+  title: string; name: string; description: string; onSave: (name: string, description: string) => void; onClose: () => void
+}) {
+  const [name, setName] = useState(initialName)
+  const [description, setDescription] = useState(initialDescription)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave(name, description)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">{title}</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Save</button>
           </div>
         </form>
       </div>
