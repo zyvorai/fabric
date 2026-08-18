@@ -53,39 +53,43 @@ export default function Console() {
         Back to VM Details
       </button>
 
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
-          <h1 className="text-2xl font-bold">Console: {name}</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMode('terminal')}
-              className={`flex items-center gap-2 px-4 py-2 rounded transition ${
-                mode === 'terminal'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              <TerminalIcon className="w-4 h-4" />
-              Terminal
-            </button>
-            <button
-              onClick={() => setMode('vnc')}
-              className={`flex items-center gap-2 px-4 py-2 rounded transition ${
-                mode === 'vnc'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              <Monitor className="w-4 h-4" />
-              VNC
-            </button>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="icon-tile icon-tile-md icon-tile-blue">
+            {mode === 'terminal' ? <TerminalIcon className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-white truncate">Console: {name}</h1>
+            <p className="text-sm text-slate-500 mt-1">Interactive access to this VM</p>
           </div>
         </div>
-
-        <div className="p-6">
-          {mode === 'terminal' ? <Terminal vmName={name} /> : <VNCViewer vmName={name} />}
+        <div className="flex items-center gap-1 p-1 bg-slate-800/50 border border-slate-700/50 rounded-xl shrink-0">
+          <button
+            onClick={() => setMode('terminal')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              mode === 'terminal'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <TerminalIcon className="w-4 h-4" />
+            Terminal
+          </button>
+          <button
+            onClick={() => setMode('vnc')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              mode === 'vnc'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Monitor className="w-4 h-4" />
+            VNC
+          </button>
         </div>
       </div>
+
+      {mode === 'terminal' ? <Terminal vmName={name} /> : <VNCViewer vmName={name} />}
     </div>
   )
 }

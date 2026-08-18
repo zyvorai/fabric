@@ -2,22 +2,29 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { getToken } from '../api/client'
+import { RotateCw } from 'lucide-react'
 
 interface TerminalProps {
   vmName: string
 }
 
+type Status = 'connecting' | 'connected' | 'disconnected'
+
 export default function Terminal({ vmName }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerm | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+  const [status, setStatus] = useState<Status>('connecting')
+  const [connectAttempt, setConnectAttempt] = useState(0)
 
   useEffect(() => {
     if (!terminalRef.current) return
+    setStatus('connecting')
+    terminalRef.current.replaceChildren()
 
     // Create terminal
     const term = new XTerm({
@@ -44,6 +51,7 @@ export default function Terminal({ vmName }: TerminalProps) {
     ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
+      setStatus('connected')
       term.write('Connected to VM console\r\n')
     }
 
@@ -61,6 +69,7 @@ export default function Terminal({ vmName }: TerminalProps) {
     }
 
     ws.onclose = () => {
+      setStatus('disconnected')
       term.write('\r\nConnection closed\r\n')
     }
 
@@ -78,13 +87,38 @@ export default function Terminal({ vmName }: TerminalProps) {
       ws.close()
       term.dispose()
     }
-  }, [vmName])
+  }, [vmName, connectAttempt])
+
+  const statusMeta: Record<Status, { label: string; dot: string; text: string }> = {
+    connecting: { label: 'Connecting…', dot: 'bg-amber-400 animate-pulse', text: 'text-amber-400' },
+    connected: { label: 'Connected', dot: 'bg-emerald-400', text: 'text-emerald-400' },
+    disconnected: { label: 'Disconnected', dot: 'bg-slate-500', text: 'text-slate-400' },
+  }
+  const meta = statusMeta[status]
 
   return (
-    <div
-      ref={terminalRef}
-      className="w-full h-full bg-black rounded"
-      style={{ minHeight: '500px' }}
-    />
+    <div className="relative rounded-xl border border-slate-700/50 overflow-hidden bg-gradient-to-b from-slate-900 to-black">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/10 bg-slate-900/70">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
+          <span className={`text-xs font-medium ${meta.text}`}>{meta.label}</span>
+        </div>
+        {status === 'disconnected' && (
+          <button
+            type="button"
+            onClick={() => setConnectAttempt((n) => n + 1)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            Reconnect
+          </button>
+        )}
+      </div>
+      <div
+        ref={terminalRef}
+        className="w-full p-2"
+        style={{ minHeight: '500px' }}
+      />
+    </div>
   )
 }

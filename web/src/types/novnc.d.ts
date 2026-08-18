@@ -11,5 +11,7 @@ declare module '@novnc/novnc' {
     clipViewport: boolean
     resizeSession: boolean
     disconnect(): void
+    sendCtrlAltDel(): void
+    focus(): void
   }
 }

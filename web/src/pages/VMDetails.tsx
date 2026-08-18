@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
-import { getVM, getMetrics, deleteVM, addPortForward, VM, VMMetrics } from '../api/vm'
+import { getVM, getMetrics, deleteVM, addPortForward, getVMLogs, VM, VMMetrics, VMLogEntry } from '../api/vm'
 import { listSnapshots, createSnapshot, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
 import { listAuditLogs, AuditLog } from '../api/audit'
 import { getMachineProperties } from '../api/machines'
@@ -1111,95 +1111,173 @@ function SnapshotsTab({ vm }: { vm: VM }) {
   )
 }
 
+const LOG_PRIORITY_STYLE: Record<string, string> = {
+  emerg: 'text-red-400', alert: 'text-red-400', crit: 'text-red-400',
+  err: 'text-red-400', error: 'text-red-400',
+  warning: 'text-amber-400', warn: 'text-amber-400',
+  notice: 'text-cyan-400', info: 'text-slate-300',
+  debug: 'text-slate-500',
+}
+
 function LogsTab({ vm }: { vm: VM }) {
-  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [logs, setLogs] = useState<VMLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [grep, setGrep] = useState('')
+  const [autoRefresh, setAutoRefresh] = useState(vm.state === 'starting' || vm.state === 'running')
+  const [showActivity, setShowActivity] = useState(false)
+  const [activity, setActivity] = useState<AuditLog[]>([])
 
-  const loadLogs = useCallback(async () => {
+  const loadLogs = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     try {
-      const data = await listAuditLogs({ resource_name: vm.name, resource_type: 'vm' })
-      setLogs(data)
+      const data = await getVMLogs(vm.name, { lines: 500, grep: grep || undefined })
+      setLogs(data.entries)
       setError(null)
     } catch (err) {
       setError(formatUserError(err))
     } finally {
       setLoading(false)
     }
-  }, [vm.name])
+  }, [vm.name, grep])
 
   useEffect(() => {
     loadLogs()
   }, [loadLogs])
 
-  const levelStyles: Record<string, string> = {
-    success: 'text-cyan-400',
-    failed: 'text-red-400',
-  }
+  useEffect(() => {
+    if (!autoRefresh) return
+    const id = setInterval(() => loadLogs({ silent: true }), 3000)
+    return () => clearInterval(id)
+  }, [autoRefresh, loadLogs])
 
-  if (loading) {
-    return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <Loader2 className="w-6 h-6 text-slate-500 mx-auto mb-2 animate-spin" />
-        <p className="text-slate-500 text-sm">Loading logs...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <AlertCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400 text-sm mb-3">{error}</p>
-        <button
-          onClick={() => { setLoading(true); loadLogs() }}
-          className="flex items-center gap-1.5 mx-auto px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Retry
-        </button>
-      </div>
-    )
-  }
-
-  if (logs.length === 0) {
-    return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <Terminal className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-500 text-sm">No log entries found for this VM</p>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (!showActivity) return
+    listAuditLogs({ resource_name: vm.name, resource_type: 'vm' }).then(setActivity).catch(() => {})
+  }, [showActivity, vm.name])
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <button
-          onClick={() => { setLoading(true); loadLogs() }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-slate-300 text-sm transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh
-        </button>
-      </div>
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="font-mono text-xs">
-          {logs.map((log) => (
-            <div key={log.id} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-slate-700/50/30 last:border-b-0">
-              <span className="text-slate-600 shrink-0 tabular-nums">
-                {new Date(log.timestamp).toLocaleTimeString()}
-              </span>
-              <span className={`shrink-0 w-16 uppercase ${levelStyles[log.status] || 'text-slate-400'}`}>
-                {log.status === 'success' ? 'INFO' : 'ERROR'}
-              </span>
-              <span className="text-slate-400 shrink-0 w-20">{log.action}</span>
-              <span className="text-slate-300">
-                {log.details || `${log.action} by ${log.user}`}
-                {log.error && <span className="text-red-400 ml-2">({log.error})</span>}
-              </span>
-            </div>
-          ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${
+            vm.state === 'running' ? 'bg-emerald-400 animate-pulse'
+              : vm.state === 'starting' ? 'bg-amber-400 animate-pulse'
+              : vm.state === 'failed' ? 'bg-red-400' : 'bg-slate-600'
+          }`} />
+          <span className="text-sm text-slate-400">
+            {vm.state === 'starting' ? 'Booting — watching console output live' : `VM is ${vm.state}`}
+          </span>
         </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={grep}
+            onChange={(e) => setGrep(e.target.value)}
+            placeholder="Filter…"
+            className="px-3 py-1.5 bg-slate-800 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 w-40"
+          />
+          <button
+            onClick={() => setAutoRefresh((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              autoRefresh ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`} />
+            Live
+          </button>
+          <button
+            onClick={() => loadLogs()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-slate-300 text-sm transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
+          <AlertCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400 text-sm mb-3">{error}</p>
+          <button
+            onClick={() => loadLogs()}
+            className="flex items-center gap-1.5 mx-auto px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!error && loading && logs.length === 0 && (
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
+          <Loader2 className="w-6 h-6 text-slate-500 mx-auto mb-2 animate-spin" />
+          <p className="text-slate-500 text-sm">Loading console output...</p>
+        </div>
+      )}
+
+      {!error && !loading && logs.length === 0 && (
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
+          <Terminal className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-500 text-sm">
+            {vm.state === 'stopped'
+              ? "No console output captured yet — it appears here once this VM has booted at least once."
+              : 'No console output yet — this can take a few seconds right after boot.'}
+          </p>
+        </div>
+      )}
+
+      {logs.length > 0 && (
+        <div className="bg-black/40 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div className="font-mono text-xs max-h-[32rem] overflow-y-auto">
+            {logs.map((log, i) => (
+              <div key={i} className="flex gap-4 px-5 py-1.5 hover:bg-white/[0.03] transition-colors">
+                <span className="text-slate-600 shrink-0 tabular-nums">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
+                {log.unit && <span className="text-slate-500 shrink-0 max-w-[8rem] truncate">{log.unit}</span>}
+                <span className={`break-all ${LOG_PRIORITY_STYLE[log.priority?.toLowerCase()] || 'text-slate-300'}`}>
+                  {log.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <button
+          onClick={() => setShowActivity((v) => !v)}
+          className="text-xs text-slate-500 hover:text-slate-400 transition-colors"
+        >
+          {showActivity ? '▾' : '▸'} Activity (create/start/stop history)
+        </button>
+        {showActivity && (
+          <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden mt-2">
+            {activity.length === 0 ? (
+              <p className="text-slate-500 text-sm p-4">No activity recorded for this VM.</p>
+            ) : (
+              <div className="font-mono text-xs">
+                {activity.map((log) => (
+                  <div key={log.id} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-slate-700/50 last:border-b-0">
+                    <span className="text-slate-600 shrink-0 tabular-nums">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className={`shrink-0 w-16 uppercase ${log.status === 'success' ? 'text-cyan-400' : 'text-red-400'}`}>
+                      {log.status === 'success' ? 'INFO' : 'ERROR'}
+                    </span>
+                    <span className="text-slate-400 shrink-0 w-20">{log.action}</span>
+                    <span className="text-slate-300">
+                      {log.details || `${log.action} by ${log.user}`}
+                      {log.error && <span className="text-red-400 ml-2">({log.error})</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

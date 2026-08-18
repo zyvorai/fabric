@@ -106,6 +106,29 @@ export async function getMetrics(name: string): Promise<VMMetrics> {
   return apiGet<VMMetrics>(`${API_BASE}/vms/${name}/metrics`)
 }
 
+export interface VMLogEntry {
+  timestamp: string
+  hostname: string
+  unit: string
+  message: string
+  priority: string
+}
+
+export interface VMLogResponse {
+  entries: VMLogEntry[]
+  count: number
+}
+
+/** Real boot/runtime console output for this VM (Ephemera's captured
+    console log), not the audit trail of API actions taken against it. */
+export async function getVMLogs(name: string, opts?: { lines?: number; grep?: string }): Promise<VMLogResponse> {
+  const params = new URLSearchParams()
+  if (opts?.lines) params.set('lines', String(opts.lines))
+  if (opts?.grep) params.set('grep', opts.grep)
+  const qs = params.toString()
+  return apiGet<VMLogResponse>(`${API_BASE}/vms/${name}/logs${qs ? `?${qs}` : ''}`)
+}
+
 /**
  * Expose a guest port on this VM's usermode networking. If the VM is
  * currently running, the backend destroys and relaunches it (usermode
