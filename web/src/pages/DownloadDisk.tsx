@@ -83,7 +83,7 @@ export default function DownloadDisk() {
 
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
     <button onClick={() => handleSort(field)} className="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors">
-      {label} <ArrowUpDown className={`w-3 h-3 ${sortField === field ? 'text-blue-400' : ''}`} />
+      {label} <ArrowUpDown className={`w-3.5 h-3.5 ${sortField === field ? 'text-blue-400' : ''}`} />
     </button>
   )
 

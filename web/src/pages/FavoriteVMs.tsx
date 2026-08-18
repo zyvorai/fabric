@@ -78,7 +78,7 @@ export default function FavoriteVMs() {
         </div>
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium flex-shrink-0 ${stateColor(vm.state)}`}>{vm.state || 'unknown'}</span>
         <Link to={`/vms/${vm.name}/console`} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all flex-shrink-0">
-          <Monitor className="w-3 h-3" /> Console
+          <Monitor className="w-3.5 h-3.5" /> Console
         </Link>
       </div>
     )

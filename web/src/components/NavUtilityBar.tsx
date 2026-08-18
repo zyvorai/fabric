@@ -85,7 +85,7 @@ export default function NavUtilityBar({
             <CircleHelp className="w-4 h-4 shrink-0" aria-hidden />
             <span className="hidden xl:inline text-xs font-medium">Help</span>
             <ChevronDown
-              className={`w-3 h-3 hidden xl:block transition-transform ${helpMenuOpen ? 'rotate-180' : ''}`}
+              className={`w-3.5 h-3.5 hidden xl:block transition-transform ${helpMenuOpen ? 'rotate-180' : ''}`}
               aria-hidden
             />
           </button>
@@ -147,7 +147,7 @@ export default function NavUtilityBar({
               >
                 <BookOpen className="w-4 h-4 shrink-0" aria-hidden />
                 Help &amp; documentation
-                <ExternalLink className="w-3 h-3 ml-auto opacity-60" aria-hidden />
+                <ExternalLink className="w-3.5 h-3.5 ml-auto opacity-60" aria-hidden />
               </a>
               <a
                 role="menuitem"
@@ -199,7 +199,7 @@ export default function NavUtilityBar({
             }`}
             title={user.username}
           >
-            <User className="w-3 h-3 shrink-0" aria-hidden />
+            <User className="w-3.5 h-3.5 shrink-0" aria-hidden />
             <span className="truncate">{user.username}</span>
           </span>
           <button

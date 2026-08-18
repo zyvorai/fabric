@@ -166,7 +166,7 @@ export default function DiskConverter() {
               <input type="text" value={sourcePath} onChange={(e) => { setSourcePath(e.target.value); setOutputEdited(false) }} placeholder="/path/to/disk.vmdk"
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
               <button onClick={() => void loadDiskImages()} disabled={loadingImages} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                <RefreshCw className={`w-3 h-3 ${loadingImages ? 'animate-spin' : ''}`} /> Load available disk images
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingImages ? 'animate-spin' : ''}`} /> Load available disk images
               </button>
             </div>
           )}

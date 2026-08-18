@@ -147,7 +147,7 @@ export default function JobMonitor() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-white truncate">{job.name || job.vm_name || job.id}</span>
                   <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
-                    <Icon className={`w-3 h-3 ${job.status === 'running' ? 'animate-spin' : ''}`} /> {job.status}
+                    <Icon className={`w-3.5 h-3.5 ${job.status === 'running' ? 'animate-spin' : ''}`} /> {job.status}
                   </span>
                 </div>
                 <div className="bg-slate-700 rounded-full h-1.5 mb-2"><div className={`h-full rounded-full transition-all ${job.status === 'completed' ? 'bg-green-500' : job.status === 'failed' ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${job.progress}%` }} /></div>

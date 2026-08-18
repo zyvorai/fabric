@@ -140,7 +140,7 @@ export default function ServiceMap() {
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${typeBadge(node.type)}`}>{node.type}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                  <Server className="w-3 h-3" /><span>{node.vm}</span>
+                  <Server className="w-3.5 h-3.5" /><span>{node.vm}</span>
                   {node.port && <><span className="text-slate-700">|</span><span>:{node.port}</span></>}
                 </div>
                 <div className="flex items-center gap-3 text-xs">

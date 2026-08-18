@@ -216,18 +216,18 @@ export default function Machines() {
                   <h3 className="font-bold text-lg">{selectedMachine}</h3>
                   <div className="flex gap-2">
                     <button onClick={handleReboot}
-                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm flex items-center gap-1"><RotateCw className="w-3 h-3" />Reboot</button>
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm flex items-center gap-1"><RotateCw className="w-3.5 h-3.5" />Reboot</button>
                     <button onClick={handlePoweroff}
-                      className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm flex items-center gap-1"><Power className="w-3 h-3" />Poweroff</button>
+                      className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm flex items-center gap-1"><Power className="w-3.5 h-3.5" />Poweroff</button>
                     <button onClick={handleTerminate}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm flex items-center gap-1"><XCircle className="w-3 h-3" />Kill</button>
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Kill</button>
                   </div>
                 </div>
 
                 {/* SSH info */}
                 {sshInfo?.ssh_command && (
                   <div className="bg-slate-800/50 rounded p-3 mb-3">
-                    <div className="text-xs text-slate-400 mb-1 flex items-center gap-1"><Key className="w-3 h-3" /> SSH Command</div>
+                    <div className="text-xs text-slate-400 mb-1 flex items-center gap-1"><Key className="w-3.5 h-3.5" /> SSH Command</div>
                     <code className="text-sm text-green-400 font-mono">{sshInfo.ssh_command}</code>
                   </div>
                 )}
@@ -303,7 +303,7 @@ export default function Machines() {
                     <td className="p-4">{img.read_only ? 'Yes' : 'No'}</td>
                     <td className="p-4">
                       <button onClick={() => handleRemoveImage(img.name)}
-                        className="p-2 bg-red-600 hover:bg-red-700 rounded"><Trash2 className="w-3 h-3" /></button>
+                        className="p-2 bg-red-600 hover:bg-red-700 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                     </td>
                   </tr>
                 ))}

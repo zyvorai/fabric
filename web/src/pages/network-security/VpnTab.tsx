@@ -204,7 +204,7 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
             <InputField label="Allowed IPs (comma-separated)" value={peerAllowedIps} onChange={setPeerAllowedIps} placeholder="10.0.0.0/24" />
           </div>
           <button type="button" onClick={addPeer} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
-            <Plus className="w-3 h-3" /> Add Peer
+            <Plus className="w-3.5 h-3.5" /> Add Peer
           </button>
           {peers.length > 0 && (
             <div className="space-y-1 mt-2">
@@ -213,7 +213,7 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
                   <span className="text-slate-300 truncate">{p.public_key.slice(0, 20)}...</span>
                   {p.endpoint && <span className="text-slate-400">{p.endpoint}</span>}
                   <button onClick={() => setPeers(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}

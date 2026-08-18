@@ -217,10 +217,10 @@ export default function Login() {
           </p>
           <div className="login-fade-in login-fade-in-d3 flex flex-wrap gap-2 mt-6">
             <span className="login-stat-pill login-stat-pill-glow">
-              <Server className="w-3 h-3" /> VMs &amp; HA
+              <Server className="w-3.5 h-3.5" /> VMs &amp; HA
             </span>
             <span className="login-stat-pill">
-              <HardDrive className="w-3 h-3" /> Storage fabric
+              <HardDrive className="w-3.5 h-3.5" /> Storage fabric
             </span>
             <span className="login-stat-pill">Network &amp; security</span>
             <span className="login-stat-pill">PAM + RBAC</span>

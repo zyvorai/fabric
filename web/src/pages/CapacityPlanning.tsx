@@ -127,7 +127,7 @@ export default function CapacityPlanning() {
                 <div className="text-right">
                   <div className="text-lg font-bold text-white">{pct.toFixed(1)}%</div>
                   <div className={`text-xs flex items-center gap-1 justify-end ${trendColor(m.trend)}`}>
-                    {m.trend > 0 ? <TrendingUp className="w-3 h-3" /> : m.trend < 0 ? <TrendingDown className="w-3 h-3" /> : null}
+                    {m.trend > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : m.trend < 0 ? <TrendingDown className="w-3.5 h-3.5" /> : null}
                     {m.trend > 0 ? '+' : ''}{m.trend.toFixed(1)}%/week
                   </div>
                 </div>

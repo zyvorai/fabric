@@ -78,9 +78,9 @@ export default function Profiles() {
             </div>
             <p className="text-sm text-slate-400 mb-4">{p.description}</p>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><Cpu className="w-3 h-3" />CPUs</span><span className="font-medium">{p.cpus}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><MemoryStick className="w-3 h-3" />Memory</span><span className="font-medium">{p.memory >= 1024 ? `${p.memory / 1024} GB` : `${p.memory} MB`}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><HardDrive className="w-3 h-3" />Disk</span><span className="font-medium">{p.disk} GB</span></div>
+              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><Cpu className="w-3.5 h-3.5" />CPUs</span><span className="font-medium">{p.cpus}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><MemoryStick className="w-3.5 h-3.5" />Memory</span><span className="font-medium">{p.memory >= 1024 ? `${p.memory / 1024} GB` : `${p.memory} MB`}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><HardDrive className="w-3.5 h-3.5" />Disk</span><span className="font-medium">{p.disk} GB</span></div>
               {p.network_bandwidth && <div className="flex justify-between"><span className="text-slate-400">Network</span><span className="font-medium">{p.network_bandwidth}</span></div>}
             </div>
             {p.builtin && <div className="mt-3 text-xs text-slate-500">Built-in</div>}

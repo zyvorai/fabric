@@ -203,7 +203,7 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
             <InputField label="TTL" value={recTtl} onChange={setRecTtl} placeholder="300" type="number" />
           </div>
           <button type="button" onClick={addRecord} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
-            <Plus className="w-3 h-3" /> Add Record
+            <Plus className="w-3.5 h-3.5" /> Add Record
           </button>
           {records.length > 0 && (
             <div className="space-y-1 mt-2">
@@ -214,7 +214,7 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
                   <span className="text-slate-400">{r.value}</span>
                   <span className="text-slate-500">TTL:{r.ttl}</span>
                   <button onClick={() => setRecords(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}

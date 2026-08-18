@@ -292,7 +292,7 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
             </div>
           </div>
           <button type="button" onClick={addThreshold} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
-            <Plus className="w-3 h-3" /> Add Threshold
+            <Plus className="w-3.5 h-3.5" /> Add Threshold
           </button>
           {thresholds.length > 0 && (
             <div className="space-y-1 mt-2">
@@ -303,7 +303,7 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
                   <span className="text-slate-400">{t.value} {t.unit}</span>
                   <span className="text-slate-500">{t.direction}</span>
                   <button onClick={() => setThresholds(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}

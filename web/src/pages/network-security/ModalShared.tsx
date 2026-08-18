@@ -54,7 +54,7 @@ export function LabelSelectorInput({
           onClick={handleAdd}
           className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-sm"
         >
-          <Plus className="w-3 h-3" /> Add
+          <Plus className="w-3.5 h-3.5" /> Add
         </button>
       </div>
       {Object.keys(labels).length > 0 && (
@@ -66,7 +66,7 @@ export function LabelSelectorInput({
             >
               {k}={v}
               <button type="button" onClick={() => handleRemove(k)} className="hover:text-red-400 transition">
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           ))}

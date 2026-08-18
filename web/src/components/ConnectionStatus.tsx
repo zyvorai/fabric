@@ -57,13 +57,13 @@ export default function ConnectionStatus() {
       {isLive ? (
         <>
           <div className={`w-1.5 h-1.5 rounded-full ${dotClasses(theme, true)}`} />
-          <Wifi className="w-3 h-3 shrink-0" aria-hidden />
+          <Wifi className="w-3.5 h-3.5 shrink-0" aria-hidden />
           <span className="whitespace-nowrap max-xl:sr-only">Live</span>
         </>
       ) : (
         <>
           <div className={`w-1.5 h-1.5 rounded-full ${dotClasses(theme, false)}`} />
-          <WifiOff className="w-3 h-3 shrink-0" aria-hidden />
+          <WifiOff className="w-3.5 h-3.5 shrink-0" aria-hidden />
           <span className="whitespace-nowrap max-xl:sr-only">Offline</span>
         </>
       )}

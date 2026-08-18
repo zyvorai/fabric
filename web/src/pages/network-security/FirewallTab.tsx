@@ -248,7 +248,7 @@ export function CreateFirewallProfileModal({ onClose, onCreated }: { onClose: ()
             </select>
           </div>
           <button type="button" onClick={addRule} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
-            <Plus className="w-3 h-3" /> Add Rule
+            <Plus className="w-3.5 h-3.5" /> Add Rule
           </button>
           {rules.length > 0 && (
             <div className="space-y-1 mt-2">
@@ -260,7 +260,7 @@ export function CreateFirewallProfileModal({ onClose, onCreated }: { onClose: ()
                   {r.source_cidr && <span className="text-slate-400">src:{r.source_cidr}</span>}
                   {r.dest_cidr && <span className="text-slate-400">dst:{r.dest_cidr}</span>}
                   <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}

@@ -94,7 +94,7 @@ export default function ZyvorAbout({ className = '' }: { className?: string }) {
                 className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-sm"
               >
                 {link.label}
-                <ExternalLink className="w-3 h-3 shrink-0" aria-hidden />
+                <ExternalLink className="w-3.5 h-3.5 shrink-0" aria-hidden />
               </a>
             </li>
           ))}

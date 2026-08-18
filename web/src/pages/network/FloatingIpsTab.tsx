@@ -78,7 +78,7 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
                         {!readOnly && f.assigned_vm ? (
                           onUnassign && (
                             <button type="button" onClick={() => onUnassign(f.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Unassign from VM">
-                              <Unlink className="w-3 h-3" /> Unassign
+                              <Unlink className="w-3.5 h-3.5" /> Unassign
                             </button>
                           )
                         ) : (
@@ -111,7 +111,7 @@ function AssignButton({ fip, onAssign }: { fip: FloatingIp; onAssign: (id: strin
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/40 transition">
-        <Link2 className="w-3 h-3" /> Assign
+        <Link2 className="w-3.5 h-3.5" /> Assign
       </button>
       {open && (
         <AssignFloatingIpModal

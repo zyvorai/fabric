@@ -327,7 +327,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium text-slate-400 bg-slate-700/50 px-2.5 py-1 rounded-full">{vms.length} VMs</span>
             <Link to="/vms" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-              View all <ArrowUpRight className="w-3 h-3" />
+              View all <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
