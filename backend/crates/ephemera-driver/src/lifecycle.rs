@@ -247,12 +247,22 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         firmware: opts.firmware.clone().map(PathBuf::from),
         kernel_args: if opts.extra_args.is_empty() { None } else { Some(opts.extra_args.join(" ")) },
         network,
-        // Only meaningful (and only ever set) alongside netns tap
-        // networking above -- static_network needs a reserved address to
-        // inject, which only that mode has (see Ephemera's
-        // ephemera_network::netns::NetnsHandle).
-        cloud_init: (opts.network_tap && opts.network_static_ip).then(|| {
-            zyvor_fabric_ephemera_client::CloudInitSpec { static_network: true, ..Default::default() }
+        // Always attach a cloud-init seed, even an empty one, not just when
+        // there's an ssh key/hostname to inject -- without ANY NoCloud
+        // datasource present, cloud-init never finds one to read and never
+        // runs its own default network config, which is what actually
+        // brings the guest's DHCP client up. Found live: a VM started with
+        // no cloud-init configured at all sat forever on
+        // systemd-networkd-wait-online with no working network -- true even
+        // for a stock Ubuntu cloud image, not something specific to a
+        // hand-built test image. `static_network` stays gated on netns tap
+        // networking -- it needs a reserved address to inject, which only
+        // that mode has (see Ephemera's ephemera_network::netns::NetnsHandle).
+        cloud_init: Some(zyvor_fabric_ephemera_client::CloudInitSpec {
+            hostname: vm.hostname.clone(),
+            ssh_authorized_keys: opts.ssh_authorized_keys.clone(),
+            static_network: opts.network_tap && opts.network_static_ip,
+            ..Default::default()
         }),
         ttl_seconds: None,
         extra_args: vec![],

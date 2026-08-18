@@ -439,6 +439,7 @@ pub async fn add_port_forward(
             port_forwards: vm.port_forwards.clone(),
             network_tap: vm.network_tap,
             network_static_ip: vm.network_static_ip,
+            ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -573,6 +574,7 @@ pub async fn start_vm(
             port_forwards: vm.port_forwards.clone(),
             network_tap: vm.network_tap,
             network_static_ip: vm.network_static_ip,
+            ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
             ..Default::default()
         });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;
@@ -991,15 +993,70 @@ pub async fn get_metrics(
     }
 }
 
+/// Pulls `ssh_authorized_keys` out of arbitrary cloud-config YAML -- either
+/// top-level (`ssh_authorized_keys: [...]`) or nested under `users[]`
+/// (the more common shape, matching CloudInitTab.tsx's default template).
+/// Best-effort: invalid/unparseable YAML just yields no keys rather than
+/// erroring the whole request, since user_data is free-text the user edits
+/// directly and may be mid-edit or intentionally minimal.
+fn extract_ssh_keys_from_user_data(user_data: &str) -> Vec<String> {
+    let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(user_data) else {
+        return Vec::new();
+    };
+    let mut keys = Vec::new();
+    let mut collect = |v: &serde_yaml::Value| {
+        if let Some(seq) = v.as_sequence() {
+            keys.extend(seq.iter().filter_map(|k| k.as_str().map(String::from)));
+        }
+    };
+    if let Some(v) = doc.get("ssh_authorized_keys") {
+        collect(v);
+    }
+    if let Some(users) = doc.get("users").and_then(|v| v.as_sequence()) {
+        for user in users {
+            if let Some(v) = user.get("ssh_authorized_keys") {
+                collect(v);
+            }
+        }
+    }
+    keys
+}
+
+/// Only `hostname` and any `ssh_authorized_keys` found in `user_data` are
+/// actually applied on the VM's next (re)launch, via Ephemera's own
+/// CloudInitSpec (see EphemeraDriver::translate_start_options) -- the ISO
+/// this also generates is not currently attached to any VM at all, so
+/// anything else in user_data (packages, runcmd, write_files, ...) is
+/// presentation-only for now, not a live no-op regression. Persisting even
+/// just these two matters beyond the values themselves: they're what makes
+/// Ephemera attach a cloud-init seed disk at all, which is what lets
+/// cloud-init find a datasource and run its own default network config --
+/// without one, a guest's DHCP client never comes up (found live: this
+/// endpoint wrote an ISO no VM ever received, so cloud-init and therefore
+/// networking silently never worked for any VM here).
 pub async fn configure_cloud_init(
     RequireWrite(_claims): RequireWrite,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(config): Json<CloudInitConfig>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&vm_name) {
         return json_error(status, msg).into_response();
     }
+
+    if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
+        vm.hostname = Some(config.hostname.clone());
+        if let Some(ref user_data) = config.user_data {
+            let keys = extract_ssh_keys_from_user_data(user_data);
+            if !keys.is_empty() {
+                vm.ssh_authorized_keys = keys;
+            }
+        }
+        if let Err(e) = state.store.save_vm(&vm) {
+            tracing::warn!("Failed to persist cloud-init settings for VM '{}': {}", vm_name, e);
+        }
+    }
+
     let generator = match CloudInitGenerator::new("/var/lib/zyvor-fabricd/cloud-init") {
         Ok(gen) => gen,
         Err(e) => {

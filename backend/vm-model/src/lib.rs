@@ -54,6 +54,16 @@ pub struct VM {
     /// DHCP client (which not every image runs automatically on boot).
     #[serde(default)]
     pub network_static_ip: bool,
+    /// SSH public keys to inject via cloud-init on (re)creation -- also the
+    /// reason *any* cloud-init seed gets attached at all for a plain NAT
+    /// VM with no other cloud-init needs: without one, cloud-init finds no
+    /// datasource and never runs its own default network config, which is
+    /// what actually brings the guest's DHCP client up (found live: a VM
+    /// with zero cloud-init configured sat forever on
+    /// systemd-networkd-wait-online, with no network -- and therefore no
+    /// working port forward -- ever coming up).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ssh_authorized_keys: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -298,6 +308,13 @@ pub struct VMStartOptions {
     /// when `network_tap` is set.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub port_forwards: Vec<PortForwardSpec>,
+    /// SSH public keys to inject via cloud-init on (re)creation. Also what
+    /// gets a cloud-init seed disk attached at all for a plain NAT VM with
+    /// nothing else cloud-init-worthy configured -- without one, cloud-init
+    /// never finds a datasource and never runs its own default network
+    /// config, which is what actually brings the guest's DHCP client up.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ssh_authorized_keys: Vec<String>,
     /// Firmware definition file path
     #[serde(skip_serializing_if = "Option::is_none")]
     pub firmware: Option<String>,
@@ -866,6 +883,7 @@ impl VM {
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,
+            ssh_authorized_keys: Vec::new(),
         }
     }
 
@@ -890,6 +908,7 @@ impl VM {
             port_forwards: req.port_forwards.clone(),
             network_tap: req.network_tap,
             network_static_ip: req.network_static_ip,
+            ssh_authorized_keys: Vec::new(),
         }
     }
 }
@@ -1074,6 +1093,7 @@ mod tests {
             network_static_ip: false,
             network_user_mode: false,
             port_forwards: vec![PortForwardSpec { host_port: 2222, guest_port: 22, protocol: "tcp".into() }],
+            ssh_authorized_keys: vec!["ssh-ed25519 AAAA test".into()],
             firmware: Some("/usr/share/ovmf/OVMF.fd".into()),
             discard_disk: Some(true),
             grow_image: Some("50G".into()),
