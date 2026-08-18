@@ -5,6 +5,7 @@
 import { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Rocket, Terminal, LayoutTemplate, ShieldCheck, ArrowRight } from 'lucide-react'
+import { FabricGraphic } from './FabricGraphic'
 
 interface Step {
   icon: ReactNode
@@ -59,9 +60,14 @@ const STEPS: Step[] = [
 export function GettingStarted() {
   return (
     <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 overflow-hidden">
-      <div className="px-6 pt-6 pb-2 animate-fade-in">
-        <h2 className="text-lg font-semibold text-white">Welcome to Zyvor Fabric</h2>
-        <p className="text-sm text-slate-400 mt-1">A few places to start — jump to whichever fits what you're doing.</p>
+      <div className="px-6 pt-6 pb-2 animate-fade-in flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Welcome to Zyvor Fabric</h2>
+          <p className="text-sm text-slate-400 mt-1">A few places to start — jump to whichever fits what you're doing.</p>
+        </div>
+        <div className="hidden sm:block w-32 h-28 shrink-0 -mt-2 -mr-1">
+          <FabricGraphic />
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6">
         {STEPS.map((step, i) => (

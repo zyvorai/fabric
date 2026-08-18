@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { listVMs, getMetrics, VM, VMMetrics } from '../api/vm'
-import { Activity, Server, Cpu, HardDrive, TrendingUp, ArrowUpRight, Power } from 'lucide-react'
+import { Activity, Server, Cpu, HardDrive, TrendingUp, ArrowUpRight, Power, Plus } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useWebSocketContext } from '../contexts/WebSocketContext'
 import { useToastContext } from '../contexts/ToastContext'
@@ -15,8 +15,10 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
-import { PageHeader } from '../components/ui/PageHeader'
 import { GettingStarted } from '../components/GettingStarted'
+import { FabricGraphic } from '../components/FabricGraphic'
+import { RadialGauge } from '../components/RadialGauge'
+import { useCountUp } from '../hooks/useCountUp'
 import { usePlatformInfo } from '../contexts/PlatformInfoContext'
 import type { SubsystemPhase } from '../api/capabilities'
 
@@ -110,28 +112,64 @@ export default function Dashboard() {
     totalCPU: vms.reduce((a, v) => a + v.cpus, 0),
     totalMem: vms.reduce((a, v) => a + v.memory, 0),
   }
+  const fleetHealthPct = stats.total > 0 ? (stats.running / stats.total) * 100 : 0
+
+  const totalCount = useCountUp(stats.total)
+  const runningCount = useCountUp(stats.running)
+  const stoppedCount = useCountUp(stats.stopped)
+  const memCount = useCountUp(Math.round(stats.totalMem >= 1024 ? stats.totalMem / 1024 : stats.totalMem))
 
   if (loading) return <SkeletonDashboard />
 
   const latestCpu = metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].cpu : 0
   const latestMem = metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].memory : 0
+  const greeting = (() => {
+    const h = new Date().getHours()
+    return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+  })()
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Zyvor Fabric"
-        description="Virtual machine infrastructure overview"
-        onRefresh={loadVMs}
-        refreshing={loading}
-        primaryAction={
-          <Link
-            to="/create"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            Create VM
-          </Link>
-        }
-      />
+      {/* Hero */}
+      <div className="glass-panel relative overflow-hidden px-6 py-6 sm:px-8 sm:py-7">
+        <div className="pointer-events-none absolute -right-6 -top-10 w-72 h-72 opacity-70">
+          <FabricGraphic ambient />
+        </div>
+        <div className="relative flex flex-col sm:flex-row sm:items-center gap-6">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-blue-300/80 uppercase tracking-wider mb-1">{greeting}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Zyvor Fabric</h1>
+            <p className="text-sm text-slate-400 mt-1.5 max-w-md">
+              {stats.total === 0
+                ? 'Your infrastructure control plane is ready — spin up the first VM to get going.'
+                : `Watching ${stats.total} VM${stats.total === 1 ? '' : 's'} across your fabric. ${stats.running} running right now.`}
+            </p>
+            <div className="flex items-center gap-3 mt-4">
+              <Link
+                to="/create"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Create VM
+              </Link>
+              <button
+                onClick={loadVMs}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+          {stats.total > 0 && (
+            <div className="shrink-0 flex items-center gap-3 self-center">
+              <RadialGauge
+                percent={fleetHealthPct}
+                color={fleetHealthPct >= 70 ? '#34d399' : fleetHealthPct >= 30 ? '#fbbf24' : '#f87171'}
+                label="fleet up"
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {loadError && (
         <ErrorBanner
@@ -205,7 +243,7 @@ export default function Dashboard() {
             </div>
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">total</span>
           </div>
-          <div className="text-2xl font-bold text-white">{stats.total}</div>
+          <div className="text-2xl font-bold text-white tabular-nums">{totalCount}</div>
           <div className="text-xs text-slate-400 mt-1">Total VMs</div>
         </div>
 
@@ -219,7 +257,7 @@ export default function Dashboard() {
               {stats.total > 0 ? `${Math.round((stats.running / stats.total) * 100)}%` : '0%'}
             </span>
           </div>
-          <div className="text-2xl font-bold text-white">{stats.running}</div>
+          <div className="text-2xl font-bold text-white tabular-nums">{runningCount}</div>
           <div className="text-xs text-slate-400 mt-1">Running</div>
         </div>
 
@@ -231,7 +269,7 @@ export default function Dashboard() {
             </div>
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">stopped</span>
           </div>
-          <div className="text-2xl font-bold text-white">{stats.stopped}</div>
+          <div className="text-2xl font-bold text-white tabular-nums">{stoppedCount}</div>
           <div className="text-xs text-slate-400 mt-1">Stopped</div>
         </div>
 
@@ -245,8 +283,8 @@ export default function Dashboard() {
               {stats.totalCPU} vCPU
             </span>
           </div>
-          <div className="text-2xl font-bold text-white">
-            {stats.totalMem >= 1024 ? `${(stats.totalMem / 1024).toFixed(1)}` : stats.totalMem}
+          <div className="text-2xl font-bold text-white tabular-nums">
+            {memCount}
             <span className="text-sm text-slate-500 font-medium ml-1">{stats.totalMem >= 1024 ? 'GB' : 'MB'}</span>
           </div>
           <div className="text-xs text-slate-400 mt-1">Total Memory</div>
