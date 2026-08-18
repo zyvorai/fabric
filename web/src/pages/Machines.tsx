@@ -3,10 +3,11 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import {
   Server, Terminal, Key, Download, Power, RotateCw, XCircle,
   HardDrive, RefreshCw, Trash2, CheckCircle2, Ban, FolderInput,
-  Copy, Pencil, Lock, Unlock, Sparkles, X,
+  Copy, Pencil, Lock, Unlock, Sparkles, X, Monitor,
 } from 'lucide-react'
 import {
   listMachines, getMachineProperties, shellMachine, getSshInfo,
@@ -26,6 +27,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Machines() {
+  const navigate = useNavigate()
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [machines, setMachines] = useState<MachineInfo[]>([])
@@ -280,7 +282,11 @@ export default function Machines() {
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-lg">{selectedMachine}</h3>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => navigate(`/vms/${selectedMachine}/console`)}
+                      className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm flex items-center gap-1"><Terminal className="w-3.5 h-3.5" />Terminal</button>
+                    <button onClick={() => navigate(`/vms/${selectedMachine}/console?mode=vnc`)}
+                      className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm flex items-center gap-1"><Monitor className="w-3.5 h-3.5" />VNC</button>
                     <button onClick={handleReboot}
                       className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm flex items-center gap-1"><RotateCw className="w-3.5 h-3.5" />Reboot</button>
                     <button onClick={handlePoweroff}
@@ -295,12 +301,25 @@ export default function Machines() {
                 </div>
 
                 {/* SSH info */}
-                {sshInfo?.ssh_command && (
-                  <div className="bg-slate-800/50 rounded p-3 mb-3">
-                    <div className="text-xs text-slate-400 mb-1 flex items-center gap-1"><Key className="w-3.5 h-3.5" /> SSH Command</div>
-                    <code className="text-sm text-green-400 font-mono">{sshInfo.ssh_command}</code>
-                  </div>
-                )}
+                <div className="bg-slate-800/50 rounded p-3 mb-3">
+                  <div className="text-xs text-slate-400 mb-1 flex items-center gap-1"><Key className="w-3.5 h-3.5" /> SSH</div>
+                  {sshInfo?.ssh_command ? (
+                    <div className="flex items-center gap-2">
+                      <code className="text-sm text-green-400 font-mono flex-1">{sshInfo.ssh_command}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(sshInfo.ssh_command!); toast.success('Copied') }}
+                        title="Copy" className="p-1.5 hover:bg-white/[0.05] rounded transition-colors text-slate-400 hover:text-white"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      No SSH address yet — this VM has no host-routable IP (NAT networking with no port
+                      forward, or bridged networking still waiting on a DHCP lease).
+                    </p>
+                  )}
+                </div>
 
                 {/* Properties */}
                 <div className="grid grid-cols-2 gap-2 text-sm">

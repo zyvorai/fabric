@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { ArrowLeft, Terminal as TerminalIcon, Monitor } from 'lucide-react'
 import Terminal from '../components/Terminal'
 import VNCViewer from '../components/VNCViewer'
@@ -17,7 +17,8 @@ export default function Console() {
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const toast = useToastContext()
-  const [mode, setMode] = useState<'terminal' | 'vnc'>('terminal')
+  const [searchParams] = useSearchParams()
+  const [mode, setMode] = useState<'terminal' | 'vnc'>(searchParams.get('mode') === 'vnc' ? 'vnc' : 'terminal')
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
