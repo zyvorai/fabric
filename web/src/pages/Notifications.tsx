@@ -8,6 +8,7 @@ import {
   listChannels,
   listRules,
   createChannel,
+  createRule,
   deleteChannel,
   deleteRule,
   enableRule,
@@ -442,22 +443,11 @@ export default function Notifications() {
       )}
 
       {showCreateRule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Create Notification Rule</h2>
-            <p className="text-slate-400 mb-4">
-              Configure when and how to send notifications
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowCreateRule(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <CreateRuleModal
+          channels={channels}
+          onClose={() => setShowCreateRule(false)}
+          onCreated={() => { setShowCreateRule(false); loadData() }}
+        />
       )}
 
       {confirmState && (
@@ -596,6 +586,116 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
             <button type="submit" disabled={saving}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50">
               {saving ? 'Creating…' : 'Create Channel'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+const RULE_EVENT_TYPES = [
+  'created', 'started', 'stopped', 'paused', 'resumed', 'deleted', 'cloned', 'migrated',
+  'snapshot_created', 'snapshot_reverted', 'cpu_hotplug', 'memory_hotplug',
+  'disk_attached', 'disk_detached', 'error', 'auto_healed',
+]
+const RULE_SEVERITIES: Array<'info' | 'warning' | 'critical'> = ['info', 'warning', 'critical']
+
+function CreateRuleModal({ channels, onClose, onCreated }: { channels: NotificationChannel[]; onClose: () => void; onCreated: () => void }) {
+  const toast = useToastContext()
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [eventTypes, setEventTypes] = useState<string[]>(['error'])
+  const [severityLevels, setSeverityLevels] = useState<Array<'info' | 'warning' | 'critical'>>(['warning', 'critical'])
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  const toggle = <T,>(list: T[], value: T, setList: (v: T[]) => void) => {
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value])
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (eventTypes.length === 0) { toast.error('Select at least one event type'); return }
+    if (severityLevels.length === 0) { toast.error('Select at least one severity'); return }
+    if (selectedChannels.length === 0) { toast.error('Select at least one channel'); return }
+    setSaving(true)
+    try {
+      await createRule({
+        name,
+        description: description || undefined,
+        event_types: eventTypes,
+        severity_levels: severityLevels,
+        channels: selectedChannels,
+      })
+      toast.success('Notification rule created')
+      onCreated()
+    } catch (err) {
+      toastFailure(toast, 'Failed to create rule', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">Create Notification Rule</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
+              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="e.g. vm-failures-to-oncall" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Description (optional)</label>
+            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Event types</label>
+            <div className="flex flex-wrap gap-2">
+              {RULE_EVENT_TYPES.map((et) => (
+                <button type="button" key={et} onClick={() => toggle(eventTypes, et, setEventTypes)}
+                  className={`px-2.5 py-1 rounded text-xs font-mono transition ${eventTypes.includes(et) ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700/50'}`}>
+                  {et}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Severity</label>
+            <div className="flex gap-2">
+              {RULE_SEVERITIES.map((sev) => (
+                <button type="button" key={sev} onClick={() => toggle(severityLevels, sev, setSeverityLevels)}
+                  className={`px-3 py-1.5 rounded text-sm capitalize transition ${severityLevels.includes(sev) ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700/50'}`}>
+                  {sev}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Channels</label>
+            {channels.length === 0 ? (
+              <p className="text-sm text-slate-500">No channels yet — add one first.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {channels.map((ch) => (
+                  <button type="button" key={ch.id} onClick={() => toggle(selectedChannels, ch.id, setSelectedChannels)}
+                    className={`px-3 py-1.5 rounded text-sm transition ${selectedChannels.includes(ch.id) ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700/50'}`}>
+                    {ch.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving || channels.length === 0}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50">
+              {saving ? 'Creating…' : 'Create Rule'}
             </button>
           </div>
         </form>
