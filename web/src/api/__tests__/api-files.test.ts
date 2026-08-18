@@ -813,7 +813,7 @@ describe('encryption', () => {
 
   it('createEncryptionPolicy calls apiPost', async () => {
     const { createEncryptionPolicy } = await import('../encryption')
-    const req = { name: 'aes256', provider_id: 'kms1', algorithm: 'AES-256-XTS', key_size: 256 }
+    const req = { name: 'aes256', key_provider_id: 'kms1', algorithm: 'aes256_xts' }
     await createEncryptionPolicy(req)
     expect(mockApiPost).toHaveBeenCalledWith('/api/encryption/policies', req)
   })

@@ -325,7 +325,7 @@ function CreateSiteModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const toast = useToastContext()
   const [name, setName] = useState('')
   const [endpoint, setEndpoint] = useState('')
-  const [siteType, setSiteType] = useState<'primary' | 'recovery'>('recovery')
+  const [siteType, setSiteType] = useState<'primary' | 'secondary' | 'bidirectional'>('secondary')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -350,10 +350,11 @@ function CreateSiteModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
-            <select value={siteType} onChange={e => setSiteType(e.target.value as any)}
+            <select value={siteType} onChange={e => setSiteType(e.target.value as 'primary' | 'secondary' | 'bidirectional')}
               className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
               <option value="primary">Primary</option>
-              <option value="recovery">Recovery</option>
+              <option value="secondary">Recovery (secondary)</option>
+              <option value="bidirectional">Bidirectional</option>
             </select>
           </div>
           <div className="flex gap-3">
