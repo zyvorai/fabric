@@ -2028,6 +2028,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Log aggregation
         .route("/vms/{name}/logs", get(api::logs::get_vm_logs))
         .route("/logs", get(api::logs::get_system_logs))
+        // Offline guest configuration via GuestKit (VM must be stopped)
+        .route("/vms/{name}/rescue", post(api::guest_rescue::rescue))
+        .route("/vms/{name}/inspect", get(api::guest_rescue::inspect))
         // 2FA/TOTP routes
         .route("/auth/2fa/setup", post(api::auth::setup_2fa))
         .route("/auth/2fa/verify", post(api::auth::verify_2fa))

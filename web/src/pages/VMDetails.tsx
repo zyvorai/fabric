@@ -11,7 +11,7 @@ import { getMachineProperties } from '../api/machines'
 import {
   Play, Square, RotateCw, Trash2, Info, Activity, HardDrive,
   Network, Camera, Terminal, Cpu, MemoryStick, Pause, Copy, Wifi,
-  AlertCircle, Loader2, RefreshCw, Plus, Plug, Usb, Cloud, Settings,
+  AlertCircle, Loader2, RefreshCw, Plus, Plug, Usb, Cloud, Settings, Wrench,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useToastContext } from '../contexts/ToastContext'
@@ -32,8 +32,9 @@ import HotplugTab from './vm-details/HotplugTab'
 import DevicesTab from './vm-details/DevicesTab'
 import CloudInitTab from './vm-details/CloudInitTab'
 import AdvancedTab from './vm-details/AdvancedTab'
+import RescueTab from './vm-details/RescueTab'
 
-type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit' | 'advanced'
+type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit' | 'advanced' | 'rescue'
 
 export default function VMDetails() {
   const { name } = useParams<{ name: string }>()
@@ -146,6 +147,7 @@ export default function VMDetails() {
     { id: 'hotplug', label: 'Hotplug', icon: Plug },
     { id: 'devices', label: 'Devices', icon: Usb },
     { id: 'cloudinit', label: 'Cloud-init', icon: Cloud },
+    { id: 'rescue', label: 'Rescue', icon: Wrench },
     { id: 'advanced', label: 'Advanced', icon: Settings },
     { id: 'logs', label: 'Logs', icon: Terminal },
   ]
@@ -259,6 +261,7 @@ export default function VMDetails() {
         {activeTab === 'hotplug' && <HotplugTab vm={vm} />}
         {activeTab === 'devices' && <DevicesTab vm={vm} />}
         {activeTab === 'cloudinit' && <CloudInitTab vm={vm} />}
+        {activeTab === 'rescue' && <RescueTab vm={vm} />}
         {activeTab === 'advanced' && <AdvancedTab vm={vm} />}
         {activeTab === 'logs' && <LogsTab vm={vm} />}
       </div>

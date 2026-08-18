@@ -13,6 +13,7 @@ pub mod backups;
 pub mod declarative;
 pub mod events;
 pub mod firmware;
+pub mod guest_rescue;
 pub mod hotplug;
 pub mod images;
 pub mod machined;
