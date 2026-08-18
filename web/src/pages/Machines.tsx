@@ -5,11 +5,12 @@
 import { useEffect, useState } from 'react'
 import {
   Server, Terminal, Key, Download, Power, RotateCw, XCircle,
-  HardDrive, RefreshCw, Trash2,
+  HardDrive, RefreshCw, Trash2, CheckCircle2, Ban, FolderInput,
 } from 'lucide-react'
 import {
   listMachines, getMachineProperties, shellMachine, getSshInfo,
   poweroffMachine, rebootMachine, terminateMachine,
+  enableMachine, disableMachine, copyToMachine, copyFromMachine, bindMachine,
   listMachineImages, pullRawImage, removeMachineImage,
   MachineInfo, MachineImage, ShellOutput, SshInfo,
 } from '../api/machines'
@@ -37,6 +38,10 @@ export default function Machines() {
   const [pullUrl, setPullUrl] = useState('')
   const [pullName, setPullName] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [fileMode, setFileMode] = useState<'copy-to' | 'copy-from' | 'bind'>('copy-to')
+  const [hostPath, setHostPath] = useState('')
+  const [machinePath, setMachinePath] = useState('')
+  const [bindReadOnly, setBindReadOnly] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -139,6 +144,30 @@ export default function Machines() {
     }
   }
 
+  const handleEnable = async () => {
+    if (!selectedMachine) return
+    try { await enableMachine(selectedMachine); toast.success(`'${selectedMachine}' enabled at boot`); selectMachine(selectedMachine) }
+    catch (e) { toastFailure(toast, 'Failed to enable machine', e) }
+  }
+
+  const handleDisable = async () => {
+    if (!selectedMachine) return
+    try { await disableMachine(selectedMachine); toast.success(`'${selectedMachine}' disabled at boot`); selectMachine(selectedMachine) }
+    catch (e) { toastFailure(toast, 'Failed to disable machine', e) }
+  }
+
+  const handleFileTransfer = async () => {
+    if (!selectedMachine || !hostPath.trim() || !machinePath.trim()) return
+    try {
+      if (fileMode === 'copy-to') await copyToMachine(selectedMachine, hostPath, machinePath)
+      else if (fileMode === 'copy-from') await copyFromMachine(selectedMachine, machinePath, hostPath)
+      else await bindMachine(selectedMachine, hostPath, machinePath, bindReadOnly)
+      toast.success(fileMode === 'bind' ? 'Bind mount created' : 'File copied')
+      setHostPath('')
+      setMachinePath('')
+    } catch (e) { toastFailure(toast, 'File transfer failed', e) }
+  }
+
   const handleRemoveImage = async (imageName: string) => {
     if (!await confirm('Remove Image', `Remove image '${imageName}'? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Remove' })) return
     try {
@@ -221,6 +250,10 @@ export default function Machines() {
                       className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm flex items-center gap-1"><Power className="w-3.5 h-3.5" />Poweroff</button>
                     <button onClick={handleTerminate}
                       className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Kill</button>
+                    <button onClick={handleEnable} title="Enable at boot"
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Enable</button>
+                    <button onClick={handleDisable} title="Disable at boot"
+                      className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm flex items-center gap-1"><Ban className="w-3.5 h-3.5" />Disable</button>
                   </div>
                 </div>
 
@@ -261,6 +294,35 @@ export default function Machines() {
                     <div className="text-slate-500 mt-2 border-t border-slate-700/50 pt-1">exit code: {shellOutput.exit_code}</div>
                   </div>
                 )}
+              </div>
+
+              {/* File transfer */}
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+                <h4 className="font-medium mb-3 flex items-center gap-2"><FolderInput className="w-4 h-4" /> Files</h4>
+                <div className="flex gap-1 mb-3 bg-slate-900/50 rounded-lg p-1 w-fit">
+                  {(['copy-to', 'copy-from', 'bind'] as const).map(m => (
+                    <button key={m} onClick={() => setFileMode(m)}
+                      className={`px-3 py-1.5 rounded text-xs font-medium ${fileMode === m ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
+                      {m === 'copy-to' ? 'Copy to VM' : m === 'copy-from' ? 'Copy from VM' : 'Bind Mount'}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <input value={hostPath} onChange={e => setHostPath(e.target.value)} placeholder="Host path"
+                    className="bg-slate-800/50 border border-slate-700/50 rounded px-3 py-2 font-mono text-sm focus:outline-none focus:border-blue-500" />
+                  <input value={machinePath} onChange={e => setMachinePath(e.target.value)} placeholder="Machine path"
+                    className="bg-slate-800/50 border border-slate-700/50 rounded px-3 py-2 font-mono text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+                {fileMode === 'bind' && (
+                  <label className="flex items-center gap-2 mb-2 text-sm">
+                    <input type="checkbox" checked={bindReadOnly} onChange={e => setBindReadOnly(e.target.checked)} />
+                    Read-only
+                  </label>
+                )}
+                <button onClick={handleFileTransfer} disabled={!hostPath.trim() || !machinePath.trim()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50">
+                  {fileMode === 'bind' ? 'Bind' : 'Copy'}
+                </button>
               </div>
             </div>
           )}
