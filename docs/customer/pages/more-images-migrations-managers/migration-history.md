@@ -2,13 +2,13 @@
 
 ## Purpose
 
-History — More — images, migrations & managers surface.
+Migration History — a read-only log of completed and failed migration jobs, with status, timing, and where the output landed.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To check whether a past migration succeeded or failed
+- To read the error message left behind by a failed migration
+- To see how long a migration took, or where its output disk was written
 
 ## How to get there
 
@@ -17,10 +17,9 @@ History — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/migration-history` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. The page loads history from the migrations API as soon as you open it; use the header **Refresh** control to reload.
+2. Table columns: **Name**, **VM**, **Status** (completed / failed / running badge, with the error message shown inline under failed rows), **Started**, **Duration**, and **Output** (output path).
+3. There are no filters, search, or per-row actions here — it's a plain historical log. If nothing has run yet, you'll see "No migration history yet."
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

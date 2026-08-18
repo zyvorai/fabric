@@ -2,13 +2,14 @@
 
 ## Purpose
 
-Replication — Operations surface.
+Replication — register remote replication sites, configure per-VM replication to them with a target RPO (recovery point objective), and monitor sync health and RPO compliance across your fleet.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To register a secondary (or bidirectional) site that VMs can replicate to
+- To start replicating a VM to another site with a target RPO in minutes
+- To pause or resume replication for a VM without tearing down the configuration
+- To check overall replication health, or find which VMs are currently violating their RPO target
 
 ## How to get there
 
@@ -17,10 +18,10 @@ Replication — Operations surface.
 
 ## What you can do
 
-1. Open `/replication` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. **Dashboard tab** — summary tiles for active replications, RPO violation count, average RPO across all replications, and paused/error counts, plus a per-site health list (healthy/degraded/unhealthy) with each site's replication count.
+2. **Sites tab** — table of registered replication sites (name, type, endpoint, status, replication count, last sync). **Add Site** registers a new site with a name, endpoint URL, and type (Primary, Recovery/secondary, or Bidirectional). Each site can be removed (confirmation dialog).
+3. **Replications tab** — table of per-VM replication configs showing target RPO, status, live sync progress bar, last/next sync time. **Configure Replication** sets up a new one: VM ID, source site, target site, and RPO in minutes. Active replications can be **paused**; paused ones can be **resumed**.
+4. **RPO Violations tab** — table of replications currently missing their target RPO, showing target vs. current RPO, compliance status, bandwidth usage, sync count, and failure count. Shows "All replications are compliant" when there are none.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

@@ -2,13 +2,14 @@
 
 ## Purpose
 
-System Health — Infrastructure surface.
+System Health — a live, read-only dashboard of host resource utilization, refreshing every 2 seconds: CPU, memory, disk I/O, filesystems, network interfaces, and top processes, rolled up into a single health score.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To get a fast, single-number (0–100) read on whether the host is under stress
+- To find out what's bottlenecking the host — CPU, memory, disk, or network — before adding more VMs to it
+- To identify the specific process consuming the most CPU or memory
+- To check filesystem usage or per-disk I/O latency and queue depth on the physical host
 
 ## How to get there
 
@@ -17,10 +18,15 @@ System Health — Infrastructure surface.
 
 ## What you can do
 
-1. Open `/system-health` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Health score gauge (0–100, colored red/amber/green) with a status label and a summary panel calling out the current bottleneck, if any.
+2. **CPU** panel — overall usage, core count, 1-minute and 5-minute load averages, and a per-core usage grid.
+3. **Memory** panel — RAM and swap usage bars with used/total detail, plus total, available, and cached memory.
+4. **Filesystems** — a usage bar per mounted filesystem (mountpoint, filesystem type, used/total), shown when data is available.
+5. **Disk I/O** — per-device reads/writes completed, bytes read/written, average latency, and queue depth.
+6. **Network** — per-interface RX/TX bytes and error counts, TCP connection-state counts, and host-wide RX/TX/retransmit totals.
+7. **Top CPU** and **Top Memory** process tables — PID, name, CPU%, and memory (MB).
+
+Entirely read-only monitoring — there's no create/edit/delete action here; data refreshes automatically every 2 seconds.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

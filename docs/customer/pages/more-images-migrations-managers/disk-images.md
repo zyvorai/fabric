@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Disk Images — More — images, migrations & managers surface.
+Disk Images — a read-only inventory of the VM disk images present on the host: name, format, size, and path for each one.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To see at a glance how many disk images exist on the host, their total footprint, and which formats are in use
+- To find a specific image by name, format, or path before referencing it elsewhere (e.g. when creating a VM from a custom disk path)
+- To select one or more images as a quick visual tally before acting on them from another page
 
 ## How to get there
 
@@ -17,12 +17,11 @@ Disk Images — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/disk-images` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
-
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+- Review summary tiles for **Total Images**, **Total Size**, distinct **Formats**, and how many rows you currently have **Selected**.
+- **Search** by name, format, or path to narrow the table.
+- Click a row (or its checkbox) to select/deselect it — selection is local to the page and just feeds the Selected counter; there's no bulk action attached to it here.
+- Each row shows the image's name, a color-coded format badge (qcow2, vmdk, vhd/vhdx, raw, img), size, and full path.
+- **Refresh** reloads the list from the host.
 
 ## Related pages
 

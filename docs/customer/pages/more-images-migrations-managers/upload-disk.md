@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Upload Disk — More — images, migrations & managers surface.
+Upload Disk Image — drag-and-drop (or browse) upload of a VM disk image file to the server, with live progress and an in-session upload history.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To get a disk image onto the host so it can be used to create a VM
+- To upload a disk exported or converted elsewhere for import
+- To check what you've uploaded recently in this session
 
 ## How to get there
 
@@ -17,10 +17,11 @@ Upload Disk — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/upload-disk` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. The drop zone accepts drag-and-drop or click-to-browse. Only `.qcow2`, `.vmdk`, `.vhd`, `.vhdx`, `.raw`, `.img`, and `.ova` are accepted — anything else is rejected with an inline error.
+2. Once a file is chosen, set the **Destination Directory** (defaults to `/var/lib/libvirt/images`) and click **Upload**.
+3. The upload runs with a live progress bar — percent complete, bytes transferred/total, and transfer speed — and a **Cancel** button to abort mid-upload.
+4. On success, a confirmation banner shows the saved path, format, and size, and the file is added to the **Upload History** list below (name, format, size, time) — this list only lasts for the current session and resets on page reload.
+5. On failure — rejected format, network error, or cancellation — an error banner explains what happened.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

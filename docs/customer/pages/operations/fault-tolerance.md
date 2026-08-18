@@ -2,13 +2,14 @@
 
 ## Purpose
 
-Fault Tolerance — Operations surface.
+Fault Tolerance (FT) — protect individual VMs with a live secondary replica on another host, so a host failure fails the VM over instead of taking it down, and monitor replication health.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To keep a critical VM running through a host failure by giving it a hot secondary on another host
+- To check whether a VM is actually FT-compatible before enabling it, and fix any blocking issues first
+- To test a failover safely, or trigger a real one when you need to move a VM off its current host
+- To watch replication health — log bandwidth, checkpoint latency, secondary host load, uptime — for protected VMs
 
 ## How to get there
 
@@ -17,10 +18,12 @@ Fault Tolerance — Operations surface.
 
 ## What you can do
 
-1. Open `/fault-tolerance` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+Summary tiles show protected VM count, how many are running, how many need attention, and total failover events. **Enable FT** opens a form to name the VM, set its primary host ID, and optionally a secondary host ID (leave blank to auto-select). Four tabs:
+
+1. **Protected VMs** — table of FT-enabled VMs with their secondary host, status, and bandwidth limit. Per row: **Test** (a non-disruptive failover test), the play icon to **trigger a real failover** (confirmation required — moves the VM to its secondary host), and the trash icon to **disable FT** (confirmation required).
+2. **Compatibility Check** — enter a VM ID and check whether it's FT-compatible; results show a pass/fail badge, any blocking or warning issues (each with a suggested fix), and recommended secondary hosts with a compatibility score.
+3. **Events** — a timeline of failover events (test and real), each showing status, failover type, source → target host, downtime in ms, timestamp, and the error message if it failed.
+4. **Metrics** — per protected VM: log bandwidth usage, checkpoint latency, secondary host's CPU/memory usage, failover count, and uptime percentage.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

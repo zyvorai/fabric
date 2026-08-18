@@ -2,13 +2,14 @@
 
 ## Purpose
 
-ISO Images — More — images, migrations & managers surface.
+ISO Images — a read-only inventory of installer and driver ISO files sitting in the host's configured images directory, showing which VMs currently have each one attached.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- Before creating a VM that boots from an OS installer ISO, to confirm the file is present on the host and copy its exact path
+- To check whether a VirtIO driver ISO (`virtio-win`) is available for installing or upgrading Windows guest drivers
+- To see which VMs have a given ISO attached before deleting or replacing that file on the host
+- To search a large images directory by name or path
 
 ## How to get there
 
@@ -17,12 +18,10 @@ ISO Images — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/iso-images` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
-
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+- **Search** ISOs by name or path.
+- Each row shows the ISO's name, path, size, last-modified time, and the list of VMs that currently have it attached (**Attached VMs**); ISOs named for `virtio-win` get a small **virtio-win** badge next to the name.
+- The list auto-refreshes every 30 seconds, and you can trigger an immediate refresh from the page header.
+- If no ISOs are found, the empty state reminds you to place ISO files in the configured images directory on the host — this page doesn't upload or manage ISOs itself, only lists them.
 
 ## Related pages
 

@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Debug Tools — Monitoring surface.
+Debug Tools — raw, terminal-style output from four classic Linux diagnostic commands (top, iostat, vmstat, netstat) against the host, rendered as monospace panels. This is the closest the dashboard gets to SSHing in and running commands yourself.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To check live process/CPU activity, disk I/O, virtual memory stats, or network connections on the host without opening a shell
+- To troubleshoot a performance problem in real time, side by side across all four views
+- When Kernel or Analytics show something is wrong and you need the raw command output to confirm it
 
 ## How to get there
 
@@ -17,10 +17,10 @@ Debug Tools — Monitoring surface.
 
 ## What you can do
 
-1. Open `/debug` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. **Four independent panels** — Top, IOStat, VMStat, and NetStat, each backed by its own endpoint and showing raw output lines in a scrollable monospace box.
+2. Panels don't load automatically — each starts with "Click Refresh to load data" until you refresh it (individually, via the **Refresh** button in that panel's header) or use **Refresh All** in the page header to load all four at once.
+3. **Auto-refresh** — toggle the switch in the header to re-pull all four panels every 3 seconds; useful for watching a metric change live. Turn it off when you're done to stop the polling.
+4. If a panel's fetch fails, that panel shows its own error message rather than blocking the others.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

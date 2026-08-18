@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Snapshot Mgr — More — images, migrations & managers surface.
+Snapshot Manager — create, revert to, and delete disk-state snapshots for a selected VM.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- Before a risky change to a VM, to capture its disk state so you can roll back
+- To revert a VM to an earlier snapshot after something went wrong
+- To clean up old snapshots you no longer need, or check a snapshot's creation time and parent
 
 ## How to get there
 
@@ -17,10 +17,12 @@ Snapshot Mgr — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/snapshot-manager` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. **Select VM** — pick a VM from the dropdown to load its snapshots; the list auto-refreshes every 15 seconds while a VM is selected, or use **Refresh** to reload on demand.
+2. **Create Snapshot** — enter a name and click **Create** to snapshot the selected VM's current disk state; a success banner confirms it.
+3. The snapshots table lists Name, Created timestamp, State, and Parent, with two actions per row:
+   - **Revert** (circular arrow) — reverts the VM to that snapshot, behind a confirmation dialog
+   - **Delete** (trash) — deletes the snapshot, behind a confirmation dialog
+4. Empty states: no VM selected prompts "Select a VM"; a VM with no snapshots shows "No snapshots."
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

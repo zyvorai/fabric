@@ -2,13 +2,12 @@
 
 ## Purpose
 
-VM Browser — Core surface.
+VM Browser — a lightweight, read-only grid of every VM, for quickly scanning or searching without the bulk-action tooling of the full [Virtual Machines](vms.md) list.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To browse or search VMs by name, state, or image in a compact card layout
+- To jump straight to a single VM's detail page without needing selection, filtering by tag, or bulk actions
 
 ## How to get there
 
@@ -17,10 +16,10 @@ VM Browser — Core surface.
 
 ## What you can do
 
-1. Open `/vm-browser` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Search by name, state, or image — the header shows total VM count and how many are running.
+2. Each card shows the VM's name, state badge, image, vCPU count, memory, and IP address (if assigned).
+3. Click a card to open that VM's detail page.
+4. **Refresh** reloads the list from the server.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

@@ -2,13 +2,13 @@
 
 ## Purpose
 
-VM Compare — Tools surface.
+VM Comparison — a side-by-side diff of two VMs' configurations, run on demand against the live VM list.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To see what differs between two VMs before assuming they're equivalent (useful when troubleshooting "why does this one behave differently")
+- To confirm a newly cloned or templated VM actually matches its source
+- To audit configuration drift between two VMs that are supposed to be identical
 
 ## How to get there
 
@@ -17,10 +17,10 @@ VM Compare — Tools surface.
 
 ## What you can do
 
-1. Open `/vm-compare` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Pick a **Source VM** and **Target VM** from two dropdowns populated from your VM list (the target list excludes whichever VM is already chosen as source).
+2. Click **Compare** (disabled until both are selected) — calls `GET /api/vms/compare?source=…&target=…`.
+3. Results appear as a table: one row per compared field, with Source value, Target value, and a Match column (Yes in green, No in amber) so mismatches jump out.
+4. Use the refresh control in the header to re-fetch the VM list if it's out of date.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

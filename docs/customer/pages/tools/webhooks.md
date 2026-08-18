@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Webhooks — Tools surface.
+Webhook Configuration — manage outbound webhooks that notify an external endpoint (generic HTTP, Slack, or Discord) when specific VM and backup events occur.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To wire VM lifecycle events (started, stopped, created, deleted) or backup results (completed, failed) into Slack, Discord, or your own HTTP endpoint
+- To verify a webhook endpoint is reachable and correctly configured before relying on it
+- To audit which webhooks exist, what events they listen for, and whether they're enabled
 
 ## How to get there
 
@@ -17,10 +17,12 @@ Webhooks — Tools surface.
 
 ## What you can do
 
-1. Open `/webhooks` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. **Add Webhook** opens a form: destination URL, delivery type (generic / Slack / Discord), and a multi-select of events (`vm.started`, `vm.stopped`, `vm.created`, `vm.deleted`, `backup.completed`, `backup.failed`). A URL and at least one event are required — validation errors show inline before it will save.
+2. Saving posts the new webhook (`POST /api/webhooks`, created enabled by default) and refreshes the list.
+3. Each configured webhook shows its URL (with a copy button), a type badge, its subscribed event tags, and an enabled/disabled indicator.
+4. **Test** sends a one-off test delivery (`POST /api/webhooks/test`) and reports delivered/failed inline on that webhook.
+5. The trash icon deletes a webhook immediately (`DELETE /api/webhooks/{id}`) — there's no confirmation dialog, so double-check before clicking.
+6. Use the refresh control in the header to re-fetch the webhook list.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

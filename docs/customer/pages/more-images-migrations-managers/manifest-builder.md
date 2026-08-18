@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Manifest Builder — More — images, migrations & managers surface.
+Manifest Builder — a client-side form for assembling a VM configuration manifest and exporting it as YAML, with a live preview as you type. It doesn't create a VM or call the API; it's a scratchpad for drafting config to copy elsewhere.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To hand-draft a VM manifest for a provisioning script, IaC pipeline, or ticket without going through the Create VM wizard
+- To sketch settings the Create VM wizard doesn't expose — TPM, Secure Boot, CPU mode, console type, or `user`/`bridge`/`tap` networking — and get syntactically valid YAML for them
+- To generate a quick YAML snippet to share with a teammate or paste into documentation
 
 ## How to get there
 
@@ -17,12 +17,11 @@ Manifest Builder — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/manifest-builder` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
-
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+1. Fill in fields under four collapsible sections — **VM Configuration** (expanded by default), **Network**, **Storage**, and **Advanced** — clicking a section header expands or collapses it.
+2. Set VM name, vCPUs, memory, disk image path, and firmware (`uefi`/`bios`) under VM Configuration; network type (`user`/`bridge`/`tap`), bridge name, and MAC address under Network; disk format (`qcow2`/`raw`/`vmdk`), disk size, and a read-only-root checkbox under Storage; and TPM, Secure Boot, console type (`serial`/`virtio`/`none`), and CPU mode (`host`/`max`/`qemu64`) under Advanced.
+3. Leave any field blank or unchecked — it's simply omitted from the generated YAML, so you only need to fill in what matters for your use case.
+4. Watch the **YAML Preview** pane update live as you type, grouped by section with a generated timestamp comment at the top.
+5. **Copy** the YAML to your clipboard, or **Download** it as a `.yaml` file named after the VM (falls back to `vm-manifest.yaml` if no name is set).
 
 ## Related pages
 

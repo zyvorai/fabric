@@ -2,13 +2,14 @@
 
 ## Purpose
 
-Notifications — Monitoring surface.
+Notifications — configure how and when Zyvor Fabric alerts you: the delivery channels (email, Slack, Teams, webhook), the rules that trigger them, and a history of what was actually sent.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- Setting up a Slack, Teams, email, or webhook channel to receive alerts
+- Checking whether a rule has fired, how often, and whether delivery succeeded or failed
+- Testing a channel to confirm it's wired up correctly before relying on it
+- Temporarily disabling a rule or channel without deleting its configuration
 
 ## How to get there
 
@@ -17,10 +18,23 @@ Notifications — Monitoring surface.
 
 ## What you can do
 
-1. Open `/notifications` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+The page has three tabs — **Channels**, **Rules**, **History** — loaded together on open.
+
+**Channels** (default tab)
+- **Add Channel** opens a form: name, type (Webhook, Slack, Teams, Email), and type-specific fields — a URL for Webhook/Slack/Teams, or SMTP host/port + from/to address for Email.
+- **Test** sends a real test notification through that channel (disabled if the channel isn't enabled).
+- **Delete** removes a channel after a confirmation prompt.
+
+**Rules**
+- Each rule shows enabled/disabled state, its description, up to 3 event-type tags (with a "+N more" overflow), how many times it has triggered, and when it last fired.
+- The enable/disable toggle (power icon) flips a rule on or off immediately.
+- **Delete** removes a rule after a confirmation prompt.
+- **Create Rule** opens a dialog describing what rules do, but rule creation isn't wired up yet — the dialog only has a Close button. Existing rules can still be toggled and deleted from this tab.
+
+**History**
+- A table of everything that's actually been sent: timestamp, rule name, event type (severity-colored), affected VM (if any), channel, and delivery status (`SENT`/`FAILED`).
+
+If the channels list fails to load, an error banner with retry appears; rules and history failing to load independently just show as empty rather than blocking the page.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

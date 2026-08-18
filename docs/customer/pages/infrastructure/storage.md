@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Storage — Infrastructure surface.
+Storage — a consolidated view of every storage pool's capacity alongside every volume (VM disk image) across all pools, regardless of which pool it lives in. To create or manage a pool itself, use [Storage Pools](storage-pools.md); for replicated/policy-driven storage across hosts, see [Distributed Storage](distributed-storage.md).
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To see total capacity, used space, volume count, and pool count across the whole host in one place
+- To find which VM a particular volume/disk is attached to, or confirm it's unattached
+- To remove an orphaned or unused volume
 
 ## How to get there
 
@@ -17,10 +17,11 @@ Storage — Infrastructure surface.
 
 ## What you can do
 
-1. Open `/storage` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Review stat cards: total capacity, used space, volume count, and pool count.
+2. Storage Pools panel — each pool's name, path, type badge, state, and a used/total usage bar color-coded by how full it is.
+3. Volumes table — every volume across all pools: name, pool, size, format (qcow2 / raw / vmdk), the VM it's attached to (or "Not attached"), and a **Delete** action with a confirmation dialog.
+
+Pool creation and lifecycle (start/stop) live on [Storage Pools](storage-pools.md) — from here you can browse and delete volumes, not create or clone them.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

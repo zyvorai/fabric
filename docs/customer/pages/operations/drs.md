@@ -2,13 +2,14 @@
 
 ## Purpose
 
-DRS — Operations surface.
+Distributed Resource Scheduler (DRS) — balances VM placement across the hosts in a cluster, surfaces migration recommendations, enforces affinity/anti-affinity rules, and can test where a new VM would land before you create it.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To see how evenly CPU and memory load is spread across your cluster's hosts
+- To review (and approve or reject) migrations DRS suggests to rebalance load
+- To keep certain VMs together (affinity) or apart (anti-affinity) — e.g. two replicas of the same service on different hosts
+- To test where a hypothetical VM (given its vCPU/memory needs) would be placed before actually creating it
 
 ## How to get there
 
@@ -17,10 +18,14 @@ DRS — Operations surface.
 
 ## What you can do
 
-1. Open `/drs` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+**DRS configuration** (top of page) — toggle DRS **On/Off**, set the **Automation Level** (Manual, Semi-Auto, or Fully Auto), adjust the **Migration Threshold** (1–5, how aggressively it rebalances), and see the configured check interval. Changes apply immediately.
+
+Four tabs below that:
+
+1. **Balance** — the overall cluster balance score plus CPU/memory imbalance percentages, and a per-host breakdown with live CPU and memory usage bars (color-coded amber/red as usage climbs).
+2. **Recommendations** — a table of migrations DRS suggests (VM, source host, target host, reason, priority, estimated benefit). Pending recommendations can be **approved** (checkmark) or **rejected** (X) directly from the row.
+3. **Rules** — affinity/anti-affinity rules, each showing type, VM count, whether it's mandatory, and whether it's enabled. **Create Rule** sets a name, chooses **Affinity** (keep together) or **Anti-Affinity** (keep apart), lists VM IDs (comma-separated), and an optional mandatory flag. Delete a rule from its row (confirmation required).
+4. **Placement** — a calculator: enter a hypothetical VM's CPU (MHz) and memory (MB), click **Test Placement**, and see the recommended host, its score and reasoning, projected CPU/memory usage after placement, and scored alternative hosts.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

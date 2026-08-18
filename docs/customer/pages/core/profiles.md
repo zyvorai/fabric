@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Profiles — Core surface.
+Profiles (shown in the UI as **Instance Types**) — a library of VM sizing presets (vCPUs, memory, disk, and optionally network bandwidth) you can pick instead of hand-tuning resources every time you create a VM.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To review available instance-type presets and their specs, grouped by category (general, compute, memory, storage, GPU)
+- To create a reusable custom profile for a sizing you use often
+- To remove a custom profile you no longer need — built-in profiles can't be deleted
 
 ## How to get there
 
@@ -17,10 +17,9 @@ Profiles — Core surface.
 
 ## What you can do
 
-1. Open `/profiles` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Browse profile cards — each shows its category badge, description, CPUs, memory, disk, and network bandwidth (if set). Built-in profiles are labeled **Built-in** and have no delete button.
+2. **Create Profile** opens a form for a name, category, CPU count, memory (MB), and disk (GB); submitting adds it to the grid immediately.
+3. Delete a custom profile with the trash icon on its card — built-in profiles can't be removed this way.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

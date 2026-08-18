@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Readiness — More — images, migrations & managers surface.
+Migration Readiness — pre-flight checks that verify the environment is in a good state before you start a migration, with a pass/fail summary and per-check detail.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- Before kicking off a migration, to confirm the environment is actually ready
+- To see how many errors vs. warnings are blocking readiness before digging in
+- To read the specific message (and detail line) behind a failing or warning check
 
 ## How to get there
 
@@ -17,10 +17,10 @@ Readiness — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/migration-readiness` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. The page runs readiness checks as soon as you open it; use the header **Refresh** control to re-run them.
+2. A summary banner at the top reads either **Ready for Migration** (all checks passed) or **Issues Found**, with a count of errors and warnings.
+3. Below it, every individual check is listed with a status icon (green check / yellow warning / red x), its name, a short message, an optional monospace detail line, and a status badge.
+4. This page is read-only — it reports state but doesn't fix anything; resolve issues elsewhere, then come back and refresh.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Autoscale — Operations surface.
+Autoscale — define per-VM policies that automatically grow or shrink a VM's vCPUs and memory within set bounds based on load, and review the history of scaling actions that were triggered.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To let a VM's resources flex automatically instead of manually resizing it under load
+- To cap how far a VM is allowed to scale (min/max vCPUs, min/max memory) so autoscaling can't run away
+- To check what scaling actions actually fired and when, via the recent scale events log
 
 ## How to get there
 
@@ -17,10 +17,11 @@ Autoscale — Operations surface.
 
 ## What you can do
 
-1. Open `/autoscale` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Review the policy table — one row per VM, showing its vCPU range, memory range, CPU scale-up/scale-down thresholds, and cooldown period (seconds between scaling actions).
+2. **Create Policy** opens a form to pick a VM (only VMs without an existing policy are offered) and set min/max vCPUs, min/max memory (MB), CPU scale-up and scale-down thresholds (%), and the cooldown in seconds.
+3. **Delete** a policy from its row (confirmation required) to stop autoscaling that VM.
+4. Check **Recent scale events** — a scrolling log of the last 20 scaling actions (VM, action, resource, timestamp) so you can see what autoscale actually did.
+5. On a read-only account, the create/delete controls are hidden and a read-only notice is shown instead.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 

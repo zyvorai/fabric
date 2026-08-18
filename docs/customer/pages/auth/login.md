@@ -2,13 +2,12 @@
 
 ## Purpose
 
-Login — Auth surface.
+Login — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- Whenever you're not signed in — it's what loads for any route if your session is missing or has expired
+- To sign in as the local admin, or with your own Linux system account instead
 
 ## How to get there
 
@@ -17,12 +16,13 @@ Login — Auth surface.
 
 ## What you can do
 
-1. Open `/login` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Enter a username and password and sign in — a failed attempt shows an inline error and clears the password field.
+2. Check **Remember me** to save your login in the browser (locally, not on the server) so it's pre-filled next time; unchecking it clears any saved login.
+3. Toggle the eye icon to show or hide the password as you type.
+4. Switch the dashboard's visual theme (Dark, Steel, Aurora) from the top-right control — cosmetic only, unrelated to signing in.
+5. Two ways to sign in, both explained on the page: **local admin** — username `admin`, password from `.admin_password` on the host — or your own **system user** account (same password as SSH; accounts that only use SSH keys need a password set with `passwd` on the server first).
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+If you can't sign in, confirm the account exists on the host and that the authentication service is reachable.
 
 ## Related pages
 

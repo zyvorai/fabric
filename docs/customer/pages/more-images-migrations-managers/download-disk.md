@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Download Disk — More — images, migrations & managers surface.
+Download Disk — browse the disk images available on the Fabric host and download any of them straight to your machine.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- To pull a copy of a VM disk image off the host — for backup, for inspection, or to move it to another environment
+- To check how much disk-image storage a host is using and how many distinct formats are present
+- To locate an image that lives outside the default images directory by browsing a custom path
 
 ## How to get there
 
@@ -17,12 +17,11 @@ Download Disk — More — images, migrations & managers surface.
 
 ## What you can do
 
-1. Open `/download-disk` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
-
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+- Review summary tiles for **Total Images**, **Total Size**, and how many distinct **Formats** are present (qcow2, vmdk, vhd/vhdx, raw, img — each gets its own color badge in the table).
+- **Filter** the list by name, format, or path, and **sort** by Name, Size, or Modified (click a column header to sort, click again to reverse direction).
+- Each row shows the image's name, format badge, size, last-modified time, and full path, with a **Download** button that streams the file to your browser.
+- Use the **Custom Path** field to look at images outside the default directory: enter a file or directory path and click **Browse** to list what's there, or **Download** to fetch a specific file path directly (pressing Enter in the field also triggers a download).
+- **Refresh** reloads the image list from the host.
 
 ## Related pages
 

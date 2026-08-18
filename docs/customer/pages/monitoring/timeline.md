@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Timeline — Monitoring surface.
+Timeline — a single reverse-chronological activity feed that merges audit-log actions and system alerts, so you can see what happened and in what order without switching between Logs and Notifications.
 
 ## When to use it
 
-- Open this surface when the job matches the purpose above
-- Start from the product home / dashboard if you are unsure where to begin
-- Confirm auth and that required backends/operators are reachable if data looks empty
+- Reconstructing a sequence of events — what led up to an error, in order
+- Getting a quick "what's happened lately" view of the whole system
+- Filtering down to just deploys, or just errors, to review one class of events
 
 ## How to get there
 
@@ -17,10 +17,10 @@ Timeline — Monitoring surface.
 
 ## What you can do
 
-1. Open `/timeline` and wait for live data from Zyvor Fabric.
-2. Use filters and search when the page provides them.
-3. Drill into a row or card for detail, then jump to related surfaces.
-4. For mutating actions: review impact, role gates, and confirmation dialogs first.
+1. Filter chips — **All**, **Actions**, **Alerts**, **Deploys**, **Errors** — filter the merged feed client-side.
+2. Each entry is auto-classified and shown with an icon/color, description, relative timestamp, and type tag: audit entries with a failed/error status become **Error**, create/deploy-style actions become **Deploy**, other audit entries become **Action**; alerts become **Alert**, or **Error** if their severity is critical/error.
+3. The feed auto-refreshes every 10 seconds; the header shows "Updated Xm ago," and there's also a manual refresh button.
+4. If a background refresh fails after data has already loaded, an amber banner reports it while the last known feed stays on screen.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 
