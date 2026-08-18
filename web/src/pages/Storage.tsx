@@ -36,7 +36,7 @@ export default function Storage() {
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<StoragePool[]>([])
-  const [volumes, setVolumes] = useState<Volume[]>([])
+  const [volumes, setVolumes] = useState<VolumeRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showCreateVolume, setShowCreateVolume] = useState<string | null>(null)

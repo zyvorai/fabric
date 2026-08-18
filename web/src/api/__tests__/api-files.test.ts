@@ -463,7 +463,7 @@ describe('contentLibrary', () => {
   it('deleteLibraryItem calls apiDelete', async () => {
     const { deleteLibraryItem } = await import('../contentLibrary')
     await deleteLibraryItem('lib1', 'item1')
-    expect(mockApiDelete).toHaveBeenCalledWith('/api/content-library/libraries/lib1/items/item1')
+    expect(mockApiDelete).toHaveBeenCalledWith('/api/content-library/items/item1')
   })
 
   it('searchItems calls apiGet', async () => {
@@ -512,8 +512,9 @@ describe('contentLibrary', () => {
 
   it('checkHostCompliance calls apiPost', async () => {
     const { checkHostCompliance } = await import('../contentLibrary')
-    await checkHostCompliance('prof1', 'host1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/content-library/host-profiles/prof1/check-compliance', { host_id: 'host1' })
+    const currentConfig = { bridge: 'br0' }
+    await checkHostCompliance('prof1', 'host1', currentConfig)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/content-library/host-profiles/prof1/compliance', { host_id: 'host1', current_config: currentConfig })
   })
 })
 
@@ -641,7 +642,14 @@ describe('distributedStorage', () => {
 
   it('createDistributedPool calls apiPost', async () => {
     const { createDistributedPool } = await import('../distributedStorage')
-    const req = { name: 'pool1', pool_type: 'replicated', hosts: ['h1'] }
+    const req = {
+      name: 'pool1',
+      cluster_id: 'cl1',
+      hosts: [{ host_id: 'h1', hostname: 'host1', disks: [] }],
+      replication_factor: 3,
+      erasure_coding: false,
+      fault_domains: [],
+    }
     await createDistributedPool(req)
     expect(mockApiPost).toHaveBeenCalledWith('/api/distributed-storage/pools', req)
   })
@@ -673,9 +681,9 @@ describe('distributedStorage', () => {
 
   it('createStoragePolicy calls apiPost', async () => {
     const { createStoragePolicy } = await import('../distributedStorage')
-    const req = { name: 'pol1', replication_factor: 3 }
+    const req = { name: 'pol1', description: 'test policy', replication_factor: 3, encryption_required: false, tier: 'gold' as const }
     await createStoragePolicy(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/distributed-storage/policies', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/distributed-storage/policies', expect.objectContaining(req))
   })
 
   it('deleteStoragePolicy calls apiDelete', async () => {
@@ -686,8 +694,8 @@ describe('distributedStorage', () => {
 
   it('checkCompliance calls apiPost', async () => {
     const { checkCompliance } = await import('../distributedStorage')
-    await checkCompliance('vm1', 'pol1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/distributed-storage/compliance/check', { vm_id: 'vm1', policy_id: 'pol1' })
+    await checkCompliance('pol1', 'vm1', 'pool1')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/distributed-storage/policies/pol1/compliance', { vm_name: 'vm1', pool_id: 'pool1' })
   })
 
   it('listDatastoreClusters calls apiGet', async () => {
@@ -698,7 +706,14 @@ describe('distributedStorage', () => {
 
   it('createDatastoreCluster calls apiPost', async () => {
     const { createDatastoreCluster } = await import('../distributedStorage')
-    const req = { name: 'dsc1', storage_pool_ids: ['p1'] }
+    const req = {
+      name: 'dsc1',
+      cluster_id: 'cl1',
+      datastore_ids: ['p1'],
+      storage_drs_enabled: true,
+      space_threshold_pct: 80,
+      automation_level: 'manual' as const,
+    }
     await createDatastoreCluster(req)
     expect(mockApiPost).toHaveBeenCalledWith('/api/distributed-storage/datastore-clusters', req)
   })
@@ -707,17 +722,17 @@ describe('distributedStorage', () => {
 // ─── drs.ts ───────────────────────────────────────────────────────────────────
 
 describe('drs', () => {
-  it('configureDrs calls apiPut', async () => {
+  it('configureDrs calls apiPost', async () => {
     const { configureDrs } = await import('../drs')
     const req = { cluster_id: 'c1', enabled: true }
     await configureDrs(req)
-    expect(mockApiPut).toHaveBeenCalledWith('/api/drs/config', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/drs/config', req)
   })
 
   it('getDrsConfig calls apiGet', async () => {
     const { getDrsConfig } = await import('../drs')
     await getDrsConfig('c1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/drs/config?cluster_id=c1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/drs/config/c1')
   })
 
   it('computePlacement calls apiPost', async () => {
@@ -730,19 +745,19 @@ describe('drs', () => {
   it('analyzeBalance calls apiGet', async () => {
     const { analyzeBalance } = await import('../drs')
     await analyzeBalance('c1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/drs/balance?cluster_id=c1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/drs/balance/c1')
   })
 
   it('generateRecommendations calls apiPost', async () => {
     const { generateRecommendations } = await import('../drs')
     await generateRecommendations('c1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/drs/recommendations/generate', { cluster_id: 'c1' })
+    expect(mockApiPost).toHaveBeenCalledWith('/api/drs/recommendations', { cluster_id: 'c1' })
   })
 
   it('listRecommendations calls apiGet', async () => {
     const { listRecommendations } = await import('../drs')
     await listRecommendations('c1')
-    expect(mockApiGet).toHaveBeenCalledWith('/api/drs/recommendations?cluster_id=c1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/drs/recommendations/c1')
   })
 
   it('approveRecommendation calls apiPostVoid', async () => {
@@ -796,7 +811,7 @@ describe('encryption', () => {
     const { registerProvider } = await import('../encryption')
     const req = { name: 'kms', provider_type: 'vault', endpoint: 'https://vault:8200' }
     await registerProvider(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/encryption/providers', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/encryption/providers', { ...req, status: 'connected' })
   })
 
   it('removeProvider calls apiDelete', async () => {
@@ -815,19 +830,19 @@ describe('encryption', () => {
     const { createEncryptionPolicy } = await import('../encryption')
     const req = { name: 'aes256', key_provider_id: 'kms1', algorithm: 'aes256_xts' }
     await createEncryptionPolicy(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/encryption/policies', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/encryption/policies', { ...req, encrypt_vmotion: false })
   })
 
   it('encryptVm calls apiPostVoid', async () => {
     const { encryptVm } = await import('../encryption')
     await encryptVm('vm1', 'pol1')
-    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/encryption/vms/vm1/encrypt', { policy_id: 'pol1' })
+    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/encryption/vms/vm1/encrypt', { vm_name: 'vm1', policy_id: 'pol1' })
   })
 
   it('decryptVm calls apiPostVoid', async () => {
     const { decryptVm } = await import('../encryption')
     await decryptVm('vm1')
-    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/encryption/vms/vm1/decrypt')
+    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/encryption/vms/vm1/decrypt', { vm_name: 'vm1' })
   })
 
   it('getVmEncryptionStatus calls apiGet', async () => {
@@ -1795,13 +1810,13 @@ describe('resourcePools', () => {
   it('moveVm calls apiPostVoid', async () => {
     const { moveVm } = await import('../resourcePools')
     await moveVm('vm1', 'p1', 'p2')
-    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/resource-pools/move-vm', { vm_id: 'vm1', from_pool_id: 'p1', to_pool_id: 'p2' })
+    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/resource-pools/p1/vms/move', { vm_name: 'vm1', target_pool_id: 'p2' })
   })
 
   it('checkAdmission calls apiPost', async () => {
     const { checkAdmission } = await import('../resourcePools')
     await checkAdmission('p1', { cpu: 4, memory_mb: 8192 })
-    expect(mockApiPost).toHaveBeenCalledWith('/api/resource-pools/p1/check-admission', { cpu: 4, memory_mb: 8192 })
+    expect(mockApiPost).toHaveBeenCalledWith('/api/resource-pools/p1/admission', { cpu_mhz: 4, memory_mb: 8192 })
   })
 })
 
@@ -1907,19 +1922,19 @@ describe('siteRecovery', () => {
   it('executePlannedMigration calls apiPost', async () => {
     const { executePlannedMigration } = await import('../siteRecovery')
     await executePlannedMigration('p1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/site-recovery/plans/p1/execute', { execution_type: 'planned_migration' })
+    expect(mockApiPost).toHaveBeenCalledWith('/api/site-recovery/plans/p1/planned-migration')
   })
 
   it('executeDisasterRecovery calls apiPost', async () => {
     const { executeDisasterRecovery } = await import('../siteRecovery')
     await executeDisasterRecovery('p1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/site-recovery/plans/p1/execute', { execution_type: 'disaster_recovery' })
+    expect(mockApiPost).toHaveBeenCalledWith('/api/site-recovery/plans/p1/disaster-recovery')
   })
 
   it('executeTestFailover calls apiPost', async () => {
     const { executeTestFailover } = await import('../siteRecovery')
     await executeTestFailover('p1')
-    expect(mockApiPost).toHaveBeenCalledWith('/api/site-recovery/plans/p1/execute', { execution_type: 'test_failover' })
+    expect(mockApiPost).toHaveBeenCalledWith('/api/site-recovery/plans/p1/test-failover')
   })
 
   it('listExecutions calls apiGet', async () => {
