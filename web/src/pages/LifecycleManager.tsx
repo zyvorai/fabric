@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, Play } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, Play, Pause, SkipForward } from 'lucide-react'
 import {
   listBaselines,
   createBaseline,
@@ -12,16 +12,22 @@ import {
   scanHostCompliance,
   listRemediations,
   listRollingUpdates,
+  createRollingUpdate,
+  startRollingUpdate,
+  pauseRollingUpdate,
+  advanceRollingUpdate,
   type Baseline,
   type HostComplianceStatus,
   type RemediationTask,
   type RollingUpdatePlan,
 } from '../api/lifecycle'
+import { listHosts, HostInfo } from '../api/datacenter'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { toastFailure } from '../utils/toastError'
 
 export default function LifecycleManager() {
   const toast = useToastContext()
@@ -30,24 +36,43 @@ export default function LifecycleManager() {
   const [scans, setScans] = useState<HostComplianceStatus[]>([])
   const [tasks, setTasks] = useState<RemediationTask[]>([])
   const [updates, setUpdates] = useState<RollingUpdatePlan[]>([])
+  const [hosts, setHosts] = useState<HostInfo[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load lifecycle data')
   const [activeTab, setActiveTab] = useState<'baselines' | 'compliance' | 'remediation' | 'updates'>('baselines')
   const [showCreateBaseline, setShowCreateBaseline] = useState(false)
+  const [showCreateUpdate, setShowCreateUpdate] = useState(false)
 
   const loadData = useCallback(() => {
     return run(async () => {
-      const [b, s, t, u] = await Promise.all([
+      const [b, s, t, u, h] = await Promise.all([
         listBaselines(),
         getComplianceStatus(),
         listRemediations(),
         listRollingUpdates(),
+        listHosts(),
       ])
       setBaselines(b)
       setScans(s)
       setTasks(t)
       setUpdates(u)
+      setHosts(h)
     })
   }, [run])
+
+  const handleStartUpdate = async (id: string) => {
+    try { await startRollingUpdate(id); toast.success('Rolling update started'); loadData() }
+    catch (err) { toastFailure(toast, 'Failed to start rolling update', err) }
+  }
+
+  const handlePauseUpdate = async (id: string) => {
+    try { await pauseRollingUpdate(id); toast.success('Rolling update paused'); loadData() }
+    catch (err) { toastFailure(toast, 'Failed to pause rolling update', err) }
+  }
+
+  const handleAdvanceUpdate = async (id: string) => {
+    try { await advanceRollingUpdate(id); toast.success('Advanced to next host'); loadData() }
+    catch (err) { toastFailure(toast, 'Failed to advance rolling update', err) }
+  }
 
   useEffect(() => {
     void loadData()
@@ -281,6 +306,13 @@ export default function LifecycleManager() {
       {/* Rolling Updates Tab */}
       {activeTab === 'updates' && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => setShowCreateUpdate(true)} disabled={baselines.length === 0 || hosts.length === 0}
+              title={baselines.length === 0 ? 'Create a baseline first' : hosts.length === 0 ? 'No hosts registered' : undefined}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Plus className="w-4 h-4" /> Create Rolling Update
+            </button>
+          </div>
           {updates.length === 0 ? (
             <div className="text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No rolling updates.</div>
           ) : updates.map(update => {
@@ -292,9 +324,31 @@ export default function LifecycleManager() {
                   <span className="font-semibold">{update.name}</span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(update.status)}`}>{update.status}</span>
                 </div>
-                <span className="text-sm text-slate-400">
-                  {update.completed_hosts}/{update.total_hosts} hosts | Parallel: {update.parallel_count}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-400">
+                    {update.completed_hosts}/{update.total_hosts} hosts | Parallel: {update.parallel_count}
+                  </span>
+                  {update.status === 'pending' && (
+                    <button onClick={() => handleStartUpdate(update.id)} className="flex items-center gap-1 text-green-400 hover:text-green-300 text-sm">
+                      <Play className="w-3.5 h-3.5" /> Start
+                    </button>
+                  )}
+                  {update.status === 'running' && (
+                    <>
+                      <button onClick={() => handleAdvanceUpdate(update.id)} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm" title="Advance to next host">
+                        <SkipForward className="w-3.5 h-3.5" /> Advance
+                      </button>
+                      <button onClick={() => handlePauseUpdate(update.id)} className="flex items-center gap-1 text-amber-400 hover:text-amber-300 text-sm">
+                        <Pause className="w-3.5 h-3.5" /> Pause
+                      </button>
+                    </>
+                  )}
+                  {update.status === 'paused' && (
+                    <button onClick={() => handleStartUpdate(update.id)} className="flex items-center gap-1 text-green-400 hover:text-green-300 text-sm">
+                      <Play className="w-3.5 h-3.5" /> Resume
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="mb-2">
                 <div className="flex justify-between text-xs text-slate-400 mb-1">
@@ -319,6 +373,10 @@ export default function LifecycleManager() {
       {/* Create Baseline Modal */}
       {showCreateBaseline && (
         <CreateBaselineModal onClose={() => setShowCreateBaseline(false)} onCreated={() => { setShowCreateBaseline(false); loadData() }} />
+      )}
+      {/* Create Rolling Update Modal */}
+      {showCreateUpdate && (
+        <CreateRollingUpdateModal baselines={baselines} hosts={hosts} onClose={() => setShowCreateUpdate(false)} onCreated={() => { setShowCreateUpdate(false); loadData() }} />
       )}
       {confirmState && (
         <ConfirmDialog
@@ -367,6 +425,84 @@ function CreateBaselineModal({ onClose, onCreated }: { onClose: () => void; onCr
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function CreateRollingUpdateModal({ baselines, hosts, onClose, onCreated }: {
+  baselines: Baseline[]; hosts: HostInfo[]; onClose: () => void; onCreated: () => void
+}) {
+  const toast = useToastContext()
+  const [name, setName] = useState('')
+  const [baselineId, setBaselineId] = useState(baselines[0]?.id || '')
+  const [selectedHosts, setSelectedHosts] = useState<Set<string>>(new Set())
+  const [parallelCount, setParallelCount] = useState(1)
+  const [failureThreshold, setFailureThreshold] = useState(1)
+  const [preCheckEnabled, setPreCheckEnabled] = useState(true)
+  const [autoRemediate, setAutoRemediate] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const toggleHost = (id: string) => setSelectedHosts(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedHosts.size === 0) { toast.error('Select at least one host'); return }
+    setSubmitting(true)
+    try {
+      await createRollingUpdate({
+        name,
+        baseline_id: baselineId,
+        host_ids: Array.from(selectedHosts),
+        parallel_count: parallelCount,
+        failure_threshold: failureThreshold,
+        pre_check_enabled: preCheckEnabled,
+        auto_remediate: autoRemediate,
+      })
+      toast.success('Rolling update plan created')
+      onCreated()
+    } catch (err) { toastFailure(toast, 'Failed to create rolling update', err) } finally { setSubmitting(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-lg">
+        <h2 className="text-xl font-bold mb-4">Create Rolling Update</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div><label className="block text-sm font-medium mb-1">Name</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. patch-cluster-2026-08" className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required /></div>
+          <div><label className="block text-sm font-medium mb-1">Baseline</label>
+            <select value={baselineId} onChange={e => setBaselineId(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+              {baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select></div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Hosts</label>
+            <div className="max-h-40 overflow-y-auto space-y-1 bg-slate-900/40 rounded p-2">
+              {hosts.map(h => (
+                <label key={h.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800/50 cursor-pointer">
+                  <input type="checkbox" checked={selectedHosts.has(h.id)} onChange={() => toggleHost(h.id)} className="rounded border-slate-600 bg-slate-700 text-blue-500" />
+                  <span className="text-sm">{h.hostname}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium mb-1">Parallel Hosts</label>
+              <input type="number" value={parallelCount} onChange={e => setParallelCount(Math.max(1, Number(e.target.value)))} min={1} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+            <div><label className="block text-sm font-medium mb-1">Failure Threshold</label>
+              <input type="number" value={failureThreshold} onChange={e => setFailureThreshold(Math.max(0, Number(e.target.value)))} min={0} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+          </div>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={preCheckEnabled} onChange={e => setPreCheckEnabled(e.target.checked)} /><span className="text-sm">Run pre-checks before each host</span></label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={autoRemediate} onChange={e => setAutoRemediate(e.target.checked)} /><span className="text-sm">Auto-remediate on failure</span></label>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{submitting ? 'Creating...' : 'Create'}</button>
           </div>
         </form>
       </div>
