@@ -83,6 +83,10 @@ _Create, run, and reshape virtual machines with declarative or interactive workf
   - **How:** Web VM detail Hotplug tab (live CPU/memory/disk/NIC) · REST resource endpoints under `/api/system/vms/:name/...` · emits `cpu_hotplug`/`memory_hotplug`/`disk_attached` events on the SSE stream.
 - **Disk Import & Conversion** — Import VMs from VMDK, VDI, and VHD with auto-conversion to qcow2, and online disk resize via QMP. — _Bring machines off VMware or VirtualBox without downtime._
   - **How:** REST `POST /api/images/import` (VMDK/VDI/VHD → qcow2) and online resize `POST /api/images/:id/resize` · Web VM Create from imported image · `zyvorctl` image import.
+- **Golden Images** — Turn any configured VM's current disk into a new, independent, catalog-registered base image — not a template's config recipe or a live copy-on-write fork, an actual standalone qcow2 file other VMs can boot from even after the source VM is gone. — _Get a workload exactly the way you want it once, then stamp out fleets from it._
+  - **How:** REST `POST /api/images/from-vm/:name` (async job, poll `GET /api/images/convert/:id`) · Web Create VM → "Create golden image from a VM." Each image is certified with [GuestKit](https://github.com/hypersdk/guestkit)'s offline `doctor` boot-readiness analysis (not qemu-guest-agent — Zyvor Fabric uses GuestKit for all guest/image inspection) as soon as conversion finishes; the score attaches to the job once ready and requires no agent running inside the guest.
+- **OS Image Catalog** — Download ready-made Ubuntu, Fedora, Debian, AlmaLinux, or Flatcar cloud images straight into the local catalog, reusing an already-downloaded copy instead of re-fetching it. — _Skip hunting for cloud-image URLs before your first VM._
+  - **How:** REST `GET /api/images/cloud` (catalog) and `POST /api/images/cloud/download` (async job) · Web Create VM → "Download an OS image."
 
 > VMs are ordinary systemd units — journalctl, watchdogs, and socket activation work exactly as operators already expect.
 
