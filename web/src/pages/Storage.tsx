@@ -3,8 +3,9 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { HardDrive, Trash2, RefreshCw, Database } from 'lucide-react'
-import { apiGet, apiDelete } from '../api/client'
+import { HardDrive, Trash2, RefreshCw, Database, Plus, Link2, Link2Off, Maximize2 } from 'lucide-react'
+import { apiGet } from '../api/client'
+import { listVolumes, createVolume, deleteVolume, resizeVolume, attachVolume, detachVolume, type Volume } from '../api/volumes'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -27,14 +28,8 @@ interface StoragePool {
   updated: string
 }
 
-interface Volume {
-  id: string
-  name: string
+interface VolumeRow extends Volume {
   pool: string
-  size: number
-  format: string
-  vm: string | null
-  snapshots: number
 }
 
 export default function Storage() {
@@ -44,6 +39,10 @@ export default function Storage() {
   const [volumes, setVolumes] = useState<Volume[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [showCreateVolume, setShowCreateVolume] = useState<string | null>(null)
+  const [attachTarget, setAttachTarget] = useState<VolumeRow | null>(null)
+  const [resizeTarget, setResizeTarget] = useState<VolumeRow | null>(null)
+  const [busyVolume, setBusyVolume] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoadError(null)
@@ -52,10 +51,10 @@ export default function Storage() {
       setPools(poolData)
 
       // Load volumes for each pool
-      const allVolumes: Volume[] = []
+      const allVolumes: VolumeRow[] = []
       for (const pool of poolData) {
         try {
-          const vols = await apiGet<Volume[]>(`/api/storage/pools/${pool.name}/volumes`)
+          const vols = await listVolumes(pool.name)
           allVolumes.push(...vols.map(v => ({ ...v, pool: pool.name })))
         } catch {
           // Pool may not support volume listing
@@ -76,12 +75,26 @@ export default function Storage() {
   }, [loadData])
 
   const handleDeleteVolume = async (pool: string, volumeId: string) => {
-    if (!await confirm('Delete Volume', 'Delete this volume?', { variant: 'danger', confirmLabel: 'Delete' })) return
+    if (!await confirm('Delete Volume Record', 'Delete this volume record? This only removes the tracking entry, not any real disk image.', { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
-      await apiDelete(`/api/storage/pools/${pool}/volumes/${volumeId}`)
+      await deleteVolume(pool, volumeId)
+      toast.success('Volume record deleted')
       await loadData()
     } catch (error) {
       toastFailure(toast, 'Failed to delete volume', error)
+    }
+  }
+
+  const handleDetach = async (v: VolumeRow) => {
+    setBusyVolume(v.id)
+    try {
+      await detachVolume(v.pool, v.id)
+      toast.success(`Detached '${v.name}'`)
+      await loadData()
+    } catch (error) {
+      toastFailure(toast, 'Failed to detach volume', error)
+    } finally {
+      setBusyVolume(null)
     }
   }
 
@@ -123,14 +136,6 @@ export default function Storage() {
     }
   }
 
-  const getFormatColor = (format: string) => {
-    switch (format) {
-      case 'qcow2': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-      case 'raw': return 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-      case 'vmdk': return 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-    }
-  }
 
   if (loading) {
     return <div className="text-center text-slate-400 py-12">Loading storage data...</div>
@@ -212,6 +217,9 @@ export default function Storage() {
                       <span className={`text-sm font-medium ${pool.state === 'Active' ? 'text-green-400' : 'text-slate-400'}`}>
                         {pool.state}
                       </span>
+                      <button onClick={() => setShowCreateVolume(pool.name)} className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-xs font-medium">
+                        <Plus className="w-3.5 h-3.5" /> Add Volume Record
+                      </button>
                     </div>
                   </div>
                   <div className="mb-2">
@@ -239,9 +247,12 @@ export default function Storage() {
       <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="p-6 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold">Volumes</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            A manual tracking ledger — records here don't create or resize real disk images. Use them to track volumes you've provisioned elsewhere.
+          </p>
         </div>
         {volumes.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">No volumes found.</div>
+          <div className="p-12 text-center text-slate-400">No volume records.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -250,7 +261,6 @@ export default function Storage() {
                   <th className="text-left p-4 font-medium text-slate-300">Name</th>
                   <th className="text-left p-4 font-medium text-slate-300">Pool</th>
                   <th className="text-left p-4 font-medium text-slate-300">Size</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Format</th>
                   <th className="text-left p-4 font-medium text-slate-300">Attached To</th>
                   <th className="text-left p-4 font-medium text-slate-300">Actions</th>
                 </tr>
@@ -265,21 +275,28 @@ export default function Storage() {
                       </div>
                     </td>
                     <td className="p-4 text-slate-400">{volume.pool}</td>
-                    <td className="p-4"><span className="font-mono text-sm">{formatBytes(volume.size)}</span></td>
+                    <td className="p-4"><span className="font-mono text-sm">{volume.size}</span></td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getFormatColor(volume.format)}`}>
-                        {volume.format.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {volume.vm ? (
-                        <span className="text-blue-400">{volume.vm}</span>
+                      {volume.vm_attached ? (
+                        <span className="text-blue-400">{volume.vm_attached}</span>
                       ) : (
                         <span className="text-slate-500 italic">Not attached</span>
                       )}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
+                        <button onClick={() => setResizeTarget(volume)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Resize record">
+                          <Maximize2 className="w-4 h-4" />
+                        </button>
+                        {volume.vm_attached ? (
+                          <button onClick={() => void handleDetach(volume)} disabled={busyVolume === volume.id} className="p-2 hover:bg-white/[0.06] rounded transition disabled:opacity-50" title="Detach">
+                            <Link2Off className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button onClick={() => setAttachTarget(volume)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Attach to VM">
+                            <Link2 className="w-4 h-4" />
+                          </button>
+                        )}
                         <button onClick={() => handleDeleteVolume(volume.pool, volume.id)} className="p-2 hover:bg-red-600 rounded transition" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -293,6 +310,16 @@ export default function Storage() {
         )}
       </div>
 
+      {showCreateVolume && (
+        <CreateVolumeModal pool={showCreateVolume} onClose={() => setShowCreateVolume(null)} onCreated={() => { setShowCreateVolume(null); void loadData() }} />
+      )}
+      {attachTarget && (
+        <AttachVolumeModal volume={attachTarget} onClose={() => setAttachTarget(null)} onAttached={() => { setAttachTarget(null); void loadData() }} />
+      )}
+      {resizeTarget && (
+        <ResizeVolumeModal volume={resizeTarget} onClose={() => setResizeTarget(null)} onResized={() => { setResizeTarget(null); void loadData() }} />
+      )}
+
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -303,6 +330,141 @@ export default function Storage() {
           onCancel={cancel}
         />
       )}
+    </div>
+  )
+}
+
+function CreateVolumeModal({ pool, onClose, onCreated }: { pool: string; onClose: () => void; onCreated: () => void }) {
+  const toast = useToastContext()
+  const [name, setName] = useState('')
+  const [size, setSize] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) { toast.error('Name is required'); return }
+    if (!size.trim()) { toast.error('Size is required'); return }
+    setCreating(true)
+    try {
+      await createVolume(pool, { name: name.trim(), size: size.trim() })
+      toast.success(`Volume record '${name}' created`)
+      onCreated()
+    } catch (err) {
+      toastFailure(toast, 'Failed to create volume record', err)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-1">Add Volume Record</h2>
+        <p className="text-sm text-slate-400 mb-4">Pool: {pool}</p>
+        <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
+          This creates a tracking record only — it does not provision a real disk image.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="my-volume" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Size</label>
+            <input value={size} onChange={e => setSize(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="20GB" />
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+            <button type="submit" disabled={creating} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{creating ? 'Creating…' : 'Create'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function AttachVolumeModal({ volume, onClose, onAttached }: { volume: VolumeRow; onClose: () => void; onAttached: () => void }) {
+  const toast = useToastContext()
+  const [vmName, setVmName] = useState('')
+  const [attaching, setAttaching] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!vmName.trim()) { toast.error('VM name is required'); return }
+    setAttaching(true)
+    try {
+      await attachVolume(volume.pool, volume.id, { vm_name: vmName.trim() })
+      toast.success(`Marked '${volume.name}' attached to '${vmName.trim()}'`)
+      onAttached()
+    } catch (err) {
+      toastFailure(toast, 'Failed to attach volume', err)
+    } finally {
+      setAttaching(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-1">Attach Volume</h2>
+        <p className="text-sm text-slate-400 mb-4">{volume.name} ({volume.pool})</p>
+        <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
+          This only updates the tracking record — it does not attach a real disk to the VM's configuration.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">VM Name</label>
+            <input value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="my-vm" />
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+            <button type="submit" disabled={attaching} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{attaching ? 'Attaching…' : 'Attach'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ResizeVolumeModal({ volume, onClose, onResized }: { volume: VolumeRow; onClose: () => void; onResized: () => void }) {
+  const toast = useToastContext()
+  const [size, setSize] = useState(volume.size)
+  const [resizing, setResizing] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!size.trim()) { toast.error('Size is required'); return }
+    setResizing(true)
+    try {
+      await resizeVolume(volume.pool, volume.id, { size: size.trim() })
+      toast.success(`Volume record '${volume.name}' resized`)
+      onResized()
+    } catch (err) {
+      toastFailure(toast, 'Failed to resize volume record', err)
+    } finally {
+      setResizing(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-1">Resize Volume Record</h2>
+        <p className="text-sm text-slate-400 mb-4">{volume.name} ({volume.pool})</p>
+        <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
+          This only updates the tracking record — it does not resize a real disk image.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">New Size</label>
+            <input value={size} onChange={e => setSize(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="40GB" />
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+            <button type="submit" disabled={resizing} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{resizing ? 'Saving…' : 'Save'}</button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
