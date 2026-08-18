@@ -20,6 +20,7 @@ import {
 } from '../api/encryption'
 import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
+import { toastFailure } from '../utils/toastError'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
@@ -85,7 +86,7 @@ export default function Encryption() {
       await decryptVm(vmName)
       toast.success(`'${vmName}' decrypted`)
       loadData()
-    } catch { toast.error('Failed to decrypt VM') }
+    } catch (err) { toastFailure(toast, 'Failed to decrypt VM', err) }
   }
 
   const getStatusColor = (status: string) => {
@@ -473,7 +474,7 @@ function EncryptVMModal({ vms, policies, onClose, onEncrypted }: { vms: VM[]; po
       await encryptVm(vmName, policyId)
       toast.success(`Encrypting '${vmName}'`)
       onEncrypted()
-    } catch { toast.error('Failed to encrypt VM') } finally { setSubmitting(false) }
+    } catch (err) { toastFailure(toast, 'Failed to encrypt VM', err) } finally { setSubmitting(false) }
   }
 
   return (
