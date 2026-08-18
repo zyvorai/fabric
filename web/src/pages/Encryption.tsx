@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, Key, Shield } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, Key, Shield, Lock, Unlock } from 'lucide-react'
 import {
   listProviders,
   registerProvider,
@@ -12,10 +12,13 @@ import {
   createEncryptionPolicy,
   listEncryptedVms,
   rotateVmKey,
+  encryptVm,
+  decryptVm,
   type KeyProvider,
   type EncryptionPolicy,
   type VmEncryptionStatus,
 } from '../api/encryption'
+import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -29,21 +32,25 @@ export default function Encryption() {
   const [providers, setProviders] = useState<KeyProvider[]>([])
   const [policies, setPolicies] = useState<EncryptionPolicy[]>([])
   const [encryptedVMs, setEncryptedVMs] = useState<VmEncryptionStatus[]>([])
+  const [allVMs, setAllVMs] = useState<VM[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load encryption data')
   const [activeTab, setActiveTab] = useState<'providers' | 'policies' | 'vms'>('providers')
   const [showCreateProvider, setShowCreateProvider] = useState(false)
   const [showCreatePolicy, setShowCreatePolicy] = useState(false)
+  const [showEncryptVM, setShowEncryptVM] = useState(false)
 
   const loadData = useCallback(() => {
     return run(async () => {
-      const [prov, pol, vms] = await Promise.all([
+      const [prov, pol, vms, allVms] = await Promise.all([
         listProviders(),
         listEncryptionPolicies(),
         listEncryptedVms(),
+        listVMs(),
       ])
       setProviders(prov)
       setPolicies(pol)
       setEncryptedVMs(vms)
+      setAllVMs(allVms)
     })
   }, [run])
 
@@ -71,6 +78,16 @@ export default function Encryption() {
     } catch { toast.error('Failed to rotate key') }
   }
 
+  const handleDecrypt = async (vmName: string) => {
+    const ok = await confirm('Decrypt VM', `Decrypt '${vmName}'? The VM's disk will no longer be protected by the encryption policy.`, { variant: 'danger', confirmLabel: 'Decrypt' })
+    if (!ok) return
+    try {
+      await decryptVm(vmName)
+      toast.success(`'${vmName}' decrypted`)
+      loadData()
+    } catch { toast.error('Failed to decrypt VM') }
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       connected: 'bg-green-100 text-green-800',
@@ -95,26 +112,26 @@ export default function Encryption() {
       <PageLoadBanner title="Could not load encryption data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
             <Key className="w-4 h-4" /> Key Providers
           </div>
           <div className="text-2xl font-bold">{providers.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
             <Shield className="w-4 h-4" /> Policies
           </div>
           <div className="text-2xl font-bold">{policies.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Encrypted VMs</div>
           <div className="text-2xl font-bold text-green-400">
             {encryptedVMs.filter(v => v.encrypted).length}
           </div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Connected Providers</div>
           <div className="text-2xl font-bold">
             {providers.filter(p => p.status === 'connected').length}
@@ -221,46 +238,61 @@ export default function Encryption() {
 
       {/* Encrypted VMs Tab */}
       {activeTab === 'vms' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-          <table className="min-w-full divide-y divide-slate-700/50">
-            <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase">
-                <th className="p-4">VM</th>
-                <th className="p-4">Encrypted</th>
-                <th className="p-4">Policy</th>
-                <th className="p-4">Algorithm</th>
-                <th className="p-4">Last Key Rotation</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {encryptedVMs.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-slate-400">No encrypted VMs.</td></tr>
-              ) : encryptedVMs.map(vm => (
-                <tr key={vm.vm_name} className="hover:bg-slate-900">
-                  <td className="p-4 font-medium">{vm.vm_name}</td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${vm.encrypted ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>
-                      {vm.encrypted ? 'Yes' : 'No'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-sm text-slate-400">{policies.find(p => p.id === vm.policy_id)?.name || vm.policy_id || '-'}</td>
-                  <td className="p-4 text-sm font-mono">{vm.algorithm || '-'}</td>
-                  <td className="p-4 text-sm text-slate-400">
-                    {vm.last_key_rotation ? new Date(vm.last_key_rotation).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="p-4">
-                    {vm.encrypted && (
-                      <button onClick={() => handleRotateKey(vm.vm_name)}
-                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm">
-                        <RefreshCw className="w-3.5 h-3.5" /> Rotate Key
-                      </button>
-                    )}
-                  </td>
+        <div>
+          <div className="flex justify-end mb-4">
+            <button onClick={() => setShowEncryptVM(true)} disabled={policies.length === 0}
+              title={policies.length === 0 ? 'Create an encryption policy first' : undefined}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Lock className="w-4 h-4" /> Encrypt VM
+            </button>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
+            <table className="min-w-full divide-y divide-slate-700/50">
+              <thead>
+                <tr className="text-left text-xs text-slate-400 uppercase">
+                  <th className="p-4">VM</th>
+                  <th className="p-4">Encrypted</th>
+                  <th className="p-4">Policy</th>
+                  <th className="p-4">Algorithm</th>
+                  <th className="p-4">Last Key Rotation</th>
+                  <th className="p-4">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {encryptedVMs.length === 0 ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">No encrypted VMs.</td></tr>
+                ) : encryptedVMs.map(vm => (
+                  <tr key={vm.vm_name} className="hover:bg-slate-900">
+                    <td className="p-4 font-medium">{vm.vm_name}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${vm.encrypted ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>
+                        {vm.encrypted ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-sm text-slate-400">{policies.find(p => p.id === vm.policy_id)?.name || vm.policy_id || '-'}</td>
+                    <td className="p-4 text-sm font-mono">{vm.algorithm || '-'}</td>
+                    <td className="p-4 text-sm text-slate-400">
+                      {vm.last_key_rotation ? new Date(vm.last_key_rotation).toLocaleDateString() : 'Never'}
+                    </td>
+                    <td className="p-4">
+                      {vm.encrypted && (
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => handleRotateKey(vm.vm_name)}
+                            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm">
+                            <RefreshCw className="w-3.5 h-3.5" /> Rotate Key
+                          </button>
+                          <button onClick={() => handleDecrypt(vm.vm_name)}
+                            className="flex items-center gap-1 text-red-400 hover:text-red-300 text-sm">
+                            <Unlock className="w-3.5 h-3.5" /> Decrypt
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -274,6 +306,16 @@ export default function Encryption() {
       {showCreatePolicy && (
         <CreatePolicyModal providers={providers} onClose={() => setShowCreatePolicy(false)}
           onCreated={() => { setShowCreatePolicy(false); loadData() }} />
+      )}
+
+      {/* Encrypt VM Modal */}
+      {showEncryptVM && (
+        <EncryptVMModal
+          vms={allVMs.filter(v => !encryptedVMs.some(e => e.vm_name === v.name && e.encrypted))}
+          policies={policies}
+          onClose={() => setShowEncryptVM(false)}
+          onEncrypted={() => { setShowEncryptVM(false); loadData() }}
+        />
       )}
 
       {confirmState && (
@@ -412,6 +454,60 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
             <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function EncryptVMModal({ vms, policies, onClose, onEncrypted }: { vms: VM[]; policies: EncryptionPolicy[]; onClose: () => void; onEncrypted: () => void }) {
+  const toast = useToastContext()
+  const [vmName, setVmName] = useState(vms[0]?.name || '')
+  const [policyId, setPolicyId] = useState(policies[0]?.id || '')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!vmName || !policyId) return
+    setSubmitting(true)
+    try {
+      await encryptVm(vmName, policyId)
+      toast.success(`Encrypting '${vmName}'`)
+      onEncrypted()
+    } catch { toast.error('Failed to encrypt VM') } finally { setSubmitting(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">Encrypt Virtual Machine</h2>
+        {vms.length === 0 ? (
+          <>
+            <p className="text-sm text-slate-400 mb-4">All VMs are already encrypted, or no VMs exist yet.</p>
+            <button onClick={onClose} className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Close</button>
+          </>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">VM</label>
+              <select value={vmName} onChange={e => setVmName(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+                {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Encryption Policy</label>
+              <select value={policyId} onChange={e => setPolicyId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+                {policies.map(p => <option key={p.id} value={p.id}>{p.name} ({p.algorithm})</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-slate-500">The VM's disk will be encrypted using the selected policy's key provider and algorithm.</p>
+            <div className="flex gap-3">
+              <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+              <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{submitting ? 'Encrypting...' : 'Encrypt'}</button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )

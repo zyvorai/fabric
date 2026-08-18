@@ -3,17 +3,20 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Check, Shield } from 'lucide-react'
+import { Plus, Check, Shield, RefreshCw, ClipboardCheck } from 'lucide-react'
 import {
   listCas,
   createCa,
   listCertificates,
+  issueCertificate,
   revokeCertificate,
+  renewCertificate,
   listCertRequests,
   approveCertRequest,
   listAttestations,
   listSecurityBaselines,
   createSecurityBaseline,
+  checkVmSecurityCompliance,
   getCertHealthDashboard,
   type CertificateAuthority,
   type Certificate,
@@ -22,6 +25,7 @@ import {
   type VmSecurityBaseline,
   type CertHealthDashboard,
 } from '../api/certificates'
+import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -39,20 +43,24 @@ export default function Certificates() {
   const [attestations, setAttestations] = useState<TrustAttestation[]>([])
   const [baselines, setBaselines] = useState<VmSecurityBaseline[]>([])
   const [health, setHealth] = useState<CertHealthDashboard | null>(null)
+  const [vms, setVMs] = useState<VM[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load certificates')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cas' | 'certs' | 'csrs' | 'attestation' | 'baselines'>('dashboard')
   const [showCreateCA, setShowCreateCA] = useState(false)
   const [showCreateBaseline, setShowCreateBaseline] = useState(false)
+  const [showIssueCert, setShowIssueCert] = useState(false)
+  const [complianceBaseline, setComplianceBaseline] = useState<VmSecurityBaseline | null>(null)
 
   const loadData = useCallback(() => {
     return run(async () => {
-      const [ca, ct, cr, at, bl, hl] = await Promise.all([
+      const [ca, ct, cr, at, bl, hl, vm] = await Promise.all([
         listCas(),
         listCertificates(),
         listCertRequests(),
         listAttestations(),
         listSecurityBaselines(),
         getCertHealthDashboard().catch(() => null),
+        listVMs(),
       ])
       setCAs(ca)
       setCerts(ct)
@@ -60,6 +68,7 @@ export default function Certificates() {
       setAttestations(at)
       setBaselines(bl)
       setHealth(hl)
+      setVMs(vm)
     })
   }, [run])
 
@@ -77,6 +86,11 @@ export default function Certificates() {
   const handleApproveCSR = async (id: string) => {
     try { await approveCertRequest(id); toast.success('Request approved'); loadData() }
     catch { toast.error('Failed to approve request') }
+  }
+
+  const handleRenew = async (id: string, subject: string) => {
+    try { await renewCertificate(id); toast.success(`Renewed certificate for '${subject}'`); loadData() }
+    catch { toast.error('Failed to renew certificate') }
   }
 
   const getStatusColor = (status: string) => {
@@ -126,34 +140,34 @@ export default function Certificates() {
 
       {activeTab === 'dashboard' && health && (
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Total Certificates</div>
               <div className="text-2xl font-bold">{health.total_certificates}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Active</div>
               <div className="text-2xl font-bold text-green-400">{health.active}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Expiring Soon</div>
               <div className="text-2xl font-bold text-yellow-400">{health.expiring_soon}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Expired</div>
               <div className="text-2xl font-bold text-red-400">{health.expired}</div>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Certificate Authorities</div>
               <div className="text-2xl font-bold">{health.ca_count}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Pending Requests</div>
               <div className="text-2xl font-bold text-blue-400">{health.pending_requests}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Overall Compliance</div>
               <div className="text-2xl font-bold">{health.overall_compliance_pct.toFixed(0)}%</div>
             </div>
@@ -223,46 +237,62 @@ export default function Certificates() {
 
       {/* Certificates Tab */}
       {activeTab === 'certs' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-          <table className="min-w-full divide-y divide-slate-700/50">
-            <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase">
-                <th className="p-4">Subject</th>
-                <th className="p-4">Type</th>
-                <th className="p-4">Serial</th>
-                <th className="p-4">Expires</th>
-                <th className="p-4">Host/Service</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {certs.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-400">No certificates.</td></tr>
-              ) : certs.map(cert => {
-                const days = daysUntil(cert.valid_to)
-                return (
-                  <tr key={cert.id} className="hover:bg-slate-900">
-                    <td className="p-4 font-mono text-sm">{cert.subject}</td>
-                    <td className="p-4 text-sm">{cert.cert_type}</td>
-                    <td className="p-4 text-xs font-mono text-slate-400">{cert.serial_number}</td>
-                    <td className="p-4 text-sm">
-                      <span className={days < 0 ? 'text-red-400' : days < 30 ? 'text-yellow-400' : 'text-slate-400'}>
-                        {new Date(cert.valid_to).toLocaleDateString()} ({days}d)
-                      </span>
-                    </td>
-                    <td className="p-4 text-sm text-slate-400">{cert.host_name || cert.service_name || '-'}</td>
-                    <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(cert.status)}`}>{cert.status.replace(/_/g, ' ')}</span></td>
-                    <td className="p-4">
-                      {cert.status === 'active' && (
-                        <button onClick={() => handleRevoke(cert.id)} className="text-red-600 hover:text-red-800 text-sm">Revoke</button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div>
+          <div className="flex justify-end mb-4">
+            <button onClick={() => setShowIssueCert(true)} disabled={cas.length === 0}
+              title={cas.length === 0 ? 'Create a Certificate Authority first' : undefined}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Plus className="w-4 h-4" /> Issue Certificate
+            </button>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
+            <table className="min-w-full divide-y divide-slate-700/50">
+              <thead>
+                <tr className="text-left text-xs text-slate-400 uppercase">
+                  <th className="p-4">Subject</th>
+                  <th className="p-4">Type</th>
+                  <th className="p-4">Serial</th>
+                  <th className="p-4">Expires</th>
+                  <th className="p-4">Host/Service</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {certs.length === 0 ? (
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No certificates.</td></tr>
+                ) : certs.map(cert => {
+                  const days = daysUntil(cert.valid_to)
+                  return (
+                    <tr key={cert.id} className="hover:bg-slate-900">
+                      <td className="p-4 font-mono text-sm">{cert.subject}</td>
+                      <td className="p-4 text-sm">{cert.cert_type}</td>
+                      <td className="p-4 text-xs font-mono text-slate-400">{cert.serial_number}</td>
+                      <td className="p-4 text-sm">
+                        <span className={days < 0 ? 'text-red-400' : days < 30 ? 'text-yellow-400' : 'text-slate-400'}>
+                          {new Date(cert.valid_to).toLocaleDateString()} ({days}d)
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm text-slate-400">{cert.host_name || cert.service_name || '-'}</td>
+                      <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(cert.status)}`}>{cert.status.replace(/_/g, ' ')}</span></td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          {(cert.status === 'active' || cert.status === 'expiring_soon') && (
+                            <button onClick={() => handleRenew(cert.id, cert.subject)} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm">
+                              <RefreshCw className="w-3.5 h-3.5" /> Renew
+                            </button>
+                          )}
+                          {cert.status === 'active' && (
+                            <button onClick={() => handleRevoke(cert.id)} className="text-red-600 hover:text-red-800 text-sm">Revoke</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -369,11 +399,12 @@ export default function Certificates() {
                   <th className="p-4">Checks</th>
                   <th className="p-4">Compliance</th>
                   <th className="p-4">Last Scan</th>
+                  <th className="p-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {baselines.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">No security baselines.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No security baselines.</td></tr>
                 ) : baselines.map(bl => {
                   const checkPct = bl.vm_count > 0 ? (bl.compliant_count / bl.vm_count * 100) : 0
                   return (
@@ -400,6 +431,13 @@ export default function Certificates() {
                         </div>
                       </td>
                       <td className="p-4 text-sm text-slate-400">{bl.last_scan ? new Date(bl.last_scan).toLocaleDateString() : 'Never'}</td>
+                      <td className="p-4">
+                        <button onClick={() => setComplianceBaseline(bl)} disabled={vms.length === 0}
+                          title={vms.length === 0 ? 'No VMs to check' : undefined}
+                          className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                          <ClipboardCheck className="w-3.5 h-3.5" /> Check Compliance
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -423,6 +461,22 @@ export default function Certificates() {
           <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Create Security Baseline</h2>
             <CreateBaselineForm onClose={() => setShowCreateBaseline(false)} onCreated={() => { setShowCreateBaseline(false); loadData() }} />
+          </div>
+        </div>
+      )}
+      {showIssueCert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Issue Certificate</h2>
+            <IssueCertificateForm cas={cas} onClose={() => setShowIssueCert(false)} onIssued={() => { setShowIssueCert(false); loadData() }} />
+          </div>
+        </div>
+      )}
+      {complianceBaseline && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Check Compliance: {complianceBaseline.name}</h2>
+            <ComplianceCheckForm baseline={complianceBaseline} vms={vms} onClose={() => setComplianceBaseline(null)} onChecked={loadData} />
           </div>
         </div>
       )}
@@ -498,5 +552,91 @@ function CreateBaselineForm({ onClose, onCreated }: { onClose: () => void; onCre
         <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
       </div>
     </form>
+  )
+}
+
+function IssueCertificateForm({ cas, onClose, onIssued }: { cas: CertificateAuthority[]; onClose: () => void; onIssued: () => void }) {
+  const toast = useToastContext()
+  const [caId, setCaId] = useState(cas[0]?.id || '')
+  const [subject, setSubject] = useState('')
+  const [certType, setCertType] = useState<'server' | 'client' | 'host' | 'service'>('server')
+  const [validityDays, setValidityDays] = useState(365)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      await issueCertificate({ ca_id: caId, subject, cert_type: certType, validity_days: validityDays })
+      toast.success('Certificate issued')
+      onIssued()
+    } catch { toast.error('Failed to issue certificate') } finally { setSubmitting(false) }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div><label className="block text-sm font-medium mb-1">Certificate Authority</label>
+        <select value={caId} onChange={e => setCaId(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+          {cas.map(ca => <option key={ca.id} value={ca.id}>{ca.name}</option>)}
+        </select></div>
+      <div><label className="block text-sm font-medium mb-1">Subject</label>
+        <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="CN=vm01.internal" required /></div>
+      <div><label className="block text-sm font-medium mb-1">Type</label>
+        <select value={certType} onChange={e => setCertType(e.target.value as typeof certType)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+          <option value="server">Server</option><option value="client">Client</option><option value="host">Host</option><option value="service">Service</option>
+        </select></div>
+      <div><label className="block text-sm font-medium mb-1">Validity (days)</label>
+        <input type="number" value={validityDays} onChange={e => setValidityDays(Math.max(1, Number(e.target.value) || 1))} min={1} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+      <div className="flex gap-3">
+        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+        <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{submitting ? 'Issuing...' : 'Issue'}</button>
+      </div>
+    </form>
+  )
+}
+
+function ComplianceCheckForm({ baseline, vms, onClose, onChecked }: { baseline: VmSecurityBaseline; vms: VM[]; onClose: () => void; onChecked: () => void }) {
+  const toast = useToastContext()
+  const [vmName, setVmName] = useState(vms[0]?.name || '')
+  const [checking, setChecking] = useState(false)
+  const [result, setResult] = useState<Awaited<ReturnType<typeof checkVmSecurityCompliance>> | null>(null)
+
+  const handleCheck = async () => {
+    if (!vmName) return
+    setChecking(true)
+    try {
+      const res = await checkVmSecurityCompliance(baseline.id, vmName)
+      setResult(res)
+      toast[res.compliant ? 'success' : 'error'](`'${vmName}' is ${res.compliant ? 'compliant' : 'non-compliant'} with '${baseline.name}'`)
+      onChecked()
+    } catch { toast.error('Failed to run compliance check') } finally { setChecking(false) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div><label className="block text-sm font-medium mb-1">VM</label>
+        <select value={vmName} onChange={e => { setVmName(e.target.value); setResult(null) }} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+          {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+        </select></div>
+      {result && (
+        <div className={`rounded-lg p-3 border ${result.compliant ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+          <div className={`text-sm font-semibold mb-2 ${result.compliant ? 'text-green-400' : 'text-red-400'}`}>
+            {result.compliant ? 'Compliant' : 'Non-compliant'}
+          </div>
+          <div className="space-y-1">
+            {result.checks.map(c => (
+              <div key={c.check_id} className="flex items-center justify-between text-xs">
+                <span className="text-slate-300">{c.name}</span>
+                <span className={c.status === 'pass' ? 'text-green-400' : c.status === 'fail' ? 'text-red-400' : 'text-slate-500'}>{c.status.replace(/_/g, ' ')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex gap-3">
+        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Close</button>
+        <button type="button" onClick={handleCheck} disabled={checking || !vmName} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{checking ? 'Checking...' : 'Run Check'}</button>
+      </div>
+    </div>
   )
 }
