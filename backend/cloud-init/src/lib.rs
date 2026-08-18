@@ -152,7 +152,13 @@ impl CloudInitGenerator {
     }
 }
 
-pub fn create_default_user_data(username: &str, ssh_key: Option<&str>) -> String {
+/// `agent_url` is the guest-reachable URL for zyvor-fabricd's own
+/// `/vendor/zyvor-guest-agent` route (see server.rs) -- there's no distro
+/// package for GuestKit's in-guest agent (unlike qemu-guest-agent), so
+/// installing it means curling the binary from somewhere. Pass `None` to
+/// skip agent installation entirely rather than reference a package that
+/// doesn't exist.
+pub fn create_default_user_data(username: &str, ssh_key: Option<&str>, agent_url: Option<&str>) -> String {
     let user_data = UserData {
         users: Some(vec![User {
             name: username.to_string(),
@@ -161,8 +167,13 @@ pub fn create_default_user_data(username: &str, ssh_key: Option<&str>) -> String
             ssh_authorized_keys: ssh_key.map(|key| vec![key.to_string()]),
         }]),
         ssh_authorized_keys: ssh_key.map(|key| vec![key.to_string()]),
-        packages: Some(vec!["qemu-guest-agent".to_string()]),
-        runcmd: None,
+        packages: None,
+        runcmd: agent_url.map(|url| {
+            vec![
+                format!("curl -fsSL {url} -o /usr/local/bin/zyvor-guest-agent"),
+                "chmod +x /usr/local/bin/zyvor-guest-agent".to_string(),
+            ]
+        }),
     };
 
     serde_yaml::to_string(&user_data).unwrap_or_default()

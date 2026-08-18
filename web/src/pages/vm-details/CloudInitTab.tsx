@@ -12,21 +12,57 @@ import { toastFailure } from '../../utils/toastError'
 import { useToastContext } from '../../contexts/ToastContext'
 import { usePermissions } from '../../hooks/usePermissions'
 
-const DEFAULT_USER_DATA = `#cloud-config
+// Installs GuestKit's own in-guest agent, not qemu-guest-agent -- this
+// project uses GuestKit for guest/image work throughout. There's no distro
+// package for it, so this curls the binary from zyvor-fabricd's own
+// /vendor route (served unauthenticated, same host this dashboard is
+// already talking to) instead. Only reachable if this VM's networking can
+// actually route back to the host -- true for bridged VMs; NAT-mode VMs
+// depend on the NAT gateway itself forwarding to the host, which this
+// deployment's default slirp setup does, but isn't guaranteed for every
+// networking config.
+function buildDefaultUserData(): string {
+  const agentUrl = `${window.location.origin}/vendor/zyvor-guest-agent`
+  return `#cloud-config
 users:
   - name: admin
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
-packages:
-  - qemu-guest-agent
+write_files:
+  - path: /etc/systemd/system/zyvor-guest-agent.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Zyvor VM Tools Guest Agent
+      Documentation=https://zyvor.dev/guestkit
+      After=network-online.target
+      Wants=network-online.target
+      ConditionPathExists=/dev/virtio-ports/org.qemu.guest_agent.0
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/bin/zyvor-guest-agent
+      Restart=always
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - curl -fsSL ${agentUrl} -o /usr/local/bin/zyvor-guest-agent
+  - chmod +x /usr/local/bin/zyvor-guest-agent
+  - systemctl daemon-reload
+  - systemctl enable --now zyvor-guest-agent
 `
+}
 
 export default function CloudInitTab({ vm }: { vm: VM }) {
   const toast = useToastContext()
   const { canWrite } = usePermissions()
   const [instanceId, setInstanceId] = useState(vm.name)
   const [hostname, setHostname] = useState(vm.name)
-  const [userData, setUserData] = useState(DEFAULT_USER_DATA)
+  const [userData, setUserData] = useState(buildDefaultUserData)
   const [networkConfig, setNetworkConfig] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)

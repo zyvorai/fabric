@@ -2165,6 +2165,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .nest("/ws", ws_routes)
         .route("/health", get(|| async { "OK" }))
         .route("/metrics", get(prometheus_exporter::metrics_handler))
+        // Unauthenticated on purpose -- cloud-init's first-boot runcmd has
+        // no bearer token to send, and this is a public agent binary, not
+        // sensitive data. Lets a VM's own cloud-init curl the GuestKit
+        // in-guest agent from the same host it's already talking to,
+        // instead of needing an externally-hosted mirror.
+        .route_service(
+            "/vendor/zyvor-guest-agent",
+            ServeFile::new("/var/lib/zyvor-fabricd/vendor/zyvor-guest-agent"),
+        )
         .fallback_service({
             let web_dir: &str = if std::path::Path::new("/usr/share/zyvor-fabricd/web").exists() {
                 "/usr/share/zyvor-fabricd/web"

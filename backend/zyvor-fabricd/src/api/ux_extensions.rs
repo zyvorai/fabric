@@ -857,16 +857,18 @@ pub async fn create_image_from_vm(
     let job_id_clone = job_id.clone();
     tokio::spawn(async move {
         run_convert_job(state_clone.clone(), job_id_clone.clone(), convert_req).await;
-        // Certify the resulting image with GuestKit's offline `doctor`
-        // analysis (boot-readiness score) -- this project doesn't use
-        // qemu-guest-agent for guest/image work, GuestKit is the tool for
-        // that. Best-effort: if the binary is missing or scoring fails, the
-        // golden image is still created, it just has no score attached.
+        // Bake in the GuestKit in-guest agent, then certify the image with
+        // GuestKit's offline `doctor` analysis (boot-readiness score) --
+        // this project doesn't use qemu-guest-agent for guest/image work,
+        // GuestKit is the tool for that. Both steps are best-effort: if the
+        // vendor binaries aren't present or either step fails, the golden
+        // image is still created, it just misses that step.
         if let Ok(Some(completed_job)) = state_clone
             .store
             .get_entity::<ConvertJob>(CONVERT_JOBS_STORE, &job_id_clone)
         {
             if completed_job.status == "completed" {
+                inject_guest_agent(&completed_job.output_path).await;
                 score_golden_image(&state_clone, &job_id_clone, &completed_job.output_path).await;
             }
         }
@@ -877,6 +879,44 @@ pub async fn create_image_from_vm(
         StatusCode::ACCEPTED,
         Json(json!({ "job_id": job.id, "id": job.id })),
     ))
+}
+
+/// Vendor location for the pre-built GuestKit in-guest agent artifacts --
+/// not part of this project's own build (they come from the separate
+/// guestkit repo: a musl-static `zyvor-guest-agent` binary for the guest,
+/// built with `cargo build --release --bin zyvor-guest-agent --features
+/// agent --no-default-features --target x86_64-unknown-linux-musl`; and a
+/// native `guestkit` CLI *also* built with `--features agent`, since the
+/// offline-only CLI normally installed system-wide refuses `agent-inject`
+/// without that feature). Both are placed here manually for now.
+const GUESTKIT_AGENT_CLI: &str = "/var/lib/zyvor-fabricd/vendor/guestkit-agent-cli";
+const GUESTKIT_AGENT_BINARY: &str = "/var/lib/zyvor-fabricd/vendor/zyvor-guest-agent";
+
+/// Offline-injects the GuestKit in-guest agent (systemd unit + binary) into
+/// a newly materialized golden image, so VMs booted from it are reachable
+/// over the agent's virtio-serial channel without depending on network
+/// access at boot (unlike a cloud-init curl install). No-ops quietly if
+/// the vendor binaries aren't present on this host.
+async fn inject_guest_agent(image_path: &str) {
+    if !tokio::fs::try_exists(GUESTKIT_AGENT_CLI).await.unwrap_or(false)
+        || !tokio::fs::try_exists(GUESTKIT_AGENT_BINARY).await.unwrap_or(false)
+    {
+        tracing::debug!("GuestKit agent vendor binaries not present, skipping agent injection");
+        return;
+    }
+    let output = tokio::process::Command::new(GUESTKIT_AGENT_CLI)
+        .args(["agent-inject", image_path, "--agent-binary", GUESTKIT_AGENT_BINARY, "-q"])
+        .output()
+        .await;
+    match output {
+        Ok(o) if o.status.success() => tracing::info!("Injected GuestKit agent into '{}'", image_path),
+        Ok(o) => tracing::warn!(
+            "guestkit agent-inject failed for '{}': {}",
+            image_path,
+            String::from_utf8_lossy(&o.stderr)
+        ),
+        Err(e) => tracing::debug!("guestkit-agent-cli not runnable, skipping agent injection: {}", e),
+    }
 }
 
 /// Runs `guestkit doctor` (read-only) against a newly materialized golden
