@@ -22,6 +22,8 @@ export interface VM {
   port_forwards?: PortForwardSpec[]
   network_tap?: boolean
   network_static_ip?: boolean
+  /** Why the VM ended up in the 'failed' state, if it did. Cleared on the next successful start. */
+  last_error?: string
 }
 
 export interface CreateVMRequest {

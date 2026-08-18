@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect, type MouseEvent as ReactMouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag, MoreVertical, ExternalLink } from 'lucide-react'
+import { Play, Square, Pause, Trash2, Terminal, Cpu, HardDrive, Copy, Tag, MoreVertical, ExternalLink, AlertTriangle } from 'lucide-react'
 import { VM } from '../api/vm'
 import { useVMActions } from '../hooks/useVMActions'
 import { usePermissions } from '../hooks/usePermissions'
@@ -72,9 +72,15 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
                 {vm.name}
               </Link>
               <p className="text-xs text-slate-500 mt-0.5 truncate">{vm.image}</p>
+              {vm.state === 'failed' && vm.last_error && (
+                <p className="flex items-start gap-1 text-xs text-red-400 mt-1.5" title={vm.last_error}>
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span className="line-clamp-2">{vm.last_error}</span>
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1.5 ml-3">
-              <StatusBadge status={vm.state} />
+              <StatusBadge status={vm.state} title={vm.state === 'failed' ? vm.last_error : undefined} />
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}

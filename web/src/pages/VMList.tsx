@@ -61,7 +61,7 @@ function VMTableRow({ vm, onUpdate, selected, onSelect, canWrite }: { vm: VM; on
         </div>
       </td>
       <td className="py-3 px-4">
-        <StatusBadge status={vm.state} />
+        <StatusBadge status={vm.state} title={vm.state === 'failed' ? vm.last_error : undefined} />
       </td>
       <td className="py-3 px-4">
         <div className="flex items-center gap-1.5 text-sm text-slate-400">

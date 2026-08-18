@@ -5,6 +5,8 @@
 interface StatusBadgeProps {
   status: string
   variant?: 'dot' | 'pill'
+  /** Native tooltip, e.g. the reason a 'failed' status happened. */
+  title?: string
 }
 
 const statusStyles: Record<string, string> = {
@@ -43,7 +45,7 @@ const dotColors: Record<string, string> = {
 
 const isRunning = (s: string) => ['running', 'active', 'enabled', 'healthy'].includes(s.toLowerCase())
 
-export function StatusBadge({ status, variant = 'pill' }: StatusBadgeProps) {
+export function StatusBadge({ status, variant = 'pill', title }: StatusBadgeProps) {
   const key = status.toLowerCase()
   const style = statusStyles[key] || statusStyles.unknown
   const pulse = isRunning(key)
@@ -51,7 +53,7 @@ export function StatusBadge({ status, variant = 'pill' }: StatusBadgeProps) {
   if (variant === 'dot') {
     const dot = dotColors[key] || dotColors.unknown
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2" title={title}>
         <span className="relative flex h-2 w-2">
           {pulse && <span className={`absolute inset-0 rounded-full ${dot} opacity-40 animate-ping`} />}
           <span className={`relative w-2 h-2 rounded-full ${dot}`} />
@@ -62,7 +64,7 @@ export function StatusBadge({ status, variant = 'pill' }: StatusBadgeProps) {
   }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium capitalize border ${style}`}>
+    <span title={title} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium capitalize border ${style}`}>
       <span className="relative flex h-1.5 w-1.5">
         {pulse && <span className={`absolute inset-0 rounded-full ${dotColors[key] || dotColors.unknown} opacity-40 animate-ping`} />}
         <span className={`relative w-1.5 h-1.5 rounded-full ${dotColors[key] || dotColors.unknown}`} />

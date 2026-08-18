@@ -249,7 +249,7 @@ export default function VMDetails() {
 
       {/* Tab Content */}
       <div className="animate-fade-in">
-        {activeTab === 'overview' && <OverviewTab vm={vm} />}
+        {activeTab === 'overview' && <OverviewTab vm={vm} onRetryStart={handleStart} />}
         {activeTab === 'metrics' && <MetricsTab vm={vm} />}
         {activeTab === 'disks' && <DisksTab vm={vm} />}
         {activeTab === 'network' && <NetworkTab vm={vm} onUpdated={loadVM} />}
@@ -316,9 +316,20 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
   )
 }
 
-function OverviewTab({ vm }: { vm: VM }) {
+function OverviewTab({ vm, onRetryStart }: { vm: VM; onRetryStart: () => void }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {vm.state === 'failed' && vm.last_error && (
+        <div className="md:col-span-2">
+          <ErrorBanner
+            title="This VM failed to start"
+            headline={vm.last_error}
+            tone="red"
+            onRetry={onRetryStart}
+            retryLabel="Try starting again"
+          />
+        </div>
+      )}
       <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
         <h3 className="text-sm font-medium text-slate-400 mb-3">Configuration</h3>
         <dl>
