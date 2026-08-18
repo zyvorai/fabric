@@ -107,6 +107,20 @@ pub struct UpdateTagsRequest {
     pub tags: Vec<String>,
 }
 
+/// Tags are display labels, not identifiers used elsewhere (no path/shell
+/// use), so this is a sanity cap rather than a security boundary -- mainly
+/// to stop an accidental paste of something huge from bloating the VM
+/// record indefinitely.
+fn validate_tag(tag: &str) -> Result<(), (StatusCode, String)> {
+    if tag.is_empty() || tag.chars().count() > 63 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Tag must be between 1 and 63 characters".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// POST /api/vms/:name/tags - Add a tag to a VM
 pub async fn add_tag(
     RequireWrite(_claims): RequireWrite,
@@ -115,6 +129,9 @@ pub async fn add_tag(
     Json(req): Json<AddTagRequest>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    if let Err((status, msg)) = validate_tag(&req.tag) {
         return json_error(status, msg).into_response();
     }
     let mut vm = match state.store.get_vm(&name) {
@@ -163,6 +180,9 @@ pub async fn update_tags(
     Json(req): Json<UpdateTagsRequest>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    if let Some((status, msg)) = req.tags.iter().find_map(|t| validate_tag(t).err()) {
         return json_error(status, msg).into_response();
     }
     let mut vm = match state.store.get_vm(&name) {

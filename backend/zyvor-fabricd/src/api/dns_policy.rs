@@ -106,6 +106,62 @@ pub async fn get_zone(
     }
 }
 
+/// PUT /api/dns-zones/:id - Update a managed DNS zone's name/description
+pub async fn update_zone(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateDnsZoneRequest>,
+) -> impl IntoResponse {
+    tracing::debug!("dns_policy::{}", stringify!(update_zone));
+    if let Err(msg) = crate::validation::validate_hostname(&req.name) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Invalid zone name: {}", msg)})),
+        )
+            .into_response();
+    }
+    if let Some(host) = super::net_security_discover::find_host_dns_zone(&state, &id) {
+        if super::net_security_discover::is_host_managed_dns_zone(&host) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "This DNS zone exists on the host and is not managed by zyvor-fabricd"
+                })),
+            )
+                .into_response();
+        }
+    }
+    let mut zone = match state.store.get_entity::<DnsZone>(ZONES_KEY, &id) {
+        Ok(Some(zone)) => zone,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "DNS zone not found" })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+                .into_response()
+        }
+    };
+    zone.name = req.name;
+    zone.description = req.description;
+    zone.updated = Utc::now();
+    if let Err(e) = state.store.save_entity(ZONES_KEY, &id, &zone) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+    (StatusCode::OK, Json(zone)).into_response()
+}
+
 pub async fn delete_zone(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,

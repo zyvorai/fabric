@@ -87,6 +87,12 @@ fn usb_device_id(vendor_id: &str, product_id: &str) -> String {
     format!("usb-hotplug-{}-{}", vendor_id, product_id)
 }
 
+/// USB vendor/product ids are 4 hex digits (e.g. "1d6b"). Reject anything
+/// else before it's embedded in a QMP command or a device id string.
+fn is_usb_id(s: &str) -> bool {
+    s.len() == 4 && s.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 /// POST /api/vms/:name/devices/usb - Attach a host USB device to a running VM
 pub async fn attach_usb(
     RequireWrite(_claims): RequireWrite,
@@ -96,6 +102,13 @@ pub async fn attach_usb(
 ) -> impl IntoResponse {
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
+    }
+    if !is_usb_id(&req.vendor_id) || !is_usb_id(&req.product_id) {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "vendor_id and product_id must each be 4 hex digits".to_string(),
+        )
+        .into_response();
     }
     let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();

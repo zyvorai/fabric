@@ -155,6 +155,9 @@ pub async fn attach_pci(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
     }
+    if let Err((s, m)) = crate::validation::validate_pci_address(&req.address) {
+        return crate::api_error::json_error(s, m).into_response();
+    }
     let dir = std::path::Path::new("/sys/bus/pci/devices").join(&req.address);
     if !dir.exists() {
         return crate::api_error::json_error(
@@ -211,6 +214,9 @@ pub async fn detach_pci(
     Path((vm_name, address)): Path<(String, String)>,
 ) -> impl IntoResponse {
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return crate::api_error::json_error(s, m).into_response();
+    }
+    if let Err((s, m)) = crate::validation::validate_pci_address(&address) {
         return crate::api_error::json_error(s, m).into_response();
     }
     let Some(qmp) = resolve_qmp(&state, &vm_name).await else {

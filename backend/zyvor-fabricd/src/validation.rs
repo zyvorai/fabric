@@ -181,6 +181,40 @@ pub fn find_vm_image_or_default(name: &str) -> String {
 
 /// Validate that a string is a valid hostname or IP address.
 /// Rejects shell metacharacters and other injection vectors.
+/// Validate a PCI Bus:Device.Function address (e.g. "0000:01:00.0") before
+/// it's used to build a sysfs path. Without this, a value like "/etc/passwd"
+/// would make `Path::new("/sys/bus/pci/devices").join(addr)` discard the
+/// base entirely (Rust's `Path::join` replaces on an absolute joinee) --
+/// harmless in `attach_pci` today only because the vfio-pci driver check
+/// after it rejects anything that isn't already passthrough-bound, but that
+/// shouldn't be the only thing standing in the way.
+pub fn validate_pci_address(addr: &str) -> Result<(), (StatusCode, String)> {
+    let parts: Vec<&str> = addr.split(':').collect();
+    let valid = match parts.as_slice() {
+        [domain, bus, rest] if domain.len() == 4 => match rest.split_once('.') {
+            Some((dev, func)) => {
+                dev.len() == 2
+                    && func.len() == 1
+                    && [*domain, *bus, dev, func]
+                        .iter()
+                        .all(|s| s.chars().all(|c| c.is_ascii_hexdigit()))
+            }
+            None => false,
+        },
+        _ => false,
+    };
+    if !valid {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "'{}' is not a valid PCI address (expected dddd:bb:dd.f, e.g. 0000:01:00.0)",
+                addr
+            ),
+        ));
+    }
+    Ok(())
+}
+
 pub fn validate_hostname(host: &str) -> Result<(), String> {
     if host.is_empty() || host.len() > 253 {
         return Err("Hostname must be between 1 and 253 characters".to_string());

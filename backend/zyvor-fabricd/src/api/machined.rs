@@ -370,6 +370,28 @@ pub async fn copy_from_machine(
         })
 }
 
+/// POST /api/machines/:name/bind - always 501; see this module's doc comment.
+/// Exists so a caller gets a clear, actionable JSON error instead of the SPA's
+/// index.html (the 404-as-HTML failure this whole sweep was about) if this
+/// ever gets wired up before anyone reads the module doc.
+pub async fn bind_machine(
+    RequireAdmin(_claims): RequireAdmin,
+    Path(name): Path<String>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::debug!("machines::{}", stringify!(bind_machine));
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "error": format!(
+                "Live bind-mounting into a running VM isn't supported -- a hardware VM has no \
+                 shared-kernel mount trick the way a container has. Set bind_mounts on \
+                 VMStartOptions when creating or restarting '{name}' instead; it's translated \
+                 into a virtiofs share at launch."
+            )
+        })),
+    )
+}
+
 // ============================================================================
 // Image management (routed through state.driver — driver_core::ImageDriver)
 // ============================================================================

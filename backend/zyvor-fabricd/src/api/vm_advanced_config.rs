@@ -370,3 +370,241 @@ pub async fn update_cpu_config(
     }
     (StatusCode::OK, Json(cfg)).into_response()
 }
+
+#[derive(Debug, Serialize)]
+pub struct CpuModelInfo {
+    pub name: String,
+    pub vendor: String,
+    pub features: Vec<String>,
+}
+
+fn guess_vendor(model: &str) -> String {
+    let m = model.to_ascii_lowercase();
+    if m.contains("epyc") || m.contains("amd") || m.contains("athlon") || m.contains("phenom") {
+        "AMD".to_string()
+    } else if m.contains("intel")
+        || m.contains("core")
+        || m.contains("xeon")
+        || m.contains("broadwell")
+        || m.contains("haswell")
+        || m.contains("skylake")
+        || m.contains("cascadelake")
+        || m.contains("icelake")
+        || m.contains("snowridge")
+        || m.contains("westmere")
+        || m.contains("nehalem")
+        || m.contains("sandybridge")
+        || m.contains("ivybridge")
+        || m.contains("penryn")
+        || m.contains("conroe")
+    {
+        "Intel".to_string()
+    } else {
+        "".to_string()
+    }
+}
+
+/// GET /api/system/cpu-models - List QEMU CPU models available on this host
+pub async fn list_cpu_models(
+    RequireRead(_claims): RequireRead,
+) -> Result<Json<Vec<CpuModelInfo>>, (StatusCode, Json<serde_json::Value>)> {
+    let output = tokio::process::Command::new("qemu-system-x86_64")
+        .args(["-cpu", "help"])
+        .output()
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to run qemu-system-x86_64: {}", e)})),
+            )
+        })?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut models = Vec::new();
+    let mut in_list = false;
+    for line in stdout.lines() {
+        if line.starts_with("Available CPUs") {
+            in_list = true;
+            continue;
+        }
+        if !in_list {
+            continue;
+        }
+        if line.trim().is_empty() || line.starts_with("Recognized CPUID") {
+            break;
+        }
+        // "x86 <model>[  <description>]"
+        let Some(rest) = line.trim_start().strip_prefix("x86 ") else {
+            continue;
+        };
+        let name = rest.split_whitespace().next().unwrap_or("").to_string();
+        if name.is_empty() {
+            continue;
+        }
+        models.push(CpuModelInfo {
+            vendor: guess_vendor(&name),
+            name,
+            // qemu -cpu help doesn't enumerate per-model feature flags without
+            // querying each model individually (expensive); left empty rather
+            // than guessed.
+            features: Vec::new(),
+        });
+    }
+
+    Ok(Json(models))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchdogConfig {
+    pub model: String,
+    pub action: String,
+}
+
+const ALLOWED_WATCHDOG_MODELS: &[&str] = &["i6300esb", "ib700"];
+const ALLOWED_WATCHDOG_ACTIONS: &[&str] = &["reset", "shutdown", "poweroff", "pause", "none"];
+
+/// GET /api/vms/:name/watchdog - null if no watchdog configured
+pub async fn get_watchdog(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+) -> impl IntoResponse {
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return crate::api_error::json_error(s, m).into_response();
+    }
+    match state
+        .store
+        .get_entity::<WatchdogConfig>("vm_watchdog_config", &vm_name)
+    {
+        Ok(cfg) => Json(cfg).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
+    }
+}
+
+/// POST /api/vms/:name/watchdog
+pub async fn set_watchdog(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(cfg): Json<WatchdogConfig>,
+) -> impl IntoResponse {
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return crate::api_error::json_error(s, m).into_response();
+    }
+    if state.store.get_vm(&vm_name).ok().flatten().is_none() {
+        return crate::api_error::json_error(
+            StatusCode::NOT_FOUND,
+            format!("VM '{}' not found", vm_name),
+        )
+        .into_response();
+    }
+    if !ALLOWED_WATCHDOG_MODELS.contains(&cfg.model.as_str()) {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Invalid watchdog model '{}'. Allowed: {}",
+                cfg.model,
+                ALLOWED_WATCHDOG_MODELS.join(", ")
+            ),
+        )
+        .into_response();
+    }
+    if !ALLOWED_WATCHDOG_ACTIONS.contains(&cfg.action.as_str()) {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Invalid watchdog action '{}'. Allowed: {}",
+                cfg.action,
+                ALLOWED_WATCHDOG_ACTIONS.join(", ")
+            ),
+        )
+        .into_response();
+    }
+    if let Err(e) = state
+        .store
+        .save_entity("vm_watchdog_config", &vm_name, &cfg)
+    {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    (StatusCode::OK, Json(cfg)).into_response()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerialConfig {
+    #[serde(rename = "type")]
+    pub serial_type: String,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub source_host: Option<String>,
+    #[serde(default)]
+    pub source_port: Option<u16>,
+}
+
+const ALLOWED_SERIAL_TYPES: &[&str] = &["pty", "unix", "tcp"];
+
+/// GET /api/vms/:name/serials
+pub async fn list_serials(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+) -> impl IntoResponse {
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return crate::api_error::json_error(s, m).into_response();
+    }
+    match state
+        .store
+        .get_entity::<Vec<SerialConfig>>("vm_serial_config", &vm_name)
+    {
+        Ok(cfg) => Json(cfg.unwrap_or_default()).into_response(),
+        Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response(),
+    }
+}
+
+/// POST /api/vms/:name/serials - append a serial console definition
+pub async fn add_serial(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(cfg): Json<SerialConfig>,
+) -> impl IntoResponse {
+    if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
+        return crate::api_error::json_error(s, m).into_response();
+    }
+    if state.store.get_vm(&vm_name).ok().flatten().is_none() {
+        return crate::api_error::json_error(
+            StatusCode::NOT_FOUND,
+            format!("VM '{}' not found", vm_name),
+        )
+        .into_response();
+    }
+    if !ALLOWED_SERIAL_TYPES.contains(&cfg.serial_type.as_str()) {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Invalid serial type '{}'. Allowed: {}",
+                cfg.serial_type,
+                ALLOWED_SERIAL_TYPES.join(", ")
+            ),
+        )
+        .into_response();
+    }
+    let mut serials = state
+        .store
+        .get_entity::<Vec<SerialConfig>>("vm_serial_config", &vm_name)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    serials.push(cfg);
+    if let Err(e) = state
+        .store
+        .save_entity("vm_serial_config", &vm_name, &serials)
+    {
+        return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            .into_response();
+    }
+    (StatusCode::OK, Json(serials)).into_response()
+}

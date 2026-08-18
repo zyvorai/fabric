@@ -914,6 +914,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/machines/{name}/copy-from",
             post(api::machined::copy_from_machine),
         )
+        .route("/machines/{name}/bind", post(api::machined::bind_machine))
         // Plugin routes
         .route("/plugins", get(plugins::list_plugins))
         // Resource optimization routes
@@ -1408,7 +1409,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/dns-zones/adopt", post(api::dns_policy::adopt_zone))
         .route(
             "/dns-zones/{id}",
-            get(api::dns_policy::get_zone).delete(api::dns_policy::delete_zone),
+            get(api::dns_policy::get_zone)
+                .put(api::dns_policy::update_zone)
+                .delete(api::dns_policy::delete_zone),
         )
         .route(
             "/dns-policies",
@@ -2080,6 +2083,17 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/vms/{name}/cpu-model",
             get(api::vm_advanced_config::get_cpu_config)
                 .post(api::vm_advanced_config::update_cpu_config),
+        )
+        .route("/system/cpu-models", get(api::vm_advanced_config::list_cpu_models))
+        .route(
+            "/vms/{name}/watchdog",
+            get(api::vm_advanced_config::get_watchdog)
+                .post(api::vm_advanced_config::set_watchdog),
+        )
+        .route(
+            "/vms/{name}/serials",
+            get(api::vm_advanced_config::list_serials)
+                .post(api::vm_advanced_config::add_serial),
         )
         // DHCP server config
         .route("/networkd/dhcp", post(api::networkd::configure_dhcp_server))
