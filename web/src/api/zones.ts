@@ -28,6 +28,14 @@ export interface SpotInstance {
   evicted_at?: string
 }
 
+export interface CreateSpotInstanceRequest {
+  vm_name: string
+  max_price_per_hour?: number
+  priority?: 'low' | 'regular'
+  zone_id?: string
+  eviction_policy?: 'stop' | 'delete' | 'deallocate'
+}
+
 export async function listZones(): Promise<AvailabilityZone[]> {
   return apiGet<AvailabilityZone[]>(`${API_BASE}/zones`)
 }
@@ -42,6 +50,14 @@ export async function deleteZone(id: string): Promise<void> {
 
 export async function listSpotInstances(): Promise<SpotInstance[]> {
   return apiGet<SpotInstance[]>(`${API_BASE}/spot-instances`)
+}
+
+export async function createSpotInstance(req: CreateSpotInstanceRequest): Promise<SpotInstance> {
+  return apiPost<SpotInstance>(`${API_BASE}/spot-instances`, req)
+}
+
+export async function deleteSpotInstance(id: string): Promise<void> {
+  return apiDelete(`${API_BASE}/spot-instances/${id}`)
 }
 
 export async function evictSpotInstance(id: string): Promise<SpotInstance> {

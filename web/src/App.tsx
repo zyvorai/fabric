@@ -29,6 +29,7 @@ const Console = lazy(() => import('./pages/Console'))
 const Logs = lazy(() => import('./pages/Logs'))
 const Network = lazy(() => import('./pages/Network'))
 const Storage = lazy(() => import('./pages/Storage'))
+const Zones = lazy(() => import('./pages/Zones'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Templates = lazy(() => import('./pages/Templates'))
 const Quotas = lazy(() => import('./pages/Quotas'))
@@ -229,6 +230,7 @@ function MainLayout() {
                 <Route path="/quotas" element={<Quotas />} />
                 <Route path="/schedules" element={<Schedules />} />
                 <Route path="/autoscale" element={<AutoscalePage />} />
+                <Route path="/zones" element={<Zones />} />
                 <Route path="/audit" element={<AuditLogs />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/backups" element={<Backups />} />

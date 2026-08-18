@@ -102,6 +102,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Content Library', path: '/content-library', icon: Archive },
       { label: 'Schedules', path: '/schedules', icon: Calendar },
       { label: 'Autoscale', path: '/autoscale', icon: TrendingUp },
+      { label: 'Availability Zones', path: '/zones', icon: Globe },
       { label: 'Snapshots', path: '/snapshots', icon: Camera },
       { label: 'Backups', path: '/backups', icon: Save },
       { label: 'Quotas', path: '/quotas', icon: Shield },
