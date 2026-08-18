@@ -3,39 +3,51 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
+import { Plus, ChevronRight, ChevronDown, Trash2, X, ArrowRightLeft } from 'lucide-react'
 import {
   listPools,
   createPool,
   deletePool,
   getPoolSummary,
   checkAdmission,
+  assignVm,
+  unassignVm,
+  moveVm,
+  sharesValue,
+  sharesLabel,
   type ResourcePool,
   type ResourcePoolSummary,
   type AdmissionControlResult,
+  type SharesLevel,
 } from '../api/resourcePools'
+import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { toastFailure } from '../utils/toastError'
 
 export default function ResourcePools() {
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [pools, setPools] = useState<ResourcePool[]>([])
   const [summaries, setSummaries] = useState<Map<string, ResourcePoolSummary>>(new Map())
+  const [vms, setVMs] = useState<VM[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load resource pools')
   const [expandedPools, setExpandedPools] = useState<Set<string>>(new Set())
   const [showCreatePool, setShowCreatePool] = useState(false)
   const [showAdmissionTest, setShowAdmissionTest] = useState<string | null>(null)
   const [admissionResult, setAdmissionResult] = useState<AdmissionControlResult | null>(null)
+  const [assignTargetPool, setAssignTargetPool] = useState<string | null>(null)
+  const [moveTarget, setMoveTarget] = useState<{ poolId: string; vmName: string } | null>(null)
 
   const loadData = useCallback(() => {
     return run(async () => {
-      const data = await listPools()
+      const [data, vmList] = await Promise.all([listPools(), listVMs()])
       setPools(data)
+      setVMs(vmList)
       const sums = new Map<string, ResourcePoolSummary>()
       for (const pool of data) {
         try {
@@ -46,6 +58,34 @@ export default function ResourcePools() {
       setSummaries(sums)
     })
   }, [run])
+
+  const handleAssign = async (poolId: string, vmName: string) => {
+    try {
+      await assignVm(poolId, vmName)
+      toast.success(`'${vmName}' assigned to pool`)
+      setAssignTargetPool(null)
+      loadData()
+    } catch (err) { toastFailure(toast, 'Failed to assign VM', err) }
+  }
+
+  const handleUnassign = async (poolId: string, vmName: string) => {
+    const ok = await confirm('Unassign VM', `Remove '${vmName}' from this resource pool?`, { variant: 'danger', confirmLabel: 'Unassign' })
+    if (!ok) return
+    try {
+      await unassignVm(poolId, vmName)
+      toast.success(`'${vmName}' unassigned`)
+      loadData()
+    } catch (err) { toastFailure(toast, 'Failed to unassign VM', err) }
+  }
+
+  const handleMove = async (fromPoolId: string, vmName: string, toPoolId: string) => {
+    try {
+      await moveVm(vmName, fromPoolId, toPoolId)
+      toast.success(`'${vmName}' moved`)
+      setMoveTarget(null)
+      loadData()
+    } catch (err) { toastFailure(toast, 'Failed to move VM', err) }
+  }
 
   useEffect(() => {
     void loadData()
@@ -84,8 +124,8 @@ export default function ResourcePools() {
     const children = getChildren(pool.id)
     const isExpanded = expandedPools.has(pool.id)
     const summary = summaries.get(pool.id)
-    const cpuPct = pool.cpu_limit > 0 ? (pool.cpu_used / pool.cpu_limit * 100) : 0
-    const memPct = pool.memory_limit_mb > 0 ? (pool.memory_used_mb / pool.memory_limit_mb * 100) : 0
+    const cpuPct = summary?.cpu_limit_mhz ? (summary.cpu_used_mhz / summary.cpu_limit_mhz * 100) : 0
+    const memPct = summary?.memory_limit_mb ? (summary.memory_used_mb / summary.memory_limit_mb * 100) : 0
 
     return (
       <div key={pool.id}>
@@ -100,7 +140,7 @@ export default function ResourcePools() {
             ) : <div className="w-4 shrink-0" />}
             <span className="font-medium truncate">{pool.name}</span>
             <span className="text-xs text-slate-400 truncate">
-              {pool.vm_count} VMs | CPU: {pool.cpu_shares} shares | Mem: {pool.memory_shares} shares
+              {pool.vms.length} VMs | CPU: {sharesLabel(pool.cpu_shares)} | Mem: {sharesLabel(pool.memory_shares)}
             </span>
           </div>
           <div className="flex items-center gap-4 shrink-0" onClick={e => e.stopPropagation()}>
@@ -131,12 +171,41 @@ export default function ResourcePools() {
           <>
             {summary && (
               <div className="grid grid-cols-4 gap-3 p-3 bg-slate-900" style={{ paddingLeft: `${depth * 24 + 40}px` }}>
-                <div className="text-xs"><span className="text-slate-400">Reservation:</span> {pool.cpu_reservation} MHz / {pool.memory_reservation_mb} MB</div>
-                <div className="text-xs"><span className="text-slate-400">Limit:</span> {pool.cpu_limit} MHz / {pool.memory_limit_mb} MB</div>
-                <div className="text-xs"><span className="text-slate-400">Available:</span> {summary.cpu_available} MHz / {summary.memory_available_mb} MB</div>
+                <div className="text-xs"><span className="text-slate-400">Reservation:</span> {pool.cpu_reservation_mhz} MHz / {pool.memory_reservation_mb} MB</div>
+                <div className="text-xs"><span className="text-slate-400">Limit:</span> {pool.cpu_limit_mhz ?? 'Unlimited'} MHz / {pool.memory_limit_mb ?? 'Unlimited'} MB</div>
+                <div className="text-xs"><span className="text-slate-400">Used:</span> {summary.cpu_used_mhz} MHz / {summary.memory_used_mb} MB</div>
                 <div className="text-xs"><span className="text-slate-400">Children:</span> {summary.child_pool_count} pools</div>
               </div>
             )}
+            <div className="p-3 bg-slate-900 border-t border-slate-800" style={{ paddingLeft: `${depth * 24 + 40}px` }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Assigned VMs</span>
+                <button onClick={() => setAssignTargetPool(pool.id)} className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Assign VM
+                </button>
+              </div>
+              {pool.vms.length === 0 ? (
+                <p className="text-xs text-slate-500">No VMs assigned.</p>
+              ) : (
+                <div className="space-y-1">
+                  {pool.vms.map(vmName => (
+                    <div key={vmName} className="flex items-center justify-between text-sm bg-slate-800/50 rounded px-3 py-1.5">
+                      <span className="truncate">{vmName}</span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        {pools.length > 1 && (
+                          <button onClick={() => setMoveTarget({ poolId: pool.id, vmName })} className="text-slate-400 hover:text-blue-300" title="Move to another pool">
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button onClick={() => handleUnassign(pool.id, vmName)} className="text-slate-400 hover:text-red-400" title="Unassign">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {children.map(child => renderPool(child, depth + 1))}
           </>
         )}
@@ -169,11 +238,11 @@ export default function ResourcePools() {
         </div>
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total CPU Shares</div>
-          <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.cpu_shares, 0)}</div>
+          <div className="text-2xl font-bold">{pools.reduce((s, p) => s + sharesValue(p.cpu_shares), 0)}</div>
         </div>
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total VMs</div>
-          <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.vm_count, 0)}</div>
+          <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.vms.length, 0)}</div>
         </div>
       </div>
 
@@ -205,6 +274,25 @@ export default function ResourcePools() {
         />
       )}
 
+      {/* Assign VM Modal */}
+      {assignTargetPool && (
+        <AssignVmModal
+          vms={vms.filter(v => !pools.some(p => p.vms.includes(v.name)))}
+          onAssign={vmName => handleAssign(assignTargetPool, vmName)}
+          onClose={() => setAssignTargetPool(null)}
+        />
+      )}
+
+      {/* Move VM Modal */}
+      {moveTarget && (
+        <MoveVmModal
+          vmName={moveTarget.vmName}
+          pools={pools.filter(p => p.id !== moveTarget.poolId)}
+          onMove={toPoolId => handleMove(moveTarget.poolId, moveTarget.vmName, toPoolId)}
+          onClose={() => setMoveTarget(null)}
+        />
+      )}
+
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -219,17 +307,41 @@ export default function ResourcePools() {
   )
 }
 
+function SharesLevelPicker({ label, value, onChange }: { label: string; value: SharesLevel; onChange: (v: SharesLevel) => void }) {
+  const preset = typeof value === 'string' ? value : 'custom'
+  const customValue = typeof value === 'string' ? 1000 : value.custom
+
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <select value={preset} onChange={e => {
+        const v = e.target.value
+        onChange(v === 'custom' ? { custom: customValue } : (v as SharesLevel))
+      }} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+        <option value="low">Low</option>
+        <option value="normal">Normal</option>
+        <option value="high">High</option>
+        <option value="custom">Custom</option>
+      </select>
+      {preset === 'custom' && (
+        <input type="number" value={customValue} onChange={e => onChange({ custom: Number(e.target.value) })} min={1}
+          className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2 mt-2" placeholder="Custom share value" />
+      )}
+    </div>
+  )
+}
+
 function CreatePoolModal({ pools, onClose, onCreated }: { pools: ResourcePool[]; onClose: () => void; onCreated: () => void }) {
   const toast = useToastContext()
   const [name, setName] = useState('')
   const [clusterId, setClusterId] = useState('')
   const [parentId, setParentId] = useState('')
-  const [cpuShares, setCpuShares] = useState(1000)
+  const [cpuShares, setCpuShares] = useState<SharesLevel>('normal')
   const [cpuReservation, setCpuReservation] = useState(0)
-  const [cpuLimit, setCpuLimit] = useState(-1)
-  const [memoryShares, setMemoryShares] = useState(1000)
+  const [cpuLimit, setCpuLimit] = useState('')
+  const [memoryShares, setMemoryShares] = useState<SharesLevel>('normal')
   const [memoryReservation, setMemoryReservation] = useState(0)
-  const [memoryLimit, setMemoryLimit] = useState(-1)
+  const [memoryLimit, setMemoryLimit] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -239,11 +351,11 @@ function CreatePoolModal({ pools, onClose, onCreated }: { pools: ResourcePool[];
         cluster_id: clusterId,
         parent_id: parentId || undefined,
         cpu_shares: cpuShares,
-        cpu_reservation: cpuReservation,
-        cpu_limit: cpuLimit,
+        cpu_reservation_mhz: cpuReservation,
+        cpu_limit_mhz: cpuLimit ? Number(cpuLimit) : undefined,
         memory_shares: memoryShares,
         memory_reservation_mb: memoryReservation,
-        memory_limit_mb: memoryLimit,
+        memory_limit_mb: memoryLimit ? Number(memoryLimit) : undefined,
       })
       onCreated()
     } catch { toast.error('Failed to create pool') }
@@ -273,34 +385,26 @@ function CreatePoolModal({ pools, onClose, onCreated }: { pools: ResourcePool[];
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">CPU Shares</label>
-              <input type="number" value={cpuShares} onChange={e => setCpuShares(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Memory Shares</label>
-              <input type="number" value={memoryShares} onChange={e => setMemoryShares(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
-            </div>
+            <SharesLevelPicker label="CPU Shares" value={cpuShares} onChange={setCpuShares} />
+            <SharesLevelPicker label="Memory Shares" value={memoryShares} onChange={setMemoryShares} />
             <div>
               <label className="block text-sm font-medium mb-1">CPU Reservation (MHz)</label>
-              <input type="number" value={cpuReservation} onChange={e => setCpuReservation(Number(e.target.value))}
+              <input type="number" value={cpuReservation} onChange={e => setCpuReservation(Number(e.target.value))} min={0}
                 className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Memory Reservation (MB)</label>
-              <input type="number" value={memoryReservation} onChange={e => setMemoryReservation(Number(e.target.value))}
+              <input type="number" value={memoryReservation} onChange={e => setMemoryReservation(Number(e.target.value))} min={0}
                 className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">CPU Limit (MHz, -1=unlimited)</label>
-              <input type="number" value={cpuLimit} onChange={e => setCpuLimit(Number(e.target.value))}
+              <label className="block text-sm font-medium mb-1">CPU Limit (MHz)</label>
+              <input type="number" value={cpuLimit} onChange={e => setCpuLimit(e.target.value)} min={1} placeholder="Unlimited"
                 className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Memory Limit (MB, -1=unlimited)</label>
-              <input type="number" value={memoryLimit} onChange={e => setMemoryLimit(Number(e.target.value))}
+              <label className="block text-sm font-medium mb-1">Memory Limit (MB)</label>
+              <input type="number" value={memoryLimit} onChange={e => setMemoryLimit(e.target.value)} min={1} placeholder="Unlimited"
                 className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" />
             </div>
           </div>
@@ -350,6 +454,61 @@ function AdmissionTestModal({ poolId, result, onTest, onClose }: {
             </div>
           )}
           <button onClick={onClose} className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AssignVmModal({ vms, onAssign, onClose }: { vms: VM[]; onAssign: (vmName: string) => void; onClose: () => void }) {
+  const [vmName, setVmName] = useState(vms[0]?.name || '')
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">Assign VM to Pool</h2>
+        {vms.length === 0 ? (
+          <>
+            <p className="text-sm text-slate-400 mb-4">Every VM is already assigned to a resource pool.</p>
+            <button onClick={onClose} className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Close</button>
+          </>
+        ) : (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">VM</label>
+              <select value={vmName} onChange={e => setVmName(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+                {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+              <button onClick={() => onAssign(vmName)} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Assign</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MoveVmModal({ vmName, pools, onMove, onClose }: { vmName: string; pools: ResourcePool[]; onMove: (toPoolId: string) => void; onClose: () => void }) {
+  const [toPoolId, setToPoolId] = useState(pools[0]?.id || '')
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">Move '{vmName}'</h2>
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Target Pool</label>
+          <select value={toPoolId} onChange={e => setToPoolId(e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+            {pools.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
+          <button onClick={() => onMove(toPoolId)} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Move</button>
         </div>
       </div>
     </div>

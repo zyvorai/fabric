@@ -1766,9 +1766,15 @@ describe('resourcePools', () => {
 
   it('createPool calls apiPost', async () => {
     const { createPool } = await import('../resourcePools')
-    const req = { name: 'pool1', cluster_id: 'c1' }
+    const req = { name: 'pool1', cluster_id: 'c1', cpu_shares: 'normal' as const, memory_shares: 'normal' as const }
     await createPool(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/resource-pools', req)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/resource-pools', {
+      cpu_reservation_mhz: 0,
+      cpu_expandable_reservation: false,
+      memory_reservation_mb: 0,
+      memory_expandable_reservation: false,
+      ...req,
+    })
   })
 
   it('getPool calls apiGet', async () => {
@@ -1798,7 +1804,7 @@ describe('resourcePools', () => {
   it('assignVm calls apiPostVoid', async () => {
     const { assignVm } = await import('../resourcePools')
     await assignVm('p1', 'vm1')
-    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/resource-pools/p1/vms', { vm_id: 'vm1' })
+    expect(mockApiPostVoid).toHaveBeenCalledWith('/api/resource-pools/p1/vms', { vm_name: 'vm1' })
   })
 
   it('unassignVm calls apiDelete', async () => {
