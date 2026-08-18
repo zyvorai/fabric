@@ -62,7 +62,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
     ? 'border-b border-[rgba(140,160,190,0.18)] bg-gradient-to-b from-[#0f141a] via-[#1a222d] to-[#0c1117] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_30px_rgba(0,0,0,0.45)]'
     : aurora
       ? 'border-b border-[rgba(167,139,250,0.22)] bg-gradient-to-b from-[#0a0618] via-[#12082a] to-[#050816] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_40px_rgba(34,211,238,0.08)]'
-      : 'bg-slate-900/80 backdrop-blur-xl border-b border-slate-700/50'
+      : 'glass-nav'
 
   const mobileToggle = (
     <button

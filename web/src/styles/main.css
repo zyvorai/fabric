@@ -3,6 +3,7 @@
 /* Layout width (matches HyperSDK dashboard inner wrappers: max-width 1400px, centered) */
 :root {
   --layout-max-width: 87.5rem;
+  color-scheme: dark;
 }
 
 body {
@@ -11,7 +12,14 @@ body {
     'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0f172a;
+  background:
+    radial-gradient(ellipse 75% 50% at 15% -10%, rgba(96, 165, 250, 0.32), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 88% 15%, rgba(167, 139, 250, 0.26), transparent 52%),
+    radial-gradient(ellipse 65% 50% at 65% 95%, rgba(52, 211, 153, 0.18), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 5% 70%, rgba(236, 72, 153, 0.1), transparent 50%),
+    linear-gradient(180deg, #0a0f1c 0%, #0b1220 40%, #0e1526 70%, #0a0f1c 100%);
+  background-attachment: fixed;
+  color: #e7ecf3;
 }
 
 code {
@@ -877,6 +885,207 @@ code {
   background: #556274;
 }
 
+/* ── Liquid Glass (default theme) ──────────────────────────────────
+   Two tiers: Tier A retints the raw utility classes every page/modal
+   already uses (no blur -- hundreds of table rows reuse these same
+   classes, so a per-row blur layer would be slow). Tier B is full
+   frosted material, applied only to named chrome surfaces (nav, page
+   shell, modals) where there's just 1-30 instances on screen. */
+
+.glass-panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0) 100%),
+    rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.08),
+    0 8px 24px -4px rgba(0, 0, 0, 0.35),
+    0 24px 48px -14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+}
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.04) 30%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0.12) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-nav {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.55) 0%, rgba(15, 23, 42, 0.78) 100%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.glass-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 12, 20, 0.55);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+.glass-modal-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0) 100%),
+    rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.1),
+    0 16px 40px -8px rgba(0, 0, 0, 0.5),
+    0 32px 64px -16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  animation: scale-in 0.2s ease-out;
+}
+.glass-modal-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0.14) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-input {
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.glass-input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Tier A -- retints every existing panel/modal for free, no per-file edits */
+.bg-slate-800\/50,
+.bg-slate-800\/40,
+.bg-slate-800 {
+  background-color: rgba(30, 41, 59, 0.45);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 60%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.bg-slate-900\/80 {
+  background-color: rgba(15, 23, 42, 0.6);
+}
+.bg-slate-950 {
+  background-color: rgba(10, 15, 28, 0.9);
+}
+.border-slate-700\/50,
+.border-slate-700,
+.border-slate-700\/30 {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.rounded-xl {
+  border-radius: 1.25rem;
+}
+.input-field {
+  background: rgba(15, 23, 42, 0.4);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e7ecf3;
+}
+.input-field:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+}
+.skeleton {
+  background: linear-gradient(90deg, #101a2e 25%, #1d2c4a 50%, #101a2e 75%);
+}
+.table-row-hover:hover {
+  background-color: rgba(96, 165, 250, 0.06);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+.text-slate-400 {
+  color: rgba(226, 232, 240, 0.62);
+}
+.text-slate-500 {
+  color: rgba(226, 232, 240, 0.48);
+}
+
+/* Icon squircle containers -- premium icon treatment */
+.icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 30%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.icon-tile-sm {
+  width: 2rem;
+  height: 2rem;
+}
+.icon-tile-md {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+.icon-tile-lg {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+.icon-tile-blue {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.28), rgba(96, 165, 250, 0.06));
+  border-color: rgba(96, 165, 250, 0.3);
+}
+.icon-tile-green {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.28), rgba(52, 211, 153, 0.06));
+  border-color: rgba(52, 211, 153, 0.3);
+}
+.icon-tile-purple {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.28), rgba(168, 85, 247, 0.06));
+  border-color: rgba(168, 85, 247, 0.3);
+}
+.icon-tile-orange {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.28), rgba(251, 146, 60, 0.06));
+  border-color: rgba(251, 146, 60, 0.3);
+}
+.icon-tile-red {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.28), rgba(248, 113, 113, 0.06));
+  border-color: rgba(248, 113, 113, 0.3);
+}
+.icon-tile-cyan {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.28), rgba(34, 211, 238, 0.06));
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
 /* ── Mobile Responsive ─────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -983,15 +1192,36 @@ code {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(8, 12, 20, 0.55);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 .modal-card {
-  background-color: #1e293b;
-  border: 1px solid rgba(51, 65, 85, 0.5);
-  border-radius: 1rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 30%, rgba(255, 255, 255, 0) 100%),
+    rgba(20, 28, 46, 0.72);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.1),
+    0 16px 40px -8px rgba(0, 0, 0, 0.5),
+    0 32px 64px -16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   animation: scale-in 0.2s ease-out;
+}
+
+/* Also upgrade the bare bg-black/50 & /60 overlay classes used directly by
+   the ~26 hand-rolled modal pages -- gives every one of them the frosted
+   backdrop for free with zero per-file edits. */
+.bg-black\/50,
+.bg-black\/60 {
+  background-color: rgba(8, 12, 20, 0.55);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 
 .vm-card {

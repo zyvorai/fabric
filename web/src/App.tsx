@@ -193,7 +193,7 @@ function MainLayout() {
       ? 'dashboard-steel min-h-screen flex flex-col text-[#d7dde5]'
       : theme === 'aurora'
         ? 'dashboard-aurora min-h-screen flex flex-col text-[#e8e4f8]'
-        : 'min-h-screen bg-slate-950 text-slate-100'
+        : 'min-h-screen text-[#e7ecf3]'
 
   const contentClass =
     theme === 'steel' ? ' steel-content' : theme === 'aurora' ? ' aurora-content' : ''
