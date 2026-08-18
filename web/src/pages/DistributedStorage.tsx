@@ -118,20 +118,20 @@ export default function DistributedStorage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Storage Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total Capacity</div>
           <div className="text-2xl font-bold">{formatGB(pools.reduce((s, p) => s + p.total_capacity_gb, 0))}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Policies</div>
           <div className="text-2xl font-bold">{policies.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Active Migrations</div>
           <div className="text-2xl font-bold text-blue-400">
             {migrations.filter(m => m.status === 'in_progress').length}

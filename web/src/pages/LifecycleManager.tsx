@@ -99,24 +99,24 @@ export default function LifecycleManager() {
       <PageLoadBanner title="Could not load lifecycle data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Baselines</div>
           <div className="text-2xl font-bold">{baselines.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Non-Compliant Hosts</div>
           <div className="text-2xl font-bold text-red-400">
             {scans.filter(s => s.status === 'non_compliant').length}
           </div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Active Tasks</div>
           <div className="text-2xl font-bold text-blue-400">
             {tasks.filter(t => t.status !== 'completed' && t.status !== 'failed').length}
           </div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Rolling Updates</div>
           <div className="text-2xl font-bold">{updates.filter(u => u.status === 'running').length} active</div>
         </div>

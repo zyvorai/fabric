@@ -162,16 +162,16 @@ export default function ResourcePools() {
       <PageLoadBanner title="Could not load resource pools" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total CPU Shares</div>
           <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.cpu_shares, 0)}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
           <div className="text-slate-400 text-sm mb-1">Total VMs</div>
           <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.vm_count, 0)}</div>
         </div>

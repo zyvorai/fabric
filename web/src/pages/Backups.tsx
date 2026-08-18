@@ -164,8 +164,8 @@ export default function Backups() {
 
       {/* Statistics */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Total Backups</p>
@@ -174,7 +174,7 @@ export default function Backups() {
               <HardDrive className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Total Size</p>

@@ -114,20 +114,20 @@ export default function Replication() {
 
       {activeTab === 'dashboard' && health && (
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Active Replications</div>
               <div className="text-2xl font-bold text-green-400">{health.active}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">RPO Violations</div>
               <div className="text-2xl font-bold text-red-400">{health.rpo_violations}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Avg RPO</div>
               <div className="text-2xl font-bold">{health.avg_rpo_minutes.toFixed(0)} min</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
               <div className="text-slate-400 text-sm mb-1">Paused / Error</div>
               <div className="text-2xl font-bold text-yellow-400">{health.paused} / {health.error}</div>
             </div>
