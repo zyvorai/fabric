@@ -344,6 +344,18 @@ fn cloud_image_catalog() -> Vec<CloudImage> {
             format: "qcow2".into(),
             arch: "x86_64".into(),
         },
+        CloudImage {
+            // Flatcar doesn't publish a dedicated "qemu" qcow2 anymore -- the
+            // kubevirt image is the maintained qcow2 build and is generic
+            // QEMU/KVM + cloud-init compatible (KubeVirt runs guests via
+            // QEMU/libvirt under the hood), so it's the correct pick here.
+            name: "flatcar-stable".into(),
+            distro: "flatcar".into(),
+            version: "stable".into(),
+            url: "https://stable.release.flatcar-linux.net/amd64-usr/current/flatcar_production_kubevirt_image.qcow2".into(),
+            format: "qcow2".into(),
+            arch: "amd64".into(),
+        },
     ]
 }
 

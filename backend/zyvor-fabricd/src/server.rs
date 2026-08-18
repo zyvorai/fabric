@@ -722,6 +722,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/images/iso/{name}", delete(api::images::delete_iso))
         // VM image import (OVA/VMDK/VDI)
         .route("/images/import", post(api::images::import_vm_image))
+        // Golden images: materialize a VM's current disk as a standalone catalog image
+        .route(
+            "/images/from-vm/{name}",
+            post(api::ux_extensions::create_image_from_vm),
+        )
         // Online disk resize
         .route("/vms/{name}/disk/resize", post(api::images::resize_disk))
         // VM profile / instance type routes

@@ -594,6 +594,13 @@ struct ConvertJob {
     format: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    /// Offline boot-readiness score (0-100) from GuestKit's `doctor` analysis
+    /// -- this project doesn't use qemu-guest-agent for in-guest/image work,
+    /// GuestKit's offline disk inspection is the tool for that. Only set for
+    /// golden-image jobs (see create_image_from_vm); None for plain format
+    /// conversions and if the guestkit binary isn't available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    boot_score: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -691,6 +698,7 @@ pub async fn start_convert(
         output_path: req.output_path.clone(),
         format: req.format.clone(),
         error: None,
+        boot_score: None,
     };
     state
         .store
@@ -732,11 +740,12 @@ async fn run_convert_job(state: Arc<AppState>, job_id: String, req: ConvertReque
             return;
         }
     };
+    // No -f flag: qemu-img auto-probes the source format on its own.
+    // "auto" is not a real format driver name -- passing "-f auto"
+    // fails with "Unknown driver 'auto'".
     let output = tokio::process::Command::new("qemu-img")
         .args([
             "convert",
-            "-f",
-            "auto",
             "-O",
             fmt,
             &req.source_path,
@@ -769,8 +778,144 @@ pub async fn get_convert_job(
         "status": job.status,
         "progress": job.progress,
         "error": job.error,
-        "output_path": job.output_path
+        "output_path": job.output_path,
+        "boot_score": job.boot_score
     })))
+}
+
+// ============================================================================
+// Golden images (materialize a VM's current disk as a standalone catalog image)
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct CreateGoldenImageRequest {
+    pub name: String,
+}
+
+/// POST /api/images/from-vm/:name - Materialize a VM's current disk as a new,
+/// independent catalog image (not a CoW fork -- the source VM can be deleted
+/// or changed afterward without affecting the new image). Runs as an async
+/// job via the same qemu-img convert pipeline as /images/convert.
+pub async fn create_image_from_vm(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(vm_name): Path<String>,
+    Json(req): Json<CreateGoldenImageRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    crate::validation::validate_vm_name(&vm_name)
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    crate::validation::validate_vm_name(&req.name)
+        .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+
+    // The VM's actual, live disk (not a naming-convention guess -- see
+    // VMDriver::get_disk_path's doc comment).
+    let source_path = state
+        .driver
+        .get_disk_path(&vm_name)
+        .await
+        .map_err(|e| not_found(format!("No disk image found for VM '{}': {}", vm_name, e)))?
+        .display()
+        .to_string();
+
+    // Configurable via storage.image_path in the daemon config (same
+    // directory the catalog listing at GET /images scans), not hardcoded.
+    let dest_dir = state.config.storage.image_path.trim_end_matches('/').to_string();
+    tokio::fs::create_dir_all(&dest_dir)
+        .await
+        .map_err(|e| internal_err(format!("Failed to create directory: {}", e)))?;
+    let output_path = format!("{}/{}.qcow2", dest_dir, req.name);
+
+    if tokio::fs::metadata(&output_path).await.is_ok() {
+        return Err(crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            format!("An image named '{}' already exists", req.name),
+        ));
+    }
+
+    let job_id = Uuid::new_v4().to_string();
+    let job = ConvertJob {
+        id: job_id.clone(),
+        status: "pending".into(),
+        progress: 0,
+        source_path: source_path.clone(),
+        output_path: output_path.clone(),
+        format: "qcow2".into(),
+        error: None,
+        boot_score: None,
+    };
+    state
+        .store
+        .save_entity(CONVERT_JOBS_STORE, &job_id, &job)
+        .map_err(store_err)?;
+
+    let state_clone = state.clone();
+    let convert_req = ConvertRequest {
+        source_path,
+        output_path,
+        format: "qcow2".into(),
+    };
+    let job_id_clone = job_id.clone();
+    tokio::spawn(async move {
+        run_convert_job(state_clone.clone(), job_id_clone.clone(), convert_req).await;
+        // Certify the resulting image with GuestKit's offline `doctor`
+        // analysis (boot-readiness score) -- this project doesn't use
+        // qemu-guest-agent for guest/image work, GuestKit is the tool for
+        // that. Best-effort: if the binary is missing or scoring fails, the
+        // golden image is still created, it just has no score attached.
+        if let Ok(Some(completed_job)) = state_clone
+            .store
+            .get_entity::<ConvertJob>(CONVERT_JOBS_STORE, &job_id_clone)
+        {
+            if completed_job.status == "completed" {
+                score_golden_image(&state_clone, &job_id_clone, &completed_job.output_path).await;
+            }
+        }
+    });
+
+    tracing::info!("Creating golden image '{}' from VM '{}'", req.name, vm_name);
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({ "job_id": job.id, "id": job.id })),
+    ))
+}
+
+/// Runs `guestkit doctor` (read-only) against a newly materialized golden
+/// image and stores the boot-readiness score on its job entity.
+async fn score_golden_image(state: &Arc<AppState>, job_id: &str, image_path: &str) {
+    let output = tokio::process::Command::new("guestkit")
+        .args(["doctor", image_path, "--target", "kvm", "-o", "json", "-R", "-q"])
+        .output()
+        .await;
+
+    let score = match output {
+        Ok(o) if o.status.success() => serde_json::from_slice::<serde_json::Value>(&o.stdout)
+            .ok()
+            .and_then(|v| v.get("bootability")?.get("score")?.as_f64()),
+        Ok(o) => {
+            tracing::warn!(
+                "guestkit doctor exited non-zero for '{}': {}",
+                image_path,
+                String::from_utf8_lossy(&o.stderr)
+            );
+            None
+        }
+        Err(e) => {
+            tracing::debug!("guestkit not available, skipping boot-readiness score: {}", e);
+            None
+        }
+    };
+
+    if let Some(score) = score {
+        if let Ok(Some(mut job)) = state
+            .store
+            .get_entity::<ConvertJob>(CONVERT_JOBS_STORE, job_id)
+        {
+            job.boot_score = Some(score);
+            if let Err(e) = state.store.save_entity(CONVERT_JOBS_STORE, job_id, &job) {
+                tracing::warn!("Failed to save boot score: {}", e);
+            }
+        }
+    }
 }
 
 // ============================================================================
