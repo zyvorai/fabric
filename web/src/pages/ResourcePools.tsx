@@ -94,16 +94,16 @@ export default function ResourcePools() {
           style={{ paddingLeft: `${depth * 24 + 16}px` }}
           onClick={() => togglePool(pool.id)}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {children.length > 0 ? (
-              isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
-            ) : <div className="w-4" />}
-            <span className="font-medium">{pool.name}</span>
-            <span className="text-xs text-slate-400">
+              isExpanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />
+            ) : <div className="w-4 shrink-0" />}
+            <span className="font-medium truncate">{pool.name}</span>
+            <span className="text-xs text-slate-400 truncate">
               {pool.vm_count} VMs | CPU: {pool.cpu_shares} shares | Mem: {pool.memory_shares} shares
             </span>
           </div>
-          <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-4 shrink-0" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-slate-400">CPU</span>
               <div className="w-20 bg-slate-800 rounded-full h-2">
@@ -163,15 +163,15 @@ export default function ResourcePools() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Total Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Total CPU Shares</div>
           <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.cpu_shares, 0)}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Total VMs</div>
           <div className="text-2xl font-bold">{pools.reduce((s, p) => s + p.vm_count, 0)}</div>
         </div>

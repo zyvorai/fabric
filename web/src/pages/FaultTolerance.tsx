@@ -125,19 +125,19 @@ export default function FaultTolerance() {
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Protected VMs</div>
           <div className="text-2xl font-bold">{ftVMs.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Running</div>
           <div className="text-2xl font-bold text-green-400">{ftVMs.filter(v => v.status === 'running').length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Needs Attention</div>
           <div className="text-2xl font-bold text-yellow-400">{ftVMs.filter(v => v.status !== 'running').length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Failover Events</div>
           <div className="text-2xl font-bold">{events.length}</div>
         </div>
@@ -252,7 +252,7 @@ export default function FaultTolerance() {
             <div className="divide-y divide-slate-700/50">
               {events.map(evt => (
                 <div key={`${evt.vm_name}-${evt.started_at}`} className="p-4 flex items-start gap-4">
-                  <div className={`w-3 h-3 rounded-full mt-1 ${evt.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <div className={`w-3.5 h-3.5 rounded-full mt-1 ${evt.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium">{evt.vm_name}</span>

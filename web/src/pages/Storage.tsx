@@ -203,14 +203,14 @@ export default function Storage() {
               return (
                 <div key={pool.id} className="bg-slate-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <Database className="w-5 h-5 text-blue-400" />
-                      <div>
-                        <div className="font-medium text-lg">{pool.name}</div>
-                        <div className="text-sm text-slate-400 font-mono">{pool.path}</div>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <Database className="w-5 h-5 text-blue-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-lg truncate">{pool.name}</div>
+                        <div className="text-sm text-slate-400 font-mono truncate">{pool.path}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 shrink-0">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getTypeColor(typeStr)}`}>
                         {typeStr.toUpperCase()}
                       </span>

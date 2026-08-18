@@ -127,19 +127,19 @@ export default function Certificates() {
       {activeTab === 'dashboard' && health && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Total Certificates</div>
               <div className="text-2xl font-bold">{health.total_certificates}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Active</div>
               <div className="text-2xl font-bold text-green-400">{health.active}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Expiring Soon</div>
               <div className="text-2xl font-bold text-yellow-400">{health.expiring_soon}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Expired</div>
               <div className="text-2xl font-bold text-red-400">{health.expired}</div>
             </div>

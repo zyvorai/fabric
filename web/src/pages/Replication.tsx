@@ -115,19 +115,19 @@ export default function Replication() {
       {activeTab === 'dashboard' && health && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Active Replications</div>
               <div className="text-2xl font-bold text-green-400">{health.active}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">RPO Violations</div>
               <div className="text-2xl font-bold text-red-400">{health.rpo_violations}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Avg RPO</div>
               <div className="text-2xl font-bold">{health.avg_rpo_minutes.toFixed(0)} min</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <div className="text-slate-400 text-sm mb-1">Paused / Error</div>
               <div className="text-2xl font-bold text-yellow-400">{health.paused} / {health.error}</div>
             </div>
@@ -138,7 +138,7 @@ export default function Replication() {
               {health.sites.map(site => (
                 <div key={site.site_id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${site.health === 'healthy' ? 'bg-green-500' : site.health === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                    <div className={`w-3.5 h-3.5 rounded-full ${site.health === 'healthy' ? 'bg-green-500' : site.health === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'}`} />
                     <span className="font-medium">{site.site_name}</span>
                   </div>
                   <span className="text-sm text-slate-400">{site.replication_count} replications</span>

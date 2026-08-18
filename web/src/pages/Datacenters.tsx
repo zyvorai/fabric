@@ -165,19 +165,19 @@ export default function Datacenters() {
       <>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Datacenters</div>
           <div className="text-2xl font-bold">{datacenters.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Clusters</div>
           <div className="text-2xl font-bold">{clusters.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Hosts</div>
           <div className="text-2xl font-bold">{hosts.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Total VMs</div>
           <div className="text-2xl font-bold">
             {hosts.reduce((s, h) => s + h.vm_count, 0)}
@@ -203,19 +203,19 @@ export default function Datacenters() {
                   className="flex items-center justify-between p-4 hover:bg-slate-900 cursor-pointer"
                   onClick={() => toggleDC(dc.id)}
                 >
-                  <div className="flex items-center gap-3">
-                    {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                    <Server className="w-5 h-5 text-blue-400" />
-                    <span className="font-semibold text-lg">{dc.name}</span>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {isExpanded ? <ChevronDown className="w-5 h-5 shrink-0" /> : <ChevronRight className="w-5 h-5 shrink-0" />}
+                    <Server className="w-5 h-5 text-blue-400 shrink-0" />
+                    <span className="font-semibold text-lg truncate">{dc.name}</span>
                     {summary && (
-                      <span className="text-sm text-slate-400 ml-2">
+                      <span className="text-sm text-slate-400 ml-2 truncate">
                         {summary.cluster_count} clusters, {summary.host_count} hosts, {summary.vm_count} VMs
                         {summary.total_cpus > 0 && ` | ${summary.total_cpus} CPUs`}
                         {summary.total_memory_mb > 0 && ` | ${(summary.total_memory_mb / 1024).toFixed(1)} GB RAM`}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => setShowCreateCluster(dc.id)}
                       className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1"
@@ -241,16 +241,16 @@ export default function Datacenters() {
                         className="flex items-center justify-between p-3 hover:bg-slate-900 cursor-pointer border-t border-slate-700/50"
                         onClick={() => toggleCluster(cl.id)}
                       >
-                        <div className="flex items-center gap-3">
-                          {clExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          <span className="font-medium">{cl.name}</span>
-                          <span className="text-xs text-slate-400">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {clExpanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+                          <span className="font-medium truncate">{cl.name}</span>
+                          <span className="text-xs text-slate-400 truncate">
                             {clHosts.length} hosts |
                             HA: {cl.ha_enabled ? 'On' : 'Off'} |
                             DRS: {cl.drs_enabled ? cl.drs_mode : 'Off'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => setShowRegisterHost(cl.id)}
                             className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1"

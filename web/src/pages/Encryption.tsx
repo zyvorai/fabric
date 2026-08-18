@@ -96,25 +96,25 @@ export default function Encryption() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
             <Key className="w-4 h-4" /> Key Providers
           </div>
           <div className="text-2xl font-bold">{providers.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
             <Shield className="w-4 h-4" /> Policies
           </div>
           <div className="text-2xl font-bold">{policies.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Encrypted VMs</div>
           <div className="text-2xl font-bold text-green-400">
             {encryptedVMs.filter(v => v.encrypted).length}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Connected Providers</div>
           <div className="text-2xl font-bold">
             {providers.filter(p => p.status === 'connected').length}
@@ -253,7 +253,7 @@ export default function Encryption() {
                     {vm.encrypted && (
                       <button onClick={() => handleRotateKey(vm.vm_name)}
                         className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm">
-                        <RefreshCw className="w-3 h-3" /> Rotate Key
+                        <RefreshCw className="w-3.5 h-3.5" /> Rotate Key
                       </button>
                     )}
                   </td>

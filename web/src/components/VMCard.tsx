@@ -59,7 +59,7 @@ export default function VMCard({ vm, onUpdate }: VMCardProps) {
       <div
         onDoubleClick={handleCardDoubleClick}
         title="Double-click to open console"
-        className={`group bg-slate-800/50 rounded-xl border border-slate-700/50 hover:border-slate-700/50 card-hover gradient-border state-bar state-bar-${vm.state} overflow-hidden`}
+        className={`group bg-slate-800/50 rounded-xl border border-slate-700/50 hover:border-slate-700/50 card-hover gradient-border state-bar state-bar-${vm.state}`}
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-3">

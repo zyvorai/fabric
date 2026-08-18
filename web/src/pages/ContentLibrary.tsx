@@ -126,19 +126,19 @@ export default function ContentLibrary() {
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Libraries</div>
           <div className="text-2xl font-bold">{libraries.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Items</div>
           <div className="text-2xl font-bold">{items.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Guest Customizations</div>
           <div className="text-2xl font-bold">{specs.length}</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Host Profiles</div>
           <div className="text-2xl font-bold">{profiles.length}</div>
         </div>
