@@ -243,6 +243,38 @@ pub trait ImageDriver: Send + Sync {
     async fn clean_images(&self, all: bool) -> Result<()>;
 }
 
+/// A named pool of VM instances pre-booted from a shared template, then
+/// paused, ready for `claim_pool` to hand one out instantly instead of a
+/// slow cold `create`+boot. `ready_members` is how many are currently
+/// paused and available to claim right now (it shrinks on claim and grows
+/// back as the backend backfills the pool).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PoolInfo {
+    pub name: String,
+    pub size: usize,
+    pub image: String,
+    pub cpus: u32,
+    pub memory: u64,
+    pub ready_members: usize,
+}
+
+/// Warm-pool management for instant VM provisioning. Not every backend has
+/// an equivalent (this is Ephemera-specific pre-boot-and-pause pooling) --
+/// an implementation with none should return a clear "not supported" error
+/// rather than silently no-op'ing, same convention as `ImageDriver`.
+#[async_trait]
+pub trait PoolDriver: Send + Sync {
+    async fn create_pool(&self, name: &str, size: usize, image: &str, cpus: u32, memory: u64) -> Result<PoolInfo>;
+    async fn list_pools(&self) -> Result<Vec<PoolInfo>>;
+    async fn get_pool(&self, name: &str) -> Result<PoolInfo>;
+    async fn delete_pool(&self, name: &str) -> Result<()>;
+    /// Resumes one ready member instantly, renames it `new_name`, and
+    /// returns the resulting VM. Fails with a clear error if the pool has
+    /// no ready member right now rather than falling back to a slow
+    /// synchronous create.
+    async fn claim_pool(&self, pool_name: &str, new_name: &str, ttl_seconds: Option<u64>) -> Result<VM>;
+}
+
 /// Feature detection for optional capabilities.
 pub trait CapabilityProvider: Send + Sync {
     /// A short, stable identifier for the active backend (`"ephemera"`)
@@ -286,6 +318,7 @@ pub trait VmDriver:
     + ImageDriver
     + ShellDriver
     + ConsoleDriver
+    + PoolDriver
     + CapabilityProvider
 {
 }
@@ -297,6 +330,7 @@ impl<T> VmDriver for T where
         + ImageDriver
         + ShellDriver
         + ConsoleDriver
+        + PoolDriver
         + CapabilityProvider
 {
 }

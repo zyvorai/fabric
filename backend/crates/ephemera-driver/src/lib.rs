@@ -34,6 +34,7 @@
 mod console;
 mod images;
 mod lifecycle;
+mod pools;
 mod resource_control;
 mod shell;
 
@@ -42,7 +43,8 @@ use zyvor_fabric_ephemera_client::EphemeraClient;
 
 pub use zyvor_fabric_driver_core::{
     CapabilityProvider, ConsoleDriver, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
-    ResourceControlDriver, ResourceStatsDriver, ShellDriver, ShellOutput, VMDriver, VmDriver,
+    PoolDriver, PoolInfo, ResourceControlDriver, ResourceStatsDriver, ShellDriver, ShellOutput,
+    VMDriver, VmDriver,
 };
 
 /// Driver backed by one `ephemera serve` instance's REST API.

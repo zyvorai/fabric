@@ -122,7 +122,7 @@ impl VMDriver for EphemeraDriver {
     }
 }
 
-fn map_status(status: VmStatus) -> VMState {
+pub(crate) fn map_status(status: VmStatus) -> VMState {
     match status {
         VmStatus::Creating => VMState::Starting,
         VmStatus::Running => VMState::Running,

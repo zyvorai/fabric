@@ -20,6 +20,7 @@ pub mod migration;
 pub mod network_cloud;
 pub mod network_cloud_discover;
 pub mod notifications;
+pub mod pools;
 pub mod profiles;
 pub mod quotas;
 pub mod schedules;

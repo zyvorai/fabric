@@ -42,6 +42,7 @@ const StoragePools = lazy(() => import('./pages/StoragePools'))
 const SystemResources = lazy(() => import('./pages/SystemResources'))
 const Datacenters = lazy(() => import('./pages/Datacenters'))
 const ResourcePools = lazy(() => import('./pages/ResourcePools'))
+const WarmPools = lazy(() => import('./pages/WarmPools'))
 const DRS = lazy(() => import('./pages/DRS'))
 const DistributedStorage = lazy(() => import('./pages/DistributedStorage'))
 const Encryption = lazy(() => import('./pages/Encryption'))
@@ -240,6 +241,7 @@ function MainLayout() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/datacenters" element={<Datacenters />} />
                 <Route path="/resource-pools" element={<ResourcePools />} />
+                <Route path="/vm-pools" element={<WarmPools />} />
                 <Route path="/drs" element={<DRS />} />
                 <Route path="/distributed-storage" element={<DistributedStorage />} />
                 <Route path="/encryption" element={<Encryption />} />

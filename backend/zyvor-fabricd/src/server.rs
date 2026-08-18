@@ -727,6 +727,16 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/images/from-vm/{name}",
             post(api::ux_extensions::create_image_from_vm),
         )
+        // Warm VM pools: pre-boot N VMs from a template, claim one instantly
+        .route(
+            "/vm-pools",
+            get(api::pools::list_pools).post(api::pools::create_pool),
+        )
+        .route(
+            "/vm-pools/{name}",
+            get(api::pools::get_pool).delete(api::pools::delete_pool),
+        )
+        .route("/vm-pools/{name}/claim", post(api::pools::claim_pool))
         // Online disk resize
         .route("/vms/{name}/disk/resize", post(api::images::resize_disk))
         // VM profile / instance type routes

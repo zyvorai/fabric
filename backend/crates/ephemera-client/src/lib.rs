@@ -293,6 +293,41 @@ struct VmListResponse {
     items: Vec<VmRecord>,
 }
 
+/// A warm pool: `size` VMs pre-booted from `template`, then paused, ready
+/// to be handed out instantly by `claim_pool` instead of cold-created.
+/// Mirrors `ephemera_core::model::PoolRecord`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PoolRecord {
+    pub name: String,
+    pub size: usize,
+    pub template: CreateVmRequest,
+    #[serde(default)]
+    pub members: Vec<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+struct PoolSpecRequest {
+    name: String,
+    size: usize,
+    template: CreateVmRequest,
+}
+
+#[derive(Debug, Deserialize)]
+struct PoolListResponse {
+    items: Vec<PoolRecord>,
+}
+
+/// Applied to the VM handed back by a pool claim, replacing whatever the
+/// template said for these two fields. Mirrors
+/// `ephemera_core::model::ClaimOverrides`.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct ClaimOverrides {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub ttl_seconds: Option<u64>,
+}
+
 /// One entry in Ephemera's image catalog. Mirrors
 /// `ephemera_image::catalog::CatalogEntry` on the wire, plus
 /// `signature_valid` which only `GET /v1/images/catalog`'s
@@ -750,6 +785,50 @@ impl EphemeraClient {
             .await?;
         let body: CleanCatalogResponse = Self::parse(resp).await?;
         Ok(body.removed)
+    }
+
+    /// `POST /v1/pools` — pre-boots `size` VMs from `template`, then pauses
+    /// each once ready. Members sit paused (booted, not cold) until
+    /// claimed.
+    pub async fn create_pool(&self, name: &str, size: usize, template: CreateVmRequest) -> Result<PoolRecord> {
+        let req = PoolSpecRequest { name: name.to_string(), size, template };
+        let resp = self.authed(self.http.post(self.url("/v1/pools")?)).json(&req).send().await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/pools`
+    pub async fn list_pools(&self) -> Result<Vec<PoolRecord>> {
+        let resp = self.authed(self.http.get(self.url("/v1/pools")?)).send().await?;
+        let body: PoolListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/pools/{name}`
+    pub async fn get_pool(&self, name: &str) -> Result<PoolRecord> {
+        let resp = self.authed(self.http.get(self.url(&format!("/v1/pools/{name}"))?)).send().await?;
+        Self::parse(resp).await
+    }
+
+    /// `DELETE /v1/pools/{name}` — also tears down every member VM.
+    pub async fn delete_pool(&self, name: &str) -> Result<()> {
+        let resp = self
+            .authed(self.http.delete(self.url(&format!("/v1/pools/{name}"))?))
+            .send()
+            .await?;
+        Self::expect_no_content(resp).await
+    }
+
+    /// `POST /v1/pools/{name}/claim` — resumes one ready (already-booted,
+    /// paused) member, applies `overrides`, and triggers a backfill to
+    /// replace it. Fails if the pool has no ready member right now rather
+    /// than falling back to a slow cold create.
+    pub async fn claim_pool(&self, name: &str, overrides: ClaimOverrides) -> Result<VmRecord> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/pools/{name}/claim"))?))
+            .json(&overrides)
+            .send()
+            .await?;
+        Self::parse(resp).await
     }
 
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {

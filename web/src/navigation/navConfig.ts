@@ -65,6 +65,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Dashboard', path: '/', icon: Home },
       { label: 'Favorites', path: '/favorites', icon: Star },
       { label: 'Virtual Machines', path: '/vms', icon: Server },
+      { label: 'Warm Pools', path: '/vm-pools', icon: PackageCheck },
       { label: 'Machines', path: '/machines', icon: Monitor },
       { label: 'Profiles', path: '/profiles', icon: Layers },
       { label: 'Datacenters', path: '/datacenters', icon: Building2 },
