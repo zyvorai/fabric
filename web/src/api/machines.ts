@@ -90,3 +90,23 @@ export async function pullRawImage(url: string, name: string): Promise<void> {
 export async function removeMachineImage(name: string): Promise<void> {
   return apiDelete(`${API_BASE}/machines/images/${name}`)
 }
+
+export async function cloneMachineImage(name: string, targetName: string): Promise<void> {
+  return apiPostVoid(`${API_BASE}/machines/images/${name}/clone`, { target_name: targetName })
+}
+
+export async function renameMachineImage(name: string, newName: string): Promise<void> {
+  return apiPostVoid(`${API_BASE}/machines/images/${name}/rename`, { new_name: newName })
+}
+
+export async function setImageReadOnly(name: string, readOnly: boolean): Promise<void> {
+  return apiPostVoid(`${API_BASE}/machines/images/${name}/read-only`, { read_only: readOnly })
+}
+
+export async function exportRawImage(name: string, path: string): Promise<void> {
+  return apiPostVoid(`${API_BASE}/machines/images/${name}/export-raw`, { path })
+}
+
+export async function cleanMachineImages(): Promise<void> {
+  return apiPostVoid(`${API_BASE}/machines/images/clean`)
+}

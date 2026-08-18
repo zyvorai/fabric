@@ -6,12 +6,14 @@ import { useEffect, useState } from 'react'
 import {
   Server, Terminal, Key, Download, Power, RotateCw, XCircle,
   HardDrive, RefreshCw, Trash2, CheckCircle2, Ban, FolderInput,
+  Copy, Pencil, Lock, Unlock, Sparkles, X,
 } from 'lucide-react'
 import {
   listMachines, getMachineProperties, shellMachine, getSshInfo,
   poweroffMachine, rebootMachine, terminateMachine,
   enableMachine, disableMachine, copyToMachine, copyFromMachine, bindMachine,
   listMachineImages, pullRawImage, removeMachineImage,
+  cloneMachineImage, renameMachineImage, setImageReadOnly, cleanMachineImages,
   MachineInfo, MachineImage, ShellOutput, SshInfo,
 } from '../api/machines'
 import { useToastContext } from '../contexts/ToastContext'
@@ -42,6 +44,7 @@ export default function Machines() {
   const [hostPath, setHostPath] = useState('')
   const [machinePath, setMachinePath] = useState('')
   const [bindReadOnly, setBindReadOnly] = useState(false)
+  const [imageAction, setImageAction] = useState<{ mode: 'clone' | 'rename'; name: string } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -176,6 +179,40 @@ export default function Machines() {
       loadData()
     } catch (e) {
       toastFailure(toast, 'Failed to remove image', e)
+    }
+  }
+
+  const handleToggleReadOnly = async (img: MachineImage) => {
+    try {
+      await setImageReadOnly(img.name, !img.read_only)
+      toast.success(`'${img.name}' is now ${img.read_only ? 'writable' : 'read-only'}`)
+      loadData()
+    } catch (e) {
+      toastFailure(toast, 'Failed to change read-only state', e)
+    }
+  }
+
+  const handleCleanImages = async () => {
+    if (!await confirm('Clean Images', 'Remove hidden/cached images not referenced by any machine?', { confirmLabel: 'Clean' })) return
+    try {
+      await cleanMachineImages()
+      toast.success('Cleaned unused images')
+      loadData()
+    } catch (e) {
+      toastFailure(toast, 'Failed to clean images', e)
+    }
+  }
+
+  const handleImageAction = async (targetName: string) => {
+    if (!imageAction) return
+    try {
+      if (imageAction.mode === 'clone') await cloneMachineImage(imageAction.name, targetName)
+      else await renameMachineImage(imageAction.name, targetName)
+      toast.success(imageAction.mode === 'clone' ? `Cloned to '${targetName}'` : `Renamed to '${targetName}'`)
+      setImageAction(null)
+      loadData()
+    } catch (e) {
+      toastFailure(toast, `Failed to ${imageAction.mode} image`, e)
     }
   }
 
@@ -333,7 +370,13 @@ export default function Machines() {
         <div className="space-y-4">
           {/* Pull image */}
           <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-            <h3 className="font-medium mb-3 flex items-center gap-2"><Download className="w-4 h-4" /> Pull Image</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium flex items-center gap-2"><Download className="w-4 h-4" /> Pull Image</h3>
+              <button onClick={handleCleanImages} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 rounded-lg transition-colors">
+                <Sparkles className="w-3.5 h-3.5" />
+                Clean unused
+              </button>
+            </div>
             <div className="flex gap-2">
               <input value={pullUrl} onChange={e => setPullUrl(e.target.value)} placeholder="Image URL (https://...)"
                 className="flex-1 bg-slate-800 border border-slate-700/50 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
@@ -364,8 +407,19 @@ export default function Machines() {
                     <td className="p-4 font-mono text-sm">{img.size}</td>
                     <td className="p-4">{img.read_only ? 'Yes' : 'No'}</td>
                     <td className="p-4">
-                      <button onClick={() => handleRemoveImage(img.name)}
-                        className="p-2 bg-red-600 hover:bg-red-700 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setImageAction({ mode: 'clone', name: img.name })}
+                          title="Clone" className="p-2 bg-slate-700 hover:bg-slate-600 rounded"><Copy className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setImageAction({ mode: 'rename', name: img.name })}
+                          title="Rename" className="p-2 bg-slate-700 hover:bg-slate-600 rounded"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleToggleReadOnly(img)}
+                          title={img.read_only ? 'Make writable' : 'Make read-only'}
+                          className="p-2 bg-slate-700 hover:bg-slate-600 rounded">
+                          {img.read_only ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        </button>
+                        <button onClick={() => handleRemoveImage(img.name)}
+                          title="Remove" className="p-2 bg-red-600 hover:bg-red-700 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -388,6 +442,55 @@ export default function Machines() {
           onCancel={cancel}
         />
       )}
+
+      {imageAction && (
+        <ImageActionModal
+          mode={imageAction.mode}
+          sourceName={imageAction.name}
+          onClose={() => setImageAction(null)}
+          onSubmit={handleImageAction}
+        />
+      )}
+    </div>
+  )
+}
+
+function ImageActionModal({ mode, sourceName, onClose, onSubmit }: {
+  mode: 'clone' | 'rename'
+  sourceName: string
+  onClose: () => void
+  onSubmit: (targetName: string) => void
+}) {
+  const [name, setName] = useState('')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-sm">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+          <h2 className="text-lg font-bold text-white">{mode === 'clone' ? 'Clone' : 'Rename'} '{sourceName}'</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">{mode === 'clone' ? 'New Image Name' : 'New Name'}</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && name) onSubmit(name) }}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white font-mono text-sm focus:outline-none focus:border-blue-500/50"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition">Cancel</button>
+            <button type="button" onClick={() => onSubmit(name)} disabled={!name} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50">
+              {mode === 'clone' ? 'Clone' : 'Rename'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
