@@ -9,6 +9,7 @@ import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { useToastContext } from '../contexts/ToastContext'
+import { useEventStream, type VMEventPayload } from '../hooks/useEventStream'
 
 interface Notification {
   id: string
@@ -92,6 +93,18 @@ export default function NotificationCenter() {
     const interval = setInterval(poll, 10000)
     return () => clearInterval(interval)
   }, [addNotification, toast])
+
+  const onVMEvent = useCallback(
+    (event: VMEventPayload) => {
+      if (event.event_type === 'started') {
+        addNotification('vm_started', `${event.vm_name} started`, event.detail)
+      } else if (event.event_type === 'stopped') {
+        addNotification('vm_stopped', `${event.vm_name} stopped`, event.detail)
+      }
+    },
+    [addNotification]
+  )
+  useEventStream({ onEvent: onVMEvent })
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

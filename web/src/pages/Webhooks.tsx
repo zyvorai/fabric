@@ -12,6 +12,8 @@ import { usePageLoader } from '../hooks/usePageLoader'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
 import CopyButton from '../components/CopyButton'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface Webhook {
   id: string
@@ -26,6 +28,7 @@ const webhookTypes = ['generic', 'slack', 'discord']
 
 export default function Webhooks() {
   const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load webhooks')
   const [showAdd, setShowAdd] = useState(false)
@@ -81,11 +84,15 @@ export default function Webhooks() {
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, url: string) => {
+    const ok = await confirm('Delete Webhook', `Delete the webhook for ${url}? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
+
     try {
       const res = await apiFetch(`/api/webhooks/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setWebhooks((prev) => prev.filter((w) => w.id !== id))
+      toast.success('Webhook deleted')
     } catch (err) {
       toastFailure(toast, 'Failed to delete webhook', err)
     }
@@ -263,7 +270,7 @@ export default function Webhooks() {
                     Test
                   </button>
                   <button
-                    onClick={() => handleDelete(wh.id)}
+                    onClick={() => handleDelete(wh.id, wh.url)}
                     className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                     title="Delete webhook"
                   >
@@ -274,6 +281,17 @@ export default function Webhooks() {
             </div>
           ))}
         </div>
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
       )}
     </div>
   )
