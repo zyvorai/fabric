@@ -52,7 +52,6 @@ const SiteRecovery = lazy(() => import('./pages/SiteRecovery'))
 const ContentLibrary = lazy(() => import('./pages/ContentLibrary'))
 const LifecycleManager = lazy(() => import('./pages/LifecycleManager'))
 const Certificates = lazy(() => import('./pages/Certificates'))
-const ImageBuilder = lazy(() => import('./pages/ImageBuilder'))
 const Machines = lazy(() => import('./pages/Machines'))
 const Migrations = lazy(() => import('./pages/Migrations'))
 const Profiles = lazy(() => import('./pages/Profiles'))
@@ -250,7 +249,6 @@ function MainLayout() {
                 <Route path="/site-recovery" element={<SiteRecovery />} />
                 <Route path="/migrations" element={<Migrations />} />
                 <Route path="/machines" element={<Machines />} />
-                <Route path="/image-builder" element={<ImageBuilder />} />
                 <Route path="/profiles" element={<Profiles />} />
                 <Route path="/snapshots" element={<Snapshots />} />
                 <Route path="/content-library" element={<ContentLibrary />} />

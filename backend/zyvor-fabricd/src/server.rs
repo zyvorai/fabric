@@ -699,9 +699,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/migrations/{id}/cancel",
             post(api::migration::cancel_migration),
         )
-        // Image build routes
-        .route("/images/build", post(api::images::build_image))
-        .route("/images/builds", get(api::images::list_builds))
         .route("/images/upload", post(api::ux_extensions::upload_image))
         .route("/images/convert", post(api::ux_extensions::start_convert))
         .route(

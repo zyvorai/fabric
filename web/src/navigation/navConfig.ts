@@ -179,7 +179,6 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: 'ISO Images', path: '/iso-images', icon: Disc },
           { label: 'Upload Disk', path: '/upload-disk', icon: Upload },
           { label: 'Download Disk', path: '/download-disk', icon: Download },
-          { label: 'Image Builder', path: '/image-builder', icon: Package },
           { label: 'Pipeline', path: '/pipeline', icon: Workflow },
           { label: 'Disk Images', path: '/disk-images', icon: HardDrive },
           { label: 'Disk Converter', path: '/disk-converter', icon: HardDrive },

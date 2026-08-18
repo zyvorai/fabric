@@ -797,31 +797,6 @@ pub async fn list_jobs(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
     let mut jobs = Vec::new();
-    if let Ok(builds) = state
-        .store
-        .list_entities::<images::ImageBuildStatus>("image_builds")
-    {
-        for b in builds {
-            let progress = match b.state {
-                images::BuildState::Completed => 100,
-                images::BuildState::Failed => 100,
-                images::BuildState::Building => 50,
-                images::BuildState::Pending => 0,
-            };
-            jobs.push(serde_json::json!({
-                "id": b.id,
-                "name": b.name,
-                "vm_name": b.name,
-                "status": format!("{:?}", b.state).to_lowercase(),
-                "progress": progress,
-                "phase": format!("{:?}", b.state).to_lowercase(),
-                "error": b.error,
-                "created_at": b.started,
-                "started_at": b.started,
-                "completed_at": b.completed
-            }));
-        }
-    }
     if let Ok(backup_jobs) = state
         .store
         .list_entities::<backups::BackupJob>("backup_jobs")
@@ -850,16 +825,6 @@ pub async fn get_job_logs(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
-    if let Ok(Some(build)) = state
-        .store
-        .get_entity::<images::ImageBuildStatus>("image_builds", &id)
-    {
-        let lines: Vec<String> = build
-            .error
-            .map(|e| vec![e])
-            .unwrap_or_else(|| vec!["Build in progress".into()]);
-        return Json(serde_json::json!({ "lines": lines }));
-    }
     if let Ok(Some(job)) = state
         .store
         .get_entity::<backups::BackupJob>("backup_jobs", &id)
@@ -870,35 +835,16 @@ pub async fn get_job_logs(
     Json(serde_json::json!({ "lines": ["Job not found"] }))
 }
 
-/// GET /api/pipeline/jobs
+/// GET /api/pipeline/jobs -- historically only ever reported mkosi image
+/// builds (now removed in favor of golden images / cloud-image downloads,
+/// which have their own job endpoints). No other pipeline-style job type
+/// has been wired in here since, so this stays a stable empty list rather
+/// than a broken/removed endpoint.
 pub async fn list_pipeline_jobs(
     RequireRead(_claims): RequireRead,
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    let mut jobs = Vec::new();
-    if let Ok(builds) = state
-        .store
-        .list_entities::<images::ImageBuildStatus>("image_builds")
-    {
-        for b in builds {
-            let progress = match b.state {
-                images::BuildState::Completed => 100,
-                images::BuildState::Failed => 100,
-                images::BuildState::Building => 50,
-                images::BuildState::Pending => 0,
-            };
-            jobs.push(serde_json::json!({
-                "id": b.id,
-                "vm_name": b.name,
-                "source": "image-builder",
-                "status": format!("{:?}", b.state).to_lowercase(),
-                "progress": progress,
-                "pipeline_stage": format!("{:?}", b.state).to_lowercase(),
-                "error": b.error
-            }));
-        }
-    }
-    Json(serde_json::json!({ "jobs": jobs }))
+    Json(serde_json::json!({ "jobs": Vec::<serde_json::Value>::new() }))
 }
 
 /// GET /api/isos — legacy path wrapping /api/images/iso

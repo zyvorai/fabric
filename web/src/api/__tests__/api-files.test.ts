@@ -1032,19 +1032,6 @@ describe('hotplug', () => {
 // ─── images.ts ────────────────────────────────────────────────────────────────
 
 describe('images', () => {
-  it('buildImage calls apiPost', async () => {
-    const { buildImage } = await import('../images')
-    const req = { name: 'img1', distribution: 'ubuntu' }
-    await buildImage(req)
-    expect(mockApiPost).toHaveBeenCalledWith('/api/images/build', req)
-  })
-
-  it('listBuilds calls apiGet', async () => {
-    const { listBuilds } = await import('../images')
-    await listBuilds()
-    expect(mockApiGet).toHaveBeenCalledWith('/api/images/builds')
-  })
-
   it('listImages calls apiGet', async () => {
     const { listImages } = await import('../images')
     await listImages()

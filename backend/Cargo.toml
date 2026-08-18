@@ -4,7 +4,6 @@ members = [
     "zyvor-fabricd",
     "zyvorctl",
     "zyvorctl-tui",
-    "zyvor-fabric-vm-driver",
     "vm-model",
     "state-store",
     "vnc-proxy",
