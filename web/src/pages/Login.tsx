@@ -213,7 +213,7 @@ export default function Login() {
           </h2>
           <p className="login-fade-in login-fade-in-d2 text-lg text-slate-300/90 max-w-lg leading-relaxed">
             Clustering, networking, security, storage, operators, Terraform, and monitoring — built on
-            Ephemera, a disposable-VM engine with no systemd dependency.
+            Ephemera, a disposable-VM engine.
           </p>
           <div className="login-fade-in login-fade-in-d3 flex flex-wrap gap-2 mt-6">
             <span className="login-stat-pill login-stat-pill-glow">
@@ -227,14 +227,12 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="relative z-10 space-y-2.5 max-h-[42vh] overflow-y-auto login-feature-scroll pr-1">
+        <div className="relative z-10 space-y-1 max-h-[42vh] overflow-y-auto login-feature-scroll pr-1">
           {features.map((f, i) => (
             <div
               key={f.title}
-              className={`login-feature-card login-fade-in flex items-start gap-4 p-4 rounded-xl backdrop-blur-md ${
-                f.highlight
-                  ? 'login-feature-card-highlight'
-                  : 'bg-white/[0.04] border border-white/10 hover:border-white/20'
+              className={`login-feature-row login-fade-in flex items-start gap-4 py-2.5 px-3 -mx-3 rounded-lg ${
+                f.highlight ? 'login-feature-row-highlight' : ''
               }`}
               style={{ animationDelay: `${0.35 + i * 0.07}s`, opacity: 0 }}
             >

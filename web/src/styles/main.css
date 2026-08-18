@@ -211,16 +211,25 @@ code {
   border-color: rgba(237, 25, 68, 0.35);
   box-shadow: 0 0 16px rgba(237, 25, 68, 0.12);
 }
-.login-feature-card {
-  transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+/* Boxless feature list -- plain rows on the page background, not cards.
+   Previously every row was its own bg-white/[0.04] card, which was so
+   faint (4% white) that the background dots/gradient showed straight
+   through the text -- read as unreadable, not as "glass." A hover wash
+   is enough to keep rows feeling interactive without wrapping every
+   line in a translucent box. */
+.login-feature-row {
+  transition: background-color 0.25s, transform 0.25s;
 }
-.login-feature-card:hover {
+.login-feature-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
   transform: translateX(4px);
 }
-.login-feature-card-highlight {
-  background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(15, 23, 42, 0.5) 100%);
-  border: 1px solid rgba(237, 25, 68, 0.35);
-  box-shadow: 0 0 32px rgba(237, 25, 68, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+.login-feature-row-highlight {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.22) 0%, rgba(15, 23, 42, 0.28) 100%);
+  box-shadow: inset 3px 0 0 rgba(237, 25, 68, 0.6);
+}
+.login-feature-row-highlight:hover {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.3) 0%, rgba(15, 23, 42, 0.36) 100%);
 }
 .login-feature-scroll {
   scrollbar-width: thin;
@@ -288,7 +297,7 @@ code {
     animation: none !important;
     opacity: 1 !important;
   }
-  .login-feature-card:hover {
+  .login-feature-row:hover {
     transform: none !important;
   }
   .login-shake {
@@ -487,10 +496,12 @@ code {
   background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.95) 25%, rgba(168, 85, 247, 0.95) 55%, rgba(236, 72, 153, 0.9) 75%, transparent);
   box-shadow: 0 0 32px rgba(34, 211, 238, 0.5), 0 0 64px rgba(168, 85, 247, 0.35);
 }
-.login-page-aurora .login-feature-card-highlight {
-  background: linear-gradient(135deg, rgba(88, 28, 135, 0.45) 0%, rgba(15, 10, 32, 0.65) 100%);
-  border: 1px solid rgba(236, 72, 153, 0.35);
-  box-shadow: 0 0 40px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+.login-page-aurora .login-feature-row-highlight {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.3) 0%, rgba(15, 10, 32, 0.4) 100%);
+  box-shadow: inset 3px 0 0 rgba(236, 72, 153, 0.7);
+}
+.login-page-aurora .login-feature-row-highlight:hover {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.4) 0%, rgba(15, 10, 32, 0.5) 100%);
 }
 .login-page-aurora .login-capability-item {
   color: rgba(232, 228, 248, 0.92);
