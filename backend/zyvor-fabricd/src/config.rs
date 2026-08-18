@@ -340,6 +340,7 @@ impl Config {
             storage: StorageConfig {
                 path: "/var/lib/zyvor-fabricd".to_string(),
                 image_path: "/var/lib/zyvor-fabricd/images".to_string(),
+                atlas_base_url: None,
             },
             network: NetworkConfig {
                 bridge: "br0".to_string(),

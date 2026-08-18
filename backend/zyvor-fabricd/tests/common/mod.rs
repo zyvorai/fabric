@@ -46,6 +46,7 @@ pub async fn create_test_app() -> Router {
         storage: StorageConfig {
             path: tmp_dir.to_string_lossy().to_string(),
             image_path: tmp_dir.join("images").to_string_lossy().to_string(),
+            atlas_base_url: None,
         },
         network: NetworkConfig {
             bridge: "br-test".to_string(),
@@ -132,6 +133,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         storage: StorageConfig {
             path: tmp_dir.to_string_lossy().to_string(),
             image_path: tmp_dir.join("images").to_string_lossy().to_string(),
+            atlas_base_url: None,
         },
         network: NetworkConfig {
             bridge: "br-test".to_string(),
