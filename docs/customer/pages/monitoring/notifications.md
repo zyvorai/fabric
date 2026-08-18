@@ -29,7 +29,7 @@ The page has three tabs — **Channels**, **Rules**, **History** — loaded toge
 - Each rule shows enabled/disabled state, its description, up to 3 event-type tags (with a "+N more" overflow), how many times it has triggered, and when it last fired.
 - The enable/disable toggle (power icon) flips a rule on or off immediately.
 - **Delete** removes a rule after a confirmation prompt.
-- **Create Rule** opens a dialog describing what rules do, but rule creation isn't wired up yet — the dialog only has a Close button. Existing rules can still be toggled and deleted from this tab.
+- **Create Rule** opens a form: name, description, VM event types (created, started, stopped, snapshot taken, hotplug, error, etc.), severity levels, and which channels to notify. Every enabled rule is evaluated in real time against actual VM events — a matching rule sends through each selected channel and updates its trigger count and last-fired time here.
 
 **History**
 - A table of everything that's actually been sent: timestamp, rule name, event type (severity-colored), affected VM (if any), channel, and delivery status (`SENT`/`FAILED`).

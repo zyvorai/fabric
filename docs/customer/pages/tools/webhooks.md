@@ -21,7 +21,7 @@ Webhook Configuration — manage outbound webhooks that notify an external endpo
 2. Saving posts the new webhook (`POST /api/webhooks`, created enabled by default) and refreshes the list.
 3. Each configured webhook shows its URL (with a copy button), a type badge, its subscribed event tags, and an enabled/disabled indicator.
 4. **Test** sends a one-off test delivery (`POST /api/webhooks/test`) and reports delivered/failed inline on that webhook.
-5. The trash icon deletes a webhook immediately (`DELETE /api/webhooks/{id}`) — there's no confirmation dialog, so double-check before clicking.
+5. The trash icon asks for confirmation, then deletes the webhook (`DELETE /api/webhooks/{id}`).
 6. Use the refresh control in the header to re-fetch the webhook list.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.

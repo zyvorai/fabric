@@ -23,8 +23,9 @@ Storage Pools — create, start/stop, and monitor the storage backends VM disks 
 3. Table of pools — name, type with backend-specific detail (NFS server:export path, LVM volume group, LVM-thin volume group/thin pool, ZFS zpool/dataset, or Ceph pool name + monitor count), path, capacity, available space, a usage bar, current state, and a health indicator for NFS/Ceph pools.
 4. **Create Pool** — pick a type (Local, NFS, LVM, LVM-thin, ZFS, Ceph) and fill in its backend-specific fields (for NFS: server, export path, mount path, NFS version, mount options; for Ceph: monitor addresses, pool name, optional user/keyring; etc.), plus an auto-start-on-daemon-boot toggle.
 5. Per-pool actions: **Start** an inactive pool, **Stop** an active one, **Refresh** to pull current stats, or **Delete** — disabled while the pool is active, so stop it first — with a confirmation dialog.
+6. For Ceph pools, a **Manage RBD images** action opens a panel to list, create, and delete raw RBD images in that pool. This is proxied through the Atlas storage control plane (Zyvor's Ceph system of record) and requires Atlas to be configured on the backend; image creation is queued and completes asynchronously rather than immediately.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed. Ceph pool health/stats and RBD image management additionally require an Atlas connection — if that's not configured, those specific actions will show an unavailable error rather than the whole page failing.
 
 ## Related pages
 

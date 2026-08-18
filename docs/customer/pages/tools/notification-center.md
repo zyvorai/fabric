@@ -17,7 +17,7 @@ Notification Center — a live, session-only tray of VM events and system alerts
 
 ## What you can do
 
-1. The page polls `GET /api/system/alerts` every 10 seconds; each newly seen alert is added to the feed, tagged **Alert** or **System Warning** based on its severity. (The type chips also reserve categories for **VM Started** / **VM Stopped**, but nothing currently feeds those from this poll.)
+1. The page polls `GET /api/system/alerts` every 10 seconds; each newly seen alert is added to the feed, tagged **Alert** or **System Warning** based on its severity. It also subscribes to the live `/api/events/stream` feed for **VM Started** / **VM Stopped** events, so all four categories populate from real activity.
 2. Category chips at the top show a live count per type.
 3. An unread count appears when there are unread notifications; clicking a notification marks it read (dims it).
 4. Click the **×** on a notification to dismiss it individually, or **Clear All** to empty the whole feed.
