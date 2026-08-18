@@ -167,6 +167,18 @@ pub fn record_event(
     if let Err(e) = state.store.save_entity("vm_events", &event.id, &event) {
         tracing::error!("Failed to record VM event: {}", e);
     }
+
+    // Evaluate notification rules against this event in the background so
+    // channel delivery (SMTP/HTTP, with retries) never adds latency to the
+    // request path that triggered the event.
+    {
+        let state_clone = state.clone();
+        let event_clone = event.clone();
+        tokio::spawn(async move {
+            super::notifications::dispatch_event_to_rules(&state_clone, &event_clone).await;
+        });
+    }
+
     // Broadcast to SSE subscribers (ignore if no receivers)
     let _ = state.event_tx.send(event);
 

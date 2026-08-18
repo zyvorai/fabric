@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect } from 'react'
-import { HardDrive, Plus, Play, Square, Trash2, RefreshCw, Server, Folder, AlertCircle, CheckCircle } from 'lucide-react'
+import { HardDrive, Plus, Play, Square, Trash2, RefreshCw, Server, Folder, AlertCircle, CheckCircle, Database } from 'lucide-react'
 import {
   listStoragePools,
   createNfsPool,
@@ -15,6 +15,9 @@ import {
   refreshPoolStats,
   getNfsHealth,
   getCephHealth,
+  listRbdImages,
+  createRbdImage,
+  deleteRbdImage,
   type StoragePool,
   type NfsHealth,
 } from '../api/storage'
@@ -38,6 +41,7 @@ export default function StoragePools() {
   const [nfsHealth, setNfsHealth] = useState<Map<string, NfsHealth>>(new Map())
   const [cephHealth, setCephHealth] = useState<Map<string, { status: string; detail: string }>>(new Map())
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [rbdPool, setRbdPool] = useState<StoragePool | null>(null)
   const { query: poolQuery, setQuery: setPoolQuery, filtered: filteredPools } = useTableFilter(pools, (p) => [p.name, p.path, p.state])
 
   useEffect(() => {
@@ -352,6 +356,15 @@ export default function StoragePools() {
                             <Square className="w-4 h-4 text-yellow-500" />
                           </button>
                         ) : null}
+                        {typeof pool.pool_type === 'object' && 'Ceph' in pool.pool_type && (
+                          <button
+                            onClick={() => setRbdPool(pool)}
+                            className="p-2 hover:bg-white/[0.03] rounded transition"
+                            title="Manage RBD images"
+                          >
+                            <Database className="w-4 h-4 text-purple-400" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleRefresh(pool.name)}
                           className="p-2 hover:bg-white/[0.03] rounded transition"
@@ -384,6 +397,10 @@ export default function StoragePools() {
       {/* Create Pool Dialog */}
       {showCreateDialog && (
         <CreatePoolDialog onClose={() => setShowCreateDialog(false)} onCreated={loadPools} />
+      )}
+
+      {rbdPool && (
+        <RbdImagesModal pool={rbdPool} onClose={() => setRbdPool(null)} />
       )}
 
       {confirmState && (
@@ -727,6 +744,155 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+interface RbdImagesModalProps {
+  pool: StoragePool
+  onClose: () => void
+}
+
+function RbdImagesModal({ pool, onClose }: RbdImagesModalProps) {
+  const toast = useToastContext()
+  const { confirmState, confirm, cancel } = useConfirm()
+  const [images, setImages] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
+  const [newSizeMb, setNewSizeMb] = useState(1024)
+  const [creating, setCreating] = useState(false)
+
+  const load = async () => {
+    setLoadError(null)
+    try {
+      const data = await listRbdImages(pool.name)
+      setImages(data)
+    } catch (error) {
+      setLoadError(formatUserError(error))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pool.name])
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newName.trim()) { toast.error('Image name is required'); return }
+    if (newSizeMb <= 0) { toast.error('Size must be greater than 0'); return }
+    setCreating(true)
+    try {
+      await createRbdImage(pool.name, { name: newName.trim(), size_mb: newSizeMb })
+      toast.success(`Image '${newName.trim()}' queued for creation`)
+      setNewName('')
+      setNewSizeMb(1024)
+      await load()
+    } catch (error) {
+      toastFailure(toast, 'Failed to create RBD image', error)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDelete = async (image: string) => {
+    const ok = await confirm('Delete RBD Image', `Delete image '${image}'? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
+    try {
+      await deleteRbdImage(pool.name, image)
+      toast.success(`Image '${image}' deleted`)
+      await load()
+    } catch (error) {
+      toastFailure(toast, 'Failed to delete RBD image', error)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+          <div>
+            <h2 className="text-xl font-bold">RBD Images</h2>
+            <p className="text-sm text-slate-400 mt-0.5">Pool: {pool.name}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
+            <span className="text-2xl">&times;</span>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {loadError && (
+            <ErrorBanner title="Could not load RBD images" headline={loadError} onRetry={load} />
+          )}
+
+          <form onSubmit={handleCreate} className="flex items-end gap-2">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Image name</label>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="my-image"
+                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="w-28">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Size (MB)</label>
+              <input
+                type="number"
+                min={1}
+                value={newSizeMb}
+                onChange={(e) => setNewSizeMb(Number(e.target.value))}
+                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={creating}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition disabled:opacity-50"
+            >
+              {creating ? 'Creating…' : 'Create'}
+            </button>
+          </form>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : images.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-6">No RBD images in this pool.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {images.map((image) => (
+                <div key={image} className="flex items-center justify-between bg-slate-900/60 border border-slate-700/50 rounded-lg px-3 py-2">
+                  <span className="text-sm font-mono truncate">{image}</span>
+                  <button
+                    onClick={() => handleDelete(image)}
+                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition"
+                    title="Delete image"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={cancel}
+        />
+      )}
     </div>
   )
 }

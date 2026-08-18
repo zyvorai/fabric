@@ -97,6 +97,14 @@ pub struct StorageConfig {
     pub path: String,
     #[serde(default = "default_image_path")]
     pub image_path: String,
+    /// Base URL of the Atlas storage control plane's API (e.g.
+    /// "http://localhost:5110/api/atlas/v1"), used to proxy Ceph RBD image
+    /// operations for `Ceph`-typed storage pools. zyvor-fabricd has no
+    /// direct Ceph/RBD driver of its own -- Atlas is the system of record
+    /// for distributed storage. Unset means RBD image endpoints are
+    /// unavailable (503) rather than silently no-op'ing.
+    #[serde(default)]
+    pub atlas_base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

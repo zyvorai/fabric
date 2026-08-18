@@ -58,7 +58,7 @@ pub struct UpdateChannelRequest {
     pub enabled: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Info,
@@ -1229,4 +1229,141 @@ async fn send_teams_notification(
 
     tracing::info!("Teams notification sent successfully");
     Ok(())
+}
+
+// ============================================================================
+// Rule Evaluation / Dispatch
+// ============================================================================
+
+/// The frontend/rule `event_types` values are the same snake_case strings
+/// VMEventType already serializes to (e.g. "started", "snapshot_created").
+fn event_type_key(event_type: &super::events::VMEventType) -> String {
+    serde_json::to_value(event_type)
+        .ok()
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_default()
+}
+
+/// VMEvent carries no severity of its own; derive a reasonable one so rules
+/// can filter by severity_levels the same way they filter by event_types.
+fn event_severity(event_type: &super::events::VMEventType) -> Severity {
+    use super::events::VMEventType;
+    match event_type {
+        VMEventType::Error => Severity::Critical,
+        VMEventType::AutoHealed | VMEventType::Deleted => Severity::Warning,
+        _ => Severity::Info,
+    }
+}
+
+/// Evaluate every enabled rule against a fired VM event and dispatch to its
+/// channels on a match. Called fire-and-forget from record_event so it never
+/// adds latency to the request path that triggered the event.
+pub async fn dispatch_event_to_rules(state: &Arc<AppState>, event: &super::events::VMEvent) {
+    let event_key = event_type_key(&event.event_type);
+    let severity = event_severity(&event.event_type);
+
+    let rules = match state
+        .store
+        .list_entities::<NotificationRule>("notifications/rules")
+    {
+        Ok(rules) => rules,
+        Err(e) => {
+            tracing::error!("Failed to load notification rules for dispatch: {}", e);
+            return;
+        }
+    };
+
+    for mut rule in rules {
+        if !rule.enabled {
+            continue;
+        }
+        if !rule.event_types.iter().any(|t| t == &event_key) {
+            continue;
+        }
+        if !rule.severity_levels.contains(&severity) {
+            continue;
+        }
+        if let Some(required_tags) = &rule.vm_tags {
+            if !required_tags.is_empty() {
+                let vm_tags = state
+                    .store
+                    .get_vm(&event.vm_name)
+                    .ok()
+                    .flatten()
+                    .and_then(|vm| vm.tags)
+                    .unwrap_or_default();
+                if !required_tags.iter().any(|t| vm_tags.contains(t)) {
+                    continue;
+                }
+            }
+        }
+
+        let message = event
+            .detail
+            .clone()
+            .unwrap_or_else(|| format!("{} on VM '{}'", event_key, event.vm_name));
+        let subject = format!("[{}] {} - {}", rule.name, event_key, event.vm_name);
+
+        let mut any_success = false;
+        for channel_id in &rule.channels {
+            let channel = match state
+                .store
+                .get_entity::<NotificationChannel>("notifications/channels", channel_id)
+            {
+                Ok(Some(c)) if c.enabled => c,
+                Ok(_) => continue,
+                Err(e) => {
+                    tracing::warn!("Failed to load channel {} for rule dispatch: {}", channel_id, e);
+                    continue;
+                }
+            };
+
+            let result = send_notification(&state.http_client, &channel, &subject, &message).await;
+            if result.is_ok() {
+                any_success = true;
+            } else if let Err(ref e) = result {
+                tracing::warn!(
+                    "Notification dispatch failed for rule '{}' channel '{}': {}",
+                    rule.name,
+                    channel.name,
+                    e
+                );
+            }
+
+            let history = NotificationHistory {
+                id: Uuid::new_v4().to_string(),
+                rule_id: rule.id.clone(),
+                rule_name: rule.name.clone(),
+                event_type: event_key.clone(),
+                severity: severity.clone(),
+                channel: channel.name.clone(),
+                vm_name: Some(event.vm_name.clone()),
+                message: message.clone(),
+                sent_at: Utc::now(),
+                status: if result.is_ok() {
+                    NotificationStatus::Sent
+                } else {
+                    NotificationStatus::Failed
+                },
+                error: result.err(),
+            };
+            if let Err(e) = state
+                .store
+                .save_entity("notification_history", &history.id, &history)
+            {
+                tracing::error!("Failed to record notification history: {}", e);
+            }
+        }
+
+        if any_success {
+            rule.triggered_count += 1;
+            rule.last_triggered = Some(Utc::now());
+            if let Err(e) = state
+                .store
+                .save_entity("notifications/rules", &rule.id, &rule)
+            {
+                tracing::error!("Failed to update rule trigger stats for '{}': {}", rule.name, e);
+            }
+        }
+    }
 }

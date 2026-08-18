@@ -416,6 +416,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route("/storage/pools/zfs", post(api::storage::create_zfs_pool))
         .route("/storage/pools/ceph", post(api::storage::create_ceph_pool))
+        // RBD images (Ceph pools only, proxied through Atlas)
+        .route(
+            "/storage/pools/{name}/images",
+            get(api::storage::list_rbd_images).post(api::storage::create_rbd_image),
+        )
+        .route(
+            "/storage/pools/{name}/images/{image}",
+            delete(api::storage::delete_rbd_image),
+        )
         // Volume management routes
         .route(
             "/storage/pools/{name}/volumes",

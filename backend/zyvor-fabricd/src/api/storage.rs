@@ -11,7 +11,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use zyvor_fabric_storage::{NfsConfig, NfsVersion, StoragePool};
+use zyvor_fabric_storage::{NfsConfig, NfsVersion, StoragePool, StoragePoolType};
 
 use crate::server::AppState;
 use security::{RequireAdmin, RequireRead, RequireWrite};
@@ -311,19 +311,42 @@ pub async fn stop_pool(
     }
 }
 
-/// GET /api/storage/pools/:name/health - Get NFS pool health
+/// GET /api/storage/pools/:name/health - Get pool health.
+///
+/// NFS: a live mount/reachability check. Ceph: proxied from Atlas, since
+/// zyvor-fabricd has no direct Ceph driver of its own -- calling
+/// `get_nfs_health` for a Ceph pool would always 404 (it only ever looks in
+/// the NFS pool map), which is what happened here before this branch existed.
 pub async fn get_pool_health(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(get_pool_health));
+
+    let pool = {
+        let manager = state.storage_manager.read().await;
+        manager
+            .get_pool(&name)
+            .await
+            .map_err(|e| (StatusCode::NOT_FOUND, format!("Pool not found: {}", e)))?
+    };
+
+    if let StoragePoolType::Ceph { pool_name, .. } = &pool.pool_type {
+        let atlas_pool = fetch_atlas_pool(&state, pool_name).await?;
+        return Ok(Json(serde_json::json!({
+            "status": atlas_health_status(atlas_pool.health),
+            "detail": format!("Atlas pool '{}': {:?}", atlas_pool.name, atlas_pool.health),
+        }))
+        .into_response());
+    }
+
     let result = {
         let manager = state.storage_manager.read().await;
         manager.get_nfs_health(&name).await
     };
     match result {
-        Ok(health) => Ok(Json(health)),
+        Ok(health) => Ok(Json(health).into_response()),
         Err(e) => Err((
             StatusCode::NOT_FOUND,
             format!("Failed to get health: {}", e),
@@ -331,21 +354,118 @@ pub async fn get_pool_health(
     }
 }
 
-/// GET /api/storage/pools/:name/stats - Get NFS pool stats
+/// GET /api/storage/pools/:name/stats - Get pool stats.
+///
+/// NFS: live `df` of the mount. Ceph: proxied from Atlas's pool capacity
+/// (used_bytes/max_bytes) -- same reasoning as get_pool_health. `objects` is
+/// always 0 for Ceph pools: Atlas's typed pool API doesn't expose a
+/// per-pool object count.
 pub async fn get_pool_stats(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("storage::{}", stringify!(get_pool_stats));
+
+    let pool = {
+        let manager = state.storage_manager.read().await;
+        manager
+            .get_pool(&name)
+            .await
+            .map_err(|e| (StatusCode::NOT_FOUND, format!("Pool not found: {}", e)))?
+    };
+
+    if let StoragePoolType::Ceph { pool_name, .. } = &pool.pool_type {
+        let atlas_pool = fetch_atlas_pool(&state, pool_name).await?;
+        let total_bytes = atlas_pool.max_bytes.unwrap_or(0);
+        let used_bytes = atlas_pool.used_bytes.unwrap_or(0);
+        return Ok(Json(serde_json::json!({
+            "total_bytes": total_bytes,
+            "used_bytes": used_bytes,
+            "available_bytes": (total_bytes - used_bytes).max(0),
+            "objects": 0,
+        }))
+        .into_response());
+    }
+
     let result = {
         let manager = state.storage_manager.read().await;
         manager.get_nfs_stats(&name).await
     };
     match result {
-        Ok(stats) => Ok(Json(stats)),
+        Ok(stats) => Ok(Json(stats).into_response()),
         Err(e) => Err((StatusCode::NOT_FOUND, format!("Failed to get stats: {}", e))),
     }
+}
+
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+enum AtlasHealth {
+    Ok,
+    Warn,
+    Critical,
+    #[default]
+    Unknown,
+}
+
+fn atlas_health_status(h: AtlasHealth) -> &'static str {
+    match h {
+        AtlasHealth::Ok => "Ok",
+        AtlasHealth::Warn | AtlasHealth::Unknown => "Warn",
+        AtlasHealth::Critical => "Error",
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct AtlasPoolInfo {
+    name: String,
+    used_bytes: Option<i64>,
+    max_bytes: Option<i64>,
+    #[serde(default)]
+    health: AtlasHealth,
+}
+
+/// Fetch a single Ceph pool's normalized info from Atlas by its raw Ceph pool name.
+async fn fetch_atlas_pool(
+    state: &Arc<AppState>,
+    ceph_pool_name: &str,
+) -> Result<AtlasPoolInfo, (StatusCode, String)> {
+    let atlas_base_url = state.config.storage.atlas_base_url.clone().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Atlas storage control plane is not configured (storage.atlas_base_url)".to_string(),
+        )
+    })?;
+    let url = atlas_url(&atlas_base_url, &["pools"])?;
+    let resp = state.http_client.get(url).send().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas request failed: {}", e),
+        )
+    })?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas returned {}: {}", status, body),
+        ));
+    }
+    let pools: Vec<AtlasPoolInfo> = resp.json().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Failed to parse Atlas response: {}", e),
+        )
+    })?;
+    pools
+        .into_iter()
+        .find(|p| p.name == ceph_pool_name)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Atlas has no pool named '{}'", ceph_pool_name),
+            )
+        })
 }
 
 /// POST /api/storage/pools/:name/refresh - Refresh pool statistics
@@ -511,6 +631,192 @@ pub async fn create_ceph_pool(
             format!("Failed to create Ceph pool: {}", e),
         )),
     }
+}
+
+// ============================================================================
+// RBD images (Ceph pools only, proxied through the Atlas storage control
+// plane -- zyvor-fabricd has no direct Ceph/RBD driver of its own).
+// ============================================================================
+
+fn atlas_url(base: &str, segments: &[&str]) -> Result<reqwest::Url, (StatusCode, String)> {
+    let mut url = reqwest::Url::parse(base).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid storage.atlas_base_url: {}", e),
+        )
+    })?;
+    {
+        let mut push = url.path_segments_mut().map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "storage.atlas_base_url cannot be a base URL".to_string(),
+            )
+        })?;
+        for seg in segments {
+            push.push(seg);
+        }
+    }
+    Ok(url)
+}
+
+/// Resolve a zyvor-fabric storage pool name to its Ceph pool_name, and
+/// confirm Atlas is configured to talk to on its behalf.
+async fn resolve_ceph_pool(
+    state: &Arc<AppState>,
+    name: &str,
+) -> Result<(String, String), (StatusCode, String)> {
+    let atlas_base_url = state.config.storage.atlas_base_url.clone().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Atlas storage control plane is not configured (storage.atlas_base_url) -- RBD image operations are unavailable".to_string(),
+        )
+    })?;
+
+    let pool = {
+        let manager = state.storage_manager.read().await;
+        manager
+            .get_pool(name)
+            .await
+            .map_err(|e| (StatusCode::NOT_FOUND, format!("Pool not found: {}", e)))?
+    };
+
+    match pool.pool_type {
+        StoragePoolType::Ceph { pool_name, .. } => Ok((atlas_base_url, pool_name)),
+        _ => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Pool '{}' is not a Ceph pool", name),
+        )),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct AtlasRbdListResponse {
+    images: Vec<String>,
+}
+
+/// GET /api/storage/pools/:name/images - List RBD images in a Ceph pool
+pub async fn list_rbd_images(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<Vec<String>>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(list_rbd_images));
+    let (atlas_base_url, pool_name) = resolve_ceph_pool(&state, &name).await?;
+
+    let mut url = atlas_url(&atlas_base_url, &["rbd-images"])?;
+    url.query_pairs_mut().append_pair("pool", &pool_name);
+
+    let resp = state.http_client.get(url).send().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas request failed: {}", e),
+        )
+    })?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas returned {}: {}", status, body),
+        ));
+    }
+
+    let parsed: AtlasRbdListResponse = resp.json().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Failed to parse Atlas response: {}", e),
+        )
+    })?;
+
+    Ok(Json(parsed.images))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateRbdImageRequest {
+    pub name: String,
+    pub size_mb: u64,
+}
+
+/// POST /api/storage/pools/:name/images - Create an RBD image in a Ceph pool.
+///
+/// Atlas provisions asynchronously via a job queue -- a successful response
+/// here means Atlas *accepted* the create request, not that the image
+/// exists yet. There's no synchronous "wait for it to land" equivalent.
+pub async fn create_rbd_image(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<CreateRbdImageRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(create_rbd_image));
+    if req.name.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Image name is required".to_string(),
+        ));
+    }
+    if req.size_mb == 0 {
+        return Err((StatusCode::BAD_REQUEST, "size_mb must be > 0".to_string()));
+    }
+    let (atlas_base_url, pool_name) = resolve_ceph_pool(&state, &name).await?;
+    let url = atlas_url(&atlas_base_url, &["rbd-images"])?;
+
+    let resp = state
+        .http_client
+        .post(url)
+        .json(&serde_json::json!({
+            "name": req.name,
+            "size_bytes": (req.size_mb as i64).saturating_mul(1024 * 1024),
+            "pool": pool_name,
+        }))
+        .send()
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Atlas request failed: {}", e),
+            )
+        })?;
+
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+    if !status.is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas rejected RBD image create: {} {}", status, body),
+        ));
+    }
+
+    Ok(Json(body))
+}
+
+/// DELETE /api/storage/pools/:name/images/:image - Delete an RBD image from a Ceph pool
+pub async fn delete_rbd_image(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, image)): Path<(String, String)>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    tracing::debug!("storage::{}", stringify!(delete_rbd_image));
+    let (atlas_base_url, pool_name) = resolve_ceph_pool(&state, &name).await?;
+    let url = atlas_url(&atlas_base_url, &["rbd-images", &pool_name, &image])?;
+
+    let resp = state.http_client.delete(url).send().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas request failed: {}", e),
+        )
+    })?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("Atlas returned {}: {}", status, body),
+        ));
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
