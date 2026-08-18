@@ -350,8 +350,15 @@ pub struct AddPortForwardRequest {
 /// Usermode/slirp networking only accepts forwards at instance-creation
 /// time -- there is no way to add one to an already-running VM -- so a
 /// running VM gets destroyed and relaunched with its full, updated forward
-/// set; a VM that was never started just picks the forward up naturally on
-/// its next Start (see start_vm's fallback to vm.port_forwards below).
+/// set; a stopped VM has its Ephemera-side record cleared too (if it has
+/// one) so its next Start creates fresh with the forward included, instead
+/// of `start_with_options` finding the old record still there and
+/// replaying its stale original request (found live: adding a forward to
+/// a VM that had already been started once before, then stopped, silently
+/// never took effect on the next Start -- `EphemeraDriver::start_with_options`
+/// deliberately replays a known VM's stored request rather than
+/// re-translating fresh options, so the only way to pick up a forward
+/// added afterward is to not have a stale record sitting there at all).
 pub async fn add_port_forward(
     RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
@@ -409,18 +416,25 @@ pub async fn add_port_forward(
             .into_response();
     }
 
-    if was_running {
-        if let Err(e) = state.driver.delete(&name).await {
-            let msg = e.to_string();
-            if !msg.contains("known to Ephemera") {
-                audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
-                return json_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to recreate VM '{}' with the new port forward: {}", name, msg),
-                )
-                .into_response();
-            }
+    // Clear any existing Ephemera-side record regardless of current running
+    // state -- a stopped VM that was previously started still has one, and
+    // leaving it in place means the next Start replays its stale original
+    // forward set instead of picking up what was just added (see doc
+    // comment above). Best-effort: "doesn't exist yet" is the expected,
+    // harmless outcome for a VM that's never been started at all.
+    if let Err(e) = state.driver.delete(&name).await {
+        let msg = e.to_string();
+        if !msg.contains("known to Ephemera") {
+            audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to clear VM '{}' for recreation with the new port forward: {}", name, msg),
+            )
+            .into_response();
         }
+    }
+
+    if was_running {
         let opts = vm_model::VMStartOptions {
             port_forwards: vm.port_forwards.clone(),
             network_tap: vm.network_tap,
