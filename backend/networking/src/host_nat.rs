@@ -149,8 +149,9 @@ fn parse_nat_rules_from_ruleset(json: &serde_json::Value) -> Vec<DiscoveredHostN
         let chain = rule.get("chain").and_then(|c| c.as_str()).unwrap_or("?");
         let handle = rule.get("handle").and_then(|h| h.as_u64()).unwrap_or(0);
         let exprs = rule.get("expr").and_then(|e| e.as_array());
+        let rule_comment = rule.get("comment").and_then(|c| c.as_str());
 
-        if let Some(parsed) = parse_nat_exprs(exprs, table, chain) {
+        if let Some(parsed) = parse_nat_exprs(exprs, rule_comment, table, chain) {
             let key = format!(
                 "{}:{}:{}:{}:{}:{}",
                 parsed.rule_type,
@@ -196,12 +197,20 @@ struct ParsedNat {
 
 fn parse_nat_exprs(
     exprs: Option<&Vec<serde_json::Value>>,
+    rule_comment: Option<&str>,
     table: &str,
     chain: &str,
 ) -> Option<ParsedNat> {
     let exprs = exprs?;
 
-    let mut name = None;
+    // `nft -j` puts a rule's comment as a field of the rule object itself,
+    // not nested inside any `expr[]` element -- the loop below used to look
+    // for `expr.comment` and could never find one, so every discovered NAT
+    // rule fell back to its generic "{table}-{chain}-{rule_type}" name
+    // instead of the name it was actually created with.
+    let mut name = rule_comment
+        .filter(|c| !c.starts_with("vm-nat-"))
+        .map(str::to_string);
     let mut rule_type = None;
     let mut protocol = None;
     let mut source_cidr = None;
@@ -212,12 +221,6 @@ fn parse_nat_exprs(
     let mut outbound_interface = None;
 
     for expr in exprs {
-        if let Some(comment) = expr.get("comment").and_then(|c| c.as_str()) {
-            if !comment.starts_with("vm-nat-") {
-                name = Some(comment.to_string());
-            }
-            continue;
-        }
         if expr.get("masquerade").is_some() {
             rule_type = Some("masquerade".to_string());
             continue;

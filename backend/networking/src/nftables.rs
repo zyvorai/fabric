@@ -623,18 +623,19 @@ fn find_rule_handles(json: &serde_json::Value, chain: &str, comment_needle: &str
                 continue;
             }
 
-            // Check comment in the rule's expression list
+            // `nft -j` puts a rule's comment as a field of the rule object
+            // itself, alongside `chain`/`handle`/`expr` -- NOT nested inside
+            // any `expr[]` element (verified live: `nft -j list table ip
+            // zyvor-fabricd` on a rule added with `comment "pf-regr-test"`
+            // shows `{"rule": {..., "handle": 5, "comment": "pf-regr-test",
+            // "expr": [...]}}`). Looking for it under `expr[].comment`
+            // instead meant this NEVER matched anything, so every port
+            // forward delete silently removed the DB record while leaving
+            // its DNAT/masquerade nftables rules running indefinitely.
             let has_comment = rule
-                .get("expr")
-                .and_then(|e| e.as_array())
-                .map(|exprs| {
-                    exprs.iter().any(|expr| {
-                        expr.get("comment")
-                            .and_then(|c| c.as_str())
-                            .map(|c| c.contains(comment_needle))
-                            .unwrap_or(false)
-                    })
-                })
+                .get("comment")
+                .and_then(|c| c.as_str())
+                .map(|c| c.contains(comment_needle))
                 .unwrap_or(false);
 
             if has_comment {
