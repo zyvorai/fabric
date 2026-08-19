@@ -50,6 +50,27 @@ fn parse_addr(cidr: &str) -> Option<IpAddr> {
     cidr.split('/').next()?.parse().ok()
 }
 
+/// Request the bridge's own address via DHCP -- `dhcpcd <iface>`, not a
+/// netlink operation (there's no rtnetlink message for "run a DHCP
+/// exchange"), so this shells out like `apply_sriov`'s `ip link set vf`
+/// calls do. dhcpcd daemonizes itself once it has a lease (or gives up),
+/// same "own the child process" pattern `zyvor_fabric_dnsmasq_manager`
+/// uses for the per-bridge DHCP *server* -- this is the DHCP *client*
+/// side, for the bridge device's own address, a separate concern.
+fn run_dhcp_client(iface: &str) -> Result<()> {
+    let output = Command::new("dhcpcd")
+        .arg(iface)
+        .output()
+        .context("failed to run dhcpcd (is it installed?)")?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "dhcpcd failed for '{iface}': {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
+}
+
 pub struct NetworkdManager {
     config_dir: PathBuf,
     file_prefix: String,
@@ -63,22 +84,39 @@ impl NetworkdManager {
         }
     }
 
-    /// Create a bridge device via netlink: name, up, mtu, mac address, and
-    /// static addresses apply immediately (no reload step). STP/forward-delay
-    /// /hello-time/max-age/vlan-filtering and DHCP-client/gateway-route are
-    /// not yet wired to netlink calls — STP needs `InfoBridge` attribute
-    /// data on the link-add message; gateway/DHCP-client are host-routing/
-    /// resolver concerns, not device-creation ones. Tracked as a follow-up,
-    /// not silently dropped: log a warning so a caller relying on them
-    /// notices instead of assuming they took effect.
+    /// Create a bridge device via netlink: name, up, mtu, mac address,
+    /// static addresses, STP on/off, a default route via `gateway`, and a
+    /// DHCP client on the bridge's own interface all apply immediately (no
+    /// reload step). forward_delay/hello_time/max_age/vlan_filtering are
+    /// finer STP tuning knobs still not wired up -- tracked as a
+    /// follow-up, not silently dropped: log a warning so a caller relying
+    /// on them notices instead of assuming they took effect.
     pub fn apply_bridge(&self, cfg: &BridgeConfig) -> Result<()> {
         block_on_netlink(netlink::create_bridge(&cfg.name))?;
-        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses);
+        let result: Result<()> = (|| {
+            self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses)?;
+            if let Some(enable) = cfg.stp {
+                block_on_netlink(netlink::set_bridge_stp(&cfg.name, enable))
+                    .with_context(|| format!("failed to set stp={enable} on '{}'", cfg.name))?;
+            }
+            if let Some(gateway) = &cfg.gateway {
+                let addr: IpAddr = gateway
+                    .parse()
+                    .with_context(|| format!("invalid gateway address '{gateway}'"))?;
+                block_on_netlink(netlink::add_default_route(&cfg.name, addr))
+                    .with_context(|| format!("failed to add default route via '{gateway}' on '{}'", cfg.name))?;
+            }
+            if cfg.dhcp != DhcpMode::No {
+                run_dhcp_client(&cfg.name)
+                    .with_context(|| format!("failed to start a DHCP client on '{}'", cfg.name))?;
+            }
+            Ok(())
+        })();
         self.cleanup_on_failure(&cfg.name, result)?;
-        if cfg.stp.is_some() || cfg.gateway.is_some() || cfg.dhcp != DhcpMode::No {
+        if cfg.forward_delay_sec.is_some() || cfg.hello_time_sec.is_some() || cfg.max_age_sec.is_some() || cfg.vlan_filtering.is_some() {
             tracing::warn!(
                 bridge = %cfg.name,
-                "stp/gateway/dhcp-client are not yet applied via netlink for bridges (device created, those settings were not)"
+                "forward_delay/hello_time/max_age/vlan_filtering are not yet applied via netlink for bridges (device created, those settings were not)"
             );
         }
         tracing::info!("Applied bridge config: {}", cfg.name);
@@ -267,8 +305,21 @@ impl NetworkdManager {
     pub fn apply_sriov(&self, cfg: &SriovConfig) -> Result<()> {
         // Set number of VFs via sysfs
         let sriov_path = format!("/sys/class/net/{}/device/sriov_numvfs", cfg.pf_name);
-        fs::write(&sriov_path, cfg.num_vfs.to_string())
-            .with_context(|| format!("Failed to set sriov_numvfs on {}", cfg.pf_name))?;
+
+        // Most NIC drivers reject writing a new nonzero VF count while VFs
+        // already exist (EBUSY) -- a well-known SR-IOV sysfs quirk:
+        // reconfiguring an already-provisioned PF requires resetting to 0
+        // first. Best-effort and silently ignored on failure (e.g. it's
+        // already 0, or this is a first-time enable and the write would
+        // have been a no-op anyway).
+        let _ = fs::write(&sriov_path, "0");
+
+        fs::write(&sriov_path, cfg.num_vfs.to_string()).with_context(|| {
+            format!(
+                "Failed to set sriov_numvfs on {} (requested {} VFs -- check /sys/class/net/{}/device/sriov_totalvfs for this device's actual maximum)",
+                cfg.pf_name, cfg.num_vfs, cfg.pf_name
+            )
+        })?;
 
         tracing::info!(
             pf = %cfg.pf_name, num_vfs = cfg.num_vfs,
@@ -315,8 +366,16 @@ impl NetworkdManager {
 
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
+                    // Don't leave some VFs configured and others (or the
+                    // rest of the requested count) not -- reset to 0 so a
+                    // failed apply doesn't strand the PF in a
+                    // partially-provisioned state with no record of it
+                    // (this create never reaches save_entity on error, the
+                    // same orphan-on-partial-failure class of bug fixed
+                    // earlier this session for bridges/vlans/etc).
+                    let _ = fs::write(&sriov_path, "0");
                     return Err(anyhow::anyhow!(
-                        "ip link set vf {} failed: {}",
+                        "ip link set vf {} failed: {} (VFs reset to 0 on this failure, not left partially configured)",
                         vf.vf_index,
                         stderr
                     ));

@@ -14,7 +14,7 @@ import type {
   VxlanConfig, SriovConfig, ParsedConfigFile,
 } from '../api/networkd'
 import {
-  BridgesTab, CreateBridgeModal, EditBridgeModal,
+  BridgesTab, CreateBridgeModal, EditBridgeModal, DhcpServerModal,
   BondsTab, CreateBondModal, EditBondModal,
   VlansTab, CreateVlanModal, EditVlanModal,
   MacvtapTab, CreateMacvtapModal,
@@ -27,7 +27,7 @@ import {
   FloatingIpsTab, CreateFloatingIpModal,
   StatusTab,
 } from './network/index'
-import type { FloatingIp } from '../api/network-cloud'
+import type { FloatingIp, DhcpServerConfig } from '../api/network-cloud'
 import { ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
 
 const FABRIC = ZYVOR_FABRIC_HELP.name
@@ -46,7 +46,7 @@ import ReadOnlyNotice from '../components/ReadOnlyNotice'
 
 type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'floatingips' | 'status'
 type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | 'floatingip'
-  | 'edit-bridge' | 'edit-bond' | 'edit-vlan' | null
+  | 'edit-bridge' | 'edit-bond' | 'edit-vlan' | 'dhcp' | null
 
 export default function Network() {
   const toast = useToastContext()
@@ -63,6 +63,7 @@ export default function Network() {
   const [vxlans, setVxlans] = useState<VxlanConfig[]>([])
   const [sriov, setSriov] = useState<SriovConfig[]>([])
   const [floatingIps, setFloatingIps] = useState<FloatingIp[]>([])
+  const [dhcpServers, setDhcpServers] = useState<DhcpServerConfig[]>([])
   const [links, setLinks] = useState<LinkInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +73,7 @@ export default function Network() {
   const [editingBridge, setEditingBridge] = useState<BridgeConfig | null>(null)
   const [editingBond, setEditingBond] = useState<BondConfig | null>(null)
   const [editingVlan, setEditingVlan] = useState<VlanConfig | null>(null)
+  const [dhcpBridge, setDhcpBridge] = useState<BridgeConfig | null>(null)
   const [showScanModal, setShowScanModal] = useState(false)
   const { confirmState, confirm, cancel } = useConfirm()
 
@@ -81,7 +83,7 @@ export default function Network() {
       setError(null)
     }
     try {
-      const [b, bo, v, m, t, nf, lf, pf, vx, sr, fip, l] = await Promise.all([
+      const [b, bo, v, m, t, nf, lf, pf, vx, sr, fip, dhcp, l] = await Promise.all([
         api.listBridges(),
         api.listBonds(),
         api.listVlans(),
@@ -93,6 +95,7 @@ export default function Network() {
         api.listVxlans(),
         api.listSriov(),
         cloudApi.listFloatingIps().catch(() => []),
+        cloudApi.listDhcpServers().catch(() => []),
         api.listLinks().catch(() => []),
       ])
       setBridges(b)
@@ -106,6 +109,7 @@ export default function Network() {
       setVxlans(vx)
       setSriov(sr)
       setFloatingIps(fip)
+      setDhcpServers(dhcp)
       setLinks(l)
     } catch (e: unknown) {
       if (!silent) {
@@ -315,6 +319,7 @@ export default function Network() {
     setEditingBridge(null)
     setEditingBond(null)
     setEditingVlan(null)
+    setDhcpBridge(null)
   }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -439,10 +444,12 @@ export default function Network() {
           {activeTab === 'bridges' && (
             <BridgesTab
               bridges={bridges}
+              dhcpServers={dhcpServers}
               onDelete={handleDeleteBridge}
               onAdopt={handleAdoptBridge}
               onCreate={() => setActiveModal('bridge')}
               onEdit={b => { setEditingBridge(b); setActiveModal('edit-bridge') }}
+              onConfigureDhcp={b => { setDhcpBridge(b); setActiveModal('dhcp') }}
             />
           )}
           {activeTab === 'bonds' && (
@@ -520,6 +527,15 @@ export default function Network() {
       {canWrite && activeModal === 'vlan' && <CreateVlanModal onClose={closeModal} onCreated={(v) => { setVlans(prev => [...prev, v]); closeModal() }} />}
       {canWrite && activeModal === 'edit-bridge' && editingBridge && (
         <EditBridgeModal bridge={editingBridge} onClose={closeModal} onUpdated={(b) => { setBridges(prev => prev.map(x => x.id === b.id ? b : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'dhcp' && dhcpBridge && (
+        <DhcpServerModal
+          bridge={dhcpBridge}
+          existing={dhcpServers.find(d => d.bridge === dhcpBridge.name) ?? null}
+          onClose={closeModal}
+          onCreated={(d) => { setDhcpServers(prev => [...prev, d]); closeModal() }}
+          onDeleted={(id) => { setDhcpServers(prev => prev.filter(d => d.id !== id)); closeModal() }}
+        />
       )}
       {canWrite && activeModal === 'edit-bond' && editingBond && (
         <EditBondModal bond={editingBond} onClose={closeModal} onUpdated={(b) => { setBonds(prev => prev.map(x => x.id === b.id ? b : x)); closeModal() }} />

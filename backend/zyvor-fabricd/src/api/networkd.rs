@@ -1965,6 +1965,19 @@ pub async fn create_sriov(
         )
         .into_response();
     }
+    // validate_hostname allows '.' (legitimate in names like "eth0.100"),
+    // so a name consisting only of dots (".", "..") would otherwise pass
+    // through -- apply_sriov interpolates pf_name directly into a sysfs
+    // path (/sys/class/net/{pf_name}/device/sriov_numvfs), and "/" isn't
+    // allowed so this can't escape further than one directory, but reject
+    // it outright anyway since it's never a real interface name.
+    if req.pf_name.chars().all(|c| c == '.') {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid PF name: must be a real interface name, not '.' or '..'",
+        )
+        .into_response();
+    }
     let now = Utc::now().to_rfc3339();
     let cfg = SriovConfig {
         id: Uuid::new_v4().to_string(),

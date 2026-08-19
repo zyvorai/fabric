@@ -43,3 +43,42 @@ export async function assignFloatingIp(id: string, vmName: string): Promise<Floa
 export async function unassignFloatingIp(id: string): Promise<FloatingIp> {
   return apiPost<FloatingIp>(`${API_BASE}/floating-ips/${id}/unassign`, {})
 }
+
+// ─── Per-bridge DHCP server ──────────────────────────────────────────────────
+
+export interface DhcpServerConfig {
+  id: string
+  bridge: string
+  pool_offset: number
+  pool_size: number
+  default_lease_time_sec: number
+  max_lease_time_sec: number
+  dns_servers: string[]
+  gateway?: string | null
+  domain?: string | null
+  enabled: boolean
+  created: string
+}
+
+export interface CreateDhcpServerRequest {
+  bridge: string
+  pool_offset?: number
+  pool_size?: number
+  default_lease_time_sec?: number
+  max_lease_time_sec?: number
+  dns_servers?: string[]
+  gateway?: string
+  domain?: string
+}
+
+export async function listDhcpServers(): Promise<DhcpServerConfig[]> {
+  return apiGet<DhcpServerConfig[]>(`${API_BASE}/dhcp-servers`)
+}
+
+export async function createDhcpServer(req: CreateDhcpServerRequest): Promise<DhcpServerConfig> {
+  return apiPost<DhcpServerConfig>(`${API_BASE}/dhcp-servers`, req)
+}
+
+export async function deleteDhcpServer(id: string): Promise<void> {
+  return apiDelete(`${API_BASE}/dhcp-servers/${id}`)
+}

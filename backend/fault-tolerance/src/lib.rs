@@ -951,6 +951,25 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::PoolDriver for MockDriver {
+        async fn create_pool(&self, _name: &str, _size: usize, _image: &str, _cpus: u32, _memory: u64) -> Result<zyvor_fabric_driver_core::PoolInfo> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn list_pools(&self) -> Result<Vec<zyvor_fabric_driver_core::PoolInfo>> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn get_pool(&self, _name: &str) -> Result<zyvor_fabric_driver_core::PoolInfo> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn delete_pool(&self, _name: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn claim_pool(&self, _pool_name: &str, _new_name: &str, _ttl_seconds: Option<u64>) -> Result<vm_model::VM> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
     impl zyvor_fabric_driver_core::CapabilityProvider for MockDriver {
         fn backend_name(&self) -> &'static str {
             "mock"

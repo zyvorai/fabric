@@ -6,14 +6,17 @@ use anyhow::{bail, Context, Result};
 use futures::TryStreamExt;
 use netlink_packet_route::address::{AddressAttribute, AddressScope};
 use netlink_packet_route::link::{
-    BondMode as NlBondMode, InfoKind, LinkAttribute, LinkFlags, LinkInfo, LinkLayerType,
-    MacVtapMode as NlMacVtapMode,
+    BondMode as NlBondMode, InfoBridge, InfoData, InfoKind, LinkAttribute, LinkFlags, LinkInfo,
+    LinkLayerType, MacVtapMode as NlMacVtapMode,
 };
 use netlink_packet_route::AddressFamily;
-use rtnetlink::{LinkBond, LinkBridge, LinkMacVtap, LinkUnspec, LinkVlan, LinkVxlan, LinkWireguard};
+use rtnetlink::{
+    LinkBond, LinkBridge, LinkMacVtap, LinkUnspec, LinkVlan, LinkVxlan, LinkWireguard,
+    RouteMessageBuilder,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// Network interface information retrieved via netlink.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -461,6 +464,43 @@ pub async fn set_mac_address(iface: &str, mac: &str) -> Result<()> {
         .execute()
         .await
         .with_context(|| format!("failed to set mac address {mac} on '{iface}'"))
+}
+
+/// Enable/disable STP on a bridge — `ip link set <iface> type bridge
+/// stp_state <0|1>`. Reuses the `LinkBridge` builder (same one
+/// `create_bridge` uses) rather than `LinkUnspec` so the message carries
+/// `IFLA_INFO_KIND=bridge` alongside the STP attribute, matching what
+/// iproute2 itself sends for a `type bridge ...` modify.
+pub async fn set_bridge_stp(iface: &str, enable: bool) -> Result<()> {
+    let handle = connect().await?;
+    handle
+        .link()
+        .set(
+            LinkBridge::new(iface)
+                .set_info_data(InfoData::Bridge(vec![InfoBridge::StpState(if enable { 1 } else { 0 })]))
+                .build(),
+        )
+        .execute()
+        .await
+        .with_context(|| format!("failed to set STP={enable} on '{iface}'"))
+}
+
+/// Add a default route (0.0.0.0/0 or ::/0, depending on `gateway`'s
+/// family) via `gateway`, egressing through `iface` — `ip route add
+/// default via <gateway> dev <iface>`.
+pub async fn add_default_route(iface: &str, gateway: IpAddr) -> Result<()> {
+    let handle = connect().await?;
+    let index = link_index_by_name(&handle, iface).await?;
+    let route = match gateway {
+        IpAddr::V4(addr) => RouteMessageBuilder::<Ipv4Addr>::new().gateway(addr).output_interface(index).build(),
+        IpAddr::V6(addr) => RouteMessageBuilder::<Ipv6Addr>::new().gateway(addr).output_interface(index).build(),
+    };
+    handle
+        .route()
+        .add(route)
+        .execute()
+        .await
+        .with_context(|| format!("failed to add default route via {gateway} on '{iface}'"))
 }
 
 /// Rename `iface` — `ip link set <iface> name <new_name>`. The interface

@@ -3,22 +3,26 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, Router, Trash2 } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { BridgeConfig, CreateBridgeRequest } from '../../api/networkd'
+import * as cloudApi from '../../api/network-cloud'
+import type { DhcpServerConfig, CreateDhcpServerRequest } from '../../api/network-cloud'
 import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface BridgesTabProps {
   bridges: BridgeConfig[]
+  dhcpServers: DhcpServerConfig[]
   onDelete: (id: string) => void
   onAdopt: (id: string) => void
   onCreate: () => void
   onEdit: (b: BridgeConfig) => void
+  onConfigureDhcp: (b: BridgeConfig) => void
 }
 
-function BridgesTabContent({ bridges, onDelete, onAdopt, onCreate, onEdit }: BridgesTabProps) {
+function BridgesTabContent({ bridges, dhcpServers, onDelete, onAdopt, onCreate, onEdit, onConfigureDhcp }: BridgesTabProps) {
   const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -74,6 +78,11 @@ function BridgesTabContent({ bridges, onDelete, onAdopt, onCreate, onEdit }: Bri
                       {!readOnly && !isHostManaged(b) && (
                         <button onClick={() => onEdit(b)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Edit bridge" type="button">
                           <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      {!readOnly && !isHostManaged(b) && (
+                        <button onClick={() => onConfigureDhcp(b)} className="p-2 hover:bg-white/[0.06] rounded transition" title={dhcpServers.some(d => d.bridge === b.name) ? 'DHCP server configured' : 'Configure DHCP server'} type="button">
+                          <Router className={`w-4 h-4 ${dhcpServers.some(d => d.bridge === b.name) ? 'text-green-400' : ''}`} />
                         </button>
                       )}
                       <HostManagedActions readOnly={readOnly} item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
@@ -185,6 +194,108 @@ export function EditBridgeModal({ bridge, onClose, onUpdated }: { bridge: Bridge
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+/// Configures (or removes) the DHCP server for one bridge -- one dnsmasq
+/// instance per bridge, handing out leases plus (via zone_hosts_dir on the
+/// backend) serving DNS Zone/Policy records to anything on that bridge.
+/// There's no update endpoint, only create/delete, so an existing config
+/// shows as read-only with a Remove action rather than an edit form.
+export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDeleted }: {
+  bridge: BridgeConfig
+  existing: DhcpServerConfig | null
+  onClose: () => void
+  onCreated: (d: DhcpServerConfig) => void
+  onDeleted: (id: string) => void
+}) {
+  const defaultGateway = bridge.addresses[0]?.split('/')[0] ?? ''
+  const [gateway, setGateway] = useState(existing?.gateway ?? defaultGateway)
+  const [poolOffset, setPoolOffset] = useState(String(existing?.pool_offset ?? 100))
+  const [poolSize, setPoolSize] = useState(String(existing?.pool_size ?? 100))
+  const [dnsServers, setDnsServers] = useState((existing?.dns_servers ?? []).join(', '))
+  const [domain, setDomain] = useState(existing?.domain ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleSubmit = async () => {
+    if (!gateway.trim()) { setErr('Gateway is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateDhcpServerRequest = {
+        bridge: bridge.name,
+        gateway: gateway.trim(),
+        pool_offset: parseInt(poolOffset) || 100,
+        pool_size: parseInt(poolSize) || 100,
+        dns_servers: dnsServers ? dnsServers.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        domain: domain.trim() || undefined,
+      }
+      const created = await cloudApi.createDhcpServer(req)
+      onCreated(created)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!existing) return
+    setSubmitting(true)
+    setErr('')
+    try {
+      await cloudApi.deleteDhcpServer(existing.id)
+      onDeleted(existing.id)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+      setSubmitting(false)
+    }
+  }
+
+  if (existing) {
+    return (
+      <ModalWrapper title={`DHCP Server — ${bridge.name}`} onClose={onClose}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">
+            This bridge's dnsmasq instance hands out leases in{' '}
+            <span className="font-mono text-slate-300">{existing.gateway?.split('.').slice(0, 3).join('.')}.{existing.pool_offset}–{existing.pool_offset + existing.pool_size - 1}</span>
+            {' '}and also serves DNS Zone/Policy records to anything on this bridge.
+          </p>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><div className="text-slate-500 text-xs mb-1">Gateway</div><div className="font-mono">{existing.gateway ?? '—'}</div></div>
+            <div><div className="text-slate-500 text-xs mb-1">Lease time</div><div>{existing.default_lease_time_sec}s</div></div>
+            <div><div className="text-slate-500 text-xs mb-1">DNS servers</div><div className="font-mono">{existing.dns_servers.join(', ') || '—'}</div></div>
+            <div><div className="text-slate-500 text-xs mb-1">Domain</div><div>{existing.domain ?? '—'}</div></div>
+          </div>
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          <button onClick={handleDelete} disabled={submitting} className="w-full flex items-center justify-center gap-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 disabled:opacity-50 py-2 px-4 rounded-lg transition">
+            <Trash2 className="w-4 h-4" /> {submitting ? 'Removing...' : 'Remove DHCP Server'}
+          </button>
+        </div>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title={`Configure DHCP — ${bridge.name}`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-400">
+          Starts a dnsmasq instance bound to this bridge, handing out leases and serving DNS Zone/Policy records to VMs on it.
+        </p>
+        <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder={defaultGateway || '10.0.0.1'} />
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Pool Start Offset" value={poolOffset} onChange={setPoolOffset} placeholder="100" type="number" />
+          <InputField label="Pool Size" value={poolSize} onChange={setPoolSize} placeholder="100" type="number" />
+        </div>
+        <InputField label="DNS Servers (comma-separated, optional)" value={dnsServers} onChange={setDnsServers} placeholder="defaults to this bridge's own gateway" />
+        <InputField label="Domain (optional)" value={domain} onChange={setDomain} placeholder="vms.local" />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Starting...' : 'Start DHCP Server'}
         </button>
       </div>
     </ModalWrapper>
