@@ -13,7 +13,7 @@ REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/deploy-common.sh"
 
 SSH_PORT="${SSH_PORT:-22}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9095/health}"
+HEALTH_URL="${HEALTH_URL:-https://127.0.0.1:9095/health}"
 STRICT="${STRICT:-0}"
 API_PORT="${API_PORT:-9095}"
 
@@ -63,11 +63,16 @@ deploy-remote.sh check [USER@HOST | USER HOST]
 Flow: rsync → ~/zyvor-fabric (or DEPLOY_DIR) → build on server → install → systemd → web.
 Full install: system deps + cargo build + systemd + dashboard.
 Quick: skip system deps (rsync + build + install + web).
-Open the UI at http://HOST:9095 (config listens on 0.0.0.0 for remote IPv4 deploys).
+Open the UI at https://HOST:9095 (self-signed cert by default; config listens on 0.0.0.0 for remote IPv4 deploys).
 
 --remote-build   After rsync+chown, run `cargo build --release -p zyvor-fabricd -p zyvorctl` only.
 --remote-check   Same but `cargo check` (faster compile smoke).
 --uninstall      Stop service, remove binaries/units; keeps /var/lib/zyvor-fabricd data.
+
+Vendor binaries (guestkit-agent-cli, zyvor-guest-agent, ephemera-guest-agent)
+live outside this repo's build and are NOT rebuilt by this script -- run
+./scripts/build-vendor-binaries.sh USER@HOST after changing guestkit or
+Ephemera's guest-agent source.
 
 Auth: SSH keys/agent by default; optional PASSWORD arg or SSHPASS env → sshpass.
 
@@ -174,14 +179,14 @@ run() {
     systemctl status zyvor-fabricd --no-pager 2>/dev/null || warn "cannot read zyvor-fabricd status"
     printf '\n💚 %s\n' "$HEALTH_URL"
     if command -v curl &>/dev/null; then
-        curl -sf --connect-timeout 3 "$HEALTH_URL" >/dev/null && ok "GET $HEALTH_URL" || warn "cannot reach $HEALTH_URL"
+        curl -skf --connect-timeout 3 "$HEALTH_URL" >/dev/null && ok "GET $HEALTH_URL" || warn "cannot reach $HEALTH_URL"
     else
         warn "curl missing — skip HTTP check"
     fi
     ctl="${REMOTE_DIR:-$HOME/zyvor-fabric}/zyvor-fabricd-ctl"
     if [[ -x "$ctl" ]]; then
         printf '\n🧪 zyvor-fabricd-ctl verify\n'
-        ZYVOR_FABRICD_URL="http://127.0.0.1:${API_PORT}" "$ctl" verify 2>/dev/null && ok "verify passed" || warn "verify failed (check admin password / service logs)"
+        ZYVOR_FABRICD_URL="https://127.0.0.1:${API_PORT}" "$ctl" verify 2>/dev/null && ok "verify passed" || warn "verify failed (check admin password / service logs)"
     fi
     printf '\n'
 }
@@ -275,7 +280,7 @@ if [[ -z "$BIND" ]] && [[ "$HOST" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] && [[ "$HO
     tip "Remote IPv4 deploy: using --bind 0.0.0.0 --open-firewall (override with --bind 127.0.0.1)"
 fi
 
-HEALTH_URL="${HEALTH_URL/http:\/\/127.0.0.1/http://${HOST}}"
+HEALTH_URL="${HEALTH_URL/127.0.0.1/${HOST}}"
 
 [[ -f "$REPO/backend/Cargo.toml" ]] || die "run from zyvor-fabric repo root"
 [[ -n "${SSHPASS:-}" ]] && ! command -v sshpass &>/dev/null && die "install sshpass for password auth"
@@ -447,11 +452,18 @@ if ! $QUICK; then
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
-if command -v dnf &>/dev/null; then
+DISTRO_ID=\"\$(. /etc/os-release 2>/dev/null && echo \"\$ID\")\"
+IS_APT=0
+if [[ \"\$DISTRO_ID\" == debian || \"\$DISTRO_ID\" == ubuntu ]] && command -v apt-get &>/dev/null; then
+    \$SUDO apt-get update -qq
+    PKG=\"\$SUDO apt-get -y install\"
+    IS_APT=1
+elif command -v dnf &>/dev/null; then
     PKG=\"\$SUDO dnf -y install\"
 elif command -v apt-get &>/dev/null; then
     \$SUDO apt-get update -qq
     PKG=\"\$SUDO apt-get -y install\"
+    IS_APT=1
 else
     echo 'ERROR: no package manager found' >&2
     exit 1
@@ -459,10 +471,15 @@ fi
 if ! command -v cargo &>/dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 fi
-\$PKG systemd-container qemu-img 2>&1 | tail -3
-\$PKG gcc openssl-devel pam-devel dbus-devel systemd-devel clang-devel 2>&1 | tail -1 || true
-\$PKG gcc libssl-dev libpam0g-dev libdbus-1-dev libsystemd-dev clang 2>&1 | tail -1 || true
-\$PKG qemu-system-x86 edk2-ovmf 2>&1 | tail -1 || true
+if [ \"\$IS_APT\" = 1 ]; then
+    \$PKG systemd-container qemu-utils 2>&1 | tail -3
+    \$PKG gcc libssl-dev libpam0g-dev libdbus-1-dev libsystemd-dev clang 2>&1 | tail -1 || true
+    \$PKG qemu-system-x86 ovmf 2>&1 | tail -1 || true
+else
+    \$PKG systemd-container qemu-img 2>&1 | tail -3
+    \$PKG gcc openssl-devel pam-devel dbus-devel systemd-devel clang-devel 2>&1 | tail -1 || true
+    \$PKG qemu-system-x86 edk2-ovmf 2>&1 | tail -1 || true
+fi
 echo 'System deps installed'
 " || die "system deps install failed"
     ok "System dependencies installed"
@@ -602,7 +619,7 @@ vmspawn_save_deploy_last "$REPO" "$HOST" "$USER" "$MODE_SAVE"
 deploy_ui_highlight "📋 Post-deploy checklist"
 deploy_ui_checklist "zyvor-fabricd" "$(ssh_r_bash "$REMOTE" 'systemctl is-active zyvor-fabricd 2>/dev/null || echo unknown' | tr -d '\r')"
 deploy_ui_checklist "machined" "$(ssh_r_bash "$REMOTE" 'systemctl is-active systemd-machined 2>/dev/null || echo unknown' | tr -d '\r')"
-deploy_ui_checklist "health" "$(curl -sf --connect-timeout 5 "http://${HOST}:${API_PORT}/health" >/dev/null && echo 200 || echo fail)"
+deploy_ui_checklist "health" "$(curl -skf --connect-timeout 5 "https://${HOST}:${API_PORT}/health" >/dev/null && echo 200 || echo fail)"
 
 deploy_ui_celebrate "Ship it!"
 vmspawn_print_success "$HOST" "$ELAPSED" "$USER"
@@ -613,7 +630,7 @@ tip "HOST USER also works: ./scripts/deploy-remote.sh ${HOST} ${USER} --quick"
 
 if $RUN_E2E; then
     deploy_ui_highlight "🧪 Post-deploy E2E"
-    if ssh_r_bash "$REMOTE" "ZYVOR_FABRICD_URL=http://127.0.0.1:${API_PORT} ${REMOTE_DIR}/zyvor-fabricd-ctl verify"; then
+    if ssh_r_bash "$REMOTE" "ZYVOR_FABRICD_URL=https://127.0.0.1:${API_PORT} ${REMOTE_DIR}/zyvor-fabricd-ctl verify"; then
         deploy_ui_celebrate "E2E passed"
     else
         warn "E2E failed (deploy itself succeeded)"

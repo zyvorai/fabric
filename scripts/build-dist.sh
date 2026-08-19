@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# scripts/build-dist.sh — build a self-contained customer distribution
+# tar.gz: prebuilt zyvor-fabric + Ephemera (+ guestkit vendor agents)
+# binaries, web dashboard, configs, systemd units, and an offline
+# install.sh. No cargo/npm/rustc required on the customer's machine to
+# install it — only to build it here.
+#
+# This repo can't produce Linux binaries on macOS, so the actual `cargo
+# build --release` runs on a remote Linux host over SSH (reuses the same
+# source trees build-vendor-binaries.sh expects: ~/zyvor-fabric,
+# ~/Ephemera, ~/guestkit). The finished tar.gz is pulled back to this
+# machine under dist/.
+#
+# Usage: scripts/build-dist.sh user@host [version]
+#   EPHEMERA_LOCAL=/path/to/Ephemera   (default: ../Ephemera next to this repo)
+#   GUESTKIT_LOCAL=/path/to/guestkit   (default: ../guestkit next to this repo)
+#   EPHEMERA_DIR=~/Ephemera            (remote checkout path)
+#   GUESTKIT_DIR=~/guestkit            (remote checkout path)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/deploy-common.sh
+source "$SCRIPT_DIR/lib/deploy-common.sh"
+
+info() { deploy_ui_info_b "$@"; }
+ok()   { deploy_ui_info "$@"; }
+warn() { deploy_ui_warn "$@"; }
+die()  { deploy_ui_error "$@"; }
+phase() { deploy_ui_phase "$@"; }
+
+REMOTE="${1:-}"
+[[ -z "$REMOTE" ]] && die "Usage: $0 user@host [version]"
+shift || true
+VERSION="${1:-$(grep -m1 '^version' "$REPO/backend/Cargo.toml" | sed -E 's/.*"([^"]+)".*/\1/')}"
+VERSION="${VERSION:-0.0.0}"
+
+EPHEMERA_LOCAL="${EPHEMERA_LOCAL:-$REPO/../Ephemera}"
+GUESTKIT_LOCAL="${GUESTKIT_LOCAL:-$REPO/../guestkit}"
+[[ -d "$EPHEMERA_LOCAL" ]] || die "Ephemera source not found at $EPHEMERA_LOCAL (set EPHEMERA_LOCAL=)"
+[[ -d "$GUESTKIT_LOCAL" ]] || die "guestkit source not found at $GUESTKIT_LOCAL (set GUESTKIT_LOCAL=)"
+
+RSYNC_EXCLUDES=(--exclude='.git' --exclude='target/' --exclude='node_modules/' --exclude='web/dist/')
+
+deploy_ui_banner "Build distribution package → ${REMOTE}" "zyvor-fabric v${VERSION}"
+deploy_ui_kv "🎯" "Build host" "$REMOTE"
+deploy_ui_kv "📦" "Bundles" "zyvor-fabric + Ephemera + guestkit vendor agents"
+
+phase 1 6 "Sync source trees to build host" "zyvor-fabric · Ephemera · guestkit"
+ssh "$REMOTE" 'mkdir -p ~/zyvor-fabric ~/Ephemera ~/guestkit'
+rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e ssh "$REPO/" "$REMOTE:zyvor-fabric/"
+rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e ssh "$EPHEMERA_LOCAL/" "$REMOTE:Ephemera/"
+rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e ssh "$GUESTKIT_LOCAL/" "$REMOTE:guestkit/"
+ok "Sources synced"
+
+phase 2 6 "Build zyvor-fabric (release)" "zyvor-fabricd · zyvorctl"
+ssh "$REMOTE" bash -s <<'EOS'
+set -euo pipefail
+export PATH="${HOME}/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:${PATH}"
+cd ~/zyvor-fabric/backend
+cargo build --release -p zyvor-fabricd -p zyvorctl
+echo "  built zyvor-fabricd, zyvorctl"
+echo "  (zyvorctl-tui skipped: crate does not currently compile)"
+EOS
+ok "zyvor-fabric built"
+
+phase 3 6 "Build Ephemera (release + musl guest agent)" "ephemera · ephemera-guest-agent"
+ssh "$REMOTE" bash -s <<'EOS'
+set -euo pipefail
+export PATH="${HOME}/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:${PATH}"
+cd ~/Ephemera
+cargo build --release --bin ephemera
+rustup target add x86_64-unknown-linux-musl 2>/dev/null || true
+cargo build --release -p ephemera-guest-agent --target x86_64-unknown-linux-musl
+echo "  built ephemera, ephemera-guest-agent (musl)"
+EOS
+ok "Ephemera built"
+
+phase 4 6 "Build guestkit vendor agents (agent feature)" "guestkit-agent-cli · zyvor-guest-agent"
+ssh "$REMOTE" bash -s <<'EOS'
+set -euo pipefail
+export PATH="${HOME}/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:${PATH}"
+if [ -z "${LIBCLANG_PATH:-}" ] && command -v llvm-config >/dev/null 2>&1; then
+    _maj="$(llvm-config --version 2>/dev/null | cut -d. -f1 || true)"
+    [ -n "$_maj" ] && [ -d "/usr/lib64/llvm${_maj}/lib64" ] && export LIBCLANG_PATH="/usr/lib64/llvm${_maj}/lib64"
+fi
+cd ~/guestkit
+cargo build --release --features agent --bin guestkit --bin zyvor-guest-agent
+echo "  built guestkit (agent feature), zyvor-guest-agent"
+EOS
+ok "guestkit vendor agents built"
+
+phase 5 6 "Build web dashboard" "npm install · npm run build"
+ssh "$REMOTE" bash -s <<'EOS'
+set -euo pipefail
+export PATH="${HOME}/.cargo/bin:/usr/local/bin:/usr/bin:${PATH}"
+cd ~/zyvor-fabric/web
+npm install --silent
+npm run build
+EOS
+ok "Web dashboard built"
+
+phase 6 6 "Stage package and create tar.gz" "bin/ vendor/ web/ configs/ systemd/ install.sh"
+ARCH="$(ssh "$REMOTE" uname -m)"
+PKG="zyvor-fabric-${VERSION}-linux-${ARCH}"
+ssh "$REMOTE" bash -s <<EOS
+set -euo pipefail
+STAGE=~/dist-stage/${PKG}
+rm -rf "\$STAGE"
+mkdir -p "\$STAGE"/{bin,vendor,web,configs/pam.d,configs/modules-load.d,configs/logrotate.d,systemd}
+
+cp ~/zyvor-fabric/backend/target/release/zyvor-fabricd "\$STAGE/bin/"
+cp ~/zyvor-fabric/backend/target/release/zyvorctl "\$STAGE/bin/"
+[ -f ~/zyvor-fabric/backend/target/release/zyvorctl-tui ] && cp ~/zyvor-fabric/backend/target/release/zyvorctl-tui "\$STAGE/bin/"
+cp ~/Ephemera/target/release/ephemera "\$STAGE/bin/"
+
+cp ~/guestkit/target/release/guestkit "\$STAGE/vendor/guestkit-agent-cli"
+cp ~/guestkit/target/release/zyvor-guest-agent "\$STAGE/vendor/zyvor-guest-agent"
+cp ~/Ephemera/target/x86_64-unknown-linux-musl/release/ephemera-guest-agent "\$STAGE/vendor/ephemera-guest-agent"
+[ -f ~/Ephemera/systemd/ephemera-guest-agent.service ] && cp ~/Ephemera/systemd/ephemera-guest-agent.service "\$STAGE/vendor/"
+
+cp -r ~/zyvor-fabric/web/dist/* "\$STAGE/web/"
+
+cp ~/zyvor-fabric/configs/zyvor-fabricd.toml "\$STAGE/configs/"
+cp ~/zyvor-fabric/configs/zyvor-fabricd.env "\$STAGE/configs/"
+cp ~/zyvor-fabric/configs/pam.d/zyvor-fabricd "\$STAGE/configs/pam.d/"
+cp ~/zyvor-fabric/configs/modules-load.d/zyvor-fabricd.conf "\$STAGE/configs/modules-load.d/"
+cp ~/zyvor-fabric/configs/logrotate.d/zyvor-fabricd "\$STAGE/configs/logrotate.d/"
+cp ~/Ephemera/config.example.toml "\$STAGE/configs/ephemera.toml"
+
+cp ~/zyvor-fabric/systemd/zyvor-fabricd.service "\$STAGE/systemd/"
+cp ~/Ephemera/systemd/ephemera.service "\$STAGE/systemd/"
+
+echo "${VERSION}" > "\$STAGE/VERSION"
+
+chmod 755 "\$STAGE"/bin/* "\$STAGE"/vendor/guestkit-agent-cli "\$STAGE"/vendor/zyvor-guest-agent "\$STAGE"/vendor/ephemera-guest-agent
+EOS
+
+rsync -az -e ssh "$SCRIPT_DIR/dist-install.sh" "$REMOTE:dist-stage/${PKG}/install.sh"
+ssh "$REMOTE" "chmod +x ~/dist-stage/${PKG}/install.sh && tar czf ~/dist-stage/${PKG}.tar.gz -C ~/dist-stage ${PKG} && sha256sum ~/dist-stage/${PKG}.tar.gz"
+
+mkdir -p "$REPO/dist"
+scp "$REMOTE:dist-stage/${PKG}.tar.gz" "$REPO/dist/"
+
+ok "Package ready: dist/${PKG}.tar.gz"
+shasum -a 256 "$REPO/dist/${PKG}.tar.gz" 2>/dev/null || sha256sum "$REPO/dist/${PKG}.tar.gz"

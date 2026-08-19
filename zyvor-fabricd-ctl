@@ -31,7 +31,7 @@ NC='\033[0m'
 
 # ── Globals ─────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-API_URL="${ZYVOR_FABRICD_URL:-http://127.0.0.1:9095}"
+API_URL="${ZYVOR_FABRICD_URL:-https://127.0.0.1:9095}"
 TOKEN=""
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -421,7 +421,7 @@ cmd_verify() {
     # 2. Check API responds
     info "Checking API..."
     local http_code
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/vms" --max-time 5 2>/dev/null) || http_code="000"
+    http_code=$(curl -sk -o /dev/null -w "%{http_code}" "$API_URL/api/vms" --max-time 5 2>/dev/null) || http_code="000"
     if [[ "$http_code" =~ ^(200|401)$ ]]; then
         ok "API responding (HTTP $http_code)"
     else
@@ -435,7 +435,7 @@ cmd_verify() {
     if [[ -f "$pw_file" ]]; then
         local password token
         password=$(sudo cat "$pw_file" 2>/dev/null || cat "$pw_file" 2>/dev/null)
-        token=$(curl -sf "$API_URL/api/auth/login" \
+        token=$(curl -skf "$API_URL/api/auth/login" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg p "$password" '{"username":"admin","password":$p}')" \
             --max-time 5 2>/dev/null | jq -r '.token // empty')
@@ -446,7 +446,7 @@ cmd_verify() {
             # 4. Test VM list endpoint
             info "Checking VM list..."
             local vm_response
-            vm_response=$(curl -sf "$API_URL/api/vms" \
+            vm_response=$(curl -skf "$API_URL/api/vms" \
                 -H "Authorization: Bearer $token" \
                 --max-time 5 2>/dev/null)
             if [[ -n "$vm_response" ]]; then
@@ -462,7 +462,7 @@ cmd_verify() {
             info "Testing VM create/delete..."
             local test_name="verify-$(date +%s)"
             local create_code
-            create_code=$(curl -sf -o /dev/null -w "%{http_code}" "$API_URL/api/vms" \
+            create_code=$(curl -skf -o /dev/null -w "%{http_code}" "$API_URL/api/vms" \
                 -H "Authorization: Bearer $token" \
                 -H "Content-Type: application/json" \
                 -d "{\"name\":\"$test_name\",\"image\":\"/var/lib/zyvor-fabricd/images/test.qcow2\",\"cpus\":1,\"memory\":512}" \
@@ -471,7 +471,7 @@ cmd_verify() {
             if [[ "$create_code" =~ ^(200|201)$ ]]; then
                 ok "VM create: HTTP $create_code"
                 # Clean up
-                curl -sf -X DELETE "$API_URL/api/vms/$test_name" \
+                curl -skf -X DELETE "$API_URL/api/vms/$test_name" \
                     -H "Authorization: Bearer $token" \
                     --max-time 5 -o /dev/null 2>/dev/null
                 ok "VM delete: cleaned up"
@@ -482,7 +482,7 @@ cmd_verify() {
             # 6. Test backup endpoint
             info "Checking backup API..."
             local backup_code
-            backup_code=$(curl -sf -o /dev/null -w "%{http_code}" "$API_URL/api/backups" \
+            backup_code=$(curl -skf -o /dev/null -w "%{http_code}" "$API_URL/api/backups" \
                 -H "Authorization: Bearer $token" \
                 --max-time 5 2>/dev/null) || backup_code="000"
             if [[ "$backup_code" == "200" ]]; then
@@ -899,7 +899,7 @@ api_login() {
 
     local payload
     payload=$(jq -n --arg p "$password" '{"username":"admin","password":$p}')
-    TOKEN=$(curl -sf "$API_URL/api/auth/login" \
+    TOKEN=$(curl -skf "$API_URL/api/auth/login" \
         -H "Content-Type: application/json" \
         -d "$payload" | jq -r '.token // empty')
 
@@ -913,7 +913,7 @@ api_login() {
 api() {
     local method="$1" path="$2"
     shift 2
-    curl -sf "$API_URL$path" \
+    curl -skf "$API_URL$path" \
         -X "$method" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
@@ -941,7 +941,7 @@ cmd_demo() {
     echo ""
 
     # Check zyvor-fabricd is running
-    if ! curl -sf "$API_URL/health" &>/dev/null; then
+    if ! curl -skf "$API_URL/health" &>/dev/null; then
         err "zyvor-fabricd is not running at $API_URL"
         info "Start it with: ${BOLD}sudo ./zyvorctl start${NC}"
         exit 1
@@ -964,7 +964,7 @@ cmd_demo() {
 
     echo ""
     info "GET /health"
-    curl -sf "$API_URL/health"
+    curl -skf "$API_URL/health"
     echo ""
 
     demo_pause
@@ -1118,7 +1118,7 @@ cmd_help() {
     echo "  ./zyvor-fabricd-ctl deploy          # Does everything in one command"
     echo ""
     echo -e "${BOLD}Environment:${NC}"
-    echo "  ZYVOR_FABRICD_URL    API URL (default: http://127.0.0.1:9095)"
+    echo "  ZYVOR_FABRICD_URL    API URL (default: https://127.0.0.1:9095)"
     echo ""
 }
 
