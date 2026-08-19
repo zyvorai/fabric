@@ -467,19 +467,38 @@ pub async fn set_mac_address(iface: &str, mac: &str) -> Result<()> {
 }
 
 /// Enable/disable STP on a bridge — `ip link set <iface> type bridge
-/// stp_state <0|1>`. Reuses the `LinkBridge` builder (same one
-/// `create_bridge` uses) rather than `LinkUnspec` so the message carries
-/// `IFLA_INFO_KIND=bridge` alongside the STP attribute, matching what
-/// iproute2 itself sends for a `type bridge ...` modify.
+/// stp_state <0|1>`. Found live via a byte-for-byte strace comparison
+/// against `ip link set ... type bridge stp_state 1` (confirmed working):
+/// iproute2 sends this as `RTM_NEWLINK` targeting the *existing* ifindex
+/// (with `IFLA_INFO_KIND=bridge` alongside `IFLA_INFO_DATA`), not
+/// `RTM_SETLINK` -- rtnetlink's own `.link().set(...)` (RTM_SETLINK)
+/// happily ACKs the same message with error=0, and top-level attributes
+/// (mtu/mac/up) genuinely do apply through it, but the kernel never
+/// actually invokes the bridge driver's changelink path for nested
+/// `IFLA_INFO_DATA` attributes that way -- stp_state silently never
+/// changes despite the clean ACK.
+///
+/// The flags matter too: iproute2's message carries plain
+/// `NLM_F_REQUEST|NLM_F_ACK` only. `.link().add(...)` defaults to
+/// `NLM_F_CREATE|NLM_F_EXCL` and `.replace()` swaps that for
+/// `NLM_F_CREATE|NLM_F_REPLACE` -- both tried live, both got rejected
+/// with `EOPNOTSUPP` (os error 95): the kernel's RTM_NEWLINK handler
+/// only calls the bridge driver's changelink for an *existing* device
+/// when neither CREATE flag is set. `set_flags` overrides to exactly
+/// iproute2's flag set (hardcoded rather than pulling in
+/// netlink-packet-core as a direct dependency just for two constants:
+/// NLM_F_REQUEST=1, NLM_F_ACK=4).
 pub async fn set_bridge_stp(iface: &str, enable: bool) -> Result<()> {
+    const NLM_F_REQUEST_ACK: u16 = 1 | 4;
     let handle = connect().await?;
     handle
         .link()
-        .set(
+        .add(
             LinkBridge::new(iface)
                 .set_info_data(InfoData::Bridge(vec![InfoBridge::StpState(if enable { 1 } else { 0 })]))
                 .build(),
         )
+        .set_flags(NLM_F_REQUEST_ACK)
         .execute()
         .await
         .with_context(|| format!("failed to set STP={enable} on '{iface}'"))

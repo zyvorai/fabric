@@ -12,14 +12,26 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 async fn main() -> Result<()> {
     // Initialize tracing with ZYVOR_FABRICD_LOG_LEVEL or RUST_LOG support
     // Priority: ZYVOR_FABRICD_LOG_LEVEL > RUST_LOG > default (info)
-    // `EnvFilter` directive targets are Rust module paths, which use
-    // underscores even when the Cargo package name has hyphens — a
-    // `zyvor-fabricd=...` directive silently matches nothing.
+    //
+    // The directive used to be scoped to just `zyvor_fabricd=` (+
+    // `tower_http=`) -- since the workspace's dozens of other crates
+    // (networking, dns-policy, vm-firewall, packet-mirror, ...) all live
+    // under their own crate names, not `zyvor_fabricd::`, EVERY
+    // tracing::info!/warn!/error! call in any of them was silently
+    // dropped in production. Found live: a `tracing::info!` added to
+    // networking::lib.rs to debug a bridge STP issue never appeared in
+    // `journalctl -u zyvor-fabricd` at all, at any level. Default to
+    // `{level}` with no target prefix (applies workspace-wide, matching
+    // every first-party crate without having to enumerate them), and
+    // dial down the known-noisiest transport/runtime dependencies
+    // explicitly rather than trying to allowlist every first-party crate
+    // by name.
+    let noisy_deps = "h2=warn,hyper=warn,hyper_util=warn,tokio_util=warn,rustls=warn,want=warn,mio=warn";
     let env_filter = if let Ok(level) = std::env::var("ZYVOR_FABRICD_LOG_LEVEL") {
-        tracing_subscriber::EnvFilter::new(format!("zyvor_fabricd={level},tower_http={level}"))
+        tracing_subscriber::EnvFilter::new(format!("{level},{noisy_deps}"))
     } else {
         tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "zyvor_fabricd=info,tower_http=info".into())
+            .unwrap_or_else(|_| format!("info,{noisy_deps}").into())
     };
 
     tracing_subscriber::registry()

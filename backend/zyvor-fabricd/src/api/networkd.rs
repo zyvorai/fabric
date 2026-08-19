@@ -99,6 +99,14 @@ pub async fn create_bridge(
 
     let mgr = networkd_manager(&state);
     if let Err(e) = mgr.apply_bridge(&cfg) {
+        // `e.to_string()` (used for the client-facing error below) only
+        // shows the outermost `.with_context()` message -- anyhow drops
+        // the rest of the chain unless printed with `{:#}` or `{:?}`.
+        // Found live: a bridge-create failure logged nothing beyond
+        // "failed to create bridge 'X'" both to the client AND (before
+        // this line existed) to the server, with the actual root cause
+        // invisible anywhere.
+        tracing::error!(bridge = %cfg.name, error = %format!("{e:#}"), "Failed to apply bridge config");
         return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             .into_response();
     }
