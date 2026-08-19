@@ -69,6 +69,44 @@ pub(crate) async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpCl
     }
 }
 
+/// Number of empty `pcie-root-port` slots Ephemera reserves at boot for
+/// device hotplug (see `ephemera-qemu::HOTPLUG_PCIE_PORTS` -- this
+/// convention is mirrored here rather than shared as code, since the two
+/// talk over Ephemera's REST API, not a Rust dependency).
+const HOTPLUG_PCIE_PORTS: u8 = 4;
+
+/// `device_add` a PCI(e) device (NIC, extra disk) onto one of the
+/// pre-reserved hotplug root ports, trying each in turn. q35's root
+/// complex (`pcie.0`) itself refuses `device_add` outright -- found live:
+/// "Bus 'pcie.0' does not support hotplugging" -- every hotpluggable PCI(e)
+/// device needs an explicit target bus that supports it, and each root
+/// port holds exactly one device, so a previous hotplug (or several) may
+/// have already filled some of them.
+fn device_add_on_hotplug_bus(qmp: &QmpClient, mut device_args: serde_json::Value) -> Result<String, String> {
+    let mut last_err = String::from("no hotplug ports configured");
+    for i in 0..HOTPLUG_PCIE_PORTS {
+        let bus = format!("hotplug-pcie-{i}");
+        if let Some(obj) = device_args.as_object_mut() {
+            obj.insert("bus".to_string(), serde_json::json!(bus));
+        }
+        match qmp.execute("device_add", device_args.clone()) {
+            Ok(_) => return Ok(bus),
+            Err(e) => last_err = e.to_string(),
+        }
+    }
+    Err(format!(
+        "all {HOTPLUG_PCIE_PORTS} hotplug slots are full (last error: {last_err}) -- restart the VM to reclaim them"
+    ))
+}
+
+/// A short, unique-enough id for a QMP `node-name`/device `id`. QEMU caps
+/// block-node names at 31 bytes (`BDRV_NODE_NAME_MAX`) -- found live: the
+/// previous `format!("drive-hotplug-{}", Uuid::new_v4().simple())` was 46
+/// bytes and blockdev-add rejected it outright with "Node name too long".
+fn short_hotplug_id(prefix: &str) -> String {
+    format!("{prefix}-{}", &uuid::Uuid::new_v4().simple().to_string()[..8])
+}
+
 /// POST /api/vms/:name/hotplug/cpu - Hot-add vCPUs
 pub async fn hotplug_cpu(
     RequireWrite(_claims): RequireWrite,
@@ -257,8 +295,8 @@ pub async fn hotplug_disk(
         return not_available_response().into_response();
     };
 
-    let node_name = format!("drive-hotplug-{}", uuid::Uuid::new_v4().simple());
-    let device_id = format!("disk-hotplug-{}", uuid::Uuid::new_v4().simple());
+    let node_name = short_hotplug_id("drive-hotplug");
+    let device_id = short_hotplug_id("disk-hotplug");
 
     // Add block device
     let blockdev_args = serde_json::json!({
@@ -281,7 +319,10 @@ pub async fn hotplug_disk(
             .into_response();
     }
 
-    // Add device
+    // Add device. Only the PCI(e) default goes through a hotplug root
+    // port -- scsi-hd/ide-hd attach to a controller bus instead, which
+    // isn't declared in Ephemera's QEMU args at all (a separate,
+    // pre-existing gap, not something this fix addresses).
     let driver = match req.bus.as_str() {
         "scsi" => "scsi-hd",
         "ide" => "ide-hd",
@@ -294,7 +335,13 @@ pub async fn hotplug_disk(
         "drive": node_name,
     });
 
-    match qmp.execute("device_add", device_args) {
+    let result = if driver == "virtio-blk-pci" {
+        device_add_on_hotplug_bus(&qmp, device_args)
+    } else {
+        qmp.execute("device_add", device_args).map(|_| String::new()).map_err(|e| e.to_string())
+    };
+
+    match result {
         Ok(_) => {
             events::record_event(
                 &state,
@@ -377,8 +424,8 @@ pub async fn hotplug_nic(
         return not_available_response().into_response();
     };
 
-    let netdev_id = format!("net-hotplug-{}", uuid::Uuid::new_v4().simple());
-    let device_id = format!("nic-hotplug-{}", uuid::Uuid::new_v4().simple());
+    let netdev_id = short_hotplug_id("net-hotplug");
+    let device_id = short_hotplug_id("nic-hotplug");
 
     // Validate bridge name
     if let Err(msg) = crate::validation::validate_hostname(&req.bridge) {
@@ -423,14 +470,16 @@ pub async fn hotplug_nic(
         .into_response();
     }
 
-    // Add NIC device
+    // Add NIC device, onto one of the pre-reserved hotplug root ports --
+    // q35's root complex refuses device_add outright otherwise (see
+    // device_add_on_hotplug_bus's doc comment).
     let device_args = serde_json::json!({
         "driver": model,
         "id": device_id,
         "netdev": netdev_id,
     });
 
-    match qmp.execute("device_add", device_args) {
+    match device_add_on_hotplug_bus(&qmp, device_args) {
         Ok(_) => Json(serde_json::json!({
             "status": "ok",
             "device_id": device_id,
