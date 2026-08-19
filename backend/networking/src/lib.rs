@@ -73,7 +73,8 @@ impl NetworkdManager {
     /// notices instead of assuming they took effect.
     pub fn apply_bridge(&self, cfg: &BridgeConfig) -> Result<()> {
         block_on_netlink(netlink::create_bridge(&cfg.name))?;
-        self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses)?;
+        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses);
+        self.cleanup_on_failure(&cfg.name, result)?;
         if cfg.stp.is_some() || cfg.gateway.is_some() || cfg.dhcp != DhcpMode::No {
             tracing::warn!(
                 bridge = %cfg.name,
@@ -87,7 +88,8 @@ impl NetworkdManager {
     /// Create a VLAN sub-interface via netlink.
     pub fn apply_vlan(&self, cfg: &VlanConfig) -> Result<()> {
         block_on_netlink(netlink::create_vlan(&cfg.parent_interface, cfg.vlan_id, &cfg.name))?;
-        self.apply_common_link_settings(&cfg.name, cfg.mtu, None, &cfg.addresses)?;
+        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, None, &cfg.addresses);
+        self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!(
             "Applied VLAN config: {} (id={}, parent={})",
             cfg.name,
@@ -100,7 +102,8 @@ impl NetworkdManager {
     /// Create a macvtap device via netlink.
     pub fn apply_macvtap(&self, cfg: &MacvtapConfig) -> Result<()> {
         block_on_netlink(netlink::create_macvtap(&cfg.parent_interface, &cfg.name, cfg.mode.as_str()))?;
-        self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &[])?;
+        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &[]);
+        self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!(
             "Applied macvtap config: {} (parent={}, mode={:?})",
             cfg.name,
@@ -115,15 +118,19 @@ impl NetworkdManager {
     /// still shells out to `ip tuntap`).
     pub fn apply_tap(&self, cfg: &TapConfig) -> Result<()> {
         block_on_netlink(netlink::create_tap(&cfg.name))?;
-        self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &[])?;
-        if let Some(bridge) = &cfg.bridge {
-            block_on_netlink(async {
-                let handle = netlink::connect().await?;
-                let master_index = netlink::link_index_by_name(&handle, bridge).await?;
-                netlink::set_master(&cfg.name, master_index).await
-            })
-            .with_context(|| format!("failed to attach tap '{}' to bridge '{bridge}'", cfg.name))?;
-        }
+        let result: Result<()> = (|| {
+            self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &[])?;
+            if let Some(bridge) = &cfg.bridge {
+                block_on_netlink(async {
+                    let handle = netlink::connect().await?;
+                    let master_index = netlink::link_index_by_name(&handle, bridge).await?;
+                    netlink::set_master(&cfg.name, master_index).await
+                })
+                .with_context(|| format!("failed to attach tap '{}' to bridge '{bridge}'", cfg.name))?;
+            }
+            Ok(())
+        })();
+        self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!("Applied tap config: {}", cfg.name);
         Ok(())
     }
@@ -131,7 +138,8 @@ impl NetworkdManager {
     /// Create a bond device and enslave its members via netlink.
     pub fn apply_bond(&self, cfg: &BondConfig) -> Result<()> {
         block_on_netlink(netlink::create_bond(&cfg.name, cfg.mode.as_str(), &cfg.slave_interfaces))?;
-        self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses)?;
+        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses);
+        self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!(
             "Applied bond config: {} (mode={}, slaves={:?})",
             cfg.name,
@@ -191,17 +199,42 @@ impl NetworkdManager {
         let local = cfg.local.as_deref().and_then(parse_addr);
         let remote = cfg.remote.as_deref().and_then(parse_addr);
         block_on_netlink(netlink::create_vxlan(&cfg.name, cfg.vni, local, remote, cfg.port))?;
-        self.apply_common_link_settings(&cfg.name, cfg.mtu.map(|m| m as u16), None, &cfg.addresses)?;
-        if let Some(parent) = &cfg.parent_interface {
-            block_on_netlink(async {
-                let handle = netlink::connect().await?;
-                let parent_index = netlink::link_index_by_name(&handle, parent).await?;
-                netlink::set_master(&cfg.name, parent_index).await
-            })
-            .with_context(|| format!("failed to attach VXLAN '{}' to parent '{parent}'", cfg.name))?;
-        }
+        let result: Result<()> = (|| {
+            self.apply_common_link_settings(&cfg.name, cfg.mtu.map(|m| m as u16), None, &cfg.addresses)?;
+            if let Some(parent) = &cfg.parent_interface {
+                block_on_netlink(async {
+                    let handle = netlink::connect().await?;
+                    let parent_index = netlink::link_index_by_name(&handle, parent).await?;
+                    netlink::set_master(&cfg.name, parent_index).await
+                })
+                .with_context(|| format!("failed to attach VXLAN '{}' to parent '{parent}'", cfg.name))?;
+            }
+            Ok(())
+        })();
+        self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!("Applied VXLAN config: {} (VNI={})", cfg.name, cfg.vni);
         Ok(())
+    }
+
+    /// Deletes the just-created `name` device (best effort) if `result` is
+    /// an `Err`, then returns `result` unchanged. Every `apply_*` create
+    /// path above adds the device via netlink first and only then applies
+    /// follow-up settings (bring-up, MTU, MAC, addresses, bridge/bond
+    /// membership) -- without this, a failure partway through those
+    /// follow-up steps left the device behind: realized in the kernel, but
+    /// with no `save_entity` record and so no way to remove it short of a
+    /// manual `ip link del` on the host. Found live: a VLAN whose parent
+    /// link was administratively down failed netlink's bring-up step and
+    /// orphaned `vlan-regr-test@eno8403` indefinitely.
+    fn cleanup_on_failure<T>(&self, name: &str, result: Result<T>) -> Result<T> {
+        if result.is_err() {
+            if let Err(cleanup_err) = block_on_netlink(netlink::delete_link(name)) {
+                tracing::warn!("Failed to roll back orphaned device '{name}' after a failed apply: {cleanup_err:#}");
+            } else {
+                tracing::info!("Rolled back orphaned device '{name}' after a failed apply");
+            }
+        }
+        result
     }
 
     /// Shared bring-up + MTU + MAC + static-address application, used by
