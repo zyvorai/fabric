@@ -456,14 +456,31 @@ pub async fn create_dhcp_server(
                 Json(json!({ "error": "gateway is required and must be a valid IPv4 address for the DHCP server's own /24" })),
             )
         })?;
+    // With no explicit dns_servers, default to advertising this bridge's
+    // own gateway -- now that it also answers DNS (zone_hosts_dir below),
+    // that's the one address that resolves both zone records and (via
+    // dnsmasq's upstream forwarding) everything else, with no extra
+    // per-VM configuration.
+    let dns_servers = if config.dns_servers.is_empty() {
+        vec![gateway.to_string()]
+    } else {
+        config.dns_servers.clone()
+    };
     let dhcp_cfg = zyvor_fabric_dnsmasq_manager::DhcpConfig {
         bridge: config.bridge.clone(),
         gateway,
         pool_offset: config.pool_offset,
         pool_size: config.pool_size,
         default_lease_time_sec: config.default_lease_time_sec,
-        dns_servers: config.dns_servers.clone(),
+        dns_servers,
         domain: config.domain.clone(),
+        // Every bridge with DHCP configured also gets DNS Zone/Policy
+        // records served locally on the same dnsmasq instance (see
+        // DhcpConfig::zone_hosts_dir's doc comment) -- VMs on this bridge
+        // already get this instance pushed as their nameserver via the
+        // dns-server DHCP option below, so this makes zone records
+        // resolvable with no extra per-VM configuration.
+        zone_hosts_dir: Some(::dns_policy::enforcement::DNS_DIR.into()),
     };
     state.dnsmasq_manager.start(&dhcp_cfg).await.map_err(|e| {
         (

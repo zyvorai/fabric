@@ -34,6 +34,15 @@ pub struct DhcpConfig {
     pub default_lease_time_sec: u32,
     pub dns_servers: Vec<String>,
     pub domain: Option<String>,
+    /// Directory of hosts-format zone files (see `dns_policy::enforcement`)
+    /// to also serve as DNS on this same instance, in addition to DHCP.
+    /// `None` keeps the old DHCP-only, `port=0` behavior. dnsmasq watches
+    /// the directory via inotify, so zone records created/updated after
+    /// this instance starts are picked up live, no restart needed.
+    /// `bind-interfaces` + `interface={bridge}` (below) scope the DNS
+    /// listener to just that bridge's address, so this can never collide
+    /// with the host's own resolver (e.g. systemd-resolved on loopback).
+    pub zone_hosts_dir: Option<PathBuf>,
 }
 
 pub struct DnsmasqManager {
@@ -54,6 +63,12 @@ impl DnsmasqManager {
         tokio::fs::create_dir_all(&self.run_dir)
             .await
             .with_context(|| format!("failed to create {}", self.run_dir.display()))?;
+        // dnsmasq requires --hostsdir's target to already exist at startup
+        // (unlike the files inside it, which it's fine to watch appear
+        // later) -- ensure it's there even if no zone has been created yet.
+        if let Some(dir) = &cfg.zone_hosts_dir {
+            tokio::fs::create_dir_all(dir).await.with_context(|| format!("failed to create {}", dir.display()))?;
+        }
 
         // Idempotent: tear down any prior instance for this bridge first.
         let _ = self.stop(&cfg.bridge).await;
@@ -174,9 +189,16 @@ fn render_config(cfg: &DhcpConfig, pid_path: &Path, lease_path: &Path) -> Result
     out.push_str(&format!("interface={}\n", cfg.bridge));
     out.push_str("bind-interfaces\n");
     out.push_str("except-interface=lo\n");
-    // No DNS service on the bridge — only DHCP, matching what
-    // systemd-networkd's [DHCPServer] directive actually provided.
-    out.push_str("port=0\n");
+    match &cfg.zone_hosts_dir {
+        // Zone records are served locally; anything else this dnsmasq
+        // doesn't have a hosts-file answer for forwards upstream via the
+        // host's own /etc/resolv.conf (dnsmasq's default when `no-resolv`
+        // isn't set), so VMs on this bridge get one DNS server for both.
+        Some(dir) => out.push_str(&format!("hostsdir={}\n", dir.display())),
+        // No DNS service on the bridge — only DHCP, matching what
+        // systemd-networkd's [DHCPServer] directive originally provided.
+        None => out.push_str("port=0\n"),
+    }
     out.push_str(&format!("dhcp-range={start_ip},{end_ip},255.255.255.0,{}\n", cfg.default_lease_time_sec));
     out.push_str(&format!("dhcp-option=option:router,{}\n", cfg.gateway));
     if !cfg.dns_servers.is_empty() {
@@ -209,6 +231,7 @@ mod tests {
             default_lease_time_sec: 3600,
             dns_servers: vec!["8.8.8.8".into(), "1.1.1.1".into()],
             domain: Some("vms.local".into()),
+            zone_hosts_dir: None,
         }
     }
 
@@ -233,6 +256,15 @@ mod tests {
         let out = render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).unwrap();
         assert!(!out.contains("dns-server"));
         assert!(!out.contains("domain="));
+    }
+
+    #[test]
+    fn test_render_config_with_zone_hosts_dir_serves_dns_instead_of_port_zero() {
+        let mut c = cfg();
+        c.zone_hosts_dir = Some(PathBuf::from("/etc/zyvor-fabricd/dns"));
+        let out = render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).unwrap();
+        assert!(out.contains("hostsdir=/etc/zyvor-fabricd/dns"));
+        assert!(!out.contains("port=0"));
     }
 
     #[test]

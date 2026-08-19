@@ -7,7 +7,10 @@ use tracing;
 
 use crate::models::*;
 
-const DNS_DIR: &str = "/etc/zyvor-fabricd/dns";
+/// Where zone hosts-files live -- also passed to each bridge's dnsmasq
+/// instance as `--hostsdir` (see `zyvor_fabric_dnsmasq_manager`) so VMs on
+/// a bridge with DHCP configured can resolve zone records automatically.
+pub const DNS_DIR: &str = "/etc/zyvor-fabricd/dns";
 
 /// Writes DNS records to hosts-format zone files.
 ///

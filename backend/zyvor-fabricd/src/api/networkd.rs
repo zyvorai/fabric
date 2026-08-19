@@ -2176,14 +2176,20 @@ pub async fn configure_dhcp_server(
     );
 
     let lease_time = req.lease_time_sec.unwrap_or(3600);
+    // See network_cloud::create_dhcp_server's matching comment: with no
+    // explicit dns_servers, default to this bridge's own gateway, which
+    // now also answers DNS for zone records (zone_hosts_dir below).
+    let dns_servers = req.dns_servers.clone().unwrap_or_default();
+    let dns_servers = if dns_servers.is_empty() { vec![gateway.to_string()] } else { dns_servers };
     let dhcp_cfg = zyvor_fabric_dnsmasq_manager::DhcpConfig {
         bridge: req.bridge_name.clone(),
         gateway,
         pool_offset,
         pool_size,
         default_lease_time_sec: lease_time,
-        dns_servers: req.dns_servers.clone().unwrap_or_default(),
+        dns_servers,
         domain: None,
+        zone_hosts_dir: Some(::dns_policy::enforcement::DNS_DIR.into()),
     };
 
     match state.dnsmasq_manager.start(&dhcp_cfg).await {
