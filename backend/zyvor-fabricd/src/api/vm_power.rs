@@ -145,15 +145,7 @@ pub async fn resume_hibernate(
             crate::api_error::json_error(StatusCode::NOT_FOUND, "No hibernation snapshot found")
         })?;
 
-    // Start VM and restore snapshot -- the VM's real, live disk if
-    // Ephemera still knows about it, falling back to the naming-convention
-    // default only if it doesn't (see VMDriver::get_disk_path).
-    let image_path = match state.driver.get_disk_path(&vm_name).await {
-        Ok(p) => p.display().to_string(),
-        Err(_) => crate::validation::find_vm_image_or_default(&vm_name),
-    };
-
-    // Validate the stored snapshot name before passing to command
+    // Validate the stored snapshot name before passing it to the driver
     if let Err((_, msg)) = crate::validation::validate_snapshot_name(&info.snapshot_name) {
         return Err(crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -161,28 +153,16 @@ pub async fn resume_hibernate(
         ));
     }
 
-    // Use qemu-img snapshot -a to restore, then start
-    let output = tokio::process::Command::new("qemu-img")
-        .args(["snapshot", "-a", &info.snapshot_name, &image_path])
-        .output()
-        .await
-        .map_err(|e| {
-            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
+    // Relaunch with the hibernate snapshot as a one-shot -loadvm override
+    // (see VMDriver::start_from_snapshot) -- this restores CPU/memory/
+    // device state, not just disk content. Previously this did an
+    // external `qemu-img snapshot -a` to revert disk content only, then
+    // an ordinary `start()` -- a cold boot that silently discarded
+    // everything hibernate had just captured beyond the disk itself.
+    if let Err(e) = state.driver.start_from_snapshot(&vm_name, &info.snapshot_name).await {
         return Err(crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to restore snapshot: {}", stderr),
-        ));
-    }
-
-    // Start the VM
-    if let Err(e) = state.driver.start(&vm_name).await {
-        return Err(crate::api_error::json_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to start VM: {}", e),
+            format!("Failed to resume VM from hibernation snapshot: {}", e),
         ));
     }
 

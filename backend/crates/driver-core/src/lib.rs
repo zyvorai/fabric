@@ -68,6 +68,15 @@ pub trait VMDriver: Send + Sync {
     /// silently ignore what it can't apply.
     async fn start_with_options(&self, vm: &VM, opts: &VMStartOptions) -> Result<()>;
 
+    /// Start a machine from an existing internal (`snapshot-save`) tag on
+    /// its own disk, restoring CPU/memory/device state (not just disk
+    /// content) instead of an ordinary cold boot -- for resuming a
+    /// hibernated VM. A one-shot override for this one launch only,
+    /// unrelated to whatever the backend would otherwise derive/replay via
+    /// plain `start`. Backends with no such capability should error
+    /// clearly rather than silently falling back to a cold boot.
+    async fn start_from_snapshot(&self, name: &str, tag: &str) -> Result<()>;
+
     /// Graceful poweroff.
     async fn poweroff(&self, name: &str) -> Result<()>;
 

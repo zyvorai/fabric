@@ -38,6 +38,11 @@ impl VMDriver for EphemeraDriver {
         self.client.create_vm(&req).await.map(|_| ())
     }
 
+    async fn start_from_snapshot(&self, name: &str, tag: &str) -> Result<()> {
+        let vm = self.resolve(name).await?;
+        self.client.start_vm_from_snapshot(vm.id, tag).await.map(|_| ())
+    }
+
     async fn poweroff(&self, name: &str) -> Result<()> {
         let vm = self.resolve(name).await?;
         self.client.stop_vm(vm.id).await.map(|_| ())

@@ -532,6 +532,20 @@ impl EphemeraClient {
         Self::parse(resp).await
     }
 
+    /// `POST /v1/vms/{id}/start-from-snapshot` — like `start_vm`, but
+    /// restores CPU/memory/device state from an existing internal
+    /// (`snapshot-save`) tag on the VM's own disk via QEMU's `-loadvm`,
+    /// instead of an ordinary cold boot. A one-shot override for this
+    /// launch only.
+    pub async fn start_vm_from_snapshot(&self, id: Uuid, tag: &str) -> Result<VmRecord> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/start-from-snapshot"))?))
+            .json(&serde_json::json!({"tag": tag}))
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
     pub async fn pause_vm(&self, id: Uuid) -> Result<VmRecord> {
         let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/pause"))?)).send().await?;
         Self::parse(resp).await

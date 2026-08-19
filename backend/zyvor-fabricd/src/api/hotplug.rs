@@ -75,6 +75,32 @@ pub(crate) async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpCl
 /// talk over Ephemera's REST API, not a Rust dependency).
 const HOTPLUG_PCIE_PORTS: u8 = 4;
 
+/// q35's built-in `ich9-ahci` SATA controller (present on every VM without
+/// any boot-time device needed -- confirmed live via `qom-list` against a
+/// freshly booted VM) exposes 6 IDE-bus ports, `ide.0`..`ide.5`, all empty
+/// by default since the boot disk is virtio-blk-pci, not SATA.
+const IDE_PORTS: u8 = 6;
+
+/// `device_add` onto the first of `bus_candidates` that accepts it, trying
+/// each in turn -- used both for PCIe hotplug (`hotplug-pcie-0..N`, one
+/// device per port) and IDE hotplug (`ide.0..5`, one drive per port).
+fn device_add_trying_buses(qmp: &QmpClient, mut device_args: serde_json::Value, bus_candidates: &[String]) -> Result<String, String> {
+    let mut last_err = String::from("no candidate buses given");
+    for bus in bus_candidates {
+        if let Some(obj) = device_args.as_object_mut() {
+            obj.insert("bus".to_string(), serde_json::json!(bus));
+        }
+        match qmp.execute("device_add", device_args.clone()) {
+            Ok(_) => return Ok(bus.clone()),
+            Err(e) => last_err = e.to_string(),
+        }
+    }
+    Err(format!(
+        "all {} candidate buses are full or unavailable (last error: {last_err}) -- restart the VM to reclaim them",
+        bus_candidates.len()
+    ))
+}
+
 /// `device_add` a PCI(e) device (NIC, extra disk) onto one of the
 /// pre-reserved hotplug root ports, trying each in turn. q35's root
 /// complex (`pcie.0`) itself refuses `device_add` outright -- found live:
@@ -82,21 +108,17 @@ const HOTPLUG_PCIE_PORTS: u8 = 4;
 /// device needs an explicit target bus that supports it, and each root
 /// port holds exactly one device, so a previous hotplug (or several) may
 /// have already filled some of them.
-fn device_add_on_hotplug_bus(qmp: &QmpClient, mut device_args: serde_json::Value) -> Result<String, String> {
-    let mut last_err = String::from("no hotplug ports configured");
-    for i in 0..HOTPLUG_PCIE_PORTS {
-        let bus = format!("hotplug-pcie-{i}");
-        if let Some(obj) = device_args.as_object_mut() {
-            obj.insert("bus".to_string(), serde_json::json!(bus));
-        }
-        match qmp.execute("device_add", device_args.clone()) {
-            Ok(_) => return Ok(bus),
-            Err(e) => last_err = e.to_string(),
-        }
-    }
-    Err(format!(
-        "all {HOTPLUG_PCIE_PORTS} hotplug slots are full (last error: {last_err}) -- restart the VM to reclaim them"
-    ))
+fn device_add_on_hotplug_bus(qmp: &QmpClient, device_args: serde_json::Value) -> Result<String, String> {
+    let candidates: Vec<String> = (0..HOTPLUG_PCIE_PORTS).map(|i| format!("hotplug-pcie-{i}")).collect();
+    device_add_trying_buses(qmp, device_args, &candidates)
+}
+
+/// `device_add` an `ide-hd` onto one of q35's 6 built-in AHCI ports (see
+/// `IDE_PORTS`), trying each in turn since previous IDE hotplugs (or the
+/// rare VM actually booted from one) may have filled some already.
+fn device_add_on_ide_bus(qmp: &QmpClient, device_args: serde_json::Value) -> Result<String, String> {
+    let candidates: Vec<String> = (0..IDE_PORTS).map(|i| format!("ide.{i}")).collect();
+    device_add_trying_buses(qmp, device_args, &candidates)
 }
 
 /// A short, unique-enough id for a QMP `node-name`/device `id`. QEMU caps
@@ -319,10 +341,12 @@ pub async fn hotplug_disk(
             .into_response();
     }
 
-    // Add device. Only the PCI(e) default goes through a hotplug root
-    // port -- scsi-hd/ide-hd attach to a controller bus instead, which
-    // isn't declared in Ephemera's QEMU args at all (a separate,
-    // pre-existing gap, not something this fix addresses).
+    // Add device, onto whichever bus its driver actually needs: the
+    // virtio-blk-pci default goes through a pre-reserved hotplug PCIe root
+    // port, scsi-hd through the single virtio-scsi controller Ephemera
+    // adds at boot, ide-hd through one of q35's 6 built-in (and normally
+    // unused) AHCI ports -- see device_add_on_hotplug_bus/
+    // device_add_on_ide_bus's doc comments.
     let driver = match req.bus.as_str() {
         "scsi" => "scsi-hd",
         "ide" => "ide-hd",
@@ -335,10 +359,16 @@ pub async fn hotplug_disk(
         "drive": node_name,
     });
 
-    let result = if driver == "virtio-blk-pci" {
-        device_add_on_hotplug_bus(&qmp, device_args)
-    } else {
-        qmp.execute("device_add", device_args).map(|_| String::new()).map_err(|e| e.to_string())
+    let result = match driver {
+        "virtio-blk-pci" => device_add_on_hotplug_bus(&qmp, device_args),
+        "ide-hd" => device_add_on_ide_bus(&qmp, device_args),
+        _ => {
+            let mut device_args = device_args;
+            if let Some(obj) = device_args.as_object_mut() {
+                obj.insert("bus".to_string(), serde_json::json!("scsi0.0"));
+            }
+            qmp.execute("device_add", device_args).map(|_| String::from("scsi0.0")).map_err(|e| e.to_string())
+        }
     };
 
     match result {

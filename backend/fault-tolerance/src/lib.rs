@@ -791,6 +791,9 @@ mod tests {
         ) -> Result<()> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
+        async fn start_from_snapshot(&self, _name: &str, _tag: &str) -> Result<()> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
         async fn poweroff(&self, _name: &str) -> Result<()> {
             Ok(())
         }
