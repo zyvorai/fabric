@@ -85,20 +85,23 @@ impl NetworkdManager {
     }
 
     /// Create a bridge device via netlink: name, up, mtu, mac address,
-    /// static addresses, STP on/off, a default route via `gateway`, and a
-    /// DHCP client on the bridge's own interface all apply immediately (no
-    /// reload step). forward_delay/hello_time/max_age/vlan_filtering are
-    /// finer STP tuning knobs still not wired up -- tracked as a
-    /// follow-up, not silently dropped: log a warning so a caller relying
-    /// on them notices instead of assuming they took effect.
+    /// static addresses, STP + its tuning knobs (forward_delay/hello_time/
+    /// max_age/vlan_filtering), a default route via `gateway`, and a DHCP
+    /// client on the bridge's own interface all apply immediately (no
+    /// reload step).
     pub fn apply_bridge(&self, cfg: &BridgeConfig) -> Result<()> {
         block_on_netlink(netlink::create_bridge(&cfg.name))?;
         let result: Result<()> = (|| {
             self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses)?;
-            if let Some(enable) = cfg.stp {
-                block_on_netlink(netlink::set_bridge_stp(&cfg.name, enable))
-                    .with_context(|| format!("failed to set stp={enable} on '{}'", cfg.name))?;
-            }
+            let bridge_opts = netlink::BridgeOptions {
+                stp: cfg.stp,
+                forward_delay_sec: cfg.forward_delay_sec,
+                hello_time_sec: cfg.hello_time_sec,
+                max_age_sec: cfg.max_age_sec,
+                vlan_filtering: cfg.vlan_filtering,
+            };
+            block_on_netlink(netlink::set_bridge_options(&cfg.name, &bridge_opts))
+                .with_context(|| format!("failed to set bridge options on '{}'", cfg.name))?;
             if let Some(gateway) = &cfg.gateway {
                 let addr: IpAddr = gateway
                     .parse()
@@ -113,12 +116,6 @@ impl NetworkdManager {
             Ok(())
         })();
         self.cleanup_on_failure(&cfg.name, result)?;
-        if cfg.forward_delay_sec.is_some() || cfg.hello_time_sec.is_some() || cfg.max_age_sec.is_some() || cfg.vlan_filtering.is_some() {
-            tracing::warn!(
-                bridge = %cfg.name,
-                "forward_delay/hello_time/max_age/vlan_filtering are not yet applied via netlink for bridges (device created, those settings were not)"
-            );
-        }
         tracing::info!("Applied bridge config: {}", cfg.name);
         Ok(())
     }

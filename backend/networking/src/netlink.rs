@@ -250,14 +250,33 @@ pub async fn link_index_by_name(handle: &rtnetlink::Handle, name: &str) -> Resul
 
 /// Create a Linux bridge (`ip link add <name> type bridge`), brought up
 /// immediately (`LinkBridge::new` sets the UP flag by default).
+///
+/// Retries a bounded number of times on failure: found live, several
+/// bridges created in immediate back-to-back succession each failed with
+/// "Received a netlink error message Numerical result out of range (os
+/// error 34)" (ERANGE) -- a 300ms stagger between creates never failed,
+/// confirming it's transient contention under rapid concurrent creation
+/// rather than a real rejection. Root mechanism not fully pinned down
+/// (kernel-side ifindex or netlink port allocation under burst churn are
+/// the leading candidates); retrying with a short backoff is far cheaper
+/// than serializing all bridge creation through a single connection/lock,
+/// and safe since a failed create leaves nothing to double up on retry.
 pub async fn create_bridge(name: &str) -> Result<()> {
-    let handle = connect().await?;
-    handle
-        .link()
-        .add(LinkBridge::new(name).build())
-        .execute()
-        .await
-        .with_context(|| format!("failed to create bridge '{name}'"))
+    const MAX_ATTEMPTS: u32 = 5;
+    let mut last_err = None;
+    for attempt in 0..MAX_ATTEMPTS {
+        let handle = connect().await?;
+        match handle.link().add(LinkBridge::new(name).build()).execute().await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                if attempt + 1 < MAX_ATTEMPTS {
+                    tokio::time::sleep(std::time::Duration::from_millis(50 * (attempt as u64 + 1))).await;
+                }
+                last_err = Some(e);
+            }
+        }
+    }
+    Err(last_err.unwrap()).with_context(|| format!("failed to create bridge '{name}' after {MAX_ATTEMPTS} attempts"))
 }
 
 /// Create an 802.1Q VLAN sub-interface on `parent` (`ip link add <name> link
@@ -466,17 +485,33 @@ pub async fn set_mac_address(iface: &str, mac: &str) -> Result<()> {
         .with_context(|| format!("failed to set mac address {mac} on '{iface}'"))
 }
 
-/// Enable/disable STP on a bridge — `ip link set <iface> type bridge
-/// stp_state <0|1>`. Found live via a byte-for-byte strace comparison
-/// against `ip link set ... type bridge stp_state 1` (confirmed working):
-/// iproute2 sends this as `RTM_NEWLINK` targeting the *existing* ifindex
-/// (with `IFLA_INFO_KIND=bridge` alongside `IFLA_INFO_DATA`), not
-/// `RTM_SETLINK` -- rtnetlink's own `.link().set(...)` (RTM_SETLINK)
-/// happily ACKs the same message with error=0, and top-level attributes
-/// (mtu/mac/up) genuinely do apply through it, but the kernel never
-/// actually invokes the bridge driver's changelink path for nested
-/// `IFLA_INFO_DATA` attributes that way -- stp_state silently never
-/// changes despite the clean ACK.
+/// STP on/off plus the finer bridge tuning knobs -- all optional, only the
+/// ones present get sent. `forward_delay_sec`/`hello_time_sec`/
+/// `max_age_sec` are whole seconds; the kernel's `IFLA_BR_*` attributes for
+/// these are in centiseconds (confirmed live: `ip -d link show` prints
+/// `forward_delay 1500 /* 15.00 s */` for the kernel default of 1500), so
+/// `set_bridge_options` multiplies by 100 before sending.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BridgeOptions {
+    pub stp: Option<bool>,
+    pub forward_delay_sec: Option<u32>,
+    pub hello_time_sec: Option<u32>,
+    pub max_age_sec: Option<u32>,
+    pub vlan_filtering: Option<bool>,
+}
+
+/// Apply bridge-specific options — `ip link set <iface> type bridge
+/// stp_state <0|1> forward_delay <cs> hello_time <cs> max_age <cs>
+/// vlan_filtering <0|1>` (whichever of these `opts` actually sets). Found
+/// live via a byte-for-byte strace comparison against a working `ip link
+/// set ... type bridge stp_state 1`: iproute2 sends this as `RTM_NEWLINK`
+/// targeting the *existing* ifindex (with `IFLA_INFO_KIND=bridge`
+/// alongside `IFLA_INFO_DATA`), not `RTM_SETLINK` -- rtnetlink's own
+/// `.link().set(...)` (RTM_SETLINK) happily ACKs the same message with
+/// error=0, and top-level attributes (mtu/mac/up) genuinely do apply
+/// through it, but the kernel never actually invokes the bridge driver's
+/// changelink path for nested `IFLA_INFO_DATA` attributes that way --
+/// nothing in `opts` actually changes despite the clean ACK.
 ///
 /// The flags matter too: iproute2's message carries plain
 /// `NLM_F_REQUEST|NLM_F_ACK` only. `.link().add(...)` defaults to
@@ -488,20 +523,37 @@ pub async fn set_mac_address(iface: &str, mac: &str) -> Result<()> {
 /// iproute2's flag set (hardcoded rather than pulling in
 /// netlink-packet-core as a direct dependency just for two constants:
 /// NLM_F_REQUEST=1, NLM_F_ACK=4).
-pub async fn set_bridge_stp(iface: &str, enable: bool) -> Result<()> {
+pub async fn set_bridge_options(iface: &str, opts: &BridgeOptions) -> Result<()> {
     const NLM_F_REQUEST_ACK: u16 = 1 | 4;
+
+    let mut attrs = Vec::new();
+    if let Some(enable) = opts.stp {
+        attrs.push(InfoBridge::StpState(if enable { 1 } else { 0 }));
+    }
+    if let Some(sec) = opts.forward_delay_sec {
+        attrs.push(InfoBridge::ForwardDelay(sec.saturating_mul(100)));
+    }
+    if let Some(sec) = opts.hello_time_sec {
+        attrs.push(InfoBridge::HelloTime(sec.saturating_mul(100)));
+    }
+    if let Some(sec) = opts.max_age_sec {
+        attrs.push(InfoBridge::MaxAge(sec.saturating_mul(100)));
+    }
+    if let Some(enable) = opts.vlan_filtering {
+        attrs.push(InfoBridge::VlanFiltering(enable));
+    }
+    if attrs.is_empty() {
+        return Ok(());
+    }
+
     let handle = connect().await?;
     handle
         .link()
-        .add(
-            LinkBridge::new(iface)
-                .set_info_data(InfoData::Bridge(vec![InfoBridge::StpState(if enable { 1 } else { 0 })]))
-                .build(),
-        )
+        .add(LinkBridge::new(iface).set_info_data(InfoData::Bridge(attrs)).build())
         .set_flags(NLM_F_REQUEST_ACK)
         .execute()
         .await
-        .with_context(|| format!("failed to set STP={enable} on '{iface}'"))
+        .with_context(|| format!("failed to set bridge options on '{iface}'"))
 }
 
 /// Add a default route (0.0.0.0/0 or ::/0, depending on `gateway`'s

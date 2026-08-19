@@ -502,6 +502,101 @@ pub async fn create_dhcp_server(
     Ok((StatusCode::CREATED, Json(config)))
 }
 
+/// PUT /api/dhcp-servers/{id} - Update an existing DHCP server config
+/// (Admin only). Stops the old bridge's dnsmasq instance (in case `bridge`
+/// itself changed) and starts a fresh one with the new config, same as
+/// create -- dnsmasq_manager.start() is itself idempotent (tears down any
+/// prior instance for the target bridge first), so this is safe even if
+/// `bridge` is unchanged.
+pub async fn update_dhcp_server(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateDhcpServerRequest>,
+) -> Result<Json<DhcpServerConfig>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!("network_cloud::{}", stringify!(update_dhcp_server));
+    let existing = state
+        .store
+        .get_entity::<DhcpServerConfig>("dhcp_servers", &id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({ "error": "DHCP server config not found" }))))?;
+
+    crate::validation::validate_hostname(&req.bridge).map_err(|msg| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid bridge name: {}", msg) })))
+    })?;
+    for dns in &req.dns_servers {
+        crate::validation::validate_ip_address(dns).map_err(|msg| {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid DNS server: {}", msg) })))
+        })?;
+    }
+    if let Some(ref gw) = req.gateway {
+        crate::validation::validate_ip_address(gw).map_err(|msg| {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid gateway: {}", msg) })))
+        })?;
+    }
+
+    let gateway: std::net::Ipv4Addr = req
+        .gateway
+        .as_deref()
+        .unwrap_or("0.0.0.0")
+        .parse()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "gateway is required and must be a valid IPv4 address for the DHCP server's own /24" })),
+            )
+        })?;
+
+    if existing.bridge != req.bridge {
+        if let Err(e) = state.dnsmasq_manager.stop(&existing.bridge).await {
+            tracing::warn!("Failed to stop DHCP server for {}: {:#}", existing.bridge, e);
+        }
+    }
+
+    let config = DhcpServerConfig {
+        id: existing.id,
+        bridge: req.bridge.clone(),
+        pool_offset: req.pool_offset,
+        pool_size: req.pool_size,
+        default_lease_time_sec: req.default_lease_time_sec,
+        max_lease_time_sec: req.max_lease_time_sec,
+        dns_servers: req.dns_servers.clone(),
+        gateway: req.gateway.clone(),
+        domain: req.domain.clone(),
+        enabled: true,
+        created: existing.created,
+    };
+
+    let dns_servers = if config.dns_servers.is_empty() {
+        vec![gateway.to_string()]
+    } else {
+        config.dns_servers.clone()
+    };
+    let dhcp_cfg = zyvor_fabric_dnsmasq_manager::DhcpConfig {
+        bridge: config.bridge.clone(),
+        gateway,
+        pool_offset: config.pool_offset,
+        pool_size: config.pool_size,
+        default_lease_time_sec: config.default_lease_time_sec,
+        dns_servers,
+        domain: config.domain.clone(),
+        zone_hosts_dir: Some(::dns_policy::enforcement::DNS_DIR.into()),
+    };
+    state.dnsmasq_manager.start(&dhcp_cfg).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to restart DHCP server: {:#}", e) })),
+        )
+    })?;
+
+    state
+        .store
+        .save_entity("dhcp_servers", &config.id, &config)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    Ok(Json(config))
+}
+
 /// GET /api/dhcp-servers - List DHCP server configs
 pub async fn list_dhcp_servers(
     RequireRead(_claims): RequireRead,

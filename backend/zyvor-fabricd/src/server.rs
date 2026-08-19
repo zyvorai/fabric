@@ -789,7 +789,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/dhcp-servers/{id}",
-            delete(api::network_cloud::delete_dhcp_server),
+            put(api::network_cloud::update_dhcp_server).delete(api::network_cloud::delete_dhcp_server),
         )
         // DNS routes (systemd-resolved)
         .route(

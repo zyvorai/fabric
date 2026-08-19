@@ -203,8 +203,9 @@ export function EditBridgeModal({ bridge, onClose, onUpdated }: { bridge: Bridge
 /// Configures (or removes) the DHCP server for one bridge -- one dnsmasq
 /// instance per bridge, handing out leases plus (via zone_hosts_dir on the
 /// backend) serving DNS Zone/Policy records to anything on that bridge.
-/// There's no update endpoint, only create/delete, so an existing config
-/// shows as read-only with a Remove action rather than an edit form.
+/// An existing config shows as a read-only summary with Edit/Remove
+/// actions; Edit reopens the same form pre-filled, submitting through
+/// updateDhcpServer (PUT) instead of create.
 export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDeleted }: {
   bridge: BridgeConfig
   existing: DhcpServerConfig | null
@@ -213,6 +214,7 @@ export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDelete
   onDeleted: (id: string) => void
 }) {
   const defaultGateway = bridge.addresses[0]?.split('/')[0] ?? ''
+  const [editing, setEditing] = useState(!existing)
   const [gateway, setGateway] = useState(existing?.gateway ?? defaultGateway)
   const [poolOffset, setPoolOffset] = useState(String(existing?.pool_offset ?? 100))
   const [poolSize, setPoolSize] = useState(String(existing?.pool_size ?? 100))
@@ -234,8 +236,8 @@ export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDelete
         dns_servers: dnsServers ? dnsServers.split(',').map(s => s.trim()).filter(Boolean) : undefined,
         domain: domain.trim() || undefined,
       }
-      const created = await cloudApi.createDhcpServer(req)
-      onCreated(created)
+      const saved = existing ? await cloudApi.updateDhcpServer(existing.id, req) : await cloudApi.createDhcpServer(req)
+      onCreated(saved)
     } catch (e: unknown) {
       setErr(extractErrorMessage(e))
     } finally {
@@ -256,7 +258,7 @@ export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDelete
     }
   }
 
-  if (existing) {
+  if (existing && !editing) {
     return (
       <ModalWrapper title={`DHCP Server — ${bridge.name}`} onClose={onClose}>
         <div className="space-y-4">
@@ -272,19 +274,26 @@ export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDelete
             <div><div className="text-slate-500 text-xs mb-1">Domain</div><div>{existing.domain ?? '—'}</div></div>
           </div>
           {err && <p className="text-red-400 text-sm">{err}</p>}
-          <button onClick={handleDelete} disabled={submitting} className="w-full flex items-center justify-center gap-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 disabled:opacity-50 py-2 px-4 rounded-lg transition">
-            <Trash2 className="w-4 h-4" /> {submitting ? 'Removing...' : 'Remove DHCP Server'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setEditing(true)} className="flex-1 flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+              <Pencil className="w-4 h-4" /> Edit
+            </button>
+            <button onClick={handleDelete} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 disabled:opacity-50 py-2 px-4 rounded-lg transition">
+              <Trash2 className="w-4 h-4" /> {submitting ? 'Removing...' : 'Remove'}
+            </button>
+          </div>
         </div>
       </ModalWrapper>
     )
   }
 
   return (
-    <ModalWrapper title={`Configure DHCP — ${bridge.name}`} onClose={onClose}>
+    <ModalWrapper title={existing ? `Edit DHCP Server — ${bridge.name}` : `Configure DHCP — ${bridge.name}`} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-slate-400">
-          Starts a dnsmasq instance bound to this bridge, handing out leases and serving DNS Zone/Policy records to VMs on it.
+          {existing
+            ? 'Restarts this bridge’s dnsmasq instance with the updated settings.'
+            : 'Starts a dnsmasq instance bound to this bridge, handing out leases and serving DNS Zone/Policy records to VMs on it.'}
         </p>
         <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder={defaultGateway || '10.0.0.1'} />
         <div className="grid grid-cols-2 gap-2">
@@ -294,9 +303,16 @@ export function DhcpServerModal({ bridge, existing, onClose, onCreated, onDelete
         <InputField label="DNS Servers (comma-separated, optional)" value={dnsServers} onChange={setDnsServers} placeholder="defaults to this bridge's own gateway" />
         <InputField label="Domain (optional)" value={domain} onChange={setDomain} placeholder="vms.local" />
         {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
-          {submitting ? 'Starting...' : 'Start DHCP Server'}
-        </button>
+        <div className="flex gap-2">
+          {existing && (
+            <button onClick={() => setEditing(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+              Cancel
+            </button>
+          )}
+          <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+            {submitting ? 'Saving...' : existing ? 'Save Changes' : 'Start DHCP Server'}
+          </button>
+        </div>
       </div>
     </ModalWrapper>
   )

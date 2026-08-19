@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { apiGet, apiPost, apiDelete } from './client'
+import { apiGet, apiPost, apiPut, apiDelete } from './client'
 
 const API_BASE = '/api'
 
@@ -77,6 +77,10 @@ export async function listDhcpServers(): Promise<DhcpServerConfig[]> {
 
 export async function createDhcpServer(req: CreateDhcpServerRequest): Promise<DhcpServerConfig> {
   return apiPost<DhcpServerConfig>(`${API_BASE}/dhcp-servers`, req)
+}
+
+export async function updateDhcpServer(id: string, req: CreateDhcpServerRequest): Promise<DhcpServerConfig> {
+  return apiPut<DhcpServerConfig>(`${API_BASE}/dhcp-servers/${id}`, req)
 }
 
 export async function deleteDhcpServer(id: string): Promise<void> {

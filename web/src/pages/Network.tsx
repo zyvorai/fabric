@@ -533,7 +533,7 @@ export default function Network() {
           bridge={dhcpBridge}
           existing={dhcpServers.find(d => d.bridge === dhcpBridge.name) ?? null}
           onClose={closeModal}
-          onCreated={(d) => { setDhcpServers(prev => [...prev, d]); closeModal() }}
+          onCreated={(d) => { setDhcpServers(prev => prev.some(x => x.id === d.id) ? prev.map(x => x.id === d.id ? d : x) : [...prev, d]); closeModal() }}
           onDeleted={(id) => { setDhcpServers(prev => prev.filter(d => d.id !== id)); closeModal() }}
         />
       )}
