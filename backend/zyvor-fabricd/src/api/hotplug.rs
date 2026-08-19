@@ -95,15 +95,61 @@ fn device_add_trying_buses(qmp: &QmpClient, mut device_args: serde_json::Value, 
     ))
 }
 
+/// Hotplug root ports (`hotplug-pcie-N`) that already host a child device,
+/// per QEMU's own `query-pci` view. `device_add` to an already-occupied
+/// port does NOT fail -- found live: QEMU happily stacks a second device
+/// onto the same root port's bus at the next PCI slot -- but the guest's
+/// ACPI hotplug slot notification only fires for a port's first child, so
+/// anything added after that is realized in QEMU yet invisible to the
+/// guest kernel (a hotplugged NIC then a hotplugged disk both silently
+/// landed on `hotplug-pcie-0`; only the NIC ever appeared in the guest's
+/// `lspci`/`lsblk`). So port selection can't rely on `device_add` erroring
+/// out once a port is "full" -- it must check real occupancy first.
+fn occupied_hotplug_buses(qmp: &QmpClient) -> std::collections::HashSet<String> {
+    let mut occupied = std::collections::HashSet::new();
+    let Ok(pci) = qmp.execute("query-pci", serde_json::Value::Null) else {
+        // Can't determine occupancy -- treat everything as free and let
+        // device_add itself be the final arbiter, same as before this fix.
+        return occupied;
+    };
+    for bus_info in pci.as_array().into_iter().flatten() {
+        for dev in bus_info.get("devices").and_then(|d| d.as_array()).into_iter().flatten() {
+            let Some(qdev_id) = dev.get("qdev_id").and_then(|v| v.as_str()) else { continue };
+            if !qdev_id.starts_with("hotplug-pcie-") {
+                continue;
+            }
+            let has_children = dev
+                .get("pci_bridge")
+                .and_then(|b| b.get("devices"))
+                .and_then(|d| d.as_array())
+                .is_some_and(|d| !d.is_empty());
+            if has_children {
+                occupied.insert(qdev_id.to_string());
+            }
+        }
+    }
+    occupied
+}
+
 /// `device_add` a PCI(e) device (NIC, extra disk) onto one of the
-/// pre-reserved hotplug root ports, trying each in turn. q35's root
-/// complex (`pcie.0`) itself refuses `device_add` outright -- found live:
-/// "Bus 'pcie.0' does not support hotplugging" -- every hotpluggable PCI(e)
-/// device needs an explicit target bus that supports it, and each root
-/// port holds exactly one device, so a previous hotplug (or several) may
-/// have already filled some of them.
+/// pre-reserved hotplug root ports, trying each genuinely empty one in
+/// turn. q35's root complex (`pcie.0`) itself refuses `device_add`
+/// outright -- found live: "Bus 'pcie.0' does not support hotplugging" --
+/// every hotpluggable PCI(e) device needs an explicit target bus that
+/// supports it, and only one device per port is actually visible to the
+/// guest (see `occupied_hotplug_buses`), so a previous hotplug may have
+/// already filled some of them.
 fn device_add_on_hotplug_bus(qmp: &QmpClient, device_args: serde_json::Value) -> Result<String, String> {
-    let candidates: Vec<String> = (0..HOTPLUG_PCIE_PORTS).map(|i| format!("hotplug-pcie-{i}")).collect();
+    let occupied = occupied_hotplug_buses(qmp);
+    let candidates: Vec<String> = (0..HOTPLUG_PCIE_PORTS)
+        .map(|i| format!("hotplug-pcie-{i}"))
+        .filter(|bus| !occupied.contains(bus))
+        .collect();
+    if candidates.is_empty() {
+        return Err(format!(
+            "all {HOTPLUG_PCIE_PORTS} hotplug root ports already hold a device -- restart the VM to reclaim them"
+        ));
+    }
     device_add_trying_buses(qmp, device_args, &candidates)
 }
 
