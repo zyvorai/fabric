@@ -553,6 +553,27 @@ if [ -f configs/pam.d/zyvor-fabricd ]; then
     echo '  ✅ PAM service -> /etc/pam.d/zyvor-fabricd'
 fi
 
+# Ephemera's own systemd unit only grants itself write access under
+# /var/lib/ephemera (ProtectSystem=strict) -- deliberately, since Ephemera
+# is a standalone product with no reason to know zyvor-fabric's directory
+# layout. Disk hotplug (attaching an image from zyvor-fabric's own catalog
+# as a second, writable drive on a running VM) needs Ephemera's QEMU child
+# to open a file under /var/lib/zyvor-fabricd/images though -- found live:
+# 'blockdev-add failed ... Read-only file system'. Granted via a drop-in
+# on ephemera.service instead of editing Ephemera's unit directly, so this
+# zyvor-fabric-specific grant lives in zyvor-fabric's own install step.
+if \$SUDO test -f /usr/lib/systemd/system/ephemera.service -o -f /etc/systemd/system/ephemera.service; then
+    EPHEMERA_DROPIN_DIR=/etc/systemd/system/ephemera.service.d
+    EPHEMERA_DROPIN=\"\$EPHEMERA_DROPIN_DIR/zyvor-fabricd-images.conf\"
+    if [ ! -f \"\$EPHEMERA_DROPIN\" ]; then
+        \$SUDO install -d -m 755 \"\$EPHEMERA_DROPIN_DIR\"
+        printf '[Service]\nReadWritePaths=/var/lib/zyvor-fabricd/images\n' | \$SUDO tee \"\$EPHEMERA_DROPIN\" >/dev/null
+        \$SUDO systemctl daemon-reload
+        \$SUDO systemctl restart ephemera 2>/dev/null || true
+        echo '  ✅ Granted ephemera write access to /var/lib/zyvor-fabricd/images (disk hotplug)'
+    fi
+fi
+
 \$SUDO systemctl daemon-reload
 if [ \"\$NO_START\" != true ]; then
     \$SUDO systemctl enable zyvor-fabricd.service 2>/dev/null || true

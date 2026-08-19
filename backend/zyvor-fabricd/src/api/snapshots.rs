@@ -99,29 +99,63 @@ pub async fn create_snapshot(
         }
     }
 
-    // Attempt qemu-img snapshot
-    let output = Command::new("qemu-img")
-        .args(["snapshot", "-c", &req.name, &image_path])
-        .output()
-        .await;
+    // A running VM already has the disk open exclusively (qcow2's own image
+    // locking) -- an external `qemu-img snapshot -c` against the same path
+    // collides with that lock and fails with "Is another process using the
+    // image?". Route through QMP's `savevm` instead when the VM is running
+    // (already used for hibernate, see vm_power::hibernate_vm): it runs
+    // inside the live QEMU process, so it coordinates with the image lock
+    // instead of fighting it, and captures full VM state (disk + memory)
+    // rather than just disk. Only fall back to the external `qemu-img`
+    // path -- which needs the disk to not be held open -- for a stopped VM.
+    let vm_running = matches!(
+        state.store.get_vm(&vm_name).ok().flatten().map(|v| v.state),
+        Some(vm_model::VMState::Running) | Some(vm_model::VMState::Paused)
+    );
 
-    match output {
-        Ok(o) if !o.status.success() => {
-            let stderr = String::from_utf8_lossy(&o.stderr);
+    if vm_running {
+        let qmp = match state.driver.get_control_socket(&vm_name).await {
+            Ok(Some(p)) => crate::qmp::QmpClient::for_socket(p.to_string_lossy().into_owned()),
+            _ => {
+                return crate::api_error::json_error(
+                    StatusCode::CONFLICT,
+                    "VM is running but its QMP control socket isn't available yet -- \
+                     wait for it to finish starting, or stop it first, then retry",
+                )
+                .into_response();
+            }
+        };
+        if let Err(e) = qmp.execute("savevm", serde_json::json!({"name": &req.name})) {
             return crate::api_error::json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("qemu-img snapshot failed: {}", stderr),
+                format!("Live snapshot failed: {}", e),
             )
             .into_response();
         }
-        Err(e) => {
-            return crate::api_error::json_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to run qemu-img: {}", e),
-            )
-            .into_response();
+    } else {
+        let output = Command::new("qemu-img")
+            .args(["snapshot", "-c", &req.name, &image_path])
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if !o.status.success() => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                return crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("qemu-img snapshot failed: {}", stderr),
+                )
+                .into_response();
+            }
+            Err(e) => {
+                return crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to run qemu-img: {}", e),
+                )
+                .into_response();
+            }
+            _ => {}
         }
-        _ => {}
     }
 
     let snapshot = VMSnapshot {
