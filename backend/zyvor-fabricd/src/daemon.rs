@@ -15,6 +15,7 @@ impl Daemon {
     pub fn new() -> Result<Self> {
         let config = Config::load()?;
         ensure_runtime_dirs(&config);
+        security::trial::init(&std::path::Path::new(&config.storage.path).join(".trial_start"));
         let state = StateStore::new(&config.storage.path)?;
 
         Ok(Self { config, state })

@@ -328,6 +328,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Auth - me endpoint (protected)
         .route("/auth/me", get(api::auth::me))
         .route("/capabilities", get(api::capabilities::get_capabilities))
+        .route("/license", get(routes::get_license_status))
         // VM management routes
         .route("/vms", get(routes::list_vms).post(routes::create_vm))
         .route("/vms/compare", get(api::ux_extensions::compare_vms))

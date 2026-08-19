@@ -5,6 +5,7 @@
 pub mod db;
 pub mod pam_auth;
 pub mod totp;
+pub mod trial;
 
 use anyhow::Result;
 use axum::{
@@ -239,7 +240,11 @@ where
 }
 
 /// Extractor that requires the caller to have write permission (Admin or User).
-/// Rejects Viewer role with 403 Forbidden.
+/// Rejects Viewer role with 403 Forbidden. Also rejects with 402 Payment
+/// Required once the evaluation trial has lapsed -- reads stay open (see
+/// `trial` module's doc comment) so a lapsed trial doesn't strand an
+/// evaluator behind a wall they can't even look through; only new writes
+/// require a current trial (or, once real licensing exists, a license).
 /// When auth is disabled (no claims in extensions), defaults to Viewer role
 /// which will be rejected by the role check below.
 pub struct RequireWrite(pub Claims);
@@ -267,12 +272,18 @@ where
             );
             return Err(StatusCode::FORBIDDEN);
         }
+        if trial::is_expired() {
+            tracing::warn!("Write operation rejected: evaluation trial has expired");
+            return Err(StatusCode::PAYMENT_REQUIRED);
+        }
         Ok(RequireWrite(claims))
     }
 }
 
 /// Extractor that requires the caller to have admin permission (Admin only).
-/// Rejects User and Viewer roles with 403 Forbidden.
+/// Rejects User and Viewer roles with 403 Forbidden. Also rejects with 402
+/// Payment Required once the evaluation trial has lapsed -- see
+/// `RequireWrite`'s matching doc comment.
 /// When auth is disabled (no claims in extensions), defaults to Viewer role
 /// which will be rejected by the role check below.
 pub struct RequireAdmin(pub Claims);
@@ -299,6 +310,10 @@ where
                 claims.role
             );
             return Err(StatusCode::FORBIDDEN);
+        }
+        if trial::is_expired() {
+            tracing::warn!("Admin operation rejected: evaluation trial has expired");
+            return Err(StatusCode::PAYMENT_REQUIRED);
         }
         Ok(RequireAdmin(claims))
     }

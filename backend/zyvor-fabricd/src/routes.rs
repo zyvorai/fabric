@@ -26,6 +26,17 @@ pub struct PaginationQuery {
     pub limit: Option<usize>,
 }
 
+/// GET /api/license - Evaluation trial status. Read-only (RequireRead, not
+/// RequireWrite/Admin) since checking remaining trial time shouldn't
+/// itself require the write access the trial gates.
+pub async fn get_license_status(RequireRead(_claims): RequireRead) -> impl IntoResponse {
+    Json(json!({
+        "trial": true,
+        "days_remaining": security::trial::days_remaining(),
+        "expired": security::trial::is_expired(),
+    }))
+}
+
 /// Helper: record an audit log entry to both tracing and the state store.
 fn audit(state: &AppState, user: &str, action: &str, resource: &str, status: &str) {
     let entry = security::AuditLog::new(
