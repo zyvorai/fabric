@@ -75,15 +75,9 @@ pub(crate) async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpCl
 /// talk over Ephemera's REST API, not a Rust dependency).
 const HOTPLUG_PCIE_PORTS: u8 = 4;
 
-/// q35's built-in `ich9-ahci` SATA controller (present on every VM without
-/// any boot-time device needed -- confirmed live via `qom-list` against a
-/// freshly booted VM) exposes 6 IDE-bus ports, `ide.0`..`ide.5`, all empty
-/// by default since the boot disk is virtio-blk-pci, not SATA.
-const IDE_PORTS: u8 = 6;
-
 /// `device_add` onto the first of `bus_candidates` that accepts it, trying
-/// each in turn -- used both for PCIe hotplug (`hotplug-pcie-0..N`, one
-/// device per port) and IDE hotplug (`ide.0..5`, one drive per port).
+/// each in turn -- used for PCIe hotplug (`hotplug-pcie-0..N`, one device
+/// per port).
 fn device_add_trying_buses(qmp: &QmpClient, mut device_args: serde_json::Value, bus_candidates: &[String]) -> Result<String, String> {
     let mut last_err = String::from("no candidate buses given");
     for bus in bus_candidates {
@@ -110,14 +104,6 @@ fn device_add_trying_buses(qmp: &QmpClient, mut device_args: serde_json::Value, 
 /// have already filled some of them.
 fn device_add_on_hotplug_bus(qmp: &QmpClient, device_args: serde_json::Value) -> Result<String, String> {
     let candidates: Vec<String> = (0..HOTPLUG_PCIE_PORTS).map(|i| format!("hotplug-pcie-{i}")).collect();
-    device_add_trying_buses(qmp, device_args, &candidates)
-}
-
-/// `device_add` an `ide-hd` onto one of q35's 6 built-in AHCI ports (see
-/// `IDE_PORTS`), trying each in turn since previous IDE hotplugs (or the
-/// rare VM actually booted from one) may have filled some already.
-fn device_add_on_ide_bus(qmp: &QmpClient, device_args: serde_json::Value) -> Result<String, String> {
-    let candidates: Vec<String> = (0..IDE_PORTS).map(|i| format!("ide.{i}")).collect();
     device_add_trying_buses(qmp, device_args, &candidates)
 }
 
@@ -313,6 +299,23 @@ pub async fn hotplug_disk(
         return crate::api_error::json_error(status, msg).into_response();
     }
 
+    // Reject up front, before touching QMP at all: IDE hotplug can never
+    // succeed here. Confirmed live -- q35's built-in ich9-ahci controller
+    // has 6 empty ports (ide.0..ide.5, verified present via qom-list), but
+    // every one of them rejects device_add outright with "Bus 'ide.N' does
+    // not support hotplugging" -- QEMU's AHCI ports only accept a drive
+    // declared at boot, never a runtime hot-add. A separate legacy PIIX3
+    // IDE controller doesn't help either: QEMU refuses to even device_add
+    // one ("Parameter 'driver' expects a pluggable device type").
+    if req.bus == "ide" {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "IDE disk hotplug isn't supported: QEMU's AHCI controller only accepts IDE drives \
+             declared at boot, not hot-added at runtime. Use bus=\"scsi\" (or the default virtio) instead.",
+        )
+        .into_response();
+    }
+
     let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
     };
@@ -344,14 +347,9 @@ pub async fn hotplug_disk(
     // Add device, onto whichever bus its driver actually needs: the
     // virtio-blk-pci default goes through a pre-reserved hotplug PCIe root
     // port, scsi-hd through the single virtio-scsi controller Ephemera
-    // adds at boot, ide-hd through one of q35's 6 built-in (and normally
-    // unused) AHCI ports -- see device_add_on_hotplug_bus/
-    // device_add_on_ide_bus's doc comments.
-    let driver = match req.bus.as_str() {
-        "scsi" => "scsi-hd",
-        "ide" => "ide-hd",
-        _ => "virtio-blk-pci",
-    };
+    // adds at boot -- see device_add_on_hotplug_bus's doc comment. (`ide`
+    // was already rejected above, before we got here.)
+    let driver = if req.bus == "scsi" { "scsi-hd" } else { "virtio-blk-pci" };
 
     let device_args = serde_json::json!({
         "driver": driver,
@@ -359,16 +357,14 @@ pub async fn hotplug_disk(
         "drive": node_name,
     });
 
-    let result = match driver {
-        "virtio-blk-pci" => device_add_on_hotplug_bus(&qmp, device_args),
-        "ide-hd" => device_add_on_ide_bus(&qmp, device_args),
-        _ => {
-            let mut device_args = device_args;
-            if let Some(obj) = device_args.as_object_mut() {
-                obj.insert("bus".to_string(), serde_json::json!("scsi0.0"));
-            }
-            qmp.execute("device_add", device_args).map(|_| String::from("scsi0.0")).map_err(|e| e.to_string())
+    let result = if driver == "virtio-blk-pci" {
+        device_add_on_hotplug_bus(&qmp, device_args)
+    } else {
+        let mut device_args = device_args;
+        if let Some(obj) = device_args.as_object_mut() {
+            obj.insert("bus".to_string(), serde_json::json!("scsi0.0"));
         }
+        qmp.execute("device_add", device_args).map(|_| String::from("scsi0.0")).map_err(|e| e.to_string())
     };
 
     match result {
