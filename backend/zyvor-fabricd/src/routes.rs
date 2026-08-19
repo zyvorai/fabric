@@ -771,14 +771,57 @@ pub async fn restart_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    match state.driver.reboot(&name).await {
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => {
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
+        }
+    };
+
+    // `driver.reboot()` (Ephemera stop+start, replaying its own stored
+    // launch request) used to be used here directly -- found live: any
+    // cloud-init/ssh-key change made via configure_cloud_init *after* a
+    // VM's first boot silently never took effect on a later restart,
+    // contradicting the Cloud-init tab's own "applied on next (re)start"
+    // promise. `EphemeraDriver::start_with_options` only re-translates
+    // fresh options for a VM Ephemera doesn't already know about --
+    // for an existing record it just replays what was stored at creation
+    // time. Same delete-then-recreate fix already used by
+    // add_port_forward/remove_port_forward: clear the stale Ephemera
+    // record first so the restart actually picks up this VM's current
+    // fields, not its original ones.
+    if let Err(e) = state.driver.delete(&name).await {
+        let msg = e.to_string();
+        if !msg.contains("known to Ephemera") {
+            audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "FAILED");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to clear VM '{}' for restart: {}", name, msg),
+            )
+            .into_response();
+        }
+    }
+
+    let opts = vm_model::VMStartOptions {
+        port_forwards: vm.port_forwards.clone(),
+        network_tap: vm.network_tap,
+        network_static_ip: vm.network_static_ip,
+        ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
+        cloud_init_packages: vm.cloud_init_packages.clone(),
+        cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
+        cloud_init_write_files: vm.cloud_init_write_files.clone(),
+        ..Default::default()
+    };
+
+    match state.driver.start_with_options(&vm, &opts).await {
         Ok(_) => {
-            if let Ok(Some(mut vm)) = state.store.get_vm(&name) {
-                vm.state = vm_model::VMState::Running;
-                vm.updated = Some(chrono::Utc::now());
-                if let Err(e) = state.store.save_vm(&vm) {
-                    tracing::error!("Failed to save VM state: {}", e);
-                }
+            vm.state = vm_model::VMState::Running;
+            vm.last_error = None;
+            vm.updated = Some(chrono::Utc::now());
+            if let Err(e) = state.store.save_vm(&vm) {
+                tracing::error!("Failed to save VM state: {}", e);
             }
             audit(
                 &state,
