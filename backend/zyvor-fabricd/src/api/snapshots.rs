@@ -83,8 +83,25 @@ fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), S
     .map_err(|e| e.to_string())?;
 
     let outcome = (|| {
+        let mut last_err = String::new();
         for _ in 0..50 {
-            let jobs = qmp.execute("query-jobs", serde_json::Value::Null).map_err(|e| e.to_string())?;
+            // A query-jobs poll can itself time out while QEMU's monitor is
+            // busy mid-dump (found live: a full vmstate write briefly
+            // starves new QMP connections' greeting read, surfacing as
+            // "Resource temporarily unavailable" here) -- that's a reason
+            // to keep polling, not to give up, since the underlying job
+            // reliably completed regardless (confirmed by inspecting the
+            // resulting qcow2's own snapshot list directly). Only a
+            // definite job status matters; a failed poll just means we
+            // don't know yet.
+            let jobs = match qmp.execute("query-jobs", serde_json::Value::Null) {
+                Ok(v) => v,
+                Err(e) => {
+                    last_err = e.to_string();
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    continue;
+                }
+            };
             let job = jobs
                 .as_array()
                 .into_iter()
@@ -100,7 +117,9 @@ fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), S
                 Some(_) | None => std::thread::sleep(std::time::Duration::from_millis(200)),
             }
         }
-        Err("timed out waiting for snapshot-save job to conclude".to_string())
+        Err(format!(
+            "timed out waiting for snapshot-save job to conclude (last poll error: {last_err})"
+        ))
     })();
 
     let _ = qmp.execute("job-dismiss", serde_json::json!({"id": job_id}));
