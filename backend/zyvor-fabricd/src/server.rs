@@ -3312,11 +3312,31 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                 continue;
             }
 
-            // Check if the VM is actually still running via D-Bus
+            // Check if the VM is actually still running via the driver.
+            // Only a *confirmed* non-running status justifies a restart --
+            // found live: `Ok(_) | Err(_)` here used to treat ANY error
+            // (a transient network blip talking to Ephemera's API, a
+            // timeout, Ephemera itself briefly restarting for its own
+            // deploy) as "the VM crashed", unconditionally force-restarting
+            // a VM that might be perfectly healthy and just running
+            // normally -- confirmed live: watched this fire and swap out a
+            // healthy VM's QEMU process (a 2-minute-old PID replaced by a
+            // brand new one) with no crash involved at all. An error here
+            // means "don't know", not "definitely down" -- skip and let
+            // the next tick re-check with fresh information instead.
             match state.driver.get_state(&vm.name).await {
                 Ok(vm_model::VMState::Running) => continue, // Still running, no action needed
-                Ok(_) | Err(_) => {
-                    // VM was supposed to be running but isn't — it crashed
+                Err(e) => {
+                    tracing::warn!(
+                        "Auto-healer: couldn't determine VM '{}' state ({}) -- skipping this tick rather than assuming a crash",
+                        vm.name,
+                        e
+                    );
+                    continue;
+                }
+                Ok(_) => {
+                    // VM was supposed to be running but the driver
+                    // confirms it isn't — it crashed
 
                     // Check restart count
                     let restart_count: u32 = state
