@@ -80,6 +80,23 @@ pub async fn hibernate_vm(
             tracing::warn!("Failed to quit VM after hibernate: {}", e);
         }
 
+        // Tell Ephemera itself the VM stopped, not just zyvor-fabricd's own
+        // store below -- found live: a raw QMP `quit` kills the QEMU
+        // process but Ephemera's own VmRecord.status has no way to learn
+        // that on its own until its next reconcile() tick, so it kept
+        // reporting Running with a now-dead PID. start_from_snapshot's
+        // `if vm.status == Running { return Ok(vm) }` guard (see
+        // ephemera-scheduler::VmManager::start_impl) then short-circuited
+        // on that stale status and never actually relaunched anything --
+        // resume_hibernate looked like it succeeded, but only
+        // zyvor-fabricd's own store had changed. The process here is
+        // already dead (`quit` above), so this is just a bookkeeping sync,
+        // not a real second shutdown -- `poweroff`'s underlying
+        // `process_alive` check skips straight past its kill logic.
+        if let Err(e) = state.driver.poweroff(&vm_name).await {
+            tracing::warn!("Failed to sync Ephemera's own stopped-state after hibernate: {}", e);
+        }
+
         // Update VM state
         if let Ok(Some(mut vm)) = state.store.get_vm(&vm_name) {
             vm.state = vm_model::VMState::Stopped;
