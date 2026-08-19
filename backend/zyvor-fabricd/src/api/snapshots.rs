@@ -60,7 +60,7 @@ fn default_snapshot_type() -> SnapshotType {
 /// savevm has not been found" -- and `human-monitor-command` is
 /// deliberately never allow-listed (see qmp::ALLOWED_QMP_COMMANDS), so
 /// this is the supported replacement: an async job, polled to completion.
-fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), String> {
+pub(crate) fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), String> {
     let blocks = qmp.execute("query-block", serde_json::Value::Null).map_err(|e| e.to_string())?;
     let node_name = blocks
         .as_array()

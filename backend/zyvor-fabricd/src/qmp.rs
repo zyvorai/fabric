@@ -51,6 +51,17 @@ const ALLOWED_QMP_COMMANDS: &[&str] = &[
     "snapshot-save",
     "query-jobs",
     "job-dismiss",
+    // Immediately terminates this one VM's QEMU process -- narrowly
+    // scoped (unlike human-monitor-command's arbitrary-command
+    // passthrough) and no more privileged than system_powerdown/
+    // system_reset above. Needed by hibernate_vm: once a snapshot-save
+    // has captured memory+disk state, the guest must not keep running
+    // and mutating disk state past that point, so a graceful ACPI
+    // powerdown (which the guest could ignore or delay) is the wrong
+    // tool -- found live: without this, hibernate's own "quit" call
+    // always failed (blocked by this same allowlist), leaving the VM
+    // marked Stopped in the store while its QEMU process kept running.
+    "quit",
 ];
 
 /// Check whether a QMP command is in the allowed list.
@@ -145,7 +156,6 @@ mod tests {
     #[test]
     fn test_disallowed_command_rejected() {
         assert!(!is_command_allowed("human-monitor-command"));
-        assert!(!is_command_allowed("quit"));
         assert!(!is_command_allowed(""));
         assert!(!is_command_allowed("rm -rf /"));
     }

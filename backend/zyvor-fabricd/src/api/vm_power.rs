@@ -54,7 +54,7 @@ pub async fn hibernate_vm(
         ));
     }
 
-    // Use QMP to save VM state via savevm
+    // Use QMP to save VM state
     let qmp = state
         .driver
         .get_control_socket(&vm_name)
@@ -63,9 +63,12 @@ pub async fn hibernate_vm(
         .flatten()
         .map(|p| crate::qmp::QmpClient::for_socket(p.to_string_lossy().into_owned()));
     if let Some(qmp) = qmp {
-        // Create a snapshot that includes memory state
+        // Create a snapshot that includes memory state. `savevm` (the old
+        // HMP command name) isn't a real top-level QMP command on current
+        // QEMU -- see snapshots::live_snapshot_via_qmp's doc comment for
+        // the full story; this is the same fix create_snapshot uses.
         let snap_name = format!("hibernate-{}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
-        if let Err(e) = qmp.execute("savevm", json!({"name": snap_name})) {
+        if let Err(e) = crate::api::snapshots::live_snapshot_via_qmp(&qmp, &snap_name) {
             return Err(crate::api_error::json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to save VM state: {}", e),
