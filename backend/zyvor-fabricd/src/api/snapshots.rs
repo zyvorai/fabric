@@ -54,6 +54,59 @@ fn default_snapshot_type() -> SnapshotType {
     SnapshotType::Disk
 }
 
+/// Internal (disk + memory) snapshot of a *running* VM via QMP's job-based
+/// `snapshot-save`. `savevm` (the old HMP command name) isn't a real
+/// top-level QMP command on current QEMU -- found live: "The command
+/// savevm has not been found" -- and `human-monitor-command` is
+/// deliberately never allow-listed (see qmp::ALLOWED_QMP_COMMANDS), so
+/// this is the supported replacement: an async job, polled to completion.
+fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), String> {
+    let blocks = qmp.execute("query-block", serde_json::Value::Null).map_err(|e| e.to_string())?;
+    let node_name = blocks
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|b| b.get("inserted")?.get("node-name")?.as_str())
+        .ok_or_else(|| "no attached block device to snapshot".to_string())?
+        .to_string();
+
+    let job_id = format!("snap-{}", &Uuid::new_v4().simple().to_string()[..8]);
+    qmp.execute(
+        "snapshot-save",
+        serde_json::json!({
+            "job-id": job_id,
+            "tag": tag,
+            "vmstate": node_name,
+            "devices": [node_name],
+        }),
+    )
+    .map_err(|e| e.to_string())?;
+
+    let outcome = (|| {
+        for _ in 0..50 {
+            let jobs = qmp.execute("query-jobs", serde_json::Value::Null).map_err(|e| e.to_string())?;
+            let job = jobs
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|j| j.get("id").and_then(|v| v.as_str()) == Some(job_id.as_str()));
+            match job.and_then(|j| j.get("status")).and_then(|s| s.as_str()) {
+                Some("concluded") => {
+                    return match job.and_then(|j| j.get("error")) {
+                        Some(e) => Err(e.to_string()),
+                        None => Ok(()),
+                    };
+                }
+                Some(_) | None => std::thread::sleep(std::time::Duration::from_millis(200)),
+            }
+        }
+        Err("timed out waiting for snapshot-save job to conclude".to_string())
+    })();
+
+    let _ = qmp.execute("job-dismiss", serde_json::json!({"id": job_id}));
+    outcome
+}
+
 /// POST /api/vms/:name/snapshots - Create a snapshot
 pub async fn create_snapshot(
     RequireWrite(_claims): RequireWrite,
@@ -102,12 +155,12 @@ pub async fn create_snapshot(
     // A running VM already has the disk open exclusively (qcow2's own image
     // locking) -- an external `qemu-img snapshot -c` against the same path
     // collides with that lock and fails with "Is another process using the
-    // image?". Route through QMP's `savevm` instead when the VM is running
-    // (already used for hibernate, see vm_power::hibernate_vm): it runs
-    // inside the live QEMU process, so it coordinates with the image lock
-    // instead of fighting it, and captures full VM state (disk + memory)
-    // rather than just disk. Only fall back to the external `qemu-img`
-    // path -- which needs the disk to not be held open -- for a stopped VM.
+    // image?". Route through QMP's job-based snapshot-save instead when the
+    // VM is running (see live_snapshot_via_qmp): it runs inside the live
+    // QEMU process, so it coordinates with the image lock instead of
+    // fighting it, and captures full VM state (disk + memory) rather than
+    // just disk. Only fall back to the external `qemu-img` path -- which
+    // needs the disk to not be held open -- for a stopped VM.
     let vm_running = matches!(
         state.store.get_vm(&vm_name).ok().flatten().map(|v| v.state),
         Some(vm_model::VMState::Running) | Some(vm_model::VMState::Paused)
@@ -125,7 +178,7 @@ pub async fn create_snapshot(
                 .into_response();
             }
         };
-        if let Err(e) = qmp.execute("savevm", serde_json::json!({"name": &req.name})) {
+        if let Err(e) = live_snapshot_via_qmp(&qmp, &req.name) {
             return crate::api_error::json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Live snapshot failed: {}", e),

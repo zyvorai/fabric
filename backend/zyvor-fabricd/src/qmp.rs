@@ -40,6 +40,17 @@ const ALLOWED_QMP_COMMANDS: &[&str] = &[
     "delvm",
     "cpu-add",
     "drive-backup",
+    // Modern (QEMU 6.0+) job-based internal-snapshot API. `savevm` above
+    // is the old HMP command name and isn't a real top-level QMP command
+    // on current QEMU -- found live: "The command savevm has not been
+    // found" -- `human-monitor-command` would work but is deliberately
+    // never allow-listed (see test_disallowed_command_rejected below):
+    // it's a raw HMP passthrough, a much bigger attack surface than any
+    // single whitelisted command. snapshot-save is the supported
+    // replacement for what savevm was meant to do here.
+    "snapshot-save",
+    "query-jobs",
+    "job-dismiss",
 ];
 
 /// Check whether a QMP command is in the allowed list.
