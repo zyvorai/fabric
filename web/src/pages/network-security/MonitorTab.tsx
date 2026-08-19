@@ -249,9 +249,9 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
       const req: CreateMonitorPolicyRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
-        thresholds: thresholds.length > 0 ? thresholds : undefined,
-        interval_seconds: parseInt(interval) || 60,
+        selector: { match_labels: labels },
+        thresholds,
+        sample_interval_secs: parseInt(interval) || 60,
       }
       const p = await api.createMonitorPolicy(req)
       onCreated(p)
@@ -392,9 +392,9 @@ export function EditMonitorPolicyModal({ id, onClose, onUpdated }: { id: string;
       const req: CreateMonitorPolicyRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
-        thresholds: thresholds.length > 0 ? thresholds : undefined,
-        interval_seconds: parseInt(interval) || 60,
+        selector: { match_labels: labels },
+        thresholds,
+        sample_interval_secs: parseInt(interval) || 60,
       }
       const p = await api.updateMonitorPolicy(id, req)
       onUpdated(p)

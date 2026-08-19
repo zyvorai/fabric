@@ -130,7 +130,7 @@ export function CreateQosModal({ onClose, onCreated }: { onClose: () => void; on
         name: name.trim(),
         description: description.trim() || undefined,
         interface: iface.trim(),
-        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        selector: { match_labels: labels },
         traffic_class: {
           name: 'default',
           guaranteed_rate: { value: parseInt(guaranteedRate) || 100, unit: 'mbit' },
@@ -216,7 +216,7 @@ export function EditQosModal({ id, onClose, onUpdated }: { id: string; onClose: 
         name: name.trim(),
         description: description.trim() || undefined,
         interface: iface.trim(),
-        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        selector: { match_labels: labels },
         traffic_class: {
           name: 'default',
           guaranteed_rate: { value: parseInt(guaranteedRate) || 100, unit: 'mbit' },

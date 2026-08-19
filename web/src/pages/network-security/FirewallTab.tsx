@@ -202,23 +202,21 @@ export function CreateFirewallProfileModal({ onClose, onCreated }: { onClose: ()
   const [ruleProto, setRuleProto] = useState('')
   const [rulePort, setRulePort] = useState('')
   const [ruleSrc, setRuleSrc] = useState('')
-  const [ruleDst, setRuleDst] = useState('')
   const [ruleAction, setRuleAction] = useState<FirewallAction>('accept')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
 
   const addRule = () => {
     setRules(prev => [...prev, {
+      priority: (prev.length + 1) * 10,
       protocol: ruleProto || undefined,
-      port: rulePort ? parseInt(rulePort) : undefined,
+      dest_port: rulePort ? parseInt(rulePort) : undefined,
       source_cidr: ruleSrc || undefined,
-      dest_cidr: ruleDst || undefined,
       action: ruleAction,
     }])
     setRuleProto('')
     setRulePort('')
     setRuleSrc('')
-    setRuleDst('')
   }
 
   const handleSubmit = async () => {
@@ -230,7 +228,7 @@ export function CreateFirewallProfileModal({ onClose, onCreated }: { onClose: ()
         name: name.trim(),
         description: description.trim() || undefined,
         default_action: defaultAction,
-        rules,
+        rules: rules.map((r, i) => ({ ...r, priority: (i + 1) * 10 })),
       }
       const p = await api.createFirewallProfile(req)
       onCreated(p)
@@ -259,12 +257,9 @@ export function CreateFirewallProfileModal({ onClose, onCreated }: { onClose: ()
           <div className="text-sm font-medium text-slate-300">Add Rule</div>
           <div className="grid grid-cols-2 gap-2">
             <InputField label="Protocol" value={ruleProto} onChange={setRuleProto} placeholder="tcp" />
-            <InputField label="Port" value={rulePort} onChange={setRulePort} placeholder="80" type="number" />
+            <InputField label="Dest Port" value={rulePort} onChange={setRulePort} placeholder="80" type="number" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <InputField label="Source CIDR" value={ruleSrc} onChange={setRuleSrc} placeholder="0.0.0.0/0" />
-            <InputField label="Dest CIDR" value={ruleDst} onChange={setRuleDst} placeholder="10.0.0.0/8" />
-          </div>
+          <InputField label="Source CIDR" value={ruleSrc} onChange={setRuleSrc} placeholder="0.0.0.0/0" />
           <div>
             <label className="block text-xs text-slate-400 mb-1">Action</label>
             <select value={ruleAction} onChange={e => setRuleAction(e.target.value as FirewallAction)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
@@ -283,9 +278,8 @@ export function CreateFirewallProfileModal({ onClose, onCreated }: { onClose: ()
                 <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
                   <StatusBadge status={r.action} color={r.action === 'accept' ? 'green' : 'red'} />
                   {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
-                  {r.port && <span className="text-slate-400">:{r.port}</span>}
+                  {r.dest_port && <span className="text-slate-400">:{r.dest_port}</span>}
                   {r.source_cidr && <span className="text-slate-400">src:{r.source_cidr}</span>}
-                  {r.dest_cidr && <span className="text-slate-400">dst:{r.dest_cidr}</span>}
                   <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -313,7 +307,6 @@ export function EditFirewallProfileModal({ id, onClose, onUpdated }: { id: strin
   const [ruleProto, setRuleProto] = useState('')
   const [rulePort, setRulePort] = useState('')
   const [ruleSrc, setRuleSrc] = useState('')
-  const [ruleDst, setRuleDst] = useState('')
   const [ruleAction, setRuleAction] = useState<FirewallAction>('accept')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
@@ -337,16 +330,15 @@ export function EditFirewallProfileModal({ id, onClose, onUpdated }: { id: strin
 
   const addRule = () => {
     setRules(prev => [...prev, {
+      priority: (prev.length + 1) * 10,
       protocol: ruleProto || undefined,
-      port: rulePort ? parseInt(rulePort) : undefined,
+      dest_port: rulePort ? parseInt(rulePort) : undefined,
       source_cidr: ruleSrc || undefined,
-      dest_cidr: ruleDst || undefined,
       action: ruleAction,
     }])
     setRuleProto('')
     setRulePort('')
     setRuleSrc('')
-    setRuleDst('')
   }
 
   const handleSubmit = async () => {
@@ -358,7 +350,7 @@ export function EditFirewallProfileModal({ id, onClose, onUpdated }: { id: strin
         name: name.trim(),
         description: description.trim() || undefined,
         default_action: defaultAction,
-        rules,
+        rules: rules.map((r, i) => ({ ...r, priority: (i + 1) * 10 })),
       }
       const p = await api.updateFirewallProfile(id, req)
       onUpdated(p)
@@ -402,12 +394,9 @@ export function EditFirewallProfileModal({ id, onClose, onUpdated }: { id: strin
           <div className="text-sm font-medium text-slate-300">Add Rule</div>
           <div className="grid grid-cols-2 gap-2">
             <InputField label="Protocol" value={ruleProto} onChange={setRuleProto} placeholder="tcp" />
-            <InputField label="Port" value={rulePort} onChange={setRulePort} placeholder="80" type="number" />
+            <InputField label="Dest Port" value={rulePort} onChange={setRulePort} placeholder="80" type="number" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <InputField label="Source CIDR" value={ruleSrc} onChange={setRuleSrc} placeholder="0.0.0.0/0" />
-            <InputField label="Dest CIDR" value={ruleDst} onChange={setRuleDst} placeholder="10.0.0.0/8" />
-          </div>
+          <InputField label="Source CIDR" value={ruleSrc} onChange={setRuleSrc} placeholder="0.0.0.0/0" />
           <div>
             <label className="block text-xs text-slate-400 mb-1">Action</label>
             <select value={ruleAction} onChange={e => setRuleAction(e.target.value as FirewallAction)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
@@ -426,9 +415,8 @@ export function EditFirewallProfileModal({ id, onClose, onUpdated }: { id: strin
                 <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
                   <StatusBadge status={r.action} color={r.action === 'accept' ? 'green' : 'red'} />
                   {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
-                  {r.port && <span className="text-slate-400">:{r.port}</span>}
+                  {r.dest_port && <span className="text-slate-400">:{r.dest_port}</span>}
                   {r.source_cidr && <span className="text-slate-400">src:{r.source_cidr}</span>}
-                  {r.dest_cidr && <span className="text-slate-400">dst:{r.dest_cidr}</span>}
                   <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

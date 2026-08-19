@@ -197,7 +197,15 @@ pub async fn update_vpn_tunnel(
         interface_name: req.interface_name,
         listen_port: req.listen_port,
         address: req.address,
-        private_key_ref: req.private_key_ref,
+        // GET/list redact private_key_ref before returning it, so the
+        // client can never legitimately resend the real value on an edit
+        // -- an empty string here means "leave it unchanged", not "clear
+        // the key" (which would break the tunnel outright).
+        private_key_ref: if req.private_key_ref.is_empty() {
+            existing.private_key_ref
+        } else {
+            req.private_key_ref
+        },
         peers: req.peers,
         enabled: req.enabled,
         managed: existing.managed,

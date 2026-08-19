@@ -163,6 +163,7 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
   const [description, setDescription] = useState('')
   const [interfaceName, setInterfaceName] = useState('')
   const [listenPort, setListenPort] = useState('51820')
+  const [address, setAddress] = useState('')
   const [privateKey, setPrivateKey] = useState('')
   const [peerKey, setPeerKey] = useState('')
   const [peerEndpoint, setPeerEndpoint] = useState('')
@@ -184,16 +185,20 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
   }
 
   const handleSubmit = async () => {
-    if (!name.trim()) { setErr('Name is required'); return }
+    if (!name.trim() || !interfaceName.trim() || !address.trim() || !privateKey.trim()) {
+      setErr('Name, interface name, address, and private key are required')
+      return
+    }
     setSubmitting(true)
     setErr('')
     try {
       const req: CreateVpnTunnelRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        interface_name: interfaceName.trim() || undefined,
+        interface_name: interfaceName.trim(),
         listen_port: parseInt(listenPort) || 51820,
-        private_key: privateKey.trim() || undefined,
+        address: address.trim(),
+        private_key_ref: privateKey.trim(),
         peers: peers.length > 0 ? peers : undefined,
       }
       const t = await api.createVpnTunnel(req)
@@ -214,6 +219,7 @@ export function CreateVpnTunnelModal({ onClose, onCreated }: { onClose: () => vo
           <InputField label="Interface Name" value={interfaceName} onChange={setInterfaceName} placeholder="wg0" />
           <InputField label="Listen Port" value={listenPort} onChange={setListenPort} placeholder="51820" type="number" />
         </div>
+        <InputField label="Address" value={address} onChange={setAddress} placeholder="10.10.0.1/24" />
         <InputField label="Private Key" value={privateKey} onChange={setPrivateKey} placeholder="Base64 private key" />
         <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
           <div className="text-sm font-medium text-slate-300">Add Peer</div>
@@ -309,6 +315,7 @@ export function EditVpnTunnelModal({ id, onClose, onUpdated }: { id: string; onC
   const [description, setDescription] = useState('')
   const [interfaceName, setInterfaceName] = useState('')
   const [listenPort, setListenPort] = useState('51820')
+  const [address, setAddress] = useState('')
   const [privateKey, setPrivateKey] = useState('')
   const [peerKey, setPeerKey] = useState('')
   const [peerEndpoint, setPeerEndpoint] = useState('')
@@ -325,6 +332,7 @@ export function EditVpnTunnelModal({ id, onClose, onUpdated }: { id: string; onC
       setDescription(t.description ?? '')
       setInterfaceName(t.interface_name)
       setListenPort(String(t.listen_port))
+      setAddress(t.address ?? '')
       setPeers(t.peers)
       setLoading(false)
     }).catch((e: unknown) => {
@@ -348,16 +356,23 @@ export function EditVpnTunnelModal({ id, onClose, onUpdated }: { id: string; onC
   }
 
   const handleSubmit = async () => {
-    if (!name.trim()) { setErr('Name is required'); return }
+    if (!name.trim() || !interfaceName.trim() || !address.trim()) {
+      setErr('Name, interface name, and address are required')
+      return
+    }
     setSubmitting(true)
     setErr('')
     try {
       const req: CreateVpnTunnelRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        interface_name: interfaceName.trim() || undefined,
+        interface_name: interfaceName.trim(),
         listen_port: parseInt(listenPort) || 51820,
-        private_key: privateKey.trim() || undefined,
+        address: address.trim(),
+        // Blank means "keep the existing key" -- the backend preserves it
+        // server-side since GET redacts the real key, so the client can
+        // never legitimately resend it.
+        private_key_ref: privateKey.trim(),
         peers: peers.length > 0 ? peers : undefined,
       }
       const t = await api.updateVpnTunnel(id, req)
@@ -393,6 +408,7 @@ export function EditVpnTunnelModal({ id, onClose, onUpdated }: { id: string; onC
           <InputField label="Interface Name" value={interfaceName} onChange={setInterfaceName} placeholder="wg0" />
           <InputField label="Listen Port" value={listenPort} onChange={setListenPort} placeholder="51820" type="number" />
         </div>
+        <InputField label="Address" value={address} onChange={setAddress} placeholder="10.10.0.1/24" />
         <InputField label="Private Key" value={privateKey} onChange={setPrivateKey} placeholder="Leave blank to keep existing key" />
         <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
           <div className="text-sm font-medium text-slate-300">Add Peer</div>

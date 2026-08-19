@@ -9,27 +9,45 @@ const API_BASE = '/api'
 // ─── Network Policies ────────────────────────────────────────────────────────
 
 export type PolicyDirection = 'ingress' | 'egress'
-export type PolicyAction = 'allow' | 'deny' | 'log'
-
+/** UI-only convenience shape for one rule being authored in the Add Rule
+ * form -- converted to the backend's PolicyIngressRule/PolicyEgressRule
+ * shape (from/to peer selectors + to_ports) on submit. The backend has no
+ * per-rule action: every ingress/egress entry is an allow, and anything
+ * not explicitly allowed is denied by default once a policy selects a VM. */
 export interface PolicyRule {
   direction: PolicyDirection
   protocol?: string
   port?: number
   cidr?: string
-  action: PolicyAction
+}
+
+export interface PolicyPortRule {
+  protocol?: 'tcp' | 'udp' | 'any'
+  port: number
+  end_port?: number
+}
+
+export type PolicyPeerSelector =
+  | { endpoint: { match_labels?: Record<string, string> } }
+  | { cidr: string }
+
+export interface PolicyIngressRule {
+  from?: PolicyPeerSelector[]
+  to_ports?: PolicyPortRule[]
+}
+
+export interface PolicyEgressRule {
+  to?: PolicyPeerSelector[]
+  to_ports?: PolicyPortRule[]
 }
 
 export interface NetworkPolicy {
   id: string
   name: string
   description?: string
-  labels?: Record<string, string>
-  endpoint_selector?: { match_labels?: Record<string, string> }
-  ingress_rules?: PolicyRule[]
-  egress_rules?: PolicyRule[]
-  ingress?: unknown[]
-  egress?: unknown[]
-  priority?: number
+  endpoint_selector: { match_labels?: Record<string, string> }
+  ingress: PolicyIngressRule[]
+  egress: PolicyEgressRule[]
   enabled: boolean
   managed?: boolean
   matched_vms?: number
@@ -40,10 +58,9 @@ export interface NetworkPolicy {
 export interface CreateNetworkPolicyRequest {
   name: string
   description?: string
-  labels?: Record<string, string>
-  ingress_rules?: PolicyRule[]
-  egress_rules?: PolicyRule[]
-  priority?: number
+  endpoint_selector: { match_labels: Record<string, string> }
+  ingress?: PolicyIngressRule[]
+  egress?: PolicyEgressRule[]
   enabled?: boolean
 }
 
@@ -106,10 +123,10 @@ export async function adoptIdentity(hostId: string): Promise<SecurityIdentity> {
 export type FirewallAction = 'accept' | 'drop' | 'reject' | 'log'
 
 export interface FirewallRule {
+  priority: number
   protocol?: string
-  port?: number
+  dest_port?: number
   source_cidr?: string
-  dest_cidr?: string
   action: FirewallAction
 }
 
@@ -502,9 +519,10 @@ export interface VpnTunnel {
 export interface CreateVpnTunnelRequest {
   name: string
   description?: string
-  interface_name?: string
+  interface_name: string
   listen_port?: number
-  private_key?: string
+  address: string
+  private_key_ref: string
   peers?: VpnPeer[]
   enabled?: boolean
 }
@@ -578,20 +596,22 @@ export async function vpnStatus(): Promise<{ active_tunnels: number; networks: n
 
 export type MirrorDirection = 'ingress' | 'egress' | 'both'
 
+export interface MirrorFilter {
+  protocol?: string
+  src_cidr?: string
+  dst_cidr?: string
+  dst_port?: number
+}
+
 export interface MirrorSession {
   id: string
   name: string
   description?: string
-  source_vm?: string
-  selector?: { match_labels?: Record<string, string> }
+  selector: { match_labels?: Record<string, string> }
   collector_type?: string
-  collector_target?: string
+  collector_target: string
   direction: MirrorDirection
-  collector_address?: string
-  collector_port?: number
-  filter_protocol?: string
-  filter_port?: number
-  filter_cidr?: string
+  filter?: MirrorFilter
   enabled: boolean
   managed?: boolean
   created: string
@@ -601,13 +621,10 @@ export interface MirrorSession {
 export interface CreateMirrorSessionRequest {
   name: string
   description?: string
-  source_vm: string
+  selector: { match_labels: Record<string, string> }
   direction?: MirrorDirection
-  collector_address: string
-  collector_port: number
-  filter_protocol?: string
-  filter_port?: number
-  filter_cidr?: string
+  collector_target: string
+  filter?: MirrorFilter
   enabled?: boolean
 }
 
@@ -800,9 +817,9 @@ export interface MonitorPolicy {
 export interface CreateMonitorPolicyRequest {
   name: string
   description?: string
-  labels?: Record<string, string>
-  thresholds?: MonitorThreshold[]
-  interval_seconds?: number
+  selector: { match_labels: Record<string, string> }
+  thresholds: MonitorThreshold[]
+  sample_interval_secs?: number
   enabled?: boolean
 }
 

@@ -7,7 +7,7 @@ import { Plus, RefreshCw, Pencil } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { MirrorSession, CreateMirrorSessionRequest, MirrorDirection } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
-import { StatusBadge } from './ModalShared'
+import { StatusBadge, LabelSelectorInput, LabelTags } from './ModalShared'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
 interface MirrorTabProps {
@@ -53,7 +53,7 @@ function MirrorTabContent({ sessions, onDelete, onAdopt, onEdit, onCreate, onSyn
             <thead className="bg-slate-800">
               <tr>
                 <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">Source VM</th>
+                <th className="text-left p-4 font-medium text-slate-300">Source Selector</th>
                 <th className="text-left p-4 font-medium text-slate-300">Direction</th>
                 <th className="text-left p-4 font-medium text-slate-300">Collector</th>
                 <th className="text-left p-4 font-medium text-slate-300">Filter</th>
@@ -68,8 +68,8 @@ function MirrorTabContent({ sessions, onDelete, onAdopt, onEdit, onCreate, onSyn
                       <div className="font-medium">{s.name}{isHostManaged(s) && <HostBadge />}</div>
                       {s.description && <div className="text-xs text-slate-500 mt-1">{s.description}</div>}
                     </td>
-                    <td className="p-4 font-mono text-sm text-blue-400">
-                      {s.source_vm ?? (Object.keys(s.selector?.match_labels ?? {}).length > 0 ? 'vm' : 'host')}
+                    <td className="p-4 text-sm">
+                      <LabelTags labels={s.selector?.match_labels} />
                     </td>
                   <td className="p-4">
                     <StatusBadge
@@ -78,11 +78,11 @@ function MirrorTabContent({ sessions, onDelete, onAdopt, onEdit, onCreate, onSyn
                     />
                   </td>
                     <td className="p-4 font-mono text-sm text-slate-400">
-                      {s.collector_target ?? (s.collector_address ? `${s.collector_address}:${s.collector_port ?? ''}` : '—')}
+                      {s.collector_target || '—'}
                     </td>
                   <td className="p-4 text-sm text-slate-400">
-                    {s.filter_protocol || s.filter_port || s.filter_cidr ? (
-                      <span>{[s.filter_protocol, s.filter_port && `:${s.filter_port}`, s.filter_cidr].filter(Boolean).join(' ')}</span>
+                    {s.filter?.protocol || s.filter?.dst_port || s.filter?.src_cidr || s.filter?.dst_cidr ? (
+                      <span>{[s.filter.protocol, s.filter.dst_port && `:${s.filter.dst_port}`, s.filter.src_cidr, s.filter.dst_cidr].filter(Boolean).join(' ')}</span>
                     ) : (
                       <span className="text-slate-500">all</span>
                     )}
@@ -117,7 +117,7 @@ function MirrorTabContent({ sessions, onDelete, onAdopt, onEdit, onCreate, onSyn
 export function CreateMirrorModal({ onClose, onCreated }: { onClose: () => void; onCreated: (s: MirrorSession) => void }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [sourceVm, setSourceVm] = useState('')
+  const [labels, setLabels] = useState<Record<string, string>>({})
   const [direction, setDirection] = useState<MirrorDirection>('both')
   const [collectorAddress, setCollectorAddress] = useState('')
   const [collectorPort, setCollectorPort] = useState('4789')
@@ -128,23 +128,25 @@ export function CreateMirrorModal({ onClose, onCreated }: { onClose: () => void;
   const [err, setErr] = useState('')
 
   const handleSubmit = async () => {
-    if (!name.trim() || !sourceVm.trim() || !collectorAddress.trim()) {
-      setErr('Name, source VM, and collector address are required')
+    if (!name.trim() || Object.keys(labels).length === 0 || !collectorAddress.trim()) {
+      setErr('Name, at least one source label, and collector address are required')
       return
     }
     setSubmitting(true)
     setErr('')
     try {
+      const hasFilter = filterProtocol.trim() || filterPort.trim() || filterCidr.trim()
       const req: CreateMirrorSessionRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        source_vm: sourceVm.trim(),
+        selector: { match_labels: labels },
         direction,
-        collector_address: collectorAddress.trim(),
-        collector_port: parseInt(collectorPort) || 4789,
-        filter_protocol: filterProtocol.trim() || undefined,
-        filter_port: filterPort ? parseInt(filterPort) : undefined,
-        filter_cidr: filterCidr.trim() || undefined,
+        collector_target: `${collectorAddress.trim()}:${parseInt(collectorPort) || 4789}`,
+        filter: hasFilter ? {
+          protocol: filterProtocol.trim() || undefined,
+          dst_port: filterPort ? parseInt(filterPort) : undefined,
+          dst_cidr: filterCidr.trim() || undefined,
+        } : undefined,
       }
       const s = await api.createMirrorSession(req)
       onCreated(s)
@@ -160,7 +162,7 @@ export function CreateMirrorModal({ onClose, onCreated }: { onClose: () => void;
       <div className="space-y-4">
         <InputField label="Name" value={name} onChange={setName} placeholder="debug-capture" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Debug traffic capture" />
-        <InputField label="Source VM" value={sourceVm} onChange={setSourceVm} placeholder="web-server-01" />
+        <LabelSelectorInput labels={labels} onChange={setLabels} />
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Direction</label>
           <select value={direction} onChange={e => setDirection(e.target.value as MirrorDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
@@ -195,7 +197,7 @@ export function EditMirrorModal({ id, onClose, onUpdated }: { id: string; onClos
   const [loadErr, setLoadErr] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [sourceVm, setSourceVm] = useState('')
+  const [labels, setLabels] = useState<Record<string, string>>({})
   const [direction, setDirection] = useState<MirrorDirection>('both')
   const [collectorAddress, setCollectorAddress] = useState('')
   const [collectorPort, setCollectorPort] = useState('4789')
@@ -211,13 +213,14 @@ export function EditMirrorModal({ id, onClose, onUpdated }: { id: string; onClos
       if (cancelled) return
       setName(s.name)
       setDescription(s.description ?? '')
-      setSourceVm(s.source_vm ?? '')
+      setLabels(s.selector?.match_labels ?? {})
       setDirection(s.direction)
-      setCollectorAddress(s.collector_address ?? '')
-      setCollectorPort(s.collector_port ? String(s.collector_port) : '4789')
-      setFilterProtocol(s.filter_protocol ?? '')
-      setFilterPort(s.filter_port ? String(s.filter_port) : '')
-      setFilterCidr(s.filter_cidr ?? '')
+      const [addr, port] = (s.collector_target ?? '').split(':')
+      setCollectorAddress(addr ?? '')
+      setCollectorPort(port || '4789')
+      setFilterProtocol(s.filter?.protocol ?? '')
+      setFilterPort(s.filter?.dst_port ? String(s.filter.dst_port) : '')
+      setFilterCidr(s.filter?.dst_cidr ?? s.filter?.src_cidr ?? '')
       setLoading(false)
     }).catch((e: unknown) => {
       if (cancelled) return
@@ -228,23 +231,25 @@ export function EditMirrorModal({ id, onClose, onUpdated }: { id: string; onClos
   }, [id])
 
   const handleSubmit = async () => {
-    if (!name.trim() || !sourceVm.trim() || !collectorAddress.trim()) {
-      setErr('Name, source VM, and collector address are required')
+    if (!name.trim() || Object.keys(labels).length === 0 || !collectorAddress.trim()) {
+      setErr('Name, at least one source label, and collector address are required')
       return
     }
     setSubmitting(true)
     setErr('')
     try {
+      const hasFilter = filterProtocol.trim() || filterPort.trim() || filterCidr.trim()
       const req: CreateMirrorSessionRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        source_vm: sourceVm.trim(),
+        selector: { match_labels: labels },
         direction,
-        collector_address: collectorAddress.trim(),
-        collector_port: parseInt(collectorPort) || 4789,
-        filter_protocol: filterProtocol.trim() || undefined,
-        filter_port: filterPort ? parseInt(filterPort) : undefined,
-        filter_cidr: filterCidr.trim() || undefined,
+        collector_target: `${collectorAddress.trim()}:${parseInt(collectorPort) || 4789}`,
+        filter: hasFilter ? {
+          protocol: filterProtocol.trim() || undefined,
+          dst_port: filterPort ? parseInt(filterPort) : undefined,
+          dst_cidr: filterCidr.trim() || undefined,
+        } : undefined,
       }
       const s = await api.updateMirrorSession(id, req)
       onUpdated(s)
@@ -275,7 +280,7 @@ export function EditMirrorModal({ id, onClose, onUpdated }: { id: string; onClos
       <div className="space-y-4">
         <InputField label="Name" value={name} onChange={setName} placeholder="debug-capture" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Debug traffic capture" />
-        <InputField label="Source VM" value={sourceVm} onChange={setSourceVm} placeholder="web-server-01" />
+        <LabelSelectorInput labels={labels} onChange={setLabels} />
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Direction</label>
           <select value={direction} onChange={e => setDirection(e.target.value as MirrorDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">

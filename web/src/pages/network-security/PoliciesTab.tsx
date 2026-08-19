@@ -5,10 +5,45 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, RefreshCw, Pencil, Eye } from 'lucide-react'
 import * as api from '../../api/network-security'
-import type { NetworkPolicy, CreateNetworkPolicyRequest, PolicyRule, PolicyDirection, PolicyAction, SecurityIdentity } from '../../api/network-security'
+import type { NetworkPolicy, CreateNetworkPolicyRequest, PolicyRule, PolicyDirection, PolicyIngressRule, PolicyEgressRule, SecurityIdentity } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
 import { LabelSelectorInput, LabelTags, StatusBadge } from './ModalShared'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
+
+/** One PolicyRule (UI's flat cidr+port shape) -> one backend rule with at
+ * most one peer selector and one port rule. The backend supports multiple
+ * peers/ports per rule and label-selector peers, which this simple form
+ * doesn't author -- good enough for rules created through this UI; a
+ * hand-crafted or discovered policy with richer rules just shows a
+ * simplified view when edited here. */
+function rulesToBackend(rules: PolicyRule[]): { ingress: PolicyIngressRule[]; egress: PolicyEgressRule[] } {
+  const toRule = (r: PolicyRule) => ({
+    peers: r.cidr ? [{ cidr: r.cidr }] : [],
+    ports: r.port ? [{ protocol: (r.protocol as 'tcp' | 'udp' | 'any') || 'tcp', port: r.port }] : [],
+  })
+  const ingress = rules.filter(r => r.direction === 'ingress').map(r => {
+    const { peers, ports } = toRule(r)
+    return { from: peers, to_ports: ports }
+  })
+  const egress = rules.filter(r => r.direction === 'egress').map(r => {
+    const { peers, ports } = toRule(r)
+    return { to: peers, to_ports: ports }
+  })
+  return { ingress, egress }
+}
+
+function rulesFromBackend(ingress: PolicyIngressRule[], egress: PolicyEgressRule[]): PolicyRule[] {
+  const fromPeers = (peers: PolicyIngressRule['from']) =>
+    (peers ?? []).find((p): p is { cidr: string } => 'cidr' in p)?.cidr
+  const rules: PolicyRule[] = []
+  for (const r of ingress) {
+    rules.push({ direction: 'ingress', cidr: fromPeers(r.from), protocol: r.to_ports?.[0]?.protocol, port: r.to_ports?.[0]?.port })
+  }
+  for (const r of egress) {
+    rules.push({ direction: 'egress', cidr: fromPeers(r.to), protocol: r.to_ports?.[0]?.protocol, port: r.to_ports?.[0]?.port })
+  }
+  return rules
+}
 
 interface PoliciesTabProps {
   policies: NetworkPolicy[]
@@ -73,7 +108,6 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                 <th className="text-left p-4 font-medium text-slate-300">Labels</th>
                 <th className="text-left p-4 font-medium text-slate-300">Ingress</th>
                 <th className="text-left p-4 font-medium text-slate-300">Egress</th>
-                <th className="text-left p-4 font-medium text-slate-300">Priority</th>
                 <th className="text-left p-4 font-medium text-slate-300">VMs</th>
                 <th className="text-left p-4 font-medium text-slate-300">Status</th>
                 <th className="text-left p-4 font-medium text-slate-300">Actions</th>
@@ -81,9 +115,9 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
             </thead>
             <tbody className="divide-y divide-slate-700/50">
               {policies.map(p => {
-                const ingressCount = p.ingress_rules?.length ?? p.ingress?.length ?? 0
-                const egressCount = p.egress_rules?.length ?? p.egress?.length ?? 0
-                const labels = p.labels ?? p.endpoint_selector?.match_labels
+                const ingressCount = p.ingress?.length ?? 0
+                const egressCount = p.egress?.length ?? 0
+                const labels = p.endpoint_selector?.match_labels
                 return (
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
@@ -97,7 +131,6 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                   <td className="p-4">
                     <StatusBadge status={`${egressCount} rules`} color="yellow" />
                   </td>
-                  <td className="p-4 font-mono text-sm">{p.priority ?? '—'}</td>
                   <td className="p-4 text-blue-400 font-medium">{p.matched_vms ?? (isHostManaged(p) ? 'host' : '—')}</td>
                   <td className="p-4">
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
@@ -250,13 +283,11 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [labels, setLabels] = useState<Record<string, string>>({})
-  const [priority, setPriority] = useState('100')
   const [rules, setRules] = useState<PolicyRule[]>([])
   const [ruleDir, setRuleDir] = useState<PolicyDirection>('ingress')
   const [ruleProto, setRuleProto] = useState('')
   const [rulePort, setRulePort] = useState('')
   const [ruleCidr, setRuleCidr] = useState('')
-  const [ruleAction, setRuleAction] = useState<PolicyAction>('allow')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
 
@@ -266,7 +297,6 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
       protocol: ruleProto || undefined,
       port: rulePort ? parseInt(rulePort) : undefined,
       cidr: ruleCidr || undefined,
-      action: ruleAction,
     }])
     setRuleProto('')
     setRulePort('')
@@ -278,13 +308,13 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
     setSubmitting(true)
     setErr('')
     try {
+      const { ingress, egress } = rulesToBackend(rules)
       const req: CreateNetworkPolicyRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
-        ingress_rules: rules.filter(r => r.direction === 'ingress'),
-        egress_rules: rules.filter(r => r.direction === 'egress'),
-        priority: parseInt(priority) || 100,
+        endpoint_selector: { match_labels: labels },
+        ingress,
+        egress,
       }
       const p = await api.createNetworkPolicy(req)
       onCreated(p)
@@ -301,25 +331,14 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
         <InputField label="Name" value={name} onChange={setName} placeholder="allow-web-traffic" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Allow HTTP/HTTPS ingress" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
-        <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
         <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-slate-300">Add Rule</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Direction</label>
-              <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
-                <option value="ingress">Ingress</option>
-                <option value="egress">Egress</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Action</label>
-              <select value={ruleAction} onChange={e => setRuleAction(e.target.value as PolicyAction)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
-                <option value="allow">Allow</option>
-                <option value="deny">Deny</option>
-                <option value="log">Log</option>
-              </select>
-            </div>
+          <div className="text-sm font-medium text-slate-300">Add Rule (allow)</div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Direction</label>
+            <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <option value="ingress">Ingress</option>
+              <option value="egress">Egress</option>
+            </select>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <InputField label="Protocol" value={ruleProto} onChange={setRuleProto} placeholder="tcp" />
@@ -334,7 +353,6 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
               {rules.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
                   <StatusBadge status={r.direction} color={r.direction === 'ingress' ? 'green' : 'yellow'} />
-                  <span>{r.action}</span>
                   {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
                   {r.port && <span className="text-slate-400">:{r.port}</span>}
                   {r.cidr && <span className="text-slate-400">{r.cidr}</span>}
@@ -361,13 +379,11 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [labels, setLabels] = useState<Record<string, string>>({})
-  const [priority, setPriority] = useState('100')
   const [rules, setRules] = useState<PolicyRule[]>([])
   const [ruleDir, setRuleDir] = useState<PolicyDirection>('ingress')
   const [ruleProto, setRuleProto] = useState('')
   const [rulePort, setRulePort] = useState('')
   const [ruleCidr, setRuleCidr] = useState('')
-  const [ruleAction, setRuleAction] = useState<PolicyAction>('allow')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
 
@@ -377,9 +393,8 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
       if (cancelled) return
       setName(p.name)
       setDescription(p.description ?? '')
-      setLabels(p.labels ?? p.endpoint_selector?.match_labels ?? {})
-      setPriority(String(p.priority ?? 100))
-      setRules([...(p.ingress_rules ?? []), ...(p.egress_rules ?? [])])
+      setLabels(p.endpoint_selector?.match_labels ?? {})
+      setRules(rulesFromBackend(p.ingress ?? [], p.egress ?? []))
       setLoading(false)
     }).catch((e: unknown) => {
       if (cancelled) return
@@ -395,7 +410,6 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
       protocol: ruleProto || undefined,
       port: rulePort ? parseInt(rulePort) : undefined,
       cidr: ruleCidr || undefined,
-      action: ruleAction,
     }])
     setRuleProto('')
     setRulePort('')
@@ -407,13 +421,13 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
     setSubmitting(true)
     setErr('')
     try {
+      const { ingress, egress } = rulesToBackend(rules)
       const req: CreateNetworkPolicyRequest = {
         name: name.trim(),
         description: description.trim() || undefined,
-        labels: Object.keys(labels).length > 0 ? labels : undefined,
-        ingress_rules: rules.filter(r => r.direction === 'ingress'),
-        egress_rules: rules.filter(r => r.direction === 'egress'),
-        priority: parseInt(priority) || 100,
+        endpoint_selector: { match_labels: labels },
+        ingress,
+        egress,
       }
       const p = await api.updateNetworkPolicy(id, req)
       onUpdated(p)
@@ -445,25 +459,14 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
         <InputField label="Name" value={name} onChange={setName} placeholder="allow-web-traffic" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Allow HTTP/HTTPS ingress" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
-        <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
         <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-slate-300">Add Rule</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Direction</label>
-              <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
-                <option value="ingress">Ingress</option>
-                <option value="egress">Egress</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Action</label>
-              <select value={ruleAction} onChange={e => setRuleAction(e.target.value as PolicyAction)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
-                <option value="allow">Allow</option>
-                <option value="deny">Deny</option>
-                <option value="log">Log</option>
-              </select>
-            </div>
+          <div className="text-sm font-medium text-slate-300">Add Rule (allow)</div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Direction</label>
+            <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <option value="ingress">Ingress</option>
+              <option value="egress">Egress</option>
+            </select>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <InputField label="Protocol" value={ruleProto} onChange={setRuleProto} placeholder="tcp" />
@@ -478,7 +481,6 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
               {rules.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
                   <StatusBadge status={r.direction} color={r.direction === 'ingress' ? 'green' : 'yellow'} />
-                  <span>{r.action}</span>
                   {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
                   {r.port && <span className="text-slate-400">:{r.port}</span>}
                   {r.cidr && <span className="text-slate-400">{r.cidr}</span>}

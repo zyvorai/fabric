@@ -128,7 +128,7 @@ export function CreateServiceModal({ onClose, onCreated }: { onClose: () => void
         virtual_ip: virtualIp.trim(),
         ports: [{ port: parseInt(port), protocol: protocol as 'tcp' | 'udp' }],
         algorithm,
-        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        selector: { match_labels: labels },
       }
       const s = await api.createService(req)
       onCreated(s)
@@ -218,7 +218,7 @@ export function EditServiceModal({ id, onClose, onUpdated }: { id: string; onClo
         virtual_ip: virtualIp.trim(),
         ports: [{ port: parseInt(port), protocol: protocol as 'tcp' | 'udp' }],
         algorithm,
-        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        selector: { match_labels: labels },
       }
       const s = await api.updateService(id, req)
       onUpdated(s)
