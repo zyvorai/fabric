@@ -3,12 +3,13 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Copy, Layers } from 'lucide-react'
+import { Plus, Trash2, Copy, Layers, Pencil } from 'lucide-react'
 import {
   listTemplates as fetchTemplates,
   deleteTemplate as removeTemplate,
   deployTemplate,
   createTemplate,
+  updateTemplate,
   VMTemplate,
 } from '../api/templates'
 import { listVMs, VM } from '../api/vm'
@@ -32,6 +33,7 @@ export default function Templates() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<VMTemplate | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -135,6 +137,7 @@ export default function Templates() {
               template={template}
               onDelete={() => handleDelete(template.id, template.name)}
               onInstantiate={() => handleInstantiate(template.id)}
+              onEdit={() => setEditingTemplate(template)}
             />
           ))}
         </div>
@@ -166,6 +169,18 @@ export default function Templates() {
         />
       )}
 
+      {editingTemplate && (
+        <EditTemplateDialog
+          template={editingTemplate}
+          onClose={() => setEditingTemplate(null)}
+          onSuccess={() => {
+            toast.success('Template updated')
+            setEditingTemplate(null)
+            loadTemplates()
+          }}
+        />
+      )}
+
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -184,10 +199,12 @@ function TemplateCard({
   template,
   onDelete,
   onInstantiate,
+  onEdit,
 }: {
   template: VMTemplate
   onDelete: () => void
   onInstantiate: () => void
+  onEdit: () => void
 }) {
   return (
     <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
@@ -230,6 +247,13 @@ function TemplateCard({
         >
           <Copy className="w-4 h-4" />
           Create VM
+        </button>
+        <button
+          onClick={onEdit}
+          title="Edit template"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-slate-300 hover:text-white rounded-lg transition"
+        >
+          <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={onDelete}
@@ -382,6 +406,101 @@ function SaveTemplateDialog({ vms, onClose, onSuccess }: { vms: VM[]; onClose: (
               className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">Cancel</button>
             <button type="submit" disabled={submitting}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Template'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function EditTemplateDialog({ template, onClose, onSuccess }: { template: VMTemplate; onClose: () => void; onSuccess: () => void }) {
+  const toast = useToastContext()
+  const [name, setName] = useState(template.name)
+  const [description, setDescription] = useState(template.description || '')
+  const [cpus, setCpus] = useState(String(template.cpus))
+  const [memory, setMemory] = useState(String(template.memory))
+  const [disk, setDisk] = useState(String(template.disk))
+  const [tags, setTags] = useState(template.tags.join(', '))
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cpusNum = parseInt(cpus)
+    const memoryNum = parseInt(memory)
+    const diskNum = parseInt(disk)
+    if (!Number.isInteger(cpusNum) || cpusNum < 1) { setError('CPUs must be a positive integer'); return }
+    if (!Number.isInteger(memoryNum) || memoryNum < 1) { setError('Memory must be a positive integer (MB)'); return }
+    if (!Number.isInteger(diskNum) || diskNum < 1) { setError('Disk must be a positive integer (GB)'); return }
+    setError('')
+    setSubmitting(true)
+    try {
+      await updateTemplate(template.id, {
+        name,
+        description: description || undefined,
+        cpus: cpusNum,
+        memory: memoryNum,
+        disk: diskNum,
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      })
+      onSuccess()
+    } catch (err) {
+      const msg = formatUserError(err)
+      setError(msg)
+      toastFailure(toast, 'Failed to update template', err)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+          <h2 className="text-xl font-bold">Edit Template</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
+            <span className="text-2xl">&times;</span>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Template Name</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" required autoFocus />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">CPUs</label>
+              <input type="number" min={1} value={cpus} onChange={e => setCpus(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-blue-500" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Memory (MB)</label>
+              <input type="number" min={1} value={memory} onChange={e => setMemory(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-blue-500" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Disk (GB)</label>
+              <input type="number" min={1} value={disk} onChange={e => setDisk(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-blue-500" required />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Tags (comma-separated)</label>
+            <input type="text" value={tags} onChange={e => setTags(e.target.value)} placeholder="prod, web"
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" />
+          </div>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={submitting}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={submitting}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Changes'}</button>
           </div>
         </form>
       </div>

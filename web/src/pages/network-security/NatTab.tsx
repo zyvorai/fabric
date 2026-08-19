@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
-import { Plus, Trash2, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { NatRule, CreateNatRuleRequest, NatPool, CreateNatPoolRequest, NatGatewayConfig, CreateNatGatewayRequest, NatRuleType } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
@@ -18,13 +18,20 @@ interface NatTabProps {
   onDeletePool: (id: string) => void
   onDeleteGateway: (id: string) => void
   onAdoptRule?: (id: string) => void
+  onEditRule?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onDeleteGateway, onAdoptRule, onCreate, onSync }: NatTabProps) {
+function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onDeleteGateway, onAdoptRule, onEditRule, onCreate, onSync }: NatTabProps) {
   const readOnly = useReadOnly()
   const [view, setView] = useState<'rules' | 'pools' | 'gateways'>('rules')
+  const [status, setStatus] = useState<{ active_rules: number; gateways: number } | null>(null)
+
+  const refreshStatus = () => { api.natStatus().then(setStatus).catch(() => {}) }
+  useEffect(() => { refreshStatus() }, [])
+  const handleSyncClick = async () => { await onSync(); refreshStatus() }
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -38,8 +45,13 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+              {status.active_rules} active &middot; {status.gateways} gateways
+            </span>
+          )}
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -87,12 +99,19 @@ function NatTabContent({ rules, pools, gateways, onDeleteRule, onDeletePool, onD
                       <StatusBadge status={r.enabled ? 'active' : 'disabled'} color={r.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions readOnly={readOnly}
-                        item={{ id: r.id, managed: r.managed }}
-                        onDelete={() => onDeleteRule(r.id)}
-                        onAdopt={onAdoptRule ? () => onAdoptRule(r.id) : undefined}
-                        adoptLabel="Adopt"
-                      />
+                      <div className="flex items-center gap-1">
+                        {!readOnly && !isHostManaged(r) && onEditRule && (
+                          <button onClick={() => onEditRule(r.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        <HostManagedActions readOnly={readOnly}
+                          item={{ id: r.id, managed: r.managed }}
+                          onDelete={() => onDeleteRule(r.id)}
+                          onAdopt={onAdoptRule ? () => onAdoptRule(r.id) : undefined}
+                          adoptLabel="Adopt"
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -330,6 +349,118 @@ export function CreateNatGatewayModal({ onClose, onCreated }: { onClose: () => v
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Gateway'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditNatRuleModal({ id, onClose, onUpdated }: { id: string; onClose: () => void; onUpdated: (r: NatRule) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [ruleType, setRuleType] = useState<NatRuleType>('masquerade')
+  const [sourceCidr, setSourceCidr] = useState('')
+  const [destCidr, setDestCidr] = useState('')
+  const [protocol, setProtocol] = useState('')
+  const [port, setPort] = useState('')
+  const [translateAddress, setTranslateAddress] = useState('')
+  const [translatePort, setTranslatePort] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getNatRule(id).then(r => {
+      if (cancelled) return
+      setName(r.name)
+      setDescription(r.description ?? '')
+      setRuleType(r.rule_type)
+      setSourceCidr(r.source_cidr ?? '')
+      setDestCidr(r.dest_cidr ?? '')
+      setProtocol(r.protocol ?? '')
+      setPort(r.dest_port ? String(r.dest_port) : '')
+      setTranslateAddress(r.translate_to ?? '')
+      setTranslatePort(r.translate_port ? String(r.translate_port) : '')
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setLoadErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateNatRuleRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        rule_type: ruleType,
+        source_cidr: sourceCidr.trim() || undefined,
+        dest_cidr: destCidr.trim() || undefined,
+        protocol: (protocol.trim() || undefined) as CreateNatRuleRequest['protocol'],
+        dest_port: port ? parseInt(port) : undefined,
+        translate_to: translateAddress.trim() || undefined,
+        translate_port: translatePort ? parseInt(translatePort) : undefined,
+      }
+      const r = await api.updateNatRule(id, req)
+      onUpdated(r)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <ModalWrapper title="Edit NAT Rule" onClose={onClose}>
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </ModalWrapper>
+    )
+  }
+  if (loadErr) {
+    return (
+      <ModalWrapper title="Edit NAT Rule" onClose={onClose}>
+        <p className="text-red-400 text-sm">{loadErr}</p>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title="Edit NAT Rule" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="outbound-masq" />
+        <InputField label="Description" value={description} onChange={setDescription} placeholder="Outbound masquerade" />
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">NAT Type</label>
+          <select value={ruleType} onChange={e => setRuleType(e.target.value as NatRuleType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="masquerade">Masquerade</option>
+            <option value="snat">SNAT</option>
+            <option value="dnat">DNAT</option>
+            <option value="hairpin">Hairpin</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Source CIDR" value={sourceCidr} onChange={setSourceCidr} placeholder="192.168.0.0/16" />
+          <InputField label="Dest CIDR" value={destCidr} onChange={setDestCidr} placeholder="0.0.0.0/0" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Protocol" value={protocol} onChange={setProtocol} placeholder="tcp" />
+          <InputField label="Port" value={port} onChange={setPort} placeholder="80" type="number" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Translate Address" value={translateAddress} onChange={setTranslateAddress} placeholder="203.0.113.1" />
+          <InputField label="Translate Port" value={translatePort} onChange={setTranslatePort} placeholder="8080" type="number" />
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

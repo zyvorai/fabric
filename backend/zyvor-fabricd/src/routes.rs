@@ -440,6 +440,9 @@ pub async fn add_port_forward(
             network_tap: vm.network_tap,
             network_static_ip: vm.network_static_ip,
             ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
+            cloud_init_packages: vm.cloud_init_packages.clone(),
+            cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
+            cloud_init_write_files: vm.cloud_init_write_files.clone(),
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -458,6 +461,93 @@ pub async fn add_port_forward(
     }
 
     audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "SUCCESS");
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
+/// Remove a previously-added port forward by its host port. Same
+/// recreate-on-running-VM reasoning as `add_port_forward` above: usermode
+/// networking only accepts forwards at instance-creation time, so removing
+/// one from a running VM means destroying and relaunching it with the
+/// updated (shorter) forward set.
+pub async fn remove_port_forward(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, host_port)): Path<(String, u16)>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => {
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
+        }
+    };
+
+    let before = vm.port_forwards.len();
+    vm.port_forwards.retain(|f| f.host_port != host_port);
+    if vm.port_forwards.len() == before {
+        return json_error(
+            StatusCode::NOT_FOUND,
+            format!("no port forward for host port {} on this VM", host_port),
+        )
+        .into_response();
+    }
+
+    let was_running = matches!(
+        vm.state,
+        vm_model::VMState::Running | vm_model::VMState::Starting | vm_model::VMState::Paused
+    );
+
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+            .into_response();
+    }
+
+    if let Err(e) = state.driver.delete(&name).await {
+        let msg = e.to_string();
+        if !msg.contains("known to Ephemera") {
+            audit(&state, &claims.sub, "REMOVE_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to clear VM '{}' for recreation without the removed port forward: {}", name, msg),
+            )
+            .into_response();
+        }
+    }
+
+    if was_running {
+        let opts = vm_model::VMStartOptions {
+            port_forwards: vm.port_forwards.clone(),
+            network_tap: vm.network_tap,
+            network_static_ip: vm.network_static_ip,
+            ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
+            cloud_init_packages: vm.cloud_init_packages.clone(),
+            cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
+            cloud_init_write_files: vm.cloud_init_write_files.clone(),
+            ..Default::default()
+        };
+        if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
+            audit(&state, &claims.sub, "REMOVE_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Removed the forward but failed to restart VM '{}': {}", name, e),
+            )
+            .into_response();
+        }
+        vm.state = vm_model::VMState::Running;
+        vm.last_error = None;
+        if let Err(e) = state.store.save_vm(&vm) {
+            tracing::error!("Failed to save VM state after port-forward removal recreate: {}", e);
+        }
+    }
+
+    audit(&state, &claims.sub, "REMOVE_PORT_FORWARD", &format!("vm/{}", name), "SUCCESS");
     (StatusCode::OK, Json(vm)).into_response()
 }
 
@@ -575,6 +665,9 @@ pub async fn start_vm(
             network_tap: vm.network_tap,
             network_static_ip: vm.network_static_ip,
             ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
+            cloud_init_packages: vm.cloud_init_packages.clone(),
+            cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
+            cloud_init_write_files: vm.cloud_init_write_files.clone(),
             ..Default::default()
         });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;
@@ -1022,18 +1115,74 @@ fn extract_ssh_keys_from_user_data(user_data: &str) -> Vec<String> {
     keys
 }
 
-/// Only `hostname` and any `ssh_authorized_keys` found in `user_data` are
-/// actually applied on the VM's next (re)launch, via Ephemera's own
-/// CloudInitSpec (see EphemeraDriver::translate_start_options) -- the ISO
-/// this also generates is not currently attached to any VM at all, so
-/// anything else in user_data (packages, runcmd, write_files, ...) is
-/// presentation-only for now, not a live no-op regression. Persisting even
-/// just these two matters beyond the values themselves: they're what makes
-/// Ephemera attach a cloud-init seed disk at all, which is what lets
+/// Pulls `packages` (top-level `packages:` list) out of arbitrary
+/// cloud-config YAML. Best-effort, same reasoning as
+/// `extract_ssh_keys_from_user_data`.
+fn extract_packages_from_user_data(user_data: &str) -> Vec<String> {
+    let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(user_data) else {
+        return Vec::new();
+    };
+    doc.get("packages")
+        .and_then(|v| v.as_sequence())
+        .map(|seq| seq.iter().filter_map(|p| p.as_str().map(String::from)).collect())
+        .unwrap_or_default()
+}
+
+/// Pulls `runcmd` (top-level `runcmd:` list) out of arbitrary cloud-config
+/// YAML. Each entry may be a plain string or a YAML sequence
+/// (`[bash, -lc, "..."]`); sequence entries are rejoined with spaces since
+/// Ephemera's own `CloudInitSpec.runcmd` is a flat `Vec<String>` of shell
+/// commands, not argv arrays.
+fn extract_runcmd_from_user_data(user_data: &str) -> Vec<String> {
+    let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(user_data) else {
+        return Vec::new();
+    };
+    let Some(seq) = doc.get("runcmd").and_then(|v| v.as_sequence()) else {
+        return Vec::new();
+    };
+    seq.iter()
+        .filter_map(|entry| {
+            if let Some(s) = entry.as_str() {
+                Some(s.to_string())
+            } else {
+                entry.as_sequence().map(|parts| {
+                    parts.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join(" ")
+                })
+            }
+        })
+        .collect()
+}
+
+/// Pulls `write_files` (top-level `write_files:` list, each with `path` and
+/// `content`) out of arbitrary cloud-config YAML. Entries missing either
+/// field are skipped rather than erroring the whole request.
+fn extract_write_files_from_user_data(user_data: &str) -> Vec<vm_model::CloudInitFile> {
+    let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(user_data) else {
+        return Vec::new();
+    };
+    let Some(seq) = doc.get("write_files").and_then(|v| v.as_sequence()) else {
+        return Vec::new();
+    };
+    seq.iter()
+        .filter_map(|entry| {
+            let path = entry.get("path")?.as_str()?.to_string();
+            let content = entry.get("content")?.as_str()?.to_string();
+            let permissions = entry.get("permissions").and_then(|v| v.as_str()).map(String::from);
+            Some(vm_model::CloudInitFile { path, content, permissions })
+        })
+        .collect()
+}
+
+/// `hostname`, `ssh_authorized_keys`, `packages`, `runcmd`, and
+/// `write_files` found in `user_data` are all persisted onto the VM record
+/// and applied on its next (re)launch, via Ephemera's own CloudInitSpec (see
+/// EphemeraDriver::translate_start_options). Persisting even just the empty
+/// case matters beyond the values themselves: any cloud-init config at all
+/// is what makes Ephemera attach a cloud-init seed disk, which is what lets
 /// cloud-init find a datasource and run its own default network config --
 /// without one, a guest's DHCP client never comes up (found live: this
-/// endpoint wrote an ISO no VM ever received, so cloud-init and therefore
-/// networking silently never worked for any VM here).
+/// endpoint used to write an ISO no VM ever received, so cloud-init and
+/// therefore networking silently never worked for any VM here).
 pub async fn configure_cloud_init(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
@@ -1051,6 +1200,9 @@ pub async fn configure_cloud_init(
             if !keys.is_empty() {
                 vm.ssh_authorized_keys = keys;
             }
+            vm.cloud_init_packages = extract_packages_from_user_data(user_data);
+            vm.cloud_init_runcmd = extract_runcmd_from_user_data(user_data);
+            vm.cloud_init_write_files = extract_write_files_from_user_data(user_data);
         }
         if let Err(e) = state.store.save_vm(&vm) {
             tracing::warn!("Failed to persist cloud-init settings for VM '{}': {}", vm_name, e);

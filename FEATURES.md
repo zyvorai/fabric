@@ -88,12 +88,13 @@
 
 ## Cloud-Init
 
-- NoCloud ISO generation
+- NoCloud seed generation via Ephemera's `CloudInitSpec`, attached on the VM's next (re)start
 - User-data and meta-data support
 - Network configuration
 - SSH key injection
-- Package installation
-- Custom script execution
+- Package installation (`packages`)
+- Custom script execution (`runcmd`)
+- File writes into the guest before first boot (`write_files`, with optional permissions)
 
 ## TPM / vTPM
 
@@ -193,7 +194,7 @@
 - nftables integration
 - Forwards bind `0.0.0.0`, so they're reachable from any client on the network, not just from the host itself
 - Set at VM creation via the Create VM wizard's "Expose ports" section (with a one-click Expose SSH (22) preset), or added/removed later for a running or stopped VM from its Network tab
-- Adding or removing a forward on a running VM restarts it automatically to apply the change
+- Adding or removing a forward on a running VM restarts it automatically to apply the change (`POST`/`DELETE /api/vms/:name/port-forwards`)
 
 ### Network Modes
 
@@ -215,6 +216,7 @@
 - **Packet Mirror** -- Direction selector (ingress/egress/both), collector target, protocol/port/CIDR filters
 - **NAT Gateway** -- Rule types (masquerade/SNAT/DNAT/hairpin), IP pool editor, gateway configuration
 - **Network Monitor** -- Threshold builder (metric/value/unit/direction/severity), live metrics, alert management
+- Create and edit modals for every resource type above, plus bridges, bonds, and VLANs on the Network page
 
 ### VPN Mesh
 
@@ -279,6 +281,7 @@
 - Performance analytics
 - Predictive DRS (4 algorithms)
 - Datacenters management
+- CPU pinning (Auto, Explicit vCPU-to-pCPU map, NUMA node, Socket) and NUMA/CPU topology inspection, from the VM's Advanced tab
 
 ## Notifications
 

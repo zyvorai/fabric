@@ -64,6 +64,25 @@ pub struct VM {
     /// working port forward -- ever coming up).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ssh_authorized_keys: Vec<String>,
+    /// APT/dnf packages to install via cloud-init on (re)creation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cloud_init_packages: Vec<String>,
+    /// Shell commands to run via cloud-init `runcmd` on first boot.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cloud_init_runcmd: Vec<String>,
+    /// Files to write into the guest before first boot via cloud-init
+    /// `write_files`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cloud_init_write_files: Vec<CloudInitFile>,
+}
+
+/// A file to write into the guest before first boot via cloud-init.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CloudInitFile {
+    pub path: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -315,6 +334,16 @@ pub struct VMStartOptions {
     /// config, which is what actually brings the guest's DHCP client up.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ssh_authorized_keys: Vec<String>,
+    /// APT/dnf packages to install via cloud-init on (re)creation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cloud_init_packages: Vec<String>,
+    /// Shell commands to run via cloud-init `runcmd` on first boot.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cloud_init_runcmd: Vec<String>,
+    /// Files to write into the guest before first boot via cloud-init
+    /// `write_files`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cloud_init_write_files: Vec<CloudInitFile>,
     /// Firmware definition file path
     #[serde(skip_serializing_if = "Option::is_none")]
     pub firmware: Option<String>,
@@ -884,6 +913,9 @@ impl VM {
             network_tap: false,
             network_static_ip: false,
             ssh_authorized_keys: Vec::new(),
+            cloud_init_packages: Vec::new(),
+            cloud_init_runcmd: Vec::new(),
+            cloud_init_write_files: Vec::new(),
         }
     }
 
@@ -909,6 +941,9 @@ impl VM {
             network_tap: req.network_tap,
             network_static_ip: req.network_static_ip,
             ssh_authorized_keys: Vec::new(),
+            cloud_init_packages: Vec::new(),
+            cloud_init_runcmd: Vec::new(),
+            cloud_init_write_files: Vec::new(),
         }
     }
 }
@@ -1094,6 +1129,9 @@ mod tests {
             network_user_mode: false,
             port_forwards: vec![PortForwardSpec { host_port: 2222, guest_port: 22, protocol: "tcp".into() }],
             ssh_authorized_keys: vec!["ssh-ed25519 AAAA test".into()],
+            cloud_init_packages: vec!["curl".into()],
+            cloud_init_runcmd: vec!["echo hi".into()],
+            cloud_init_write_files: vec![CloudInitFile { path: "/etc/motd".into(), content: "hi".into(), permissions: Some("0644".into()) }],
             firmware: Some("/usr/share/ovmf/OVMF.fd".into()),
             discard_disk: Some(true),
             grow_image: Some("50G".into()),

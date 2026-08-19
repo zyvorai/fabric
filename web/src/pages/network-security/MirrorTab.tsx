@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, RefreshCw, Pencil } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { MirrorSession, CreateMirrorSessionRequest, MirrorDirection } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
@@ -14,18 +14,30 @@ interface MirrorTabProps {
   sessions: MirrorSession[]
   onDelete: (id: string) => void
   onAdopt?: (id: string) => void
+  onEdit?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function MirrorTabContent({ sessions, onDelete, onAdopt, onCreate, onSync }: MirrorTabProps) {
+function MirrorTabContent({ sessions, onDelete, onAdopt, onEdit, onCreate, onSync }: MirrorTabProps) {
   const readOnly = useReadOnly()
+  const [status, setStatus] = useState<{ active_sessions: number; mirrored_vms: number } | null>(null)
+
+  const refreshStatus = () => { api.mirrorStatus().then(setStatus).catch(() => {}) }
+  useEffect(() => { refreshStatus() }, [])
+  const handleSyncClick = async () => { await onSync(); refreshStatus() }
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Packet Mirror</h2>
-        <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+              {status.active_sessions} active &middot; {status.mirrored_vms} mirrored VMs
+            </span>
+          )}
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -79,11 +91,18 @@ function MirrorTabContent({ sessions, onDelete, onAdopt, onCreate, onSync }: Mir
                     <StatusBadge status={s.enabled ? 'active' : 'disabled'} color={s.enabled ? 'green' : 'gray'} />
                   </td>
                     <td className="p-4">
-                      <HostManagedActions readOnly={readOnly}
-                        item={{ id: s.id, managed: s.managed }}
-                        onDelete={() => onDelete(s.id)}
-                        onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}
-                      />
+                      <div className="flex items-center gap-1">
+                        {!readOnly && !isHostManaged(s) && onEdit && (
+                          <button onClick={() => onEdit(s.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        <HostManagedActions readOnly={readOnly}
+                          item={{ id: s.id, managed: s.managed }}
+                          onDelete={() => onDelete(s.id)}
+                          onAdopt={onAdopt ? () => onAdopt(s.id) : undefined}
+                        />
+                      </div>
                     </td>
                 </tr>
               ))}
@@ -165,6 +184,121 @@ export function CreateMirrorModal({ onClose, onCreated }: { onClose: () => void;
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Session'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditMirrorModal({ id, onClose, onUpdated }: { id: string; onClose: () => void; onUpdated: (s: MirrorSession) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [sourceVm, setSourceVm] = useState('')
+  const [direction, setDirection] = useState<MirrorDirection>('both')
+  const [collectorAddress, setCollectorAddress] = useState('')
+  const [collectorPort, setCollectorPort] = useState('4789')
+  const [filterProtocol, setFilterProtocol] = useState('')
+  const [filterPort, setFilterPort] = useState('')
+  const [filterCidr, setFilterCidr] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getMirrorSession(id).then(s => {
+      if (cancelled) return
+      setName(s.name)
+      setDescription(s.description ?? '')
+      setSourceVm(s.source_vm ?? '')
+      setDirection(s.direction)
+      setCollectorAddress(s.collector_address ?? '')
+      setCollectorPort(s.collector_port ? String(s.collector_port) : '4789')
+      setFilterProtocol(s.filter_protocol ?? '')
+      setFilterPort(s.filter_port ? String(s.filter_port) : '')
+      setFilterCidr(s.filter_cidr ?? '')
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setLoadErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !sourceVm.trim() || !collectorAddress.trim()) {
+      setErr('Name, source VM, and collector address are required')
+      return
+    }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateMirrorSessionRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        source_vm: sourceVm.trim(),
+        direction,
+        collector_address: collectorAddress.trim(),
+        collector_port: parseInt(collectorPort) || 4789,
+        filter_protocol: filterProtocol.trim() || undefined,
+        filter_port: filterPort ? parseInt(filterPort) : undefined,
+        filter_cidr: filterCidr.trim() || undefined,
+      }
+      const s = await api.updateMirrorSession(id, req)
+      onUpdated(s)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <ModalWrapper title="Edit Mirror Session" onClose={onClose}>
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </ModalWrapper>
+    )
+  }
+  if (loadErr) {
+    return (
+      <ModalWrapper title="Edit Mirror Session" onClose={onClose}>
+        <p className="text-red-400 text-sm">{loadErr}</p>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title="Edit Mirror Session" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="debug-capture" />
+        <InputField label="Description" value={description} onChange={setDescription} placeholder="Debug traffic capture" />
+        <InputField label="Source VM" value={sourceVm} onChange={setSourceVm} placeholder="web-server-01" />
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Direction</label>
+          <select value={direction} onChange={e => setDirection(e.target.value as MirrorDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="both">Both</option>
+            <option value="ingress">Ingress</option>
+            <option value="egress">Egress</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Collector Address" value={collectorAddress} onChange={setCollectorAddress} placeholder="10.0.0.50" />
+          <InputField label="Collector Port" value={collectorPort} onChange={setCollectorPort} placeholder="4789" type="number" />
+        </div>
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Filters (optional)</div>
+          <div className="grid grid-cols-3 gap-2">
+            <InputField label="Protocol" value={filterProtocol} onChange={setFilterProtocol} placeholder="tcp" />
+            <InputField label="Port" value={filterPort} onChange={setFilterPort} placeholder="80" type="number" />
+            <InputField label="CIDR" value={filterCidr} onChange={setFilterCidr} placeholder="10.0.0.0/8" />
+          </div>
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

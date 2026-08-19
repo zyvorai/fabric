@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { VlanConfig, CreateVlanRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
@@ -15,9 +15,10 @@ interface VlansTabProps {
   onDelete: (id: string) => void
   onAdopt: (id: string) => void
   onCreate: () => void
+  onEdit: (v: VlanConfig) => void
 }
 
-function VlansTabContent({ vlans, onDelete, onAdopt, onCreate }: VlansTabProps) {
+function VlansTabContent({ vlans, onDelete, onAdopt, onCreate, onEdit }: VlansTabProps) {
   const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -80,7 +81,14 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate }: VlansTabProps) 
                   <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{v.dhcp}</td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly} item={v} onDelete={() => onDelete(v.id)} onAdopt={() => onAdopt(v.id)} />
+                    <div className="flex items-center gap-1">
+                      {!readOnly && !isHostManaged(v) && (
+                        <button onClick={() => onEdit(v)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Edit VLAN" type="button">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <HostManagedActions readOnly={readOnly} item={v} onDelete={() => onDelete(v.id)} onAdopt={() => onAdopt(v.id)} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -137,6 +145,53 @@ export function CreateVlanModal({ onClose, onCreated }: { onClose: () => void; o
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create VLAN'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditVlanModal({ vlan, onClose, onUpdated }: { vlan: VlanConfig; onClose: () => void; onUpdated: (v: VlanConfig) => void }) {
+  const [name, setName] = useState(vlan.name)
+  const [vlanId, setVlanId] = useState(String(vlan.vlan_id))
+  const [parent, setParent] = useState(vlan.parent_interface)
+  const [addresses, setAddresses] = useState(vlan.addresses.join(', '))
+  const [gateway, setGateway] = useState(vlan.gateway ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !vlanId || !parent.trim()) { setErr('Name, VLAN ID, and parent interface are required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateVlanRequest = {
+        name: name.trim(),
+        vlan_id: parseInt(vlanId),
+        parent_interface: parent.trim(),
+        addresses: addresses ? addresses.split(',').map(s => s.trim()).filter(Boolean) : [],
+        gateway: gateway.trim() || undefined,
+      }
+      const updated = await api.updateVlan(vlan.id, req)
+      onUpdated(updated)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Edit VLAN" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="vlan100" />
+        <InputField label="VLAN ID" value={vlanId} onChange={setVlanId} placeholder="100" type="number" />
+        <InputField label="Parent Interface" value={parent} onChange={setParent} placeholder="eth0" />
+        <InputField label="Addresses (comma-separated)" value={addresses} onChange={setAddresses} placeholder="192.168.100.1/24" />
+        <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder="192.168.100.254" />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

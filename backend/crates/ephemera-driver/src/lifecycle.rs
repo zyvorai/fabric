@@ -262,6 +262,17 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
             hostname: vm.hostname.clone(),
             ssh_authorized_keys: opts.ssh_authorized_keys.clone(),
             static_network: opts.network_tap && opts.network_static_ip,
+            packages: opts.cloud_init_packages.clone(),
+            runcmd: opts.cloud_init_runcmd.clone(),
+            write_files: opts
+                .cloud_init_write_files
+                .iter()
+                .map(|f| zyvor_fabric_ephemera_client::CloudInitFile {
+                    path: f.path.clone(),
+                    content: f.content.clone(),
+                    permissions: f.permissions.clone(),
+                })
+                .collect(),
             ..Default::default()
         }),
         ttl_seconds: None,

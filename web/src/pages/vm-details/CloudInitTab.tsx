@@ -81,7 +81,11 @@ export default function CloudInitTab({ vm }: { vm: VM }) {
           ? (JSON.parse(networkConfig) as Record<string, unknown>)
           : null,
       })
-      toast.success('Cloud-init ISO generated and attached')
+      toast.success(
+        vm.state === 'running'
+          ? 'Cloud-init settings saved — restart the VM to apply them'
+          : 'Cloud-init settings saved — will apply on next start',
+      )
     } catch (err) {
       const msg = formatUserError(err)
       setSubmitError(msg)
@@ -108,6 +112,13 @@ export default function CloudInitTab({ vm }: { vm: VM }) {
           <Cloud className="w-4 h-4 text-sky-400" />
           NoCloud datasource
         </div>
+
+        <p className="text-xs text-slate-500 -mt-2">
+          Hostname and, from User data, any <code className="text-slate-400">ssh_authorized_keys</code>,{' '}
+          <code className="text-slate-400">packages</code>, <code className="text-slate-400">runcmd</code>, and{' '}
+          <code className="text-slate-400">write_files</code> are applied on this VM's next (re)start. Instance ID
+          and Network config below are not currently applied to a live guest.
+        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

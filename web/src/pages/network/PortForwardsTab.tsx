@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Eye } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { PortForwardConfig, CreatePortForwardRequest, Protocol } from '../../api/networkd'
-import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage, DetailModal } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
@@ -33,6 +33,24 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
   const [originFilter, setOriginFilter] = useState<PfOriginFilter>('all')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
+  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [viewData, setViewData] = useState<PortForwardConfig | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [viewErr, setViewErr] = useState('')
+
+  const handleView = async (id: string) => {
+    setViewingId(id)
+    setViewLoading(true)
+    setViewErr('')
+    setViewData(null)
+    try {
+      setViewData(await api.getPortForward(id))
+    } catch (e: unknown) {
+      setViewErr(extractErrorMessage(e))
+    } finally {
+      setViewLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -137,11 +155,16 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
                   <td className="p-4 font-mono text-sm text-slate-400">{pf.guest_ip}:{pf.guest_port}</td>
                   <td className="p-4">{pf.enabled ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly}
-                      item={pf}
-                      onDelete={() => onDelete(pf.id)}
-                      onAdopt={onAdopt ? () => onAdopt(pf.id) : undefined}
-                    />
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleView(pf.id)} className="p-2 hover:bg-white/[0.06] rounded transition" title="View details" type="button">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <HostManagedActions readOnly={readOnly}
+                        item={pf}
+                        onDelete={() => onDelete(pf.id)}
+                        onAdopt={onAdopt ? () => onAdopt(pf.id) : undefined}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -152,6 +175,15 @@ function PortForwardsTabContent({ portForwards, onDelete, onAdopt, onCreate, onS
           )}
           </div>
         </>
+      )}
+      {viewingId && (
+        <DetailModal
+          title="Port Forward Details"
+          data={viewData as unknown as Record<string, unknown> | null}
+          loading={viewLoading}
+          error={viewErr}
+          onClose={() => setViewingId(null)}
+        />
       )}
     </div>
   )

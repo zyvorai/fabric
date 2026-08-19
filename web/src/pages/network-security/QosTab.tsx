@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, RefreshCw, Pencil } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { QoSPolicy, CreateQoSPolicyRequest } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
@@ -18,18 +18,30 @@ interface QosTabProps {
   policies: QoSPolicy[]
   onDelete: (id: string) => void
   onAdopt?: (id: string) => void
+  onEdit?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function QosTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: QosTabProps) {
+function QosTabContent({ policies, onDelete, onAdopt, onEdit, onCreate, onSync }: QosTabProps) {
   const readOnly = useReadOnly()
+  const [status, setStatus] = useState<{ active_policies: number; shaped_vms: number } | null>(null)
+
+  const refreshStatus = () => { api.qosStatus().then(setStatus).catch(() => {}) }
+  useEffect(() => { refreshStatus() }, [])
+  const handleSyncClick = async () => { await onSync(); refreshStatus() }
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
         <h2 className="text-xl font-semibold">QoS / Traffic Shaping</h2>
-        <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+              {status.active_policies} active &middot; {status.shaped_vms} shaped VMs
+            </span>
+          )}
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -74,11 +86,18 @@ function QosTabContent({ policies, onDelete, onAdopt, onCreate, onSync }: QosTab
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly}
-                      item={{ id: p.id, managed: p.managed }}
-                      onDelete={() => onDelete(p.id)}
-                      onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
-                    />
+                    <div className="flex items-center gap-1">
+                      {!readOnly && !isHostManaged(p) && onEdit && (
+                        <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <HostManagedActions readOnly={readOnly}
+                        item={{ id: p.id, managed: p.managed }}
+                        onDelete={() => onDelete(p.id)}
+                        onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -147,6 +166,107 @@ export function CreateQosModal({ onClose, onCreated }: { onClose: () => void; on
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create QoS Policy'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditQosModal({ id, onClose, onUpdated }: { id: string; onClose: () => void; onUpdated: (p: QoSPolicy) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [iface, setIface] = useState('eth0')
+  const [labels, setLabels] = useState<Record<string, string>>({})
+  const [guaranteedRate, setGuaranteedRate] = useState('100')
+  const [maxRate, setMaxRate] = useState('100')
+  const [burst, setBurst] = useState('')
+  const [priority, setPriority] = useState('4')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getQosPolicy(id).then(p => {
+      if (cancelled) return
+      setName(p.name)
+      setDescription(p.description ?? '')
+      setIface(p.interface)
+      setLabels(p.selector?.match_labels ?? {})
+      setGuaranteedRate(String(p.traffic_class?.guaranteed_rate?.value ?? 100))
+      setMaxRate(String(p.traffic_class?.max_rate?.value ?? 100))
+      setBurst(p.traffic_class?.burst ?? '')
+      setPriority(String(p.traffic_class?.priority ?? 4))
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setLoadErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !iface.trim()) { setErr('Name and interface are required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateQoSPolicyRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        interface: iface.trim(),
+        selector: Object.keys(labels).length > 0 ? { match_labels: labels } : undefined,
+        traffic_class: {
+          name: 'default',
+          guaranteed_rate: { value: parseInt(guaranteedRate) || 100, unit: 'mbit' },
+          max_rate: { value: parseInt(maxRate) || 100, unit: 'mbit' },
+          burst: burst.trim() || undefined,
+          priority: parseInt(priority) || 4,
+        },
+      }
+      const p = await api.updateQosPolicy(id, req)
+      onUpdated(p)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <ModalWrapper title="Edit QoS Policy" onClose={onClose}>
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </ModalWrapper>
+    )
+  }
+  if (loadErr) {
+    return (
+      <ModalWrapper title="Edit QoS Policy" onClose={onClose}>
+        <p className="text-red-400 text-sm">{loadErr}</p>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title="Edit QoS Policy" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="high-priority" />
+        <InputField label="Description" value={description} onChange={setDescription} placeholder="High priority traffic shaping" />
+        <InputField label="Interface" value={iface} onChange={setIface} placeholder="eth0" />
+        <LabelSelectorInput labels={labels} onChange={setLabels} />
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Guaranteed (mbit)" value={guaranteedRate} onChange={setGuaranteedRate} placeholder="100" type="number" />
+          <InputField label="Max (mbit)" value={maxRate} onChange={setMaxRate} placeholder="1000" type="number" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Burst" value={burst} onChange={setBurst} placeholder="32kbit" />
+          <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

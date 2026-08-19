@@ -80,14 +80,18 @@ packages:
   - docker.io
 runcmd:
   - systemctl start qemu-guest-agent
+write_files:
+  - path: /etc/motd
+    content: "Welcome to vm1"
+    permissions: "0644"
 ```
 
 ### How It Works
 
-1. Zyvor Fabric generates an ISO with NoCloud datasource (meta-data, user-data, optional network-config)
-2. The ISO is attached as a CD-ROM drive to the VM
-3. cloud-init inside the guest reads the config on first boot
-4. Supports both v1 and v2 network configuration formats
+1. `POST /api/vms/:name/cloud-init` parses `user_data` and persists `hostname`, `ssh_authorized_keys`, `packages`, `runcmd`, and `write_files` onto the VM record.
+2. On the VM's next (re)start, those fields are passed to Ephemera as part of its own `CloudInitSpec`, which is what makes Ephemera attach a cloud-init seed disk (NoCloud datasource) to the VM.
+3. cloud-init inside the guest reads that seed on first boot.
+4. Because attaching the seed is what brings up cloud-init's own default network config, this is also what makes the guest's DHCP client come up — a VM with no cloud-init config at all gets no seed and no automatic networking.
 
 ---
 

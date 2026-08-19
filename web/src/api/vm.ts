@@ -146,6 +146,14 @@ export async function addPortForward(
   })
 }
 
+/**
+ * Stop exposing a previously-forwarded guest port. Same restart-on-running-VM
+ * caveat as addPortForward -- usermode networking can't drop a forward live.
+ */
+export async function removePortForward(name: string, hostPort: number): Promise<void> {
+  return apiDelete(`${API_BASE}/vms/${name}/port-forwards/${hostPort}`)
+}
+
 export async function cloneVM(sourceName: string, targetName: string, options?: {
   includeSnapshots?: boolean
   linkedClone?: boolean

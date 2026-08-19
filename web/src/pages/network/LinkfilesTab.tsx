@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { LinkFileConfig, CreateLinkFileRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
@@ -14,6 +14,57 @@ interface LinkfilesTabProps {
   linkfiles: LinkFileConfig[]
   onDelete: (id: string) => void
   onCreate: () => void
+}
+
+function ManagedFilesPanel() {
+  const [open, setOpen] = useState(false)
+  const [files, setFiles] = useState<string[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const toggle = async () => {
+    const next = !open
+    setOpen(next)
+    if (next && files === null) {
+      setLoading(true)
+      setErr('')
+      try {
+        setFiles(await api.listManagedFiles())
+      } catch (e: unknown) {
+        setErr(extractErrorMessage(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <div className="border-b border-slate-700/50">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center gap-2 px-6 py-3 text-sm text-slate-300 hover:bg-white/[0.03] transition"
+      >
+        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        <FolderOpen className="w-4 h-4" />
+        Managed config files on host
+      </button>
+      {open && (
+        <div className="px-6 pb-4">
+          {loading && <p className="text-slate-500 text-sm">Loading…</p>}
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          {files && files.length === 0 && <p className="text-slate-500 text-sm">No managed config files found.</p>}
+          {files && files.length > 0 && (
+            <ul className="space-y-1 max-h-64 overflow-y-auto">
+              {files.map(f => (
+                <li key={f} className="font-mono text-xs text-slate-400 truncate">{f}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProps) {
@@ -42,6 +93,7 @@ function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProp
           <Plus className="w-4 h-4" /> Create Link File
         </button>}
       </div>
+      <ManagedFilesPanel />
       {linkfiles.length === 0 ? (
         <div className="p-12 text-center text-slate-400">No link files configured. Use these to rename interfaces, set MTU, MAC, or Wake-on-LAN.</div>
       ) : (

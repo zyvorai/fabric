@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Eye } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { TapConfig, CreateTapRequest } from '../../api/networkd'
-import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage, DetailModal } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
@@ -22,6 +22,25 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
+  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [viewData, setViewData] = useState<TapConfig | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [viewErr, setViewErr] = useState('')
+
+  const handleView = async (id: string) => {
+    setViewingId(id)
+    setViewLoading(true)
+    setViewErr('')
+    setViewData(null)
+    try {
+      setViewData(await api.getTap(id))
+    } catch (e: unknown) {
+      setViewErr(extractErrorMessage(e))
+    } finally {
+      setViewLoading(false)
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     let list = [...taps].sort((a, b) => a.name.localeCompare(b.name))
@@ -64,7 +83,12 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
                   <td className="p-4">{t.multi_queue ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">{t.vnet_hdr ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly} item={t} onDelete={() => onDelete(t.id)} onAdopt={() => onAdopt(t.id)} />
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleView(t.id)} className="p-2 hover:bg-white/[0.06] rounded transition" title="View details" type="button">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <HostManagedActions readOnly={readOnly} item={t} onDelete={() => onDelete(t.id)} onAdopt={() => onAdopt(t.id)} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -73,6 +97,15 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
           {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No tap devices match your search.</div>}
           </div>
         </>
+      )}
+      {viewingId && (
+        <DetailModal
+          title="Tap Details"
+          data={viewData as unknown as Record<string, unknown> | null}
+          loading={viewLoading}
+          error={viewErr}
+          onClose={() => setViewingId(null)}
+        />
       )}
     </div>
   )

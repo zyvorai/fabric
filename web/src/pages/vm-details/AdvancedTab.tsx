@@ -32,6 +32,17 @@ import {
   resetNvram,
   type FirmwareStatus,
 } from '../../api/firmware'
+import {
+  getCpuTopology,
+  getNumaTopology,
+  getNumaPlacement,
+  setCpuPinning,
+  removeCpuPinning,
+  getCpuAffinity,
+  type CpuTopology,
+  type NumaTopology,
+  type CpuPinning,
+} from '../../api/system'
 import ErrorBanner from '../../components/ErrorBanner'
 import { formatUserError } from '../../utils/apiError'
 import { toastFailure } from '../../utils/toastError'
@@ -65,6 +76,13 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
   const [watchdog, setWatchdogState] = useState<WatchdogConfig | null>(null)
   const [serials, setSerialsState] = useState<SerialConfig[]>([])
   const [firmware, setFirmware] = useState<FirmwareStatus | null>(null)
+  const [cpuTopology, setCpuTopology] = useState<CpuTopology | null>(null)
+  const [numaTopology, setNumaTopology] = useState<NumaTopology | null>(null)
+  const [cpuAffinity, setCpuAffinity] = useState<number[] | null>(null)
+  const [pinMode, setPinMode] = useState<CpuPinning['type']>('Auto')
+  const [pinNumaNode, setPinNumaNode] = useState(0)
+  const [pinSocket, setPinSocket] = useState(0)
+  const [pinExplicit, setPinExplicit] = useState('')
 
   const [savingBoot, setSavingBoot] = useState(false)
   const [savingDisplay, setSavingDisplay] = useState(false)
@@ -73,12 +91,13 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
   const [addingSerial, setAddingSerial] = useState(false)
   const [newSerialType, setNewSerialType] = useState<SerialConfig['type']>('pty')
   const [firmwareBusy, setFirmwareBusy] = useState(false)
+  const [savingPinning, setSavingPinning] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
     try {
-      const [b, d, c, models, w, s, f] = await Promise.all([
+      const [b, d, c, models, w, s, f, cpuTopo, numaTopo, affinity] = await Promise.all([
         getBootConfig(vm.name),
         getDisplay(vm.name),
         getCPUConfig(vm.name),
@@ -86,6 +105,9 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
         getWatchdog(vm.name).catch(() => null),
         listSerials(vm.name).catch(() => []),
         getFirmwareStatus(vm.name).catch(() => null),
+        getCpuTopology().catch(() => null),
+        getNumaTopology().catch(() => null),
+        getCpuAffinity(vm.name).catch(() => null),
       ])
       setBoot(b)
       setDisplay(d)
@@ -94,6 +116,9 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
       setWatchdogState(w)
       setSerialsState(s)
       setFirmware(f)
+      setCpuTopology(cpuTopo)
+      setNumaTopology(numaTopo)
+      setCpuAffinity(affinity)
     } catch (e) {
       setLoadError(formatUserError(e))
     } finally {
@@ -154,6 +179,61 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
       toastFailure(toast, 'Failed to configure watchdog', e)
     } finally {
       setSavingWatchdog(false)
+    }
+  }
+
+  const applyPinning = async () => {
+    setSavingPinning(true)
+    try {
+      if (pinMode === 'Explicit') {
+        const cpus = pinExplicit.split(',').map((s) => s.trim()).filter(Boolean).map(Number)
+        if (cpus.some((n) => Number.isNaN(n))) {
+          toastFailure(toast, 'Failed to apply CPU pinning', new Error('Explicit CPUs must be a comma-separated list of numbers'))
+          return
+        }
+        const pins = cpus.map((physical_cpu, i) => ({ vcpu_id: i, physical_cpu }))
+        await setCpuPinning(vm.name, { pinning: { type: 'Explicit', value: pins } })
+      } else if (pinMode === 'NumaNode') {
+        await setCpuPinning(vm.name, { pinning: { type: 'NumaNode', value: pinNumaNode } })
+      } else if (pinMode === 'Socket') {
+        await setCpuPinning(vm.name, { pinning: { type: 'Socket', value: pinSocket } })
+      } else {
+        await setCpuPinning(vm.name, { pinning: { type: 'Auto' } })
+      }
+      toast.success(
+        vm.state === 'running'
+          ? 'CPU pinning applied'
+          : 'CPU pinning saved — will apply on next start',
+      )
+      setCpuAffinity(await getCpuAffinity(vm.name).catch(() => null))
+    } catch (e) {
+      toastFailure(toast, 'Failed to apply CPU pinning', e)
+    } finally {
+      setSavingPinning(false)
+    }
+  }
+
+  const clearPinning = async () => {
+    setSavingPinning(true)
+    try {
+      await removeCpuPinning(vm.name)
+      toast.success('CPU pinning removed')
+      setCpuAffinity(await getCpuAffinity(vm.name).catch(() => null))
+    } catch (e) {
+      toastFailure(toast, 'Failed to remove CPU pinning', e)
+    } finally {
+      setSavingPinning(false)
+    }
+  }
+
+  const applyRecommendedNuma = async () => {
+    try {
+      const rec = await getNumaPlacement(vm.memory, vm.cpus)
+      setPinMode('NumaNode')
+      setPinNumaNode(rec.numa_node)
+      toast.success(`Recommended NUMA node ${rec.numa_node} (affinity: ${rec.cpu_affinity.join(', ')})`)
+    } catch (e) {
+      toastFailure(toast, 'Failed to get NUMA placement recommendation', e)
     }
   }
 
@@ -398,6 +478,113 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
             <button onClick={() => void saveCpu()} disabled={savingCpu} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
               <Save className="w-3.5 h-3.5" />{savingCpu ? 'Saving…' : 'Save CPU Config'}
             </button>
+          )}
+        </Section>
+      )}
+
+      {(cpuTopology || numaTopology) && (
+        <Section title="CPU Pinning & NUMA">
+          {cpuTopology && (
+            <p className="text-sm text-slate-300">
+              Host: <span className="font-mono">{cpuTopology.total_cpus}</span> CPUs across{' '}
+              <span className="font-mono">{cpuTopology.sockets}</span> socket{cpuTopology.sockets === 1 ? '' : 's'}
+              {numaTopology && <> · <span className="font-mono">{numaTopology.nodes.length}</span> NUMA node{numaTopology.nodes.length === 1 ? '' : 's'}</>}
+            </p>
+          )}
+          <p className="text-sm text-slate-400">
+            Current affinity:{' '}
+            {cpuAffinity && cpuAffinity.length > 0 ? (
+              <span className="font-mono text-slate-300">{cpuAffinity.join(', ')}</span>
+            ) : (
+              <span className="text-slate-500">none (floating across all host CPUs)</span>
+            )}
+          </p>
+
+          {canWrite && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Pinning Mode</label>
+                  <select
+                    disabled={savingPinning}
+                    value={pinMode}
+                    onChange={(e) => setPinMode(e.target.value as CpuPinning['type'])}
+                    className={inputCls}
+                  >
+                    <option value="Auto">Auto (no pinning)</option>
+                    <option value="NumaNode">Pin to NUMA node</option>
+                    <option value="Socket">Pin to socket</option>
+                    <option value="Explicit">Explicit vCPU → physical CPU map</option>
+                  </select>
+                </div>
+
+                {pinMode === 'NumaNode' && numaTopology && (
+                  <div>
+                    <label className={labelCls}>NUMA Node</label>
+                    <select
+                      disabled={savingPinning}
+                      value={pinNumaNode}
+                      onChange={(e) => setPinNumaNode(Number(e.target.value))}
+                      className={inputCls}
+                    >
+                      {numaTopology.nodes.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          Node {n.id} ({n.cpus.length} CPUs, {Math.round(n.memory_free_mb / 1024)} GB free)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {pinMode === 'Socket' && cpuTopology && (
+                  <div>
+                    <label className={labelCls}>Socket</label>
+                    <select
+                      disabled={savingPinning}
+                      value={pinSocket}
+                      onChange={(e) => setPinSocket(Number(e.target.value))}
+                      className={inputCls}
+                    >
+                      {Array.from({ length: cpuTopology.sockets }, (_, i) => i).map((s) => (
+                        <option key={s} value={s}>Socket {s}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {pinMode === 'Explicit' && (
+                <div>
+                  <label className={labelCls}>Physical CPUs (comma-separated, one per vCPU in order)</label>
+                  <input
+                    disabled={savingPinning}
+                    className={inputCls}
+                    value={pinExplicit}
+                    onChange={(e) => setPinExplicit(e.target.value)}
+                    placeholder="0,1,2,3"
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => void applyPinning()} disabled={savingPinning} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+                  <Save className="w-3.5 h-3.5" />{savingPinning ? 'Applying…' : 'Apply Pinning'}
+                </button>
+                {numaTopology && (
+                  <button onClick={() => void applyRecommendedNuma()} disabled={savingPinning} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-600 rounded-lg text-sm disabled:opacity-50">
+                    Use Recommended NUMA Node
+                  </button>
+                )}
+                {cpuAffinity && cpuAffinity.length > 0 && (
+                  <button onClick={() => void clearPinning()} disabled={savingPinning} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-600 rounded-lg text-sm disabled:opacity-50">
+                    Clear Pinning
+                  </button>
+                )}
+              </div>
+              {vm.state === 'running' && (
+                <p className="text-xs text-amber-400/80">This VM is running — pinning changes apply immediately to the live process.</p>
+              )}
+            </>
           )}
         </Section>
       )}

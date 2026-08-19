@@ -2,9 +2,9 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-export { default as BridgesTab, CreateBridgeModal } from './BridgesTab'
-export { default as BondsTab, CreateBondModal } from './BondsTab'
-export { default as VlansTab, CreateVlanModal } from './VlansTab'
+export { default as BridgesTab, CreateBridgeModal, EditBridgeModal } from './BridgesTab'
+export { default as BondsTab, CreateBondModal, EditBondModal } from './BondsTab'
+export { default as VlansTab, CreateVlanModal, EditVlanModal } from './VlansTab'
 export { default as MacvtapTab, CreateMacvtapModal } from './MacvtapTab'
 export { default as TapsTab, CreateTapModal } from './TapsTab'
 export { default as NetfilesTab, CreateNetfileModal, countNetfileTypes } from './NetfilesTab'

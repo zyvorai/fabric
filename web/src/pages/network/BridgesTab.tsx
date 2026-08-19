@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { BridgeConfig, CreateBridgeRequest } from '../../api/networkd'
 import { ModalWrapper, InputField, CheckboxField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
@@ -15,9 +15,10 @@ interface BridgesTabProps {
   onDelete: (id: string) => void
   onAdopt: (id: string) => void
   onCreate: () => void
+  onEdit: (b: BridgeConfig) => void
 }
 
-function BridgesTabContent({ bridges, onDelete, onAdopt, onCreate }: BridgesTabProps) {
+function BridgesTabContent({ bridges, onDelete, onAdopt, onCreate, onEdit }: BridgesTabProps) {
   const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -69,7 +70,14 @@ function BridgesTabContent({ bridges, onDelete, onAdopt, onCreate }: BridgesTabP
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4 text-slate-400">{b.mtu ?? '-'}</td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly} item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
+                    <div className="flex items-center gap-1">
+                      {!readOnly && !isHostManaged(b) && (
+                        <button onClick={() => onEdit(b)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Edit bridge" type="button">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <HostManagedActions readOnly={readOnly} item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -127,6 +135,56 @@ export function CreateBridgeModal({ onClose, onCreated }: { onClose: () => void;
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Bridge'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditBridgeModal({ bridge, onClose, onUpdated }: { bridge: BridgeConfig; onClose: () => void; onUpdated: (b: BridgeConfig) => void }) {
+  const [name, setName] = useState(bridge.name)
+  const [addresses, setAddresses] = useState(bridge.addresses.join(', '))
+  const [gateway, setGateway] = useState(bridge.gateway ?? '')
+  const [dns, setDns] = useState(bridge.dns.join(', '))
+  const [stp, setStp] = useState(bridge.stp ?? false)
+  const [mtu, setMtu] = useState(bridge.mtu ? String(bridge.mtu) : '')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateBridgeRequest = {
+        name: name.trim(),
+        stp: stp || undefined,
+        mtu: mtu ? parseInt(mtu) : undefined,
+        addresses: addresses ? addresses.split(',').map(s => s.trim()).filter(Boolean) : [],
+        gateway: gateway.trim() || undefined,
+        dns: dns ? dns.split(',').map(s => s.trim()).filter(Boolean) : [],
+      }
+      const updated = await api.updateBridge(bridge.id, req)
+      onUpdated(updated)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Edit Bridge" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="br0" />
+        <InputField label="Addresses (comma-separated)" value={addresses} onChange={setAddresses} placeholder="10.0.0.1/24, 192.168.1.1/24" />
+        <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder="10.0.0.254" />
+        <InputField label="DNS (comma-separated)" value={dns} onChange={setDns} placeholder="8.8.8.8, 1.1.1.1" />
+        <InputField label="MTU" value={mtu} onChange={setMtu} placeholder="1500" type="number" />
+        <CheckboxField label="Enable STP (Spanning Tree Protocol)" checked={stp} onChange={setStp} />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

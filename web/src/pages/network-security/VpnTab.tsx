@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
-import { Plus, Trash2, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { VpnTunnel, CreateVpnTunnelRequest, VpnNetwork, CreateVpnNetworkRequest, VpnTopology } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
@@ -16,13 +16,20 @@ interface VpnTabProps {
   onDeleteTunnel: (id: string) => void
   onDeleteNetwork: (id: string) => void
   onAdoptTunnel?: (id: string) => void
+  onEditTunnel?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onAdoptTunnel, onCreate, onSync }: VpnTabProps) {
+function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onAdoptTunnel, onEditTunnel, onCreate, onSync }: VpnTabProps) {
   const readOnly = useReadOnly()
   const [view, setView] = useState<'tunnels' | 'networks'>('tunnels')
+  const [status, setStatus] = useState<{ active_tunnels: number; networks: number } | null>(null)
+
+  const refreshStatus = () => { api.vpnStatus().then(setStatus).catch(() => {}) }
+  useEffect(() => { refreshStatus() }, [])
+  const handleSyncClick = async () => { await onSync(); refreshStatus() }
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -36,8 +43,13 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onA
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+              {status.active_tunnels} active &middot; {status.networks} networks
+            </span>
+          )}
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -83,11 +95,18 @@ function VpnTabContent({ tunnels, networks, onDeleteTunnel, onDeleteNetwork, onA
                       <StatusBadge status={t.enabled ? 'active' : 'disabled'} color={t.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions readOnly={readOnly}
-                        item={{ id: t.id, managed: t.managed }}
-                        onDelete={() => onDeleteTunnel(t.id)}
-                        onAdopt={onAdoptTunnel ? () => onAdoptTunnel(t.id) : undefined}
-                      />
+                      <div className="flex items-center gap-1">
+                        {!readOnly && !isHostManaged(t) && onEditTunnel && (
+                          <button onClick={() => onEditTunnel(t.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        <HostManagedActions readOnly={readOnly}
+                          item={{ id: t.id, managed: t.managed }}
+                          onDelete={() => onDeleteTunnel(t.id)}
+                          onAdopt={onAdoptTunnel ? () => onAdoptTunnel(t.id) : undefined}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -277,6 +296,131 @@ export function CreateVpnNetworkModal({ onClose, onCreated }: { onClose: () => v
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Network'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditVpnTunnelModal({ id, onClose, onUpdated }: { id: string; onClose: () => void; onUpdated: (t: VpnTunnel) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [interfaceName, setInterfaceName] = useState('')
+  const [listenPort, setListenPort] = useState('51820')
+  const [privateKey, setPrivateKey] = useState('')
+  const [peerKey, setPeerKey] = useState('')
+  const [peerEndpoint, setPeerEndpoint] = useState('')
+  const [peerAllowedIps, setPeerAllowedIps] = useState('')
+  const [peers, setPeers] = useState<{ public_key: string; endpoint?: string; allowed_ips: string[] }[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getVpnTunnel(id).then(t => {
+      if (cancelled) return
+      setName(t.name)
+      setDescription(t.description ?? '')
+      setInterfaceName(t.interface_name)
+      setListenPort(String(t.listen_port))
+      setPeers(t.peers)
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setLoadErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  const addPeer = () => {
+    if (!peerKey.trim()) return
+    setPeers(prev => [...prev, {
+      public_key: peerKey.trim(),
+      endpoint: peerEndpoint.trim() || undefined,
+      allowed_ips: peerAllowedIps.trim() ? peerAllowedIps.split(',').map(s => s.trim()) : [],
+    }])
+    setPeerKey('')
+    setPeerEndpoint('')
+    setPeerAllowedIps('')
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateVpnTunnelRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        interface_name: interfaceName.trim() || undefined,
+        listen_port: parseInt(listenPort) || 51820,
+        private_key: privateKey.trim() || undefined,
+        peers: peers.length > 0 ? peers : undefined,
+      }
+      const t = await api.updateVpnTunnel(id, req)
+      onUpdated(t)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <ModalWrapper title="Edit VPN Tunnel" onClose={onClose}>
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </ModalWrapper>
+    )
+  }
+  if (loadErr) {
+    return (
+      <ModalWrapper title="Edit VPN Tunnel" onClose={onClose}>
+        <p className="text-red-400 text-sm">{loadErr}</p>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title="Edit VPN Tunnel" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="wg-site-a" />
+        <InputField label="Description" value={description} onChange={setDescription} placeholder="Site A WireGuard tunnel" />
+        <div className="grid grid-cols-2 gap-2">
+          <InputField label="Interface Name" value={interfaceName} onChange={setInterfaceName} placeholder="wg0" />
+          <InputField label="Listen Port" value={listenPort} onChange={setListenPort} placeholder="51820" type="number" />
+        </div>
+        <InputField label="Private Key" value={privateKey} onChange={setPrivateKey} placeholder="Leave blank to keep existing key" />
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Add Peer</div>
+          <InputField label="Public Key" value={peerKey} onChange={setPeerKey} placeholder="Base64 public key" />
+          <div className="grid grid-cols-2 gap-2">
+            <InputField label="Endpoint" value={peerEndpoint} onChange={setPeerEndpoint} placeholder="1.2.3.4:51820" />
+            <InputField label="Allowed IPs (comma-separated)" value={peerAllowedIps} onChange={setPeerAllowedIps} placeholder="10.0.0.0/24" />
+          </div>
+          <button type="button" onClick={addPeer} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+            <Plus className="w-3.5 h-3.5" /> Add Peer
+          </button>
+          {peers.length > 0 && (
+            <div className="space-y-1 mt-2">
+              {peers.map((p, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                  <span className="text-slate-300 truncate">{p.public_key.slice(0, 20)}...</span>
+                  {p.endpoint && <span className="text-slate-400">{p.endpoint}</span>}
+                  <button onClick={() => setPeers(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

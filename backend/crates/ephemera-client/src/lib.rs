@@ -144,6 +144,16 @@ pub struct CloudInitSpec {
     /// static_network`.
     #[serde(default)]
     pub static_network: bool,
+    #[serde(default)]
+    pub write_files: Vec<CloudInitFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudInitFile {
+    pub path: String,
+    pub content: String,
+    #[serde(default)]
+    pub permissions: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

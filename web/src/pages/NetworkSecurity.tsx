@@ -17,15 +17,15 @@ import type {
   MonitorPolicy, NetworkMetrics, BandwidthAlert, SecurityIdentity,
 } from '../api/network-security'
 import {
-  PoliciesTab, CreatePolicyModal,
-  FirewallTab, CreateFirewallProfileModal,
-  ServicesTab, CreateServiceModal,
-  QosTab, CreateQosModal,
-  DnsTab, CreateDnsZoneModal, CreateDnsPolicyModal,
-  VpnTab, CreateVpnTunnelModal, CreateVpnNetworkModal,
-  MirrorTab, CreateMirrorModal,
-  NatTab, CreateNatRuleModal, CreateNatPoolModal, CreateNatGatewayModal,
-  MonitorTab, CreateMonitorPolicyModal,
+  PoliciesTab, CreatePolicyModal, EditPolicyModal,
+  FirewallTab, CreateFirewallProfileModal, EditFirewallProfileModal, CreateFirewallZoneModal, CreateVMFirewallAssignmentModal,
+  ServicesTab, CreateServiceModal, EditServiceModal,
+  QosTab, CreateQosModal, EditQosModal,
+  DnsTab, CreateDnsZoneModal, CreateDnsPolicyModal, EditDnsZoneModal, EditDnsPolicyModal,
+  VpnTab, CreateVpnTunnelModal, CreateVpnNetworkModal, EditVpnTunnelModal,
+  MirrorTab, CreateMirrorModal, EditMirrorModal,
+  NatTab, CreateNatRuleModal, CreateNatPoolModal, CreateNatGatewayModal, EditNatRuleModal,
+  MonitorTab, CreateMonitorPolicyModal, EditMonitorPolicyModal,
 } from './network-security'
 import { extractErrorMessage } from './network/ModalShared'
 import ErrorBanner from '../components/ErrorBanner'
@@ -39,9 +39,12 @@ import ReadOnlyNotice from '../components/ReadOnlyNotice'
 
 type Tab = 'policies' | 'firewall' | 'services' | 'qos' | 'dns' | 'vpn' | 'mirror' | 'nat' | 'monitor'
 type Modal =
-  | 'policy' | 'firewall-profile' | 'service' | 'qos'
+  | 'policy' | 'firewall-profile' | 'firewall-zone' | 'firewall-assignment' | 'service' | 'qos'
   | 'dns-zone' | 'dns-policy' | 'vpn-tunnel' | 'vpn-network'
   | 'mirror' | 'nat-rule' | 'nat-pool' | 'nat-gateway' | 'monitor'
+  | 'edit-policy' | 'edit-firewall-profile' | 'edit-service' | 'edit-qos'
+  | 'edit-dns-zone' | 'edit-dns-policy' | 'edit-vpn-tunnel'
+  | 'edit-mirror' | 'edit-nat-rule' | 'edit-monitor'
   | null
 
 export default function NetworkSecurity() {
@@ -72,7 +75,10 @@ export default function NetworkSecurity() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<Modal>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const { confirmState, confirm, cancel } = useConfirm()
+
+  const openEdit = (modal: Modal, id: string) => { setEditingId(id); setActiveModal(modal) }
 
   const fetchAll = useCallback(async (silent = false) => {
     if (!silent) {
@@ -330,7 +336,7 @@ export default function NetworkSecurity() {
     catch (e: unknown) { failAction('Sync failed', e) }
   }
 
-  const closeModal = () => setActiveModal(null)
+  const closeModal = () => { setActiveModal(null); setEditingId(null) }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'policies', label: 'Policies', icon: <ShieldCheck className="w-4 h-4" /> },
@@ -438,6 +444,7 @@ export default function NetworkSecurity() {
               onDelete={handleDeletePolicy}
               onAdopt={handleAdoptNetworkPolicy}
               onAdoptIdentity={handleAdoptIdentity}
+              onEdit={(id) => openEdit('edit-policy', id)}
               onCreate={() => setActiveModal('policy')}
               onSync={() => handleSync(api.syncNetworkPolicies)}
             />
@@ -448,20 +455,26 @@ export default function NetworkSecurity() {
               onDeleteProfile={handleDeleteFwProfile} onDeleteZone={handleDeleteFwZone} onDeleteAssignment={handleDeleteFwAssignment}
               onAdoptProfile={handleAdoptFwProfile}
               onAdoptZone={handleAdoptFwZone}
-              onCreate={() => setActiveModal('firewall-profile')} onSync={() => handleSync(api.syncFirewall)}
+              onEditProfile={(id) => openEdit('edit-firewall-profile', id)}
+              onCreate={() => setActiveModal('firewall-profile')}
+              onCreateZone={() => setActiveModal('firewall-zone')}
+              onCreateAssignment={() => setActiveModal('firewall-assignment')}
+              onSync={() => handleSync(api.syncFirewall)}
             />
           )}
           {activeTab === 'services' && (
-            <ServicesTab services={services} onDelete={handleDeleteService} onAdopt={handleAdoptService} onCreate={() => setActiveModal('service')} onSync={() => handleSync(api.syncServices)} />
+            <ServicesTab services={services} onDelete={handleDeleteService} onAdopt={handleAdoptService} onEdit={(id) => openEdit('edit-service', id)} onCreate={() => setActiveModal('service')} onSync={() => handleSync(api.syncServices)} />
           )}
           {activeTab === 'qos' && (
-            <QosTab policies={qosPolicies} onDelete={handleDeleteQos} onAdopt={handleAdoptQos} onCreate={() => setActiveModal('qos')} onSync={() => handleSync(api.syncQos)} />
+            <QosTab policies={qosPolicies} onDelete={handleDeleteQos} onAdopt={handleAdoptQos} onEdit={(id) => openEdit('edit-qos', id)} onCreate={() => setActiveModal('qos')} onSync={() => handleSync(api.syncQos)} />
           )}
           {activeTab === 'dns' && (
             <DnsTab
               zones={dnsZones} policies={dnsPolicies}
               onDeleteZone={handleDeleteDnsZone} onDeletePolicy={handleDeleteDnsPolicy}
               onAdoptZone={handleAdoptDnsZone} onAdoptPolicy={handleAdoptDnsPolicy}
+              onEditZone={(id) => openEdit('edit-dns-zone', id)}
+              onEditPolicy={(id) => openEdit('edit-dns-policy', id)}
               onCreate={() => setActiveModal('dns-zone')} onSync={() => handleSync(api.syncDns)}
             />
           )}
@@ -470,6 +483,7 @@ export default function NetworkSecurity() {
               tunnels={vpnTunnels} networks={vpnNetworks}
               onDeleteTunnel={handleDeleteVpnTunnel} onDeleteNetwork={handleDeleteVpnNetwork}
               onAdoptTunnel={handleAdoptVpnTunnel}
+              onEditTunnel={(id) => openEdit('edit-vpn-tunnel', id)}
               onCreate={() => setActiveModal('vpn-tunnel')} onSync={() => handleSync(api.syncVpn)}
             />
           )}
@@ -478,6 +492,7 @@ export default function NetworkSecurity() {
               sessions={mirrorSessions}
               onDelete={handleDeleteMirror}
               onAdopt={handleAdoptMirrorSession}
+              onEdit={(id) => openEdit('edit-mirror', id)}
               onCreate={() => setActiveModal('mirror')}
               onSync={() => handleSync(api.syncMirror)}
             />
@@ -487,6 +502,7 @@ export default function NetworkSecurity() {
               rules={natRules} pools={natPools} gateways={natGateways}
               onDeleteRule={handleDeleteNatRule} onDeletePool={handleDeleteNatPool} onDeleteGateway={handleDeleteNatGateway}
               onAdoptRule={handleAdoptNatRule}
+              onEditRule={(id) => openEdit('edit-nat-rule', id)}
               onCreate={() => setActiveModal('nat-rule')} onSync={() => handleSync(api.syncNat)}
             />
           )}
@@ -494,6 +510,7 @@ export default function NetworkSecurity() {
             <MonitorTab
               policies={monitorPolicies} metrics={metrics} alerts={alerts}
               onDelete={handleDeleteMonitorPolicy} onAdopt={handleAdoptMonitorPolicy}
+              onEdit={(id) => openEdit('edit-monitor', id)}
               onAcknowledge={handleAcknowledgeAlert}
               onCreate={() => setActiveModal('monitor')} onSync={() => handleSync(api.syncMonitor)}
             />
@@ -504,6 +521,8 @@ export default function NetworkSecurity() {
       {/* Modals */}
       {canWrite && activeModal === 'policy' && <CreatePolicyModal onClose={closeModal} onCreated={(p) => { setPolicies(prev => [...prev, p]); closeModal() }} />}
       {canWrite && activeModal === 'firewall-profile' && <CreateFirewallProfileModal onClose={closeModal} onCreated={(p) => { setFwProfiles(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'firewall-zone' && <CreateFirewallZoneModal profiles={fwProfiles} onClose={closeModal} onCreated={(z) => { setFwZones(prev => [...prev, z]); closeModal() }} />}
+      {canWrite && activeModal === 'firewall-assignment' && <CreateVMFirewallAssignmentModal profiles={fwProfiles} zones={fwZones} onClose={closeModal} onCreated={(a) => { setFwAssignments(prev => [...prev.filter(x => x.vm_name !== a.vm_name), a]); closeModal() }} />}
       {canWrite && activeModal === 'service' && <CreateServiceModal onClose={closeModal} onCreated={(s) => { setServices(prev => [...prev, s]); closeModal() }} />}
       {canWrite && activeModal === 'qos' && <CreateQosModal onClose={closeModal} onCreated={(p) => { setQosPolicies(prev => [...prev, p]); closeModal() }} />}
       {canWrite && activeModal === 'dns-zone' && <CreateDnsZoneModal onClose={closeModal} onCreated={(z) => { setDnsZones(prev => [...prev, z]); closeModal() }} />}
@@ -515,6 +534,36 @@ export default function NetworkSecurity() {
       {canWrite && activeModal === 'nat-pool' && <CreateNatPoolModal onClose={closeModal} onCreated={(p) => { setNatPools(prev => [...prev, p]); closeModal() }} />}
       {canWrite && activeModal === 'nat-gateway' && <CreateNatGatewayModal onClose={closeModal} onCreated={(g) => { setNatGateways(prev => [...prev, g]); closeModal() }} />}
       {canWrite && activeModal === 'monitor' && <CreateMonitorPolicyModal onClose={closeModal} onCreated={(p) => { setMonitorPolicies(prev => [...prev, p]); closeModal() }} />}
+      {canWrite && activeModal === 'edit-policy' && editingId && (
+        <EditPolicyModal id={editingId} onClose={closeModal} onUpdated={(p) => { setPolicies(prev => prev.map(x => x.id === p.id ? p : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-firewall-profile' && editingId && (
+        <EditFirewallProfileModal id={editingId} onClose={closeModal} onUpdated={(p) => { setFwProfiles(prev => prev.map(x => x.id === p.id ? p : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-service' && editingId && (
+        <EditServiceModal id={editingId} onClose={closeModal} onUpdated={(s) => { setServices(prev => prev.map(x => x.id === s.id ? s : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-qos' && editingId && (
+        <EditQosModal id={editingId} onClose={closeModal} onUpdated={(p) => { setQosPolicies(prev => prev.map(x => x.id === p.id ? p : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-dns-zone' && editingId && (
+        <EditDnsZoneModal id={editingId} onClose={closeModal} onUpdated={(z) => { setDnsZones(prev => prev.map(x => x.id === z.id ? z : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-dns-policy' && editingId && (
+        <EditDnsPolicyModal id={editingId} zones={dnsZones} onClose={closeModal} onUpdated={(p) => { setDnsPolicies(prev => prev.map(x => x.id === p.id ? p : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-vpn-tunnel' && editingId && (
+        <EditVpnTunnelModal id={editingId} onClose={closeModal} onUpdated={(t) => { setVpnTunnels(prev => prev.map(x => x.id === t.id ? t : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-mirror' && editingId && (
+        <EditMirrorModal id={editingId} onClose={closeModal} onUpdated={(s) => { setMirrorSessions(prev => prev.map(x => x.id === s.id ? s : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-nat-rule' && editingId && (
+        <EditNatRuleModal id={editingId} onClose={closeModal} onUpdated={(r) => { setNatRules(prev => prev.map(x => x.id === r.id ? r : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-monitor' && editingId && (
+        <EditMonitorPolicyModal id={editingId} onClose={closeModal} onUpdated={(p) => { setMonitorPolicies(prev => prev.map(x => x.id === p.id ? p : x)); closeModal() }} />
+      )}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}

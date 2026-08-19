@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
-import { Plus, Trash2, RefreshCw, Check } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, RefreshCw, Check, Pencil } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type {
   MonitorPolicy, CreateMonitorPolicyRequest, MonitorThreshold,
@@ -19,6 +19,7 @@ interface MonitorTabProps {
   alerts: BandwidthAlert[]
   onDelete: (id: string) => void
   onAdopt?: (id: string) => void
+  onEdit?: (id: string) => void
   onAcknowledge: (id: string) => void
   onCreate: () => void
   onSync: () => void
@@ -31,9 +32,15 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1073741824).toFixed(1)} GB`
 }
 
-function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAcknowledge, onCreate, onSync }: MonitorTabProps) {
+function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onEdit, onAcknowledge, onCreate, onSync }: MonitorTabProps) {
   const readOnly = useReadOnly()
   const [view, setView] = useState<'policies' | 'metrics' | 'alerts'>('policies')
+  const [status, setStatus] = useState<{ active_policies: number; monitored_vms: number } | null>(null)
+
+  const refreshStatus = () => { api.monitorStatus().then(setStatus).catch(() => {}) }
+  useEffect(() => { refreshStatus() }, [])
+  const handleSyncClick = async () => { await onSync(); refreshStatus() }
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
       <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
@@ -50,8 +57,13 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAck
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+              {status.active_policies} active &middot; {status.monitored_vms} monitored VMs
+            </span>
+          )}
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
@@ -90,11 +102,18 @@ function MonitorTabContent({ policies, metrics, alerts, onDelete, onAdopt, onAck
                       <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
-                      <HostManagedActions readOnly={readOnly}
-                        item={{ id: p.id, managed: p.managed }}
-                        onDelete={() => onDelete(p.id)}
-                        onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
-                      />
+                      <div className="flex items-center gap-1">
+                        {!readOnly && !isHostManaged(p) && onEdit && (
+                          <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        <HostManagedActions readOnly={readOnly}
+                          item={{ id: p.id, managed: p.managed }}
+                          onDelete={() => onDelete(p.id)}
+                          onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -313,6 +332,164 @@ export function CreateMonitorPolicyModal({ onClose, onCreated }: { onClose: () =
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Monitor Policy'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditMonitorPolicyModal({ id, onClose, onUpdated }: { id: string; onClose: () => void; onUpdated: (p: MonitorPolicy) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [labels, setLabels] = useState<Record<string, string>>({})
+  const [interval, setInterval] = useState('60')
+  const [thresholds, setThresholds] = useState<MonitorThreshold[]>([])
+  const [thMetric, setThMetric] = useState('bandwidth')
+  const [thValue, setThValue] = useState('')
+  const [thUnit, setThUnit] = useState('mbps')
+  const [thDirection, setThDirection] = useState<MetricDirection>('both')
+  const [thSeverity, setThSeverity] = useState<AlertSeverity>('warning')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getMonitorPolicy(id).then(p => {
+      if (cancelled) return
+      setName(p.name)
+      setDescription(p.description ?? '')
+      setLabels(p.labels ?? p.selector?.match_labels ?? {})
+      setInterval(String(p.interval_seconds ?? p.sample_interval_secs ?? 60))
+      setThresholds(p.thresholds ?? [])
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setLoadErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  const addThreshold = () => {
+    if (!thValue) return
+    setThresholds(prev => [...prev, {
+      metric: thMetric,
+      value: parseFloat(thValue),
+      unit: thUnit,
+      direction: thDirection,
+      severity: thSeverity,
+    }])
+    setThValue('')
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateMonitorPolicyRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        labels: Object.keys(labels).length > 0 ? labels : undefined,
+        thresholds: thresholds.length > 0 ? thresholds : undefined,
+        interval_seconds: parseInt(interval) || 60,
+      }
+      const p = await api.updateMonitorPolicy(id, req)
+      onUpdated(p)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <ModalWrapper title="Edit Monitor Policy" onClose={onClose}>
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </ModalWrapper>
+    )
+  }
+  if (loadErr) {
+    return (
+      <ModalWrapper title="Edit Monitor Policy" onClose={onClose}>
+        <p className="text-red-400 text-sm">{loadErr}</p>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title="Edit Monitor Policy" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="high-bandwidth-alert" />
+        <InputField label="Description" value={description} onChange={setDescription} placeholder="Alert on high bandwidth" />
+        <LabelSelectorInput labels={labels} onChange={setLabels} />
+        <InputField label="Interval (seconds)" value={interval} onChange={setInterval} placeholder="60" type="number" />
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Add Threshold</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Metric</label>
+              <select value={thMetric} onChange={e => setThMetric(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="bandwidth">Bandwidth</option>
+                <option value="packets">Packets</option>
+                <option value="errors">Errors</option>
+                <option value="drops">Drops</option>
+              </select>
+            </div>
+            <InputField label="Value" value={thValue} onChange={setThValue} placeholder="100" type="number" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Unit</label>
+              <select value={thUnit} onChange={e => setThUnit(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="mbps">Mbps</option>
+                <option value="gbps">Gbps</option>
+                <option value="kpps">Kpps</option>
+                <option value="count">Count</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Direction</label>
+              <select value={thDirection} onChange={e => setThDirection(e.target.value as MetricDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="both">Both</option>
+                <option value="inbound">Inbound</option>
+                <option value="outbound">Outbound</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Severity</label>
+              <select value={thSeverity} onChange={e => setThSeverity(e.target.value as AlertSeverity)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="info">Info</option>
+                <option value="warning">Warning</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" onClick={addThreshold} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+            <Plus className="w-3.5 h-3.5" /> Add Threshold
+          </button>
+          {thresholds.length > 0 && (
+            <div className="space-y-1 mt-2">
+              {thresholds.map((t, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                  <StatusBadge status={t.severity} color={t.severity === 'critical' ? 'red' : t.severity === 'warning' ? 'yellow' : 'blue'} />
+                  <span className="text-slate-300">{t.metric}</span>
+                  <span className="text-slate-400">{t.value} {t.unit}</span>
+                  <span className="text-slate-500">{t.direction}</span>
+                  <button onClick={() => setThresholds(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

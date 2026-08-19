@@ -3,10 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Eye } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { MacvtapConfig, CreateMacvtapRequest, MacvtapMode } from '../../api/networkd'
-import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage, DetailModal } from './ModalShared'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
 
@@ -22,6 +22,25 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
+  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [viewData, setViewData] = useState<MacvtapConfig | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [viewErr, setViewErr] = useState('')
+
+  const handleView = async (id: string) => {
+    setViewingId(id)
+    setViewLoading(true)
+    setViewErr('')
+    setViewData(null)
+    try {
+      setViewData(await api.getMacvtap(id))
+    } catch (e: unknown) {
+      setViewErr(extractErrorMessage(e))
+    } finally {
+      setViewLoading(false)
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     let list = [...macvtaps].sort((a, b) => a.name.localeCompare(b.name))
@@ -66,7 +85,12 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
                   <td className="p-4 text-slate-400 font-mono text-sm">{m.mac_address ?? '-'}</td>
                   <td className="p-4 text-slate-400">{m.mtu ?? '-'}</td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly} item={m} onDelete={() => onDelete(m.id)} onAdopt={() => onAdopt(m.id)} />
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleView(m.id)} className="p-2 hover:bg-white/[0.06] rounded transition" title="View details" type="button">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <HostManagedActions readOnly={readOnly} item={m} onDelete={() => onDelete(m.id)} onAdopt={() => onAdopt(m.id)} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -75,6 +99,15 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
           {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No macvtap devices match your search.</div>}
           </div>
         </>
+      )}
+      {viewingId && (
+        <DetailModal
+          title="Macvtap Details"
+          data={viewData as unknown as Record<string, unknown> | null}
+          loading={viewLoading}
+          error={viewErr}
+          onClose={() => setViewingId(null)}
+        />
       )}
     </div>
   )

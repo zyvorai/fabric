@@ -4,8 +4,10 @@
 
 import { useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import * as api from '../../api/networkd'
 import type { LinkInfo } from '../../api/networkd'
 import { ListControls, DEFAULT_PAGE_SIZE, paginateSlice } from './ListControls'
+import { DetailModal, extractErrorMessage } from './ModalShared'
 
 interface StatusTabProps {
   links: LinkInfo[]
@@ -25,6 +27,24 @@ function StatusTabContent({ links, onRefresh }: StatusTabProps) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
+  const [viewingName, setViewingName] = useState<string | null>(null)
+  const [viewData, setViewData] = useState<{ name: string; status: string } | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [viewErr, setViewErr] = useState('')
+
+  const handleView = async (name: string) => {
+    setViewingName(name)
+    setViewLoading(true)
+    setViewErr('')
+    setViewData(null)
+    try {
+      setViewData(await api.getDeviceStatus(name))
+    } catch (e: unknown) {
+      setViewErr(extractErrorMessage(e))
+    } finally {
+      setViewLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -78,7 +98,12 @@ function StatusTabContent({ links, onRefresh }: StatusTabProps) {
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {pageItems.map(l => (
-                  <tr key={l.index} className="hover:bg-white/[0.03] transition">
+                  <tr
+                    key={l.index}
+                    className="hover:bg-white/[0.03] transition cursor-pointer"
+                    onClick={() => handleView(l.name)}
+                    title="Click for device status detail"
+                  >
                     <td className="p-4 font-mono text-sm">{l.index}</td>
                     <td className="p-4 font-medium">{l.name}</td>
                     <td className="p-4 text-slate-400">{l.kind}</td>
@@ -103,6 +128,15 @@ function StatusTabContent({ links, onRefresh }: StatusTabProps) {
             )}
           </div>
         </>
+      )}
+      {viewingName && (
+        <DetailModal
+          title={`Device Status: ${viewingName}`}
+          data={viewData as unknown as Record<string, unknown> | null}
+          loading={viewLoading}
+          error={viewErr}
+          onClose={() => setViewingName(null)}
+        />
       )}
     </div>
   )

@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
-import { getVM, getMetrics, deleteVM, addPortForward, getVMLogs, VM, VMMetrics, VMLogEntry } from '../api/vm'
+import { getVM, getMetrics, deleteVM, addPortForward, removePortForward, getVMLogs, VM, VMMetrics, VMLogEntry } from '../api/vm'
 import { listSnapshots, createSnapshot, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
 import { listAuditLogs, AuditLog } from '../api/audit'
 import { getMachineProperties } from '../api/machines'
@@ -718,8 +718,26 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
   const [protocol, setProtocol] = useState<'tcp' | 'udp'>('tcp')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [removingPort, setRemovingPort] = useState<number | null>(null)
 
   const forwards = vm.port_forwards ?? []
+
+  const handleRemove = async (hostPort: number) => {
+    setRemovingPort(hostPort)
+    try {
+      await removePortForward(vm.name, hostPort)
+      toast.success(
+        vm.state === 'running'
+          ? `Port ${hostPort} no longer exposed — VM restarted to apply it`
+          : `Port ${hostPort} will no longer be exposed on next start`,
+      )
+      onUpdated()
+    } catch (err) {
+      toastFailure(toast, 'Failed to remove port forward', err)
+    } finally {
+      setRemovingPort(null)
+    }
+  }
 
   const handleAdd = async () => {
     const h = parseInt(hostPort)
@@ -850,6 +868,7 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
               <th className="py-3 px-5">Host Port</th>
               <th className="py-3 px-4">Guest Port</th>
               <th className="py-3 px-4">Protocol</th>
+              <th className="py-3 px-4"></th>
             </tr>
           </thead>
           <tbody>
@@ -861,6 +880,18 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
                   <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
                     {f.protocol}
                   </span>
+                </td>
+                <td className="py-3 px-4 text-right">
+                  {canWrite && (
+                    <button
+                      onClick={() => handleRemove(f.host_port)}
+                      disabled={removingPort === f.host_port}
+                      title="Remove port forward"
+                      className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

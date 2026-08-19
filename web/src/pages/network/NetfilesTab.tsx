@@ -3,11 +3,11 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Eye } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { NetworkFileConfig, CreateNetworkFileRequest } from '../../api/networkd'
 import { useReadOnly } from '../../contexts/ReadOnlyContext'
-import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
+import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage, DetailModal } from './ModalShared'
 import {
   ListControls,
   DEFAULT_PAGE_SIZE,
@@ -40,6 +40,24 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
   const [page, setPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'state'>('name')
+  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [viewData, setViewData] = useState<NetworkFileConfig | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [viewErr, setViewErr] = useState('')
+
+  const handleView = async (id: string) => {
+    setViewingId(id)
+    setViewLoading(true)
+    setViewErr('')
+    setViewData(null)
+    try {
+      setViewData(await api.getNetworkFile(id))
+    } catch (e: unknown) {
+      setViewErr(extractErrorMessage(e))
+    } finally {
+      setViewLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -135,7 +153,12 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
                     <td className="p-4 text-slate-400">{n.bond ?? '-'}</td>
                     <td className="p-4 text-slate-400">{n.mtu ?? '-'}</td>
                     <td className="p-4">
-                      <HostManagedActions readOnly={readOnly} item={n} onDelete={() => onDelete(n.id)} onAdopt={() => onAdopt(n.id)} stateLabel={n.operational_state} />
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleView(n.id)} className="p-2 hover:bg-white/[0.06] rounded transition" title="View details" type="button">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <HostManagedActions readOnly={readOnly} item={n} onDelete={() => onDelete(n.id)} onAdopt={() => onAdopt(n.id)} stateLabel={n.operational_state} />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -146,6 +169,15 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
             )}
           </div>
         </>
+      )}
+      {viewingId && (
+        <DetailModal
+          title="Interface Details"
+          data={viewData as unknown as Record<string, unknown> | null}
+          loading={viewLoading}
+          error={viewErr}
+          onClose={() => setViewingId(null)}
+        />
       )}
     </div>
   )

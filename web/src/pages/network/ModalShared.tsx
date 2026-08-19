@@ -115,3 +115,37 @@ export function CheckboxField({ label, checked, onChange }: { label: string; che
 export function extractErrorMessage(e: unknown): string {
   return formatUserError(e)
 }
+
+function formatDetailValue(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '-'
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '-'
+  if (typeof v === 'boolean') return v ? 'yes' : 'no'
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+/** Read-only key/value detail view for resources that support GET but not PUT. */
+export function DetailModal({ title, data, loading, error, onClose }: {
+  title: string
+  data: Record<string, unknown> | null
+  loading?: boolean
+  error?: string
+  onClose: () => void
+}) {
+  return (
+    <ModalWrapper title={title} onClose={onClose}>
+      {loading && <p className="text-slate-400 text-sm">Loading…</p>}
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {!loading && !error && data && (
+        <dl className="space-y-2 text-sm">
+          {Object.entries(data).map(([k, v]) => (
+            <div key={k} className="flex items-start justify-between gap-4 border-b border-slate-700/30 pb-2">
+              <dt className="text-slate-400 shrink-0">{k}</dt>
+              <dd className="text-white font-mono text-right break-all">{formatDetailValue(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </ModalWrapper>
+  )
+}

@@ -2,8 +2,8 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { useState } from 'react'
-import { Plus, Trash2, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, RefreshCw, Pencil, Eye } from 'lucide-react'
 import * as api from '../../api/network-security'
 import type { NetworkPolicy, CreateNetworkPolicyRequest, PolicyRule, PolicyDirection, PolicyAction, SecurityIdentity } from '../../api/network-security'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from '../network/ModalShared'
@@ -16,13 +16,20 @@ interface PoliciesTabProps {
   onDelete: (id: string) => void
   onAdopt?: (id: string) => void
   onAdoptIdentity?: (id: string) => void
+  onEdit?: (id: string) => void
   onCreate: () => void
   onSync: () => void
 }
 
-function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptIdentity, onCreate, onSync }: PoliciesTabProps) {
+function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptIdentity, onEdit, onCreate, onSync }: PoliciesTabProps) {
   const readOnly = useReadOnly()
   const [view, setView] = useState<'policies' | 'identities'>('policies')
+  const [status, setStatus] = useState<{ enforced: number; pending: number } | null>(null)
+  const [viewingIdentityId, setViewingIdentityId] = useState<number | null>(null)
+
+  const refreshStatus = () => { api.networkPolicyStatus().then(setStatus).catch(() => {}) }
+  useEffect(() => { refreshStatus() }, [])
+  const handleSyncClick = async () => { await onSync(); refreshStatus() }
 
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -37,8 +44,13 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+        <div className="flex items-center gap-2">
+          {status && (
+            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+              {status.enforced} enforced &middot; {status.pending} pending
+            </span>
+          )}
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {view === 'policies' && !readOnly && (
@@ -91,11 +103,18 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly}
-                      item={{ id: p.id, managed: p.managed }}
-                      onDelete={() => onDelete(p.id)}
-                      onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
-                    />
+                    <div className="flex items-center gap-1">
+                      {!readOnly && !isHostManaged(p) && onEdit && (
+                        <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <HostManagedActions readOnly={readOnly}
+                        item={{ id: p.id, managed: p.managed }}
+                        onDelete={() => onDelete(p.id)}
+                        onAdopt={onAdopt ? () => onAdopt(p.id) : undefined}
+                      />
+                    </div>
                   </td>
                 </tr>
               )})}
@@ -132,12 +151,17 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                       {i.endpoints.length > 0 ? i.endpoints.join(', ') : '—'}
                     </td>
                     <td className="p-4">
-                      <HostManagedActions readOnly={readOnly}
-                        item={{ id: String(i.id), managed: i.managed }}
-                        onDelete={() => {}}
-                        onAdopt={onAdoptIdentity ? () => onAdoptIdentity(String(i.id)) : undefined}
-                        adoptLabel="Adopt"
-                      />
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setViewingIdentityId(i.id)} className="p-2 hover:bg-slate-600 rounded transition" title="View details">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <HostManagedActions readOnly={readOnly}
+                          item={{ id: String(i.id), managed: i.managed }}
+                          onDelete={() => {}}
+                          onAdopt={onAdoptIdentity ? () => onAdoptIdentity(String(i.id)) : undefined}
+                          adoptLabel="Adopt"
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -146,7 +170,79 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
           </div>
         )
       )}
+      {viewingIdentityId !== null && (
+        <IdentityDetailModal id={viewingIdentityId} onClose={() => setViewingIdentityId(null)} />
+      )}
     </div>
+  )
+}
+
+function IdentityDetailModal({ id, onClose }: { id: number; onClose: () => void }) {
+  const [identity, setIdentity] = useState<SecurityIdentity | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getIdentity(id).then(i => {
+      if (cancelled) return
+      setIdentity(i)
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  return (
+    <ModalWrapper title={`Identity ${id}`} onClose={onClose}>
+      {loading ? (
+        <div className="text-slate-400 text-sm">Loading...</div>
+      ) : err ? (
+        <p className="text-red-400 text-sm">{err}</p>
+      ) : identity ? (
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs text-slate-400 mb-1">ID</div>
+            <div className="font-mono text-sm">{identity.id}{isHostManaged({ managed: identity.managed, id: String(identity.id) }) && <HostBadge />}</div>
+          </div>
+          {identity.description && (
+            <div>
+              <div className="text-xs text-slate-400 mb-1">Description</div>
+              <div className="text-sm text-slate-300">{identity.description}</div>
+            </div>
+          )}
+          <div>
+            <div className="text-xs text-slate-400 mb-1">Labels</div>
+            <LabelTags labels={identity.labels} />
+          </div>
+          <div>
+            <div className="text-xs text-slate-400 mb-1">Endpoints</div>
+            {identity.endpoints.length > 0 ? (
+              <div className="space-y-1">
+                {identity.endpoints.map((ep, idx) => (
+                  <div key={idx} className="font-mono text-xs text-slate-300 bg-slate-800 rounded px-2 py-1">{ep}</div>
+                ))}
+              </div>
+            ) : (
+              <span className="text-slate-500 text-sm">none</span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
+            <div>
+              <div className="mb-1">Created</div>
+              <div>{new Date(identity.created).toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="mb-1">Updated</div>
+              <div>{new Date(identity.updated).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </ModalWrapper>
   )
 }
 
@@ -253,6 +349,150 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Policy'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClose: () => void; onUpdated: (p: NetworkPolicy) => void }) {
+  const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [labels, setLabels] = useState<Record<string, string>>({})
+  const [priority, setPriority] = useState('100')
+  const [rules, setRules] = useState<PolicyRule[]>([])
+  const [ruleDir, setRuleDir] = useState<PolicyDirection>('ingress')
+  const [ruleProto, setRuleProto] = useState('')
+  const [rulePort, setRulePort] = useState('')
+  const [ruleCidr, setRuleCidr] = useState('')
+  const [ruleAction, setRuleAction] = useState<PolicyAction>('allow')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.getNetworkPolicy(id).then(p => {
+      if (cancelled) return
+      setName(p.name)
+      setDescription(p.description ?? '')
+      setLabels(p.labels ?? p.endpoint_selector?.match_labels ?? {})
+      setPriority(String(p.priority ?? 100))
+      setRules([...(p.ingress_rules ?? []), ...(p.egress_rules ?? [])])
+      setLoading(false)
+    }).catch((e: unknown) => {
+      if (cancelled) return
+      setLoadErr(extractErrorMessage(e))
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id])
+
+  const addRule = () => {
+    setRules(prev => [...prev, {
+      direction: ruleDir,
+      protocol: ruleProto || undefined,
+      port: rulePort ? parseInt(rulePort) : undefined,
+      cidr: ruleCidr || undefined,
+      action: ruleAction,
+    }])
+    setRuleProto('')
+    setRulePort('')
+    setRuleCidr('')
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateNetworkPolicyRequest = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        labels: Object.keys(labels).length > 0 ? labels : undefined,
+        ingress_rules: rules.filter(r => r.direction === 'ingress'),
+        egress_rules: rules.filter(r => r.direction === 'egress'),
+        priority: parseInt(priority) || 100,
+      }
+      const p = await api.updateNetworkPolicy(id, req)
+      onUpdated(p)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <ModalWrapper title="Edit Network Policy" onClose={onClose}>
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </ModalWrapper>
+    )
+  }
+  if (loadErr) {
+    return (
+      <ModalWrapper title="Edit Network Policy" onClose={onClose}>
+        <p className="text-red-400 text-sm">{loadErr}</p>
+      </ModalWrapper>
+    )
+  }
+
+  return (
+    <ModalWrapper title="Edit Network Policy" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="allow-web-traffic" />
+        <InputField label="Description" value={description} onChange={setDescription} placeholder="Allow HTTP/HTTPS ingress" />
+        <LabelSelectorInput labels={labels} onChange={setLabels} />
+        <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
+        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-slate-300">Add Rule</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Direction</label>
+              <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="ingress">Ingress</option>
+                <option value="egress">Egress</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Action</label>
+              <select value={ruleAction} onChange={e => setRuleAction(e.target.value as PolicyAction)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="allow">Allow</option>
+                <option value="deny">Deny</option>
+                <option value="log">Log</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <InputField label="Protocol" value={ruleProto} onChange={setRuleProto} placeholder="tcp" />
+            <InputField label="Port" value={rulePort} onChange={setRulePort} placeholder="443" type="number" />
+            <InputField label="CIDR" value={ruleCidr} onChange={setRuleCidr} placeholder="10.0.0.0/8" />
+          </div>
+          <button type="button" onClick={addRule} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+            <Plus className="w-3.5 h-3.5" /> Add Rule
+          </button>
+          {rules.length > 0 && (
+            <div className="space-y-1 mt-2">
+              {rules.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                  <StatusBadge status={r.direction} color={r.direction === 'ingress' ? 'green' : 'yellow'} />
+                  <span>{r.action}</span>
+                  {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
+                  {r.port && <span className="text-slate-400">:{r.port}</span>}
+                  {r.cidr && <span className="text-slate-400">{r.cidr}</span>}
+                  <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>

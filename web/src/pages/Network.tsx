@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
-import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu, Globe } from 'lucide-react'
+import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu, Globe, ScanSearch } from 'lucide-react'
 import * as api from '../api/networkd'
 import * as cloudApi from '../api/network-cloud'
 import { useConfirm } from '../hooks/useConfirm'
@@ -11,12 +11,12 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import type {
   BridgeConfig, VlanConfig, MacvtapConfig, TapConfig, LinkInfo,
   BondConfig, NetworkFileConfig, LinkFileConfig, PortForwardConfig,
-  VxlanConfig, SriovConfig,
+  VxlanConfig, SriovConfig, ParsedConfigFile,
 } from '../api/networkd'
 import {
-  BridgesTab, CreateBridgeModal,
-  BondsTab, CreateBondModal,
-  VlansTab, CreateVlanModal,
+  BridgesTab, CreateBridgeModal, EditBridgeModal,
+  BondsTab, CreateBondModal, EditBondModal,
+  VlansTab, CreateVlanModal, EditVlanModal,
   MacvtapTab, CreateMacvtapModal,
   TapsTab, CreateTapModal,
   NetfilesTab, CreateNetfileModal,
@@ -32,7 +32,7 @@ import { ZYVOR_FABRIC_HELP } from '../config/zyvorHelp'
 
 const FABRIC = ZYVOR_FABRIC_HELP.name
 import { countNetfileTypes } from './network/NetfilesTab'
-import { extractErrorMessage } from './network/ModalShared'
+import { extractErrorMessage, ModalWrapper } from './network/ModalShared'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
@@ -45,7 +45,8 @@ import { ReadOnlyProvider } from '../contexts/ReadOnlyContext'
 import ReadOnlyNotice from '../components/ReadOnlyNotice'
 
 type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'floatingips' | 'status'
-type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | 'floatingip' | null
+type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | 'floatingip'
+  | 'edit-bridge' | 'edit-bond' | 'edit-vlan' | null
 
 export default function Network() {
   const toast = useToastContext()
@@ -68,6 +69,10 @@ export default function Network() {
 
   // Single modal state replaces 8 separate booleans
   const [activeModal, setActiveModal] = useState<Modal>(null)
+  const [editingBridge, setEditingBridge] = useState<BridgeConfig | null>(null)
+  const [editingBond, setEditingBond] = useState<BondConfig | null>(null)
+  const [editingVlan, setEditingVlan] = useState<VlanConfig | null>(null)
+  const [showScanModal, setShowScanModal] = useState(false)
   const { confirmState, confirm, cancel } = useConfirm()
 
   const fetchAll = useCallback(async (silent = false) => {
@@ -305,7 +310,12 @@ export default function Network() {
 
   const netfileCounts = useMemo(() => countNetfileTypes(netfiles), [netfiles])
 
-  const closeModal = () => setActiveModal(null)
+  const closeModal = () => {
+    setActiveModal(null)
+    setEditingBridge(null)
+    setEditingBond(null)
+    setEditingVlan(null)
+  }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'bridges', label: 'Bridges', icon: <Server className="w-4 h-4" /> },
@@ -332,12 +342,18 @@ export default function Network() {
           <NetworkIcon className="w-8 h-8" />
           Network Configuration
         </h1>
-        {canWrite && (
-          <button onClick={handleReload} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
-            <RefreshCw className="w-4 h-4" />
-            Reload networkd
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowScanModal(true)} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+            <ScanSearch className="w-4 h-4" />
+            Scan Configs
           </button>
-        )}
+          {canWrite && (
+            <button onClick={handleReload} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+              <RefreshCw className="w-4 h-4" />
+              Reload networkd
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -421,13 +437,31 @@ export default function Network() {
       ) : (
         <>
           {activeTab === 'bridges' && (
-            <BridgesTab bridges={bridges} onDelete={handleDeleteBridge} onAdopt={handleAdoptBridge} onCreate={() => setActiveModal('bridge')} />
+            <BridgesTab
+              bridges={bridges}
+              onDelete={handleDeleteBridge}
+              onAdopt={handleAdoptBridge}
+              onCreate={() => setActiveModal('bridge')}
+              onEdit={b => { setEditingBridge(b); setActiveModal('edit-bridge') }}
+            />
           )}
           {activeTab === 'bonds' && (
-            <BondsTab bonds={bonds} onDelete={handleDeleteBond} onAdopt={id => adoptHost('Bond', id, api.adoptBond, setBonds)} onCreate={() => setActiveModal('bond')} />
+            <BondsTab
+              bonds={bonds}
+              onDelete={handleDeleteBond}
+              onAdopt={id => adoptHost('Bond', id, api.adoptBond, setBonds)}
+              onCreate={() => setActiveModal('bond')}
+              onEdit={b => { setEditingBond(b); setActiveModal('edit-bond') }}
+            />
           )}
           {activeTab === 'vlans' && (
-            <VlansTab vlans={vlans} onDelete={handleDeleteVlan} onAdopt={id => adoptHost('VLAN', id, api.adoptVlan, setVlans)} onCreate={() => setActiveModal('vlan')} />
+            <VlansTab
+              vlans={vlans}
+              onDelete={handleDeleteVlan}
+              onAdopt={id => adoptHost('VLAN', id, api.adoptVlan, setVlans)}
+              onCreate={() => setActiveModal('vlan')}
+              onEdit={v => { setEditingVlan(v); setActiveModal('edit-vlan') }}
+            />
           )}
           {activeTab === 'macvtap' && (
             <MacvtapTab macvtaps={macvtaps} onDelete={handleDeleteMacvtap} onAdopt={id => adoptHost('Macvtap', id, api.adoptMacvtap, setMacvtaps)} onCreate={() => setActiveModal('macvtap')} />
@@ -484,6 +518,15 @@ export default function Network() {
       {canWrite && activeModal === 'bridge' && <CreateBridgeModal onClose={closeModal} onCreated={(b) => { setBridges(prev => [...prev, b]); closeModal() }} />}
       {canWrite && activeModal === 'bond' && <CreateBondModal onClose={closeModal} onCreated={(b) => { setBonds(prev => [...prev, b]); closeModal() }} />}
       {canWrite && activeModal === 'vlan' && <CreateVlanModal onClose={closeModal} onCreated={(v) => { setVlans(prev => [...prev, v]); closeModal() }} />}
+      {canWrite && activeModal === 'edit-bridge' && editingBridge && (
+        <EditBridgeModal bridge={editingBridge} onClose={closeModal} onUpdated={(b) => { setBridges(prev => prev.map(x => x.id === b.id ? b : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-bond' && editingBond && (
+        <EditBondModal bond={editingBond} onClose={closeModal} onUpdated={(b) => { setBonds(prev => prev.map(x => x.id === b.id ? b : x)); closeModal() }} />
+      )}
+      {canWrite && activeModal === 'edit-vlan' && editingVlan && (
+        <EditVlanModal vlan={editingVlan} onClose={closeModal} onUpdated={(v) => { setVlans(prev => prev.map(x => x.id === v.id ? v : x)); closeModal() }} />
+      )}
       {canWrite && activeModal === 'macvtap' && <CreateMacvtapModal onClose={closeModal} onCreated={(m) => { setMacvtaps(prev => [...prev, m]); closeModal() }} />}
       {canWrite && activeModal === 'tap' && <CreateTapModal onClose={closeModal} onCreated={(t) => { setTaps(prev => [...prev, t]); closeModal() }} />}
       {canWrite && activeModal === 'netfile' && <CreateNetfileModal onClose={closeModal} onCreated={(n) => { setNetfiles(prev => [...prev, n]); closeModal() }} />}
@@ -492,6 +535,7 @@ export default function Network() {
       {canWrite && activeModal === 'vxlan' && <CreateVxlanModal onClose={closeModal} onCreated={(v) => { setVxlans(prev => [...prev, v]); closeModal() }} />}
       {canWrite && activeModal === 'sriov' && <CreateSriovModal onClose={closeModal} onCreated={(s) => { setSriov(prev => [...prev, s]); closeModal() }} />}
       {canWrite && activeModal === 'floatingip' && <CreateFloatingIpModal interfaceOptions={interfaceOptions} onClose={closeModal} onCreated={(f) => { setFloatingIps(prev => [...prev, f]); closeModal() }} />}
+      {showScanModal && <ScanConfigsModal onClose={() => setShowScanModal(false)} />}
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
@@ -504,5 +548,70 @@ export default function Network() {
       )}
     </div>
     </ReadOnlyProvider>
+  )
+}
+
+function ScanConfigsModal({ onClose }: { onClose: () => void }) {
+  const [data, setData] = useState<ParsedConfigFile[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const result = await api.scanConfigs()
+        if (!cancelled) setData(result)
+      } catch (e: unknown) {
+        if (!cancelled) setErr(extractErrorMessage(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const toggle = (filename: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(filename)) next.delete(filename)
+      else next.add(filename)
+      return next
+    })
+  }
+
+  return (
+    <ModalWrapper title="Scanned Host Configs" onClose={onClose}>
+      <div className="space-y-3">
+        {loading && <p className="text-slate-400 text-sm">Scanning host configuration files…</p>}
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        {data && data.length === 0 && <p className="text-slate-400 text-sm">No existing config files found on host.</p>}
+        {data && data.map(f => (
+          <div key={f.filename} className="border border-slate-700/50 rounded-lg">
+            <button
+              type="button"
+              onClick={() => toggle(f.filename)}
+              className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.03] transition"
+            >
+              <span className="font-mono text-sm">{f.filename}</span>
+              <span className="text-xs text-slate-400">{f.file_type}</span>
+            </button>
+            {expanded.has(f.filename) && (
+              <div className="px-3 pb-3 space-y-2">
+                {f.sections.map((s, i) => (
+                  <div key={i} className="text-xs">
+                    <div className="text-slate-400 font-medium mb-1">[{s.name}]</div>
+                    <div className="pl-3 space-y-0.5 font-mono text-slate-500">
+                      {s.entries.map(([k, v], j) => <div key={j}>{k}={v}</div>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </ModalWrapper>
   )
 }

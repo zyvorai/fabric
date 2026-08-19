@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import * as api from '../../api/networkd'
 import type { BondConfig, CreateBondRequest, BondMode } from '../../api/networkd'
 import { ModalWrapper, InputField, HostBadge, HostManagedActions, isHostManaged, extractErrorMessage } from './ModalShared'
@@ -15,9 +15,10 @@ interface BondsTabProps {
   onDelete: (id: string) => void
   onAdopt: (id: string) => void
   onCreate: () => void
+  onEdit: (b: BondConfig) => void
 }
 
-function BondsTabContent({ bonds, onDelete, onAdopt, onCreate }: BondsTabProps) {
+function BondsTabContent({ bonds, onDelete, onAdopt, onCreate, onEdit }: BondsTabProps) {
   const readOnly = useReadOnly()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -82,7 +83,14 @@ function BondsTabContent({ bonds, onDelete, onAdopt, onCreate }: BondsTabProps) 
                   <td className="p-4 text-slate-400 font-mono text-sm">{b.addresses.join(', ') || '-'}</td>
                   <td className="p-4 text-slate-400">{b.dhcp}</td>
                   <td className="p-4">
-                    <HostManagedActions readOnly={readOnly} item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
+                    <div className="flex items-center gap-1">
+                      {!readOnly && !isHostManaged(b) && (
+                        <button onClick={() => onEdit(b)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Edit bond" type="button">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <HostManagedActions readOnly={readOnly} item={b} onDelete={() => onDelete(b.id)} onAdopt={() => onAdopt(b.id)} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -153,6 +161,67 @@ export function CreateBondModal({ onClose, onCreated }: { onClose: () => void; o
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Bond'}
+        </button>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+export function EditBondModal({ bond, onClose, onUpdated }: { bond: BondConfig; onClose: () => void; onUpdated: (b: BondConfig) => void }) {
+  const [name, setName] = useState(bond.name)
+  const [mode, setMode] = useState<BondMode>(bond.mode)
+  const [slaves, setSlaves] = useState(bond.slave_interfaces.join(', '))
+  const [miiMonitor, setMiiMonitor] = useState(bond.mii_monitor_sec != null ? String(bond.mii_monitor_sec) : '')
+  const [addresses, setAddresses] = useState(bond.addresses.join(', '))
+  const [gateway, setGateway] = useState(bond.gateway ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSubmitting(true)
+    setErr('')
+    try {
+      const req: CreateBondRequest = {
+        name: name.trim(),
+        mode,
+        mii_monitor_sec: miiMonitor ? parseInt(miiMonitor) : undefined,
+        slave_interfaces: slaves ? slaves.split(',').map(s => s.trim()).filter(Boolean) : [],
+        addresses: addresses ? addresses.split(',').map(s => s.trim()).filter(Boolean) : [],
+        gateway: gateway.trim() || undefined,
+      }
+      const updated = await api.updateBond(bond.id, req)
+      onUpdated(updated)
+    } catch (e: unknown) {
+      setErr(extractErrorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Edit Bond" onClose={onClose}>
+      <div className="space-y-4">
+        <InputField label="Name" value={name} onChange={setName} placeholder="bond0" />
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Mode</label>
+          <select value={mode} onChange={e => setMode(e.target.value as BondMode)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="802.3ad">802.3ad (LACP)</option>
+            <option value="active-backup">active-backup</option>
+            <option value="balance-rr">balance-rr</option>
+            <option value="balance-xor">balance-xor</option>
+            <option value="broadcast">broadcast</option>
+            <option value="balance-tlb">balance-tlb</option>
+            <option value="balance-alb">balance-alb</option>
+          </select>
+        </div>
+        <InputField label="Slave Interfaces (comma-separated)" value={slaves} onChange={setSlaves} placeholder="eth0, eth1" />
+        <InputField label="MII Monitor (ms)" value={miiMonitor} onChange={setMiiMonitor} placeholder="100" type="number" />
+        <InputField label="Addresses (comma-separated)" value={addresses} onChange={setAddresses} placeholder="10.0.0.1/24" />
+        <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder="10.0.0.254" />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </ModalWrapper>
