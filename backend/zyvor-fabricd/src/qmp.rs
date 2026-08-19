@@ -18,6 +18,10 @@ const ALLOWED_QMP_COMMANDS: &[&str] = &[
     "query-memory-size-summary",
     "query-vnc",
     "query-spice",
+    // Read-only PCI topology inspection -- used to check which hotplug
+    // root ports already have a child device before picking one for
+    // device_add (see hotplug.rs::occupied_hotplug_buses).
+    "query-pci",
     "system_powerdown",
     "system_reset",
     "stop",
