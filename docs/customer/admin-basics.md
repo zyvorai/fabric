@@ -11,6 +11,26 @@
 
 External OIDC + JWT bearer.
 
+### JWT secret and admin password
+
+Both are auto-generated (cryptographically random, 64 chars) on first start if unset, and
+persisted to disk so they survive restarts — never a hardcoded or predictable default:
+
+| Env var | Default when unset | Persisted at |
+|---------|---------------------|--------------|
+| `ZYVOR_FABRICD_JWT_SECRET` | Random, generated once | `/var/lib/zyvor-fabricd/.jwt_secret` (mode 0600) |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Random, generated once — never defaults to `admin` | `/var/lib/zyvor-fabricd/.admin_password` |
+
+Retrieve the generated admin password:
+
+```bash
+cat /var/lib/zyvor-fabricd/.admin_password
+```
+
+Set your own at deploy time instead by exporting the env var before first start — once a
+value is persisted to disk, it's reused across restarts even if the env var is later
+unset, so set it before the very first run if you want a specific value from day one.
+
 ## Install sketch
 
 Follow the product README and deploy/Helm docs in the repository. Verify health endpoints or CLI status before opening the UI.
