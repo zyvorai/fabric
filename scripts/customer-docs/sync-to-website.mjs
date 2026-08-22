@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CUSTOMER = resolve(ROOT, 'docs/customer')
 const SITE = resolve(process.argv[2] ?? resolve(ROOT, '../hypersdk-web'))
-const PRODUCT = process.env.CUSTOMER_DOCS_PRODUCT || 'Product'
+const PRODUCT = process.env.CUSTOMER_DOCS_PRODUCT || 'Zyvor Fabric'
 const SLUG = (process.env.CUSTOMER_DOCS_SLUG || PRODUCT).toLowerCase().replace(/\s+/g, '-')
 const PDF_PREFIX = process.env.CUSTOMER_DOCS_PDF_PREFIX || PRODUCT.replace(/\s+/g, '-')
 const MANUAL_DIR = process.env.CUSTOMER_DOCS_MANUAL_DIR || `${SLUG}-manual`
