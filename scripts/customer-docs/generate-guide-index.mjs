@@ -12,13 +12,25 @@ function titleOf(file) {
   return first ? first.slice(2).trim() : null
 }
 
-function summaryOf(file) {
+function summaryOf(file, dir) {
   const lines = readFileSync(file, 'utf8').split('\n')
   const i = lines.findIndex((l) => l.trim() === '## Purpose')
   if (i === -1) return ''
   for (let j = i + 1; j < lines.length; j++) {
     const t = lines[j].trim()
-    if (t && !t.startsWith('#')) return t.replace(/\s+/g, ' ').replace(/\|/g, '\\|').replace(/\*\*/g, '')
+    if (t && !t.startsWith('#')) {
+      return t
+        .replace(/\s+/g, ' ')
+        .replace(/\|/g, '\\|')
+        .replace(/\*\*/g, '')
+        // A Purpose paragraph often cross-links sibling guides by bare filename
+        // (e.g. `[Storage](storage.md)`), which resolves correctly on the guide's
+        // own page but breaks once this same text is copied into pages/README.md
+        // one directory up. Re-root any bare `*.md` link onto this guide's own
+        // subdirectory; already-qualified links (`dir/file.md`, `../x.md`,
+        // `http(s)://...`) are left untouched.
+        .replace(/\]\(([a-zA-Z0-9_-]+\.md)\)/g, `](${dir}/$1)`)
+    }
   }
   return ''
 }
@@ -43,7 +55,7 @@ if (existsSync(PAGES)) {
       lines.push(`## ${heading}`, '', '| Page | What it covers |', '|------|----------------|')
       for (const f of guides) {
         const full = join(fullDir, f)
-        lines.push(`| [${titleOf(full) ?? f}](${dir}/${f}) | ${summaryOf(full)} |`)
+        lines.push(`| [${titleOf(full) ?? f}](${dir}/${f}) | ${summaryOf(full, dir)} |`)
         total++
       }
       lines.push('')
