@@ -2,7 +2,7 @@
 
 Every primary navigable dashboard route.
 
-_Generated: 2026-08-29 · 79 routes_
+_Generated: 2026-08-29 · 84 routes_
 
 Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 
@@ -19,6 +19,8 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | VM Browser | `/vm-browser` | VM Browser — Core surface. | [Open](pages/core/vm-browser.md) |
 | Create VM | `/create` | Create VM — Core surface. | [Open](pages/core/create.md) |
 | VM Console | `/vms/:name/console` | VM Console — Core surface. | — |
+| Settings | `/settings` | Settings — Core product and console preferences. | [Open](pages/core/settings.md) |
+| VM Wizard | `/vm-wizard` | VM Wizard — guided VM creation flow. | [Open](pages/core/vm-wizard.md) |
 
 ## Infrastructure
 
@@ -33,6 +35,8 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | System | `/system` | System — Infrastructure surface. | [Open](pages/infrastructure/system.md) |
 | System Health | `/system-health` | System Health — Infrastructure surface. | [Open](pages/infrastructure/system-health.md) |
 | Containers | `/containers` | Containers — Infrastructure surface. | [Open](pages/infrastructure/containers.md) |
+| Zones | `/zones` | Zones — Infrastructure surface for placement domains. | [Open](pages/infrastructure/zones.md) |
+| VM Pools | `/vm-pools` | VM Pools — warm / capacity pools for fast provisioning. | [Open](pages/infrastructure/vm-pools.md) |
 
 ## Operations
 
@@ -94,6 +98,7 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | VM Compare | `/vm-compare` | VM Compare — Tools surface. | [Open](pages/tools/vm-compare.md) |
 | VM Health Check | `/vm-healthcheck` | VM Health Check — Tools surface. | [Open](pages/tools/vm-healthcheck.md) |
 | Notification Center | `/notification-center` | Notification Center — Tools surface. | [Open](pages/tools/notification-center.md) |
+| API Playground | `/playground` | API Playground — try Fabric APIs interactively. | [Open](pages/tools/playground.md) |
 
 ## More — images, migrations & managers
 

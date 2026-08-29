@@ -473,6 +473,36 @@
       "path": "/login",
       "category": "Auth",
       "legacy": false
+    },
+    {
+      "label": "Zones",
+      "path": "/zones",
+      "category": "Infrastructure",
+      "legacy": false
+    },
+    {
+      "label": "Settings",
+      "path": "/settings",
+      "category": "Core",
+      "legacy": false
+    },
+    {
+      "label": "VM Pools",
+      "path": "/vm-pools",
+      "category": "Infrastructure",
+      "legacy": false
+    },
+    {
+      "label": "API Playground",
+      "path": "/playground",
+      "category": "Tools",
+      "legacy": false
+    },
+    {
+      "label": "VM Wizard",
+      "path": "/vm-wizard",
+      "category": "Core",
+      "legacy": false
     }
   ]
 }

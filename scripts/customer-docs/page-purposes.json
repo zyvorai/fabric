@@ -77,5 +77,10 @@
   "/network-topology": "Network Topology \u2014 More \u2014 images, migrations & managers surface.",
   "/create": "Create VM \u2014 Core surface.",
   "/vms/:name/console": "VM Console \u2014 Core surface.",
-  "/login": "Login \u2014 Auth surface."
+  "/login": "Login \u2014 Auth surface.",
+  "/zones": "Zones \u2014 Infrastructure surface for placement domains.",
+  "/settings": "Settings \u2014 Core product and console preferences.",
+  "/vm-pools": "VM Pools \u2014 warm / capacity pools for fast provisioning.",
+  "/playground": "API Playground \u2014 try Fabric APIs interactively.",
+  "/vm-wizard": "VM Wizard \u2014 guided VM creation flow."
 }

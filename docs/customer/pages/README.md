@@ -20,7 +20,9 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Dashboard](core/home.md) | Dashboard — the fabric at a glance: how many VMs exist and in what state, live CPU/memory trends, and whether each backend subsystem is actually reachable. |
 | [Machines](core/machines.md) | Machines — a lower-level view of the VM driver's running instances and the raw disk images it can boot, with direct shell access into a running instance. |
 | [Profiles](core/profiles.md) | Profiles (shown in the UI as Instance Types) — a library of VM sizing presets (vCPUs, memory, disk, and optionally network bandwidth) you can pick instead of hand-tuning resources every time you create a VM. |
+| [Settings](core/settings.md) | Settings — Core product and console preferences. |
 | [VM Browser](core/vm-browser.md) | VM Browser — a lightweight, read-only grid of every VM, for quickly scanning or searching without the bulk-action tooling of the full [Virtual Machines](core/vms.md) list. |
+| [VM Wizard](core/vm-wizard.md) | VM Wizard — guided VM creation flow. |
 | [VM Console](core/vms-name-console.md) | VM Console — a real, live console into a running VM, from the browser, without SSH or any other client installed. |
 | [Virtual Machines](core/vms.md) | Virtual Machines — the fleet view of every VM in the fabric, and the starting point for managing any one of them. |
 
@@ -37,6 +39,8 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Storage](infrastructure/storage.md) | Storage — a consolidated view of every storage pool's capacity alongside a manual volume tracking ledger. To create or manage a pool itself, use [Storage Pools](infrastructure/storage-pools.md); for replicated/policy-driven storage across hosts, see [Distributed Storage](infrastructure/distributed-storage.md). |
 | [System Health](infrastructure/system-health.md) | System Health — a live, read-only dashboard of host resource utilization, refreshing every 2 seconds: CPU, memory, disk I/O, filesystems, network interfaces, and top processes, rolled up into a single health score. |
 | [System](infrastructure/system.md) | System — the physical host's hardware topology (CPU sockets/cores/threads, NUMA nodes, hugepages) plus topology-aware optimization recommendations for individual VMs. This is distinct from [System Health](infrastructure/system-health.md), which tracks live utilization rather than hardware layout. |
+| [VM Pools](infrastructure/vm-pools.md) | VM Pools — warm / capacity pools for fast provisioning. |
+| [Zones](infrastructure/zones.md) | Zones — Infrastructure surface for placement domains. |
 
 ## Monitoring
 
@@ -119,10 +123,11 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 |------|----------------|
 | [Cost Estimator](tools/cost-estimator.md) | Storage Cost Estimator — a what-if calculator that projects cloud storage cost (AWS S3, Azure Blob, GCS) for your VM fleet and compares it against an on-premises baseline. It's a planning tool: figures come from the inputs you set, not from your actual billing or usage. |
 | [Notification Center](tools/notification-center.md) | Notification Center — a live, session-only tray of VM events and system alerts, polled from the server every 10 seconds. It's separate from Monitoring → Notifications, which manages persistent delivery channels, rules, and history; this page just surfaces what's firing right now and forgets everything when you reload. |
+| [API Playground](tools/playground.md) | API Playground — try Fabric APIs interactively. |
 | [VM Compare](tools/vm-compare.md) | VM Comparison — a side-by-side diff of two VMs' configurations, run on demand against the live VM list. |
 | [VM Health Check](tools/vm-healthcheck.md) | VM Health Check — runs a set of health verification checks against a single VM, on demand, and reports pass/warning/fail per check plus an overall status. |
 | [Webhooks](tools/webhooks.md) | Webhook Configuration — manage outbound webhooks that notify an external endpoint (generic HTTP, Slack, or Discord) when specific VM and backup events occur. |
 
 ---
 
-79 guides. Regenerate: `node scripts/customer-docs/generate-guide-index.mjs`.
+84 guides. Regenerate: `node scripts/customer-docs/generate-guide-index.mjs`.

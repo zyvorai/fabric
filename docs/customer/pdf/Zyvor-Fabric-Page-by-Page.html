@@ -75,8 +75,16 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <td>Profiles (shown in the UI as Instance Types) — a library of VM sizing presets (vCPUs, memory, disk, and optionally network bandwidth) you can pick instead of hand-tuning resources every time you create a VM.</td>
 </tr>
 <tr>
+<td><a href="core/settings.md">Settings</a></td>
+<td>Settings — Core product and console preferences.</td>
+</tr>
+<tr>
 <td><a href="core/vm-browser.md">VM Browser</a></td>
 <td>VM Browser — a lightweight, read-only grid of every VM, for quickly scanning or searching without the bulk-action tooling of the full <a href="core/vms.md">Virtual Machines</a> list.</td>
+</tr>
+<tr>
+<td><a href="core/vm-wizard.md">VM Wizard</a></td>
+<td>VM Wizard — guided VM creation flow.</td>
 </tr>
 <tr>
 <td><a href="core/vms-name-console.md">VM Console</a></td>
@@ -130,6 +138,14 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <tr>
 <td><a href="infrastructure/system.md">System</a></td>
 <td>System — the physical host&#39;s hardware topology (CPU sockets/cores/threads, NUMA nodes, hugepages) plus topology-aware optimization recommendations for individual VMs. This is distinct from <a href="infrastructure/system-health.md">System Health</a>, which tracks live utilization rather than hardware layout.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/vm-pools.md">VM Pools</a></td>
+<td>VM Pools — warm / capacity pools for fast provisioning.</td>
+</tr>
+<tr>
+<td><a href="infrastructure/zones.md">Zones</a></td>
+<td>Zones — Infrastructure surface for placement domains.</td>
 </tr>
 </tbody></table>
 <h3>Monitoring</h3>
@@ -405,6 +421,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <td>Notification Center — a live, session-only tray of VM events and system alerts, polled from the server every 10 seconds. It&#39;s separate from Monitoring → Notifications, which manages persistent delivery channels, rules, and history; this page just surfaces what&#39;s firing right now and forgets everything when you reload.</td>
 </tr>
 <tr>
+<td><a href="tools/playground.md">API Playground</a></td>
+<td>API Playground — try Fabric APIs interactively.</td>
+</tr>
+<tr>
 <td><a href="tools/vm-compare.md">VM Compare</a></td>
 <td>VM Comparison — a side-by-side diff of two VMs&#39; configurations, run on demand against the live VM list.</td>
 </tr>
@@ -418,7 +438,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </tr>
 </tbody></table>
 <hr>
-<p>79 guides. Regenerate: <code>node scripts/customer-docs/generate-guide-index.mjs</code>.</p>
+<p>84 guides. Regenerate: <code>node scripts/customer-docs/generate-guide-index.mjs</code>.</p>
 <hr>
 <h2>Login</h2>
 <h3>Purpose</h3>
@@ -637,6 +657,34 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
 <hr>
+<h2>Settings</h2>
+<h3>Purpose</h3>
+<p>Settings — Core product and console preferences.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/settings</code></li>
+<li>Nav: <strong>Core → Settings</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/settings</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
 <h2>VM Browser</h2>
 <h3>Purpose</h3>
 <p>VM Browser — a lightweight, read-only grid of every VM, for quickly scanning or searching without the bulk-action tooling of the full <a href="vms.md">Virtual Machines</a> list.</p>
@@ -656,6 +704,34 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Each card shows the VM&#39;s name, state badge, image, vCPU count, memory, and IP address (if assigned).</li>
 <li>Click a card to open that VM&#39;s detail page.</li>
 <li><strong>Refresh</strong> reloads the list from the server.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>VM Wizard</h2>
+<h3>Purpose</h3>
+<p>VM Wizard — guided VM creation flow.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vm-wizard</code></li>
+<li>Nav: <strong>Core → VM Wizard</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vm-wizard</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
 </ol>
 <p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
 <h3>Related pages</h3>
@@ -1010,6 +1086,62 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li><strong>NUMA Topology</strong> — per-node CPU list, memory total/free with a usage bar, per-node hugepage counts, and an inter-node distance matrix.</li>
 <li><strong>Memory &amp; Hugepages</strong> — system memory breakdown (total, available, usage bar, buffers, cached) plus 2MB and 1GB hugepage stats. <strong>Allocate Hugepages</strong> opens a dialog to pick a page size and count and apply it immediately.</li>
 <li><strong>Optimization</strong> — per-VM recommendations (resource, current → recommended value, reason, expected impact). <strong>Apply</strong> runs the recommended change against that VM right away.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>VM Pools</h2>
+<h3>Purpose</h3>
+<p>VM Pools — warm / capacity pools for fast provisioning.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/vm-pools</code></li>
+<li>Nav: <strong>Infrastructure → VM Pools</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/vm-pools</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Zones</h2>
+<h3>Purpose</h3>
+<p>Zones — Infrastructure surface for placement domains.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/zones</code></li>
+<li>Nav: <strong>Infrastructure → Zones</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/zones</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
 </ol>
 <p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
 <h3>Related pages</h3>
@@ -2714,6 +2846,34 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
 <hr>
+<h2>API Playground</h2>
+<h3>Purpose</h3>
+<p>API Playground — try Fabric APIs interactively.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Open this surface when the job matches the purpose above</li>
+<li>Start from the product home / dashboard if you are unsure where to begin</li>
+<li>Confirm auth and that required backends/operators are reachable if data looks empty</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route / id: <code>/playground</code></li>
+<li>Nav: <strong>Tools → API Playground</strong> (sidebar, command palette, or desktop nav)</li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Open <code>/playground</code> and wait for live data from Zyvor Fabric.</li>
+<li>Use filters and search when the page provides them.</li>
+<li>Drill into a row or card for detail, then jump to related surfaces.</li>
+<li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
+</ol>
+<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
+<h3>Related pages</h3>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
 <h2>VM Compare</h2>
 <h3>Purpose</h3>
 <p>VM Comparison — a side-by-side diff of two VMs&#39; configurations, run on demand against the live VM list.</p>
@@ -2804,7 +2964,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <hr>
 <h2>Zyvor Fabric — Complete page index</h2>
 <p>Every primary navigable dashboard route.</p>
-<p><em>Generated: 2026-08-29 · 79 routes</em></p>
+<p><em>Generated: 2026-08-29 · 84 routes</em></p>
 <p>Regenerate: <code>node scripts/customer-docs/generate-page-index.mjs</code></p>
 <h3>Core</h3>
 <table>
@@ -2870,6 +3030,18 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <td>VM Console — Core surface.</td>
 <td>—</td>
 </tr>
+<tr>
+<td>Settings</td>
+<td><code>/settings</code></td>
+<td>Settings — Core product and console preferences.</td>
+<td><a href="pages/core/settings.md">Open</a></td>
+</tr>
+<tr>
+<td>VM Wizard</td>
+<td><code>/vm-wizard</code></td>
+<td>VM Wizard — guided VM creation flow.</td>
+<td><a href="pages/core/vm-wizard.md">Open</a></td>
+</tr>
 </tbody></table>
 <h3>Infrastructure</h3>
 <table>
@@ -2934,6 +3106,18 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <td><code>/containers</code></td>
 <td>Containers — Infrastructure surface.</td>
 <td><a href="pages/infrastructure/containers.md">Open</a></td>
+</tr>
+<tr>
+<td>Zones</td>
+<td><code>/zones</code></td>
+<td>Zones — Infrastructure surface for placement domains.</td>
+<td><a href="pages/infrastructure/zones.md">Open</a></td>
+</tr>
+<tr>
+<td>VM Pools</td>
+<td><code>/vm-pools</code></td>
+<td>VM Pools — warm / capacity pools for fast provisioning.</td>
+<td><a href="pages/infrastructure/vm-pools.md">Open</a></td>
 </tr>
 </tbody></table>
 <h3>Operations</h3>
@@ -3224,6 +3408,12 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <td><code>/notification-center</code></td>
 <td>Notification Center — Tools surface.</td>
 <td><a href="pages/tools/notification-center.md">Open</a></td>
+</tr>
+<tr>
+<td>API Playground</td>
+<td><code>/playground</code></td>
+<td>API Playground — try Fabric APIs interactively.</td>
+<td><a href="pages/tools/playground.md">Open</a></td>
 </tr>
 </tbody></table>
 <h3>More — images, migrations &amp; managers</h3>

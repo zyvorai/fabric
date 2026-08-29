@@ -137,11 +137,11 @@ let pdfs = 0
 const pdfDir = join(CUSTOMER, 'pdf')
 if (existsSync(pdfDir)) {
   for (const f of readdirSync(pdfDir)) {
-    if (!f.endsWith('.pdf')) continue
+    if (!f.endsWith('.pdf') && !f.endsWith('.html')) continue
     cpSync(join(pdfDir, f), join(PDF_TARGET, f))
     pdfs++
   }
 }
 
 console.log(`Synced ${written} markdown files -> ${TARGET}`)
-console.log(`Copied ${pdfs} PDFs -> ${PDF_TARGET}`)
+console.log(`Copied ${pdfs} PDF/HTML files -> ${PDF_TARGET}`)
