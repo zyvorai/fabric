@@ -24,7 +24,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
 <h1>Zyvor <span>Fabric</span></h1>
 <div class="sub">Admin Basics</div>
-<div class="badge">2026-08-17</div>
+<div class="badge">2026-08-29</div>
 <div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
 <main><h2>Ports / access</h2>
 <table>
@@ -45,6 +45,34 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </tbody></table>
 <h2>Auth</h2>
 <p>External OIDC + JWT bearer.</p>
+<h3>JWT secret and admin password</h3>
+<p>Both are auto-generated (cryptographically random, 64 chars) on first start if unset, and
+persisted to disk so they survive restarts — never a hardcoded or predictable default:</p>
+<table>
+<thead>
+<tr>
+<th>Env var</th>
+<th>Default when unset</th>
+<th>Persisted at</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ZYVOR_FABRICD_JWT_SECRET</code></td>
+<td>Random, generated once</td>
+<td><code>/var/lib/zyvor-fabricd/.jwt_secret</code> (mode 0600)</td>
+</tr>
+<tr>
+<td><code>ZYVOR_FABRICD_ADMIN_PASSWORD</code></td>
+<td>Random, generated once — never defaults to <code>admin</code></td>
+<td><code>/var/lib/zyvor-fabricd/.admin_password</code></td>
+</tr>
+</tbody></table>
+<p>Retrieve the generated admin password:</p>
+<pre><code class="language-bash">cat /var/lib/zyvor-fabricd/.admin_password
+</code></pre>
+<p>Set your own at deploy time instead by exporting the env var before first start — once a
+value is persisted to disk, it&#39;s reused across restarts even if the env var is later
+unset, so set it before the very first run if you want a specific value from day one.</p>
 <h2>Install sketch</h2>
 <p>Follow the product README and deploy/Helm docs in the repository. Verify health endpoints or CLI status before opening the UI.</p>
 <h2>Related</h2>
