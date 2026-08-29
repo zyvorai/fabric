@@ -15,7 +15,7 @@ Migration History — a read-only log of completed and failed migration jobs, wi
 - Route / id: `/migration-history`
 - Nav: **More — images, migrations & managers → History** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. The page loads history from the migrations API as soon as you open it; use the header **Refresh** control to reload.
 2. Table columns: **Name**, **VM**, **Status** (completed / failed / running badge, with the error message shown inline under failed rows), **Started**, **Duration**, and **Output** (output path).

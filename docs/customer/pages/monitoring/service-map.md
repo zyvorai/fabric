@@ -15,7 +15,7 @@ Service Map — shows the services discovered across your VMs, which ones depend
 - Route / id: `/service-map`
 - Nav: **Monitoring → Service Map** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Summary cards show **Services**, **Healthy**, **Degraded**, and **Down** counts.
 2. Service cards in a grid show name, a health dot (green/amber/red/gray), a type badge (web, database, cache, queue, api, proxy, …), the host VM, port, and inbound/outbound link counts.

@@ -15,7 +15,7 @@ Autoscale — define per-VM policies that automatically grow or shrink a VM's vC
 - Route / id: `/autoscale`
 - Nav: **Operations → Autoscale** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review the policy table — one row per VM, showing its vCPU range, memory range, CPU scale-up/scale-down thresholds, and cooldown period (seconds between scaling actions).
 2. **Create Policy** opens a form to pick a VM (only VMs without an existing policy are offered) and set min/max vCPUs, min/max memory (MB), CPU scale-up and scale-down thresholds (%), and the cooldown in seconds.

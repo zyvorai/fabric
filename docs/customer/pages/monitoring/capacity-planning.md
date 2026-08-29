@@ -15,7 +15,7 @@ Capacity Planning — resource usage against total capacity per resource (memory
 - Route / id: `/capacity-planning`
 - Nav: **Monitoring → Capacity** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Capacity warning banner** — appears automatically whenever any tracked resource is above 75% usage, naming which ones.
 2. **Summary tiles** — Active VMs (count), Resources Tracked, resources Over 75% Usage, and Growing Resources (trending upward).

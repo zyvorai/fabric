@@ -14,7 +14,7 @@ VM Browser — a lightweight, read-only grid of every VM, for quickly scanning o
 - Route / id: `/vm-browser`
 - Nav: **Core → VM Browser** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Search by name, state, or image — the header shows total VM count and how many are running.
 2. Each card shows the VM's name, state badge, image, vCPU count, memory, and IP address (if assigned).

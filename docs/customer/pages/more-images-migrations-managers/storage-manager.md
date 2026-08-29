@@ -15,7 +15,7 @@ Storage Manager — browse storage pools with their capacity and usage, and dril
 - Route / id: `/storage-manager`
 - Nav: **More — images, migrations & managers → Storage Mgr** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Pools load on open; the header **Refresh** reloads them.
 2. Each pool is a card showing its name, a type badge (dir / logical / netfs / disk / iscsi / rbd / zfs), a state badge, a usage bar (blue, turning amber above 70% and red above 90%), and used / capacity / available figures.

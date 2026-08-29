@@ -16,7 +16,7 @@ Site Recovery — define disaster recovery plans that group VMs by source and ta
 - Route / id: `/site-recovery`
 - Nav: **Operations → Site Recovery** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **DR Dashboard tab** — summary tiles for protected vs. unprotected VMs, average RTO, average RPO, and plans tested vs. total plans; plus a per-site status list and the 5 most recent executions with their status.
 2. **Recovery Plans tab** — table of plans (name/description, VM group count and total VMs, status, last tested date, last executed date). **Create Plan** defines a plan name, description, source site ID, target site ID, a VM group name, and a comma-separated list of VM IDs in that group.

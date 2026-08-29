@@ -15,7 +15,7 @@ Migration Templates — reusable migration configuration presets (disk format, v
 - Route / id: `/migration-templates`
 - Nav: **More — images, migrations & managers → Migration Templates** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Three **built-in** templates are always available — Production Linux (4 vCPU / 8 GB, bridged, qcow2, compressed), Dev/Test Linux (2 vCPU / 2 GB, user networking, uncompressed), and Windows Server (4 vCPU / 16 GB, bridged, qcow2, compressed, virtio). They're tagged **Built-in** and can't be deleted.
 2. **New Template** opens a form — Name, Description, Format (QCOW2 / RAW / VMDK), vCPUs, Memory (MB) — **Add** saves it as a custom template.

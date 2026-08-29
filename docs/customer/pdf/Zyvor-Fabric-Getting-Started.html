@@ -43,6 +43,14 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li><a href="admin-basics.md">Admin basics</a></li>
 <li><a href="pages/README.md">Page guides</a></li>
 </ul>
+<h2>Operate from the console (UX)</h2>
+<ol>
+<li>Open this route from the nav or command palette and wait for live API data.</li>
+<li>Use filters/search when present; drill into a row for detail.</li>
+<li>For mutating actions: confirm role gates and impact before applying.</li>
+<li><strong>Empty / fail:</strong> Check service health, auth, and that required CRDs/backends for this domain are installed.</li>
+<li><strong>Success:</strong> Live data loads; created/updated objects appear without error toasts.</li>
+</ol>
 <hr>
 <p>Zyvor Fabric is organized by navigation groups (sidebar, desktop nav, or CLI command groups). Use search / command palette when available.</p>
 <h2>Surfaces</h2>
@@ -81,7 +89,16 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li><a href="getting-started.md">Getting Started</a></li>
 <li><a href="pages/README.md">Page-by-page guides</a></li>
 </ul>
+<h2>Operate from the console (UX)</h2>
+<ol>
+<li>Open this route from the nav or command palette and wait for live API data.</li>
+<li>Use filters/search when present; drill into a row for detail.</li>
+<li>For mutating actions: confirm role gates and impact before applying.</li>
+<li><strong>Empty / fail:</strong> Check service health, auth, and that required CRDs/backends for this domain are installed.</li>
+<li><strong>Success:</strong> Live data loads; created/updated objects appear without error toasts.</li>
+</ol>
 <hr>
+<h2>Purpose</h2>
 <ol>
 <li>Open the home surface (<code>/</code>) from <a href="getting-started.md">Getting Started</a>.</li>
 <li>Use the <a href="PAGE_INDEX.md">page index</a> to jump to the domain you need.</li>
@@ -91,5 +108,34 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <ul>
 <li><a href="getting-started.md">Getting Started</a></li>
 <li><a href="pages/README.md">Page-by-page guides</a></li>
+</ul>
+<h2>When to use it</h2>
+<ul>
+<li>Open <strong>Common workflows</strong> when the job matches this screen</li>
+<li>Prefer the product home / Get started panel if you are unsure where to begin</li>
+<li>Confirm health and auth tokens if probes fail</li>
+</ul>
+<h2>How to get there</h2>
+<ul>
+<li>UI path: <code>/ui/</code> → <strong>Common workflows</strong> (or matching nav tab)</li>
+<li>Spotlight / in-app links when available</li>
+</ul>
+<h2>Operate from the console (UX)</h2>
+<ol>
+<li>Open the Zyvor Fabric UI (<code>/ui/</code>) on <code>https://&lt;host&gt;:…</code> (see Admin basics for the default port).</li>
+<li>Navigate to <strong>Common workflows</strong>.</li>
+<li>Complete the on-screen fields / actions for this surface (1. Open the home surface (<code>/</code>) from <a href="getting-started.md">Getting Started</a>.</li>
+<li>Use the <a href="PAGE_INDEX.md">page index</a> to jum…).</li>
+<li>Use <strong>Probe</strong> / <strong>Save</strong> / <strong>Send</strong> (or the primary button on the page) and watch status chips.</li>
+<li><strong>Empty / fail:</strong> Check Admin basics env vars, JWT/<code>API_TOKEN</code>, TLS insecure for lab certs, and backend reachability.</li>
+<li><strong>Success:</strong> Status shows healthy / accepted; related Lab or Logs surfaces reflect the change.</li>
+</ol>
+<p>Never publish lab IPs — use <code>&lt;host&gt;</code>.</p>
+<h2>Related pages</h2>
+<ul>
+<li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../using-the-dashboard.md">Using the Dashboard</a></li>
+<li><a href="../../admin-basics.md">Admin basics</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
 </main></body></html>

@@ -15,7 +15,7 @@ System — the physical host's hardware topology (CPU sockets/cores/threads, NUM
 - Route / id: `/system`
 - Nav: **Infrastructure → System** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Four tabs — **CPU Topology, NUMA Topology, Memory & Hugepages, Optimization** (badged with the pending recommendation count) — plus stat cards for total CPUs (sockets × cores), NUMA node count, total/available memory, and 2MB hugepage total/free.
 

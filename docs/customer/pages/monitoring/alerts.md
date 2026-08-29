@@ -15,7 +15,7 @@ Alerts — a live view of currently firing system alerts and the notification ru
 - Route / id: `/alerts`
 - Nav: **Monitoring → Alerts** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Active Alerts summary** — three stat tiles at the top show the total number of active alerts, how many are critical, and how many are warning-level.
 2. **Active Alerts list** — each alert is a card showing its severity badge (critical/warning/info), timestamp, title, message, and the triggering value when one is available. Cards are left-bordered in red, amber, or blue to match severity. If nothing is currently firing, the list shows "No active alerts".

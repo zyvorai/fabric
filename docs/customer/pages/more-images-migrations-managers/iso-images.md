@@ -16,12 +16,16 @@ ISO Images — a read-only inventory of installer and driver ISO files sitting i
 - Route / id: `/iso-images`
 - Nav: **More — images, migrations & managers → ISO Images** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 - **Search** ISOs by name or path.
 - Each row shows the ISO's name, path, size, last-modified time, and the list of VMs that currently have it attached (**Attached VMs**); ISOs named for `virtio-win` get a small **virtio-win** badge next to the name.
 - The list auto-refreshes every 30 seconds, and you can trigger an immediate refresh from the page header.
 - If no ISOs are found, the empty state reminds you to place ISO files in the configured images directory on the host — this page doesn't upload or manage ISOs itself, only lists them.
+
+
+5. **Empty / fail:** Check health, auth, and domain dependencies.
+6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 

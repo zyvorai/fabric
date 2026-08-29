@@ -15,7 +15,7 @@ Settings — Core product and console preferences.
 - Route / id: `/settings`
 - Nav: **Core → Settings** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Open `/settings` and wait for live data from Zyvor Fabric.
 2. Use filters and search when the page provides them.

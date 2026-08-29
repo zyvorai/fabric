@@ -17,7 +17,7 @@ Certificates & Security — a PKI console for Zyvor Fabric: certificate authorit
 - Route / id: `/certificates`
 - Nav: **Security → Certificates** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Six tabs: **Dashboard**, **CAs**, **Certificates**, **Requests**, **Attestation**, **Security Baselines**.
 

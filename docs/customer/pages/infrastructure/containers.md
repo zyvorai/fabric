@@ -15,7 +15,7 @@ Containers — a read-only, auto-refreshing view of container workloads running 
 - Route / id: `/containers`
 - Nav: **Infrastructure → Containers** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review the summary cards: total containers, how many are running, total CPU%, and total memory across every container detected.
 2. Scan the container grid — each card shows the container's name/ID, a state badge (running / exited / paused / restarting), its image, live CPU and memory usage bars, and RX/TX network counters when available.

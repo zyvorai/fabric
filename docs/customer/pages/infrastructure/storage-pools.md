@@ -16,7 +16,7 @@ Storage Pools — create, start/stop, and monitor the storage backends VM disks 
 - Route / id: `/storage-pools`
 - Nav: **Infrastructure → Storage Pools** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review stat cards: total pools, active pools, total capacity, and total available space.
 2. Search pools by name, path, or state.

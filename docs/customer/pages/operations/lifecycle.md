@@ -15,7 +15,7 @@ Lifecycle Manager — define patch/upgrade baselines, scan hosts for compliance 
 - Route / id: `/lifecycle`
 - Nav: **Operations → Lifecycle** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Summary tiles show total baselines, non-compliant hosts, active remediation tasks, and currently-running rolling updates. Four tabs:
 

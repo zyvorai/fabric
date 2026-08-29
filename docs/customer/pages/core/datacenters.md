@@ -16,7 +16,7 @@ Datacenters — the physical inventory tree: datacenters, the clusters inside ea
 - Route / id: `/datacenters`
 - Nav: **Core → Datacenters** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Read the top-of-page summary cards: total datacenters, clusters, hosts, and VMs across the whole fabric.
 2. Click a datacenter to expand it — you'll see a rollup (cluster count, host count, VM count, and, once summary data loads, total CPUs and memory) plus its list of clusters.

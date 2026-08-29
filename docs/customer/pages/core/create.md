@@ -15,7 +15,7 @@ Create VM — a three-step wizard (Basics → Resources → Review) for launchin
 - Route / id: `/create`
 - Nav: **Core → Create VM** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 **1. Basics** — name the VM and pick a disk image, either from the built-in catalog or a path on the host.
 

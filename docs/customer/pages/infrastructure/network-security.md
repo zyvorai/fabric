@@ -17,7 +17,7 @@ Net Security — the advanced SDN and security control plane: network policies s
 - Route / id: `/network-security`
 - Nav: **Infrastructure → Net Security** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Nine tabs, each with its own live count in the header: **Policies, Firewall, Services, QoS, DNS, VPN, Mirror, NAT, Monitor**. Data refreshes automatically every 15 seconds and on demand via **Refresh**. Read-only accounts see a read-only notice and can't create, adopt, sync, or delete anything.
 

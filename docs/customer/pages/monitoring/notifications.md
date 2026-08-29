@@ -16,7 +16,7 @@ Notifications — configure how and when Zyvor Fabric alerts you: the delivery c
 - Route / id: `/notifications`
 - Nav: **Monitoring → Notifications** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 The page has three tabs — **Channels**, **Rules**, **History** — loaded together on open.
 

@@ -16,7 +16,7 @@ Distributed Storage — the enterprise/clustered layer above a single storage ba
 - Route / id: `/distributed-storage`
 - Nav: **Infrastructure → Distributed Storage** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Four tabs — **Pools**, **Policies**, **Migrations**, **Datastore Clusters** — plus summary cards for total pools, aggregate capacity, policy count, and active migrations.
 

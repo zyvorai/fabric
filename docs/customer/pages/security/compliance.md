@@ -16,7 +16,7 @@ Compliance Dashboard — a security and configuration compliance scorecard: an o
 - Route / id: `/compliance`
 - Nav: **Security → Compliance** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. View the compliance score (0-100, color-coded green/amber/red) alongside Passed, Warnings, Failed, and Total Checks tiles.
 2. Click **Run Scan** to trigger a fresh compliance scan — the button reads "Scanning…" while it runs, and the dashboard refreshes with the new results when it completes.

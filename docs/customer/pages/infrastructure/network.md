@@ -16,7 +16,7 @@ Network — day-to-day VM networking: which mode a VM uses, its port forwards, a
 - Nav: **Infrastructure → Network** (sidebar, command palette, or desktop nav)
 - Per-VM networking is also managed from that VM's own **Network** tab on its detail page
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review VMs by networking mode:
    - **NAT** — private, outbound-only by default; individual ports can be exposed with a host→guest port forward (set at creation in the [Create VM](../core/create.md) wizard, or added later from a VM's Network tab).

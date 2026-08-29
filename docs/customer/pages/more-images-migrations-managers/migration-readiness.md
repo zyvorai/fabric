@@ -15,7 +15,7 @@ Migration Readiness — pre-flight checks that verify the environment is in a go
 - Route / id: `/migration-readiness`
 - Nav: **More — images, migrations & managers → Readiness** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. The page runs readiness checks as soon as you open it; use the header **Refresh** control to re-run them.
 2. A summary banner at the top reads either **Ready for Migration** (all checks passed) or **Issues Found**, with a count of errors and warnings.

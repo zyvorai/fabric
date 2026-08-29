@@ -15,7 +15,7 @@ Job Monitor — a live view of background jobs (disk conversions, migrations, an
 - Route / id: `/job-monitor`
 - Nav: **More — images, migrations & managers → Job Monitor** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Job list** (left) — every job as a card: name (or VM name), a status badge (pending, running, completed, failed, cancelled) with icon, and a progress bar with current step. The list polls every 3 seconds, so running jobs update live.
 2. **Select a job** to open its detail panel on the right: Status, Progress, Phase, and Duration tiles, plus a pipeline-stage tracker (**prepare → convert → validate → deploy**) that highlights the completed stages in green and the current stage in blue (or red if the job failed). A failed job also shows its error message in a dedicated panel.

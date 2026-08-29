@@ -15,7 +15,7 @@ Migration Report — a shareable summary of all migration jobs (totals by status
 - Route / id: `/migration-report`
 - Nav: **More — images, migrations & managers → Report** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. The page generates a report as soon as you open it; use the header **Refresh** control to regenerate it.
 2. Once data loads, two header actions appear: **Copy Report** — copies a formatted plain-text summary (totals, average duration, and each migration's name/status/VM/duration/error) to your clipboard — and **Print** — opens the browser print dialog with a print-optimized layout.

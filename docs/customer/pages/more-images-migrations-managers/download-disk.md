@@ -15,13 +15,17 @@ Download Disk — browse the disk images available on the Fabric host and downlo
 - Route / id: `/download-disk`
 - Nav: **More — images, migrations & managers → Download Disk** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 - Review summary tiles for **Total Images**, **Total Size**, and how many distinct **Formats** are present (qcow2, vmdk, vhd/vhdx, raw, img — each gets its own color badge in the table).
 - **Filter** the list by name, format, or path, and **sort** by Name, Size, or Modified (click a column header to sort, click again to reverse direction).
 - Each row shows the image's name, format badge, size, last-modified time, and full path, with a **Download** button that streams the file to your browser.
 - Use the **Custom Path** field to look at images outside the default directory: enter a file or directory path and click **Browse** to list what's there, or **Download** to fetch a specific file path directly (pressing Enter in the field also triggers a download).
 - **Refresh** reloads the image list from the host.
+
+
+5. **Empty / fail:** Check health, auth, and domain dependencies.
+6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 

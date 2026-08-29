@@ -16,7 +16,7 @@ Replication — register remote replication sites, configure per-VM replication 
 - Route / id: `/replication`
 - Nav: **Operations → Replication** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Dashboard tab** — summary tiles for active replications, RPO violation count, average RPO across all replications, and paused/error counts, plus a per-site health list (healthy/degraded/unhealthy) with each site's replication count.
 2. **Sites tab** — table of registered replication sites (name, type, endpoint, status, replication count, last sync). **Add Site** registers a new site with a name, endpoint URL, and type (Primary, Recovery/secondary, or Bidirectional). Each site can be removed (confirmation dialog).

@@ -15,7 +15,7 @@ Webhook Configuration — manage outbound webhooks that notify an external endpo
 - Route / id: `/webhooks`
 - Nav: **Tools → Webhooks** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Add Webhook** opens a form: destination URL, delivery type (generic / Slack / Discord), and a multi-select of events (`vm.started`, `vm.stopped`, `vm.created`, `vm.deleted`, `backup.completed`, `backup.failed`). A URL and at least one event are required — validation errors show inline before it will save.
 2. Saving posts the new webhook (`POST /api/webhooks`, created enabled by default) and refreshes the list.

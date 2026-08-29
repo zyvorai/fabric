@@ -16,7 +16,7 @@ VM Console — a real, live console into a running VM, from the browser, without
 - From a VM's detail page, click **Console** in the header
 - Nav: reached via **Core → Virtual Machines**, not linked directly from the top nav
 
-## What you can do
+## Operate from the console (UX)
 
 The page has two tabs:
 
@@ -26,6 +26,10 @@ The page has two tabs:
 Both are authenticated with your existing session — no separate console password or exposed port.
 
 If the console tab stays black or disconnected, confirm the VM is running and that the host's console/VNC services are reachable — check service health if it persists.
+
+
+5. **Empty / fail:** Check health, auth, and domain dependencies.
+6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 

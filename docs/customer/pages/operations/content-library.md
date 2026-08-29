@@ -15,7 +15,7 @@ Content Library — a catalog of reusable provisioning building blocks: librarie
 - Route / id: `/content-library`
 - Nav: **Operations → Content Library** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Summary tiles at the top show total libraries, items, guest customization specs, and host profiles. Four tabs underneath:
 

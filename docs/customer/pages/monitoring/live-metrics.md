@@ -15,7 +15,7 @@ Live Metrics — a real-time view of host performance: CPU, memory, disk I/O, an
 - Route / id: `/live-metrics`
 - Nav: **Monitoring → Live Metrics** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 - Six live cards — CPU Usage, Memory Usage, Disk Read, Disk Write, Network RX, Network TX — each showing the current value and a 60-second sparkline history, polled every second.
 - Network RX/TX are computed rates (bytes/sec), derived on the client from the delta between successive cumulative counter samples — not raw totals.

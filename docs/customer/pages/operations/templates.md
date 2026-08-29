@@ -15,7 +15,7 @@ VM Templates — reusable VM configurations (CPU/memory/disk, tags) that you sav
 - Route / id: `/templates`
 - Nav: **Operations → Templates** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Templates aren't created directly on this page — click **Create from VM** to jump to the [Virtual Machines](../core/vms.md) page, where a template is saved from an existing VM's configuration.
 2. Each saved template shows as a card with its name, description, CPUs, memory (MB), disk size (GB), tags, and creation date.

@@ -453,7 +453,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/login</code></li>
 <li>Nav: <strong>Auth → Login</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Enter a username and password and sign in — a failed attempt shows an inline error and clears the password field.</li>
 <li>Check <strong>Remember me</strong> to save your login in the browser (locally, not on the server) so it&#39;s pre-filled next time; unchecking it clears any saved login.</li>
@@ -462,6 +462,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Two ways to sign in, both explained on the page: <strong>local admin</strong> — username <code>admin</code>, password from <code>.admin_password</code> on the host — or your own <strong>system user</strong> account (same password as SSH; accounts that only use SSH keys need a password set with <code>passwd</code> on the server first).</li>
 </ol>
 <p>If you can&#39;t sign in, confirm the account exists on the host and that the authentication service is reachable.</p>
+<ol start="5">
+<li><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</li>
+<li><strong>Success:</strong> Live data loads; mutations complete without error toasts.</li>
+</ol>
 <h3>Related pages</h3>
 <ul>
 <li><a href="../../getting-started.md">Getting Started</a></li>
@@ -482,7 +486,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/create</code></li>
 <li>Nav: <strong>Core → Create VM</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p><strong>1. Basics</strong> — name the VM and pick a disk image, either from the built-in catalog or a path on the host.</p>
 <p><strong>2. Resources</strong> — set vCPUs, memory, and root disk size. Under <strong>Advanced Options</strong> you choose networking:</p>
 <ul>
@@ -519,7 +523,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/datacenters</code></li>
 <li>Nav: <strong>Core → Datacenters</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Read the top-of-page summary cards: total datacenters, clusters, hosts, and VMs across the whole fabric.</li>
 <li>Click a datacenter to expand it — you&#39;ll see a rollup (cluster count, host count, VM count, and, once summary data loads, total CPUs and memory) plus its list of clusters.</li>
@@ -550,7 +554,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/favorites</code></li>
 <li>Nav: <strong>Core → Favorites</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Click the star next to any VM to pin or unpin it. Favorites are saved in your browser&#39;s local storage, not on the server — they don&#39;t follow you to a different browser or device.</li>
 <li>The list splits into <strong>Pinned VMs</strong> (your favorites) and <strong>All VMs</strong> (everything else); the search box filters both by name or state.</li>
@@ -578,7 +582,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/</code></li>
 <li>Nav: <strong>Core → Dashboard</strong> (sidebar, command palette, or desktop nav), or the logo in the top left</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Check subsystem status (VM driver, storage, network security, authentication, events) — each shows Live, Unreachable, or Off, with a short detail line.</li>
 <li>Read the stat cards: total VMs, running, stopped, and total allocated memory/vCPUs.</li>
@@ -610,7 +614,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/machines</code></li>
 <li>Nav: <strong>Core → Machines</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>The page has two tabs, and refreshes itself every 10 seconds:</p>
 <p><strong>Running Machines</strong></p>
 <ol>
@@ -644,7 +648,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/profiles</code></li>
 <li>Nav: <strong>Core → Profiles</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Browse profile cards — each shows its category badge, description, CPUs, memory, disk, and network bandwidth (if set). Built-in profiles are labeled <strong>Built-in</strong> and have no delete button.</li>
 <li><strong>Create Profile</strong> opens a form for a name, category, CPU count, memory (MB), and disk (GB); submitting adds it to the grid immediately.</li>
@@ -671,7 +675,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/settings</code></li>
 <li>Nav: <strong>Core → Settings</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Open <code>/settings</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
@@ -698,7 +702,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/vm-browser</code></li>
 <li>Nav: <strong>Core → VM Browser</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Search by name, state, or image — the header shows total VM count and how many are running.</li>
 <li>Each card shows the VM&#39;s name, state badge, image, vCPU count, memory, and IP address (if assigned).</li>
@@ -726,7 +730,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/vm-wizard</code></li>
 <li>Nav: <strong>Core → VM Wizard</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Open <code>/vm-wizard</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
@@ -755,7 +759,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>From a VM&#39;s detail page, click <strong>Console</strong> in the header</li>
 <li>Nav: reached via <strong>Core → Virtual Machines</strong>, not linked directly from the top nav</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>The page has two tabs:</p>
 <ol>
 <li><strong>Terminal</strong> — a real interactive shell (xterm.js) streamed over the VM&#39;s PTY. Type as you would in any terminal; output renders live.</li>
@@ -763,6 +767,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ol>
 <p>Both are authenticated with your existing session — no separate console password or exposed port.</p>
 <p>If the console tab stays black or disconnected, confirm the VM is running and that the host&#39;s console/VNC services are reachable — check service health if it persists.</p>
+<ol start="5">
+<li><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</li>
+<li><strong>Success:</strong> Live data loads; mutations complete without error toasts.</li>
+</ol>
 <h3>Related pages</h3>
 <ul>
 <li><a href="vms.md">Virtual Machines</a></li>
@@ -786,7 +794,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Nav: <strong>Core → Virtual Machines</strong> (sidebar, command palette, or desktop nav)</li>
 <li>A single VM&#39;s detail page is <code>/vms/:name</code>, reached by clicking its name here</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p><strong>On the list</strong></p>
 <ol>
 <li>Switch between grid and table view with the toggle in the top right.</li>
@@ -826,7 +834,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/containers</code></li>
 <li>Nav: <strong>Infrastructure → Containers</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review the summary cards: total containers, how many are running, total CPU%, and total memory across every container detected.</li>
 <li>Scan the container grid — each card shows the container&#39;s name/ID, a state badge (running / exited / paused / restarting), its image, live CPU and memory usage bars, and RX/TX network counters when available.</li>
@@ -855,7 +863,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/distributed-storage</code></li>
 <li>Nav: <strong>Infrastructure → Distributed Storage</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Four tabs — <strong>Pools</strong>, <strong>Policies</strong>, <strong>Migrations</strong>, <strong>Datastore Clusters</strong> — plus summary cards for total pools, aggregate capacity, policy count, and active migrations.</p>
 <ol>
 <li><strong>Pools</strong> — distributed storage pools with a status badge, host count, and replication factor, and a used/available capacity bar. <strong>Create Pool</strong> sets a name, type, and replication factor. Delete a pool with a confirmation dialog.</li>
@@ -886,7 +894,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/network-security</code></li>
 <li>Nav: <strong>Infrastructure → Net Security</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Nine tabs, each with its own live count in the header: <strong>Policies, Firewall, Services, QoS, DNS, VPN, Mirror, NAT, Monitor</strong>. Data refreshes automatically every 15 seconds and on demand via <strong>Refresh</strong>. Read-only accounts see a read-only notice and can&#39;t create, adopt, sync, or delete anything.</p>
 <ol>
 <li><strong>Policies</strong> — network policies bound to security identities (identities are auto-created from VM labels or discovered from firewalld zones/nftables sets on the host). Create or delete a policy; adopt a discovered policy or identity into management.</li>
@@ -922,7 +930,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Nav: <strong>Infrastructure → Network</strong> (sidebar, command palette, or desktop nav)</li>
 <li>Per-VM networking is also managed from that VM&#39;s own <strong>Network</strong> tab on its detail page</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review VMs by networking mode:<ul>
 <li><strong>NAT</strong> — private, outbound-only by default; individual ports can be exposed with a host→guest port forward (set at creation in the <a href="../core/create.md">Create VM</a> wizard, or added later from a VM&#39;s Network tab).</li>
@@ -958,7 +966,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/resource-pools</code></li>
 <li>Nav: <strong>Infrastructure → Resource Pools</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review stat cards: total pools, total CPU shares, and total VMs across all pools.</li>
 <li>Browse the expandable pool tree — click a pool to expand/collapse its children; each row shows VM count, CPU/memory shares, and live usage bars that turn red above 80%.</li>
@@ -989,7 +997,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/storage-pools</code></li>
 <li>Nav: <strong>Infrastructure → Storage Pools</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review stat cards: total pools, active pools, total capacity, and total available space.</li>
 <li>Search pools by name, path, or state.</li>
@@ -1018,7 +1026,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/storage</code></li>
 <li>Nav: <strong>Infrastructure → Storage</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review stat cards: total capacity, used space, volume count, and pool count.</li>
 <li>Storage Pools panel — each pool&#39;s name, path, type badge, state, a used/total usage bar color-coded by how full it is, and an <strong>Add Volume Record</strong> button.</li>
@@ -1047,7 +1055,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/system-health</code></li>
 <li>Nav: <strong>Infrastructure → System Health</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Health score gauge (0–100, colored red/amber/green) with a status label and a summary panel calling out the current bottleneck, if any.</li>
 <li><strong>CPU</strong> panel — overall usage, core count, 1-minute and 5-minute load averages, and a per-core usage grid.</li>
@@ -1079,7 +1087,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/system</code></li>
 <li>Nav: <strong>Infrastructure → System</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Four tabs — <strong>CPU Topology, NUMA Topology, Memory &amp; Hugepages, Optimization</strong> (badged with the pending recommendation count) — plus stat cards for total CPUs (sockets × cores), NUMA node count, total/available memory, and 2MB hugepage total/free.</p>
 <ol>
 <li><strong>CPU Topology</strong> — CPUs grouped by socket, showing each CPU&#39;s online/offline status; hover a CPU for its core, thread, and NUMA node.</li>
@@ -1108,7 +1116,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/vm-pools</code></li>
 <li>Nav: <strong>Infrastructure → VM Pools</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Open <code>/vm-pools</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
@@ -1136,7 +1144,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/zones</code></li>
 <li>Nav: <strong>Infrastructure → Zones</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Open <code>/zones</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
@@ -1164,7 +1172,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/alerts</code></li>
 <li>Nav: <strong>Monitoring → Alerts</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Active Alerts summary</strong> — three stat tiles at the top show the total number of active alerts, how many are critical, and how many are warning-level.</li>
 <li><strong>Active Alerts list</strong> — each alert is a card showing its severity badge (critical/warning/info), timestamp, title, message, and the triggering value when one is available. Cards are left-bordered in red, amber, or blue to match severity. If nothing is currently firing, the list shows &quot;No active alerts&quot;.</li>
@@ -1194,7 +1202,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/analytics</code></li>
 <li>Nav: <strong>Monitoring → Analytics</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Time range</strong> — pick Last Hour, 6 Hours, 24 Hours, 7 Days, or 30 Days from the dropdown; it drives the performance chart and reloads all data on the page.</li>
 <li><strong>Export</strong> — the Export button opens a menu to download a performance report as PDF or CSV for the selected time range.</li>
@@ -1225,7 +1233,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/audit</code></li>
 <li>Nav: <strong>Monitoring → Audit</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Stats row</strong> — total logs, success rate, recent failures, and the top 3 most common actions.</li>
 <li><strong>Search</strong> — free-text search box matches against action, user, resource name, and resource type; press Enter or the results filter live as you type.</li>
@@ -1254,7 +1262,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/capacity-planning</code></li>
 <li>Nav: <strong>Monitoring → Capacity</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Capacity warning banner</strong> — appears automatically whenever any tracked resource is above 75% usage, naming which ones.</li>
 <li><strong>Summary tiles</strong> — Active VMs (count), Resources Tracked, resources Over 75% Usage, and Growing Resources (trending upward).</li>
@@ -1283,7 +1291,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/debug</code></li>
 <li>Nav: <strong>Monitoring → Debug Tools</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Four independent panels</strong> — Top, IOStat, VMStat, and NetStat, each backed by its own endpoint and showing raw output lines in a scrollable monospace box.</li>
 <li>Panels don&#39;t load automatically — each starts with &quot;Click Refresh to load data&quot; until you refresh it (individually, via the <strong>Refresh</strong> button in that panel&#39;s header) or use <strong>Refresh All</strong> in the page header to load all four at once.</li>
@@ -1311,7 +1319,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/event-stream</code></li>
 <li>Nav: <strong>Monitoring → Event Stream</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Connection indicator</strong> — shows Connected (green) or Reconnecting… (amber, pulsing) for the underlying SSE connection.</li>
 <li><strong>Pause / Resume</strong> — pause freezes the view and drops incoming events instead of queuing them; resume starts appending new events again from that point on.</li>
@@ -1340,7 +1348,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/explain</code></li>
 <li>Nav: <strong>Monitoring → Explain</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Pick a metric</strong> — four buttons: CPU, Memory, Disk, Network. Selecting one fetches its explanation and its last-hour timeseries; nothing loads until you pick one.</li>
 <li><strong>Current Value &amp; Status</strong> — shows the metric&#39;s current value with a trend arrow (up/down/flat) and a status badge (e.g. normal, elevated, critical) with a short written summary.</li>
@@ -1370,7 +1378,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/kernel</code></li>
 <li>Nav: <strong>Monitoring → Kernel</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Summary tiles</strong> — Kernel Version, Hostname, Architecture, and Modules Loaded count.</li>
 <li><strong>Boot Command Line</strong> — shown verbatim in a code block when the backend reports one.</li>
@@ -1399,7 +1407,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/live-metrics</code></li>
 <li>Nav: <strong>Monitoring → Live Metrics</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ul>
 <li>Six live cards — CPU Usage, Memory Usage, Disk Read, Disk Write, Network RX, Network TX — each showing the current value and a 60-second sparkline history, polled every second.</li>
 <li>Network RX/TX are computed rates (bytes/sec), derived on the client from the delta between successive cumulative counter samples — not raw totals.</li>
@@ -1429,7 +1437,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/logs</code></li>
 <li>Nav: <strong>Monitoring → Logs</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Filter box</strong> — matches against the log message and source as you type.</li>
 <li><strong>Level dropdown</strong> — narrow to <code>ALL</code>, <code>INFO</code>, <code>WARN</code>, <code>ERROR</code>, or <code>DEBUG</code>.</li>
@@ -1461,7 +1469,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/notifications</code></li>
 <li>Nav: <strong>Monitoring → Notifications</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>The page has three tabs — <strong>Channels</strong>, <strong>Rules</strong>, <strong>History</strong> — loaded together on open.</p>
 <p><strong>Channels</strong> (default tab)</p>
 <ul>
@@ -1502,7 +1510,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/processes</code></li>
 <li>Nav: <strong>Monitoring → Processes</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Summary cards show <strong>Total Processes</strong>, <strong>Running</strong>, and <strong>Sleeping</strong> counts.</li>
 <li>Filter box matches by PID, process name, or state as you type.</li>
@@ -1531,7 +1539,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/resource-optimizer</code></li>
 <li>Nav: <strong>Monitoring → Optimizer</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Summary cards show <strong>VMs Analyzed</strong>, total <strong>Recommendations</strong>, <strong>High Impact</strong>, and <strong>Medium Impact</strong> counts.</li>
 <li>If nothing needs changing, the page shows an &quot;All VMs are optimally configured&quot; state instead of a list.</li>
@@ -1560,7 +1568,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/service-map</code></li>
 <li>Nav: <strong>Monitoring → Service Map</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Summary cards show <strong>Services</strong>, <strong>Healthy</strong>, <strong>Degraded</strong>, and <strong>Down</strong> counts.</li>
 <li>Service cards in a grid show name, a health dot (green/amber/red/gray), a type badge (web, database, cache, queue, api, proxy, …), the host VM, port, and inbound/outbound link counts.</li>
@@ -1589,7 +1597,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/timeline</code></li>
 <li>Nav: <strong>Monitoring → Timeline</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Filter chips — <strong>All</strong>, <strong>Actions</strong>, <strong>Alerts</strong>, <strong>Deploys</strong>, <strong>Errors</strong> — filter the merged feed client-side.</li>
 <li>Each entry is auto-classified and shown with an icon/color, description, relative timestamp, and type tag: audit entries with a failed/error status become <strong>Error</strong>, create/deploy-style actions become <strong>Deploy</strong>, other audit entries become <strong>Action</strong>; alerts become <strong>Alert</strong>, or <strong>Error</strong> if their severity is critical/error.</li>
@@ -1617,7 +1625,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/backup-scheduler</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Backup Scheduler</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p><strong>Select VMs</strong> — check the VMs you want the schedule to cover (each row shows its current state, e.g. <code>running</code>); <strong>Select All</strong> / <strong>Deselect All</strong> toggles the whole list at once.</p>
 <p><strong>Schedule Configuration</strong> — build the job:</p>
 <ul>
@@ -1651,13 +1659,22 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/batch-import</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Batch Import</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
-<li><strong>Provide the input</strong> — drag and drop a <code>.yaml</code>/<code>.yml</code>/<code>.json</code> file onto the drop zone (or click to browse), or paste YAML/JSON directly into the text box. Each entry needs a <code>name</code> and <code>image</code>; <code>cpus</code> and <code>memory</code> are optional and default to <code>2</code> and <code>2G</code>. Click <strong>Download Template</strong> for an example file with three sample VMs.</li>
-<li><strong>Preview</strong> — click <strong>Preview</strong> to parse the input into a table of VMs. If entries are missing a name or image, or nothing parses, you get an inline error instead of moving on.</li>
-<li><strong>Review the table</strong> — each row shows the VM&#39;s name, vCPUs, memory, and image path, plus a status icon (pending, submitting, submitted, or failed).</li>
-<li><strong>Submit All</strong> — creates the VMs one at a time via the VM creation API. Each row&#39;s status updates live as it&#39;s submitted; failed rows show the specific error message under the image path. A summary line at the top tracks total, submitted, and failed counts.</li>
-<li><strong>Back to Editor</strong> — return to the input step to fix and re-preview without losing your place.</li>
+<li><p><strong>Provide the input</strong> — drag and drop a <code>.yaml</code>/<code>.yml</code>/<code>.json</code> file onto the drop zone (or click to browse), or paste YAML/JSON directly into the text box. Each entry needs a <code>name</code> and <code>image</code>; <code>cpus</code> and <code>memory</code> are optional and default to <code>2</code> and <code>2G</code>. Click <strong>Download Template</strong> for an example file with three sample VMs.</p>
+</li>
+<li><p><strong>Preview</strong> — click <strong>Preview</strong> to parse the input into a table of VMs. If entries are missing a name or image, or nothing parses, you get an inline error instead of moving on.</p>
+</li>
+<li><p><strong>Review the table</strong> — each row shows the VM&#39;s name, vCPUs, memory, and image path, plus a status icon (pending, submitting, submitted, or failed).</p>
+</li>
+<li><p><strong>Submit All</strong> — creates the VMs one at a time via the VM creation API. Each row&#39;s status updates live as it&#39;s submitted; failed rows show the specific error message under the image path. A summary line at the top tracks total, submitted, and failed counts.</p>
+</li>
+<li><p><strong>Back to Editor</strong> — return to the input step to fix and re-preview without losing your place.</p>
+</li>
+<li><p><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</p>
+</li>
+<li><p><strong>Success:</strong> Live data loads; mutations complete without error toasts.</p>
+</li>
 </ol>
 <h3>Related pages</h3>
 <ul>
@@ -1679,13 +1696,22 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/batch-migration</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Batch Migration</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
-<li><strong>Add VM</strong> — adds a new, expanded entry card to the list; each is numbered in order.</li>
-<li><strong>Fill in each entry</strong> — VM Name, Source Path (e.g. <code>/path/to/disk.vmdk</code>), Target Format (QCOW2, RAW, or VMDK), vCPUs, and Memory (MB). Click an entry&#39;s header to collapse or expand it; the collapsed view still shows the name and source path for quick scanning.</li>
-<li><strong>Remove</strong> — the trash icon on an entry deletes it from the list.</li>
-<li><strong>JSON Preview</strong> — as soon as you have at least one entry, a live JSON preview builds the migration spec (<code>migrations: [...]</code> with <code>vm_name</code>, <code>source_path</code>, <code>target_format</code>, <code>cpus</code>, <code>memory_mb</code> per entry).</li>
-<li><strong>Copy</strong> or <strong>Download</strong> the generated JSON to use elsewhere — Copy puts it on the clipboard (with a brief confirmation), Download saves it as <code>batch-migration.json</code>.</li>
+<li><p><strong>Add VM</strong> — adds a new, expanded entry card to the list; each is numbered in order.</p>
+</li>
+<li><p><strong>Fill in each entry</strong> — VM Name, Source Path (e.g. <code>/path/to/disk.vmdk</code>), Target Format (QCOW2, RAW, or VMDK), vCPUs, and Memory (MB). Click an entry&#39;s header to collapse or expand it; the collapsed view still shows the name and source path for quick scanning.</p>
+</li>
+<li><p><strong>Remove</strong> — the trash icon on an entry deletes it from the list.</p>
+</li>
+<li><p><strong>JSON Preview</strong> — as soon as you have at least one entry, a live JSON preview builds the migration spec (<code>migrations: [...]</code> with <code>vm_name</code>, <code>source_path</code>, <code>target_format</code>, <code>cpus</code>, <code>memory_mb</code> per entry).</p>
+</li>
+<li><p><strong>Copy</strong> or <strong>Download</strong> the generated JSON to use elsewhere — Copy puts it on the clipboard (with a brief confirmation), Download saves it as <code>batch-migration.json</code>.</p>
+</li>
+<li><p><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</p>
+</li>
+<li><p><strong>Success:</strong> Live data loads; mutations complete without error toasts.</p>
+</li>
 </ol>
 <h3>Related pages</h3>
 <ul>
@@ -1707,7 +1733,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/disk-converter</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Disk Converter</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Pick a source disk</strong> — choose from the dropdown of disk images already known to the host, or type a path directly (e.g. <code>/path/to/disk.vmdk</code>). If no images are listed, click <strong>Load available disk images</strong> to fetch them.</li>
 <li><strong>Choose the target format</strong> — QCOW2, VMDK, VHD, VHDX, or RAW.</li>
@@ -1736,7 +1762,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/disk-images</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Disk Images</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ul>
 <li>Review summary tiles for <strong>Total Images</strong>, <strong>Total Size</strong>, distinct <strong>Formats</strong>, and how many rows you currently have <strong>Selected</strong>.</li>
 <li><strong>Search</strong> by name, format, or path to narrow the table.</li>
@@ -1744,6 +1770,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Each row shows the image&#39;s name, a color-coded format badge (qcow2, vmdk, vhd/vhdx, raw, img), size, and full path.</li>
 <li><strong>Refresh</strong> reloads the list from the host.</li>
 </ul>
+<ol start="5">
+<li><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</li>
+<li><strong>Success:</strong> Live data loads; mutations complete without error toasts.</li>
+</ol>
 <h3>Related pages</h3>
 <ul>
 <li><a href="../../getting-started.md">Getting Started</a></li>
@@ -1764,7 +1794,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/download-disk</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Download Disk</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ul>
 <li>Review summary tiles for <strong>Total Images</strong>, <strong>Total Size</strong>, and how many distinct <strong>Formats</strong> are present (qcow2, vmdk, vhd/vhdx, raw, img — each gets its own color badge in the table).</li>
 <li><strong>Filter</strong> the list by name, format, or path, and <strong>sort</strong> by Name, Size, or Modified (click a column header to sort, click again to reverse direction).</li>
@@ -1772,6 +1802,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Use the <strong>Custom Path</strong> field to look at images outside the default directory: enter a file or directory path and click <strong>Browse</strong> to list what&#39;s there, or <strong>Download</strong> to fetch a specific file path directly (pressing Enter in the field also triggers a download).</li>
 <li><strong>Refresh</strong> reloads the image list from the host.</li>
 </ul>
+<ol start="5">
+<li><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</li>
+<li><strong>Success:</strong> Live data loads; mutations complete without error toasts.</li>
+</ol>
 <h3>Related pages</h3>
 <ul>
 <li><a href="../../getting-started.md">Getting Started</a></li>
@@ -1792,7 +1826,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/image-builder</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Image Builder</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Build Image</strong> — opens a dialog to configure a new build: an <strong>Image Name</strong>, a <strong>Distribution</strong> (Fedora, Ubuntu, Debian, CentOS, Arch Linux, or openSUSE), and a comma-separated <strong>Packages</strong> list (defaults to <code>systemd,openssh-server,iproute,vim-minimal</code>). Click <strong>Build</strong> to queue it; the page polls for updates every 5 seconds while builds are in progress.</li>
 <li><strong>Active Builds</strong> — shows any build currently <code>pending</code> or <code>building</code>, with its name, distribution, and state badge.</li>
@@ -1821,13 +1855,17 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/iso-images</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → ISO Images</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ul>
 <li><strong>Search</strong> ISOs by name or path.</li>
 <li>Each row shows the ISO&#39;s name, path, size, last-modified time, and the list of VMs that currently have it attached (<strong>Attached VMs</strong>); ISOs named for <code>virtio-win</code> get a small <strong>virtio-win</strong> badge next to the name.</li>
 <li>The list auto-refreshes every 30 seconds, and you can trigger an immediate refresh from the page header.</li>
 <li>If no ISOs are found, the empty state reminds you to place ISO files in the configured images directory on the host — this page doesn&#39;t upload or manage ISOs itself, only lists them.</li>
 </ul>
+<ol start="5">
+<li><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</li>
+<li><strong>Success:</strong> Live data loads; mutations complete without error toasts.</li>
+</ol>
 <h3>Related pages</h3>
 <ul>
 <li><a href="../../getting-started.md">Getting Started</a></li>
@@ -1848,7 +1886,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/job-monitor</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Job Monitor</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Job list</strong> (left) — every job as a card: name (or VM name), a status badge (pending, running, completed, failed, cancelled) with icon, and a progress bar with current step. The list polls every 3 seconds, so running jobs update live.</li>
 <li><strong>Select a job</strong> to open its detail panel on the right: Status, Progress, Phase, and Duration tiles, plus a pipeline-stage tracker (<strong>prepare → convert → validate → deploy</strong>) that highlights the completed stages in green and the current stage in blue (or red if the job failed). A failed job also shows its error message in a dedicated panel.</li>
@@ -1877,13 +1915,22 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/manifest-builder</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Manifest Builder</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
-<li>Fill in fields under four collapsible sections — <strong>VM Configuration</strong> (expanded by default), <strong>Network</strong>, <strong>Storage</strong>, and <strong>Advanced</strong> — clicking a section header expands or collapses it.</li>
-<li>Set VM name, vCPUs, memory, disk image path, and firmware (<code>uefi</code>/<code>bios</code>) under VM Configuration; network type (<code>user</code>/<code>bridge</code>/<code>tap</code>), bridge name, and MAC address under Network; disk format (<code>qcow2</code>/<code>raw</code>/<code>vmdk</code>), disk size, and a read-only-root checkbox under Storage; and TPM, Secure Boot, console type (<code>serial</code>/<code>virtio</code>/<code>none</code>), and CPU mode (<code>host</code>/<code>max</code>/<code>qemu64</code>) under Advanced.</li>
-<li>Leave any field blank or unchecked — it&#39;s simply omitted from the generated YAML, so you only need to fill in what matters for your use case.</li>
-<li>Watch the <strong>YAML Preview</strong> pane update live as you type, grouped by section with a generated timestamp comment at the top.</li>
-<li><strong>Copy</strong> the YAML to your clipboard, or <strong>Download</strong> it as a <code>.yaml</code> file named after the VM (falls back to <code>vm-manifest.yaml</code> if no name is set).</li>
+<li><p>Fill in fields under four collapsible sections — <strong>VM Configuration</strong> (expanded by default), <strong>Network</strong>, <strong>Storage</strong>, and <strong>Advanced</strong> — clicking a section header expands or collapses it.</p>
+</li>
+<li><p>Set VM name, vCPUs, memory, disk image path, and firmware (<code>uefi</code>/<code>bios</code>) under VM Configuration; network type (<code>user</code>/<code>bridge</code>/<code>tap</code>), bridge name, and MAC address under Network; disk format (<code>qcow2</code>/<code>raw</code>/<code>vmdk</code>), disk size, and a read-only-root checkbox under Storage; and TPM, Secure Boot, console type (<code>serial</code>/<code>virtio</code>/<code>none</code>), and CPU mode (<code>host</code>/<code>max</code>/<code>qemu64</code>) under Advanced.</p>
+</li>
+<li><p>Leave any field blank or unchecked — it&#39;s simply omitted from the generated YAML, so you only need to fill in what matters for your use case.</p>
+</li>
+<li><p>Watch the <strong>YAML Preview</strong> pane update live as you type, grouped by section with a generated timestamp comment at the top.</p>
+</li>
+<li><p><strong>Copy</strong> the YAML to your clipboard, or <strong>Download</strong> it as a <code>.yaml</code> file named after the VM (falls back to <code>vm-manifest.yaml</code> if no name is set).</p>
+</li>
+<li><p><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</p>
+</li>
+<li><p><strong>Success:</strong> Live data loads; mutations complete without error toasts.</p>
+</li>
 </ol>
 <h3>Related pages</h3>
 <ul>
@@ -1905,7 +1952,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/migration-history</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → History</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>The page loads history from the migrations API as soon as you open it; use the header <strong>Refresh</strong> control to reload.</li>
 <li>Table columns: <strong>Name</strong>, <strong>VM</strong>, <strong>Status</strong> (completed / failed / running badge, with the error message shown inline under failed rows), <strong>Started</strong>, <strong>Duration</strong>, and <strong>Output</strong> (output path).</li>
@@ -1932,7 +1979,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/migration-readiness</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Readiness</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>The page runs readiness checks as soon as you open it; use the header <strong>Refresh</strong> control to re-run them.</li>
 <li>A summary banner at the top reads either <strong>Ready for Migration</strong> (all checks passed) or <strong>Issues Found</strong>, with a count of errors and warnings.</li>
@@ -1960,7 +2007,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/migration-report</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Report</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>The page generates a report as soon as you open it; use the header <strong>Refresh</strong> control to regenerate it.</li>
 <li>Once data loads, two header actions appear: <strong>Copy Report</strong> — copies a formatted plain-text summary (totals, average duration, and each migration&#39;s name/status/VM/duration/error) to your clipboard — and <strong>Print</strong> — opens the browser print dialog with a print-optimized layout.</li>
@@ -1988,7 +2035,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/migration-templates</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Migration Templates</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Three <strong>built-in</strong> templates are always available — Production Linux (4 vCPU / 8 GB, bridged, qcow2, compressed), Dev/Test Linux (2 vCPU / 2 GB, user networking, uncompressed), and Windows Server (4 vCPU / 16 GB, bridged, qcow2, compressed, virtio). They&#39;re tagged <strong>Built-in</strong> and can&#39;t be deleted.</li>
 <li><strong>New Template</strong> opens a form — Name, Description, Format (QCOW2 / RAW / VMDK), vCPUs, Memory (MB) — <strong>Add</strong> saves it as a custom template.</li>
@@ -2017,7 +2064,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/network-topology</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Network Topology</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>The page loads VM interfaces, virtual networks, host bridges, and links on open, then refreshes silently every 15 seconds; the header <strong>Refresh</strong> forces a full reload.</li>
 <li>A summary line shows counts of virtual networks, host bridges, and VMs.</li>
@@ -2047,7 +2094,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/pipeline</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Pipeline</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>The page loads active jobs on open, then polls silently every 3 seconds; the header <strong>Refresh</strong> forces a manual reload.</li>
 <li>Each job card shows the VM name, job ID, source, and a status badge (pending / running / completed / failed).</li>
@@ -2077,7 +2124,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/snapshot-manager</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Snapshot Mgr</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Select VM</strong> — pick a VM from the dropdown to load its snapshots; the list auto-refreshes every 15 seconds while a VM is selected, or use <strong>Refresh</strong> to reload on demand.</li>
 <li><strong>Create Snapshot</strong> — enter a name and click <strong>Create</strong> to snapshot the selected VM&#39;s current disk state; a success banner confirms it.</li>
@@ -2109,7 +2156,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/storage-manager</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Storage Mgr</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Pools load on open; the header <strong>Refresh</strong> reloads them.</li>
 <li>Each pool is a card showing its name, a type badge (dir / logical / netfs / disk / iscsi / rbd / zfs), a state badge, a usage bar (blue, turning amber above 70% and red above 90%), and used / capacity / available figures.</li>
@@ -2138,7 +2185,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/upload-disk</code></li>
 <li>Nav: <strong>More — images, migrations &amp; managers → Upload Disk</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>The drop zone accepts drag-and-drop or click-to-browse. Only <code>.qcow2</code>, <code>.vmdk</code>, <code>.vhd</code>, <code>.vhdx</code>, <code>.raw</code>, <code>.img</code>, and <code>.ova</code> are accepted — anything else is rejected with an inline error.</li>
 <li>Once a file is chosen, set the <strong>Destination Directory</strong> (defaults to <code>/var/lib/libvirt/images</code>) and click <strong>Upload</strong>.</li>
@@ -2167,7 +2214,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/autoscale</code></li>
 <li>Nav: <strong>Operations → Autoscale</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review the policy table — one row per VM, showing its vCPU range, memory range, CPU scale-up/scale-down thresholds, and cooldown period (seconds between scaling actions).</li>
 <li><strong>Create Policy</strong> opens a form to pick a VM (only VMs without an existing policy are offered) and set min/max vCPUs, min/max memory (MB), CPU scale-up and scale-down thresholds (%), and the cooldown in seconds.</li>
@@ -2196,7 +2243,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/backups</code></li>
 <li>Nav: <strong>Operations → Backups</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review the summary tiles: total backups, total size, a breakdown by type (full vs. incremental), and the timestamp of the newest backup.</li>
 <li>Watch <strong>Active Jobs</strong> — running or queued backup/restore jobs with a live progress bar, refreshed automatically every 5 seconds.</li>
@@ -2226,7 +2273,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/bulk-operations</code></li>
 <li>Nav: <strong>Operations → Bulk Operations</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Filter the VM list by name, then click rows to select VMs (or use <strong>Select All</strong> / <strong>Deselect All</strong> for whatever the current filter shows).</li>
 <li>Once at least one VM is selected, an action bar appears with <strong>Start</strong>, <strong>Stop</strong>, <strong>Restart</strong>, and <strong>Snapshot</strong> — snapshot creates a timestamped snapshot (<code>bulk-snap-&lt;timestamp&gt;</code>) on each selected VM.</li>
@@ -2255,7 +2302,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/content-library</code></li>
 <li>Nav: <strong>Operations → Content Library</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Summary tiles at the top show total libraries, items, guest customization specs, and host profiles. Four tabs underneath:</p>
 <ol>
 <li><strong>Libraries</strong> — cards showing each library&#39;s status, item count, and total size. <strong>Create Library</strong> names it, sets an optional description, chooses <strong>Local</strong> or <strong>Subscribed</strong> type, and requires a storage path. <strong>Browse</strong> jumps to the Item Browser tab filtered to that library; the trash icon deletes a library and all its items (confirmation required).</li>
@@ -2285,7 +2332,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/drs</code></li>
 <li>Nav: <strong>Operations → DRS</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p><strong>DRS configuration</strong> (top of page) — toggle DRS <strong>On/Off</strong>, set the <strong>Automation Level</strong> (Manual, Semi-Auto, or Fully Auto), adjust the <strong>Migration Threshold</strong> (1–5, how aggressively it rebalances), and see the configured check interval. Changes apply immediately.</p>
 <p>Four tabs below that:</p>
 <ol>
@@ -2316,7 +2363,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/fault-tolerance</code></li>
 <li>Nav: <strong>Operations → Fault Tolerance</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Summary tiles show protected VM count, how many are running, how many need attention, and total failover events. <strong>Enable FT</strong> opens a form to name the VM, set its primary host ID, and optionally a secondary host ID (leave blank to auto-select). Four tabs:</p>
 <ol>
 <li><strong>Protected VMs</strong> — table of FT-enabled VMs with their secondary host, status, and bandwidth limit. Per row: <strong>Test</strong> (a non-disruptive failover test), the play icon to <strong>trigger a real failover</strong> (confirmation required — moves the VM to its secondary host), and the trash icon to <strong>disable FT</strong> (confirmation required).</li>
@@ -2345,7 +2392,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/lifecycle</code></li>
 <li>Nav: <strong>Operations → Lifecycle</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Summary tiles show total baselines, non-compliant hosts, active remediation tasks, and currently-running rolling updates. Four tabs:</p>
 <ol>
 <li><strong>Baselines</strong> — table of baselines (type, severity, release date, host count, compliant count, and a compliance progress bar). <strong>Create Baseline</strong> sets a name, optional description, type (Patch/Upgrade/Extension), and severity (Critical/Important/Moderate/Low). Per row: the play icon <strong>runs a compliance scan</strong> against that baseline, and the trash icon <strong>deletes it</strong> (confirmation required).</li>
@@ -2374,7 +2421,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/migration-wizard</code></li>
 <li>Nav: <strong>Operations → Migration Wizard</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p><strong>1. Source</strong> — choose <strong>Local File</strong> (a disk image path, e.g. <code>/path/to/disk.vmdk</code>) or <strong>Remote Host</strong> (an <code>user@hostname:/path</code> target reachable over SSH).</p>
 <p><strong>2. Configure</strong> — set the new VM&#39;s name, target disk format (QCOW2, RAW, or VMDK), vCPUs (1–64), memory (MB, in 256 MB steps), the output directory for the converted image (defaults to <code>/var/lib/zyvor-fabricd/images</code>), and whether to auto-start the VM once migration completes.</p>
 <p><strong>3. Review &amp; Submit</strong> — shows a summary of everything chosen, then <strong>Submit Migration</strong> posts the job. Success or failure is shown inline on this step (with hints on failure); you can&#39;t resubmit once it succeeds. Use <strong>Back</strong> at any point to revisit an earlier step before submitting.</p>
@@ -2400,7 +2447,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/migrations</code></li>
 <li>Nav: <strong>Operations → Migrations</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Start Migration</strong> — opens a dialog where you pick a VM from the dropdown (populated from your VM list), enter a target host (hostname or IP), and choose a migration type:<ul>
 <li><strong>Offline</strong> — stop the VM, copy its data, then start it on the target</li>
@@ -2435,7 +2482,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/quotas</code></li>
 <li>Nav: <strong>Operations → Quotas</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Create Quota</strong> — opens a form for the quota name, four numeric limits (max CPUs, max memory in MB, max disk in GB, max VMs), and optional tags to scope it to tagged VMs only (leave tags empty to apply globally). A checkbox lets you enable the quota immediately on creation.</li>
 <li>Each quota renders as a card with <strong>Enabled/Disabled</strong> and <strong>Exceeded</strong> badges, and four usage bars (CPUs, memory, disk, VMs) each showing used/limit and a percentage, colored green under 75%, yellow at 75–89%, and red at 90%+.</li>
@@ -2465,7 +2512,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/replication</code></li>
 <li>Nav: <strong>Operations → Replication</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Dashboard tab</strong> — summary tiles for active replications, RPO violation count, average RPO across all replications, and paused/error counts, plus a per-site health list (healthy/degraded/unhealthy) with each site&#39;s replication count.</li>
 <li><strong>Sites tab</strong> — table of registered replication sites (name, type, endpoint, status, replication count, last sync). <strong>Add Site</strong> registers a new site with a name, endpoint URL, and type (Primary, Recovery/secondary, or Bidirectional). Each site can be removed (confirmation dialog).</li>
@@ -2494,7 +2541,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Route / id: <code>/schedules</code></li>
 <li>Nav: <strong>Operations → Schedules</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Create Schedule</strong> — pick a VM, an action (Start VM, Stop VM, Restart VM, Create Snapshot), a schedule type, and a time (24-hour UTC):<ul>
 <li><strong>Once</strong> — runs a single time</li>
@@ -2530,7 +2577,7 @@ A checkbox enables the schedule immediately on creation.</li>
 <li>Route / id: <code>/site-recovery</code></li>
 <li>Nav: <strong>Operations → Site Recovery</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>DR Dashboard tab</strong> — summary tiles for protected vs. unprotected VMs, average RTO, average RPO, and plans tested vs. total plans; plus a per-site status list and the 5 most recent executions with their status.</li>
 <li><strong>Recovery Plans tab</strong> — table of plans (name/description, VM group count and total VMs, status, last tested date, last executed date). <strong>Create Plan</strong> defines a plan name, description, source site ID, target site ID, a VM group name, and a comma-separated list of VM IDs in that group.</li>
@@ -2565,7 +2612,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/snapshots</code></li>
 <li>Nav: <strong>Operations → Snapshots</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Type a VM name into the <strong>VM Name</strong> field and click <strong>Load Snapshots</strong> (or wait — snapshots load automatically once a name is entered) to see that VM&#39;s snapshot list. Nothing loads until a VM name is provided.</li>
 <li><strong>Create</strong> — opens a dialog for a snapshot name, an optional description, and a type: <strong>Disk Only</strong> or <strong>Full (Disk + State)</strong>.</li>
@@ -2594,7 +2641,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/templates</code></li>
 <li>Nav: <strong>Operations → Templates</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Templates aren&#39;t created directly on this page — click <strong>Create from VM</strong> to jump to the <a href="../core/vms.md">Virtual Machines</a> page, where a template is saved from an existing VM&#39;s configuration.</li>
 <li>Each saved template shows as a card with its name, description, CPUs, memory (MB), disk size (GB), tags, and creation date.</li>
@@ -2624,7 +2671,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/access-control</code></li>
 <li>Nav: <strong>Security → Access Control</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review the four stat tiles — Total Users, Admins, Operators, Viewers — for a quick read on who has access.</li>
 <li>Click <strong>Add User</strong> to open the inline form: enter a username (3-32 characters — letters, numbers, hyphens, underscores), a password (8+ characters), and pick a role by clicking <strong>Admin</strong>, <strong>Operator</strong>, or <strong>Viewer</strong>. Bad input is caught client-side before it&#39;s submitted.</li>
@@ -2655,7 +2702,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/certificates</code></li>
 <li>Nav: <strong>Security → Certificates</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Six tabs: <strong>Dashboard</strong>, <strong>CAs</strong>, <strong>Certificates</strong>, <strong>Requests</strong>, <strong>Attestation</strong>, <strong>Security Baselines</strong>.</p>
 <ol>
 <li><strong>Dashboard</strong> — total certificates, active/expiring-soon/expired counts, CA count, pending requests, and overall compliance %, plus a list of certificates expiring within 30 days with days remaining.</li>
@@ -2687,7 +2734,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/compliance</code></li>
 <li>Nav: <strong>Security → Compliance</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>View the compliance score (0-100, color-coded green/amber/red) alongside Passed, Warnings, Failed, and Total Checks tiles.</li>
 <li>Click <strong>Run Scan</strong> to trigger a fresh compliance scan — the button reads &quot;Scanning…&quot; while it runs, and the dashboard refreshes with the new results when it completes.</li>
@@ -2717,7 +2764,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/encryption</code></li>
 <li>Nav: <strong>Security → Encryption</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <p>Summary tiles up top (Key Providers, Policies, Encrypted VMs, Connected Providers), then three tabs:</p>
 <ol>
 <li><strong>Key Providers</strong> — table of registered providers (name, type, endpoint, status). <strong>Add Provider</strong> opens a form: name, type (<strong>KMIP</strong>, <strong>Local</strong> software-based, or <strong>HashiCorp Vault Transit</strong>), and endpoint URL. Remove a provider with the trash icon, gated by a confirmation dialog.</li>
@@ -2745,7 +2792,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/plugins</code></li>
 <li>Nav: <strong>Security → Plugins</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Review the four stat tiles: Total Plugins, Running, Errors, and Types (distinct plugin categories installed).</li>
 <li>Browse the plugin cards — each shows name, version, a type badge (storage/network/security/monitoring/backup), status (running/stopped/error), description, and author when provided.</li>
@@ -2774,7 +2821,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/security-dashboard</code></li>
 <li>Nav: <strong>Security → Security Dashboard</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>View the risk score gauge (0-100, color-coded) alongside Critical Alerts, Warnings, and Failed Logins count tiles.</li>
 <li>Review the Security Alerts list — severity badge, message, source, and timestamp per alert; shows &quot;No active alerts&quot; when clear.</li>
@@ -2803,14 +2850,24 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/cost-estimator</code></li>
 <li>Nav: <strong>Tools → Cost Estimator</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
-<li><strong>Configuration</strong> — set Number of VMs (1–1000), Average VM Size (10 GB–2 TB), and Storage Duration (1–36 months) with sliders. Toggle <strong>Include snapshots</strong> to add 50% to the total storage figure.</li>
-<li>Click <strong>Calculate Costs</strong>. The page first tries the backend (<code>POST /api/cost/estimate</code>); if that call fails or returns no estimates, it falls back to a client-side calculation using fixed per-GB rates (AWS S3 $0.023, Azure Blob $0.018, GCS $0.020, on-prem $0.10).</li>
-<li>Results show three provider cards (Monthly / Annual / Total for the chosen duration), with the cheapest option badged.</li>
-<li>A savings panel compares the cheapest cloud option against the on-prem estimate, with a percentage saved.</li>
-<li>A horizontal bar chart compares monthly cost across all three cloud providers plus on-prem.</li>
-<li><strong>Copy Estimate to Clipboard</strong> copies a plain-text summary of your inputs and the results — handy for pasting into a ticket or email.</li>
+<li><p><strong>Configuration</strong> — set Number of VMs (1–1000), Average VM Size (10 GB–2 TB), and Storage Duration (1–36 months) with sliders. Toggle <strong>Include snapshots</strong> to add 50% to the total storage figure.</p>
+</li>
+<li><p>Click <strong>Calculate Costs</strong>. The page first tries the backend (<code>POST /api/cost/estimate</code>); if that call fails or returns no estimates, it falls back to a client-side calculation using fixed per-GB rates (AWS S3 $0.023, Azure Blob $0.018, GCS $0.020, on-prem $0.10).</p>
+</li>
+<li><p>Results show three provider cards (Monthly / Annual / Total for the chosen duration), with the cheapest option badged.</p>
+</li>
+<li><p>A savings panel compares the cheapest cloud option against the on-prem estimate, with a percentage saved.</p>
+</li>
+<li><p>A horizontal bar chart compares monthly cost across all three cloud providers plus on-prem.</p>
+</li>
+<li><p><strong>Copy Estimate to Clipboard</strong> copies a plain-text summary of your inputs and the results — handy for pasting into a ticket or email.</p>
+</li>
+<li><p><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</p>
+</li>
+<li><p><strong>Success:</strong> Live data loads; mutations complete without error toasts.</p>
+</li>
 </ol>
 <h3>Related pages</h3>
 <ul>
@@ -2832,13 +2889,22 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/notification-center</code></li>
 <li>Nav: <strong>Tools → Notification Center</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
-<li>The page polls <code>GET /api/system/alerts</code> every 10 seconds; each newly seen alert is added to the feed, tagged <strong>Alert</strong> or <strong>System Warning</strong> based on its severity. It also subscribes to the live <code>/api/events/stream</code> feed for <strong>VM Started</strong> / <strong>VM Stopped</strong> events, so all four categories populate from real activity.</li>
-<li>Category chips at the top show a live count per type.</li>
-<li>An unread count appears when there are unread notifications; clicking a notification marks it read (dims it).</li>
-<li>Click the <strong>×</strong> on a notification to dismiss it individually, or <strong>Clear All</strong> to empty the whole feed.</li>
-<li>If polling fails, an amber banner reports the error; polling keeps retrying every 10 seconds in the background.</li>
+<li><p>The page polls <code>GET /api/system/alerts</code> every 10 seconds; each newly seen alert is added to the feed, tagged <strong>Alert</strong> or <strong>System Warning</strong> based on its severity. It also subscribes to the live <code>/api/events/stream</code> feed for <strong>VM Started</strong> / <strong>VM Stopped</strong> events, so all four categories populate from real activity.</p>
+</li>
+<li><p>Category chips at the top show a live count per type.</p>
+</li>
+<li><p>An unread count appears when there are unread notifications; clicking a notification marks it read (dims it).</p>
+</li>
+<li><p>Click the <strong>×</strong> on a notification to dismiss it individually, or <strong>Clear All</strong> to empty the whole feed.</p>
+</li>
+<li><p>If polling fails, an amber banner reports the error; polling keeps retrying every 10 seconds in the background.</p>
+</li>
+<li><p><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</p>
+</li>
+<li><p><strong>Success:</strong> Live data loads; mutations complete without error toasts.</p>
+</li>
 </ol>
 <h3>Related pages</h3>
 <ul>
@@ -2860,7 +2926,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/playground</code></li>
 <li>Nav: <strong>Tools → API Playground</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Open <code>/playground</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
@@ -2888,7 +2954,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/vm-compare</code></li>
 <li>Nav: <strong>Tools → VM Compare</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Pick a <strong>Source VM</strong> and <strong>Target VM</strong> from two dropdowns populated from your VM list (the target list excludes whichever VM is already chosen as source).</li>
 <li>Click <strong>Compare</strong> (disabled until both are selected) — calls <code>GET /api/vms/compare?source=…&amp;target=…</code>.</li>
@@ -2916,7 +2982,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/vm-healthcheck</code></li>
 <li>Nav: <strong>Tools → VM Health Check</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li>Select a VM from the dropdown, populated from your VM list.</li>
 <li>Click <strong>Run Health Check</strong> — calls <code>GET /api/vms/{name}/healthcheck</code>.</li>
@@ -2946,7 +3012,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <li>Route / id: <code>/webhooks</code></li>
 <li>Nav: <strong>Tools → Webhooks</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
-<h3>What you can do</h3>
+<h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Add Webhook</strong> opens a form: destination URL, delivery type (generic / Slack / Discord), and a multi-select of events (<code>vm.started</code>, <code>vm.stopped</code>, <code>vm.created</code>, <code>vm.deleted</code>, <code>backup.completed</code>, <code>backup.failed</code>). A URL and at least one event are required — validation errors show inline before it will save.</li>
 <li>Saving posts the new webhook (<code>POST /api/webhooks</code>, created enabled by default) and refreshes the list.</li>

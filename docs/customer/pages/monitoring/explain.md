@@ -15,7 +15,7 @@ Explain — plain-language, AI-generated explanations for a chosen system metric
 - Route / id: `/explain`
 - Nav: **Monitoring → Explain** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Pick a metric** — four buttons: CPU, Memory, Disk, Network. Selecting one fetches its explanation and its last-hour timeseries; nothing loads until you pick one.
 2. **Current Value & Status** — shows the metric's current value with a trend arrow (up/down/flat) and a status badge (e.g. normal, elevated, critical) with a short written summary.

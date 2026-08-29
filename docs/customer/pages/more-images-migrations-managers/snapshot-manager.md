@@ -15,7 +15,7 @@ Snapshot Manager — create, revert to, and delete disk-state snapshots for a se
 - Route / id: `/snapshot-manager`
 - Nav: **More — images, migrations & managers → Snapshot Mgr** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Select VM** — pick a VM from the dropdown to load its snapshots; the list auto-refreshes every 15 seconds while a VM is selected, or use **Refresh** to reload on demand.
 2. **Create Snapshot** — enter a name and click **Create** to snapshot the selected VM's current disk state; a success banner confirms it.

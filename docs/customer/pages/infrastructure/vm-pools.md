@@ -15,7 +15,7 @@ VM Pools — warm / capacity pools for fast provisioning.
 - Route / id: `/vm-pools`
 - Nav: **Infrastructure → VM Pools** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Open `/vm-pools` and wait for live data from Zyvor Fabric.
 2. Use filters and search when the page provides them.

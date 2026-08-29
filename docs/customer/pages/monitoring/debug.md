@@ -15,7 +15,7 @@ Debug Tools — raw, terminal-style output from four classic Linux diagnostic co
 - Route / id: `/debug`
 - Nav: **Monitoring → Debug Tools** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Four independent panels** — Top, IOStat, VMStat, and NetStat, each backed by its own endpoint and showing raw output lines in a scrollable monospace box.
 2. Panels don't load automatically — each starts with "Click Refresh to load data" until you refresh it (individually, via the **Refresh** button in that panel's header) or use **Refresh All** in the page header to load all four at once.

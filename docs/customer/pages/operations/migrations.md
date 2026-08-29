@@ -16,7 +16,7 @@ VM Migrations — move a VM from its current host to a different target host, an
 - Route / id: `/migrations`
 - Nav: **Operations → Migrations** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Start Migration** — opens a dialog where you pick a VM from the dropdown (populated from your VM list), enter a target host (hostname or IP), and choose a migration type:
    - **Offline** — stop the VM, copy its data, then start it on the target

@@ -15,7 +15,7 @@ Plugin Manager — enable, disable, and review the server extensions installed o
 - Route / id: `/plugins`
 - Nav: **Security → Plugins** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review the four stat tiles: Total Plugins, Running, Errors, and Types (distinct plugin categories installed).
 2. Browse the plugin cards — each shows name, version, a type badge (storage/network/security/monitoring/backup), status (running/stopped/error), description, and author when provided.

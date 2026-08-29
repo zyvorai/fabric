@@ -16,7 +16,7 @@ Resource Quotas — cap CPU, memory, disk, and VM-count usage, applied either gl
 - Route / id: `/quotas`
 - Nav: **Operations → Quotas** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Create Quota** — opens a form for the quota name, four numeric limits (max CPUs, max memory in MB, max disk in GB, max VMs), and optional tags to scope it to tagged VMs only (leave tags empty to apply globally). A checkbox lets you enable the quota immediately on creation.
 2. Each quota renders as a card with **Enabled/Disabled** and **Exceeded** badges, and four usage bars (CPUs, memory, disk, VMs) each showing used/limit and a percentage, colored green under 75%, yellow at 75–89%, and red at 90%+.

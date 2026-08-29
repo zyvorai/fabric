@@ -15,7 +15,7 @@ VM Comparison — a side-by-side diff of two VMs' configurations, run on demand 
 - Route / id: `/vm-compare`
 - Nav: **Tools → VM Compare** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Pick a **Source VM** and **Target VM** from two dropdowns populated from your VM list (the target list excludes whichever VM is already chosen as source).
 2. Click **Compare** (disabled until both are selected) — calls `GET /api/vms/compare?source=…&target=…`.

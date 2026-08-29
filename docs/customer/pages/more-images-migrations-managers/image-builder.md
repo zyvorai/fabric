@@ -15,7 +15,7 @@ Image Builder — build custom VM disk images from scratch using [mkosi](https:/
 - Route / id: `/image-builder`
 - Nav: **More — images, migrations & managers → Image Builder** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Build Image** — opens a dialog to configure a new build: an **Image Name**, a **Distribution** (Fedora, Ubuntu, Debian, CentOS, Arch Linux, or openSUSE), and a comma-separated **Packages** list (defaults to `systemd,openssh-server,iproute,vim-minimal`). Click **Build** to queue it; the page polls for updates every 5 seconds while builds are in progress.
 2. **Active Builds** — shows any build currently `pending` or `building`, with its name, distribution, and state badge.

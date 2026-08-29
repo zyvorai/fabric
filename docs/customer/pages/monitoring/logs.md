@@ -15,7 +15,7 @@ Logs — a searchable, filterable console view of Zyvor Fabric's audit log: ever
 - Route / id: `/logs`
 - Nav: **Monitoring → Logs** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Filter box** — matches against the log message and source as you type.
 2. **Level dropdown** — narrow to `ALL`, `INFO`, `WARN`, `ERROR`, or `DEBUG`.

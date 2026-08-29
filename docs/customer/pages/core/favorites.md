@@ -15,7 +15,7 @@ Favorites — a personal, starred shortlist of VMs pulled from your full VM list
 - Route / id: `/favorites`
 - Nav: **Core → Favorites** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Click the star next to any VM to pin or unpin it. Favorites are saved in your browser's local storage, not on the server — they don't follow you to a different browser or device.
 2. The list splits into **Pinned VMs** (your favorites) and **All VMs** (everything else); the search box filters both by name or state.

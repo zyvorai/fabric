@@ -14,7 +14,7 @@ Login — the sign-in screen for the Zyvor Fabric dashboard. Authenticates again
 - Route / id: `/login`
 - Nav: **Auth → Login** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Enter a username and password and sign in — a failed attempt shows an inline error and clears the password field.
 2. Check **Remember me** to save your login in the browser (locally, not on the server) so it's pre-filled next time; unchecking it clears any saved login.
@@ -23,6 +23,10 @@ Login — the sign-in screen for the Zyvor Fabric dashboard. Authenticates again
 5. Two ways to sign in, both explained on the page: **local admin** — username `admin`, password from `.admin_password` on the host — or your own **system user** account (same password as SSH; accounts that only use SSH keys need a password set with `passwd` on the server first).
 
 If you can't sign in, confirm the account exists on the host and that the authentication service is reachable.
+
+
+5. **Empty / fail:** Check health, auth, and domain dependencies.
+6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 

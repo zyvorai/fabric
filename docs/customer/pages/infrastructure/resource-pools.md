@@ -16,7 +16,7 @@ Resource Pools — hierarchical CPU/memory allocation pools (nested, with shares
 - Route / id: `/resource-pools`
 - Nav: **Infrastructure → Resource Pools** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review stat cards: total pools, total CPU shares, and total VMs across all pools.
 2. Browse the expandable pool tree — click a pool to expand/collapse its children; each row shows VM count, CPU/memory shares, and live usage bars that turn red above 80%.

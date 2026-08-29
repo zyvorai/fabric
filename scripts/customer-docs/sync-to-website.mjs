@@ -4,8 +4,15 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+try {
+  const envText = readFileSync(resolve(ROOT, 'scripts/customer-docs/product.env'), 'utf8')
+  for (const line of envText.split('\n')) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/)
+    if (m) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '')
+  }
+} catch {}
 const CUSTOMER = resolve(ROOT, 'docs/customer')
-const SITE = resolve(process.argv[2] ?? resolve(ROOT, '../hypersdk-web'))
+const SITE = resolve(process.argv[2] ?? resolve(ROOT, '../zyvor-web'))
 const PRODUCT = process.env.CUSTOMER_DOCS_PRODUCT || 'Zyvor Fabric'
 const SLUG = (process.env.CUSTOMER_DOCS_SLUG || PRODUCT).toLowerCase().replace(/\s+/g, '-')
 const PDF_PREFIX = process.env.CUSTOMER_DOCS_PDF_PREFIX || PRODUCT.replace(/\s+/g, '-')
@@ -14,7 +21,7 @@ const TARGET = join(SITE, `docs/${MANUAL_DIR}`)
 const PDF_TARGET = join(SITE, `static/downloads/${SLUG}-docs`)
 
 if (!existsSync(join(SITE, 'docusaurus.config.ts'))) {
-  console.error(`ERROR: ${SITE} is not hypersdk-web`)
+  console.error(`ERROR: ${SITE} is not zyvor-web`)
   process.exit(1)
 }
 

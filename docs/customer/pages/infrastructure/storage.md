@@ -14,7 +14,7 @@ Storage — a consolidated view of every storage pool's capacity alongside a man
 - Route / id: `/storage`
 - Nav: **Infrastructure → Storage** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review stat cards: total capacity, used space, volume count, and pool count.
 2. Storage Pools panel — each pool's name, path, type badge, state, a used/total usage bar color-coded by how full it is, and an **Add Volume Record** button.

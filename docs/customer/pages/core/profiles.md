@@ -15,7 +15,7 @@ Profiles (shown in the UI as **Instance Types**) — a library of VM sizing pres
 - Route / id: `/profiles`
 - Nav: **Core → Profiles** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Browse profile cards — each shows its category badge, description, CPUs, memory, disk, and network bandwidth (if set). Built-in profiles are labeled **Built-in** and have no delete button.
 2. **Create Profile** opens a form for a name, category, CPU count, memory (MB), and disk (GB); submitting adds it to the grid immediately.

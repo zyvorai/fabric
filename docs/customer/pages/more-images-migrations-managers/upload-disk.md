@@ -15,7 +15,7 @@ Upload Disk Image — drag-and-drop (or browse) upload of a VM disk image file t
 - Route / id: `/upload-disk`
 - Nav: **More — images, migrations & managers → Upload Disk** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. The drop zone accepts drag-and-drop or click-to-browse. Only `.qcow2`, `.vmdk`, `.vhd`, `.vhdx`, `.raw`, `.img`, and `.ova` are accepted — anything else is rejected with an inline error.
 2. Once a file is chosen, set the **Destination Directory** (defaults to `/var/lib/libvirt/images`) and click **Upload**.

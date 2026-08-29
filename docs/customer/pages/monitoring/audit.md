@@ -15,7 +15,7 @@ Audit Logs — the security and compliance trail of who did what: every tracked 
 - Route / id: `/audit`
 - Nav: **Monitoring → Audit** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Stats row** — total logs, success rate, recent failures, and the top 3 most common actions.
 2. **Search** — free-text search box matches against action, user, resource name, and resource type; press Enter or the results filter live as you type.

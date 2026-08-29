@@ -15,7 +15,7 @@ VM Health Check — runs a set of health verification checks against a single VM
 - Route / id: `/vm-healthcheck`
 - Nav: **Tools → VM Health Check** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Select a VM from the dropdown, populated from your VM list.
 2. Click **Run Health Check** — calls `GET /api/vms/{name}/healthcheck`.

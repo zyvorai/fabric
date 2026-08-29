@@ -15,7 +15,7 @@ Bulk Operations — select any number of VMs and start, stop, restart, or snapsh
 - Route / id: `/bulk-operations`
 - Nav: **Operations → Bulk Operations** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Filter the VM list by name, then click rows to select VMs (or use **Select All** / **Deselect All** for whatever the current filter shows).
 2. Once at least one VM is selected, an action bar appears with **Start**, **Stop**, **Restart**, and **Snapshot** — snapshot creates a timestamped snapshot (`bulk-snap-<timestamp>`) on each selected VM.

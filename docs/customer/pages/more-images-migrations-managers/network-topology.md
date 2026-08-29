@@ -15,7 +15,7 @@ Network Topology — a live map of which VMs are attached to which virtual netwo
 - Route / id: `/network-topology`
 - Nav: **More — images, migrations & managers → Network Topology** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. The page loads VM interfaces, virtual networks, host bridges, and links on open, then refreshes silently every 15 seconds; the header **Refresh** forces a full reload.
 2. A summary line shows counts of virtual networks, host bridges, and VMs.

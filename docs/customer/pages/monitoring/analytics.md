@@ -16,7 +16,7 @@ Performance Analytics — fleet-wide resource utilization, trends over time, and
 - Route / id: `/analytics`
 - Nav: **Monitoring → Analytics** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Time range** — pick Last Hour, 6 Hours, 24 Hours, 7 Days, or 30 Days from the dropdown; it drives the performance chart and reloads all data on the page.
 2. **Export** — the Export button opens a menu to download a performance report as PDF or CSV for the selected time range.

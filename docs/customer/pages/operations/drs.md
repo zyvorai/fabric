@@ -16,7 +16,7 @@ Distributed Resource Scheduler (DRS) — balances VM placement across the hosts 
 - Route / id: `/drs`
 - Nav: **Operations → DRS** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 **DRS configuration** (top of page) — toggle DRS **On/Off**, set the **Automation Level** (Manual, Semi-Auto, or Fully Auto), adjust the **Migration Threshold** (1–5, how aggressively it rebalances), and see the configured check interval. Changes apply immediately.
 

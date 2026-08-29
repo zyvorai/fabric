@@ -15,7 +15,7 @@ Event Stream — a live, scrolling log of VM lifecycle events (create, start, st
 - Route / id: `/event-stream`
 - Nav: **Monitoring → Event Stream** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Connection indicator** — shows Connected (green) or Reconnecting… (amber, pulsing) for the underlying SSE connection.
 2. **Pause / Resume** — pause freezes the view and drops incoming events instead of queuing them; resume starts appending new events again from that point on.

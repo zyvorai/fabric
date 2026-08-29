@@ -15,7 +15,7 @@ Processes — a live process monitor for the host: every OS process with its CPU
 - Route / id: `/processes`
 - Nav: **Monitoring → Processes** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Summary cards show **Total Processes**, **Running**, and **Sleeping** counts.
 2. Filter box matches by PID, process name, or state as you type.

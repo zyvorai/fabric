@@ -15,7 +15,7 @@ Backups & Restore — create full or incremental VM backups, track running backu
 - Route / id: `/backups`
 - Nav: **Operations → Backups** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review the summary tiles: total backups, total size, a breakdown by type (full vs. incremental), and the timestamp of the newest backup.
 2. Watch **Active Jobs** — running or queued backup/restore jobs with a live progress bar, refreshed automatically every 5 seconds.

@@ -16,7 +16,7 @@ System Health — a live, read-only dashboard of host resource utilization, refr
 - Route / id: `/system-health`
 - Nav: **Infrastructure → System Health** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Health score gauge (0–100, colored red/amber/green) with a status label and a summary panel calling out the current bottleneck, if any.
 2. **CPU** panel — overall usage, core count, 1-minute and 5-minute load averages, and a per-core usage grid.

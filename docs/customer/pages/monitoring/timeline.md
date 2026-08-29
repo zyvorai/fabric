@@ -15,7 +15,7 @@ Timeline — a single reverse-chronological activity feed that merges audit-log 
 - Route / id: `/timeline`
 - Nav: **Monitoring → Timeline** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Filter chips — **All**, **Actions**, **Alerts**, **Deploys**, **Errors** — filter the merged feed client-side.
 2. Each entry is auto-classified and shown with an icon/color, description, relative timestamp, and type tag: audit entries with a failed/error status become **Error**, create/deploy-style actions become **Deploy**, other audit entries become **Action**; alerts become **Alert**, or **Error** if their severity is critical/error.

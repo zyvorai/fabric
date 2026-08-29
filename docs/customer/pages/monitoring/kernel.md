@@ -15,7 +15,7 @@ Kernel — a snapshot of the host's kernel configuration: version, hostname, arc
 - Route / id: `/kernel`
 - Nav: **Monitoring → Kernel** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Summary tiles** — Kernel Version, Hostname, Architecture, and Modules Loaded count.
 2. **Boot Command Line** — shown verbatim in a code block when the backend reports one.

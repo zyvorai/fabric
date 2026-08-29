@@ -15,7 +15,7 @@ Optimizer — a right-sizing advisor that analyzes each VM's actual resource usa
 - Route / id: `/resource-optimizer`
 - Nav: **Monitoring → Optimizer** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Summary cards show **VMs Analyzed**, total **Recommendations**, **High Impact**, and **Medium Impact** counts.
 2. If nothing needs changing, the page shows an "All VMs are optimally configured" state instead of a list.

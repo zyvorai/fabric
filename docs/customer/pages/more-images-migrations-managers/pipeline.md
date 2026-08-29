@@ -15,7 +15,7 @@ Pipeline Monitor — a live, auto-refreshing view of in-progress migration/conve
 - Route / id: `/pipeline`
 - Nav: **More — images, migrations & managers → Pipeline** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. The page loads active jobs on open, then polls silently every 3 seconds; the header **Refresh** forces a manual reload.
 2. Each job card shows the VM name, job ID, source, and a status badge (pending / running / completed / failed).

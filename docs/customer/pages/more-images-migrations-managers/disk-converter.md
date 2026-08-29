@@ -15,7 +15,7 @@ Disk Format Converter — convert a single disk image between QCOW2, VMDK, VHD, 
 - Route / id: `/disk-converter`
 - Nav: **More — images, migrations & managers → Disk Converter** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Pick a source disk** — choose from the dropdown of disk images already known to the host, or type a path directly (e.g. `/path/to/disk.vmdk`). If no images are listed, click **Load available disk images** to fetch them.
 2. **Choose the target format** — QCOW2, VMDK, VHD, VHDX, or RAW.

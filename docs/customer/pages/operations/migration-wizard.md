@@ -15,7 +15,7 @@ Migration Wizard — a three-step wizard (Source → Configure → Review) for c
 - Route / id: `/migration-wizard`
 - Nav: **Operations → Migration Wizard** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 **1. Source** — choose **Local File** (a disk image path, e.g. `/path/to/disk.vmdk`) or **Remote Host** (an `user@hostname:/path` target reachable over SSH).
 

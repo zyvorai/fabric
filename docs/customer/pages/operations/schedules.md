@@ -16,7 +16,7 @@ VM Schedules — automate a recurring lifecycle action (start, stop, restart, or
 - Route / id: `/schedules`
 - Nav: **Operations → Schedules** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Create Schedule** — pick a VM, an action (Start VM, Stop VM, Restart VM, Create Snapshot), a schedule type, and a time (24-hour UTC):
    - **Once** — runs a single time

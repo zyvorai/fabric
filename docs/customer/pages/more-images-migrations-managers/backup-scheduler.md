@@ -15,7 +15,7 @@ Backup Scheduler — create and manage recurring, automated backup jobs that sna
 - Route / id: `/backup-scheduler`
 - Nav: **More — images, migrations & managers → Backup Scheduler** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 **Select VMs** — check the VMs you want the schedule to cover (each row shows its current state, e.g. `running`); **Select All** / **Deselect All** toggles the whole list at once.
 

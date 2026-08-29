@@ -15,13 +15,17 @@ Batch Migration Builder — a form-based editor for assembling a multi-VM migrat
 - Route / id: `/batch-migration`
 - Nav: **More — images, migrations & managers → Batch Migration** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. **Add VM** — adds a new, expanded entry card to the list; each is numbered in order.
 2. **Fill in each entry** — VM Name, Source Path (e.g. `/path/to/disk.vmdk`), Target Format (QCOW2, RAW, or VMDK), vCPUs, and Memory (MB). Click an entry's header to collapse or expand it; the collapsed view still shows the name and source path for quick scanning.
 3. **Remove** — the trash icon on an entry deletes it from the list.
 4. **JSON Preview** — as soon as you have at least one entry, a live JSON preview builds the migration spec (`migrations: [...]` with `vm_name`, `source_path`, `target_format`, `cpus`, `memory_mb` per entry).
 5. **Copy** or **Download** the generated JSON to use elsewhere — Copy puts it on the clipboard (with a brief confirmation), Download saves it as `batch-migration.json`.
+
+
+5. **Empty / fail:** Check health, auth, and domain dependencies.
+6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 

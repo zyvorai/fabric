@@ -15,7 +15,7 @@ Dashboard — the fabric at a glance: how many VMs exist and in what state, live
 - Route / id: `/`
 - Nav: **Core → Dashboard** (sidebar, command palette, or desktop nav), or the logo in the top left
 
-## What you can do
+## Operate from the console (UX)
 
 1. Check subsystem status (VM driver, storage, network security, authentication, events) — each shows Live, Unreachable, or Off, with a short detail line.
 2. Read the stat cards: total VMs, running, stopped, and total allocated memory/vCPUs.

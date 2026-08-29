@@ -17,7 +17,7 @@ Virtual Machines — the fleet view of every VM in the fabric, and the starting 
 - Nav: **Core → Virtual Machines** (sidebar, command palette, or desktop nav)
 - A single VM's detail page is `/vms/:name`, reached by clicking its name here
 
-## What you can do
+## Operate from the console (UX)
 
 **On the list**
 

@@ -16,7 +16,7 @@ Machines — a lower-level view of the VM driver's running instances and the raw
 - Route / id: `/machines`
 - Nav: **Core → Machines** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 The page has two tabs, and refreshes itself every 10 seconds:
 

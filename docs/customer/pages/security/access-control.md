@@ -16,7 +16,7 @@ Access Control — manage the user accounts that can sign in to Zyvor Fabric: cr
 - Route / id: `/access-control`
 - Nav: **Security → Access Control** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Review the four stat tiles — Total Users, Admins, Operators, Viewers — for a quick read on who has access.
 2. Click **Add User** to open the inline form: enter a username (3-32 characters — letters, numbers, hyphens, underscores), a password (8+ characters), and pick a role by clicking **Admin**, **Operator**, or **Viewer**. Bad input is caught client-side before it's submitted.

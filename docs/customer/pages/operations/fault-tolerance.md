@@ -16,7 +16,7 @@ Fault Tolerance (FT) — protect individual VMs with a live secondary replica on
 - Route / id: `/fault-tolerance`
 - Nav: **Operations → Fault Tolerance** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 Summary tiles show protected VM count, how many are running, how many need attention, and total failover events. **Enable FT** opens a form to name the VM, set its primary host ID, and optionally a secondary host ID (leave blank to auto-select). Four tabs:
 

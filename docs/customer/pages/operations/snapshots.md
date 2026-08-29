@@ -16,7 +16,7 @@ VM Snapshots — create point-in-time snapshots of a specific VM's disk (or disk
 - Route / id: `/snapshots`
 - Nav: **Operations → Snapshots** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. Type a VM name into the **VM Name** field and click **Load Snapshots** (or wait — snapshots load automatically once a name is entered) to see that VM's snapshot list. Nothing loads until a VM name is provided.
 2. **Create** — opens a dialog for a snapshot name, an optional description, and a type: **Disk Only** or **Full (Disk + State)**.

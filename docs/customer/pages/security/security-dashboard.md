@@ -16,7 +16,7 @@ Security — a real-time security posture and threat-monitoring view: an overall
 - Route / id: `/security-dashboard`
 - Nav: **Security → Security Dashboard** (sidebar, command palette, or desktop nav)
 
-## What you can do
+## Operate from the console (UX)
 
 1. View the risk score gauge (0-100, color-coded) alongside Critical Alerts, Warnings, and Failed Logins count tiles.
 2. Review the Security Alerts list — severity badge, message, source, and timestamp per alert; shows "No active alerts" when clear.
