@@ -51,17 +51,17 @@ import { usePermissions } from '../../hooks/usePermissions'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-700/50">
-        <h3 className="text-sm font-medium text-slate-300">{title}</h3>
+    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+      <div className="px-5 py-3 border-b border-[#d2d2d7]">
+        <h3 className="text-sm font-medium text-[#1d1d1f]">{title}</h3>
       </div>
       <div className="p-5 space-y-3">{children}</div>
     </div>
   )
 }
 
-const inputCls = 'w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-1.5 text-sm'
-const labelCls = 'block text-xs font-medium text-slate-400 mb-1'
+const inputCls = 'w-full bg-white border border-[#d2d2d7] rounded px-3 py-1.5 text-sm'
+const labelCls = 'block text-xs font-medium text-[#6e6e73] mb-1'
 
 export default function AdvancedTab({ vm }: { vm: VM }) {
   const toast = useToastContext()
@@ -301,9 +301,9 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
 
   if (loading) {
     return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <Loader2 className="w-6 h-6 text-slate-500 mx-auto mb-2 animate-spin" />
-        <p className="text-slate-500 text-sm">Loading advanced configuration...</p>
+      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
+        <Loader2 className="w-6 h-6 text-[#6e6e73] mx-auto mb-2 animate-spin" />
+        <p className="text-[#6e6e73] text-sm">Loading advanced configuration...</p>
       </div>
     )
   }
@@ -313,7 +313,7 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
       <div className="flex justify-end">
         <button
           onClick={() => void load()}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-slate-300 text-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[#6e6e73] hover:text-[#1d1d1f] text-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh
@@ -333,30 +333,30 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
       <Section title="Firmware">
         {firmware ? (
           <>
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-[#1d1d1f]">
               <span className="font-mono">{firmware.firmware_type}</span>
-              {firmware.tpm_enabled && <span className="text-slate-400"> · TPM {firmware.tpm_version}</span>}
+              {firmware.tpm_enabled && <span className="text-[#6e6e73]"> · TPM {firmware.tpm_version}</span>}
             </p>
             <p className="text-sm">
-              Secure Boot: <span className={firmware.secure_boot_enabled ? 'text-green-400' : 'text-slate-500'}>{firmware.secure_boot_enabled ? 'Enabled' : 'Disabled'}</span>
+              Secure Boot: <span className={firmware.secure_boot_enabled ? 'text-emerald-600' : 'text-[#6e6e73]'}>{firmware.secure_boot_enabled ? 'Enabled' : 'Disabled'}</span>
             </p>
           </>
         ) : (
-          <p className="text-sm text-slate-500">UEFI is not enabled for this VM (currently BIOS boot).</p>
+          <p className="text-sm text-[#6e6e73]">UEFI is not enabled for this VM (currently BIOS boot).</p>
         )}
         {canWrite && (
           <div className="flex flex-wrap gap-2">
             {!firmware && (
-              <button onClick={() => void handleEnableUefi()} disabled={firmwareBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+              <button onClick={() => void handleEnableUefi()} disabled={firmwareBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
                 <ShieldCheck className="w-3.5 h-3.5" />{firmwareBusy ? 'Working…' : 'Enable UEFI'}
               </button>
             )}
             {firmware && (
               <>
-                <button onClick={() => void handleToggleSecureBoot()} disabled={firmwareBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+                <button onClick={() => void handleToggleSecureBoot()} disabled={firmwareBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
                   <ShieldCheck className="w-3.5 h-3.5" />{firmwareBusy ? 'Working…' : firmware.secure_boot_enabled ? 'Disable Secure Boot' : 'Enable Secure Boot'}
                 </button>
-                <button onClick={() => void handleResetNvram()} disabled={firmwareBusy} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-600 rounded-lg text-sm disabled:opacity-50">
+                <button onClick={() => void handleResetNvram()} disabled={firmwareBusy} className="px-3 py-1.5 bg-white hover:bg-[#d2d2d7] rounded-lg text-sm disabled:opacity-50">
                   {firmwareBusy ? 'Working…' : 'Reset NVRAM'}
                 </button>
               </>
@@ -403,7 +403,7 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
             />
           </div>
           {canWrite && (
-            <button onClick={() => void saveBoot()} disabled={savingBoot} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+            <button onClick={() => void saveBoot()} disabled={savingBoot} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
               <Save className="w-3.5 h-3.5" />{savingBoot ? 'Saving…' : 'Save Boot Config'}
             </button>
           )}
@@ -431,7 +431,7 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
             </div>
           </div>
           {canWrite && (
-            <button onClick={() => void saveDisplay()} disabled={savingDisplay} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+            <button onClick={() => void saveDisplay()} disabled={savingDisplay} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
               <Save className="w-3.5 h-3.5" />{savingDisplay ? 'Saving…' : 'Save Display Config'}
             </button>
           )}
@@ -472,10 +472,10 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
             )}
           </div>
           {cpuModels.length === 0 && cpuConfig.mode === 'custom' && (
-            <p className="text-xs text-slate-500">No host CPU model list available — enter a model name via Custom mode only if you know it's supported by qemu on this host.</p>
+            <p className="text-xs text-[#6e6e73]">No host CPU model list available — enter a model name via Custom mode only if you know it's supported by qemu on this host.</p>
           )}
           {canWrite && (
-            <button onClick={() => void saveCpu()} disabled={savingCpu} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+            <button onClick={() => void saveCpu()} disabled={savingCpu} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
               <Save className="w-3.5 h-3.5" />{savingCpu ? 'Saving…' : 'Save CPU Config'}
             </button>
           )}
@@ -485,18 +485,18 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
       {(cpuTopology || numaTopology) && (
         <Section title="CPU Pinning & NUMA">
           {cpuTopology && (
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-[#1d1d1f]">
               Host: <span className="font-mono">{cpuTopology.total_cpus}</span> CPUs across{' '}
               <span className="font-mono">{cpuTopology.sockets}</span> socket{cpuTopology.sockets === 1 ? '' : 's'}
               {numaTopology && <> · <span className="font-mono">{numaTopology.nodes.length}</span> NUMA node{numaTopology.nodes.length === 1 ? '' : 's'}</>}
             </p>
           )}
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-[#6e6e73]">
             Current affinity:{' '}
             {cpuAffinity && cpuAffinity.length > 0 ? (
-              <span className="font-mono text-slate-300">{cpuAffinity.join(', ')}</span>
+              <span className="font-mono text-[#1d1d1f]">{cpuAffinity.join(', ')}</span>
             ) : (
-              <span className="text-slate-500">none (floating across all host CPUs)</span>
+              <span className="text-[#6e6e73]">none (floating across all host CPUs)</span>
             )}
           </p>
 
@@ -567,16 +567,16 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
               )}
 
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => void applyPinning()} disabled={savingPinning} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+                <button onClick={() => void applyPinning()} disabled={savingPinning} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
                   <Save className="w-3.5 h-3.5" />{savingPinning ? 'Applying…' : 'Apply Pinning'}
                 </button>
                 {numaTopology && (
-                  <button onClick={() => void applyRecommendedNuma()} disabled={savingPinning} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-600 rounded-lg text-sm disabled:opacity-50">
+                  <button onClick={() => void applyRecommendedNuma()} disabled={savingPinning} className="px-3 py-1.5 bg-white hover:bg-[#d2d2d7] rounded-lg text-sm disabled:opacity-50">
                     Use Recommended NUMA Node
                   </button>
                 )}
                 {cpuAffinity && cpuAffinity.length > 0 && (
-                  <button onClick={() => void clearPinning()} disabled={savingPinning} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-600 rounded-lg text-sm disabled:opacity-50">
+                  <button onClick={() => void clearPinning()} disabled={savingPinning} className="px-3 py-1.5 bg-white hover:bg-[#d2d2d7] rounded-lg text-sm disabled:opacity-50">
                     Clear Pinning
                   </button>
                 )}
@@ -591,11 +591,11 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
 
       <Section title="Watchdog">
         {watchdog ? (
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-[#1d1d1f]">
             <span className="font-mono">{watchdog.model}</span> — on hang: <span className="font-mono">{watchdog.action}</span>
           </p>
         ) : (
-          <p className="text-sm text-slate-500">No watchdog configured.</p>
+          <p className="text-sm text-[#6e6e73]">No watchdog configured.</p>
         )}
         {canWrite && (
           <div className="grid grid-cols-2 gap-3">
@@ -630,7 +630,7 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
               const action = (document.getElementById('watchdog-action') as HTMLSelectElement).value as WatchdogConfig['action']
               void saveWatchdog(model, action)
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />{savingWatchdog ? 'Saving…' : 'Set Watchdog'}
           </button>
@@ -639,14 +639,14 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
 
       <Section title="Serial Consoles">
         {serials.length === 0 ? (
-          <p className="text-sm text-slate-500">No serial consoles configured.</p>
+          <p className="text-sm text-[#6e6e73]">No serial consoles configured.</p>
         ) : (
           <div className="space-y-1.5">
             {serials.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm bg-slate-900/60 border border-slate-700/50 rounded px-3 py-1.5">
+              <div key={i} className="flex items-center gap-2 text-sm bg-[#f5f5f7] border border-[#d2d2d7] rounded px-3 py-1.5">
                 <span className="font-mono">{s.type}</span>
-                {s.path && <span className="text-slate-500 font-mono">{s.path}</span>}
-                {s.source_host && <span className="text-slate-500 font-mono">{s.source_host}:{s.source_port}</span>}
+                {s.path && <span className="text-[#6e6e73] font-mono">{s.path}</span>}
+                {s.source_host && <span className="text-[#6e6e73] font-mono">{s.source_host}:{s.source_port}</span>}
               </div>
             ))}
           </div>
@@ -661,7 +661,7 @@ export default function AdvancedTab({ vm }: { vm: VM }) {
                 <option value="tcp">tcp</option>
               </select>
             </div>
-            <button onClick={() => void submitSerial()} disabled={addingSerial} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+            <button onClick={() => void submitSerial()} disabled={addingSerial} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm disabled:opacity-50">
               <Plus className="w-3.5 h-3.5" />{addingSerial ? 'Adding…' : 'Add Serial'}
             </button>
           </div>

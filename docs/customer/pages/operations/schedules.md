@@ -13,7 +13,7 @@ VM Schedules — automate a recurring lifecycle action (start, stop, restart, or
 
 ## How to get there
 
-- Route / id: `/schedules`
+- Route / id: `/app/schedules`
 - Nav: **Operations → Schedules** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

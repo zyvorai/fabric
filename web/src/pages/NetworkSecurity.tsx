@@ -359,7 +359,7 @@ export default function NetworkSecurity() {
           <Shield className="w-8 h-8" />
           Network Security
         </h1>
-        <button onClick={() => fetchAll()} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+        <button onClick={() => fetchAll()} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           <RefreshCw className="w-4 h-4" />
           Refresh
         </button>
@@ -375,46 +375,46 @@ export default function NetworkSecurity() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Policies</div>
-          <div className="text-2xl font-bold text-blue-400">{policies.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Policies</div>
+          <div className="text-2xl font-bold text-[#0066cc]">{policies.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Firewall</div>
-          <div className="text-2xl font-bold text-red-400">{fwProfiles.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Firewall</div>
+          <div className="text-2xl font-bold text-red-600">{fwProfiles.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Services</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Services</div>
           <div className="text-2xl font-bold text-cyan-400">{services.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">QoS</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">QoS</div>
           <div className="text-2xl font-bold text-purple-400">{qosPolicies.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">DNS</div>
-          <div className="text-2xl font-bold text-green-400">{dnsZones.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">DNS</div>
+          <div className="text-2xl font-bold text-emerald-600">{dnsZones.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">VPN</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">VPN</div>
           <div className="text-2xl font-bold text-orange-400">{vpnTunnels.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Mirror</div>
-          <div className="text-2xl font-bold text-yellow-400">{mirrorSessions.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Mirror</div>
+          <div className="text-2xl font-bold text-amber-600">{mirrorSessions.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">NAT</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">NAT</div>
           <div className="text-2xl font-bold text-pink-400">{natRules.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Monitor</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Monitor</div>
           <div className="text-2xl font-bold text-teal-400">{monitorPolicies.length}</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-700/50">
+      <div className="border-b border-[#d2d2d7]">
         <div className="flex gap-1 overflow-x-auto">
           {tabs.map(t => (
             <button
@@ -422,8 +422,8 @@ export default function NetworkSecurity() {
               onClick={() => setActiveTab(t.key)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
                 activeTab === t.key
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-blue-500 text-[#0066cc]'
+                  : 'border-transparent text-[#6e6e73] hover:text-[#1d1d1f]'
               }`}
             >
               {t.icon}
@@ -434,7 +434,7 @@ export default function NetworkSecurity() {
       </div>
 
       {loading ? (
-        <div className="text-center text-slate-400 py-12">Loading...</div>
+        <div className="text-center text-[#6e6e73] py-12">Loading...</div>
       ) : (
         <>
           {activeTab === 'policies' && (

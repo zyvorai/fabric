@@ -217,7 +217,7 @@ On first startup with authentication enabled, Zyvor Fabric creates an `admin` us
 sudo cat /var/lib/zyvor-fabricd/.admin_password
 
 # Log in and obtain a JWT token
-curl -s http://127.0.0.1:9095/api/v1/auth/login \
+curl -s http://127.0.0.1:9095/api/v1/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "THE_PASSWORD"}'
 ```

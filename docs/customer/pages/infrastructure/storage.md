@@ -11,7 +11,7 @@ Storage — a consolidated view of every storage pool's capacity alongside a man
 
 ## How to get there
 
-- Route / id: `/storage`
+- Route / id: `/app/storage`
 - Nav: **Infrastructure → Storage** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

@@ -12,7 +12,7 @@ Content Library — a catalog of reusable provisioning building blocks: librarie
 
 ## How to get there
 
-- Route / id: `/content-library`
+- Route / id: `/app/content-library`
 - Nav: **Operations → Content Library** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

@@ -50,38 +50,38 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
   const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <h2 className="text-xl font-semibold">Tap Devices</h2>
-        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create Tap
         </button>}
       </div>
       {taps.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No tap devices configured.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No tap devices configured.</div>
       ) : (
         <>
           <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search name, bridge, user…" total={taps.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
           <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-800">
+            <thead className="bg-white">
               <tr>
-                <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">Bridge</th>
-                <th className="text-left p-4 font-medium text-slate-300">User</th>
-                <th className="text-left p-4 font-medium text-slate-300">MultiQueue</th>
-                <th className="text-left p-4 font-medium text-slate-300">VNet Header</th>
-                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Bridge</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">User</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">MultiQueue</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">VNet Header</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {pageItems.map(t => (
                 <tr key={t.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{t.name}{isHostManaged(t) && <HostBadge />}</td>
-                  <td className="p-4 text-slate-400">{t.bridge ?? '-'}</td>
-                  <td className="p-4 text-slate-400">{t.user ?? '-'}</td>
-                  <td className="p-4">{t.multi_queue ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
-                  <td className="p-4">{t.vnet_hdr ? <span className="text-green-400">yes</span> : <span className="text-slate-500">no</span>}</td>
+                  <td className="p-4 text-[#6e6e73]">{t.bridge ?? '-'}</td>
+                  <td className="p-4 text-[#6e6e73]">{t.user ?? '-'}</td>
+                  <td className="p-4">{t.multi_queue ? <span className="text-emerald-600">yes</span> : <span className="text-[#6e6e73]">no</span>}</td>
+                  <td className="p-4">{t.vnet_hdr ? <span className="text-emerald-600">yes</span> : <span className="text-[#6e6e73]">no</span>}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-1">
                       <button onClick={() => handleView(t.id)} className="p-2 hover:bg-white/[0.06] rounded transition" title="View details" type="button">
@@ -94,7 +94,7 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No tap devices match your search.</div>}
+          {filtered.length === 0 && <div className="p-8 text-center text-[#6e6e73] text-sm">No tap devices match your search.</div>}
           </div>
         </>
       )}
@@ -152,8 +152,8 @@ export function CreateTapModal({ onClose, onCreated }: { onClose: () => void; on
         <InputField label="Group" value={group} onChange={setGroup} placeholder="kvm" />
         <CheckboxField label="Multi-queue" checked={multiQueue} onChange={setMultiQueue} />
         <CheckboxField label="VNet header" checked={vnetHdr} onChange={setVnetHdr} />
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Tap'}
         </button>
       </div>

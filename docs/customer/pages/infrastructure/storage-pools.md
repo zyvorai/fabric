@@ -13,7 +13,7 @@ Storage Pools — create, start/stop, and monitor the storage backends VM disks 
 
 ## How to get there
 
-- Route / id: `/storage-pools`
+- Route / id: `/app/storage-pools`
 - Nav: **Infrastructure → Storage Pools** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

@@ -58,7 +58,7 @@ export default function NavUtilityBar({
             ? 'text-[#9aa8b8] hover:text-white hover:bg-white/5'
             : aurora
               ? 'text-[#a89ec8] hover:text-[#f5f3ff] hover:bg-white/5'
-              : 'hover:bg-slate-700/60 text-slate-400 hover:text-white'
+              : 'hover:bg-[#d2d2d7] text-slate-400 hover:text-white'
         }`}
         title="Search (Ctrl+K)"
         aria-label="Search"
@@ -77,8 +77,8 @@ export default function NavUtilityBar({
                 ? 'text-[#9aa8b8] hover:text-white hover:bg-white/5'
                 : aurora
                   ? 'text-[#a89ec8] hover:text-[#f5f3ff] hover:bg-white/5'
-                  : 'text-slate-400 hover:bg-slate-700/60 hover:text-white'
-            } ${helpMenuOpen ? (themed ? 'bg-white/5 text-white' : 'bg-slate-700/60 text-white') : ''}`}
+                  : 'text-slate-400 hover:bg-[#d2d2d7] hover:text-white'
+            } ${helpMenuOpen ? (themed ? 'bg-white/5 text-white' : 'bg-[#d2d2d7] text-white') : ''}`}
             title="Help (?)"
             aria-label="Help menu"
           >
@@ -108,7 +108,7 @@ export default function NavUtilityBar({
                   onOpenHelp('shortcuts')
                 }}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-sm ${
-                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                 }`}
               >
                 <Keyboard className="w-4 h-4 shrink-0" aria-hidden />
@@ -129,7 +129,7 @@ export default function NavUtilityBar({
                   onOpenHelp('about')
                 }}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-sm ${
-                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                 }`}
               >
                 <Info className="w-4 h-4 shrink-0" aria-hidden />
@@ -142,7 +142,7 @@ export default function NavUtilityBar({
                 rel="noopener noreferrer"
                 onClick={() => setHelpMenuOpen(false)}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-sm ${
-                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                 }`}
               >
                 <BookOpen className="w-4 h-4 shrink-0" aria-hidden />
@@ -156,7 +156,7 @@ export default function NavUtilityBar({
                 rel="noopener noreferrer"
                 onClick={() => setHelpMenuOpen(false)}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-sm ${
-                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                  themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                 }`}
               >
                 <ExternalLink className="w-4 h-4 shrink-0" aria-hidden />
@@ -170,7 +170,7 @@ export default function NavUtilityBar({
         <ConnectionStatus />
       </div>
       <Link
-        to="/create"
+        to="/app/create"
         className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium shrink-0 whitespace-nowrap ${
           steel
             ? 'bg-gradient-to-r from-[#5d90f7] to-[#3d6fd0] text-white hover:brightness-110'
@@ -190,7 +190,7 @@ export default function NavUtilityBar({
               ? 'border-[rgba(140,160,190,0.2)]'
               : aurora
                 ? 'border-[rgba(167,139,250,0.2)]'
-                : 'border-slate-700/60'
+                : 'border-[#d2d2d7]'
           }`}
         >
           <span
@@ -210,7 +210,7 @@ export default function NavUtilityBar({
                 ? 'text-[#cfd8e3] border-[rgba(140,160,190,0.25)] hover:bg-white/5 hover:text-white'
                 : aurora
                   ? 'text-[#e8e4f8] border-[rgba(167,139,250,0.28)] hover:bg-white/5 hover:text-white'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white border-slate-600/60 hover:border-slate-500'
+                  : 'text-slate-300 hover:bg-slate-700 hover:text-white border-slate-600/60 hover:border-[#6e6e73]'
             }`}
             title={`Sign out (${user.username})`}
             aria-label="Sign out"

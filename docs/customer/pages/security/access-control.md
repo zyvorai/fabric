@@ -13,7 +13,7 @@ Access Control — manage the user accounts that can sign in to Zyvor Fabric: cr
 
 ## How to get there
 
-- Route / id: `/access-control`
+- Route / id: `/app/access-control`
 - Nav: **Security → Access Control** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

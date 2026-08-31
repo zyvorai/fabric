@@ -18,7 +18,7 @@ Zyvor Fabric is a production-grade private cloud control plane built in Rust. It
 
 - **One binary, one config file** — deploys in under 5 minutes (`zyvor-fabricd`), with systemd support built in but not required
 - **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
-- **5 management interfaces** — CLI, terminal UI, web dashboard, Kubernetes operator, Terraform provider
+- **4 management interfaces** — CLI, web dashboard, Kubernetes operator, Terraform provider
 - **Enterprise features** — HA clustering, live migration, GPU passthrough, backup/restore, network policies
 
 ```
@@ -137,7 +137,7 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 - Multi-channel notifications: Email, Slack, **Webhook with retry + backoff**, Microsoft Teams
 - VM scheduling (once, daily, weekly)
 - Backup/restore with retention policies and incremental backups
-- **Per-VM backup** from web UI and TUI (single or bulk)
+- **Per-VM backup** from web UI (single or bulk)
 - **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
 - **Automated weekly state store cleanup** via systemd timer (events, audit logs, webhook deliveries, history)
 - **Backup configuration** via `[backup]` section in config file or `ZYVOR_FABRICD_BACKUP_DIR`/`ZYVOR_FABRICD_BACKUP_RETAIN`/`ZYVOR_FABRICD_BACKUP_TYPE` env vars
@@ -179,13 +179,13 @@ zyvorctl policy list
 zyvorctl ceph health my-pool
 ```
 
-### Terminal UI (`zyvorctl-tui`)
+### Terminal UI (removed)
 
-k9s-style dashboard with 8 views, vim keybindings, sparkline graphs, and live API data. Per-VM actions: `s` start, `t` stop, `r` restart, `b` backup, `d` delete.
+The former `zyvorctl-tui` terminal dashboard has been removed. Use the web console under `/app` or the `zyvorctl` CLI.
 
 ### Web Dashboard
 
-React-based UI with 37+ pages, command palette (Ctrl+K), dark theme, real-time WebSocket updates, and bulk operations. Per-VM actions: start, stop, pause, backup, console, details. Bulk actions: start, stop, backup, delete.
+Hybrid UI: public marketing pages (`/`, `/product`, `/platform`, `/security`) and a light Apple-style console under `/app` (React 19, SF Pro / system UI fonts, command palette Ctrl+K, WebSocket updates, bulk operations). Sign in at `/sign-in`.
 
 ### Kubernetes Operator
 
@@ -220,24 +220,19 @@ resource "zyvor_fabric_vm" "web" {
 ## Architecture
 
 ```
-                    +-----------+    +-----------+    +----------+
-                    |   zyvorctl   |    | zyvorctl-tui |    |  Web UI  |
-                    |   (CLI)   |    |   (TUI)   |    | (React)  |
-                    +-----+-----+    +-----+-----+    +----+-----+
-                          |                |               |
-                +---------+----------+     |      +--------+
-                |         |          |     |      |
-           +----v----+   |   +------v-----v------v-------+
-           |   K8s   |   |   |       zyvor-fabricd daemon      |
-           |Operator |   |   |   REST API + WebSocket      |
-           +---------+   |   +---+----+----+----+----+----+
-                          |       |    |    |    |    |
-           +-----------+  |       |    |    |    |    |
-           | Terraform |--+       |    |    |    |    |
-           | Provider  |         |    |    |    |    |
-           +-----------+         |    |    |    |    |
-                                  v    v    v    v    v
-                        VM Driver: Ephemera
+                    +-----------+    +----------+    +-----------+    +------------+
+                    |  zyvorctl |    |  Web UI  |    |    K8s    |    | Terraform  |
+                    |   (CLI)   |    | (React)  |    | Operator  |    | Provider   |
+                    +-----+-----+    +----+-----+    +-----+-----+    +------+-----+
+                          |               |                |                  |
+                          +---------------+----------------+------------------+
+                                            |
+                              +-------------v-------------+
+                              |    zyvor-fabricd daemon   |
+                              |   REST API + WebSocket    |
+                              +-------------+-------------+
+                                            |
+                                  VM Driver: Ephemera
 ```
 
 ---
@@ -272,7 +267,7 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | REST API | 520+ endpoints | ~50 | ~200 | XML-RPC |
 | Web UI | Yes | Yes | Yes (Horizon) | No |
 | CLI | Yes | Yes | Yes | Yes |
-| Terminal UI | Yes | No | No | No |
+| Terminal UI | No (removed) | No | No | No |
 | Kubernetes Operator | Yes | No | Yes | No |
 | Terraform Provider | Yes | Yes | Yes | Yes |
 | Network Policies | Cilium-style | Basic | Neutron | No |
@@ -301,7 +296,7 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Language | Rust (2021 edition) |
 | Async Runtime | Tokio 1.44 |
 | Web Framework | Axum 0.8 |
-| Terminal UI | ratatui + crossterm |
+| Web UI | React 19 + Vite |
 | Web UI | React 18 + TypeScript + Vite + TailwindCSS |
 | VM Backend | Ephemera (no systemd dependency) |
 | Monitoring | Prometheus |

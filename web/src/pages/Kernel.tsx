@@ -89,39 +89,39 @@ export default function Kernel() {
         <>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
-          <div className="text-xs text-slate-400 mb-1">Kernel Version</div>
-          <div className="text-sm font-bold text-white truncate">{data?.version || data?.kernel_version || '-'}</div>
+        <div className="stat-card-purple rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
+          <div className="text-xs text-[#6e6e73] mb-1">Kernel Version</div>
+          <div className="text-sm font-bold text-[#1d1d1f] truncate">{data?.version || data?.kernel_version || '-'}</div>
         </div>
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-xs text-slate-400 mb-1">Hostname</div>
-          <div className="text-sm font-bold text-white truncate">{data?.hostname || '-'}</div>
+        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-xs text-[#6e6e73] mb-1">Hostname</div>
+          <div className="text-sm font-bold text-[#1d1d1f] truncate">{data?.hostname || '-'}</div>
         </div>
-        <div className="stat-card-cyan rounded-xl border border-slate-700/50 px-4 py-3 card-glow-cyan transition-all hover:scale-[1.02]">
-          <div className="text-xs text-slate-400 mb-1">Architecture</div>
-          <div className="text-sm font-bold text-white">{data?.architecture || data?.arch || '-'}</div>
+        <div className="stat-card-cyan rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-cyan transition-all hover:scale-[1.02]">
+          <div className="text-xs text-[#6e6e73] mb-1">Architecture</div>
+          <div className="text-sm font-bold text-[#1d1d1f]">{data?.architecture || data?.arch || '-'}</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
-          <div className="text-xs text-slate-400 mb-1">Modules Loaded</div>
-          <div className="text-2xl font-bold text-white">{modules.length}</div>
+        <div className="stat-card-green rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
+          <div className="text-xs text-[#6e6e73] mb-1">Modules Loaded</div>
+          <div className="text-2xl font-bold text-[#1d1d1f]">{modules.length}</div>
         </div>
       </div>
 
       {(data?.cmdline || data?.boot_cmdline) && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
-          <h3 className="text-base font-semibold text-white mb-3">Boot Command Line</h3>
-          <pre className="text-xs text-slate-300 bg-slate-900/50 rounded-lg p-4 overflow-x-auto font-mono whitespace-pre-wrap break-all">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
+          <h3 className="text-base font-semibold text-[#1d1d1f] mb-3">Boot Command Line</h3>
+          <pre className="text-xs text-[#1d1d1f] bg-white rounded-lg p-4 overflow-x-auto font-mono whitespace-pre-wrap break-all">
             {data.cmdline || data.boot_cmdline}
           </pre>
         </div>
       )}
 
       {modules.length > 0 && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between flex-wrap gap-3">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#d2d2d7] flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <h3 className="text-base font-semibold text-white">Kernel Modules</h3>
-              <span className="text-xs font-medium text-slate-400 bg-slate-700/50 px-2.5 py-1 rounded-full">
+              <h3 className="text-base font-semibold text-[#1d1d1f]">Kernel Modules</h3>
+              <span className="text-xs font-medium text-[#6e6e73] bg-[#e8e8ed] px-2.5 py-1 rounded-full">
                 {filteredModules.length} / {modules.length}
               </span>
             </div>
@@ -131,28 +131,28 @@ export default function Kernel() {
               aria-label="Filter modules"
               value={moduleFilter}
               onChange={(e) => setModuleFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-900/50 border border-slate-700/50 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-48"
+              className="px-3 py-1.5 text-xs bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-1 focus:ring-blue-500 w-48"
             />
           </div>
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-slate-800">
-                <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                  <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Size</th>
-                  <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Used By</th>
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b border-[#d2d2d7]">
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Name</th>
+                  <th className="text-right px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Size</th>
+                  <th className="text-right px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Used By</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-[#d2d2d7]/30">
                 {filteredModules.slice(0, 100).map((mod: any, i: number) => {
                   const name = typeof mod === 'string' ? mod : mod.name
                   const size = typeof mod === 'object' ? mod.size : undefined
                   const usedBy = typeof mod === 'object' ? (mod.used_by || mod.dependents) : undefined
                   return (
                     <tr key={i} className="table-row-hover">
-                      <td className="px-5 py-2 text-xs text-white font-mono">{name}</td>
-                      <td className="px-5 py-2 text-xs text-right text-slate-400">{size ?? '-'}</td>
-                      <td className="px-5 py-2 text-xs text-right text-slate-400">
+                      <td className="px-5 py-2 text-xs text-[#1d1d1f] font-mono">{name}</td>
+                      <td className="px-5 py-2 text-xs text-right text-[#6e6e73]">{size ?? '-'}</td>
+                      <td className="px-5 py-2 text-xs text-right text-[#6e6e73]">
                         {Array.isArray(usedBy) ? usedBy.join(', ') : usedBy ?? '-'}
                       </td>
                     </tr>
@@ -165,26 +165,26 @@ export default function Kernel() {
       )}
 
       {sysctls.length > 0 && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-white">Sysctl Parameters</h3>
-            <span className="text-xs font-medium text-slate-400 bg-slate-700/50 px-2.5 py-1 rounded-full">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#d2d2d7] flex items-center justify-between">
+            <h3 className="text-base font-semibold text-[#1d1d1f]">Sysctl Parameters</h3>
+            <span className="text-xs font-medium text-[#6e6e73] bg-[#e8e8ed] px-2.5 py-1 rounded-full">
               {sysctls.length} params
             </span>
           </div>
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-slate-800">
-                <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Key</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Value</th>
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b border-[#d2d2d7]">
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Key</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-[#d2d2d7]/30">
                 {sysctls.map((param: any, i: number) => (
                   <tr key={i} className="table-row-hover">
-                    <td className="px-5 py-2 text-xs text-white font-mono">{param.key || param.name || '-'}</td>
-                    <td className="px-5 py-2 text-xs text-slate-300 font-mono break-all">{String(param.value ?? '-')}</td>
+                    <td className="px-5 py-2 text-xs text-[#1d1d1f] font-mono">{param.key || param.name || '-'}</td>
+                    <td className="px-5 py-2 text-xs text-[#1d1d1f] font-mono break-all">{String(param.value ?? '-')}</td>
                   </tr>
                 ))}
               </tbody>

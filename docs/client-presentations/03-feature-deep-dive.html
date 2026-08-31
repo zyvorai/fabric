@@ -217,7 +217,7 @@ runcmd:
       </ul>
       <h3 style="margin-top: 20px;">Backup Features</h3>
       <ul>
-        <li>Per-VM backup from any interface (CLI, TUI, Web)</li>
+        <li>Per-VM backup from any interface (CLI, web)</li>
         <li>Bulk backup operations</li>
         <li>Incremental backup support</li>
         <li>Automated daily backups via systemd timer</li>
@@ -492,7 +492,7 @@ zyvorctl config myvm \
       <h3 style="margin-top: 20px;">Dashboard</h3>
       <ul>
         <li>Web UI analytics page with charts</li>
-        <li>TUI with sparkline graphs</li>
+        <li>web console with sparkline graphs</li>
         <li>Grafana dashboard compatible</li>
         <li>Real-time WebSocket updates</li>
       </ul>
@@ -657,18 +657,18 @@ key = "/etc/zyvor-fabricd/tls/key.pem"</code></pre>
   <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;">
     <div class="card" style="text-align: center;">
       <h3>CLI</h3>
-      <p><code>zyvorctl</code></p>
+      <p><code>/app</code> console · <code>zyvorctl</code> CLI</p>
       <p style="font-size: 0.95em;">Scriptable command-line with JSON, YAML, and table output. Bash tab completion. Perfect for automation.</p>
     </div>
     <div class="card" style="text-align: center;">
-      <h3>Terminal UI</h3>
-      <p><code>zyvorctl-tui</code></p>
-      <p style="font-size: 0.95em;">k9s-style dashboard with 8 views, vim keybindings, sparkline graphs. SSH-friendly for remote servers.</p>
+      <h3>Web console</h3>
+      <p><code>/app</code> console · <code>zyvorctl</code> CLI</p>
+      <p style="font-size: 0.95em;"> SSH-friendly for remote servers.</p>
     </div>
     <div class="card" style="text-align: center;">
       <h3>Web UI</h3>
       <p>React Dashboard</p>
-      <p style="font-size: 0.95em;">37+ pages, command palette, dark theme, WebSocket live updates, bulk operations. Full-featured browser access.</p>
+      <p style="font-size: 0.95em;">37+ pages, command palette, light Apple console, WebSocket live updates, bulk operations. Full-featured browser access.</p>
     </div>
     <div class="card" style="text-align: center;">
       <h3>K8s Operator</h3>
@@ -933,7 +933,7 @@ curl "$HOST/api/billing/usage" \
       <table>
         <tr><th>Endpoint</th><th>Description</th></tr>
         <tr><td><code>POST /api/storage/iscsi/discover</code></td><td>Discover targets</td></tr>
-        <tr><td><code>POST /api/storage/iscsi/login</code></td><td>Login to a target</td></tr>
+        <tr><td><code>POST /api/storage/iscsi/sign-in</code></td><td>Login to a target</td></tr>
         <tr><td><code>POST /api/storage/iscsi/logout</code></td><td>Logout from a target</td></tr>
         <tr><td><code>GET /api/storage/iscsi/sessions</code></td><td>List active sessions</td></tr>
       </table>
@@ -947,7 +947,7 @@ curl -X POST "$HOST/api/storage/iscsi/discover" \
   -d '{"portal": "10.0.0.50:3260"}'
 
 # Login to a target
-curl -X POST "$HOST/api/storage/iscsi/login" \
+curl -X POST "$HOST/api/storage/iscsi/sign-in" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

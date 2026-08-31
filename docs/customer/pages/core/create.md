@@ -12,7 +12,7 @@ Create VM — a three-step wizard (Basics → Resources → Review) for launchin
 
 ## How to get there
 
-- Route / id: `/create`
+- Route / id: `/app/create`
 - Nav: **Core → Create VM** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

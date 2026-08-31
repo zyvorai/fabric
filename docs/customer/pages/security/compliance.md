@@ -13,7 +13,7 @@ Compliance Dashboard — a security and configuration compliance scorecard: an o
 
 ## How to get there
 
-- Route / id: `/compliance`
+- Route / id: `/app/compliance`
 - Nav: **Security → Compliance** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

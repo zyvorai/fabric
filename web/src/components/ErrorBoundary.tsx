@@ -38,15 +38,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
           <div className="p-3 rounded-xl bg-red-500/10 mb-4">
-            <AlertTriangle className="w-8 h-8 text-red-400" />
+            <AlertTriangle className="w-8 h-8 text-red-600" />
           </div>
-          <h2 className="text-lg font-semibold text-white mb-1">Something went wrong</h2>
-          <p className="text-sm text-slate-500 mb-6 text-center max-w-md">
+          <h2 className="text-lg font-semibold text-[#1d1d1f] mb-1">Something went wrong</h2>
+          <p className="text-sm text-[#6e6e73] mb-6 text-center max-w-md">
             {this.state.error?.message || 'An unexpected error occurred.'}
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors text-sm font-medium text-white"
+            className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition-colors text-sm font-medium text-white"
           >
             Reload Page
           </button>
@@ -67,20 +67,20 @@ export function PageErrorBoundary({ children }: { children: React.ReactNode }) {
       fallback={
         <div className="flex flex-col items-center justify-center p-12">
           <div className="p-2.5 rounded-xl bg-yellow-500/10 mb-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-400" />
+            <AlertTriangle className="w-6 h-6 text-amber-600" />
           </div>
-          <h3 className="text-base font-semibold text-white mb-1">Section error</h3>
-          <p className="text-sm text-slate-500 mb-5">This section encountered an error</p>
+          <h3 className="text-base font-semibold text-[#1d1d1f] mb-1">Section error</h3>
+          <p className="text-sm text-[#6e6e73] mb-5">This section encountered an error</p>
           <div className="flex gap-2">
             <button
               onClick={() => setKey((k) => k + 1)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors text-sm font-medium"
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition-colors text-sm font-medium"
             >
               Try Again
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-lg transition-colors text-sm text-slate-300"
+              className="px-4 py-2 bg-white border border-[#d2d2d7] hover:border-[#d2d2d7] rounded-lg transition-colors text-sm text-[#1d1d1f]"
             >
               Reload Page
             </button>

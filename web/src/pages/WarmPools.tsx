@@ -76,7 +76,7 @@ export default function WarmPools() {
         primaryAction={
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+            className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition"
           >
             <Plus className="w-4 h-4" />
             Create Pool
@@ -85,13 +85,13 @@ export default function WarmPools() {
       />
 
       {pools.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
           <EmptyState
             icon={<PackageCheck className="w-16 h-16" />}
             title="No warm pools yet"
             description="Create a pool to keep N VMs pre-booted and paused, ready to hand out instantly on claim"
             action={
-              <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
+              <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition">
                 Create Pool
               </button>
             }
@@ -100,42 +100,42 @@ export default function WarmPools() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {pools.map((pool) => (
-            <div key={pool.name} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+            <div key={pool.name} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="icon-tile icon-tile-sm icon-tile-green shrink-0">
                     <PackageCheck className="w-4 h-4" />
                   </div>
-                  <h3 className="font-semibold text-white truncate">{pool.name}</h3>
+                  <h3 className="font-semibold text-[#1d1d1f] truncate">{pool.name}</h3>
                 </div>
                 <button
                   onClick={() => handleDelete(pool)}
-                  className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
+                  className="p-1.5 rounded-md text-[#6e6e73] hover:text-red-600 hover:bg-red-400/10 transition-colors shrink-0"
                   title="Delete pool"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 font-mono truncate">
+              <div className="flex items-center gap-1.5 text-xs text-[#6e6e73] mb-3 font-mono truncate">
                 <HardDrive className="w-3.5 h-3.5 shrink-0" />
                 {pool.image}
               </div>
 
               <div className="flex items-center justify-between text-sm mb-1.5">
-                <span className="text-slate-500">Ready to claim</span>
-                <span className={pool.ready_members > 0 ? 'text-emerald-400 font-medium' : 'text-amber-400 font-medium'}>
+                <span className="text-[#6e6e73]">Ready to claim</span>
+                <span className={pool.ready_members > 0 ? 'text-emerald-600 font-medium' : 'text-amber-400 font-medium'}>
                   {pool.ready_members} / {pool.size}
                 </span>
               </div>
-              <div className="h-1.5 rounded-full bg-slate-900 overflow-hidden mb-4">
+              <div className="h-1.5 rounded-full bg-white overflow-hidden mb-4">
                 <div
                   className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
                   style={{ width: `${pool.size > 0 ? (pool.ready_members / pool.size) * 100 : 0}%` }}
                 />
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-slate-500 mb-4">
+              <div className="flex items-center gap-3 text-xs text-[#6e6e73] mb-4">
                 <span>{pool.cpus} vCPUs</span>
                 <span>·</span>
                 <span>{pool.memory} MB</span>
@@ -144,7 +144,7 @@ export default function WarmPools() {
               <button
                 onClick={() => setClaimTarget(pool)}
                 disabled={pool.ready_members === 0}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#e8e8ed] disabled:text-[#6e6e73] text-white rounded-lg text-sm font-medium transition-colors"
                 title={pool.ready_members === 0 ? 'No ready members right now' : undefined}
               >
                 <Zap className="w-3.5 h-3.5" />
@@ -169,7 +169,7 @@ export default function WarmPools() {
           onClaimed={(vmName) => {
             setClaimTarget(null)
             toast.success(`Claimed '${vmName}' from pool '${claimTarget.name}'`)
-            navigate(`/vms/${vmName}`)
+            navigate(`/app/vms/${vmName}`)
           }}
         />
       )}
@@ -226,44 +226,44 @@ function CreatePoolModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <div className="flex items-center gap-3">
             <div className="icon-tile icon-tile-md icon-tile-green">
               <PackageCheck className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-white">Create Warm Pool</h2>
+            <h2 className="text-lg font-bold text-[#1d1d1f]">Create Warm Pool</h2>
           </div>
           {!submitting && (
-            <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+            <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-[#6e6e73] hover:text-[#1d1d1f]">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
         <div className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 text-sm">{error}</div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Pool Name</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Pool Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. web-workers"
               disabled={submitting}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
               required
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Disk Image</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Disk Image</label>
             <select
               value={image}
               onChange={(e) => setImage(e.target.value)}
               disabled={submitting}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
             >
               {images.length === 0 && <option value="">No catalog images found</option>}
               {images.map((img) => (
@@ -273,45 +273,45 @@ function CreatePoolModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Size</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Size</label>
               <input
                 type="number" min={1} max={64} value={size}
                 onChange={(e) => setSize(Math.max(1, Math.min(64, parseInt(e.target.value) || 1)))}
                 disabled={submitting}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">vCPUs</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">vCPUs</label>
               <input
                 type="number" min={1} max={32} value={cpus}
                 onChange={(e) => setCpus(Math.max(1, Math.min(32, parseInt(e.target.value) || 1)))}
                 disabled={submitting}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Memory (MB)</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Memory (MB)</label>
               <input
                 type="number" min={256} step={256} value={memory}
                 onChange={(e) => setMemory(Math.max(256, parseInt(e.target.value) || 256))}
                 disabled={submitting}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
               />
             </div>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[#6e6e73]">
             Each member boots fully, then pauses -- claiming resumes one instantly instead of a cold create. The pool backfills automatically after every claim.
           </p>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">
+            <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50">
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSubmit}
               disabled={submitting || !name || !image}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50"
             >
               {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {submitting ? 'Creating…' : 'Create Pool'}
@@ -344,29 +344,29 @@ function ClaimPoolModal({ pool, onClose, onClaimed }: { pool: WarmPool; onClose:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-sm">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-sm">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <div className="flex items-center gap-3">
             <div className="icon-tile icon-tile-md icon-tile-green">
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Claim from '{pool.name}'</h2>
-              <p className="text-xs text-slate-500">Instantly resumes an already-booted member</p>
+              <h2 className="text-lg font-bold text-[#1d1d1f]">Claim from '{pool.name}'</h2>
+              <p className="text-xs text-[#6e6e73]">Instantly resumes an already-booted member</p>
             </div>
           </div>
           {!submitting && (
-            <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+            <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-[#6e6e73] hover:text-[#1d1d1f]">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
         <div className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 text-sm">{error}</div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">New VM Name</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">New VM Name</label>
             <input
               type="text"
               value={name}
@@ -374,13 +374,13 @@ function ClaimPoolModal({ pool, onClose, onClaimed }: { pool: WarmPool; onClose:
               onKeyDown={(e) => { if (e.key === 'Enter' && name && !submitting) handleSubmit() }}
               placeholder="e.g. web-worker-7"
               disabled={submitting}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
               required
               autoFocus
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">
+            <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50">
               Cancel
             </button>
             <button

@@ -28,10 +28,10 @@ const typeConfig: Record<Notification['type'], { bg: string; border: string; ico
 }
 
 const typeTextColor: Record<Notification['type'], string> = {
-  vm_started: 'text-green-400',
-  vm_stopped: 'text-red-400',
+  vm_started: 'text-emerald-600',
+  vm_stopped: 'text-red-600',
   alert: 'text-amber-400',
-  warning: 'text-blue-400',
+  warning: 'text-[#0066cc]',
 }
 
 function formatTimeAgo(date: Date): string {
@@ -125,14 +125,14 @@ export default function NotificationCenter() {
         description="VM events, alerts, and system warnings"
         actions={
           notifications.length > 0 ? (
-            <button onClick={clearAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors">
+            <button onClick={clearAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
               Clear All
             </button>
           ) : undefined
         }
       />
       {unreadCount > 0 && (
-        <div className="text-xs text-slate-400">{unreadCount} unread</div>
+        <div className="text-xs text-[#6e6e73]">{unreadCount} unread</div>
       )}
       {pollError && (
         <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
@@ -153,9 +153,9 @@ export default function NotificationCenter() {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-12 text-center">
-          <p className="text-slate-500 text-sm">No notifications yet.</p>
-          <p className="text-slate-600 text-xs mt-1">VM events, alerts, and warnings will appear here.</p>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-12 text-center">
+          <p className="text-[#6e6e73] text-sm">No notifications yet.</p>
+          <p className="text-[#6e6e73] text-xs mt-1">VM events, alerts, and warnings will appear here.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -170,12 +170,12 @@ export default function NotificationCenter() {
                     <span className={`text-xs font-semibold ${typeTextColor[n.type]}`}>{cfg.label}</span>
                     {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
                   </div>
-                  <p className="text-sm text-slate-200 mt-0.5">{n.message}</p>
-                  {n.detail && <p className="text-xs text-slate-500 mt-0.5 truncate">{n.detail}</p>}
-                  <p className="text-xs text-slate-600 mt-1">{formatTimeAgo(n.timestamp)}</p>
+                  <p className="text-sm text-[#1d1d1f] mt-0.5">{n.message}</p>
+                  {n.detail && <p className="text-xs text-[#6e6e73] mt-0.5 truncate">{n.detail}</p>}
+                  <p className="text-xs text-[#6e6e73] mt-1">{formatTimeAgo(n.timestamp)}</p>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
-                  className="text-slate-600 hover:text-slate-400 transition-colors p-1" title="Dismiss">
+                  className="text-[#6e6e73] hover:text-[#6e6e73] transition-colors p-1" title="Dismiss">
                   <X className="w-4 h-4" />
                 </button>
               </div>

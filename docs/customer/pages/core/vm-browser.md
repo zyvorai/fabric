@@ -11,7 +11,7 @@ VM Browser — a lightweight, read-only grid of every VM, for quickly scanning o
 
 ## How to get there
 
-- Route / id: `/vm-browser`
+- Route / id: `/app/vm-browser`
 - Nav: **Core → VM Browser** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

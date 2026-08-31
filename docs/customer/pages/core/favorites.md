@@ -12,7 +12,7 @@ Favorites — a personal, starred shortlist of VMs pulled from your full VM list
 
 ## How to get there
 
-- Route / id: `/favorites`
+- Route / id: `/app/favorites`
 - Nav: **Core → Favorites** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

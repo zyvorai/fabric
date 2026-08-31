@@ -22,7 +22,7 @@ driver.ephemera_url in zyvor-fabricd.toml. Provides REST API, WebSocket
 console, VNC proxy, and comprehensive VM lifecycle management. Runs under
 systemd or any other supervisor — nothing in this package requires it.
 
-Includes zyvorctl CLI tool and zyvorctl-tui terminal interface.
+Includes zyvorctl CLI tool.
 
 %package web
 Summary:        Web UI for zyvor-fabricd
@@ -62,7 +62,6 @@ exit 0
 %doc README.md
 %{_bindir}/zyvor-fabricd
 %{_bindir}/zyvorctl
-%{_bindir}/zyvorctl-tui
 # Optional: for operators who choose to run zyvor-fabricd under systemd.
 # Nothing in this package enables, starts, or otherwise wires this up —
 # that's a manual `systemctl enable --now zyvor-fabricd.service`.
@@ -85,7 +84,6 @@ exit 0
 - Initial package
 - zyvor-fabricd daemon with REST API and WebSocket
 - zyvorctl CLI with JSON/YAML output and 15+ subcommand groups
-- zyvorctl-tui terminal UI with 8 views
 - Network security (policies, firewall, service mesh, QoS, DNS, VPN, mirror, NAT, monitor)
 - Ceph/RBD storage support
 - systemd units are optional; nothing in this package requires, enables, or

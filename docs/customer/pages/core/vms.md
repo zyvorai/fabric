@@ -13,9 +13,9 @@ Virtual Machines — the fleet view of every VM in the fabric, and the starting 
 
 ## How to get there
 
-- Route / id: `/vms`
+- Route / id: `/app/vms`
 - Nav: **Core → Virtual Machines** (sidebar, command palette, or desktop nav)
-- A single VM's detail page is `/vms/:name`, reached by clicking its name here
+- A single VM's detail page is `/app/vms/:name`, reached by clicking its name here
 
 ## Operate from the console (UX)
 
@@ -28,7 +28,7 @@ Virtual Machines — the fleet view of every VM in the fabric, and the starting 
 5. Copy a VM's name straight from the list — hover the name and click the copy icon that appears next to it.
 6. Click a VM's name to open its detail page.
 
-**On a VM's detail page** (`/vms/:name`)
+**On a VM's detail page** (`/app/vms/:name`)
 
 1. Start, stop, pause, resume, restart, or clone the VM from the header actions.
 2. Open a real console — either the browser terminal (xterm.js) or a graphical VNC session — from the Console tab.

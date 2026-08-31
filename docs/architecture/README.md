@@ -273,7 +273,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 **Utilities** (4 crates): `cloud-init`, `prometheus-exporter`, `vnc-proxy`, `zyvorctl`
 
-**UI** (2 crates): `zyvorctl`, `zyvorctl-tui`
+**UI**: `zyvorctl` CLI + React web (`web/`)
 
 ---
 
@@ -568,7 +568,7 @@ to detect and correct configuration drift:
 ```
 +-- Client ---------+      +-- Zyvor Fabric --------------------+
 |                    |      |                                 |
-| POST /auth/login  | ---> |  1. Lookup user in SQLite DB    |
+| POST /auth/sign-in  | ---> |  1. Lookup user in SQLite DB    |
 | { username, pass } |      |  2. Verify bcrypt password hash |
 |                    |      |  3. OR: PAM authenticate        |
 |                    | <--- |  4. Generate JWT (24h default)  |

@@ -13,7 +13,7 @@ Distributed Resource Scheduler (DRS) — balances VM placement across the hosts 
 
 ## How to get there
 
-- Route / id: `/drs`
+- Route / id: `/app/drs`
 - Nav: **Operations → DRS** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

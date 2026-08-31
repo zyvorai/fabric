@@ -113,9 +113,9 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50 sticky top-0 bg-slate-900 z-10">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7] sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
             <Calendar className="w-6 h-6 text-blue-500" />
             <div>
@@ -123,13 +123,13 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
                 {mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}
               </h2>
               {mode === 'edit' && (
-                <p className="text-sm text-slate-400">VM: {schedule.vm_name}</p>
+                <p className="text-sm text-[#6e6e73]">VM: {schedule.vm_name}</p>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition"
+            className="text-[#6e6e73] hover:text-[#1d1d1f] transition"
           >
             <X className="w-6 h-6" />
           </button>
@@ -147,7 +147,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Stop dev VMs at night"
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
               required
             />
           </div>
@@ -161,7 +161,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
               <select
                 value={formData.vm_name}
                 onChange={(e) => setFormData({ ...formData, vm_name: e.target.value })}
-                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
                 required
               >
                 {vms.length === 0 && (
@@ -184,7 +184,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
             <select
               value={formData.action}
               onChange={(e) => setFormData({ ...formData, action: e.target.value as CreateScheduleRequest['action'] })}
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               required
             >
               <option value="start">Start VM</option>
@@ -209,7 +209,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
                   days_of_week: newType === 'weekly' ? formData.days_of_week : [],
                 })
               }}
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               required
             >
               <option value="once">Once (run one time)</option>
@@ -234,8 +234,8 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
                       onClick={() => toggleDay(day.value)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                         isSelected
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-600'
+                          ? 'bg-[#0066cc] text-white'
+                          : 'bg-white text-[#1d1d1f] hover:bg-[#d2d2d7]'
                       }`}
                     >
                       {day.label}
@@ -255,29 +255,29 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
               type="time"
               value={formData.time}
               onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               required
             />
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-[#6e6e73] mt-1">
               24-hour format (HH:MM), UTC -- not your browser's local time
             </p>
           </div>
 
           {/* Current Status (edit mode only) */}
           {mode === 'edit' && (
-            <div className="p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+            <div className="p-4 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
               <h4 className="text-sm font-medium mb-2">Current Status</h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-slate-400">Status</p>
-                  <p className={schedule.enabled ? 'text-green-400' : 'text-slate-400'}>
+                  <p className="text-[#6e6e73]">Status</p>
+                  <p className={schedule.enabled ? 'text-emerald-600' : 'text-[#6e6e73]'}>
                     {schedule.enabled ? 'Enabled' : 'Disabled'}
                   </p>
                 </div>
                 {schedule.next_run && (
                   <div>
-                    <p className="text-slate-400">Next Run</p>
-                    <p className="text-blue-400">{new Date(schedule.next_run).toLocaleString()}</p>
+                    <p className="text-[#6e6e73]">Next Run</p>
+                    <p className="text-[#0066cc]">{new Date(schedule.next_run).toLocaleString()}</p>
                   </div>
                 )}
               </div>
@@ -292,7 +292,7 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
                 id="enabled"
                 checked={formData.enabled}
                 onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="w-4 h-4 bg-slate-800/50 border-slate-700/50 rounded focus:ring-blue-500"
+                className="w-4 h-4 bg-[#f5f5f7] border-[#d2d2d7] rounded focus:ring-blue-500"
               />
               <label htmlFor="enabled" className="text-sm font-medium">
                 Enable schedule immediately
@@ -301,19 +301,19 @@ export default function ScheduleDialog({ mode, schedule, onClose, onSuccess }: S
           )}
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#d2d2d7]">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50"
             >
               {submitting
                 ? (mode === 'create' ? 'Creating...' : 'Saving...')

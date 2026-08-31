@@ -46,16 +46,16 @@ const presetEndpoints: { method: HttpMethod; path: string; label: string }[] = [
 ]
 
 const methodColors: Record<HttpMethod, string> = {
-  GET: 'text-green-400 bg-green-500/10',
-  POST: 'text-blue-400 bg-blue-500/10',
+  GET: 'text-emerald-600 bg-green-500/10',
+  POST: 'text-[#0066cc] bg-blue-500/10',
   PUT: 'text-amber-400 bg-amber-500/10',
-  DELETE: 'text-red-400 bg-red-500/10',
+  DELETE: 'text-red-600 bg-red-500/10',
 }
 
 function statusColor(status: number): string {
-  if (status < 300) return 'bg-green-500/20 text-green-400'
+  if (status < 300) return 'bg-green-500/20 text-emerald-600'
   if (status < 400) return 'bg-amber-500/20 text-amber-400'
-  return 'bg-red-500/20 text-red-400'
+  return 'bg-red-500/20 text-red-600'
 }
 
 let historyIdCounter = 0
@@ -128,20 +128,20 @@ export default function APIPlayground() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Terminal className="w-6 h-6 text-green-400" />
-        <h2 className="text-xl font-bold text-white">API Playground</h2>
+        <Terminal className="w-6 h-6 text-emerald-600" />
+        <h2 className="text-xl font-bold text-[#1d1d1f]">API Playground</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1 space-y-4">
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Endpoints</h3>
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-4">
+            <h3 className="text-xs font-semibold text-[#6e6e73] uppercase tracking-wider mb-3">Endpoints</h3>
             <div className="space-y-1 max-h-[300px] overflow-y-auto">
               {presetEndpoints.map((ep, idx) => (
                 <button
                   key={idx}
                   onClick={() => handlePreset(ep)}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800 rounded-lg transition-colors text-left"
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-[#1d1d1f] hover:bg-white rounded-lg transition-colors text-left"
                 >
                   <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${methodColors[ep.method]}`}>
                     {ep.method}
@@ -153,12 +153,12 @@ export default function APIPlayground() {
           </div>
 
           {history.length > 0 && (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">History</h3>
+                <h3 className="text-xs font-semibold text-[#6e6e73] uppercase tracking-wider">History</h3>
                 <button
                   onClick={() => setHistory([])}
-                  className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="p-1 text-[#6e6e73] hover:text-[#1d1d1f] transition-colors"
                   title="Clear history"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -169,7 +169,7 @@ export default function APIPlayground() {
                   <button
                     key={h.id}
                     onClick={() => { setMethod(h.method); setUrl(h.url) }}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 rounded-lg transition-colors text-left"
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-[#6e6e73] hover:bg-white rounded-lg transition-colors text-left"
                   >
                     <span className={`font-mono font-bold px-1 py-0.5 rounded text-[10px] ${methodColors[h.method]}`}>
                       {h.method}
@@ -189,7 +189,7 @@ export default function APIPlayground() {
               value={method}
               onChange={(e) => setMethod(e.target.value as HttpMethod)}
               aria-label="HTTP method"
-              className={`px-3 py-2.5 text-sm font-bold font-mono rounded-lg border border-slate-700 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-green-500/50 ${methodColors[method]}`}
+              className={`px-3 py-2.5 text-sm font-bold font-mono rounded-lg border border-[#d2d2d7] bg-white focus:outline-none focus:ring-2 focus:ring-green-500/50 ${methodColors[method]}`}
             >
               {(['GET', 'POST', 'PUT', 'DELETE'] as HttpMethod[]).map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -201,13 +201,13 @@ export default function APIPlayground() {
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSend() }}
               aria-label="Request URL"
-              className="flex-1 bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500"
+              className="flex-1 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-3 py-2.5 text-sm text-[#1d1d1f] font-mono focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500"
               placeholder="/api/..."
             />
             <button
               onClick={handleSend}
               disabled={loading || !url.trim()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium text-sm rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-[#e8e8ed] disabled:text-[#6e6e73] text-white font-medium text-sm rounded-lg transition-colors"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Send
@@ -216,12 +216,12 @@ export default function APIPlayground() {
 
           {(method === 'POST' || method === 'PUT') && (
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Request Body (JSON)</label>
+              <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Request Body (JSON)</label>
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={6}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-y"
+                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-3 text-sm text-[#1d1d1f] font-mono focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-y"
                 placeholder='{"key": "value"}'
               />
             </div>
@@ -237,36 +237,36 @@ export default function APIPlayground() {
           )}
 
           {response && (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800/50">
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#d2d2d7] bg-[#f5f5f7]">
                 <div className="flex items-center gap-3">
                   <span className={`px-2 py-1 rounded text-xs font-bold ${statusColor(response.status)}`}>
                     {response.status} {response.statusText}
                   </span>
-                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <span className="flex items-center gap-1 text-xs text-[#6e6e73]">
                     <Clock className="w-3.5 h-3.5" />
                     {response.duration}ms
                   </span>
                 </div>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 rounded transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-[#6e6e73] hover:text-[#1d1d1f] bg-white hover:bg-black/[0.04] rounded transition-colors"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
 
-              <details className="border-b border-slate-800">
-                <summary className="px-4 py-2 text-xs font-medium text-slate-500 cursor-pointer hover:text-slate-300 flex items-center gap-1">
+              <details className="border-b border-[#d2d2d7]">
+                <summary className="px-4 py-2 text-xs font-medium text-[#6e6e73] cursor-pointer hover:text-[#1d1d1f] flex items-center gap-1">
                   <ChevronRight className="w-3.5 h-3.5" />
                   Response Headers ({Object.keys(response.headers).length})
                 </summary>
                 <div className="px-4 pb-3">
-                  <div className="text-xs font-mono text-slate-400 space-y-0.5">
+                  <div className="text-xs font-mono text-[#6e6e73] space-y-0.5">
                     {Object.entries(response.headers).map(([k, v]) => (
                       <div key={k}>
-                        <span className="text-slate-500">{k}:</span> {v}
+                        <span className="text-[#6e6e73]">{k}:</span> {v}
                       </div>
                     ))}
                   </div>
@@ -274,7 +274,7 @@ export default function APIPlayground() {
               </details>
 
               <div className="p-4">
-                <pre className="text-sm text-slate-200 font-mono whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto">
+                <pre className="text-sm text-[#1d1d1f] font-mono whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto">
                   {response.body || '(empty body)'}
                 </pre>
               </div>
@@ -282,7 +282,7 @@ export default function APIPlayground() {
           )}
 
           {!response && !error && !loading && (
-            <div className="text-center py-16 text-slate-500">
+            <div className="text-center py-16 text-[#6e6e73]">
               <Terminal className="w-10 h-10 mx-auto mb-3 opacity-50" />
               <p className="text-sm">Select an endpoint or enter a URL and click Send.</p>
             </div>

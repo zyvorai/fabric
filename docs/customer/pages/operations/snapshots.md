@@ -13,7 +13,7 @@ VM Snapshots — create point-in-time snapshots of a specific VM's disk (or disk
 
 ## How to get there
 
-- Route / id: `/snapshots`
+- Route / id: `/app/snapshots`
 - Nav: **Operations → Snapshots** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

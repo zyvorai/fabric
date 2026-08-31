@@ -9,11 +9,11 @@
 
 **[Customer manual (page-by-page)](docs/customer/README.md)** — getting started, admin basics, and a guide for every product surface (PDFs under `docs/customer/pdf/`).
 
-Clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support on Linux — manage infrastructure through **CLI, TUI, web dashboard, Kubernetes operator, or Terraform**. Proxmox + KubeVirt UX without the heavyweight stack.
+Clustering, networking, security, storage, operators, Terraform, monitoring, HA, and GPU support on Linux — manage infrastructure through **CLI, web dashboard, Kubernetes operator, or Terraform**. Proxmox + KubeVirt UX without the heavyweight stack.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│  Interfaces   zyvorctl CLI · zyvorctl-tui · Web UI · TF · Operator   │
+│  Interfaces   zyvorctl CLI · Web UI · TF · Operator   │
 ├──────────────────────────────────────────────────────────────┤
 │  Daemon       Zyvor Fabric — 480+ REST endpoints · WebSocket │
 ├──────────────────────────────────────────────────────────────┤
@@ -31,7 +31,7 @@ Part of the [Zyvor](https://zyvor.dev) product family.
 |---------|---------------------|
 | Private cloud = heavy hypervisor stack | Lightweight VM driver — [Ephemera](https://github.com/hypersdk/ephemera), no systemd dependency |
 | No unified API across interfaces | 480+ REST endpoints, 3 WebSocket channels |
-| Scripting vs GUI is either/or | CLI + TUI + web + Terraform + K8s operator |
+| Scripting vs GUI is either/or | CLI + web + Terraform + K8s operator |
 | Enterprise needs RBAC + audit | JWT, roles, audit export, encryption at rest |
 | GPU passthrough is bolted on | First-class GPU API on Linux KVM |
 
@@ -44,8 +44,8 @@ Part of the [Zyvor](https://zyvor.dev) product family.
 | Rust crates | 40 |
 | REST endpoints | 480+ |
 | LOC | ~87K (60K Rust + 27K TS) |
-| Interfaces | 5 (CLI, TUI, Web, Operator, Terraform) |
-| Web pages | 37+ |
+| Interfaces | 4 (CLI, Web, Operator, Terraform) |
+| Web pages | 80+ console routes + marketing |
 
 ---
 
@@ -59,10 +59,7 @@ make build && sudo make install
 zyvorctl vm list
 zyvorctl vm create --name web-01 --cpus 2 --memory 4G
 
-# TUI
-zyvorctl-tui
-
-# Web UI → https://localhost:8443
+# Web UI → http://localhost:9095 (marketing) · console at /app
 sudo zyvor-fabricd                   # run directly (no systemd required)
 # — or, if you'd rather run it under systemd (optional, not required):
 sudo systemctl start zyvor-fabricd
@@ -82,8 +79,7 @@ sudo systemctl start zyvor-fabricd
 ```mermaid
 flowchart TB
   CLI[zyvorctl] --> Daemon[Zyvor Fabric Daemon]
-  TUI[zyvorctl-tui] --> Daemon
-  Web[Web UI] --> Daemon
+    Web[Web UI] --> Daemon
   TF[Terraform] --> Daemon
   Op[K8s Operator] --> Daemon
   Daemon --> Eph[Ephemera VM driver]
@@ -111,7 +107,7 @@ flowchart TB
 | **hypersdk / hyper2kvm** | Multi-cloud VM migration |
 | **guestkit** | Offline VM migration assurance |
 | **packetwolf** | Kernel-native network intelligence |
-| **Aether** | Universal runtime portability |
+| **Axiom** | k8s-native private cloud control plane |
 | **Veyron** | KubeVirt VM command center |
 | **IronWolf** | Metal3 bare-metal automation |
 | **zyvor-fabric** | Private cloud with a pluggable VM driver |

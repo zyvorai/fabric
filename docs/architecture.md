@@ -2,17 +2,17 @@
 
 ## Overview
 
-Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a TUI, a Kubernetes operator, and a Terraform provider, backed by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (`driver.ephemera_url` in `zyvor-fabricd.toml`). systemd itself is optional for the daemon's own packaging/init too -- it runs fine under systemd or any other supervisor.
+Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a Kubernetes operator, and a Terraform provider, backed by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (`driver.ephemera_url` in `zyvor-fabricd.toml`). systemd itself is optional for the daemon's own packaging/init too -- it runs fine under systemd or any other supervisor.
 
 ## System Diagram
 
 ```
- +--------+   +-----------+   +----------+   +-----------+   +------------+
- | zyvorctl  |   | zyvorctl-tui |   |  Web UI  |   |    K8s    |   | Terraform  |
- | (CLI)  |   |   (TUI)   |   | (React)  |   | Operator  |   | Provider   |
- +---+----+   +-----+-----+   +----+-----+   +-----+-----+   +------+-----+
-     |              |              |               |                 |
-     +--------------+--------------+---------------+-----------------+
+ +----------+   +----------+   +-----------+   +------------+
+ | zyvorctl |   |  Web UI  |   |    K8s    |   | Terraform  |
+ |  (CLI)   |   | (React)  |   | Operator  |   | Provider   |
+ +----+-----+   +----+-----+   +-----+-----+   +------+-----+
+      |              |               |                 |
+      +--------------+---------------+-----------------+
                                    |
                     +--------------v--------------+
                     |      zyvor-fabricd daemon         |
@@ -51,50 +51,6 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 | `vm-model` | Core data structures: VM definitions, state enums, request/response types |
 | `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
 | `zyvorctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
-| `zyvorctl-tui` | TUI -- k9s-style terminal dashboard with 8 views |
-
-### Core Library Crates (`backend/crates/`)
-
-| Crate | Purpose |
-|-------|---------|
-| `zyvor-fabric-cgroup` | cgroup v2 resource management |
-| `zyvor-fabric-system` | System integration utilities |
-| `zyvor-fabric-vm` | VM model and type definitions |
-| `zyvor-fabric-storage` | Storage backend abstraction |
-| `zyvor-fabric-driver-core` | `VmDriver` trait (lifecycle, resource control, logs, images, shell, console, capabilities) |
-| `zyvor-fabric-ephemera-client` | REST/WebSocket client for Ephemera's API |
-| `zyvor-fabric-ephemera-driver` | `VmDriver` implementation against Ephemera -- no systemd dependency |
-| `zyvor-fabric-dnsmasq-manager` | Per-bridge DHCP via a directly-managed `dnsmasq` process (replaces systemd-networkd's built-in DHCP server) |
-| `zyvor-fabric-lock-manager` | Distributed lock management |
-
-### Networking
-
-| Crate | Purpose |
-|-------|---------|
-| `networking` | Bridge, VLAN, and interface management |
-| `network-policy` | Cilium-style label-based ingress/egress rules |
-| `vm-firewall` | Per-VM firewall profiles and zones via nftables |
-| `service-mesh` | Virtual IP load-balanced services |
-| `traffic-shaping` | QoS -- guaranteed/max rate, burst, priority |
-| `dns-policy` | DNS zone management and domain blocking |
-| `vpn-mesh` | WireGuard tunnels (point-to-point, hub-spoke, full-mesh) |
-| `packet-mirror` | Traffic capture with tc mirred |
-| `nat-gateway` | Masquerade, SNAT, DNAT, hairpin NAT via nftables |
-| `net-monitor` | Per-VM bandwidth tracking with threshold alerts |
-
-### Storage
-
-| Crate | Purpose |
-|-------|---------|
-| `storage` | Local, NFS, LVM, LVM-thin, ZFS storage backends |
-| `distributed-storage` | Ceph/RBD distributed storage |
-
-### Security and Identity
-
-| Crate | Purpose |
-|-------|---------|
-| `security` | JWT auth, RBAC, API keys, audit logging |
-| `tpm-support` | Virtual TPM management (swtpm, TPM 1.2/2.0) |
 | `encryption` | Encryption at rest |
 | `certificate-manager` | TLS certificate management |
 
@@ -139,7 +95,7 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 | Web framework | Axum 0.8 |
 | Serialization | serde + serde_json |
 | CLI | clap 4.5 |
-| TUI | ratatui 0.29 + crossterm 0.28 |
+| Web | React 19 + Vite |
 | D-Bus | zbus 4 |
 | Frontend | React 18 + TypeScript + Vite + TailwindCSS |
 | Terminal emulator | xterm.js |
@@ -156,7 +112,7 @@ All endpoints use JSON payloads and follow RESTful conventions.
 ## Data Flow
 
 ```
-User --> CLI / TUI / Web UI / K8s Operator / Terraform Provider
+User --> CLI  /  Web UI / K8s Operator / Terraform Provider
                       |
                       v
               REST API / WebSocket (Axum + Tokio)

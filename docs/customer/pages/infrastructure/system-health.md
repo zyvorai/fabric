@@ -13,7 +13,7 @@ System Health — a live, read-only dashboard of host resource utilization, refr
 
 ## How to get there
 
-- Route / id: `/system-health`
+- Route / id: `/app/system-health`
 - Nav: **Infrastructure → System Health** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

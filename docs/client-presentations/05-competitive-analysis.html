@@ -77,16 +77,7 @@
         <tr><th>Feature</th><th>Zyvor Fabric</th><th>libvirt</th></tr>
         <tr><td>REST API</td><td class="win">520+ endpoints</td><td class="lose">XML-RPC only</td></tr>
         <tr><td>Web UI</td><td class="win">React dashboard</td><td class="lose">None (desktop only)</td></tr>
-        <tr><td>Terminal UI</td><td class="win">k9s-style TUI</td><td class="lose">None</td></tr>
-        <tr><td>Authentication</td><td class="win">PAM + JWT + SSO</td><td class="lose">None built-in</td></tr>
-        <tr><td>RBAC</td><td class="win">3-tier roles</td><td class="lose">None</td></tr>
-        <tr><td>Network Policies</td><td class="win">Cilium-style</td><td class="lose">None</td></tr>
-        <tr><td>Backup Automation</td><td class="win">Scheduled + retention</td><td class="lose">Manual</td></tr>
-        <tr><td>K8s Operator</td><td class="win">Yes</td><td class="lose">No</td></tr>
-        <tr><td>Memory Safety</td><td class="win">Rust</td><td class="lose">C</td></tr>
-        <tr><td>Audit Logging</td><td class="win">Yes</td><td class="lose">No</td></tr>
-      </table>
-      <p style="margin-top: 12px;"><strong>Summary:</strong> libvirt is a library; Zyvor Fabric is a complete platform. If you need more than basic VM start/stop, Zyvor Fabric provides the management layer that libvirt lacks.</p>
+        <tr><td>Web console</td><td class="win"> If you need more than basic VM start/stop, Zyvor Fabric provides the management layer that libvirt lacks.</p>
     </div>
   </div>
 </div>
@@ -122,7 +113,7 @@
         <tr><td>Distro Support</td><td class="win">Any with systemd</td><td class="lose">Debian only</td></tr>
         <tr><td>License</td><td class="win">MIT</td><td class="tie">AGPL</td></tr>
         <tr><td>Language</td><td class="win">Rust</td><td class="lose">Perl/C</td></tr>
-        <tr><td>Terminal UI</td><td class="win">Yes</td><td class="lose">No</td></tr>
+        <tr><td>Web console</td><td class="win">Yes</td><td class="lose">No</td></tr>
         <tr><td>K8s Operator</td><td class="win">Yes</td><td class="lose">No</td></tr>
         <tr><td>Network Policies</td><td class="win">Cilium-style</td><td class="tie">Basic firewall</td></tr>
         <tr><td>VPN Mesh</td><td class="win">WireGuard</td><td class="lose">No</td></tr>
@@ -166,7 +157,7 @@
         <tr><td>Binary Size</td><td class="win">~15MB</td><td class="lose">GB+ installed</td></tr>
         <tr><td>Memory Usage</td><td class="win">~20MB daemon</td><td class="lose">GB+ services</td></tr>
         <tr><td>Upgrade Path</td><td class="win">Replace binary</td><td class="lose">Multi-day process</td></tr>
-        <tr><td>Terminal UI</td><td class="win">Yes</td><td class="lose">No</td></tr>
+        <tr><td>Web console</td><td class="win">Yes</td><td class="lose">No</td></tr>
         <tr><td>VPN Mesh</td><td class="win">WireGuard</td><td class="lose">No</td></tr>
         <tr><td>K8s Operator</td><td class="tie">Yes</td><td class="tie">Yes</td></tr>
         <tr><td>Live Migration</td><td class="tie">Yes</td><td class="tie">Yes</td></tr>
@@ -208,7 +199,7 @@
         <tr><td>License Cost</td><td class="win">Free (MIT)</td><td class="lose">$$$ per socket</td></tr>
         <tr><td>Runs on</td><td class="win">Any Linux</td><td class="lose">ESXi only</td></tr>
         <tr><td>API</td><td class="win">520+ REST</td><td class="tie">Proprietary SDK</td></tr>
-        <tr><td>Terminal UI</td><td class="win">Yes</td><td class="lose">No</td></tr>
+        <tr><td>Web console</td><td class="win">Yes</td><td class="lose">No</td></tr>
         <tr><td>K8s Operator</td><td class="win">Yes</td><td class="tie">Limited</td></tr>
         <tr><td>Memory Safety</td><td class="win">Rust</td><td class="lose">C++</td></tr>
         <tr><td>Daemon Size</td><td class="win">~20MB RSS</td><td class="lose">GB+ (vCenter)</td></tr>
@@ -237,7 +228,7 @@
     <tr><td>Single-binary deploy</td><td class="win">Yes</td><td>N/A</td><td>No</td><td>No</td><td>No</td></tr>
     <tr><td>REST API</td><td class="win">520+</td><td>XML-RPC</td><td>~50</td><td>~200</td><td>SDK</td></tr>
     <tr><td>Web UI</td><td class="win">Yes</td><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Terminal UI</td><td class="win">Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+    <tr><td>Web console</td><td class="win">Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
     <tr><td>K8s Operator</td><td class="win">Yes</td><td>No</td><td>No</td><td>Yes</td><td>Limited</td></tr>
     <tr><td>Terraform</td><td class="tie">Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
     <tr><td>Network Policies</td><td class="win">Cilium-style</td><td>No</td><td>Basic</td><td>Neutron</td><td>NSX ($$$)</td></tr>
@@ -399,7 +390,7 @@ Setup:
           <li>You manage 1-100 servers (single or clustered)</li>
           <li>You need to migrate from VMware post-Broadcom</li>
           <li>You want Kubernetes-native VM management</li>
-          <li>Your team prefers CLI/TUI workflows</li>
+          <li>Your team prefers CLI workflows</li>
           <li>You need edge/branch deployments with minimal footprint</li>
         </ul>
       </div>
@@ -417,7 +408,7 @@ Setup:
       <div class="card">
         <h3>Zyvor Fabric's Unique Strengths</h3>
         <ul>
-          <li>Only platform with both TUI and K8s operator</li>
+          <li>Only platform with both web console and K8s operator</li>
           <li>Only platform with built-in WireGuard VPN mesh</li>
           <li>Only platform with Cilium-style network policies</li>
           <li>Only platform with service mesh load balancing</li>

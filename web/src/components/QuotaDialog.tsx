@@ -84,9 +84,9 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50 sticky top-0 bg-slate-900 z-10">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7] sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
             <Shield className="w-6 h-6 text-blue-500" />
             <div>
@@ -94,13 +94,13 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 {mode === 'create' ? 'Create Resource Quota' : 'Edit Resource Quota'}
               </h2>
               {mode === 'edit' && (
-                <p className="text-sm text-slate-400">ID: {quota.id}</p>
+                <p className="text-sm text-[#6e6e73]">ID: {quota.id}</p>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition"
+            className="text-[#6e6e73] hover:text-[#1d1d1f] transition"
           >
             <X className="w-6 h-6" />
           </button>
@@ -118,34 +118,34 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Development Team Quota"
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
               required
             />
           </div>
 
           {/* Current Usage Info (edit mode only) */}
           {mode === 'edit' && (
-            <div className="p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+            <div className="p-4 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
               <h4 className="text-sm font-medium mb-3">Current Usage</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <p className="text-slate-400">CPUs</p>
+                  <p className="text-[#6e6e73]">CPUs</p>
                   <p className="font-medium">{quota.used_cpus} used</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Memory</p>
+                  <p className="text-[#6e6e73]">Memory</p>
                   <p className="font-medium">{quota.used_memory}MB used</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Disk</p>
+                  <p className="text-[#6e6e73]">Disk</p>
                   <p className="font-medium">{quota.used_disk}GB used</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">VMs</p>
+                  <p className="text-[#6e6e73]">VMs</p>
                   <p className="font-medium">{quota.used_vms} active</p>
                 </div>
               </div>
-              <p className="text-xs text-yellow-400 mt-3">
+              <p className="text-xs text-amber-600 mt-3">
                 Warning: Setting limits below current usage may prevent new VM creation
               </p>
             </div>
@@ -163,15 +163,15 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 value={formData.max_cpus}
                 onChange={(e) => setFormData({ ...formData, max_cpus: parseInt(e.target.value) || 0 })}
                 min="1"
-                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_cpus < quota.used_cpus ? (
-                <p className="text-xs text-red-400 mt-1">
+                <p className="text-xs text-red-600 mt-1">
                   Below current usage ({quota.used_cpus})
                 </p>
               ) : (
-                <p className="text-xs text-slate-400 mt-1">Total CPU cores allowed</p>
+                <p className="text-xs text-[#6e6e73] mt-1">Total CPU cores allowed</p>
               )}
             </div>
 
@@ -186,15 +186,15 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 onChange={(e) => setFormData({ ...formData, max_memory: parseInt(e.target.value) || 0 })}
                 min="1"
                 step="1024"
-                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_memory < quota.used_memory ? (
-                <p className="text-xs text-red-400 mt-1">
+                <p className="text-xs text-red-600 mt-1">
                   Below current usage ({quota.used_memory}MB)
                 </p>
               ) : (
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-[#6e6e73] mt-1">
                   {(formData.max_memory / 1024).toFixed(1)}GB total
                 </p>
               )}
@@ -211,15 +211,15 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 onChange={(e) => setFormData({ ...formData, max_disk: parseInt(e.target.value) || 0 })}
                 min="1"
                 step="10"
-                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_disk < quota.used_disk ? (
-                <p className="text-xs text-red-400 mt-1">
+                <p className="text-xs text-red-600 mt-1">
                   Below current usage ({quota.used_disk}GB)
                 </p>
               ) : (
-                <p className="text-xs text-slate-400 mt-1">Total disk space allowed</p>
+                <p className="text-xs text-[#6e6e73] mt-1">Total disk space allowed</p>
               )}
             </div>
 
@@ -233,15 +233,15 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 value={formData.max_vms}
                 onChange={(e) => setFormData({ ...formData, max_vms: parseInt(e.target.value) || 0 })}
                 min="1"
-                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
                 required
               />
               {mode === 'edit' && formData.max_vms < quota.used_vms ? (
-                <p className="text-xs text-red-400 mt-1">
+                <p className="text-xs text-red-600 mt-1">
                   Below current usage ({quota.used_vms} VMs)
                 </p>
               ) : (
-                <p className="text-xs text-slate-400 mt-1">Maximum number of VMs</p>
+                <p className="text-xs text-[#6e6e73] mt-1">Maximum number of VMs</p>
               )}
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
             <label className="block text-sm font-medium mb-2">
               Apply to VMs with Tags (Optional)
             </label>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-[#6e6e73] mb-3">
               Leave empty to apply globally, or specify tags to limit quota to tagged VMs
             </p>
 
@@ -261,7 +261,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 {formData.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 rounded-full text-sm font-medium"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#0066cc] rounded-full text-sm font-medium"
                   >
                     {tag}
                     <button
@@ -284,13 +284,13 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 placeholder="Enter tag name..."
-                className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
               />
               <button
                 type="button"
                 onClick={handleAddTag}
                 disabled={!tagInput.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Tag
               </button>
@@ -305,7 +305,7 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
                 id="enabled"
                 checked={formData.enabled}
                 onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="w-4 h-4 bg-slate-800/50 border-slate-700/50 rounded focus:ring-blue-500"
+                className="w-4 h-4 bg-[#f5f5f7] border-[#d2d2d7] rounded focus:ring-blue-500"
               />
               <label htmlFor="enabled" className="text-sm font-medium">
                 Enable quota immediately
@@ -314,19 +314,19 @@ export default function QuotaDialog({ mode, quota, onClose, onSuccess }: QuotaDi
           )}
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#d2d2d7]">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50"
             >
               {submitting
                 ? (mode === 'create' ? 'Creating...' : 'Saving...')

@@ -98,7 +98,7 @@ export default function Templates() {
             onClick={() => setShowSaveTemplate(true)}
             disabled={vms.length === 0}
             title={vms.length === 0 ? 'No VMs to create a template from' : undefined}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" />
             Create from VM
@@ -106,7 +106,7 @@ export default function Templates() {
         }
       />
 
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-sm text-blue-400">
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-sm text-[#0066cc]">
         <p>
           Templates allow you to quickly create new VMs from pre-configured images.
           Create a template from an existing VM to save its configuration.
@@ -114,15 +114,15 @@ export default function Templates() {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
           <EmptyState
             icon={<Layers className="w-16 h-16" />}
             title="No templates yet"
             description="Create a template from an existing VM to get started"
             action={
               <button
-                onClick={() => vms.length === 0 ? navigate('/vms') : setShowSaveTemplate(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                onClick={() => vms.length === 0 ? navigate('/app/vms') : setShowSaveTemplate(true)}
+                className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition"
               >
                 {vms.length === 0 ? 'Go to VMs' : 'Create from VM'}
               </button>
@@ -152,7 +152,7 @@ export default function Templates() {
           }}
           onSuccess={() => {
             toast.success('VM created from template successfully')
-            navigate('/vms')
+            navigate('/app/vms')
           }}
         />
       )}
@@ -207,35 +207,35 @@ function TemplateCard({
   onEdit: () => void
 }) {
   return (
-    <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
+    <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7] hover:border-[#d2d2d7] transition">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold mb-2">{template.name}</h3>
-          <p className="text-sm text-slate-400">{template.description || 'No description'}</p>
+          <p className="text-sm text-[#6e6e73]">{template.description || 'No description'}</p>
         </div>
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-slate-400">CPUs</span>
+          <span className="text-[#6e6e73]">CPUs</span>
           <span className="font-medium">{template.cpus}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-slate-400">Memory</span>
+          <span className="text-[#6e6e73]">Memory</span>
           <span className="font-medium">{template.memory} MB</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-slate-400">Disk Size</span>
+          <span className="text-[#6e6e73]">Disk Size</span>
           <span className="font-medium">{template.disk} GB</span>
         </div>
         {template.tags.length > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-slate-400">Tags</span>
+            <span className="text-[#6e6e73]">Tags</span>
             <span className="font-medium text-xs">{template.tags.join(', ')}</span>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-slate-400">Created</span>
+          <span className="text-[#6e6e73]">Created</span>
           <span className="font-medium text-xs">{new Date(template.created).toLocaleDateString()}</span>
         </div>
       </div>
@@ -243,7 +243,7 @@ function TemplateCard({
       <div className="flex gap-2">
         <button
           onClick={onInstantiate}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition"
         >
           <Copy className="w-4 h-4" />
           Create VM
@@ -251,7 +251,7 @@ function TemplateCard({
         <button
           onClick={onEdit}
           title="Edit template"
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-slate-300 hover:text-white rounded-lg transition"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-[#d2d2d7] hover:border-[#d2d2d7] text-[#1d1d1f] hover:text-[#1d1d1f] rounded-lg transition"
         >
           <Pencil className="w-4 h-4" />
         </button>
@@ -299,8 +299,8 @@ function CreateVMFromTemplateDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-bold">Create VM from Template</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
             <span className="text-2xl">&times;</span>
@@ -309,30 +309,30 @@ function CreateVMFromTemplateDialog({
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">VM Name</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">VM Name</label>
             <input
               type="text"
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
               placeholder="Enter VM name"
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               autoFocus
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 p-6 border-t border-slate-700/50">
+        <div className="flex justify-end gap-2 p-6 border-t border-[#d2d2d7]">
           <button
             onClick={onClose}
             disabled={isCreating}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={isCreating}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50"
           >
             {isCreating ? 'Creating...' : 'Create VM'}
           </button>
@@ -375,8 +375,8 @@ function SaveTemplateDialog({ vms, onClose, onSuccess }: { vms: VM[]; onClose: (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-bold">Create Template from VM</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
             <span className="text-2xl">&times;</span>
@@ -384,28 +384,28 @@ function SaveTemplateDialog({ vms, onClose, onSuccess }: { vms: VM[]; onClose: (
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Source VM</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Source VM</label>
             <select value={vmName} onChange={e => setVmName(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500">
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500">
               {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
             </select>
-            <p className="text-xs text-slate-500 mt-1">The template captures this VM's CPU, memory, disk size, image, and tags.</p>
+            <p className="text-xs text-[#6e6e73] mt-1">The template captures this VM's CPU, memory, disk size, image, and tags.</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Template Name</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Template Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. web-server-baseline"
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" required autoFocus />
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500" required autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" />
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} disabled={submitting}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">Cancel</button>
+              className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50">Cancel</button>
             <button type="submit" disabled={submitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Template'}</button>
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Template'}</button>
           </div>
         </form>
       </div>
@@ -455,8 +455,8 @@ function EditTemplateDialog({ template, onClose, onSuccess }: { template: VMTemp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-bold">Edit Template</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
             <span className="text-2xl">&times;</span>
@@ -464,43 +464,43 @@ function EditTemplateDialog({ template, onClose, onSuccess }: { template: VMTemp
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Template Name</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Template Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" required autoFocus />
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500" required autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" />
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">CPUs</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">CPUs</label>
               <input type="number" min={1} value={cpus} onChange={e => setCpus(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-blue-500" required />
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f] focus:outline-none focus:border-blue-500" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Memory (MB)</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Memory (MB)</label>
               <input type="number" min={1} value={memory} onChange={e => setMemory(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-blue-500" required />
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f] focus:outline-none focus:border-blue-500" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Disk (GB)</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Disk (GB)</label>
               <input type="number" min={1} value={disk} onChange={e => setDisk(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-blue-500" required />
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f] focus:outline-none focus:border-blue-500" required />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Tags (comma-separated)</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Tags (comma-separated)</label>
             <input type="text" value={tags} onChange={e => setTags(e.target.value)} placeholder="prod, web"
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" />
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500" />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} disabled={submitting}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50">Cancel</button>
+              className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50">Cancel</button>
             <button type="submit" disabled={submitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Changes'}</button>
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50">{submitting ? 'Saving...' : 'Save Changes'}</button>
           </div>
         </form>
       </div>

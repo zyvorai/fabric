@@ -12,7 +12,7 @@ VM Console — a real, live console into a running VM, from the browser, without
 
 ## How to get there
 
-- Route / id: `/vms/:name/console`
+- Route / id: `/app/vms/:name/console`
 - From a VM's detail page, click **Console** in the header
 - Nav: reached via **Core → Virtual Machines**, not linked directly from the top nav
 

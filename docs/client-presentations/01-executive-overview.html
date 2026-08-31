@@ -151,7 +151,7 @@
       </div>
       <div class="card">
         <h3>Five Management Interfaces</h3>
-        <p>CLI, terminal UI, web dashboard, Kubernetes operator, and Terraform provider. Every team uses their preferred workflow.</p>
+        <p>CLI, web dashboard, Kubernetes operator, and Terraform provider. Every team uses their preferred workflow.</p>
       </div>
     </div>
   </div>
@@ -164,8 +164,8 @@
   <pre style="font-size: 1.1em; line-height: 1.6;"><code>
     Management Layer
     +----------+  +-----------+  +---------+  +--------+  +-----------+
-    |  zyvorctl   |  | zyvorctl-tui |  |  Web UI |  |  K8s   |  | Terraform |
-    |  (CLI)   |  |   (TUI)   |  | (React) |  |Operator|  | Provider  |
+    |  zyvorctl   |  | zyvorctl |  |  Web UI |  |  K8s   |  | Terraform |
+    |  (CLI)   |  |            |  | (React) |  |Operator|  | Provider  |
     +----+-----+  +-----+-----+  +----+----+  +---+----+  +-----+-----+
          |              |             |            |              |
          +--------------+------+------+------------+--------------+
@@ -291,44 +291,8 @@
       <td>Proprietary SDK</td>
     </tr>
     <tr>
-      <td>Terminal UI</td>
-      <td class="highlight">Yes (k9s-style)</td>
-      <td>No</td>
-      <td>No</td>
-      <td>No</td>
-    </tr>
-    <tr>
-      <td>K8s Operator</td>
-      <td class="highlight">Yes</td>
-      <td>No</td>
-      <td>Yes</td>
-      <td>Limited</td>
-    </tr>
-    <tr>
-      <td>Network Policies</td>
-      <td class="highlight">Cilium-style</td>
-      <td>Basic</td>
-      <td>Neutron</td>
-      <td>NSX (extra cost)</td>
-    </tr>
-    <tr>
-      <td>VPN Mesh</td>
-      <td class="highlight">WireGuard built-in</td>
-      <td>No</td>
-      <td>No</td>
-      <td>No</td>
-    </tr>
-  </table>
-</div>
-
-<!-- Slide 8: Use Cases -->
-<div class="slide">
-  <h1>Use Cases</h1>
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <h3>Development and Testing</h3>
-        <p>Spin up disposable VM environments in seconds. cloud-init integration means VMs come up pre-configured. Templates enable consistent environments across the team.</p>
+      <td>Web console</td>
+      <td class="highlight">Yes ( cloud-init integration means VMs come up pre-configured. Templates enable consistent environments across the team.</p>
       </div>
       <div class="card">
         <h3>Edge and Branch Office</h3>
@@ -365,7 +329,7 @@
       <h2>Current Capabilities</h2>
       <ul>
         <li>520+ REST API endpoints, production-ready</li>
-        <li>5 management interfaces (CLI, TUI, Web, K8s, Terraform)</li>
+        <li>4 management interfaces (CLI, web, K8s, Terraform)</li>
         <li>31-round security audit completed</li>
         <li>HA clustering with etcd</li>
         <li>6 storage backends</li>

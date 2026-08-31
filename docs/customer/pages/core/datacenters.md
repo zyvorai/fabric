@@ -13,7 +13,7 @@ Datacenters — the physical inventory tree: datacenters, the clusters inside ea
 
 ## How to get there
 
-- Route / id: `/datacenters`
+- Route / id: `/app/datacenters`
 - Nav: **Core → Datacenters** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

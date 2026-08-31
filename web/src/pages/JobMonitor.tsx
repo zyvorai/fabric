@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; bg: str
   running:   { icon: Loader2,     color: 'text-blue-500',   bg: 'bg-blue-500/10' },
   completed: { icon: CheckCircle, color: 'text-green-500',  bg: 'bg-green-500/10' },
   failed:    { icon: AlertCircle, color: 'text-red-500',    bg: 'bg-red-500/10' },
-  cancelled: { icon: XCircle,     color: 'text-slate-400',  bg: 'bg-slate-500/10' },
+  cancelled: { icon: XCircle,     color: 'text-[#6e6e73]',  bg: 'bg-black/[0.04]' },
 }
 
 const PIPELINE_STAGES = ['prepare', 'convert', 'validate', 'deploy']
@@ -102,7 +102,7 @@ export default function JobMonitor() {
     return (
       <div className="space-y-6">
         <PageHeader title="Job Monitor" description="Real-time job tracking with live logs" />
-        <div className="flex items-center justify-center h-64 text-slate-400">
+        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
           <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
           Loading jobs…
         </div>
@@ -137,21 +137,21 @@ export default function JobMonitor() {
         {/* Job list */}
         <div className="space-y-2 max-h-[600px] overflow-y-auto">
           {jobs.length === 0 ? (
-            <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500 text-sm">No jobs found</div>
+            <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73] text-sm">No jobs found</div>
           ) : jobs.map(job => {
             const cfg = STATUS_CONFIG[job.status] || STATUS_CONFIG.pending
             const Icon = cfg.icon
             const isSelected = selectedJob === job.id
             return (
-              <div key={job.id} role="button" tabIndex={0} onClick={() => setSelectedJob(job.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedJob(job.id) } }} className={`bg-slate-800/50 rounded-xl border p-4 cursor-pointer transition-all hover:scale-[1.01] ${isSelected ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-700/50'}`}>
+              <div key={job.id} role="button" tabIndex={0} onClick={() => setSelectedJob(job.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedJob(job.id) } }} className={`bg-[#f5f5f7] rounded-xl border p-4 cursor-pointer transition-all hover:scale-[1.01] ${isSelected ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-[#d2d2d7]'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-white truncate">{job.name || job.vm_name || job.id}</span>
+                  <span className="text-sm font-semibold text-[#1d1d1f] truncate">{job.name || job.vm_name || job.id}</span>
                   <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
                     <Icon className={`w-3.5 h-3.5 ${job.status === 'running' ? 'animate-spin' : ''}`} /> {job.status}
                   </span>
                 </div>
-                <div className="bg-slate-700 rounded-full h-1.5 mb-2"><div className={`h-full rounded-full transition-all ${job.status === 'completed' ? 'bg-green-500' : job.status === 'failed' ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${job.progress}%` }} /></div>
-                <div className="text-xs text-slate-500">{job.progress}% {job.current_step && `— ${job.current_step}`}</div>
+                <div className="bg-[#e8e8ed] rounded-full h-1.5 mb-2"><div className={`h-full rounded-full transition-all ${job.status === 'completed' ? 'bg-green-500' : job.status === 'failed' ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${job.progress}%` }} /></div>
+                <div className="text-xs text-[#6e6e73]">{job.progress}% {job.current_step && `— ${job.current_step}`}</div>
               </div>
             )
           })}
@@ -161,43 +161,43 @@ export default function JobMonitor() {
         <div className="lg:col-span-2 space-y-4">
           {selected ? (
             <>
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
-                <h3 className="text-base font-semibold text-white mb-3">{selected.name || selected.vm_name || selected.id}</h3>
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
+                <h3 className="text-base font-semibold text-[#1d1d1f] mb-3">{selected.name || selected.vm_name || selected.id}</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                  <div className="bg-slate-900/50 rounded-lg p-3"><div className="text-[10px] text-slate-500">Status</div><div className="text-xs font-semibold text-white capitalize">{selected.status}</div></div>
-                  <div className="bg-slate-900/50 rounded-lg p-3"><div className="text-[10px] text-slate-500">Progress</div><div className="text-xs font-semibold text-white">{selected.progress}%</div></div>
-                  <div className="bg-slate-900/50 rounded-lg p-3"><div className="text-[10px] text-slate-500">Phase</div><div className="text-xs font-semibold text-white capitalize">{selected.phase || '-'}</div></div>
-                  <div className="bg-slate-900/50 rounded-lg p-3"><div className="text-[10px] text-slate-500">Duration</div><div className="text-xs font-semibold text-white">{selected.started_at && selected.completed_at ? formatDuration(selected.started_at, selected.completed_at) : selected.started_at ? formatDuration(selected.started_at, new Date().toISOString()) : '-'}</div></div>
+                  <div className="bg-white rounded-lg p-3"><div className="text-[10px] text-[#6e6e73]">Status</div><div className="text-xs font-semibold text-[#1d1d1f] capitalize">{selected.status}</div></div>
+                  <div className="bg-white rounded-lg p-3"><div className="text-[10px] text-[#6e6e73]">Progress</div><div className="text-xs font-semibold text-[#1d1d1f]">{selected.progress}%</div></div>
+                  <div className="bg-white rounded-lg p-3"><div className="text-[10px] text-[#6e6e73]">Phase</div><div className="text-xs font-semibold text-[#1d1d1f] capitalize">{selected.phase || '-'}</div></div>
+                  <div className="bg-white rounded-lg p-3"><div className="text-[10px] text-[#6e6e73]">Duration</div><div className="text-xs font-semibold text-[#1d1d1f]">{selected.started_at && selected.completed_at ? formatDuration(selected.started_at, selected.completed_at) : selected.started_at ? formatDuration(selected.started_at, new Date().toISOString()) : '-'}</div></div>
                 </div>
                 {/* Pipeline stages */}
                 <div className="flex items-center gap-0 mb-3">
                   {PIPELINE_STAGES.map((stage, idx) => {
-                    let cls = 'bg-slate-700 text-slate-400'
+                    let cls = 'bg-[#e8e8ed] text-[#6e6e73]'
                     if (idx < stageIndex) cls = 'bg-green-500 text-white'
-                    else if (idx === stageIndex) cls = selected.status === 'failed' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white animate-pulse'
+                    else if (idx === stageIndex) cls = selected.status === 'failed' ? 'bg-red-500 text-white' : 'bg-blue-500 text-[#1d1d1f] animate-pulse'
                     return (
                       <Fragment key={stage}>
-                        {idx > 0 && <div className={`h-0.5 w-6 ${idx <= stageIndex ? 'bg-green-500' : 'bg-slate-700'}`} />}
+                        {idx > 0 && <div className={`h-0.5 w-6 ${idx <= stageIndex ? 'bg-green-500' : 'bg-[#e8e8ed]'}`} />}
                         <div className={`px-2 py-1 text-[10px] font-semibold rounded uppercase whitespace-nowrap ${cls}`}>{stage}</div>
                       </Fragment>
                     )
                   })}
                 </div>
-                {selected.error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-xs text-red-400 font-mono">{selected.error}</div>}
+                {selected.error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-xs text-red-600 font-mono">{selected.error}</div>}
               </div>
               {/* Live logs */}
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
-                  <div className="flex items-center gap-2"><Terminal className="w-4 h-4 text-green-400" /><span className="text-sm font-semibold text-white">Logs</span></div>
-                  <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-blue-500" /> Follow</label>
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#d2d2d7] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><Terminal className="w-4 h-4 text-emerald-600" /><span className="text-sm font-semibold text-[#1d1d1f]">Logs</span></div>
+                  <label className="flex items-center gap-2 text-xs text-[#6e6e73] cursor-pointer"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="rounded border-[#d2d2d7] bg-[#e8e8ed] text-blue-500" /> Follow</label>
                 </div>
-                <pre ref={logRef} className="p-4 text-xs font-mono text-green-400 bg-slate-950 max-h-80 overflow-y-auto whitespace-pre">
+                <pre ref={logRef} className="p-4 text-xs font-mono text-emerald-600 bg-[#f5f5f7] max-h-80 overflow-y-auto whitespace-pre">
                   {logs.length > 0 ? logs.join('\n') : 'No logs available — click a running job to stream logs'}
                 </pre>
               </div>
             </>
           ) : (
-            <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500 text-sm">Select a job to view details and logs</div>
+            <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73] text-sm">Select a job to view details and logs</div>
           )}
         </div>
       </div>

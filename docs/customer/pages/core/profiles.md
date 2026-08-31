@@ -12,7 +12,7 @@ Profiles (shown in the UI as **Instance Types**) — a library of VM sizing pres
 
 ## How to get there
 
-- Route / id: `/profiles`
+- Route / id: `/app/profiles`
 - Nav: **Core → Profiles** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

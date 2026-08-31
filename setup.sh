@@ -167,7 +167,7 @@ build_zyvor_fabricd() {
     info "Building release binaries (this may take a few minutes)"
     cargo build --release 2>&1 | tail -10
 
-    for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+    for bin in zyvor-fabricd zyvorctl; do
         if [[ -f "target/release/${bin}" ]]; then
             success "  target/release/${bin} ($(du -h "target/release/${bin}" | cut -f1))"
         fi
@@ -215,7 +215,7 @@ install_binaries() {
     step "Installing binaries to ${INSTALL_PREFIX}/bin"
     install -d "${INSTALL_PREFIX}/bin"
 
-    for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+    for bin in zyvor-fabricd zyvorctl; do
         if [[ -f "backend/target/release/${bin}" ]]; then
             install -m 0755 "backend/target/release/${bin}" "${INSTALL_PREFIX}/bin/${bin}"
             info "  Installed ${bin}"
@@ -351,7 +351,7 @@ print_summary() {
     echo "✅  zyvor-fabricd ${ZYVOR_FABRICD_VERSION} — Setup Complete"
     echo "✅ ================================================================"
     echo ""
-    echo "  Binaries:        ${INSTALL_PREFIX}/bin/zyvor-fabricd, zyvorctl, zyvorctl-tui"
+    echo "  Binaries:        ${INSTALL_PREFIX}/bin/zyvor-fabricd, zyvorctl,"
     echo "  Config:          /etc/zyvor-fabricd/zyvor-fabricd.toml"
     echo "  Data:            /var/lib/zyvor-fabricd/"
     echo "  Logs:            /var/log/zyvor-fabricd/"

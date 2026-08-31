@@ -1,18 +1,36 @@
 # Zyvor Fabric web UX conventions
 
-Shared patterns for errors, empty lists, and shell chrome in [`web/src/`](../web/src/).
+Hybrid surface: public Apple-style marketing pages and a light, sparse authenticated console under `/app`.
 
-## Themes
+Visual reference: [apple.com/airpods](https://www.apple.com/airpods/) — SF Pro typography, high-contrast ink on `#f5f5f7`.
 
-Three dark themes cycle from the navbar palette control:
+## Surfaces
 
-| Theme | Class |
-|-------|--------|
-| `dark` | default slate shell |
-| `steel` | `.steel-theme` industrial accents |
-| `aurora` | `.aurora-theme` prismatic accents |
+| Surface | Routes | Shell |
+|---------|--------|--------|
+| Marketing | `/`, `/product`, `/platform`, `/security` | [`MarketingLayout`](../web/src/components/MarketingLayout.tsx) |
+| Sign-in | `/sign-in` (legacy `/login` redirects here) | Standalone card |
+| Console | `/app/*` | [`ConsoleLayout`](../web/src/components/ConsoleLayout.tsx) — top bar + left nav |
 
-Stored in `localStorage` as `Zyvor Fabric-theme`.
+## Visual system
+
+Light-first Apple tokens in [`web/src/styles/main.css`](../web/src/styles/main.css):
+
+| Token | Value | Role |
+|-------|--------|------|
+| `--zf-ink` | `#1d1d1f` | Headlines and primary body |
+| `--zf-secondary` | `#333336` | Supporting copy (clearly readable) |
+| `--zf-muted` | `#6e6e73` | Captions, table headers, footnotes |
+| `--zf-canvas` | `#f5f5f7` | Page background |
+| `--zf-surface` | `#ffffff` | Cards and panels |
+| `--zf-hairline` | `#d2d2d7` | Borders |
+| `--zf-link` | `#0066cc` | Links and primary accents |
+
+Typography: **SF Pro Text / Display** via `-apple-system` / `BlinkMacSystemFont` (same stack as apple.com). Themes `dark` / `steel` / `aurora` are removed.
+
+Buttons: `.zf-btn` / `.zf-btn-primary` / `.zf-btn-ghost` / `.zf-btn-secondary`.
+
+Console table cells stay ink; muted is for captions only. Avoid `#86868b` — too faint on `#f5f5f7`.
 
 ## Primitives
 
@@ -22,10 +40,10 @@ Stored in `localStorage` as `Zyvor Fabric-theme`.
 | [`ErrorBanner`](../web/src/components/ErrorBanner.tsx) | Page load or action failure with hints |
 | [`PageHeader`](../web/src/components/ui/PageHeader.tsx) | Title, description, refresh, primary action |
 | [`WizardStepper`](../web/src/components/WizardStepper.tsx) | Multi-step Create VM / wizard flows |
-| [`Breadcrumb`](../web/src/components/Breadcrumb.tsx) | Path trail on detail/settings pages |
+| [`Breadcrumb`](../web/src/components/Breadcrumb.tsx) | Path trail under `/app` |
 | [`CopyButton`](../web/src/components/CopyButton.tsx) | Clipboard copy with toast |
 | [`PageSkeleton`](../web/src/components/PageSkeleton.tsx) | Suspense fallback for lazy routes |
-| [`HelpDialog`](../web/src/components/HelpDialog.tsx) | Shortcuts and About (Zyvor links) |
+| [`HelpDialog`](../web/src/components/HelpDialog.tsx) | Shortcuts and About |
 
 ## API errors
 
@@ -37,70 +55,19 @@ Daemon returns `{ "error": "…", "error_code": "operation_failed" }` on failure
 | [`formatUserError`](../web/src/utils/apiError.ts) | Any `catch` shown in toasts or banners |
 | [`toastFailure`](../web/src/utils/toastError.ts) | `toastFailure(toast, 'Label', e)` shorthand |
 
-Do not display raw HTML or bare `error_code` strings. [`Toast.tsx`](../web/src/components/Toast.tsx) sanitizes error messages.
+Wire [`daemonHints.ts`](../web/src/utils/daemonHints.ts) via `ErrorBanner` `hints={hintsForError(loadError, 'vm')}` on Dashboard, VM list/detail, Storage, Network, and Operations pages.
 
-Rust mirror: [`api-error`](../backend/crates/api-error/) crate; TUI uses `format_http_error_body` for failed start/stop/snapshot HTTP responses.
+## Console chrome
 
-### Domain hints
+- **Command palette** — `Ctrl/Cmd+K`; fuzzy search VMs and pages (`/app/...` routes)
+- **Sequence shortcuts** — `g` then `d`/`v`/`n`/`s`/`c`/`l`/`b`/`i`/`e` → `/app/...`
+- **Help** — `?`
+- **Connection** — live WebSocket badge in the top bar
 
-[`daemonHints.ts`](../web/src/utils/daemonHints.ts) exports `hintsForError(err, domain?)` for contextual banner copy (VM driver, storage, auth). Wire via `ErrorBanner` `hints={hintsForError(loadError, 'vm')}` on Dashboard, VM list/detail, Storage, Network, and tier-2 Operations pages.
+## Create VM
 
-### Stable codes
+Canonical route: **`/app/create`**.
 
-| Code | User label |
-|------|------------|
-| `operation_failed` | The operation failed on the server |
-| `not_found` | The requested resource was not found |
-| `driver_connection` | Could not reach the VM driver backend (Ephemera) |
-| `invalid_request` | The request was invalid |
-| `forbidden` | You do not have permission |
-| `unauthorized` | Authentication required or session expired |
+## Interfaces
 
-## Shell
-
-- **Command palette** — `Ctrl/Cmd+K`; fuzzy search VMs and pages; pin/recent pages
-- **Sequence shortcuts** — `g` then `d`/`v`/`n`/`s`/`c`/`l`/`b`/`i`/`e`
-- **Help** — `?` or navbar Help menu
-- **Connection** — [`ConnectionStatus`](../web/src/components/ConnectionStatus.tsx) WebSocket live badge
-
-## Login
-
-[`Login.tsx`](../web/src/pages/Login.tsx) uses [`PremiumLoginShell`](../web/src/components/PremiumLoginShell.tsx) with aurora/particles; disabled when `prefers-reduced-motion` is set.
-
-## TUI (`zyvorctl-tui`)
-
-Machina-aligned **GuestKit** orange theme, inventory sidebar, `:` colon commands (`:vms`, `:dashboard`, `:start`, `:stop`, `:snap`, `:refresh`, `:help`), `/` fuzzy search, styled confirmation overlay (`[y]` red / `[n]` green), recent tasks bar, 3s toasts. Failed VM actions parse API `error_code` via `format_http_error_body`.
-
-## Dashboard health cards
-
-`GET /api/v1/capabilities` returns subsystem phases (`off` | `unreachable` | `live`) for **vm_driver**, **storage**, **network_security**, **auth**, and **events**. The dashboard reads these via [`PlatformInfoContext`](../web/src/contexts/PlatformInfoContext.tsx) and refreshes every 30s.
-
-## Create VM wizard
-
-Canonical route: **`/create`**. `/vm-wizard` redirects to `/create`.
-
-[`CreateVM`](../web/src/pages/CreateVM.tsx) uses [`WizardStepper`](../web/src/components/WizardStepper.tsx) with three gated steps:
-
-1. **Basics** — name, image picker from `GET /api/images` plus manual path override
-2. **Resources** — vCPUs, memory presets, disk size (GB), optional advanced panel (boot, display, CPU mode applied after create)
-3. **Review** — summary and submit (`name`, `image`, `cpus`, `memory`, `disk`)
-
-Back/Next buttons only show fields for the active step.
-
-## Page errors (tier 2)
-
-Operations and infrastructure pages use `loadError` + [`ErrorBanner`](../web/src/components/ErrorBanner.tsx) + `toastFailure`: Templates, Logs, Machines, Schedules, Storage Pools, Disk Images, Audit Logs, Notifications, Migrations, System Health, Favorite VMs. Use `Promise.allSettled` when loading multiple catalogs.
-
-## Breadcrumbs
-
-[`Breadcrumb`](../web/src/components/Breadcrumb.tsx) on VM detail, Settings, Machines, Storage Pools, Backups, and migration subpages. Labels come from [`routeLabels`](../web/src/utils/routes.tsx).
-
-## Build
-
-```bash
-cd web && npm install && npm run build
-cd web && npm run typecheck
-cd web && npm test
-```
-
-Production UI is [`web/`](../web/) (router-based). Legacy state SPA: [`web-legacy/`](../web-legacy/).
+Human UI is **web only**. CLI (`zyvorctl`), Kubernetes operator, and Terraform remain. The former terminal UI (`zyvorctl-tui`) has been removed.

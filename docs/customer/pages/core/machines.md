@@ -13,7 +13,7 @@ Machines — a lower-level view of the VM driver's running instances and the raw
 
 ## How to get there
 
-- Route / id: `/machines`
+- Route / id: `/app/machines`
 - Nav: **Core → Machines** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

@@ -16,11 +16,11 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 | **Analogy** | Proxmox-class UX + KubeVirt-style operations, single Rust daemon |
 | **Runtime** | `zyvor-fabricd` — one binary, one config; runs under systemd (still fully supported) or standalone |
 | **Scope** | VMs, network fabric, security policy, storage, HA, migration, observability |
-| **Interfaces** | CLI (`zyvorctl`), TUI (`zyvorctl-tui`), Web UI, K8s operator, Terraform provider |
+| **Interfaces** | CLI (`zyvorctl`), Web UI, K8s operator, Terraform provider |
 
 ### Elevator pitch
 
-> Zyvor Fabric is a production-grade private cloud control plane for Linux. Deploy in minutes with a single daemon, manage everything through five interfaces, and get enterprise features — RBAC, HA, live migration, GPU passthrough, network policies — without VMware complexity or OpenStack overhead.
+> Zyvor Fabric is a production-grade private cloud control plane for Linux. Deploy in minutes with a single daemon, manage everything through four interfaces, and get enterprise features — RBAC, HA, live migration, GPU passthrough, network policies — without VMware complexity or OpenStack overhead.
 
 ---
 

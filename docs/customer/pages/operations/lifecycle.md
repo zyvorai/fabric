@@ -12,7 +12,7 @@ Lifecycle Manager — define patch/upgrade baselines, scan hosts for compliance 
 
 ## How to get there
 
-- Route / id: `/lifecycle`
+- Route / id: `/app/lifecycle`
 - Nav: **Operations → Lifecycle** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

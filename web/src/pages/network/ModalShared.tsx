@@ -11,8 +11,8 @@ const FABRIC = ZYVOR_FABRIC_HELP.name
 export function ModalWrapper({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <h3 className="text-lg font-semibold">{title}</h3>
           <button onClick={onClose} className="p-1 hover:bg-white/[0.03] rounded"><X className="w-5 h-5" /></button>
         </div>
@@ -27,13 +27,13 @@ export function InputField({ label, value, onChange, placeholder, type = 'text' 
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-[#1d1d1f] mb-1">{label}</label>
       <input
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+        className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
       />
     </div>
   )
@@ -69,7 +69,7 @@ export function HostManagedActions({
   if (readOnly) {
     if (isHostManaged(item)) {
       return (
-        <span className="text-xs text-slate-500" title={`Managed outside ${FABRIC}`}>
+        <span className="text-xs text-[#6e6e73]" title={`Managed outside ${FABRIC}`}>
           {stateLabel ?? item.operational_state ?? 'external'}
         </span>
       )
@@ -79,7 +79,7 @@ export function HostManagedActions({
   if (isHostManaged(item)) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-500" title={`Managed outside ${FABRIC}`}>
+        <span className="text-xs text-[#6e6e73]" title={`Managed outside ${FABRIC}`}>
           {stateLabel ?? item.operational_state ?? 'external'}
         </span>
         {onAdopt && (
@@ -105,8 +105,8 @@ export function HostManagedActions({
 export function CheckboxField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer">
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="rounded bg-slate-800 border-slate-700/50" />
-      <span className="text-sm text-slate-300">{label}</span>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="rounded bg-white border-[#d2d2d7]" />
+      <span className="text-sm text-[#1d1d1f]">{label}</span>
     </label>
   )
 }
@@ -134,14 +134,14 @@ export function DetailModal({ title, data, loading, error, onClose }: {
 }) {
   return (
     <ModalWrapper title={title} onClose={onClose}>
-      {loading && <p className="text-slate-400 text-sm">Loading…</p>}
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {loading && <p className="text-[#6e6e73] text-sm">Loading…</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
       {!loading && !error && data && (
         <dl className="space-y-2 text-sm">
           {Object.entries(data).map(([k, v]) => (
-            <div key={k} className="flex items-start justify-between gap-4 border-b border-slate-700/30 pb-2">
-              <dt className="text-slate-400 shrink-0">{k}</dt>
-              <dd className="text-white font-mono text-right break-all">{formatDetailValue(v)}</dd>
+            <div key={k} className="flex items-start justify-between gap-4 border-b border-[#d2d2d7]/60 pb-2">
+              <dt className="text-[#6e6e73] shrink-0">{k}</dt>
+              <dd className="text-[#1d1d1f] font-mono text-right break-all">{formatDetailValue(v)}</dd>
             </div>
           ))}
         </dl>

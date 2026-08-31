@@ -5,45 +5,45 @@
 interface StatusBadgeProps {
   status: string
   variant?: 'dot' | 'pill'
-  /** Native tooltip, e.g. the reason a 'failed' status happened. */
   title?: string
 }
 
 const statusStyles: Record<string, string> = {
-  running: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  active: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  enabled: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  healthy: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  completed: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  success: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-  stopped: 'text-red-400 bg-red-400/10 border-red-400/20',
-  failed: 'text-red-400 bg-red-400/10 border-red-400/20',
-  error: 'text-red-400 bg-red-400/10 border-red-400/20',
-  disabled: 'text-red-400 bg-red-400/10 border-red-400/20',
-  paused: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-  warning: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-  pending: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-  unknown: 'text-slate-400 bg-slate-400/10 border-slate-400/20',
+  running: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  active: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  enabled: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  healthy: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  success: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  stopped: 'text-red-700 bg-red-50 border-red-200',
+  failed: 'text-red-700 bg-red-50 border-red-200',
+  error: 'text-red-700 bg-red-50 border-red-200',
+  disabled: 'text-red-700 bg-red-50 border-red-200',
+  paused: 'text-amber-800 bg-amber-50 border-amber-200',
+  warning: 'text-amber-800 bg-amber-50 border-amber-200',
+  pending: 'text-amber-800 bg-amber-50 border-amber-200',
+  unknown: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
 }
 
 const dotColors: Record<string, string> = {
-  running: 'bg-emerald-400',
-  active: 'bg-emerald-400',
-  enabled: 'bg-emerald-400',
-  healthy: 'bg-emerald-400',
-  completed: 'bg-emerald-400',
-  success: 'bg-emerald-400',
-  stopped: 'bg-red-400',
-  failed: 'bg-red-400',
-  error: 'bg-red-400',
-  disabled: 'bg-red-400',
-  paused: 'bg-yellow-400',
-  warning: 'bg-yellow-400',
-  pending: 'bg-yellow-400',
-  unknown: 'bg-slate-400',
+  running: 'bg-emerald-500',
+  active: 'bg-emerald-500',
+  enabled: 'bg-emerald-500',
+  healthy: 'bg-emerald-500',
+  completed: 'bg-emerald-500',
+  success: 'bg-emerald-500',
+  stopped: 'bg-red-500',
+  failed: 'bg-red-500',
+  error: 'bg-red-500',
+  disabled: 'bg-red-500',
+  paused: 'bg-amber-500',
+  warning: 'bg-amber-500',
+  pending: 'bg-amber-500',
+  unknown: 'bg-[var(--zf-muted)]',
 }
 
-const isRunning = (s: string) => ['running', 'active', 'enabled', 'healthy'].includes(s.toLowerCase())
+const isRunning = (s: string) =>
+  ['running', 'active', 'enabled', 'healthy'].includes(s.toLowerCase())
 
 export function StatusBadge({ status, variant = 'pill', title }: StatusBadgeProps) {
   const key = status.toLowerCase()
@@ -58,15 +58,22 @@ export function StatusBadge({ status, variant = 'pill', title }: StatusBadgeProp
           {pulse && <span className={`absolute inset-0 rounded-full ${dot} opacity-40 animate-ping`} />}
           <span className={`relative w-2 h-2 rounded-full ${dot}`} />
         </span>
-        <span className="capitalize">{status}</span>
+        <span className="capitalize text-[var(--zf-ink)]">{status}</span>
       </span>
     )
   }
 
   return (
-    <span title={title} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium capitalize border ${style}`}>
+    <span
+      title={title}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize border ${style}`}
+    >
       <span className="relative flex h-1.5 w-1.5">
-        {pulse && <span className={`absolute inset-0 rounded-full ${dotColors[key] || dotColors.unknown} opacity-40 animate-ping`} />}
+        {pulse && (
+          <span
+            className={`absolute inset-0 rounded-full ${dotColors[key] || dotColors.unknown} opacity-40 animate-ping`}
+          />
+        )}
         <span className={`relative w-1.5 h-1.5 rounded-full ${dotColors[key] || dotColors.unknown}`} />
       </span>
       {status}

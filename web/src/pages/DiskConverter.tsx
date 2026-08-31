@@ -145,27 +145,27 @@ export default function DiskConverter() {
         <ErrorBanner title="Conversion error" headline={error} hints={hintsForError(error, 'storage')} onRetry={handleConvert} />
       )}
 
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
         <div className="mb-4">
-          <label className="block text-xs font-medium text-slate-400 mb-1">Source Disk Image</label>
+          <label className="block text-xs font-medium text-[#6e6e73] mb-1">Source Disk Image</label>
           {diskImages.length > 0 ? (
             <div className="space-y-2">
               <select value={sourcePath} onChange={(e) => { setSourcePath(e.target.value); setOutputEdited(false) }}
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                className="w-full px-3 py-2 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                 <option value="">Select a disk image...</option>
                 {diskImages.map((img) => (
                   <option key={img.path} value={img.path}>{img.name || img.path} ({img.format?.toUpperCase()}, {formatBytes(img.size)})</option>
                 ))}
               </select>
-              <div className="text-xs text-slate-500">Or type a path:</div>
+              <div className="text-xs text-[#6e6e73]">Or type a path:</div>
               <input type="text" value={sourcePath} onChange={(e) => { setSourcePath(e.target.value); setOutputEdited(false) }} placeholder="/path/to/disk.vmdk"
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                className="w-full px-3 py-2 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
             </div>
           ) : (
             <div className="space-y-2">
               <input type="text" value={sourcePath} onChange={(e) => { setSourcePath(e.target.value); setOutputEdited(false) }} placeholder="/path/to/disk.vmdk"
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-              <button onClick={() => void loadDiskImages()} disabled={loadingImages} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                className="w-full px-3 py-2 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              <button onClick={() => void loadDiskImages()} disabled={loadingImages} className="flex items-center gap-1.5 text-xs text-[#0066cc] hover:text-blue-300 transition-colors">
                 <RefreshCw className={`w-3.5 h-3.5 ${loadingImages ? 'animate-spin' : ''}`} /> Load available disk images
               </button>
             </div>
@@ -174,30 +174,30 @@ export default function DiskConverter() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Target Format</label>
+            <label className="block text-xs font-medium text-[#6e6e73] mb-1">Target Format</label>
             <select value={targetFormat} onChange={(e) => { setTargetFormat(e.target.value); setOutputEdited(false) }}
-              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+              className="w-full px-3 py-2 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
               {FORMATS.map((f) => (<option key={f} value={f}>{f.toUpperCase()}</option>))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Output Path</label>
+            <label className="block text-xs font-medium text-[#6e6e73] mb-1">Output Path</label>
             <input type="text" value={outputPath} onChange={(e) => { setOutputPath(e.target.value); setOutputEdited(true) }} placeholder="Auto-generated from source"
-              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              className="w-full px-3 py-2 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
           </div>
         </div>
 
         {sourcePath && (
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-slate-900/50 border border-slate-700/50">
-            <span className="text-xs text-slate-300 truncate flex-1">{sourcePath}</span>
-            <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
-            <span className="text-xs font-medium text-blue-400 flex-shrink-0">{targetFormat.toUpperCase()}</span>
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-white border border-[#d2d2d7]">
+            <span className="text-xs text-[#1d1d1f] truncate flex-1">{sourcePath}</span>
+            <ArrowRight className="w-4 h-4 text-[#0066cc] flex-shrink-0" />
+            <span className="text-xs font-medium text-[#0066cc] flex-shrink-0">{targetFormat.toUpperCase()}</span>
           </div>
         )}
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-300">{error}</p>
           </div>
         )}
@@ -208,34 +208,34 @@ export default function DiskConverter() {
             {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />Submitting...</> : <><HardDrive className="w-4 h-4" />Convert</>}
           </button>
           {(job || error) && (
-            <button onClick={handleReset} className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700/50 transition-all">Reset</button>
+            <button onClick={handleReset} className="px-4 py-2 text-sm font-medium rounded-lg border border-[#d2d2d7] text-[#1d1d1f] hover:bg-black/[0.04] transition-all">Reset</button>
           )}
         </div>
 
         {job && (
-          <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 p-4">
+          <div className="bg-white rounded-lg border border-[#d2d2d7] p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                {jobDone && <CheckCircle className="w-4 h-4 text-green-400" />}
-                {jobFailed && <AlertTriangle className="w-4 h-4 text-red-400" />}
-                {jobRunning && <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />}
-                <span className="text-sm font-medium text-white">
+                {jobDone && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+                {jobFailed && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                {jobRunning && <Loader2 className="w-4 h-4 text-[#0066cc] animate-spin" />}
+                <span className="text-sm font-medium text-[#1d1d1f]">
                   {jobDone ? 'Conversion Complete' : jobFailed ? 'Conversion Failed' : 'Converting...'}
                 </span>
               </div>
-              <span className="text-xs text-slate-400 font-mono">{job.id.substring(0, 12)}</span>
+              <span className="text-xs text-[#6e6e73] font-mono">{job.id.substring(0, 12)}</span>
             </div>
-            <div className="bg-slate-700 rounded-full h-2 mb-2">
+            <div className="bg-[#e8e8ed] rounded-full h-2 mb-2">
               <div className={`rounded-full h-full transition-all duration-500 ${jobDone ? 'bg-green-500' : jobFailed ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${job.progress}%` }} />
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-400">
+            <div className="flex items-center justify-between text-xs text-[#6e6e73]">
               <span>{job.progress}%</span>
-              <span className={`capitalize ${jobDone ? 'text-green-400' : jobFailed ? 'text-red-400' : 'text-blue-400'}`}>{job.status}</span>
+              <span className={`capitalize ${jobDone ? 'text-emerald-600' : jobFailed ? 'text-red-600' : 'text-[#0066cc]'}`}>{job.status}</span>
             </div>
             {jobFailed && job.error && <div className="mt-3 p-2 bg-red-500/10 rounded text-xs text-red-300">{job.error}</div>}
             {jobDone && (
-              <div className="mt-3 text-xs text-slate-400">
-                Output: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-slate-200">{job.output_path || outputPath}</code>
+              <div className="mt-3 text-xs text-[#6e6e73]">
+                Output: <code className="bg-white px-1.5 py-0.5 rounded text-xs text-[#1d1d1f]">{job.output_path || outputPath}</code>
               </div>
             )}
           </div>

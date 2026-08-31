@@ -17,9 +17,9 @@ interface HealthCheck { name: string; status: string; message: string; detail?: 
 interface HealthCheckResult { vm: string; overall: string; checks: HealthCheck[]; timestamp: string }
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === 'pass') return <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-xs">&#10003;</span>
-  if (status === 'warning') return <span className="flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 text-xs">&#9888;</span>
-  return <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20 text-red-400 text-xs">&#10007;</span>
+  if (status === 'pass') return <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-emerald-600 text-xs">&#10003;</span>
+  if (status === 'warning') return <span className="flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20 text-amber-600 text-xs">&#9888;</span>
+  return <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20 text-red-600 text-xs">&#10007;</span>
 }
 
 export default function VMHealthCheck() {
@@ -63,8 +63,8 @@ export default function VMHealthCheck() {
     return (
       <div className="space-y-6">
         <PageHeader title="VM Health Check" description="Run health verification checks on a VM" />
-        <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3">
-          <div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
+          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
           <span className="text-sm">Loading VMs…</span>
         </div>
       </div>
@@ -83,14 +83,14 @@ export default function VMHealthCheck() {
 
       {!loadError && (
         <>
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="bg-[#f5f5f7] rounded-xl p-4 border border-[#d2d2d7]">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Select VM</label>
+                <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Select VM</label>
                 <select
                   value={selectedVM}
                   onChange={(e) => setSelectedVM(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-[#e8e8ed] border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="">Select a VM…</option>
                   {vms.map((vm) => (
@@ -104,7 +104,7 @@ export default function VMHealthCheck() {
                 <button
                   onClick={runHealthCheck}
                   disabled={!selectedVM || checking}
-                  className="w-full px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 text-sm font-medium bg-[#0066cc] hover:bg-[#0077ed] disabled:bg-[#e8e8ed] disabled:text-[#6e6e73] text-white rounded-lg transition-colors disabled:cursor-not-allowed"
                 >
                   {checking ? 'Checking…' : 'Run Health Check'}
                 </button>
@@ -122,8 +122,8 @@ export default function VMHealthCheck() {
           )}
 
           {checking && (
-            <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3">
-              <div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+            <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
+              <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
               <span className="text-sm">Running health checks on {selectedVM}…</span>
             </div>
           )}
@@ -134,34 +134,34 @@ export default function VMHealthCheck() {
                 className={`rounded-xl p-4 border flex items-center gap-3 ${result.overall === 'healthy' ? 'bg-green-500/10 border-green-700/50' : 'bg-red-500/10 border-red-700/50'}`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${result.overall === 'healthy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${result.overall === 'healthy' ? 'bg-green-500/20 text-emerald-600' : 'bg-red-500/20 text-red-600'}`}
                 >
                   {result.overall === 'healthy' ? '\u2713' : '\u26A0'}
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-white">
+                  <div className="text-sm font-semibold text-[#1d1d1f]">
                     {result.overall === 'healthy' ? 'Healthy' : 'Issues Found'}
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-[#6e6e73]">
                     {result.checks.filter((c) => c.status === 'pass').length} of {result.checks.length} checks passed for{' '}
                     {result.vm}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 divide-y divide-slate-700/50">
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] divide-y divide-[#d2d2d7]">
                 {result.checks.map((check, idx) => (
                   <div key={idx} className="flex items-start gap-3 p-4">
                     <StatusIcon status={check.status} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white">{check.name}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{check.message}</div>
+                      <div className="text-sm font-medium text-[#1d1d1f]">{check.name}</div>
+                      <div className="text-xs text-[#6e6e73] mt-0.5">{check.message}</div>
                       {check.detail && (
-                        <div className="text-xs text-slate-500 mt-1 font-mono truncate">{check.detail}</div>
+                        <div className="text-xs text-[#6e6e73] mt-1 font-mono truncate">{check.detail}</div>
                       )}
                     </div>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${check.status === 'pass' ? 'bg-green-500/20 text-green-400' : check.status === 'warning' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${check.status === 'pass' ? 'bg-green-500/20 text-emerald-600' : check.status === 'warning' ? 'bg-yellow-500/20 text-amber-600' : 'bg-red-500/20 text-red-600'}`}
                     >
                       {check.status}
                     </span>
@@ -172,7 +172,7 @@ export default function VMHealthCheck() {
           )}
 
           {!result && !checkError && !checking && (
-            <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-2">
+            <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-2">
               <span className="text-sm">Select a VM and run a health check</span>
             </div>
           )}

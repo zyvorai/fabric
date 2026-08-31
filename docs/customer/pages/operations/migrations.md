@@ -13,7 +13,7 @@ VM Migrations — move a VM from its current host to a different target host, an
 
 ## How to get there
 
-- Route / id: `/migrations`
+- Route / id: `/app/migrations`
 - Nav: **Operations → Migrations** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

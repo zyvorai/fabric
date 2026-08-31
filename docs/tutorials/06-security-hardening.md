@@ -736,7 +736,7 @@ Expected response:
 Once 2FA is enabled, include the `totp_code` field in login requests:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/login" \
+curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/sign-in" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin",

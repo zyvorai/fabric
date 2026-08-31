@@ -327,7 +327,7 @@ export function LoginDivider({ label = 'or' }: { label?: string }) {
   return (
     <div className="relative py-3 mt-4 text-center text-xs uppercase tracking-[0.22em] text-slate-500">
       <span className="relative px-2 bg-slate-900/40">{label}</span>
-      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-slate-700/60" />
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-[#d2d2d7]" />
     </div>
   );
 }

@@ -47,8 +47,8 @@ export default function Console() {
         />
       )}
       <button
-        onClick={() => navigate(`/vms/${name}`)}
-        className="flex items-center gap-2 mb-6 text-slate-400 hover:text-white transition"
+        onClick={() => navigate(`/app/vms/${name}`)}
+        className="flex items-center gap-2 mb-6 text-[#6e6e73] hover:text-[#1d1d1f] transition"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to VM Details
@@ -60,17 +60,17 @@ export default function Console() {
             {mode === 'terminal' ? <TerminalIcon className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-white truncate">Console: {name}</h1>
-            <p className="text-sm text-slate-500 mt-1">Interactive access to this VM</p>
+            <h1 className="text-2xl font-bold text-[#1d1d1f] truncate">Console: {name}</h1>
+            <p className="text-sm text-[#6e6e73] mt-1">Interactive access to this VM</p>
           </div>
         </div>
-        <div className="flex items-center gap-1 p-1 bg-slate-800/50 border border-slate-700/50 rounded-xl shrink-0">
+        <div className="flex items-center gap-1 p-1 bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl shrink-0">
           <button
             onClick={() => setMode('terminal')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               mode === 'terminal'
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#0066cc] text-white'
+                : 'text-[#6e6e73] hover:text-[#1d1d1f]'
             }`}
           >
             <TerminalIcon className="w-4 h-4" />
@@ -80,8 +80,8 @@ export default function Console() {
             onClick={() => setMode('vnc')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               mode === 'vnc'
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#0066cc] text-white'
+                : 'text-[#6e6e73] hover:text-[#1d1d1f]'
             }`}
           >
             <Monitor className="w-4 h-4" />

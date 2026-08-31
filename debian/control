@@ -24,7 +24,7 @@ Description: Virtual Machine Management Daemon
  console, VNC proxy, and comprehensive VM lifecycle management. Runs under
  systemd or any other supervisor — nothing in this package requires it.
  .
- Includes zyvorctl CLI tool and zyvorctl-tui terminal interface.
+ Includes zyvorctl CLI tool.
 
 Package: zyvor-fabricd-web
 Architecture: all

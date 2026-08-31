@@ -2,7 +2,7 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-//! User-facing HTTP/API error formatting (shared by daemon and TUI).
+//! User-facing HTTP/API error formatting (shared by daemon and web/CLI clients).
 
 use serde::Deserialize;
 

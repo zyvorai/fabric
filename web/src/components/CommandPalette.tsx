@@ -169,8 +169,8 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
   }
 
   staticCommands.push(
-    { id: 'nav-dashboard', label: 'Dashboard', icon: <Home className="w-4 h-4" />, action: () => go('/'), category: 'Quick Actions', keywords: ['home'] },
-    { id: 'nav-create', label: 'Create VM', icon: <Plus className="w-4 h-4" />, action: () => go('/create'), category: 'Quick Actions', keywords: ['new'] },
+    { id: 'nav-dashboard', label: 'Dashboard', icon: <Home className="w-4 h-4" />, action: () => go('/app'), category: 'Quick Actions', keywords: ['home'] },
+    { id: 'nav-create', label: 'Create VM', icon: <Plus className="w-4 h-4" />, action: () => go('/app/create'), category: 'Quick Actions', keywords: ['new'] },
     { id: 'action-refresh', label: 'Refresh Page', icon: <RotateCw className="w-4 h-4" />, action: () => window.location.reload(), category: 'Quick Actions', keywords: ['reload'] },
   )
 
@@ -182,7 +182,7 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
         label: `View ${vm.name}`,
         description: `${vm.state} - ${vm.cpus} vCPUs, ${vm.memory} MB`,
         icon: <Server className="w-4 h-4" />,
-        action: () => go(`/vms/${vm.name}`),
+        action: () => go(`/app/vms/${vm.name}`),
         category: 'Virtual Machines',
         keywords: [vm.name, 'details'],
       },
@@ -190,7 +190,7 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
         id: `vm-console-${vm.name}`,
         label: `Console: ${vm.name}`,
         icon: <Terminal className="w-4 h-4" />,
-        action: () => go(`/vms/${vm.name}/console`),
+        action: () => go(`/app/vms/${vm.name}/console`),
         category: 'Virtual Machines',
         keywords: [vm.name, 'terminal', 'shell'],
       },
@@ -314,22 +314,22 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
       onClick={close}
     >
       <div
-        className="bg-slate-800/50 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-xl max-h-[420px] overflow-hidden"
+        className="bg-[#f5f5f7] rounded-xl shadow-2xl border border-[#d2d2d7] w-full max-w-xl max-h-[420px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/50">
-          <Search className="w-4 h-4 text-slate-500 shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#d2d2d7]">
+          <Search className="w-4 h-4 text-[#6e6e73] shrink-0" />
           <input
             ref={inputRef}
             type="text"
             placeholder="Search commands, VMs, pages..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-slate-500"
+            className="flex-1 bg-transparent border-none outline-none text-sm text-[#1d1d1f] placeholder-[#6e6e73]"
             autoFocus
           />
-          <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700/50 rounded text-[10px] text-slate-500 font-mono shrink-0">
+          <kbd className="px-1.5 py-0.5 bg-white border border-[#d2d2d7] rounded text-[10px] text-[#6e6e73] font-mono shrink-0">
             ESC
           </kbd>
         </div>
@@ -338,12 +338,12 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
         <div ref={listRef} className="overflow-y-auto max-h-[320px] sidebar-scroll">
           {filteredCommands.length === 0 ? (
             <div className="px-4 py-8 text-center">
-              <p className="text-sm text-slate-500">No results for "{query}"</p>
+              <p className="text-sm text-[#6e6e73]">No results for "{query}"</p>
             </div>
           ) : (
             Object.entries(groupedCommands).map(([category, cmds]) => (
               <div key={category}>
-                <div className="px-4 py-1.5 text-[10px] font-semibold text-slate-600 uppercase tracking-wider sticky top-0 bg-slate-900">
+                <div className="px-4 py-1.5 text-[10px] font-semibold text-[#6e6e73] uppercase tracking-wider sticky top-0 bg-white">
                   {category}
                 </div>
                 {cmds.map((cmd) => {
@@ -357,21 +357,21 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
                       onClick={() => execute(cmd)}
                       onMouseEnter={() => setSelectedIndex(currentIndex)}
                       className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
-                        isSelected ? 'bg-blue-600/10 text-white' : 'text-slate-400 hover:text-white'
+                        isSelected ? 'bg-[#0066cc]/10 text-[#1d1d1f]' : 'text-[#6e6e73] hover:text-[#1d1d1f]'
                       }`}
                     >
                       {cmd.icon && (
-                        <span className={`shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-600'}`}>
+                        <span className={`shrink-0 ${isSelected ? 'text-[#0066cc]' : 'text-[#6e6e73]'}`}>
                           {cmd.icon}
                         </span>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">{cmd.label}</div>
                         {cmd.description && (
-                          <div className="text-[11px] text-slate-600 truncate">{cmd.description}</div>
+                          <div className="text-[11px] text-[#6e6e73] truncate">{cmd.description}</div>
                         )}
                       </div>
-                      {isSelected && <ArrowRight className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                      {isSelected && <ArrowRight className="w-3.5 h-3.5 text-[#0066cc] shrink-0" />}
                     </button>
                   )
                 })}
@@ -381,13 +381,13 @@ export default function CommandPalette({ onOpenHelp }: CommandPaletteProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-slate-700/50 text-[10px] text-slate-600">
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-[#d2d2d7] text-[10px] text-[#6e6e73]">
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 bg-slate-800 border border-slate-700/50 rounded font-mono">↑↓</kbd>
+            <kbd className="px-1 py-0.5 bg-white border border-[#d2d2d7] rounded font-mono">↑↓</kbd>
             navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 py-0.5 bg-slate-800 border border-slate-700/50 rounded font-mono">↵</kbd>
+            <kbd className="px-1 py-0.5 bg-white border border-[#d2d2d7] rounded font-mono">↵</kbd>
             select
           </span>
           <span className="ml-auto">{filteredCommands.length} results</span>

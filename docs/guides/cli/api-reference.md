@@ -3102,7 +3102,7 @@ curl -s -X POST http://localhost:3000/api/storage/iscsi/discover \
 
 ---
 
-### POST /api/storage/iscsi/login
+### POST /api/storage/iscsi/sign-in
 
 Log in to an iSCSI target to establish a session and make the LUN accessible as a block device.
 
@@ -3132,7 +3132,7 @@ Log in to an iSCSI target to establish a session and make the LUN accessible as 
 **curl example:**
 
 ```bash
-curl -s -X POST http://localhost:3000/api/storage/iscsi/login \
+curl -s -X POST http://localhost:3000/api/storage/iscsi/sign-in \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

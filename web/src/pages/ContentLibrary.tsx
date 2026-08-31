@@ -106,9 +106,9 @@ export default function ContentLibrary() {
     const m: Record<string, string> = {
       template: 'bg-blue-100 text-blue-800', iso: 'bg-purple-100 text-purple-800',
       ovf: 'bg-green-100 text-green-800', script: 'bg-yellow-100 text-yellow-800',
-      file: 'bg-slate-500/20 text-slate-400',
+      file: 'bg-black/[0.06] text-[#6e6e73]',
     }
-    return m[type] || 'bg-slate-500/20 text-slate-400'
+    return m[type] || 'bg-black/[0.06] text-[#6e6e73]'
   }
 
   const filteredItems = selectedLibrary ? items.filter(i => i.library_id === selectedLibrary) : items
@@ -126,29 +126,29 @@ export default function ContentLibrary() {
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Libraries</div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Libraries</div>
           <div className="text-2xl font-bold">{libraries.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Items</div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Items</div>
           <div className="text-2xl font-bold">{items.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Guest Customizations</div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Guest Customizations</div>
           <div className="text-2xl font-bold">{specs.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Host Profiles</div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Host Profiles</div>
           <div className="text-2xl font-bold">{profiles.length}</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-[#f5f5f7] rounded-lg p-1">
         {(['libraries', 'items', 'specs', 'profiles'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium ${activeTab === tab ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
             {tab === 'specs' ? 'Guest Customization' : tab === 'profiles' ? 'Host Profiles' : tab === 'items' ? 'Item Browser' : 'Libraries'}
           </button>
         ))}
@@ -159,21 +159,21 @@ export default function ContentLibrary() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateLibrary(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Library
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {libraries.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No libraries.</div>
+              <div className="col-span-full text-center py-12 text-[#6e6e73] bg-[#f5f5f7] rounded-lg">No libraries.</div>
             ) : libraries.map(lib => (
-              <div key={lib.id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <div key={lib.id} className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-lg">{lib.name}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${lib.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-500/20 text-slate-400'}`}>{lib.status}</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${lib.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-black/[0.06] text-[#6e6e73]'}`}>{lib.status}</span>
                 </div>
-                {lib.description && <p className="text-sm text-slate-400 mb-3">{lib.description}</p>}
-                <div className="flex justify-between text-sm text-slate-400 mb-3">
+                {lib.description && <p className="text-sm text-[#6e6e73] mb-3">{lib.description}</p>}
+                <div className="flex justify-between text-sm text-[#6e6e73] mb-3">
                   <span>{lib.item_count} items</span>
                   <span>{formatBytes(lib.total_size_bytes)}</span>
                 </div>
@@ -183,7 +183,7 @@ export default function ContentLibrary() {
                   </span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => { setSelectedLibrary(lib.id); setActiveTab('items') }}
-                      className="text-blue-400 hover:text-blue-300 text-sm">Browse</button>
+                      className="text-[#0066cc] hover:text-blue-300 text-sm">Browse</button>
                     <button onClick={() => handleDeleteLibrary(lib.id)} className="text-red-600 hover:text-red-800">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -201,17 +201,17 @@ export default function ContentLibrary() {
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-3">
               <select value={selectedLibrary || ''} onChange={e => setSelectedLibrary(e.target.value || null)}
-                className="bg-slate-800 border border-slate-700/50 rounded px-3 py-2 text-sm">
+                className="bg-white border border-[#d2d2d7] rounded px-3 py-2 text-sm">
                 <option value="">All Libraries</option>
                 {libraries.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
-              <span className="text-sm text-slate-400">{filteredItems.length} items</span>
+              <span className="text-sm text-[#6e6e73]">{filteredItems.length} items</span>
             </div>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-            <table className="min-w-full divide-y divide-slate-700/50">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+            <table className="min-w-full divide-y divide-[#d2d2d7]">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase">
+                <tr className="text-left text-xs text-[#6e6e73] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Type</th>
                   <th className="p-4">Version</th>
@@ -220,21 +220,21 @@ export default function ContentLibrary() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {filteredItems.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">No items found.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No items found.</td></tr>
                 ) : filteredItems.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-900">
+                  <tr key={item.id} className="hover:bg-white">
                     <td className="p-4">
                       <div className="font-medium">{item.name}</div>
-                      {item.description && <div className="text-xs text-slate-400">{item.description}</div>}
+                      {item.description && <div className="text-xs text-[#6e6e73]">{item.description}</div>}
                     </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(item.item_type)}`}>{item.item_type}</span>
                     </td>
                     <td className="p-4 text-sm">{item.version}</td>
                     <td className="p-4 text-sm">{formatBytes(item.size_bytes)}</td>
-                    <td className="p-4 text-sm text-slate-400">{item.updated ? new Date(item.updated).toLocaleDateString() : '-'}</td>
+                    <td className="p-4 text-sm text-[#6e6e73]">{item.updated ? new Date(item.updated).toLocaleDateString() : '-'}</td>
                     <td className="p-4">
                       <button onClick={() => handleDeleteItem(item.library_id, item.id)} className="text-red-600 hover:text-red-800">
                         <Trash2 className="w-4 h-4" />
@@ -253,14 +253,14 @@ export default function ContentLibrary() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateSpec(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Spec
             </button>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-            <table className="min-w-full divide-y divide-slate-700/50">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+            <table className="min-w-full divide-y divide-[#d2d2d7]">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase">
+                <tr className="text-left text-xs text-[#6e6e73] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">OS Type</th>
                   <th className="p-4">Hostname Prefix</th>
@@ -269,20 +269,20 @@ export default function ContentLibrary() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {specs.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">No customization specs.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No customization specs.</td></tr>
                 ) : specs.map(spec => (
-                  <tr key={spec.id} className="hover:bg-slate-900">
+                  <tr key={spec.id} className="hover:bg-white">
                     <td className="p-4 font-medium">{spec.name}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${spec.os_type === 'linux' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
                         {spec.os_type}
                       </span>
                     </td>
-                    <td className="p-4 text-sm text-slate-400">{spec.hostname_prefix || '-'}</td>
-                    <td className="p-4 text-sm text-slate-400">{spec.domain || '-'}</td>
-                    <td className="p-4 text-sm font-mono text-slate-400">{spec.dns_servers?.join(', ') || '-'}</td>
+                    <td className="p-4 text-sm text-[#6e6e73]">{spec.hostname_prefix || '-'}</td>
+                    <td className="p-4 text-sm text-[#6e6e73]">{spec.domain || '-'}</td>
+                    <td className="p-4 text-sm font-mono text-[#6e6e73]">{spec.dns_servers?.join(', ') || '-'}</td>
                     <td className="p-4">
                       <button onClick={() => handleDeleteSpec(spec.id)} className="text-red-600 hover:text-red-800">
                         <Trash2 className="w-4 h-4" />
@@ -301,14 +301,14 @@ export default function ContentLibrary() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateProfile(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Profile
             </button>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-            <table className="min-w-full divide-y divide-slate-700/50">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+            <table className="min-w-full divide-y divide-[#d2d2d7]">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase">
+                <tr className="text-left text-xs text-[#6e6e73] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Compliant</th>
                   <th className="p-4">Non-Compliant</th>
@@ -316,21 +316,21 @@ export default function ContentLibrary() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {profiles.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No host profiles.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">No host profiles.</td></tr>
                 ) : profiles.map(profile => (
-                  <tr key={profile.id} className="hover:bg-slate-900">
+                  <tr key={profile.id} className="hover:bg-white">
                     <td className="p-4">
                       <div className="font-medium">{profile.name}</div>
-                      {profile.description && <div className="text-xs text-slate-400">{profile.description}</div>}
+                      {profile.description && <div className="text-xs text-[#6e6e73]">{profile.description}</div>}
                     </td>
-                    <td className="p-4 text-sm text-green-400">{profile.compliant_hosts}</td>
-                    <td className="p-4 text-sm text-red-400">{profile.non_compliant_hosts}</td>
+                    <td className="p-4 text-sm text-emerald-600">{profile.compliant_hosts}</td>
+                    <td className="p-4 text-sm text-red-600">{profile.non_compliant_hosts}</td>
                     <td className="p-4 text-sm">{profile.status}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setComplianceModalProfile(profile)} className="text-blue-400 hover:text-blue-300" title="Check host compliance">
+                        <button onClick={() => setComplianceModalProfile(profile)} className="text-[#0066cc] hover:text-blue-300" title="Check host compliance">
                           <ShieldCheck className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleDeleteProfile(profile.id)} className="text-red-600 hover:text-red-800">
@@ -380,22 +380,22 @@ function CreateLibraryModal({ onClose, onCreated }: { onClose: () => void; onCre
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Library</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required /></div>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required /></div>
           <div><label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
           <div><label className="block text-sm font-medium mb-1">Type</label>
-            <select value={libraryType} onChange={e => setLibraryType(e.target.value as 'local' | 'subscribed')} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+            <select value={libraryType} onChange={e => setLibraryType(e.target.value as 'local' | 'subscribed')} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               <option value="local">Local</option><option value="subscribed">Subscribed</option>
             </select></div>
           <div><label className="block text-sm font-medium mb-1">Storage Path</label>
-            <input type="text" value={storagePath} onChange={e => setStoragePath(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2 font-mono" required /></div>
+            <input type="text" value={storagePath} onChange={e => setStoragePath(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2 font-mono" required /></div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
           </div>
         </form>
       </div>
@@ -421,24 +421,24 @@ function CreateSpecModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Customization Spec</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required /></div>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required /></div>
           <div><label className="block text-sm font-medium mb-1">OS Type</label>
-            <select value={osType} onChange={e => setOsType(e.target.value as 'linux' | 'windows')} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+            <select value={osType} onChange={e => setOsType(e.target.value as 'linux' | 'windows')} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               <option value="linux">Linux</option><option value="windows">Windows</option>
             </select></div>
           <div><label className="block text-sm font-medium mb-1">Hostname Prefix</label>
-            <input type="text" value={hostnamePrefix} onChange={e => setHostnamePrefix(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+            <input type="text" value={hostnamePrefix} onChange={e => setHostnamePrefix(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
           <div><label className="block text-sm font-medium mb-1">Domain</label>
-            <input type="text" value={domain} onChange={e => setDomain(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+            <input type="text" value={domain} onChange={e => setDomain(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
           <div><label className="block text-sm font-medium mb-1">DNS Servers (comma-separated)</label>
-            <input type="text" value={dnsServers} onChange={e => setDnsServers(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="8.8.8.8, 8.8.4.4" /></div>
+            <input type="text" value={dnsServers} onChange={e => setDnsServers(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="8.8.8.8, 8.8.4.4" /></div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
           </div>
         </form>
       </div>
@@ -459,16 +459,16 @@ function CreateProfileModal({ onClose, onCreated }: { onClose: () => void; onCre
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Host Profile</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required /></div>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required /></div>
           <div><label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
           </div>
         </form>
       </div>
@@ -509,31 +509,31 @@ function HostComplianceModal({ profile, onClose }: { profile: HostProfile; onClo
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-1">Check Host Compliance</h2>
-        <p className="text-sm text-slate-400 mb-4">Against profile "{profile.name}"</p>
+        <p className="text-sm text-[#6e6e73] mb-4">Against profile "{profile.name}"</p>
         <form onSubmit={handleCheck} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Host ID</label>
             <input value={hostId} onChange={e => setHostId(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="host-01" />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="host-01" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Host's current config (JSON)</label>
             <textarea value={configText} onChange={e => setConfigText(e.target.value)} rows={8}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2 font-mono text-xs" />
-            {configError && <p className="text-xs text-red-400 mt-1">{configError}</p>}
-            <p className="text-xs text-slate-500 mt-1">Pre-filled from the profile's reference settings — edit to reflect what's actually configured on this host.</p>
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2 font-mono text-xs" />
+            {configError && <p className="text-xs text-red-600 mt-1">{configError}</p>}
+            <p className="text-xs text-[#6e6e73] mt-1">Pre-filled from the profile's reference settings — edit to reflect what's actually configured on this host.</p>
           </div>
 
           {result && (
             <div className={`rounded-lg border p-3 ${result.compliant ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-              <div className={`flex items-center gap-2 text-sm font-medium ${result.compliant ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`flex items-center gap-2 text-sm font-medium ${result.compliant ? 'text-emerald-600' : 'text-red-600'}`}>
                 {result.compliant ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                 {result.compliant ? 'Compliant' : `${result.deviations.length} deviation(s)`}
               </div>
               {!result.compliant && (
-                <ul className="mt-2 space-y-1 text-xs text-slate-300">
+                <ul className="mt-2 space-y-1 text-xs text-[#1d1d1f]">
                   {result.deviations.map((d, i) => (
                     <li key={i}><span className="text-amber-400">{d.setting}</span>: expected {d.expected}, got {d.actual}</li>
                   ))}
@@ -543,8 +543,8 @@ function HostComplianceModal({ profile, onClose }: { profile: HostProfile; onClo
           )}
 
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Close</button>
-            <button type="submit" disabled={checking} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Close</button>
+            <button type="submit" disabled={checking} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">
               {checking ? 'Checking…' : 'Check'}
             </button>
           </div>

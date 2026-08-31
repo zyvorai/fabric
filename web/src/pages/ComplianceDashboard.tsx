@@ -33,9 +33,9 @@ interface ComplianceSummary {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 90) return 'text-emerald-400'
+  if (score >= 90) return 'text-emerald-600'
   if (score >= 70) return 'text-amber-400'
-  return 'text-red-400'
+  return 'text-red-600'
 }
 
 function scoreBorder(score: number): string {
@@ -46,19 +46,19 @@ function scoreBorder(score: number): string {
 
 function statusIcon(status: string) {
   switch (status) {
-    case 'pass': return <CheckCircle className="w-5 h-5 text-green-400" />
+    case 'pass': return <CheckCircle className="w-5 h-5 text-emerald-600" />
     case 'warning': return <AlertTriangle className="w-5 h-5 text-amber-400" />
-    case 'fail': return <XCircle className="w-5 h-5 text-red-400" />
+    case 'fail': return <XCircle className="w-5 h-5 text-red-600" />
     default: return null
   }
 }
 
 function statusBadge(status: string): string {
   switch (status) {
-    case 'pass': return 'bg-green-500/20 text-green-400'
+    case 'pass': return 'bg-green-500/20 text-emerald-600'
     case 'warning': return 'bg-amber-500/20 text-amber-400'
-    case 'fail': return 'bg-red-500/20 text-red-400'
-    default: return 'bg-slate-500/20 text-slate-400'
+    case 'fail': return 'bg-red-500/20 text-red-600'
+    default: return 'bg-black/[0.06] text-[#6e6e73]'
   }
 }
 
@@ -118,7 +118,7 @@ export default function ComplianceDashboard() {
     return (
       <div className="space-y-6">
         <PageHeader title="Compliance Dashboard" description="Security and configuration compliance posture" />
-        <div className="flex items-center justify-center h-64 text-slate-400">
+        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
           <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
           Running compliance checks…
         </div>
@@ -138,7 +138,7 @@ export default function ComplianceDashboard() {
         onRefresh={fetchCompliance}
         refreshing={loading}
         actions={
-          <button onClick={runScan} disabled={scanning} title="Run compliance scan" className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+          <button onClick={runScan} disabled={scanning} title="Run compliance scan" className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
             <Shield className={`w-4 h-4 ${scanning ? 'animate-pulse' : ''}`} /> {scanning ? 'Scanning…' : 'Run Scan'}
           </button>
         }
@@ -159,56 +159,56 @@ export default function ComplianceDashboard() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 flex flex-col items-center justify-center">
-          <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 ${scoreBorder(summary.score)} bg-slate-900/50`}>
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-6 flex flex-col items-center justify-center">
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 ${scoreBorder(summary.score)} bg-white`}>
             <span className={`text-3xl font-bold ${scoreColor(summary.score)}`}>{summary.score}</span>
           </div>
-          <span className="text-xs text-slate-400 mt-2">Compliance Score</span>
+          <span className="text-xs text-[#6e6e73] mt-2">Compliance Score</span>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{summary.passed}</div>
-          <div className="text-xs text-slate-400 mt-1">Passed</div>
+        <div className="stat-card-green rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{summary.passed}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Passed</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{summary.warnings}</div>
-          <div className="text-xs text-slate-400 mt-1">Warnings</div>
+        <div className="stat-card-orange rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{summary.warnings}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Warnings</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{summary.failed}</div>
-          <div className="text-xs text-slate-400 mt-1">Failed</div>
+        <div className="stat-card-red rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{summary.failed}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Failed</div>
         </div>
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{summary.total}</div>
-          <div className="text-xs text-slate-400 mt-1">Total Checks</div>
+        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{summary.total}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Total Checks</div>
         </div>
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {categories.map(cat => (
           <button key={cat} onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap capitalize ${selectedCategory === cat ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200 bg-slate-800/50 border border-slate-700 hover:border-slate-600'}`}>
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap capitalize ${selectedCategory === cat ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30' : 'text-[#6e6e73] hover:text-[#1d1d1f] bg-[#f5f5f7] border border-[#d2d2d7] hover:border-[#d2d2d7]'}`}>
             {cat}
           </button>
         ))}
       </div>
 
       {filteredChecks.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500 text-sm">No checks in this category</div>
+        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73] text-sm">No checks in this category</div>
       ) : (
         <div className="space-y-2">
           {filteredChecks.map((check) => (
-            <div key={check.id} className={`bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 flex items-start gap-4 ${check.status === 'fail' ? 'border-l-4 border-l-red-500' : check.status === 'warning' ? 'border-l-4 border-l-amber-500' : ''}`}>
+            <div key={check.id} className={`bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-4 flex items-start gap-4 ${check.status === 'fail' ? 'border-l-4 border-l-red-500' : check.status === 'warning' ? 'border-l-4 border-l-amber-500' : ''}`}>
               {statusIcon(check.status)}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-white">{check.name}</span>
+                  <span className="text-sm font-medium text-[#1d1d1f]">{check.name}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(check.status)}`}>{check.status}</span>
-                  <span className="text-xs text-slate-600 capitalize">{check.category}</span>
+                  <span className="text-xs text-[#6e6e73] capitalize">{check.category}</span>
                 </div>
-                <p className="text-xs text-slate-400">{check.description}</p>
+                <p className="text-xs text-[#6e6e73]">{check.description}</p>
                 {check.remediation && check.status !== 'pass' && (
-                  <div className="mt-2 bg-slate-900/50 rounded-lg p-2 text-xs text-slate-300">
-                    <span className="text-slate-500">Fix: </span>{check.remediation}
+                  <div className="mt-2 bg-white rounded-lg p-2 text-xs text-[#1d1d1f]">
+                    <span className="text-[#6e6e73]">Fix: </span>{check.remediation}
                   </div>
                 )}
               </div>
@@ -217,7 +217,7 @@ export default function ComplianceDashboard() {
         </div>
       )}
 
-      {summary.last_scan && <div className="text-xs text-slate-600 text-right">Last scan: {new Date(summary.last_scan).toLocaleString()}</div>}
+      {summary.last_scan && <div className="text-xs text-[#6e6e73] text-right">Last scan: {new Date(summary.last_scan).toLocaleString()}</div>}
     </div>
   )
 }

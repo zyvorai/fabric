@@ -4,13 +4,15 @@ Zyvor Fabric is organized by navigation groups (sidebar, desktop nav, or CLI com
 
 ## Surfaces
 
+Public marketing: `/`, `/product`, `/platform`, `/security`. Sign in at `/sign-in`. Console lives under `/app`.
+
 | Need | Path |
 |------|------|
-| Dashboard | `/` |
-| VMs | `/vms` |
-| DRS / FT | `/drs`, `/fault-tolerance` |
-| Site Recovery | `/site-recovery` |
-| Settings | `/settings` |
+| Dashboard | `/app` |
+| VMs | `/app/vms` |
+| DRS / FT | `/app/drs`, `/app/fault-tolerance` |
+| Site Recovery | `/app/site-recovery` |
+| Settings | `/app/settings` |
 
 ## Browse vs act
 

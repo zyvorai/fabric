@@ -111,20 +111,20 @@ export default function VMCompare() {
       )}
 
       {loadingVMs && !loadError ? (
-        <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3">
-          <div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
+          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
           <span className="text-sm">Loading VM list…</span>
         </div>
       ) : !loadError ? (
         <>
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="bg-[#f5f5f7] rounded-xl p-4 border border-[#d2d2d7]">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Source VM</label>
+                <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Source VM</label>
                 <select
                   value={sourceVM}
                   onChange={(e) => setSourceVM(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-[#e8e8ed] border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="">Select source VM…</option>
                   {vms.map((vm) => (
@@ -135,11 +135,11 @@ export default function VMCompare() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Target VM</label>
+                <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Target VM</label>
                 <select
                   value={targetVM}
                   onChange={(e) => setTargetVM(e.target.value)}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-[#e8e8ed] border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="">Select target VM…</option>
                   {vms
@@ -155,7 +155,7 @@ export default function VMCompare() {
                 type="button"
                 onClick={handleCompare}
                 disabled={loading || !sourceVM || !targetVM}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
               >
                 <GitCompare className="w-4 h-4" />
                 {loading ? 'Comparing…' : 'Compare'}
@@ -164,33 +164,33 @@ export default function VMCompare() {
           </div>
 
           {result && (
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">
+            <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#d2d2d7] flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[#1d1d1f]">
                   {result.source_name} vs {result.target_name}
                 </h3>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-[#6e6e73]">
                   {new Date(result.timestamp).toLocaleString()}
                 </span>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-700/50 bg-slate-700/20">
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase">Field</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase">Source</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase">Target</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase w-20">Match</th>
+                  <tr className="border-b border-[#d2d2d7] bg-[#f5f5f7]">
+                    <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase">Field</th>
+                    <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase">Source</th>
+                    <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase">Target</th>
+                    <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase w-20">Match</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/30">
+                <tbody className="divide-y divide-[#d2d2d7]/30">
                   {result.fields.map((field) => (
-                    <tr key={field.label} className="hover:bg-slate-700/20">
-                      <td className="p-3 text-slate-300 font-medium">{field.label}</td>
-                      <td className="p-3 text-slate-400 font-mono text-xs">{field.source}</td>
-                      <td className="p-3 text-slate-400 font-mono text-xs">{field.target}</td>
+                    <tr key={field.label} className="hover:bg-black/[0.04]">
+                      <td className="p-3 text-[#1d1d1f] font-medium">{field.label}</td>
+                      <td className="p-3 text-[#6e6e73] font-mono text-xs">{field.source}</td>
+                      <td className="p-3 text-[#6e6e73] font-mono text-xs">{field.target}</td>
                       <td className="p-3">
                         <span
-                          className={`text-xs font-medium ${field.match ? 'text-green-400' : 'text-amber-400'}`}
+                          className={`text-xs font-medium ${field.match ? 'text-emerald-600' : 'text-amber-400'}`}
                         >
                           {field.match ? 'Yes' : 'No'}
                         </span>

@@ -8,7 +8,7 @@ One-page cheat sheet for common operations with Zyvor Fabric.
 
 ```bash
 # Log in and get a JWT token
-TOKEN=$(curl -s http://127.0.0.1:9095/api/v1/auth/login \
+TOKEN=$(curl -s http://127.0.0.1:9095/api/v1/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "YOUR_PASSWORD"}' | jq -r '.token')
 
@@ -31,7 +31,7 @@ curl -s -X POST http://127.0.0.1:9095/api/v1/auth/2fa/verify \
   -d '{"totp_code": "123456"}' | jq .
 
 # Log in with 2FA
-TOKEN=$(curl -s http://127.0.0.1:9095/api/v1/auth/login \
+TOKEN=$(curl -s http://127.0.0.1:9095/api/v1/auth/sign-in \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "YOUR_PASSWORD", "totp_code": "654321"}' | jq -r '.token')
 ```
@@ -398,7 +398,7 @@ curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/discover \
   -d '{"portal": "192.168.1.100:3260"}' | jq .
 
 # Log in to an iSCSI target
-curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/login \
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/sign-in \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"portal": "192.168.1.100:3260", "target": "iqn.2026-01.com.example:storage"}' | jq .

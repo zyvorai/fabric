@@ -12,7 +12,7 @@ Containers — a read-only, auto-refreshing view of container workloads running 
 
 ## How to get there
 
-- Route / id: `/containers`
+- Route / id: `/app/containers`
 - Nav: **Infrastructure → Containers** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

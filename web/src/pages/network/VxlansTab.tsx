@@ -31,31 +31,31 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
   const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <h2 className="text-xl font-semibold">VXLAN</h2>
-        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create VXLAN
         </button>}
       </div>
       {vxlans.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No VXLAN interfaces configured.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No VXLAN interfaces configured.</div>
       ) : (
         <>
           <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search name, VNI, remote…" total={vxlans.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
           <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-800">
+            <thead className="bg-white">
               <tr>
-                <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">VNI</th>
-                <th className="text-left p-4 font-medium text-slate-300">Remote</th>
-                <th className="text-left p-4 font-medium text-slate-300">Parent</th>
-                <th className="text-left p-4 font-medium text-slate-300">Addresses</th>
-                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">VNI</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Remote</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Parent</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Addresses</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {pageItems.map(v => (
                 <tr key={v.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">
@@ -63,9 +63,9 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
                     {isHostManaged(v) && <HostBadge />}
                   </td>
                   <td className="p-4 font-mono text-indigo-400">{v.vni}</td>
-                  <td className="p-4 text-slate-400 font-mono text-sm">{v.remote ?? '-'}</td>
-                  <td className="p-4 text-slate-400">{v.parent_interface ?? '-'}</td>
-                  <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
+                  <td className="p-4 text-[#6e6e73] font-mono text-sm">{v.remote ?? '-'}</td>
+                  <td className="p-4 text-[#6e6e73]">{v.parent_interface ?? '-'}</td>
+                  <td className="p-4 text-[#6e6e73] font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
                   <td className="p-4">
                     <HostManagedActions readOnly={readOnly}
                       item={v}
@@ -77,7 +77,7 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No VXLAN interfaces match your search.</div>}
+          {filtered.length === 0 && <div className="p-8 text-center text-[#6e6e73] text-sm">No VXLAN interfaces match your search.</div>}
           </div>
         </>
       )}
@@ -130,8 +130,8 @@ export function CreateVxlanModal({ onClose, onCreated }: { onClose: () => void; 
         <InputField label="UDP Port" value={port} onChange={setPort} placeholder="4789" type="number" />
         <InputField label="Parent Interface (optional)" value={parent} onChange={setParent} placeholder="eth0" />
         <InputField label="Addresses (comma-separated)" value={addresses} onChange={setAddresses} placeholder="10.10.0.1/24" />
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create VXLAN'}
         </button>
       </div>

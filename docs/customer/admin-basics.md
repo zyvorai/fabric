@@ -4,12 +4,16 @@
 
 | Port | Service |
 |------|--------|
-| **9095** | Daemon / API |
-| **3000** | Vite UI (dev) |
+| **9095** | Daemon / API / production web UI |
+| **5173** | Vite UI (dev) |
+
+Web routes: marketing `/`, `/product`, `/platform`, `/security`; sign-in `/sign-in`; console `/app/*`.
 
 ## Auth
 
-External OIDC + JWT bearer.
+JWT bearer (local admin by default). Optional LDAP/OIDC.
+
+Sign in at `http://127.0.0.1:9095/sign-in`, then open `/app`.
 
 ### JWT secret and admin password
 

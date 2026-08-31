@@ -6,8 +6,8 @@
 - 165 Rust source files, 130 TypeScript files
 - ~87,000 lines of code (60K Rust + 27K TypeScript)
 - 480+ REST API endpoints + 3 WebSocket endpoints
-- 37 web pages + 20 network/security sub-pages
-- 20+ React components + reusable UI subcomponents
+- 80+ console pages under `/app` + marketing routes
+- 4 interfaces (CLI, Web, Operator, Terraform) — terminal UI removed
 - 3 RBAC roles (Admin, User, Viewer)
 - 4 disk formats (qcow2, raw, vmdk, vdi)
 - 6 storage backends (Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD)
@@ -43,35 +43,21 @@
 - Ceph management: pool create, health, stats, RBD image CRUD
 - Color output and progress indicators
 
-### TUI (zyvorctl-tui)
-
-- 8 views (Dashboard, VMs, Logs, Metrics, Network, Net Security, Storage, Help)
-- Real-time updates from live API data
-- Keyboard navigation with vim-style bindings
-- Net Security view with 9 sub-tabs (Policies, Firewall, Services, QoS, DNS, VPN, Mirror, NAT, Monitor)
-- Storage view with Ceph pool details, RBD images, and health status
-- Logs view with live audit log entries
-- Network view with live bridge, VLAN, and link data
-- Status colors and auto-refresh
-
 ### Web UI (React)
 
-- 37 pages + 20 network/security sub-pages
-- 20+ React components + reusable UI subcomponents
-- Dashboard with real-time statistics
-- Cilium-style network security page with 9 tabs, label selector editors, create modals
-- VM list with quick actions
-- VM details, creation wizard
-- Ceph storage pool creation with monitor/pool/user/keyring config
-- Live logs from audit API (no mock data)
-- Storage management with live pool and volume data from API
-- Settings with dynamically populated storage pool dropdown
-- First-run "Getting Started" panel on the dashboard when no VMs exist yet, linking straight to VM creation, templates, the API playground, and access control
-- Search, live relative timestamps ("3m ago"), and one-click copy on IDs/paths/URLs across high-traffic list pages (VMs, backups, schedules, certificates, notifications, audit logs, webhooks, storage pools)
-- Undo window on VM deletion — confirming delete shows a few seconds' grace with an Undo button before the VM is actually removed
-- Dark theme, responsive layout
-- TailwindCSS styling
+- Hybrid: public marketing (`/`, `/product`, `/platform`, `/security`) + light Apple-style console under `/app`
+- Sign-in at `/sign-in` (`/login` redirects)
+- 80+ console pages + network/security sub-tabs
+- Command palette (Ctrl/Cmd+K), sequence shortcuts, left nav
+- Dashboard with real-time statistics and capabilities health
+- Cilium-style network security page with 9 tabs
+- VM list, detail tabs, creation wizard, console/VNC
+- First-run Getting Started panel when no VMs exist
+- Undo window on VM deletion
+- SF Pro / system UI font; Apple contrast tokens (`#1d1d1f`, `#333336`, `#6e6e73` on `#f5f5f7`)
+- Tailwind CSS styling
 
+The former terminal UI (`zyvorctl-tui`) has been removed.
 ## Console Access
 
 ### WebSocket Console

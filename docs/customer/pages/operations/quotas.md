@@ -13,7 +13,7 @@ Resource Quotas — cap CPU, memory, disk, and VM-count usage, applied either gl
 
 ## How to get there
 
-- Route / id: `/quotas`
+- Route / id: `/app/quotas`
 - Nav: **Operations → Quotas** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

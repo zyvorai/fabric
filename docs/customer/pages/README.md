@@ -1,3 +1,5 @@
+Console guides below assume you are signed in. Public marketing routes are `/`, `/product`, `/platform`, `/security`; sign in at `/sign-in`.
+
 # Page-by-page guides
 
 Each guide follows: Purpose → When to use it → How to get there → What you can do → Related pages.
@@ -8,7 +10,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
-| [Login](auth/login.md) | Login — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host. |
+| [Sign in](auth/sign-in.md) | Sign in — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host. |
 
 ## Core
 

@@ -35,37 +35,37 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
   const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <h2 className="text-xl font-semibold">Floating IPs</h2>
-        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Add Floating IP
         </button>}
       </div>
       {floatingIps.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No floating IPs configured. Host secondary addresses appear here when discovered, or create one to assign to a VM.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No floating IPs configured. Host secondary addresses appear here when discovered, or create one to assign to a VM.</div>
       ) : (
         <>
           <ListControls search={search} onSearchChange={setSearch} searchPlaceholder="Search address, interface, VM…" total={floatingIps.length} filtered={filtered.length} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} showAll={showAll} onShowAllChange={setShowAll} />
           <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-800">
+            <thead className="bg-white">
               <tr>
-                <th className="text-left p-4 font-medium text-slate-300">Address</th>
-                <th className="text-left p-4 font-medium text-slate-300">Interface</th>
-                <th className="text-left p-4 font-medium text-slate-300">Assigned VM</th>
-                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Address</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Interface</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Assigned VM</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {pageItems.map(f => (
                 <tr key={f.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-mono text-cyan-400">
                     {f.address}
                     {isHostManaged(f) && <HostBadge />}
                   </td>
-                  <td className="p-4 font-mono text-sm text-slate-400">{f.interface}</td>
-                  <td className="p-4 text-slate-400">{f.assigned_vm ?? '—'}</td>
+                  <td className="p-4 font-mono text-sm text-[#6e6e73]">{f.interface}</td>
+                  <td className="p-4 text-[#6e6e73]">{f.assigned_vm ?? '—'}</td>
                   <td className="p-4">
                     {isHostManaged(f) ? (
                       <HostManagedActions readOnly={readOnly}
@@ -77,7 +77,7 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
                       <div className="flex items-center gap-2">
                         {!readOnly && f.assigned_vm ? (
                           onUnassign && (
-                            <button type="button" onClick={() => onUnassign(f.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Unassign from VM">
+                            <button type="button" onClick={() => onUnassign(f.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] transition" title="Unassign from VM">
                               <Unlink className="w-3.5 h-3.5" /> Unassign
                             </button>
                           )
@@ -87,7 +87,7 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
                           )
                         )}
                         {!readOnly && (
-                        <button type="button" onClick={() => onDelete(f.id)} className="p-2 hover:bg-red-600/20 rounded transition text-red-400" title="Delete">
+                        <button type="button" onClick={() => onDelete(f.id)} className="p-2 hover:bg-red-600/20 rounded transition text-red-600" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
                         )}
@@ -98,7 +98,7 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="p-8 text-center text-slate-500 text-sm">No floating IPs match your search.</div>}
+          {filtered.length === 0 && <div className="p-8 text-center text-[#6e6e73] text-sm">No floating IPs match your search.</div>}
           </div>
         </>
       )}
@@ -158,9 +158,9 @@ export function CreateFloatingIpModal({
       <div className="space-y-4">
         <InputField label="Address" value={address} onChange={setAddress} placeholder="203.0.113.10" />
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Interface</label>
+          <label className="block text-sm font-medium text-[#1d1d1f] mb-1">Interface</label>
           {interfaceOptions.length > 0 ? (
-            <select value={iface} onChange={e => setIface(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <select value={iface} onChange={e => setIface(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
               {interfaceOptions.map(name => (
                 <option key={name} value={name}>{name}</option>
               ))}
@@ -171,12 +171,12 @@ export function CreateFloatingIpModal({
               value={iface}
               onChange={e => setIface(e.target.value)}
               placeholder="eno1"
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500"
             />
           )}
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating…' : 'Create Floating IP'}
         </button>
       </div>
@@ -223,23 +223,23 @@ function AssignFloatingIpModal({
   return (
     <ModalWrapper title={`Assign ${fip.address}`} onClose={onClose}>
       <div className="space-y-4">
-        <p className="text-sm text-slate-400">Bind this address on <span className="font-mono text-slate-300">{fip.interface}</span> and record the VM assignment.</p>
+        <p className="text-sm text-[#6e6e73]">Bind this address on <span className="font-mono text-[#1d1d1f]">{fip.interface}</span> and record the VM assignment.</p>
         {loading ? (
-          <p className="text-sm text-slate-500">Loading VMs…</p>
+          <p className="text-sm text-[#6e6e73]">Loading VMs…</p>
         ) : vms.length === 0 ? (
           <p className="text-sm text-amber-400">No VMs available. Create a VM first.</p>
         ) : (
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">VM</label>
-            <select value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-1">VM</label>
+            <select value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
               {vms.map(vm => (
                 <option key={vm.name} value={vm.name}>{vm.name} ({vm.state})</option>
               ))}
             </select>
           </div>
         )}
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting || loading || vms.length === 0} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting || loading || vms.length === 0} className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Assigning…' : 'Assign to VM'}
         </button>
       </div>

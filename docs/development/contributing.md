@@ -166,9 +166,9 @@ committing.
 ### API Conventions
 
 - All API endpoints are under `/api/v1/`
-- Use plural nouns for resource collections: `/vms`, `/templates`, `/backups`
-- Use nested resources for relationships: `/vms/{name}/snapshots`
-- Use POST for actions: `/vms/{name}/start`, `/vms/{name}/stop`
+- Use plural nouns for resource collections: `/app/vms`, `/app/templates`, `/app/backups`
+- Use nested resources for relationships: `/app/vms/{name}/snapshots`
+- Use POST for actions: `/app/vms/{name}/start`, `/app/vms/{name}/stop`
 - Return paginated responses: `{ items: [...], total, offset, limit }`
 - Return `201 Created` for successful creation
 - Return `404 Not Found` for missing resources

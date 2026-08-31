@@ -7,8 +7,10 @@ Private cloud control plane with a pluggable VM driver (systemd-machined/systemd
 | Goal | Document |
 |------|----------|
 | Main README | [README.md](../README.md) |
+| **Web UX** (marketing + `/app` console) | [web-ui.md](web-ui.md) · [ux.md](ux.md) |
 | **User journeys & acceptance criteria** | [User Stories](USER_STORIES.md) |
 | **Ephemera VM driver** — config, capability matrix, known gaps | [guides/vm-drivers/ephemera.md](guides/vm-drivers/ephemera.md) |
+| Customer page index | [customer/PAGE_INDEX.md](customer/PAGE_INDEX.md) |
 
 ## User Stories
 
@@ -18,7 +20,7 @@ Persona-based journeys with acceptance criteria: **[USER_STORIES.md](USER_STORIE
 |---------|-------|
 | Alex (Private Cloud Admin) | VM lifecycle via the pluggable driver (systemd-vmspawn or Ephemera) |
 | Morgan (Platform Engineer) | K8s operator and Terraform |
-| Jordan (Developer) | CLI/TUI/API for VM operations |
+| Jordan (Developer) | CLI/API for VM operations |
 
 ## Ecosystem
 
@@ -34,7 +36,7 @@ Part of the [Zyvor / HyperSDK platform stack](https://zyvor.dev):
 | **ephemera** | Disposable-VM control plane — optional VM driver backend (see [above](guides/vm-drivers/ephemera.md)) |
 | **guestkit** | Offline VM assurance |
 | **packetwolf** | Network intelligence |
-| **Aether** | Runtime portability |
+| **Axiom** | k8s-native private cloud control plane |
 | **hermes** | Application layer for K8s |
 
 See also: [../README.md](../README.md)

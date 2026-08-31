@@ -128,7 +128,7 @@ export default function Webhooks() {
         actions={
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-600 hover:bg-orange-500 text-[#1d1d1f] font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Webhook
@@ -139,22 +139,22 @@ export default function Webhooks() {
       <PageLoadBanner title="Could not load webhooks" headline={loadError} onRetry={() => void fetchWebhooks()} />
 
       {showAdd && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-slate-300">New Webhook</h3>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-[#1d1d1f]">New Webhook</h3>
 
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Webhook URL</label>
+            <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Webhook URL</label>
             <input
               type="url"
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               placeholder="https://hooks.example.com/webhook"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Type</label>
+            <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Type</label>
             <div className="flex gap-2">
               {webhookTypes.map((t) => (
                 <button
@@ -163,7 +163,7 @@ export default function Webhooks() {
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors capitalize ${
                     newType === t
                       ? 'bg-orange-600/20 text-orange-400 border-orange-500/30'
-                      : 'text-slate-400 bg-slate-800 border-slate-700 hover:border-slate-600'
+                      : 'text-[#6e6e73] bg-white border-[#d2d2d7] hover:border-[#d2d2d7]'
                   }`}
                 >
                   {t}
@@ -173,7 +173,7 @@ export default function Webhooks() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Events</label>
+            <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Events</label>
             <div className="flex flex-wrap gap-2">
               {availableEvents.map((ev) => (
                 <label key={ev} className="flex items-center gap-2 cursor-pointer">
@@ -181,30 +181,30 @@ export default function Webhooks() {
                     type="checkbox"
                     checked={newEvents.includes(ev)}
                     onChange={() => toggleEvent(ev)}
-                    className="rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500/50"
+                    className="rounded border-[#d2d2d7] bg-white text-orange-500 focus:ring-orange-500/50"
                   />
-                  <span className="text-sm text-slate-300 font-mono">{ev}</span>
+                  <span className="text-sm text-[#1d1d1f] font-mono">{ev}</span>
                 </label>
               ))}
             </div>
           </div>
 
           {addError && (
-            <p className="text-sm text-red-400">{addError}</p>
+            <p className="text-sm text-red-600">{addError}</p>
           )}
 
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
               disabled={adding}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-[#e8e8ed] disabled:text-[#6e6e73] text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors"
             >
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               {adding ? 'Adding...' : 'Add'}
             </button>
             <button
               onClick={() => { setShowAdd(false); setAddError('') }}
-              className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-[#6e6e73] hover:text-[#1d1d1f] bg-white hover:bg-black/[0.04] rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -217,42 +217,42 @@ export default function Webhooks() {
           <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : webhooks.length === 0 ? (
-        <div className="text-center py-16 text-slate-500">
+        <div className="text-center py-16 text-[#6e6e73]">
           <Bell className="w-10 h-10 mx-auto mb-3 opacity-50" />
           <p className="text-sm">No webhooks configured yet.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {webhooks.map((wh) => (
-            <div key={wh.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+            <div key={wh.id} className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <Globe className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                    <span className="text-sm text-slate-200 font-mono truncate">{wh.url}</span>
+                    <Globe className="w-4 h-4 text-[#6e6e73] flex-shrink-0" />
+                    <span className="text-sm text-[#1d1d1f] font-mono truncate">{wh.url}</span>
                     <CopyButton text={wh.url} iconOnly successMessage="Webhook URL copied" />
                   </div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded capitalize ${
                       wh.type === 'slack' ? 'bg-purple-500/20 text-purple-400'
                         : wh.type === 'discord' ? 'bg-indigo-500/20 text-indigo-400'
-                        : 'bg-slate-700 text-slate-400'
+                        : 'bg-[#e8e8ed] text-[#6e6e73]'
                     }`}>
                       {wh.type || 'generic'}
                     </span>
                     {wh.events?.map((ev) => (
-                      <span key={ev} className="text-xs px-2 py-0.5 bg-slate-800 text-slate-400 rounded font-mono">{ev}</span>
+                      <span key={ev} className="text-xs px-2 py-0.5 bg-white text-[#6e6e73] rounded font-mono">{ev}</span>
                     ))}
                     <div className="flex items-center gap-1 text-xs">
                       {wh.enabled ? (
-                        <><ToggleRight className="w-4 h-4 text-green-400" /><span className="text-green-400">Enabled</span></>
+                        <><ToggleRight className="w-4 h-4 text-emerald-600" /><span className="text-emerald-600">Enabled</span></>
                       ) : (
-                        <><ToggleLeft className="w-4 h-4 text-slate-500" /><span className="text-slate-500">Disabled</span></>
+                        <><ToggleLeft className="w-4 h-4 text-[#6e6e73]" /><span className="text-[#6e6e73]">Disabled</span></>
                       )}
                     </div>
                   </div>
                   {testResult?.id === wh.id && (
-                    <div className={`mt-2 flex items-center gap-1.5 text-xs ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                    <div className={`mt-2 flex items-center gap-1.5 text-xs ${testResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
                       {testResult.ok ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                       {testResult.msg}
                     </div>
@@ -263,7 +263,7 @@ export default function Webhooks() {
                   <button
                     onClick={() => handleTest(wh.id)}
                     disabled={testingId === wh.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white hover:bg-black/[0.04] text-[#1d1d1f] rounded-lg transition-colors border border-[#d2d2d7]"
                     title="Test webhook"
                   >
                     {testingId === wh.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -271,7 +271,7 @@ export default function Webhooks() {
                   </button>
                   <button
                     onClick={() => handleDelete(wh.id, wh.url)}
-                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    className="p-1.5 text-[#6e6e73] hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
                     title="Delete webhook"
                   >
                     <Trash2 className="w-4 h-4" />

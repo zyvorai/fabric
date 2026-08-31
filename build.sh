@@ -61,14 +61,14 @@ if $BUILD_BACKEND; then
         cd backend
         if [[ "$BUILD_MODE" == "release" ]]; then
             cargo build --release 2>&1
-            for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+            for bin in zyvor-fabricd zyvorctl; do
                 if [[ -f "target/release/$bin" ]]; then
                     info "$bin ($(du -h "target/release/$bin" | cut -f1))"
                 fi
             done
         else
             cargo build 2>&1
-            for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+            for bin in zyvor-fabricd zyvorctl; do
                 if [[ -f "target/debug/$bin" ]]; then
                     info "$bin (debug, $(du -h "target/debug/$bin" | cut -f1))"
                 fi

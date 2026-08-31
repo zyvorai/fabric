@@ -74,7 +74,7 @@ export default function Autoscale() {
           canWrite ? (
             <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
             >
               <Plus className="w-4 h-4" />
               Create Policy
@@ -94,7 +94,7 @@ export default function Autoscale() {
             canWrite ? (
               <button
                 onClick={() => setShowCreate(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm"
+                className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm"
               >
                 Create Policy
               </button>
@@ -104,9 +104,9 @@ export default function Autoscale() {
       )}
 
       {policies.length > 0 && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/50 text-slate-400 text-left">
+            <thead className="bg-white text-[#6e6e73] text-left">
               <tr>
                 <th className="p-4">VM</th>
                 <th className="p-4">CPU range</th>
@@ -116,21 +116,21 @@ export default function Autoscale() {
                 <th className="p-4" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {policies.map((p) => (
                 <tr key={p.vm_name} className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-medium text-white">{p.vm_name}</td>
-                  <td className="p-4 text-slate-400">{p.min_cpus}–{p.max_cpus} vCPU</td>
-                  <td className="p-4 text-slate-400">{p.min_memory_mb}–{p.max_memory_mb} MB</td>
-                  <td className="p-4 text-slate-400 text-xs">
+                  <td className="p-4 font-medium text-[#1d1d1f]">{p.vm_name}</td>
+                  <td className="p-4 text-[#6e6e73]">{p.min_cpus}–{p.max_cpus} vCPU</td>
+                  <td className="p-4 text-[#6e6e73]">{p.min_memory_mb}–{p.max_memory_mb} MB</td>
+                  <td className="p-4 text-[#6e6e73] text-xs">
                     CPU ↑{p.cpu_scale_up_threshold ?? '—'}% ↓{p.cpu_scale_down_threshold ?? '—'}%
                   </td>
-                  <td className="p-4 text-slate-400">{p.cooldown_secs}s</td>
+                  <td className="p-4 text-[#6e6e73]">{p.cooldown_secs}s</td>
                   <td className="p-4 text-right">
                     {canWrite && (
                       <button
                         onClick={() => void handleDelete(p.vm_name)}
-                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg"
+                        className="p-2 text-red-600 hover:bg-red-400/10 rounded-lg"
                         title="Delete policy"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -145,16 +145,16 @@ export default function Autoscale() {
       )}
 
       {events.length > 0 && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-4">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-4">
             <Clock className="w-4 h-4 text-amber-400" />
             Recent scale events
           </h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {events.slice(0, 20).map((ev) => (
-              <div key={ev.id} className="flex justify-between gap-4 text-xs border-b border-slate-700/30 pb-2">
-                <span className="text-slate-300">{ev.vm_name} · {ev.action} {ev.resource}</span>
-                <span className="text-slate-500 shrink-0">{new Date(ev.timestamp).toLocaleString()}</span>
+              <div key={ev.id} className="flex justify-between gap-4 text-xs border-b border-[#d2d2d7]/60 pb-2">
+                <span className="text-[#1d1d1f]">{ev.vm_name} · {ev.action} {ev.resource}</span>
+                <span className="text-[#6e6e73] shrink-0">{new Date(ev.timestamp).toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -236,15 +236,15 @@ function CreatePolicyDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700/50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-lg border border-[#d2d2d7]">
         <h2 className="text-xl font-bold mb-4">Create autoscale policy</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs text-slate-400 mb-1">VM</label>
+            <label className="block text-xs text-[#6e6e73] mb-1">VM</label>
             <select
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f]"
               required
             >
               {available.length === 0 && <option value="">No VMs available</option>}
@@ -263,11 +263,11 @@ function CreatePolicyDialog({
           </div>
           <Field label="Cooldown (seconds)" value={cooldown} onChange={setCooldown} />
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-[#6e6e73] hover:text-[#1d1d1f]">Cancel</button>
             <button
               type="submit"
               disabled={saving || !vmName}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white disabled:opacity-50"
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-white disabled:opacity-50"
             >
               Create
             </button>
@@ -289,12 +289,12 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-xs text-slate-400 mb-1">{label}</label>
+      <label className="block text-xs text-[#6e6e73] mb-1">{label}</label>
       <input
         type="number"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+        className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f]"
       />
     </div>
   )

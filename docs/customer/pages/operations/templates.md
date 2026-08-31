@@ -12,7 +12,7 @@ VM Templates — reusable VM configurations (CPU/memory/disk, tags) that you sav
 
 ## How to get there
 
-- Route / id: `/templates`
+- Route / id: `/app/templates`
 - Nav: **Operations → Templates** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

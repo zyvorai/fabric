@@ -48,7 +48,7 @@ export function ListControls({
   const safePage = Math.min(page, totalPages)
 
   return (
-    <div className="p-4 border-b border-slate-700/50 space-y-3">
+    <div className="p-4 border-b border-[#d2d2d7] space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <input
           type="search"
@@ -58,7 +58,7 @@ export function ListControls({
             onPageChange(1)
           }}
           placeholder={searchPlaceholder}
-          className="flex-1 bg-slate-900 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          className="flex-1 bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
         />
         {showTypeFilters && onTypeFilterChange && (
           <div className="flex gap-1 shrink-0">
@@ -73,7 +73,7 @@ export function ListControls({
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                   typeFilter === t
                     ? 'bg-yellow-600/30 text-yellow-300 border border-yellow-500/40'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700/50 hover:text-slate-200'
+                    : 'bg-white text-[#6e6e73] border border-[#d2d2d7] hover:text-[#1d1d1f]'
                 }`}
               >
                 {t === 'all' ? 'All' : t === 'physical' ? 'Physical' : 'Container'}
@@ -82,7 +82,7 @@ export function ListControls({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6e6e73]">
         <span>
           Showing {filtered} of {total}
           {!showAll && filtered > pageSize && (
@@ -95,7 +95,7 @@ export function ListControls({
               type="checkbox"
               checked={showAll}
               onChange={e => onShowAllChange(e.target.checked)}
-              className="rounded border-slate-600"
+              className="rounded border-[#d2d2d7]"
             />
             Show all
           </label>
@@ -105,7 +105,7 @@ export function ListControls({
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => onPageChange(safePage - 1)}
-                className="px-2 py-1 rounded bg-slate-800 disabled:opacity-40 hover:bg-slate-700"
+                className="px-2 py-1 rounded bg-white disabled:opacity-40 hover:bg-black/[0.04]"
               >
                 Prev
               </button>
@@ -113,7 +113,7 @@ export function ListControls({
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => onPageChange(safePage + 1)}
-                className="px-2 py-1 rounded bg-slate-800 disabled:opacity-40 hover:bg-slate-700"
+                className="px-2 py-1 rounded bg-white disabled:opacity-40 hover:bg-black/[0.04]"
               >
                 Next
               </button>

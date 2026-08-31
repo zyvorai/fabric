@@ -18,12 +18,12 @@ const TAG_COLORS: Record<string, string> = {
   production: 'bg-red-600',
   staging: 'bg-yellow-600',
   development: 'bg-green-600',
-  testing: 'bg-blue-600',
+  testing: 'bg-[#0066cc]',
   web: 'bg-purple-600',
   database: 'bg-pink-600',
   backend: 'bg-indigo-600',
   frontend: 'bg-cyan-600',
-  default: 'bg-slate-600',
+  default: 'bg-[#e8e8ed]',
 }
 
 export function getTagColor(tag: string): string {
@@ -75,19 +75,19 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-2xl">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <div className="flex items-center gap-3">
             <Tag className="w-6 h-6 text-blue-500" />
             <div>
               <h2 className="text-xl font-bold">Manage Tags</h2>
-              <p className="text-sm text-slate-400">VM: {vmName}</p>
+              <p className="text-sm text-[#6e6e73]">VM: {vmName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition"
+            className="text-[#6e6e73] hover:text-[#1d1d1f] transition"
           >
             <X className="w-6 h-6" />
           </button>
@@ -99,8 +99,8 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
           <div>
             <label className="block text-sm font-medium mb-3">Current Tags</label>
             {tags.length === 0 ? (
-              <div className="text-center py-8 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                <p className="text-slate-400">No tags assigned</p>
+              <div className="text-center py-8 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+                <p className="text-[#6e6e73]">No tags assigned</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -132,12 +132,12 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="Enter tag name..."
-                className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
               />
               <button
                 onClick={handleAddTag}
                 disabled={!newTag.trim() || tags.includes(newTag.trim())}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -165,17 +165,17 @@ export default function TagEditor({ vmName, currentTags, onClose, onSuccess }: T
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-700/50 bg-slate-900">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-[#d2d2d7] bg-white">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition"
+            className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
+            className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Tags'}
           </button>

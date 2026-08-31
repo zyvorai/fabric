@@ -302,7 +302,7 @@ done
 for unit in zyvor-fabricd.service vm@.service zyvor-fabricd-backup.service zyvor-fabricd-backup.timer zyvor-fabricd-cleanup.service zyvor-fabricd-cleanup.timer; do
   \$SUDO rm -f /usr/lib/systemd/system/\$unit 2>/dev/null || true
 done
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui zyvorctl; do
+for bin in zyvor-fabricd zyvorctl zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 \$SUDO rm -rf /usr/share/zyvor-fabricd 2>/dev/null || true
@@ -439,7 +439,7 @@ if ! $QUICK && ! $DEPS_ONLY; then
 set -euo pipefail
 SUDO='${SUDO}'
 \$SUDO systemctl stop zyvor-fabricd.service 2>/dev/null || true
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+for bin in zyvor-fabricd zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 " || warn "could not remove old binaries"
@@ -495,7 +495,7 @@ elif ! $DEPS_ONLY; then
 set -euo pipefail
 SUDO='${SUDO}'
 \$SUDO systemctl stop zyvor-fabricd.service 2>/dev/null || true
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+for bin in zyvor-fabricd zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 " || warn "could not remove old binaries"
@@ -524,7 +524,7 @@ NO_START='${NO_START}'
 API_PORT='${API_PORT}'
 cd \"\$REMOTE_DIR\"
 
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+for bin in zyvor-fabricd zyvorctl; do
     if [ -f \"backend/target/release/\$bin\" ]; then
         \$SUDO install -m 755 \"backend/target/release/\$bin\" \"/usr/bin/\$bin\"
         echo \"  ✅ \$bin -> /usr/bin/\$bin\"

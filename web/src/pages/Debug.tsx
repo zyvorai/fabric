@@ -80,16 +80,16 @@ export default function Debug() {
           <button
             onClick={fetchAll}
             title="Refresh all panels"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white text-sm font-medium rounded-lg transition-colors"
           >
             Refresh All
           </button>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={autoRefresh} onChange={() => setAutoRefresh((v) => !v)} className="sr-only" />
-            <div className={`w-10 h-5 rounded-full transition-colors relative ${autoRefresh ? 'bg-blue-600' : 'bg-slate-600'}`}>
+            <div className={`w-10 h-5 rounded-full transition-colors relative ${autoRefresh ? 'bg-[#0066cc]' : 'bg-[#e8e8ed]'}`}>
               <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${autoRefresh ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </div>
-            <span className="text-sm text-slate-300">Auto-refresh (3s)</span>
+            <span className="text-sm text-[#1d1d1f]">Auto-refresh (3s)</span>
           </label>
         </div>
         }
@@ -99,26 +99,26 @@ export default function Debug() {
         {PANELS.map((panel) => {
           const state = panels[panel.key]
           return (
-            <div key={panel.key} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">{panel.label}</h3>
+            <div key={panel.key} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#d2d2d7] flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[#1d1d1f]">{panel.label}</h3>
                 <button
                   onClick={() => fetchPanel(panel.key)}
                   disabled={state.loading}
-                  className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors disabled:opacity-50"
+                  className="px-3 py-1 text-xs bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition-colors disabled:opacity-50"
                 >
                   {state.loading ? 'Loading...' : 'Refresh'}
                 </button>
               </div>
               <div className="p-2">
                 {state.error ? (
-                  <div className="p-4 text-center text-red-400 text-sm">{state.error}</div>
+                  <div className="p-4 text-center text-red-600 text-sm">{state.error}</div>
                 ) : state.lines.length === 0 && !state.loading ? (
-                  <div className="p-4 text-center text-slate-500 text-sm">
+                  <div className="p-4 text-center text-[#6e6e73] text-sm">
                     Click Refresh to load data
                   </div>
                 ) : (
-                  <pre className="bg-slate-950 rounded-lg p-4 text-green-400 text-xs font-mono overflow-x-auto max-h-80 overflow-y-auto whitespace-pre">
+                  <pre className="bg-[#f5f5f7] rounded-lg p-4 text-emerald-600 text-xs font-mono overflow-x-auto max-h-80 overflow-y-auto whitespace-pre">
                     {state.lines.join('\n')}
                   </pre>
                 )}

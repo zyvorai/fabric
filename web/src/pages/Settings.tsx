@@ -139,7 +139,7 @@ export default function Settings() {
         <div className="flex gap-2">
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition"
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition"
           >
             <RotateCcw className="w-4 h-4" />
             Reset
@@ -147,7 +147,7 @@ export default function Settings() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Changes
@@ -156,30 +156,30 @@ export default function Settings() {
       </div>
 
       {/* General Settings */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+        <div className="p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Globe className="w-5 h-5 text-blue-400" />
+            <Globe className="w-5 h-5 text-[#0066cc]" />
             General
           </h2>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Daemon Name</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Daemon Name</label>
               <input
                 type="text"
                 value={settings.daemon_name}
                 onChange={(e) => update('daemon_name', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Log Level</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Log Level</label>
               <select
                 value={settings.log_level}
                 onChange={(e) => update('log_level', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               >
                 <option value="debug">Debug</option>
                 <option value="info">Info</option>
@@ -190,13 +190,13 @@ export default function Settings() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Refresh Interval (seconds)</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Refresh Interval (seconds)</label>
               <input
                 type="number"
                 value={settings.refresh_interval}
                 onChange={(e) => update('refresh_interval', parseInt(e.target.value) || 5)}
                 disabled={!settings.auto_refresh}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500 disabled:opacity-50"
               />
             </div>
           </div>
@@ -206,40 +206,40 @@ export default function Settings() {
               id="autoRefresh"
               checked={settings.auto_refresh}
               onChange={(e) => update('auto_refresh', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
             />
-            <label htmlFor="autoRefresh" className="text-sm text-slate-300">Enable auto-refresh</label>
+            <label htmlFor="autoRefresh" className="text-sm text-[#1d1d1f]">Enable auto-refresh</label>
           </div>
         </div>
       </div>
 
       {/* Network Settings */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+        <div className="p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Globe className="w-5 h-5 text-green-400" />
+            <Globe className="w-5 h-5 text-emerald-600" />
             Network
           </h2>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Default Bridge</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Default Bridge</label>
               <input
                 type="text"
                 value={settings.default_bridge}
                 onChange={(e) => update('default_bridge', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">DNS Servers</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">DNS Servers</label>
               <input
                 type="text"
                 value={settings.dns_servers}
                 onChange={(e) => update('dns_servers', e.target.value)}
                 placeholder="Comma-separated"
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -249,16 +249,16 @@ export default function Settings() {
               id="enableIPv6"
               checked={settings.enable_ipv6}
               onChange={(e) => update('enable_ipv6', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
             />
-            <label htmlFor="enableIPv6" className="text-sm text-slate-300">Enable IPv6 networking</label>
+            <label htmlFor="enableIPv6" className="text-sm text-[#1d1d1f]">Enable IPv6 networking</label>
           </div>
         </div>
       </div>
 
       {/* Storage Settings */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+        <div className="p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Database className="w-5 h-5 text-purple-400" />
             Storage
@@ -267,11 +267,11 @@ export default function Settings() {
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Default Storage Pool</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Default Storage Pool</label>
               <select
                 value={settings.default_pool}
                 onChange={(e) => update('default_pool', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               >
                 {poolNames.length > 0 ? (
                   poolNames.map(name => (
@@ -283,11 +283,11 @@ export default function Settings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Default Disk Format</label>
+              <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Default Disk Format</label>
               <select
                 value={settings.default_format}
                 onChange={(e) => update('default_format', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
               >
                 <option value="qcow2">QCOW2</option>
                 <option value="raw">RAW</option>
@@ -296,12 +296,12 @@ export default function Settings() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Snapshot Retention (days)</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Snapshot Retention (days)</label>
             <input
               type="number"
               value={settings.snapshot_retention}
               onChange={(e) => update('snapshot_retention', parseInt(e.target.value) || 30)}
-              className="w-full md:w-1/2 bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full md:w-1/2 bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -310,29 +310,29 @@ export default function Settings() {
               id="enableCompression"
               checked={settings.enable_compression}
               onChange={(e) => update('enable_compression', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
             />
-            <label htmlFor="enableCompression" className="text-sm text-slate-300">Enable disk compression for QCOW2</label>
+            <label htmlFor="enableCompression" className="text-sm text-[#1d1d1f]">Enable disk compression for QCOW2</label>
           </div>
         </div>
       </div>
 
       {/* Security Settings */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+        <div className="p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Shield className="w-5 h-5 text-red-400" />
+            <Shield className="w-5 h-5 text-red-600" />
             Security
           </h2>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Session Timeout (seconds)</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Session Timeout (seconds)</label>
             <input
               type="number"
               value={settings.session_timeout}
               onChange={(e) => update('session_timeout', parseInt(e.target.value) || 3600)}
-              className="w-full md:w-1/2 bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full md:w-1/2 bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="space-y-2">
@@ -347,9 +347,9 @@ export default function Settings() {
                   id={id}
                   checked={settings[field] as boolean}
                   onChange={(e) => update(field, e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
                 />
-                <label htmlFor={id} className="text-sm text-slate-300">{label}</label>
+                <label htmlFor={id} className="text-sm text-[#1d1d1f]">{label}</label>
               </div>
             ))}
           </div>
@@ -357,22 +357,22 @@ export default function Settings() {
       </div>
 
       {/* Notification Settings */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+        <div className="p-6 border-b border-[#d2d2d7]">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Bell className="w-5 h-5 text-yellow-400" />
+            <Bell className="w-5 h-5 text-amber-600" />
             Notifications
           </h2>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Webhook URL (optional)</label>
+            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Webhook URL (optional)</label>
             <input
               type="text"
               value={settings.webhook_url}
               onChange={(e) => update('webhook_url', e.target.value)}
               placeholder="https://hooks.slack.com/..."
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="space-y-2">
@@ -382,11 +382,11 @@ export default function Settings() {
                 id="emailNotifications"
                 checked={settings.email_notifications}
                 onChange={(e) => update('email_notifications', e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
               />
-              <label htmlFor="emailNotifications" className="text-sm text-slate-300">Enable email notifications</label>
+              <label htmlFor="emailNotifications" className="text-sm text-[#1d1d1f]">Enable email notifications</label>
             </div>
-            <div className="ml-6 space-y-2 text-sm text-slate-400">
+            <div className="ml-6 space-y-2 text-sm text-[#6e6e73]">
               {[
                 { id: 'notifyOnStart', label: 'VM started', field: 'notify_on_start' as const },
                 { id: 'notifyOnStop', label: 'VM stopped', field: 'notify_on_stop' as const },
@@ -398,7 +398,7 @@ export default function Settings() {
                     id={id}
                     checked={settings[field] as boolean}
                     onChange={(e) => update(field, e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
                   />
                   <label htmlFor={id}>{label}</label>
                 </div>

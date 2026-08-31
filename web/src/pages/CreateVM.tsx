@@ -192,12 +192,12 @@ export default function CreateVM() {
             ? advErr.failures.map((f) => f.option).join(', ')
             : 'some options'
           toastFailure(toast, `VM created, but ${failed} could not be applied`, advErr)
-          navigate(`/vms/${name}`)
+          navigate(`/app/vms/${name}`)
           return
         }
       }
       toast.success(`VM '${name}' created`)
-      navigate(`/vms/${name}`)
+      navigate(`/app/vms/${name}`)
     } catch (err) {
       const msg = formatUserError(err)
       setSubmitError(msg)
@@ -210,8 +210,8 @@ export default function CreateVM() {
   return (
     <div>
       <button
-        onClick={() => navigate('/vms')}
-        className="flex items-center gap-2 mb-6 text-slate-500 hover:text-slate-300 transition-colors text-sm"
+        onClick={() => navigate('/app/vms')}
+        className="flex items-center gap-2 mb-6 text-[#6e6e73] hover:text-[#1d1d1f] transition-colors text-sm"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to VMs
@@ -254,17 +254,17 @@ export default function CreateVM() {
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {validationError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 text-sm">
               {validationError}
             </div>
           )}
 
           {wizardStep === 0 && (
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 space-y-5">
-              <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Basic Configuration</h2>
+            <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-6 space-y-5">
+              <h2 className="text-sm font-medium text-[#6e6e73] uppercase tracking-wider">Basic Configuration</h2>
 
               <div>
-                <label htmlFor="vm-name" className="block text-sm font-medium text-slate-300 mb-1.5">
+                <label htmlFor="vm-name" className="block text-sm font-medium text-[#1d1d1f] mb-1.5">
                   VM Name
                 </label>
                 <input
@@ -273,7 +273,7 @@ export default function CreateVM() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="my-virtual-machine"
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm"
                   required
                   autoFocus
                 />
@@ -281,14 +281,14 @@ export default function CreateVM() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5 gap-3 flex-wrap">
-                <label htmlFor="vm-image" className="block text-sm font-medium text-slate-300">
+                <label htmlFor="vm-image" className="block text-sm font-medium text-[#1d1d1f]">
                   Disk image
                 </label>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setShowDownloadImage(true)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#0066cc] hover:text-blue-300 transition-colors shrink-0"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Download an OS image
@@ -296,7 +296,7 @@ export default function CreateVM() {
                   <button
                     type="button"
                     onClick={() => setShowGoldenImage(true)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#0066cc] hover:text-blue-300 transition-colors shrink-0"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     Create golden image from a VM
@@ -307,7 +307,7 @@ export default function CreateVM() {
               {imagesLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
                   {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-[4.25rem] rounded-lg bg-slate-800/60 animate-pulse" />
+                    <div key={i} className="h-[4.25rem] rounded-lg bg-[#f5f5f7] animate-pulse" />
                   ))}
                 </div>
               ) : imageOptions.length > 0 ? (
@@ -321,22 +321,22 @@ export default function CreateVM() {
                         onClick={() => setImage(opt.path)}
                         className={`relative text-left p-3 rounded-lg border transition-colors ${
                           selected
-                            ? 'bg-blue-600/15 border-blue-500/40 ring-1 ring-blue-500/30'
-                            : 'bg-slate-800 border-slate-700/50 hover:border-slate-600'
+                            ? 'bg-[#0066cc]/15 border-blue-500/40 ring-1 ring-blue-500/30'
+                            : 'bg-white border-[#d2d2d7] hover:border-[#d2d2d7]'
                         }`}
                       >
                         {selected && (
                           <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                            <Check className="w-2.5 h-2.5 text-white" />
+                            <Check className="w-2.5 h-2.5 text-[#1d1d1f]" />
                           </div>
                         )}
                         <div className="flex items-center gap-2 mb-1.5">
                           <div className="icon-tile icon-tile-sm icon-tile-blue shrink-0">
                             <HardDrive className="w-3.5 h-3.5" />
                           </div>
-                          <span className="text-sm font-medium text-white truncate">{opt.name}</span>
+                          <span className="text-sm font-medium text-[#1d1d1f] truncate">{opt.name}</span>
                         </div>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[#6e6e73]">
                           {opt.format.toUpperCase()} · {formatBytes(opt.size_bytes)}
                         </p>
                       </button>
@@ -344,7 +344,7 @@ export default function CreateVM() {
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 mb-2">
+                <p className="text-xs text-[#6e6e73] mb-2">
                   No catalog images found — enter a path below, or create a golden image from an existing VM.
                 </p>
               )}
@@ -355,7 +355,7 @@ export default function CreateVM() {
                 value={image}
                 onChange={(e) => setImage(e.target.value)}
                 placeholder="Or enter a path on the host, e.g. /var/lib/zyvor-fabricd/images/ubuntu-24.04.qcow2"
-                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm font-mono"
+                className="w-full px-3.5 py-2.5 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-colors text-sm font-mono"
                 required
               />
             </div>
@@ -387,12 +387,12 @@ export default function CreateVM() {
 
           {wizardStep === 1 && (
             <>
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 space-y-5">
-                <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Resources</h2>
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-6 space-y-5">
+                <h2 className="text-sm font-medium text-[#6e6e73] uppercase tracking-wider">Resources</h2>
 
                 <div>
-                  <label htmlFor="vm-cpus" className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                    <Cpu className="w-4 h-4 text-slate-500" />
+                  <label htmlFor="vm-cpus" className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-2">
+                    <Cpu className="w-4 h-4 text-[#6e6e73]" />
                     vCPUs
                   </label>
                   <div className="flex items-center gap-3">
@@ -412,15 +412,15 @@ export default function CreateVM() {
                         onChange={(e) => setCpus(Math.max(1, Math.min(32, parseInt(e.target.value) || 1)))}
                         min={1}
                         max={32}
-                        className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-center text-sm text-white focus:outline-none focus:border-blue-500/50"
+                        className="w-full px-2 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-center text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500/50"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                    <HardDrive className="w-4 h-4 text-slate-500" />
+                  <label className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-2">
+                    <HardDrive className="w-4 h-4 text-[#6e6e73]" />
                     Memory
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3">
@@ -431,8 +431,8 @@ export default function CreateVM() {
                         onClick={() => setMemory(preset.value)}
                         className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                           memory === preset.value
-                            ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                            : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300 hover:border-slate-600'
+                            ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30'
+                            : 'bg-white border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f] hover:border-[#d2d2d7]'
                         }`}
                       >
                         {preset.label}
@@ -447,10 +447,10 @@ export default function CreateVM() {
                       onChange={(e) => setMemory(parseInt(e.target.value) || 512)}
                       min={256}
                       step={256}
-                      className="w-28 px-3 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+                      className="w-28 px-3 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500/50"
                     />
-                    <span className="text-sm text-slate-500">MB</span>
-                    <span className="text-sm text-slate-600 ml-2">
+                    <span className="text-sm text-[#6e6e73]">MB</span>
+                    <span className="text-sm text-[#6e6e73] ml-2">
                       ({(memory / 1024).toFixed(1)} GB)
                     </span>
                   </div>
@@ -458,7 +458,7 @@ export default function CreateVM() {
               </div>
 
               <div>
-              <label htmlFor="vm-disk" className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label htmlFor="vm-disk" className="block text-sm font-medium text-[#1d1d1f] mb-1.5">
                 Root disk (GB)
               </label>
               <input
@@ -468,28 +468,28 @@ export default function CreateVM() {
                 max={2048}
                 value={diskGb}
                 onChange={(e) => setDiskGb(Math.max(1, parseInt(e.target.value) || 20))}
-                className="w-28 px-3 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white"
+                className="w-28 px-3 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f]"
               />
             </div>
 
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-6 py-4 text-sm font-medium text-slate-400 hover:text-slate-300 transition-colors"
+              className="w-full flex items-center justify-between px-6 py-4 text-sm font-medium text-[#6e6e73] hover:text-[#1d1d1f] transition-colors"
             >
               <span className="uppercase tracking-wider">Advanced Options</span>
                   {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
 
             {showAdvanced && (
-              <div className="px-6 pb-6 space-y-5 border-t border-slate-700/50 pt-5">
-                <p className="text-xs text-slate-500 bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2">
+              <div className="px-6 pb-6 space-y-5 border-t border-[#d2d2d7] pt-5">
+                <p className="text-xs text-[#6e6e73] bg-white border border-[#d2d2d7] rounded-lg px-3 py-2">
                   Applied after the VM is created (boot, display, CPU mode, and UEFI settings).
                 </p>
                 <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                        <Shield className="w-4 h-4 text-slate-500" />
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-2">
+                        <Shield className="w-4 h-4 text-[#6e6e73]" />
                         Firmware
                       </label>
                       <div className="flex gap-2">
@@ -506,8 +506,8 @@ export default function CreateVM() {
                             }
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                               advanced.firmware === fw
-                                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                                : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+                                ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30'
+                                : 'bg-white border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f]'
                             }`}
                           >
                             {fw.toUpperCase()}
@@ -517,8 +517,8 @@ export default function CreateVM() {
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                        <Monitor className="w-4 h-4 text-slate-500" />
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-2">
+                        <Monitor className="w-4 h-4 text-[#6e6e73]" />
                         Display Protocol
                       </label>
                       <div className="flex gap-2">
@@ -529,8 +529,8 @@ export default function CreateVM() {
                             onClick={() => setAdvanced({ ...advanced, displayType: dt })}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                               advanced.displayType === dt
-                                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                                : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+                                ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30'
+                                : 'bg-white border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f]'
                             }`}
                           >
                             {dt.toUpperCase()}
@@ -540,8 +540,8 @@ export default function CreateVM() {
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                        <Network className="w-4 h-4 text-slate-500" />
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-2">
+                        <Network className="w-4 h-4 text-[#6e6e73]" />
                         Networking
                       </label>
                       <div className="flex gap-2">
@@ -550,8 +550,8 @@ export default function CreateVM() {
                           onClick={() => setNetworkMode('nat')}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                             networkMode === 'nat'
-                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                              : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+                              ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30'
+                              : 'bg-white border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f]'
                           }`}
                         >
                           NAT (default)
@@ -561,30 +561,30 @@ export default function CreateVM() {
                           onClick={() => setNetworkMode('bridged')}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                             networkMode === 'bridged'
-                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                              : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-300'
+                              ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30'
+                              : 'bg-white border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f]'
                           }`}
                         >
                           Bridged (DHCP)
                         </button>
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">
+                      <p className="text-xs text-[#6e6e73] mt-2">
                         {networkMode === 'nat'
                           ? 'No host-routable IP — reach anything inside this VM (like SSH) by forwarding a port below.'
                           : 'This VM gets its own real IP (visible on its Network tab once booted) — no port forwards needed.'}
                       </p>
                       {networkMode === 'bridged' && (
-                        <label className="flex items-center gap-2 mt-3 text-sm text-slate-300">
+                        <label className="flex items-center gap-2 mt-3 text-sm text-[#1d1d1f]">
                           <input
                             type="checkbox"
                             checked={staticIp}
                             onChange={(e) => setStaticIp(e.target.checked)}
-                            className="rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-blue-500/50"
+                            className="rounded border-[#d2d2d7] bg-white text-blue-500 focus:ring-blue-500/50"
                           />
                           Assign the IP statically via cloud-init
                         </label>
                       )}
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-[#6e6e73] mt-1">
                         {networkMode === 'bridged' && staticIp
                           ? 'The address is configured directly at boot — no dependency on the guest running a working DHCP client, but the image must support cloud-init.'
                           : networkMode === 'bridged'
@@ -595,11 +595,11 @@ export default function CreateVM() {
 
                     {networkMode === 'nat' && (
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                        <Network className="w-4 h-4 text-slate-500" />
+                      <label className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] mb-2">
+                        <Network className="w-4 h-4 text-[#6e6e73]" />
                         Expose ports (host port → guest port)
                       </label>
-                      <p className="text-xs text-slate-500 mb-2">
+                      <p className="text-xs text-[#6e6e73] mb-2">
                         This VM uses NAT networking with no host-routable IP — a port must be forwarded here to
                         reach anything inside it (like SSH) from outside the host.
                       </p>
@@ -607,7 +607,7 @@ export default function CreateVM() {
                         <button
                           type="button"
                           onClick={() => addPortForwardRow('22')}
-                          className="mb-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+                          className="mb-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-[#d2d2d7] text-[#1d1d1f] hover:text-[#1d1d1f] hover:border-[#d2d2d7] transition-colors"
                         >
                           + Expose SSH (22)
                         </button>
@@ -622,9 +622,9 @@ export default function CreateVM() {
                               placeholder="Host port"
                               min={1}
                               max={65535}
-                              className="w-28 px-2.5 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+                              className="w-28 px-2.5 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500/50"
                             />
-                            <span className="text-slate-500 text-sm">→</span>
+                            <span className="text-[#6e6e73] text-sm">→</span>
                             <input
                               type="number"
                               value={row.guestPort}
@@ -632,12 +632,12 @@ export default function CreateVM() {
                               placeholder="Guest port"
                               min={1}
                               max={65535}
-                              className="w-28 px-2.5 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-white focus:outline-none focus:border-blue-500/50"
+                              className="w-28 px-2.5 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500/50"
                             />
                             <select
                               value={row.protocol}
                               onChange={(e) => updatePortForwardRow(i, { protocol: e.target.value as 'tcp' | 'udp' })}
-                              className="px-2 py-1.5 bg-slate-800 border border-slate-700/50 rounded-md text-sm text-slate-300"
+                              className="px-2 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f]"
                             >
                               <option value="tcp">TCP</option>
                               <option value="udp">UDP</option>
@@ -645,7 +645,7 @@ export default function CreateVM() {
                             <button
                               type="button"
                               onClick={() => removePortForwardRow(i)}
-                              className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                              className="p-1.5 rounded-md text-[#6e6e73] hover:text-red-600 hover:bg-red-400/10 transition-colors"
                               title="Remove"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -656,7 +656,7 @@ export default function CreateVM() {
                       <button
                         type="button"
                         onClick={() => addPortForwardRow()}
-                        className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+                        className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-[#d2d2d7] text-[#1d1d1f] hover:text-[#1d1d1f] hover:border-[#d2d2d7] transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Add port forward
@@ -670,41 +670,41 @@ export default function CreateVM() {
           )}
 
           {wizardStep === 2 && (
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 space-y-4">
-              <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Review</h2>
+            <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-6 space-y-4">
+              <h2 className="text-sm font-medium text-[#6e6e73] uppercase tracking-wider">Review</h2>
               <dl className="grid grid-cols-1 gap-3 text-sm">
-                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
-                  <dt className="text-slate-500">Name</dt>
-                  <dd className="text-white font-medium">{name}</dd>
+                <div className="flex justify-between gap-4 border-b border-[#d2d2d7] pb-2">
+                  <dt className="text-[#6e6e73]">Name</dt>
+                  <dd className="text-[#1d1d1f] font-medium">{name}</dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
-                  <dt className="text-slate-500">Image</dt>
-                  <dd className="text-slate-300 font-mono text-xs text-right break-all">{image}</dd>
+                <div className="flex justify-between gap-4 border-b border-[#d2d2d7] pb-2">
+                  <dt className="text-[#6e6e73]">Image</dt>
+                  <dd className="text-[#1d1d1f] font-mono text-xs text-right break-all">{image}</dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
-                  <dt className="text-slate-500">vCPUs</dt>
-                  <dd className="text-white">{cpus}</dd>
+                <div className="flex justify-between gap-4 border-b border-[#d2d2d7] pb-2">
+                  <dt className="text-[#6e6e73]">vCPUs</dt>
+                  <dd className="text-[#1d1d1f]">{cpus}</dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
-                  <dt className="text-slate-500">Memory</dt>
-                  <dd className="text-white">
+                <div className="flex justify-between gap-4 border-b border-[#d2d2d7] pb-2">
+                  <dt className="text-[#6e6e73]">Memory</dt>
+                  <dd className="text-[#1d1d1f]">
                     {memory} MB ({(memory / 1024).toFixed(1)} GB)
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-slate-700/40 pb-2">
-                  <dt className="text-slate-500">Root disk</dt>
-                  <dd className="text-white">{diskGb} GB</dd>
+                <div className="flex justify-between gap-4 border-b border-[#d2d2d7] pb-2">
+                  <dt className="text-[#6e6e73]">Root disk</dt>
+                  <dd className="text-[#1d1d1f]">{diskGb} GB</dd>
                 </div>
-                <div className={`flex justify-between gap-4 ${networkMode === 'nat' && portForwards.length ? 'border-b border-slate-700/40 pb-2' : ''}`}>
-                  <dt className="text-slate-500">Networking</dt>
-                  <dd className="text-white">
+                <div className={`flex justify-between gap-4 ${networkMode === 'nat' && portForwards.length ? 'border-b border-[#d2d2d7] pb-2' : ''}`}>
+                  <dt className="text-[#6e6e73]">Networking</dt>
+                  <dd className="text-[#1d1d1f]">
                     {networkMode === 'nat' ? 'NAT' : staticIp ? 'Bridged (static IP)' : 'Bridged (DHCP)'}
                   </dd>
                 </div>
                 {networkMode === 'nat' && portForwards.length > 0 && (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-slate-500">Exposed ports</dt>
-                    <dd className="text-white text-right">
+                    <dt className="text-[#6e6e73]">Exposed ports</dt>
+                    <dd className="text-[#1d1d1f] text-right">
                       {portForwards.map((row, i) => (
                         <div key={i} className="font-mono text-xs">
                           {row.hostPort} → {row.guestPort}/{row.protocol}
@@ -722,7 +722,7 @@ export default function CreateVM() {
               <button
                 type="button"
                 onClick={goBack}
-                className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-xl font-medium text-sm text-slate-300 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 bg-white border border-[#d2d2d7] hover:border-[#d2d2d7] rounded-xl font-medium text-sm text-[#1d1d1f] transition-colors flex items-center justify-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back
@@ -741,7 +741,7 @@ export default function CreateVM() {
               <button
                 type="submit"
                 disabled={loading || !name || !image}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 disabled:shadow-none"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-[#e8e8ed] disabled:to-[#f5f5f7] disabled:text-[#6e6e73] rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 disabled:shadow-none"
               >
                 {loading ? (
                   <>
@@ -836,19 +836,19 @@ function GoldenImageModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <div className="flex items-center gap-3">
             <div className="icon-tile icon-tile-md icon-tile-purple">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Create Golden Image</h2>
-              <p className="text-xs text-slate-500">Materialize a VM's current disk as a reusable catalog image</p>
+              <h2 className="text-lg font-bold text-[#1d1d1f]">Create Golden Image</h2>
+              <p className="text-xs text-[#6e6e73]">Materialize a VM's current disk as a reusable catalog image</p>
             </div>
           </div>
           {!submitting && (
-            <button type="button" onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+            <button type="button" onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-[#6e6e73] hover:text-[#1d1d1f]">
               <X className="w-4 h-4" />
             </button>
           )}
@@ -859,35 +859,35 @@ function GoldenImageModal({ onClose, onCreated }: { onClose: () => void; onCreat
             the OUTER wizard form and reload the page instead). */}
         <div className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 text-sm">
               {error}
             </div>
           )}
 
           {vmsLoading ? (
-            <div className="h-10 rounded-lg bg-slate-800 animate-pulse" />
+            <div className="h-10 rounded-lg bg-white animate-pulse" />
           ) : vms.length === 0 ? (
-            <p className="text-sm text-slate-400">No VMs exist yet — create a VM first, then come back here to save its disk as a golden image.</p>
+            <p className="text-sm text-[#6e6e73]">No VMs exist yet — create a VM first, then come back here to save its disk as a golden image.</p>
           ) : (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Source VM</label>
+                <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Source VM</label>
                 <select
                   value={vmName}
                   onChange={(e) => setVmName(e.target.value)}
                   disabled={submitting}
-                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                  className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
                 >
                   {vms.map((v) => (
                     <option key={v.name} value={v.name}>{v.name} ({v.state})</option>
                   ))}
                 </select>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-[#6e6e73] mt-1">
                   The image is an independent copy — the source VM can change or be deleted afterward without affecting it.
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Image Name</label>
+                <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Image Name</label>
                 <input
                   type="text"
                   value={name}
@@ -897,20 +897,20 @@ function GoldenImageModal({ onClose, onCreated }: { onClose: () => void; onCreat
                   }}
                   placeholder="e.g. web-server-golden"
                   disabled={submitting}
-                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                  className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] font-mono text-sm focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
                   required
                   autoFocus
                 />
               </div>
               {submitting && progress !== null && (
                 <div>
-                  <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-white overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
                       style={{ width: `${Math.max(5, progress)}%` }}
                     />
                   </div>
-                  <p className="text-xs text-slate-500 mt-1.5">Converting disk image…</p>
+                  <p className="text-xs text-[#6e6e73] mt-1.5">Converting disk image…</p>
                 </div>
               )}
               <div className="flex justify-end gap-2 pt-2">
@@ -918,7 +918,7 @@ function GoldenImageModal({ onClose, onCreated }: { onClose: () => void; onCreat
                   type="button"
                   onClick={onClose}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
+                  className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -926,7 +926,7 @@ function GoldenImageModal({ onClose, onCreated }: { onClose: () => void; onCreat
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting || !name || !vmName}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50"
                 >
                   {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                   {submitting ? 'Creating…' : 'Create Image'}
@@ -1023,26 +1023,26 @@ function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-lg">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
           <div className="flex items-center gap-3">
             <div className="icon-tile icon-tile-md icon-tile-cyan">
               <Download className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Download an OS Image</h2>
-              <p className="text-xs text-slate-500">Fetch a ready-made distro image straight into the catalog</p>
+              <h2 className="text-lg font-bold text-[#1d1d1f]">Download an OS Image</h2>
+              <p className="text-xs text-[#6e6e73]">Fetch a ready-made distro image straight into the catalog</p>
             </div>
           </div>
           {!submitting && (
-            <button type="button" onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-slate-400 hover:text-white">
+            <button type="button" onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-[#6e6e73] hover:text-[#1d1d1f]">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
         <div className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 text-sm">
               {error}
             </div>
           )}
@@ -1050,7 +1050,7 @@ function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
           {catalogLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-16 rounded-lg bg-slate-800 animate-pulse" />
+                <div key={i} className="h-16 rounded-lg bg-white animate-pulse" />
               ))}
             </div>
           ) : (
@@ -1066,22 +1066,22 @@ function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
                     disabled={submitting}
                     className={`relative text-left p-3 rounded-lg border transition-colors disabled:opacity-50 ${
                       isSelected
-                        ? 'bg-blue-600/15 border-blue-500/40 ring-1 ring-blue-500/30'
-                        : 'bg-slate-800 border-slate-700/50 hover:border-slate-600'
+                        ? 'bg-[#0066cc]/15 border-blue-500/40 ring-1 ring-blue-500/30'
+                        : 'bg-white border-[#d2d2d7] hover:border-[#d2d2d7]'
                     }`}
                   >
                     {isSelected && (
                       <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-white" />
+                        <Check className="w-2.5 h-2.5 text-[#1d1d1f]" />
                       </div>
                     )}
                     <div className={`icon-tile icon-tile-sm icon-tile-${DISTRO_TILE_COLOR[img.distro] || 'blue'} mb-1.5`}>
                       <Server className="w-3.5 h-3.5" />
                     </div>
-                    <p className="text-sm font-medium text-white truncate capitalize">{img.distro}</p>
-                    <p className="text-xs text-slate-500">{img.version} · {img.arch}</p>
+                    <p className="text-sm font-medium text-[#1d1d1f] truncate capitalize">{img.distro}</p>
+                    <p className="text-xs text-[#6e6e73]">{img.version} · {img.arch}</p>
                     {onDisk && (
-                      <p className="text-[10px] font-medium text-emerald-400 mt-1">Already on disk</p>
+                      <p className="text-[10px] font-medium text-emerald-600 mt-1">Already on disk</p>
                     )}
                   </button>
                 )
@@ -1090,8 +1090,8 @@ function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
           )}
 
           {submitting && (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <div className="w-3.5 h-3.5 border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin" />
+            <div className="flex items-center gap-2 text-sm text-[#6e6e73]">
+              <div className="w-3.5 h-3.5 border-2 border-[#d2d2d7] border-t-blue-400 rounded-full animate-spin" />
               {statusLabel}
             </div>
           )}
@@ -1101,7 +1101,7 @@ function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-600 text-white rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1109,7 +1109,7 @@ function DownloadImageModal({ existingImages, onClose, onDownloaded }: {
               type="button"
               onClick={handleDownload}
               disabled={submitting || !selected}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50"
             >
               {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {submitting

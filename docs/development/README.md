@@ -44,7 +44,6 @@ zyvor-fabric/
   +-- backend/                 # Rust workspace
   |   +-- zyvor-fabricd/          # Main daemon binary
   |   +-- zyvorctl/               # CLI client
-  |   +-- zyvorctl-tui/           # Terminal UI client
   |   +-- vm-model/            # Core data structures
   |   +-- state-store/         # Persistent state storage
   |   +-- security/            # Auth, JWT, PAM, RBAC

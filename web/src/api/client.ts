@@ -36,8 +36,8 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 
   if (response.status === 401) {
     clearToken()
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
+    if (window.location.pathname !== '/sign-in' && window.location.pathname !== '/login') {
+      window.location.href = '/sign-in'
     }
   }
 

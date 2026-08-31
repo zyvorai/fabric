@@ -24,25 +24,45 @@ import type { SubsystemPhase } from '../api/capabilities'
 
 interface MetricsPoint { time: string; cpu: number; memory: number }
 
-function subsystemPhaseStyle(phase: SubsystemPhase | undefined): { label: string; className: string } {
+function subsystemPhaseStyle(phase: SubsystemPhase | undefined): {
+  label: string
+  className: string
+  pill: string
+} {
   switch (phase) {
     case 'live':
-      return { label: 'Live', className: 'text-emerald-400' }
+      return {
+        label: 'Live',
+        className: 'text-[#1d1d1f]',
+        pill: 'bg-[#e8f5e9] text-[#1b5e20] border-[#c8e6c9]',
+      }
     case 'unreachable':
-      return { label: 'Unreachable', className: 'text-amber-400' }
+      return {
+        label: 'Unreachable',
+        className: 'text-[#1d1d1f]',
+        pill: 'bg-[#fff3e0] text-[#e65100] border-[#ffe0b2]',
+      }
     case 'off':
-      return { label: 'Off', className: 'text-slate-500' }
+      return {
+        label: 'Off',
+        className: 'text-[#1d1d1f]',
+        pill: 'bg-[#f5f5f7] text-[#6e6e73] border-[#d2d2d7]',
+      }
     default:
-      return { label: 'Checking…', className: 'text-slate-400' }
+      return {
+        label: 'Checking…',
+        className: 'text-[#6e6e73]',
+        pill: 'bg-[#f5f5f7] text-[#6e6e73] border-[#d2d2d7]',
+      }
   }
 }
 
-const DARK_TOOLTIP_STYLE = {
-  backgroundColor: '#0f172a',
-  border: '1px solid #1e293b',
-  borderRadius: '8px',
+const CHART_TOOLTIP_STYLE = {
+  backgroundColor: '#ffffff',
+  border: '1px solid #d2d2d7',
+  borderRadius: '12px',
   fontSize: '12px',
-  color: '#e2e8f0',
+  color: '#1d1d1f',
 }
 
 export default function Dashboard() {
@@ -137,23 +157,25 @@ export default function Dashboard() {
         </div>
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-blue-300/80 uppercase tracking-wider mb-1">{greeting}</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Zyvor Fabric</h1>
-            <p className="text-sm text-slate-400 mt-1.5 max-w-md">
+            <p className="text-xs font-semibold text-[#0066cc] uppercase tracking-[0.04em] mb-1">{greeting}</p>
+            <h1 className="text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-[-0.022em] leading-none">
+              Zyvor Fabric
+            </h1>
+            <p className="text-[17px] text-[#333336] mt-2 max-w-md tracking-[-0.022em] leading-snug">
               {stats.total === 0
                 ? 'Your infrastructure control plane is ready — spin up the first VM to get going.'
                 : `Watching ${stats.total} VM${stats.total === 1 ? '' : 's'} across your fabric. ${stats.running} running right now.`}
             </p>
             <div className="flex items-center gap-3 mt-4">
               <Link
-                to="/create"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+                to="/app/create"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" /> Create VM
               </Link>
               <button
                 onClick={loadVMs}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+                className="px-4 py-2 bg-white hover:bg-black/[0.04] text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors"
               >
                 Refresh
               </button>
@@ -188,7 +210,7 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {(
           [
             {
@@ -220,12 +242,21 @@ export default function Dashboard() {
         ).map(({ title, subtitle, status }) => {
           const phase = subsystemPhaseStyle(status?.phase)
           return (
-            <div key={title} className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-              <p className={`text-sm mt-2 font-medium ${phase.className}`}>
-                {capsLoading && !capabilities ? '…' : phase.label}
+            <div
+              key={title}
+              className="rounded-[12px] border border-[#d2d2d7] bg-[#f5f5f7] p-4"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#0066cc]">
+                {title}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="mt-2">
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${phase.pill}`}
+                >
+                  {capsLoading && !capabilities ? '…' : phase.label}
+                </span>
+              </p>
+              <p className="text-[14px] text-[#333336] mt-2 leading-snug tracking-[-0.016em]">
                 {status?.detail || subtitle}
               </p>
             </div>
@@ -236,71 +267,71 @@ export default function Dashboard() {
       {/* Stat Cards - matching hypersdk exactly */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total VMs - Blue */}
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] p-5 card-glow transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Server className="h-5 w-5 text-white" />
+              <Server className="h-5 w-5 text-[#1d1d1f]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">total</span>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-[#0066cc]">total</span>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">{totalCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Total VMs</div>
+          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">{totalCount}</div>
+          <div className="text-[13px] text-[#333336] mt-1">Total VMs</div>
         </div>
 
         {/* Running - Green */}
-        <div className="stat-card-green rounded-xl border border-slate-700/50 p-5 card-glow-green transition-all hover:scale-[1.02]">
+        <div className="stat-card-green rounded-xl border border-[#d2d2d7] p-5 card-glow-green transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-green-500/20">
-              <Activity className="h-5 w-5 text-white" />
+              <Activity className="h-5 w-5 text-[#1d1d1f]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-emerald-600">
               {stats.total > 0 ? `${Math.round((stats.running / stats.total) * 100)}%` : '0%'}
             </span>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">{runningCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Running</div>
+          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">{runningCount}</div>
+          <div className="text-[13px] text-[#333336] mt-1">Running</div>
         </div>
 
         {/* Stopped - Red */}
-        <div className="stat-card-red rounded-xl border border-slate-700/50 p-5 card-glow transition-all hover:scale-[1.02]">
+        <div className="stat-card-red rounded-xl border border-[#d2d2d7] p-5 card-glow transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/20">
-              <Power className="h-5 w-5 text-white" />
+              <Power className="h-5 w-5 text-[#1d1d1f]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">stopped</span>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-600">stopped</span>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">{stoppedCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Stopped</div>
+          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">{stoppedCount}</div>
+          <div className="text-[13px] text-[#333336] mt-1">Stopped</div>
         </div>
 
         {/* Resources - Purple */}
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 p-5 card-glow-purple transition-all hover:scale-[1.02]">
+        <div className="stat-card-purple rounded-xl border border-[#d2d2d7] p-5 card-glow-purple transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <Cpu className="h-5 w-5 text-white" />
+              <Cpu className="h-5 w-5 text-[#1d1d1f]" />
             </div>
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400">
               {stats.totalCPU} vCPU
             </span>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">
+          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">
             {memCount}
-            <span className="text-sm text-slate-500 font-medium ml-1">{stats.totalMem >= 1024 ? 'GB' : 'MB'}</span>
+            <span className="text-sm text-[#6e6e73] font-medium ml-1">{stats.totalMem >= 1024 ? 'GB' : 'MB'}</span>
           </div>
-          <div className="text-xs text-slate-400 mt-1">Total Memory</div>
+          <div className="text-[13px] text-[#333336] mt-1">Total Memory</div>
         </div>
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CPU Chart */}
-        <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-xl p-5 border border-[#d2d2d7]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <TrendingUp className="w-4 h-4 text-white" />
+              <TrendingUp className="w-4 h-4 text-[#1d1d1f]" />
             </div>
-            <h3 className="text-base font-semibold text-white">CPU Usage</h3>
-            <span className={`ml-auto text-lg font-semibold tabular-nums ${latestCpu > 80 ? 'text-red-400' : latestCpu > 50 ? 'text-yellow-400' : 'text-blue-400'}`}>
+            <h3 className="text-base font-semibold text-[#1d1d1f]">CPU Usage</h3>
+            <span className={`ml-auto text-lg font-semibold tabular-nums ${latestCpu > 80 ? 'text-red-600' : latestCpu > 50 ? 'text-amber-600' : 'text-[#0066cc]'}`}>
               {metricsHistory.length > 0 ? `${latestCpu}%` : '--'}
             </span>
           </div>
@@ -312,23 +343,23 @@ export default function Dashboard() {
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="time" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#475569" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
-              <Tooltip contentStyle={DARK_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'CPU']} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#d2d2d7" />
+              <XAxis dataKey="time" stroke="#6e6e73" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="#6e6e73" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'CPU']} />
               <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#gradCpu)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         {/* Memory Chart */}
-        <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-xl p-5 border border-[#d2d2d7]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <HardDrive className="w-4 h-4 text-white" />
+              <HardDrive className="w-4 h-4 text-[#1d1d1f]" />
             </div>
-            <h3 className="text-base font-semibold text-white">Memory Usage</h3>
-            <span className={`ml-auto text-lg font-semibold tabular-nums ${latestMem > 80 ? 'text-red-400' : latestMem > 50 ? 'text-yellow-400' : 'text-emerald-400'}`}>
+            <h3 className="text-base font-semibold text-[#1d1d1f]">Memory Usage</h3>
+            <span className={`ml-auto text-lg font-semibold tabular-nums ${latestMem > 80 ? 'text-red-600' : latestMem > 50 ? 'text-amber-600' : 'text-emerald-600'}`}>
               {metricsHistory.length > 0 ? `${latestMem}%` : '--'}
             </span>
           </div>
@@ -340,10 +371,10 @@ export default function Dashboard() {
                   <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="time" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#475569" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
-              <Tooltip contentStyle={DARK_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'Memory']} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#d2d2d7" />
+              <XAxis dataKey="time" stroke="#6e6e73" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="#6e6e73" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'Memory']} />
               <Area type="monotone" dataKey="memory" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#gradMem)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
@@ -354,17 +385,17 @@ export default function Dashboard() {
       {vms.length === 0 ? (
         <GettingStarted />
       ) : (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
+      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#d2d2d7] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-700 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Server className="w-4 h-4 text-white" />
+              <Server className="w-4 h-4 text-[#1d1d1f]" />
             </div>
-            <h2 className="text-base font-semibold text-white">Virtual Machines</h2>
+            <h2 className="text-base font-semibold text-[#1d1d1f]">Virtual Machines</h2>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-slate-400 bg-slate-700/50 px-2.5 py-1 rounded-full">{vms.length} VMs</span>
-            <Link to="/vms" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+            <span className="text-xs font-medium text-[#6e6e73] bg-[#e8e8ed] px-2.5 py-1 rounded-full">{vms.length} VMs</span>
+            <Link to="/app/vms" className="flex items-center gap-1 text-xs text-[#0066cc] hover:text-blue-300 transition-colors">
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -372,24 +403,24 @@ export default function Dashboard() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">CPU</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Memory</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP</th>
+              <tr className="border-b border-[#d2d2d7]">
+                <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">CPU</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Memory</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">IP</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody className="divide-y divide-[#d2d2d7]/30">
               {vms.slice(0, 8).map((vm) => (
                 <tr key={vm.name} className="table-row-hover transition-colors">
                   <td className="px-5 py-3">
-                    <Link to={`/vms/${vm.name}`} className="font-medium text-white hover:text-blue-400 transition-colors">{vm.name}</Link>
+                    <Link to={`/app/vms/${vm.name}`} className="font-medium text-[#1d1d1f] hover:text-[#0066cc] transition-colors">{vm.name}</Link>
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={vm.state} /></td>
-                  <td className="px-4 py-3 text-slate-400 tabular-nums">{vm.cpus} vCPU</td>
-                  <td className="px-4 py-3 text-slate-400 tabular-nums">{vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}</td>
-                  <td className="px-4 py-3 text-slate-500 font-mono text-xs">{vm.ip || '-'}</td>
+                  <td className="px-4 py-3 text-[#6e6e73] tabular-nums">{vm.cpus} vCPU</td>
+                  <td className="px-4 py-3 text-[#6e6e73] tabular-nums">{vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}</td>
+                  <td className="px-4 py-3 text-[#6e6e73] font-mono text-xs">{vm.ip || '-'}</td>
                 </tr>
               ))}
             </tbody>

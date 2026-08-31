@@ -12,7 +12,7 @@ Bulk Operations — select any number of VMs and start, stop, restart, or snapsh
 
 ## How to get there
 
-- Route / id: `/bulk-operations`
+- Route / id: `/app/bulk-operations`
 - Nav: **Operations → Bulk Operations** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

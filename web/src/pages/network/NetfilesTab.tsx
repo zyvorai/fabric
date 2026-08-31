@@ -86,25 +86,25 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
   const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <h2 className="text-xl font-semibold">Interface Configuration (.network)</h2>
         <div className="flex items-center gap-2">
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'name' | 'state')}
-            className="bg-slate-900 border border-slate-700/50 rounded-lg px-2 py-1.5 text-xs text-slate-300"
+            className="bg-white border border-[#d2d2d7] rounded-lg px-2 py-1.5 text-xs text-[#1d1d1f]"
           >
             <option value="name">Sort by name</option>
             <option value="state">Sort by state</option>
           </select>
-          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Configure Interface
           </button>}
         </div>
       </div>
       {netfiles.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No interface configurations. Configure a physical interface to assign IPs, bridge membership, etc.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No interface configurations. Configure a physical interface to assign IPs, bridge membership, etc.</div>
       ) : (
         <>
           <ListControls
@@ -124,19 +124,19 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
           />
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-800">
+              <thead className="bg-white">
                 <tr>
-                  <th className="text-left p-4 font-medium text-slate-300">Interface</th>
-                  <th className="text-left p-4 font-medium text-slate-300">State</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Addresses</th>
-                  <th className="text-left p-4 font-medium text-slate-300">DHCP</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Bridge</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Bond</th>
-                  <th className="text-left p-4 font-medium text-slate-300">MTU</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Interface</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">State</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Addresses</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">DHCP</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Bridge</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Bond</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">MTU</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {pageItems.map(n => (
                   <tr key={n.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">
@@ -144,14 +144,14 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
                         {n.match_name}
                         {isHostManaged(n) && <HostBadge />}
                       </span>
-                      {n.description && <span className="block text-xs text-slate-500 font-normal">{n.description}</span>}
+                      {n.description && <span className="block text-xs text-[#6e6e73] font-normal">{n.description}</span>}
                     </td>
-                    <td className="p-4 text-slate-400 text-sm">{n.operational_state ?? '-'}</td>
-                    <td className="p-4 text-slate-400 font-mono text-sm">{n.addresses.join(', ') || '-'}</td>
-                    <td className="p-4 text-slate-400">{n.dhcp}</td>
-                    <td className="p-4 text-slate-400">{n.bridge ?? '-'}</td>
-                    <td className="p-4 text-slate-400">{n.bond ?? '-'}</td>
-                    <td className="p-4 text-slate-400">{n.mtu ?? '-'}</td>
+                    <td className="p-4 text-[#6e6e73] text-sm">{n.operational_state ?? '-'}</td>
+                    <td className="p-4 text-[#6e6e73] font-mono text-sm">{n.addresses.join(', ') || '-'}</td>
+                    <td className="p-4 text-[#6e6e73]">{n.dhcp}</td>
+                    <td className="p-4 text-[#6e6e73]">{n.bridge ?? '-'}</td>
+                    <td className="p-4 text-[#6e6e73]">{n.bond ?? '-'}</td>
+                    <td className="p-4 text-[#6e6e73]">{n.mtu ?? '-'}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-1">
                         <button onClick={() => handleView(n.id)} className="p-2 hover:bg-white/[0.06] rounded transition" title="View details" type="button">
@@ -165,7 +165,7 @@ function NetfilesTabContent({ netfiles, onDelete, onAdopt, onCreate }: NetfilesT
               </tbody>
             </table>
             {filtered.length === 0 && (
-              <div className="p-8 text-center text-slate-500 text-sm">No interfaces match your filters.</div>
+              <div className="p-8 text-center text-[#6e6e73] text-sm">No interfaces match your filters.</div>
             )}
           </div>
         </>
@@ -227,8 +227,8 @@ export function CreateNetfileModal({ onClose, onCreated }: { onClose: () => void
         <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder="192.168.1.1" />
         <InputField label="DNS (comma-separated)" value={dns} onChange={setDns} placeholder="8.8.8.8, 1.1.1.1" />
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">DHCP</label>
-          <select value={dhcp} onChange={e => setDhcp(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          <label className="block text-sm font-medium text-[#1d1d1f] mb-1">DHCP</label>
+          <select value={dhcp} onChange={e => setDhcp(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500">
             <option value="no">no</option>
             <option value="yes">yes</option>
             <option value="ipv4">ipv4</option>
@@ -238,8 +238,8 @@ export function CreateNetfileModal({ onClose, onCreated }: { onClose: () => void
         <InputField label="Bridge (attach to)" value={bridge} onChange={setBridge} placeholder="br0" />
         <InputField label="Bond (attach to)" value={bond} onChange={setBond} placeholder="bond0" />
         <InputField label="MTU" value={mtu} onChange={setMtu} placeholder="1500" type="number" />
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Configure Interface'}
         </button>
       </div>

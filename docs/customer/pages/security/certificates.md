@@ -14,7 +14,7 @@ Certificates & Security — a PKI console for Zyvor Fabric: certificate authorit
 
 ## How to get there
 
-- Route / id: `/certificates`
+- Route / id: `/app/certificates`
 - Nav: **Security → Certificates** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

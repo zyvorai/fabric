@@ -36,23 +36,23 @@ export function ToastItem({ toast, onClose }: ToastProps) {
   const display = displayMessage(toast.type, toast.message)
 
   const config = {
-    success: { icon: CheckCircle, bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' },
-    error: { icon: XCircle, bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
-    warning: { icon: AlertCircle, bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400' },
-    info: { icon: Info, bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
+    success: { icon: CheckCircle, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
+    error: { icon: XCircle, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+    warning: { icon: AlertCircle, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800' },
+    info: { icon: Info, bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800' },
   }[toast.type]
 
   const Icon = config.icon
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-lg animate-slide-in ${config.bg} ${config.border}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg animate-slide-in bg-white ${config.bg} ${config.border}`}
     >
       <Icon className={`w-4 h-4 shrink-0 ${config.text}`} />
-      <span className="flex-1 text-sm text-slate-200 whitespace-pre-wrap break-words">{display}</span>
+      <span className="flex-1 text-sm text-[var(--zf-ink)] whitespace-pre-wrap break-words">{display}</span>
       <button
         onClick={() => onClose(toast.id)}
-        className="shrink-0 p-0.5 rounded-md text-slate-500 hover:text-slate-300 transition-colors"
+        className="shrink-0 p-0.5 rounded-md text-[var(--zf-muted)] hover:text-[var(--zf-ink)] transition-colors"
       >
         <X className="w-3.5 h-3.5" />
       </button>

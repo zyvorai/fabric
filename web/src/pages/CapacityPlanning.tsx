@@ -14,7 +14,7 @@ interface ResourceMetric { label: string; used: number; total: number; unit: str
 
 function usagePercent(used: number, total: number): number { return total > 0 ? Math.min(100, (used / total) * 100) : 0 }
 function barColor(pct: number): string { if (pct > 90) return 'bg-red-500'; if (pct > 75) return 'bg-amber-500'; if (pct > 50) return 'bg-blue-500'; return 'bg-emerald-500' }
-function trendColor(trend: number): string { if (trend > 5) return 'text-red-400'; if (trend > 0) return 'text-amber-400'; if (trend < 0) return 'text-green-400'; return 'text-slate-400' }
+function trendColor(trend: number): string { if (trend > 5) return 'text-red-600'; if (trend > 0) return 'text-amber-400'; if (trend < 0) return 'text-emerald-600'; return 'text-[#6e6e73]' }
 function fmtVal(val: number, unit: string): string {
   if (unit === 'GB' && val >= 1024) return `${(val / 1024).toFixed(1)} TB`
   return `${val.toFixed(1)} ${unit}`
@@ -71,7 +71,7 @@ export default function CapacityPlanning() {
       />
       <PageLoadBanner title="Could not load capacity data" headline={loadError} onRetry={() => void load()} />
       {loading && !loadError && (
-        <div className="flex items-center justify-center h-32 text-slate-400">
+        <div className="flex items-center justify-center h-32 text-[#6e6e73]">
           <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
           Loading capacity data…
         </div>
@@ -84,48 +84,48 @@ export default function CapacityPlanning() {
           <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-amber-400">Capacity Warning</p>
-            <p className="text-xs text-slate-400 mt-1">{warningResources.map(r => r.label).join(', ')} usage above 75% threshold</p>
+            <p className="text-xs text-[#6e6e73] mt-1">{warningResources.map(r => r.label).join(', ')} usage above 75% threshold</p>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="stat-card-blue rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{vmCount}</div>
-          <div className="text-xs text-slate-400 mt-1">Active VMs</div>
+        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{vmCount}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Active VMs</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-slate-700/50 px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{metrics.length}</div>
-          <div className="text-xs text-slate-400 mt-1">Resources Tracked</div>
+        <div className="stat-card-green rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{metrics.length}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Resources Tracked</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-slate-700/50 px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{warningResources.length}</div>
-          <div className="text-xs text-slate-400 mt-1">Over 75% Usage</div>
+        <div className="stat-card-orange rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{warningResources.length}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Over 75% Usage</div>
         </div>
-        <div className="stat-card-purple rounded-xl border border-slate-700/50 px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-white">{metrics.filter(m => m.trend > 0).length}</div>
-          <div className="text-xs text-slate-400 mt-1">Growing Resources</div>
+        <div className="stat-card-purple rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[#1d1d1f]">{metrics.filter(m => m.trend > 0).length}</div>
+          <div className="text-xs text-[#6e6e73] mt-1">Growing Resources</div>
         </div>
       </div>
 
       <div className="space-y-4">
         {metrics.map((m, idx) => {
           const pct = usagePercent(m.used, m.total)
-          const icon = m.label.toLowerCase().includes('cpu') ? <Cpu className="w-5 h-5 text-blue-400" /> :
+          const icon = m.label.toLowerCase().includes('cpu') ? <Cpu className="w-5 h-5 text-[#0066cc]" /> :
                        m.label.toLowerCase().includes('memory') || m.label.toLowerCase().includes('ram') ? <Database className="w-5 h-5 text-purple-400" /> :
                        <HardDrive className="w-5 h-5 text-teal-400" />
           return (
-            <div key={idx} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+            <div key={idx} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   {icon}
                   <div>
-                    <h3 className="text-sm font-semibold text-white">{m.label}</h3>
-                    <p className="text-xs text-slate-500">{fmtVal(m.used, m.unit)} / {fmtVal(m.total, m.unit)} used</p>
+                    <h3 className="text-sm font-semibold text-[#1d1d1f]">{m.label}</h3>
+                    <p className="text-xs text-[#6e6e73]">{fmtVal(m.used, m.unit)} / {fmtVal(m.total, m.unit)} used</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-white">{pct.toFixed(1)}%</div>
+                  <div className="text-lg font-bold text-[#1d1d1f]">{pct.toFixed(1)}%</div>
                   <div className={`text-xs flex items-center gap-1 justify-end ${trendColor(m.trend)}`}>
                     {m.trend > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : m.trend < 0 ? <TrendingDown className="w-3.5 h-3.5" /> : null}
                     {m.trend > 0 ? '+' : ''}{m.trend.toFixed(1)}%/week
@@ -133,11 +133,11 @@ export default function CapacityPlanning() {
                 </div>
               </div>
 
-              <div className="h-3 rounded-full bg-slate-700 overflow-hidden mb-2">
+              <div className="h-3 rounded-full bg-[#e8e8ed] overflow-hidden mb-2">
                 <div className={`h-full rounded-full transition-all duration-500 ${barColor(pct)}`} style={{ width: `${pct}%` }} />
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center justify-between text-xs text-[#6e6e73]">
                 <span>{fmtVal(m.total - m.used, m.unit)} available</span>
                 {m.projected_full && m.projected_full !== 'N/A' && (
                   <span className="text-amber-400">Projected full: {m.projected_full}</span>
@@ -149,7 +149,7 @@ export default function CapacityPlanning() {
       </div>
 
       {metrics.length === 0 && (
-        <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 text-center text-slate-500 text-sm">No capacity data available</div>
+        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73] text-sm">No capacity data available</div>
       )}
       </>
       )}

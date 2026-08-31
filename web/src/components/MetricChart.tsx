@@ -12,21 +12,23 @@ interface MetricChartProps {
 
 export default function MetricChart({ title, data, color = '#3b82f6' }: MetricChartProps) {
   return (
-    <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
+    <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7]">
       <h3 className="text-lg font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis dataKey="time" stroke="#9ca3af" />
-          <YAxis stroke="#9ca3af" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#d2d2d7" />
+          <XAxis dataKey="time" stroke="#6e6e73" />
+          <YAxis stroke="#6e6e73" />
           <Tooltip
             contentStyle={{
-              backgroundColor: '#1f2937',
-              border: '1px solid #374151',
+              backgroundColor: '#ffffff',
+              border: '1px solid #d2d2d7',
               borderRadius: '0.5rem',
+              color: '#1d1d1f',
+              fontFamily: 'SF Pro Text, -apple-system, BlinkMacSystemFont, Helvetica Neue, Helvetica, Arial, sans-serif',
             }}
           />
-          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="value" stroke={color === '#3b82f6' ? '#0066cc' : color} strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

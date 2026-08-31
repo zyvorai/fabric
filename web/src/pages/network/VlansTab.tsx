@@ -37,15 +37,15 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate, onEdit }: VlansTa
   const pageItems = paginateSlice(filtered, page, DEFAULT_PAGE_SIZE, showAll)
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <h2 className="text-xl font-semibold">VLANs</h2>
-        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm">
+        {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
           <Plus className="w-4 h-4" /> Create VLAN
         </button>}
       </div>
       {vlans.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No VLANs configured.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No VLANs configured.</div>
       ) : (
         <>
           <ListControls
@@ -62,24 +62,24 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate, onEdit }: VlansTa
           />
           <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-800">
+            <thead className="bg-white">
               <tr>
-                <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">VLAN ID</th>
-                <th className="text-left p-4 font-medium text-slate-300">Parent</th>
-                <th className="text-left p-4 font-medium text-slate-300">Addresses</th>
-                <th className="text-left p-4 font-medium text-slate-300">DHCP</th>
-                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">VLAN ID</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Parent</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Addresses</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">DHCP</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {pageItems.map(v => (
                 <tr key={v.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4 font-medium">{v.name}{isHostManaged(v) && <HostBadge />}</td>
                   <td className="p-4 font-mono text-purple-400">{v.vlan_id}</td>
-                  <td className="p-4 text-slate-400">{v.parent_interface}</td>
-                  <td className="p-4 text-slate-400 font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
-                  <td className="p-4 text-slate-400">{v.dhcp}</td>
+                  <td className="p-4 text-[#6e6e73]">{v.parent_interface}</td>
+                  <td className="p-4 text-[#6e6e73] font-mono text-sm">{v.addresses.join(', ') || '-'}</td>
+                  <td className="p-4 text-[#6e6e73]">{v.dhcp}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-1">
                       {!readOnly && !isHostManaged(v) && (
@@ -95,7 +95,7 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate, onEdit }: VlansTa
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div className="p-8 text-center text-slate-500 text-sm">No VLANs match your search.</div>
+            <div className="p-8 text-center text-[#6e6e73] text-sm">No VLANs match your search.</div>
           )}
           </div>
         </>
@@ -142,8 +142,8 @@ export function CreateVlanModal({ onClose, onCreated }: { onClose: () => void; o
         <InputField label="Parent Interface" value={parent} onChange={setParent} placeholder="eth0" />
         <InputField label="Addresses (comma-separated)" value={addresses} onChange={setAddresses} placeholder="192.168.100.1/24" />
         <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder="192.168.100.254" />
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create VLAN'}
         </button>
       </div>
@@ -189,8 +189,8 @@ export function EditVlanModal({ vlan, onClose, onUpdated }: { vlan: VlanConfig; 
         <InputField label="Parent Interface" value={parent} onChange={setParent} placeholder="eth0" />
         <InputField label="Addresses (comma-separated)" value={addresses} onChange={setAddresses} placeholder="192.168.100.1/24" />
         <InputField label="Gateway" value={gateway} onChange={setGateway} placeholder="192.168.100.254" />
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-[#1d1d1f] py-2 px-4 rounded-lg transition">
           {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>

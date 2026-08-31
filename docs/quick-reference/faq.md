@@ -406,7 +406,7 @@ curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/discover \
   -d '{"portal": "192.168.1.100:3260"}' | jq .
 
 # Log in to a target
-curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/login \
+curl -s -X POST http://127.0.0.1:9095/api/v1/iscsi/sign-in \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"portal": "192.168.1.100:3260", "target": "iqn.2026-01.com.example:storage"}' | jq .

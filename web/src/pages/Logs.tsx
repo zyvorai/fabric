@@ -98,10 +98,10 @@ export default function Logs() {
   const getLevelColor = (level: string) => {
     switch (level) {
       case 'INFO': return 'text-cyan-400'
-      case 'WARN': case 'WARNING': return 'text-yellow-400'
-      case 'ERROR': case 'CRITICAL': return 'text-red-400'
-      case 'DEBUG': return 'text-slate-400'
-      default: return 'text-white'
+      case 'WARN': case 'WARNING': return 'text-amber-600'
+      case 'ERROR': case 'CRITICAL': return 'text-red-600'
+      case 'DEBUG': return 'text-[#6e6e73]'
+      default: return 'text-[#1d1d1f]'
     }
   }
 
@@ -110,8 +110,8 @@ export default function Logs() {
       case 'INFO': return 'bg-cyan-500/10 border-cyan-500/20'
       case 'WARN': case 'WARNING': return 'bg-yellow-500/10 border-yellow-500/20'
       case 'ERROR': case 'CRITICAL': return 'bg-red-500/10 border-red-500/20'
-      case 'DEBUG': return 'bg-slate-500/10 border-slate-500/20'
-      default: return 'bg-slate-800'
+      case 'DEBUG': return 'bg-black/[0.04] border-[#d2d2d7]'
+      default: return 'bg-white'
     }
   }
 
@@ -133,28 +133,28 @@ export default function Logs() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => void loadLogs()}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm"
+            className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
-          <span className="text-sm text-slate-400">{filteredLogs.length} entries</span>
+          <span className="text-sm text-[#6e6e73]">{filteredLogs.length} entries</span>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg p-4 border border-[#d2d2d7]">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#6e6e73]" />
               <input
                 type="text"
                 placeholder="Filter logs..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 pl-10 pr-4 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function Logs() {
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
             >
               <option value="ALL">All Levels</option>
               <option value="INFO">INFO</option>
@@ -178,7 +178,7 @@ export default function Logs() {
           <div className="flex gap-2">
             <button
               onClick={exportLogs}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition"
+              className="flex-1 flex items-center justify-center gap-2 bg-[#0066cc] hover:bg-[#0077ed] text-white py-2 px-4 rounded-lg transition"
             >
               <Download className="w-4 h-4" />
               Export
@@ -199,43 +199,43 @@ export default function Logs() {
             id="autoScroll"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700/50 rounded focus:ring-blue-500"
+            className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
           />
-          <label htmlFor="autoScroll" className="text-sm text-slate-400">
+          <label htmlFor="autoScroll" className="text-sm text-[#6e6e73]">
             Auto-scroll to new logs
           </label>
         </div>
       </div>
 
       {/* Log Stream */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] overflow-hidden">
         <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-slate-400">
+            <div className="flex items-center justify-center h-full text-[#6e6e73]">
               Loading logs...
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-400">
+            <div className="flex items-center justify-center h-full text-[#6e6e73]">
               No logs to display
             </div>
           ) : (
-            <div className="divide-y divide-slate-700/50">
+            <div className="divide-y divide-[#d2d2d7]">
               {filteredLogs.map((log, index) => (
                 <div
                   key={log.id || index}
                   className={`p-3 hover:bg-white/[0.03] transition ${getLevelBg(log.level)} border-l-4`}
                 >
                   <div className="flex items-start gap-4">
-                    <span className="text-slate-500 text-xs whitespace-nowrap">
+                    <span className="text-[#6e6e73] text-xs whitespace-nowrap">
                       {log.timestamp.length > 19 ? log.timestamp.slice(0, 19).replace('T', ' ') : log.timestamp}
                     </span>
                     <span className={`font-bold text-xs whitespace-nowrap ${getLevelColor(log.level)}`}>
                       {log.level}
                     </span>
-                    <span className="text-slate-400 text-xs whitespace-nowrap">
+                    <span className="text-[#6e6e73] text-xs whitespace-nowrap">
                       [{log.source}]
                     </span>
-                    <span className="text-slate-200 flex-1">
+                    <span className="text-[#1d1d1f] flex-1">
                       {log.message}
                     </span>
                   </div>

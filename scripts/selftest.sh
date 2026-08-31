@@ -32,7 +32,7 @@ echo ""
 
 # ── Binaries ──
 section "Binaries"
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+for bin in zyvor-fabricd zyvorctl; do
     if command -v "$bin" &>/dev/null; then
         ver=$("$bin" --version 2>/dev/null || echo "installed")
         pass "$bin: $ver"

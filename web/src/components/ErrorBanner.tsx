@@ -21,16 +21,16 @@ type Props = {
 
 const toneStyles: Record<Tone, { border: string; bg: string; title: string; text: string }> = {
   amber: {
-    border: 'border-amber-500/40',
-    bg: 'bg-amber-950/40',
-    title: 'text-amber-100',
-    text: 'text-amber-50/95',
+    border: 'border-amber-200',
+    bg: 'bg-amber-50',
+    title: 'text-amber-900',
+    text: 'text-amber-900/90',
   },
   red: {
-    border: 'border-red-500/40',
-    bg: 'bg-red-950/35',
-    title: 'text-red-100',
-    text: 'text-red-50/95',
+    border: 'border-red-200',
+    bg: 'bg-red-50',
+    title: 'text-red-900',
+    text: 'text-red-900/90',
   },
 }
 
@@ -47,63 +47,40 @@ export default function ErrorBanner({
   actions,
 }: Props) {
   const s = toneStyles[tone]
-
   return (
-    <div
-      role="alert"
-      className={`rounded-xl border ${s.border} ${s.bg} px-4 py-3 space-y-3`}
-    >
-      <div className="flex items-start gap-2">
-        <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${tone === 'red' ? 'text-red-400' : 'text-amber-400'}`} />
-        <div className="min-w-0 flex-1 space-y-1">
-          <h3 className={`text-sm font-semibold ${s.title}`}>{title}</h3>
-          <p className={`text-sm ${s.text} leading-relaxed`}>{headline}</p>
-        </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="text-xs px-2 py-1 rounded border border-amber-500/30 text-amber-200 hover:bg-amber-500/10"
-            >
-              {retryLabel}
-            </button>
+    <div className={`rounded-[12px] border ${s.border} ${s.bg} p-4 mb-4`} role="alert">
+      <div className="flex gap-3">
+        <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${s.title}`} />
+        <div className="min-w-0 flex-1">
+          <div className={`text-sm font-semibold ${s.title}`}>{title}</div>
+          <p className={`text-sm mt-1 ${s.text}`}>{headline}</p>
+          {hints && hints.length > 0 && (
+            <ul className={`mt-2 text-sm list-disc pl-4 space-y-1 ${s.text}`}>
+              {hints.map((h) => (
+                <li key={h}>{h}</li>
+              ))}
+            </ul>
           )}
-          {onDismiss && (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="text-xs text-amber-200/80 hover:text-amber-50 px-2 py-1 rounded border border-amber-500/30"
-            >
-              Dismiss
-            </button>
+          {technicalDetail && (
+            <pre className="mt-2 text-xs overflow-x-auto opacity-80 font-mono whitespace-pre-wrap">
+              {technicalDetail}
+            </pre>
           )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {onRetry && (
+              <button type="button" className="zf-btn zf-btn-ghost zf-btn-sm" onClick={onRetry}>
+                {retryLabel}
+              </button>
+            )}
+            {onDismiss && (
+              <button type="button" className="zf-btn zf-btn-secondary zf-btn-sm" onClick={onDismiss}>
+                Dismiss
+              </button>
+            )}
+            {actions}
+          </div>
         </div>
       </div>
-
-      {hints && hints.length > 0 && (
-        <div className="pl-7 space-y-1.5">
-          <p className="text-xs font-medium text-amber-200/90">What usually fixes it</p>
-          <ul className="text-xs text-amber-100/85 list-disc pl-4 space-y-1">
-            {hints.map((h, i) => (
-              <li key={i}>{h}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {actions && <div className="pl-7 flex flex-wrap gap-2">{actions}</div>}
-
-      {technicalDetail && (
-        <details className="pl-7 group">
-          <summary className="text-xs text-amber-200/80 cursor-pointer hover:text-amber-100">
-            Technical details
-          </summary>
-          <pre className="mt-2 text-[11px] leading-snug text-slate-300 bg-slate-950/80 border border-slate-700/80 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-words max-h-56 overflow-y-auto">
-            {technicalDetail}
-          </pre>
-        </details>
-      )}
     </div>
   )
 }

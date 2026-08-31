@@ -165,7 +165,7 @@ zyvorctl image list</code></pre>
   <div class="demo-step">
     <h3>Step 4: Show the API directly</h3>
     <pre><code># Authenticate and get JWT token
-TOKEN=$(curl -s -X POST http://localhost:9095/api/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:9095/api/v1/auth/sign-in \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"..."}' | jq -r .token)
 
@@ -186,7 +186,7 @@ curl -s http://localhost:9095/api/v1/vms \
   <div class="demo-step">
     <h3>Step 1: Open the Web Dashboard</h3>
     <p>Navigate to <code>http://localhost:9095</code> in the browser. Log in with admin credentials.</p>
-    <p>Point out: dark theme, clean layout, command palette (Ctrl+K).</p>
+    <p>Point out: light Apple console, clean layout, command palette (Ctrl+K).</p>
   </div>
   <div class="demo-step">
     <h3>Step 2: Navigate to the VM</h3>
@@ -241,7 +241,7 @@ systemctl status</code></pre>
     <p>Explain: automated daily backups run via systemd timer with configurable retention.</p>
   </div>
   <div class="talking-point">
-    "Backups run automatically at 2 AM daily with configurable retention. You can also trigger per-VM backups from the CLI, TUI, or web UI -- individually or in bulk."
+    "Backups run automatically at 2 AM daily with configurable retention. You can also trigger per-VM backups from the CLI or web console -- individually or in bulk."
   </div>
 </div>
 
@@ -305,10 +305,8 @@ zyvorctl net-monitor demo-web</code></pre>
     </ul>
   </div>
   <div class="demo-step">
-    <h3>Step 3: Terminal UI (Bonus)</h3>
-    <pre><code># Show the k9s-style terminal UI
-zyvorctl-tui</code></pre>
-    <p>Navigate between views. Show sparkline graphs. Demonstrate vim keybindings. Press <code>s</code> to start a VM, <code>b</code> to backup.</p>
+    <h3>Step 3: Web console</h3>
+    <pre><code># Show the  Show sparkline graphs. Demonstrate vim keybindings. Press <code>s</code> to start a VM, <code>b</code> to backup.</p>
   </div>
   <div class="demo-step">
     <h3>Step 4: Prometheus Metrics</h3>
@@ -347,7 +345,7 @@ zyvorctl delete demo-app</code></pre>
     <ul>
       <li>Single binary, 5-minute deployment</li>
       <li>520+ REST API endpoints -- everything is programmable</li>
-      <li>5 management interfaces -- CLI, TUI, Web, K8s, Terraform</li>
+      <li>4 management interfaces -- CLI, web, K8s, Terraform</li>
       <li>Enterprise networking -- policies, firewall, VPN mesh</li>
       <li>Built in Rust -- memory safe, fast, secure</li>
       <li>31-round security audit -- production ready</li>

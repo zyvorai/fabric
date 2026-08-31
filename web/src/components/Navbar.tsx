@@ -72,7 +72,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
           ? 'text-[#9aa8b8] hover:bg-white/5 hover:text-white'
           : aurora
             ? 'text-[#a89ec8] hover:bg-white/5 hover:text-[#f5f3ff]'
-            : 'hover:bg-slate-700/60'
+            : 'hover:bg-[#d2d2d7]'
       }`}
       onClick={() => setMobileOpen(!mobileOpen)}
       aria-label="Open menu"
@@ -164,7 +164,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
                       to={item.path}
                       onClick={() => setMobileOpen(false)}
                       className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                        themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                       }`}
                     >
                       <QIcon className="w-4 h-4 shrink-0" />
@@ -206,7 +206,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
             <MobileNavSections onNavigate={() => setMobileOpen(false)} />
 
             <Link
-              to="/create"
+              to="/app/create"
               onClick={() => setMobileOpen(false)}
               className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium text-sm ${
                 steel
@@ -235,7 +235,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
                     onOpenHelp('shortcuts')
                   }}
                   className={`flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-                    themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                    themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                   }`}
                 >
                   <Keyboard className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function Navbar({ onOpenHelp }: NavbarProps) {
                     onOpenHelp('about')
                   }}
                   className={`flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-                    themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-slate-700/60'
+                    themed ? 'text-[#cfd8e3] hover:bg-white/5' : 'text-slate-300 hover:bg-[#d2d2d7]'
                   }`}
                 >
                   <Info className="w-4 h-4" />

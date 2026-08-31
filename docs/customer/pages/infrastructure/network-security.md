@@ -14,7 +14,7 @@ Net Security — the advanced SDN and security control plane: network policies s
 
 ## How to get there
 
-- Route / id: `/network-security`
+- Route / id: `/app/network-security`
 - Nav: **Infrastructure → Net Security** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

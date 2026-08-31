@@ -79,10 +79,10 @@ export default function ManifestBuilder() {
         {/* Form */}
         <div className="space-y-3">
           {SECTIONS.map(section => (
-            <div key={section.key} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-              <button onClick={() => toggleSection(section.key)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700/30 transition-colors">
+            <div key={section.key} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+              <button onClick={() => toggleSection(section.key)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-[#1d1d1f] hover:bg-black/[0.04] transition-colors">
                 {section.name}
-                {expanded[section.key] ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                {expanded[section.key] ? <ChevronUp className="w-4 h-4 text-[#6e6e73]" /> : <ChevronDown className="w-4 h-4 text-[#6e6e73]" />}
               </button>
               {expanded[section.key] && (
                 <div className="px-4 pb-4 space-y-3">
@@ -90,22 +90,22 @@ export default function ManifestBuilder() {
                     <div key={field.key}>
                       {field.type === 'checkbox' ? (
                         <label className="flex items-center gap-3 cursor-pointer">
-                          <input type="checkbox" checked={!!config[field.key]} onChange={(e) => setField(field.key, e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500" />
-                          <span className="text-sm text-slate-300">{field.label}</span>
+                          <input type="checkbox" checked={!!config[field.key]} onChange={(e) => setField(field.key, e.target.checked)} className="rounded border-[#d2d2d7] bg-[#e8e8ed] text-blue-500 focus:ring-blue-500" />
+                          <span className="text-sm text-[#1d1d1f]">{field.label}</span>
                         </label>
                       ) : (
                         <>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">{field.label}</label>
+                          <label className="block text-xs font-medium text-[#6e6e73] mb-1">{field.label}</label>
                           {field.type === 'select' ? (
                             <select value={String(config[field.key] || '')} onChange={(e) => setField(field.key, e.target.value)} aria-label={field.label}
-                              className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500">
                               <option value="">Select...</option>
                               {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             </select>
                           ) : (
                             <input type={field.type} value={String(config[field.key] || '')} onChange={(e) => setField(field.key, field.type === 'number' ? Number(e.target.value) : e.target.value)}
                               placeholder={field.placeholder} aria-label={field.label}
-                              className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+                              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500" />
                           )}
                         </>
                       )}
@@ -119,19 +119,19 @@ export default function ManifestBuilder() {
 
         {/* YAML preview */}
         <div className="space-y-3">
-          <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
-              <span className="text-sm font-semibold text-white">YAML Preview</span>
+          <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#d2d2d7] flex items-center justify-between">
+              <span className="text-sm font-semibold text-[#1d1d1f]">YAML Preview</span>
               <div className="flex items-center gap-2">
-                <button onClick={handleCopy} title="Copy to clipboard" className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy'}
+                <button onClick={handleCopy} title="Copy to clipboard" className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition-colors">
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy'}
                 </button>
-                <button onClick={handleDownload} title="Download YAML" className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">
+                <button onClick={handleDownload} title="Download YAML" className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition-colors">
                   <Download className="w-3.5 h-3.5" /> Download
                 </button>
               </div>
             </div>
-            <pre className="p-4 text-xs text-slate-300 font-mono bg-slate-950 max-h-[500px] overflow-y-auto whitespace-pre">{yaml}</pre>
+            <pre className="p-4 text-xs text-[#1d1d1f] font-mono bg-[#f5f5f7] max-h-[500px] overflow-y-auto whitespace-pre">{yaml}</pre>
           </div>
         </div>
       </div>

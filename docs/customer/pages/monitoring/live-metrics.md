@@ -12,7 +12,7 @@ Live Metrics — a real-time view of host performance: CPU, memory, disk I/O, an
 
 ## How to get there
 
-- Route / id: `/live-metrics`
+- Route / id: `/app/live-metrics`
 - Nav: **Monitoring → Live Metrics** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

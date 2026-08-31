@@ -40,7 +40,7 @@ User authentication and session management.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/auth/login` | Authenticate and obtain a token |
+| POST | `/auth/sign-in` | Authenticate and obtain a token |
 | POST | `/auth/logout` | Invalidate the current token |
 | POST | `/auth/refresh` | Refresh an expiring token |
 | GET | `/auth/me` | Get the current authenticated user |
@@ -57,17 +57,17 @@ Core virtual machine lifecycle operations.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/vms` | List all VMs |
-| POST | `/vms` | Create a new VM |
-| GET | `/vms/:name` | Get VM details |
-| DELETE | `/vms/:name` | Delete a VM |
-| POST | `/vms/:name/start` | Start a VM |
-| POST | `/vms/:name/stop` | Stop a VM |
-| POST | `/vms/:name/restart` | Restart a VM |
-| POST | `/vms/:name/pause` | Pause a VM |
-| POST | `/vms/:name/resume` | Resume a paused VM |
-| GET | `/vms/:name/metrics` | Get VM resource metrics |
-| GET | `/vms/:name/status` | Get detailed VM status |
+| GET | `/app/vms` | List all VMs |
+| POST | `/app/vms` | Create a new VM |
+| GET | `/app/vms/:name` | Get VM details |
+| DELETE | `/app/vms/:name` | Delete a VM |
+| POST | `/app/vms/:name/start` | Start a VM |
+| POST | `/app/vms/:name/stop` | Stop a VM |
+| POST | `/app/vms/:name/restart` | Restart a VM |
+| POST | `/app/vms/:name/pause` | Pause a VM |
+| POST | `/app/vms/:name/resume` | Resume a paused VM |
+| GET | `/app/vms/:name/metrics` | Get VM resource metrics |
+| GET | `/app/vms/:name/status` | Get detailed VM status |
 
 ### Example: Create a VM
 
@@ -205,11 +205,11 @@ Point-in-time VM state capture and restoration.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/vms/:name/snapshots` | List snapshots for a VM |
-| POST | `/vms/:name/snapshots` | Create a snapshot |
-| GET | `/vms/:name/snapshots/:id` | Get snapshot details |
-| DELETE | `/vms/:name/snapshots/:id` | Delete a snapshot |
-| POST | `/vms/:name/snapshots/:id/revert` | Revert VM to snapshot |
+| GET | `/app/vms/:name/snapshots` | List snapshots for a VM |
+| POST | `/app/vms/:name/snapshots` | Create a snapshot |
+| GET | `/app/vms/:name/snapshots/:id` | Get snapshot details |
+| DELETE | `/app/vms/:name/snapshots/:id` | Delete a snapshot |
+| POST | `/app/vms/:name/snapshots/:id/revert` | Revert VM to snapshot |
 
 ## Storage
 
@@ -217,16 +217,16 @@ Disk and volume management.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/storage/pools` | List storage pools |
-| POST | `/storage/pools` | Create a storage pool |
-| GET | `/storage/pools/:id` | Get pool details |
-| DELETE | `/storage/pools/:id` | Delete a storage pool |
-| GET | `/storage/volumes` | List volumes |
-| POST | `/storage/volumes` | Create a volume |
-| DELETE | `/storage/volumes/:id` | Delete a volume |
-| POST | `/storage/volumes/:id/resize` | Resize a volume |
-| POST | `/storage/volumes/:id/attach` | Attach volume to a VM |
-| POST | `/storage/volumes/:id/detach` | Detach volume from a VM |
+| GET | `/app/storage/pools` | List storage pools |
+| POST | `/app/storage/pools` | Create a storage pool |
+| GET | `/app/storage/pools/:id` | Get pool details |
+| DELETE | `/app/storage/pools/:id` | Delete a storage pool |
+| GET | `/app/storage/volumes` | List volumes |
+| POST | `/app/storage/volumes` | Create a volume |
+| DELETE | `/app/storage/volumes/:id` | Delete a volume |
+| POST | `/app/storage/volumes/:id/resize` | Resize a volume |
+| POST | `/app/storage/volumes/:id/attach` | Attach volume to a VM |
+| POST | `/app/storage/volumes/:id/detach` | Detach volume from a VM |
 
 ## Distributed Storage
 
@@ -250,9 +250,9 @@ Virtual network and interface management.
 | GET | `/networks/:id` | Get network details |
 | PUT | `/networks/:id` | Update a network |
 | DELETE | `/networks/:id` | Delete a network |
-| GET | `/vms/:name/interfaces` | List VM network interfaces |
-| POST | `/vms/:name/interfaces` | Attach a network interface |
-| DELETE | `/vms/:name/interfaces/:id` | Detach a network interface |
+| GET | `/app/vms/:name/interfaces` | List VM network interfaces |
+| POST | `/app/vms/:name/interfaces` | Attach a network interface |
+| DELETE | `/app/vms/:name/interfaces/:id` | Detach a network interface |
 
 ## System
 
@@ -261,9 +261,9 @@ Daemon health, configuration, and system information.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
-| GET | `/system/info` | System information |
-| GET | `/system/config` | Get daemon configuration |
-| PUT | `/system/config` | Update daemon configuration |
+| GET | `/app/system/info` | System information |
+| GET | `/app/system/config` | Get daemon configuration |
+| PUT | `/app/system/config` | Update daemon configuration |
 | GET | `/metrics` | Prometheus-format metrics |
 
 ## Quotas
@@ -272,12 +272,12 @@ Resource usage limits per user or project.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/quotas` | List all quotas |
-| POST | `/quotas` | Create a quota |
-| GET | `/quotas/:id` | Get quota details |
-| PUT | `/quotas/:id` | Update a quota |
-| DELETE | `/quotas/:id` | Delete a quota |
-| GET | `/quotas/:id/usage` | Get current usage against quota |
+| GET | `/app/quotas` | List all quotas |
+| POST | `/app/quotas` | Create a quota |
+| GET | `/app/quotas/:id` | Get quota details |
+| PUT | `/app/quotas/:id` | Update a quota |
+| DELETE | `/app/quotas/:id` | Delete a quota |
+| GET | `/app/quotas/:id/usage` | Get current usage against quota |
 
 ## Schedules
 
@@ -285,12 +285,12 @@ Scheduled VM operations (start, stop, snapshot, backup).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/schedules` | List schedules |
-| POST | `/schedules` | Create a schedule |
-| GET | `/schedules/:id` | Get schedule details |
-| PUT | `/schedules/:id` | Update a schedule |
-| DELETE | `/schedules/:id` | Delete a schedule |
-| POST | `/schedules/:id/trigger` | Manually trigger a schedule |
+| GET | `/app/schedules` | List schedules |
+| POST | `/app/schedules` | Create a schedule |
+| GET | `/app/schedules/:id` | Get schedule details |
+| PUT | `/app/schedules/:id` | Update a schedule |
+| DELETE | `/app/schedules/:id` | Delete a schedule |
+| POST | `/app/schedules/:id/trigger` | Manually trigger a schedule |
 
 ## Audit
 
@@ -298,9 +298,9 @@ Administrative action audit trail.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/audit/logs` | Query audit log entries |
-| GET | `/audit/logs/:id` | Get a specific audit entry |
-| GET | `/audit/summary` | Get audit summary statistics |
+| GET | `/app/audit/logs` | Query audit log entries |
+| GET | `/app/audit/logs/:id` | Get a specific audit entry |
+| GET | `/app/audit/summary` | Get audit summary statistics |
 
 ## Analytics
 
@@ -308,10 +308,10 @@ Usage and performance analytics.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/analytics/overview` | Platform-wide analytics summary |
-| GET | `/analytics/vms` | Per-VM analytics |
-| GET | `/analytics/resources` | Resource utilization trends |
-| GET | `/analytics/reports` | Generate or list reports |
+| GET | `/app/analytics/overview` | Platform-wide analytics summary |
+| GET | `/app/analytics/vms` | Per-VM analytics |
+| GET | `/app/analytics/resources` | Resource utilization trends |
+| GET | `/app/analytics/reports` | Generate or list reports |
 
 ## Backups
 
@@ -319,13 +319,13 @@ VM backup and restore operations.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/backups` | List backups |
-| POST | `/backups` | Create a backup |
-| GET | `/backups/:id` | Get backup details |
-| DELETE | `/backups/:id` | Delete a backup |
-| POST | `/backups/:id/restore` | Restore a VM from backup |
-| GET | `/backups/policies` | List backup policies |
-| POST | `/backups/policies` | Create a backup policy |
+| GET | `/app/backups` | List backups |
+| POST | `/app/backups` | Create a backup |
+| GET | `/app/backups/:id` | Get backup details |
+| DELETE | `/app/backups/:id` | Delete a backup |
+| POST | `/app/backups/:id/restore` | Restore a VM from backup |
+| GET | `/app/backups/policies` | List backup policies |
+| POST | `/app/backups/policies` | Create a backup policy |
 
 ## Notifications
 
@@ -347,12 +347,12 @@ VM templates for standardized provisioning.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/templates` | List templates |
-| POST | `/templates` | Create a template |
-| GET | `/templates/:id` | Get template details |
-| PUT | `/templates/:id` | Update a template |
-| DELETE | `/templates/:id` | Delete a template |
-| POST | `/templates/:id/deploy` | Deploy a VM from template |
+| GET | `/app/templates` | List templates |
+| POST | `/app/templates` | Create a template |
+| GET | `/app/templates/:id` | Get template details |
+| PUT | `/app/templates/:id` | Update a template |
+| DELETE | `/app/templates/:id` | Delete a template |
+| POST | `/app/templates/:id/deploy` | Deploy a VM from template |
 
 ## Tags
 
@@ -363,8 +363,8 @@ Resource tagging and categorization.
 | GET | `/tags` | List all tags |
 | POST | `/tags` | Create a tag |
 | DELETE | `/tags/:id` | Delete a tag |
-| POST | `/vms/:name/tags` | Tag a VM |
-| DELETE | `/vms/:name/tags/:tag` | Remove a tag from a VM |
+| POST | `/app/vms/:name/tags` | Tag a VM |
+| DELETE | `/app/vms/:name/tags/:tag` | Remove a tag from a VM |
 
 ## Cloning
 
@@ -372,8 +372,8 @@ VM cloning (full and linked).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/vms/:name/clone` | Clone a VM |
-| GET | `/vms/:name/clones` | List clones of a VM |
+| POST | `/app/vms/:name/clone` | Clone a VM |
+| GET | `/app/vms/:name/clones` | List clones of a VM |
 
 ## DRS (Distributed Resource Scheduler)
 
@@ -381,10 +381,10 @@ Automatic VM placement and load balancing.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/drs/config` | Get DRS configuration |
-| PUT | `/drs/config` | Update DRS configuration |
-| GET | `/drs/recommendations` | Get placement recommendations |
-| POST | `/drs/recommendations/:id/apply` | Apply a recommendation |
+| GET | `/app/drs/config` | Get DRS configuration |
+| PUT | `/app/drs/config` | Update DRS configuration |
+| GET | `/app/drs/recommendations` | Get placement recommendations |
+| POST | `/app/drs/recommendations/:id/apply` | Apply a recommendation |
 
 ## Fault Tolerance
 
@@ -392,9 +392,9 @@ VM fault tolerance configuration.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/vms/:name/ft` | Get fault tolerance status |
-| POST | `/vms/:name/ft/enable` | Enable fault tolerance |
-| POST | `/vms/:name/ft/disable` | Disable fault tolerance |
+| GET | `/app/vms/:name/ft` | Get fault tolerance status |
+| POST | `/app/vms/:name/ft/enable` | Enable fault tolerance |
+| POST | `/app/vms/:name/ft/disable` | Disable fault tolerance |
 
 ## Replication
 
@@ -402,11 +402,11 @@ VM replication to secondary hosts.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/replication/configs` | List replication configurations |
-| POST | `/replication/configs` | Create a replication config |
-| GET | `/replication/configs/:id` | Get replication config details |
-| DELETE | `/replication/configs/:id` | Delete a replication config |
-| POST | `/replication/configs/:id/sync` | Trigger manual sync |
+| GET | `/app/replication/configs` | List replication configurations |
+| POST | `/app/replication/configs` | Create a replication config |
+| GET | `/app/replication/configs/:id` | Get replication config details |
+| DELETE | `/app/replication/configs/:id` | Delete a replication config |
+| POST | `/app/replication/configs/:id/sync` | Trigger manual sync |
 
 ## Site Recovery
 
@@ -414,11 +414,11 @@ Disaster recovery and failover.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/site-recovery/plans` | List recovery plans |
-| POST | `/site-recovery/plans` | Create a recovery plan |
-| POST | `/site-recovery/plans/:id/test` | Test a recovery plan |
-| POST | `/site-recovery/plans/:id/execute` | Execute failover |
-| POST | `/site-recovery/plans/:id/reprotect` | Reprotect after failover |
+| GET | `/app/site-recovery/plans` | List recovery plans |
+| POST | `/app/site-recovery/plans` | Create a recovery plan |
+| POST | `/app/site-recovery/plans/:id/test` | Test a recovery plan |
+| POST | `/app/site-recovery/plans/:id/execute` | Execute failover |
+| POST | `/app/site-recovery/plans/:id/reprotect` | Reprotect after failover |
 
 ## Content Library
 
@@ -426,11 +426,11 @@ Shared image and template repository.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/content-library/items` | List library items |
-| POST | `/content-library/items` | Upload an item |
-| GET | `/content-library/items/:id` | Get item details |
-| DELETE | `/content-library/items/:id` | Delete an item |
-| POST | `/content-library/items/:id/deploy` | Deploy from library item |
+| GET | `/app/content-library/items` | List library items |
+| POST | `/app/content-library/items` | Upload an item |
+| GET | `/app/content-library/items/:id` | Get item details |
+| DELETE | `/app/content-library/items/:id` | Delete an item |
+| POST | `/app/content-library/items/:id/deploy` | Deploy from library item |
 
 ## Lifecycle
 
@@ -438,10 +438,10 @@ VM lifecycle policies and operations.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/lifecycle/policies` | List lifecycle policies |
-| POST | `/lifecycle/policies` | Create a lifecycle policy |
-| PUT | `/lifecycle/policies/:id` | Update a lifecycle policy |
-| DELETE | `/lifecycle/policies/:id` | Delete a lifecycle policy |
+| GET | `/app/lifecycle/policies` | List lifecycle policies |
+| POST | `/app/lifecycle/policies` | Create a lifecycle policy |
+| PUT | `/app/lifecycle/policies/:id` | Update a lifecycle policy |
+| DELETE | `/app/lifecycle/policies/:id` | Delete a lifecycle policy |
 
 ## Certificates
 
@@ -449,10 +449,10 @@ TLS certificate management.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/certificates` | List certificates |
-| POST | `/certificates` | Upload a certificate |
-| DELETE | `/certificates/:id` | Delete a certificate |
-| POST | `/certificates/:id/renew` | Renew a certificate |
+| GET | `/app/certificates` | List certificates |
+| POST | `/app/certificates` | Upload a certificate |
+| DELETE | `/app/certificates/:id` | Delete a certificate |
+| POST | `/app/certificates/:id/renew` | Renew a certificate |
 
 ## VPN Mesh
 
@@ -558,11 +558,11 @@ Data-at-rest and key management.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/encryption/keys` | List encryption keys |
-| POST | `/encryption/keys` | Create an encryption key |
-| DELETE | `/encryption/keys/:id` | Delete an encryption key |
-| POST | `/encryption/keys/:id/rotate` | Rotate an encryption key |
-| POST | `/vms/:name/encrypt` | Encrypt a VM's disks |
+| GET | `/app/encryption/keys` | List encryption keys |
+| POST | `/app/encryption/keys` | Create an encryption key |
+| DELETE | `/app/encryption/keys/:id` | Delete an encryption key |
+| POST | `/app/encryption/keys/:id/rotate` | Rotate an encryption key |
+| POST | `/app/vms/:name/encrypt` | Encrypt a VM's disks |
 
 ## Resource Pools
 
@@ -583,11 +583,11 @@ Logical datacenter management.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/datacenters` | List datacenters |
-| POST | `/datacenters` | Create a datacenter |
-| GET | `/datacenters/:id` | Get datacenter details |
-| PUT | `/datacenters/:id` | Update a datacenter |
-| DELETE | `/datacenters/:id` | Delete a datacenter |
+| GET | `/app/datacenters` | List datacenters |
+| POST | `/app/datacenters` | Create a datacenter |
+| GET | `/app/datacenters/:id` | Get datacenter details |
+| PUT | `/app/datacenters/:id` | Update a datacenter |
+| DELETE | `/app/datacenters/:id` | Delete a datacenter |
 
 ## Machines
 
@@ -595,11 +595,11 @@ Host machine management.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/machines` | List host machines |
-| POST | `/machines` | Register a host machine |
-| GET | `/machines/:id` | Get machine details |
-| DELETE | `/machines/:id` | Remove a host machine |
-| POST | `/machines/:id/maintenance` | Enter maintenance mode |
+| GET | `/app/machines` | List host machines |
+| POST | `/app/machines` | Register a host machine |
+| GET | `/app/machines/:id` | Get machine details |
+| DELETE | `/app/machines/:id` | Remove a host machine |
+| POST | `/app/machines/:id/maintenance` | Enter maintenance mode |
 
 ## Events
 
@@ -629,10 +629,10 @@ Live add/remove of devices to running VMs.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/vms/:name/hotplug/cpu` | Add/remove CPUs |
-| POST | `/vms/:name/hotplug/memory` | Add/remove memory |
-| POST | `/vms/:name/hotplug/disk` | Attach/detach disk |
-| POST | `/vms/:name/hotplug/nic` | Attach/detach network interface |
+| POST | `/app/vms/:name/hotplug/cpu` | Add/remove CPUs |
+| POST | `/app/vms/:name/hotplug/memory` | Add/remove memory |
+| POST | `/app/vms/:name/hotplug/disk` | Attach/detach disk |
+| POST | `/app/vms/:name/hotplug/nic` | Attach/detach network interface |
 
 ## Image Builder
 

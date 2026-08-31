@@ -12,7 +12,7 @@ Backups & Restore — create full or incremental VM backups, track running backu
 
 ## How to get there
 
-- Route / id: `/backups`
+- Route / id: `/app/backups`
 - Nav: **Operations → Backups** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

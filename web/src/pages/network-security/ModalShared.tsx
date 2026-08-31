@@ -33,26 +33,26 @@ export function LabelSelectorInput({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1">Label Selectors</label>
+      <label className="block text-sm font-medium text-[#1d1d1f] mb-1">Label Selectors</label>
       <div className="flex gap-2 mb-2">
         <input
           type="text"
           value={key}
           onChange={e => setKey(e.target.value)}
           placeholder="key"
-          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+          className="flex-1 bg-[#e8e8ed] border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500 text-sm"
         />
         <input
           type="text"
           value={value}
           onChange={e => setValue(e.target.value)}
           placeholder="value"
-          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+          className="flex-1 bg-[#e8e8ed] border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500 text-sm"
         />
         <button
           type="button"
           onClick={handleAdd}
-          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-sm"
+          className="flex items-center gap-1 bg-[#0066cc] hover:bg-[#0077ed] text-white px-3 py-2 rounded-lg transition text-sm"
         >
           <Plus className="w-3.5 h-3.5" /> Add
         </button>
@@ -65,7 +65,7 @@ export function LabelSelectorInput({
               className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30"
             >
               {k}={v}
-              <button type="button" onClick={() => handleRemove(k)} className="hover:text-red-400 transition">
+              <button type="button" onClick={() => handleRemove(k)} className="hover:text-red-600 transition">
                 <X className="w-3.5 h-3.5" />
               </button>
             </span>
@@ -79,11 +79,11 @@ export function LabelSelectorInput({
 /** Colored status badge */
 export function StatusBadge({ status, color }: { status: string; color?: string }) {
   const colorMap: Record<string, string> = {
-    green: 'bg-green-500/10 text-green-400 border-green-500/20',
-    red: 'bg-red-500/10 text-red-400 border-red-500/20',
-    yellow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    gray: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    green: 'bg-green-500/10 text-emerald-600 border-green-500/20',
+    red: 'bg-red-500/10 text-red-600 border-red-500/20',
+    yellow: 'bg-yellow-500/10 text-amber-600 border-yellow-500/20',
+    blue: 'bg-blue-500/10 text-[#0066cc] border-blue-500/20',
+    gray: 'bg-black/[0.04] text-[#6e6e73] border-[#d2d2d7]',
   }
   const c = colorMap[color ?? 'blue'] ?? colorMap.blue
   return (
@@ -96,7 +96,7 @@ export function StatusBadge({ status, color }: { status: string; color?: string 
 /** Render label tags inline */
 export function LabelTags({ labels }: { labels?: Record<string, string> }) {
   const entries = Object.entries(labels ?? {})
-  if (entries.length === 0) return <span className="text-slate-500 text-sm">none</span>
+  if (entries.length === 0) return <span className="text-[#6e6e73] text-sm">none</span>
   return (
     <div className="flex flex-wrap gap-1">
       {entries.map(([k, v]) => (

@@ -33,13 +33,16 @@ Private cloud control plane with no systemd dependency — vCenter-style VM ops,
 
 ## Support surfaces (quick map)
 
+Public marketing: `/`, `/product`, `/platform`, `/security`. Sign in: `/sign-in`. Ops console: `/app/*`.
+
+
 | Need | Path |
 |------|------|
-| Dashboard | `/` |
-| VMs | `/vms` |
-| DRS / FT | `/drs`, `/fault-tolerance` |
-| Site Recovery | `/site-recovery` |
-| Settings | `/settings` |
+| Dashboard | `/app` |
+| VMs | `/app/vms` |
+| DRS / FT | `/app/drs`, `/app/fault-tolerance` |
+| Site Recovery | `/app/site-recovery` |
+| Settings | `/app/settings` |
 
 ---
 

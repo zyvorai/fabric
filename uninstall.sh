@@ -70,7 +70,7 @@ fi
 
 # Remove binaries
 step "Removing binaries"
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui zyvorctl; do
+for bin in zyvor-fabricd zyvorctl; do
     for dir in /usr/bin /usr/local/bin; do
         if [[ -f "$dir/$bin" ]]; then
             rm -f "$dir/$bin"

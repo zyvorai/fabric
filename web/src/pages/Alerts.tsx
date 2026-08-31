@@ -25,11 +25,11 @@ function severityBorderClass(severity: string): string {
 function severityBadgeClasses(severity: string): string {
   switch (severity) {
     case 'critical':
-      return 'bg-red-500/20 text-red-400'
+      return 'bg-red-500/20 text-red-600'
     case 'warning':
       return 'bg-amber-500/20 text-amber-400'
     default:
-      return 'bg-blue-500/20 text-blue-400'
+      return 'bg-blue-500/20 text-[#0066cc]'
   }
 }
 
@@ -92,7 +92,7 @@ export default function Alerts() {
     return (
       <div className="space-y-6">
         <PageHeader title="Alerts" description="System alerts and notification rules" />
-        <div className="flex items-center justify-center h-64 text-slate-400">
+        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
           <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
           Loading alerts…
         </div>
@@ -125,24 +125,24 @@ export default function Alerts() {
       {!loadError && (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
-              <div className="text-xs text-slate-400 mb-1">Active Alerts</div>
-              <div className="text-2xl font-bold text-white">{activeCount}</div>
+            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
+              <div className="text-xs text-[#6e6e73] mb-1">Active Alerts</div>
+              <div className="text-2xl font-bold text-[#1d1d1f]">{activeCount}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
-              <div className="text-xs text-slate-400 mb-1">Critical</div>
-              <div className="text-2xl font-bold text-red-400">{criticalCount}</div>
+            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
+              <div className="text-xs text-[#6e6e73] mb-1">Critical</div>
+              <div className="text-2xl font-bold text-red-600">{criticalCount}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
-              <div className="text-xs text-slate-400 mb-1">Warning</div>
+            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
+              <div className="text-xs text-[#6e6e73] mb-1">Warning</div>
               <div className="text-2xl font-bold text-amber-400">{warningCount}</div>
             </div>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-white mb-3">Active Alerts</h2>
+            <h2 className="text-lg font-semibold text-[#1d1d1f] mb-3">Active Alerts</h2>
             {alerts.length === 0 ? (
-              <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3">
+              <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
                 <span className="text-sm">No active alerts</span>
               </div>
             ) : (
@@ -150,7 +150,7 @@ export default function Alerts() {
                 {alerts.map((alert: any, idx: number) => (
                   <div
                     key={alert.id ?? idx}
-                    className={`bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 border-l-4 ${severityBorderClass(alert.severity)}`}
+                    className={`bg-[#f5f5f7] rounded-xl p-4 border border-[#d2d2d7] border-l-4 ${severityBorderClass(alert.severity)}`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <span
@@ -158,16 +158,16 @@ export default function Alerts() {
                       >
                         {alert.severity}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-[#6e6e73]">
                         {alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}
                       </span>
                     </div>
-                    <div className="text-sm font-semibold text-white mb-1">
+                    <div className="text-sm font-semibold text-[#1d1d1f] mb-1">
                       {alert.title ?? alert.name ?? 'Alert'}
                     </div>
-                    <div className="text-sm text-slate-400">{alert.message}</div>
+                    <div className="text-sm text-[#6e6e73]">{alert.message}</div>
                     {alert.value !== undefined && (
-                      <div className="text-xs text-slate-500 mt-2">Value: {alert.value}</div>
+                      <div className="text-xs text-[#6e6e73] mt-2">Value: {alert.value}</div>
                     )}
                   </div>
                 ))}
@@ -177,24 +177,24 @@ export default function Alerts() {
 
           {rules.length > 0 && (
             <div>
-              <h2 className="text-lg font-semibold text-white mb-3">Alert Rules</h2>
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+              <h2 className="text-lg font-semibold text-[#1d1d1f] mb-3">Alert Rules</h2>
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700/50">
-                      <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b border-[#d2d2d7]">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
                         Name
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
                         Condition
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
                         Threshold
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
                         Severity
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
                         Enabled
                       </th>
                     </tr>
@@ -203,11 +203,11 @@ export default function Alerts() {
                     {rules.map((rule: any, idx: number) => (
                       <tr
                         key={rule.name ?? idx}
-                        className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors"
+                        className="border-b border-[#d2d2d7]/60 hover:bg-black/[0.04] transition-colors"
                       >
-                        <td className="px-4 py-3 text-white font-medium">{rule.name}</td>
-                        <td className="px-4 py-3 text-slate-300">{rule.condition}</td>
-                        <td className="px-4 py-3 text-slate-300">{rule.threshold}</td>
+                        <td className="px-4 py-3 text-[#1d1d1f] font-medium">{rule.name}</td>
+                        <td className="px-4 py-3 text-[#1d1d1f]">{rule.condition}</td>
+                        <td className="px-4 py-3 text-[#1d1d1f]">{rule.threshold}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${severityBadgeClasses(rule.severity)}`}
@@ -217,7 +217,7 @@ export default function Alerts() {
                         </td>
                         <td className="px-4 py-3">
                           <span
-                            className={`text-xs font-medium ${rule.enabled ? 'text-emerald-400' : 'text-slate-500'}`}
+                            className={`text-xs font-medium ${rule.enabled ? 'text-emerald-600' : 'text-[#6e6e73]'}`}
                           >
                             {rule.enabled ? 'Yes' : 'No'}
                           </span>

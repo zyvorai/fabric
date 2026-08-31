@@ -84,7 +84,7 @@ export default function SystemResources() {
     return (
       <div className="p-8 space-y-6">
         <PageHeader title="System Resources" description="Hardware topology and resource allocation" />
-        <div className="text-slate-400">Loading system resources…</div>
+        <div className="text-[#6e6e73]">Loading system resources…</div>
       </div>
     )
   }
@@ -111,7 +111,7 @@ export default function SystemResources() {
         <div />
         <button
           onClick={loadResources}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded transition"
+          className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded transition"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -120,63 +120,63 @@ export default function SystemResources() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
-            <Cpu className="w-5 h-5 text-blue-400" />
-            <div className="text-slate-400 text-sm">Total CPUs</div>
+            <Cpu className="w-5 h-5 text-[#0066cc]" />
+            <div className="text-[#6e6e73] text-sm">Total CPUs</div>
           </div>
           <div className="text-2xl font-bold">{cpuTopology?.total_cpus || 0}</div>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm text-[#6e6e73] mt-1">
             {cpuTopology?.sockets || 0} socket(s) × {cpuTopology?.cores_per_socket || 0} cores
           </div>
         </div>
 
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
-            <Server className="w-5 h-5 text-green-400" />
-            <div className="text-slate-400 text-sm">NUMA Nodes</div>
+            <Server className="w-5 h-5 text-emerald-600" />
+            <div className="text-[#6e6e73] text-sm">NUMA Nodes</div>
           </div>
           <div className="text-2xl font-bold">{numaTopology?.nodes.length || 0}</div>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm text-[#6e6e73] mt-1">
             {numaTopology ? 'Available' : 'Not available'}
           </div>
         </div>
 
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
             <MemoryStick className="w-5 h-5 text-purple-400" />
-            <div className="text-slate-400 text-sm">Total Memory</div>
+            <div className="text-[#6e6e73] text-sm">Total Memory</div>
           </div>
           <div className="text-2xl font-bold">
             {systemMemory ? formatMemory(systemMemory.total_kb) : 'N/A'}
           </div>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm text-[#6e6e73] mt-1">
             {systemMemory ? formatMemory(systemMemory.available_kb) : 'N/A'} available
           </div>
         </div>
 
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="flex items-center gap-3 mb-2">
-            <HardDrive className="w-5 h-5 text-yellow-400" />
-            <div className="text-slate-400 text-sm">Hugepages (2MB)</div>
+            <HardDrive className="w-5 h-5 text-amber-600" />
+            <div className="text-[#6e6e73] text-sm">Hugepages (2MB)</div>
           </div>
           <div className="text-2xl font-bold">{hugepages2mb?.total || 0}</div>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm text-[#6e6e73] mt-1">
             {hugepages2mb?.free || 0} free
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-        <div className="border-b border-slate-700/50">
+      <div className="bg-[#f5f5f7] rounded-lg overflow-hidden">
+        <div className="border-b border-[#d2d2d7]">
           <div className="flex">
             <button
               onClick={() => setActiveTab('cpu')}
               className={`px-6 py-3 ${
                 activeTab === 'cpu'
-                  ? 'bg-slate-800 border-b-2 border-blue-500'
-                  : 'hover:bg-slate-900'
+                  ? 'bg-white border-b-2 border-blue-500'
+                  : 'hover:bg-white'
               }`}
             >
               CPU Topology
@@ -185,8 +185,8 @@ export default function SystemResources() {
               onClick={() => setActiveTab('numa')}
               className={`px-6 py-3 ${
                 activeTab === 'numa'
-                  ? 'bg-slate-800 border-b-2 border-blue-500'
-                  : 'hover:bg-slate-900'
+                  ? 'bg-white border-b-2 border-blue-500'
+                  : 'hover:bg-white'
               }`}
             >
               NUMA Topology
@@ -195,8 +195,8 @@ export default function SystemResources() {
               onClick={() => setActiveTab('memory')}
               className={`px-6 py-3 ${
                 activeTab === 'memory'
-                  ? 'bg-slate-800 border-b-2 border-blue-500'
-                  : 'hover:bg-slate-900'
+                  ? 'bg-white border-b-2 border-blue-500'
+                  : 'hover:bg-white'
               }`}
             >
               Memory & Hugepages
@@ -205,8 +205,8 @@ export default function SystemResources() {
               onClick={() => setActiveTab('optimization')}
               className={`px-6 py-3 flex items-center gap-2 ${
                 activeTab === 'optimization'
-                  ? 'bg-slate-800 border-b-2 border-blue-500'
-                  : 'hover:bg-slate-900'
+                  ? 'bg-white border-b-2 border-blue-500'
+                  : 'hover:bg-white'
               }`}
             >
               <Zap className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function SystemResources() {
 
 function CpuTopologyView({ topology }: { topology: CpuTopology | null }) {
   if (!topology) {
-    return <div className="text-slate-400">CPU topology information not available</div>
+    return <div className="text-[#6e6e73]">CPU topology information not available</div>
   }
 
   // Group CPUs by socket
@@ -264,17 +264,17 @@ function CpuTopologyView({ topology }: { topology: CpuTopology | null }) {
     <div>
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
-          <div className="text-sm text-slate-400 mb-1">Architecture</div>
+          <div className="text-sm text-[#6e6e73] mb-1">Architecture</div>
           <div className="text-lg font-medium">
             {topology.sockets} Socket(s) × {topology.cores_per_socket} Core(s) ×{' '}
             {topology.threads_per_core} Thread(s)
           </div>
         </div>
         <div>
-          <div className="text-sm text-slate-400 mb-1">Online CPUs</div>
+          <div className="text-sm text-[#6e6e73] mb-1">Online CPUs</div>
           <div className="text-lg font-medium">{topology.online_cpus.length} CPUs</div>
           {topology.offline_cpus.length > 0 && (
-            <div className="text-sm text-slate-400">
+            <div className="text-sm text-[#6e6e73]">
               {topology.offline_cpus.length} offline
             </div>
           )}
@@ -283,14 +283,14 @@ function CpuTopologyView({ topology }: { topology: CpuTopology | null }) {
 
       <div className="space-y-6">
         {Array.from(cpusBySocket.entries()).map(([socketId, cpus]) => (
-          <div key={socketId} className="bg-slate-800/50 rounded-lg p-4">
+          <div key={socketId} className="bg-[#f5f5f7] rounded-lg p-4">
             <div className="font-medium mb-3">Socket {socketId}</div>
             <div className="grid grid-cols-8 gap-2">
               {cpus.map((cpu) => (
                 <div
                   key={cpu.id}
                   className={`p-2 rounded text-center text-sm ${
-                    cpu.online ? 'bg-green-500/20 text-green-400' : 'bg-slate-800 text-slate-500'
+                    cpu.online ? 'bg-green-500/20 text-emerald-600' : 'bg-white text-[#6e6e73]'
                   }`}
                   title={`CPU ${cpu.id}\nCore ${cpu.core_id}\nThread ${cpu.thread_id}\nNUMA ${
                     cpu.numa_node ?? 'N/A'
@@ -309,7 +309,7 @@ function CpuTopologyView({ topology }: { topology: CpuTopology | null }) {
 
 function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
   if (!topology) {
-    return <div className="text-slate-400">NUMA topology not available on this system</div>
+    return <div className="text-[#6e6e73]">NUMA topology not available on this system</div>
   }
 
   const formatMemory = (mb: number) => {
@@ -322,15 +322,15 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
   return (
     <div className="space-y-6">
       {topology.nodes.map((node) => (
-        <div key={node.id} className="bg-slate-800/50 rounded-lg p-6">
+        <div key={node.id} className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xl font-bold mb-1">Node {node.id}</div>
-              <div className="text-sm text-slate-400">{node.cpus.length} CPUs</div>
+              <div className="text-sm text-[#6e6e73]">{node.cpus.length} CPUs</div>
             </div>
             <div className="text-right">
               <div className="text-lg font-medium">{formatMemory(node.memory_total_mb)}</div>
-              <div className="text-sm text-slate-400">
+              <div className="text-sm text-[#6e6e73]">
                 {formatMemory(node.memory_free_mb)} free
               </div>
             </div>
@@ -338,13 +338,13 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <div className="text-sm text-slate-400 mb-1">CPU List</div>
+              <div className="text-sm text-[#6e6e73] mb-1">CPU List</div>
               <div className="font-mono text-sm">{node.cpus.join(', ')}</div>
             </div>
             <div>
-              <div className="text-sm text-slate-400 mb-1">Memory Usage</div>
+              <div className="text-sm text-[#6e6e73] mb-1">Memory Usage</div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div className="flex-1 bg-white rounded-full h-2 overflow-hidden">
                   <div
                     className="h-full bg-blue-500"
                     style={{
@@ -367,15 +367,15 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
           </div>
 
           {(node.hugepages_2mb_total > 0 || node.hugepages_1gb_total > 0) && (
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50">
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#d2d2d7]">
               <div>
-                <div className="text-sm text-slate-400 mb-1">Hugepages 2MB</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Hugepages 2MB</div>
                 <div className="text-sm">
                   {node.hugepages_2mb_free} / {node.hugepages_2mb_total} free
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400 mb-1">Hugepages 1GB</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Hugepages 1GB</div>
                 <div className="text-sm">
                   {node.hugepages_1gb_free} / {node.hugepages_1gb_total} free
                 </div>
@@ -386,14 +386,14 @@ function NumaTopologyView({ topology }: { topology: NumaTopology | null }) {
       ))}
 
       {topology.distances.length > 0 && (
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="font-medium mb-3">Inter-Node Distances</div>
           <table className="w-full">
             <thead>
               <tr>
-                <th className="p-2 text-left text-sm text-slate-400">From \ To</th>
+                <th className="p-2 text-left text-sm text-[#6e6e73]">From \ To</th>
                 {topology.nodes.map((node) => (
-                  <th key={node.id} className="p-2 text-sm text-slate-400">
+                  <th key={node.id} className="p-2 text-sm text-[#6e6e73]">
                     Node {node.id}
                   </th>
                 ))}
@@ -437,7 +437,7 @@ function MemoryView({
   const [showAllocateDialog, setShowAllocateDialog] = useState(false)
 
   if (!memory) {
-    return <div className="text-slate-400">Memory information not available</div>
+    return <div className="text-[#6e6e73]">Memory information not available</div>
   }
 
   const formatMemory = (kb: number) => {
@@ -452,23 +452,23 @@ function MemoryView({
 
   return (
     <div>
-      <div className="bg-slate-800/50 rounded-lg p-6 mb-6">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 mb-6">
         <div className="text-lg font-medium mb-4">System Memory</div>
         <div className="grid grid-cols-3 gap-6 mb-4">
           <div>
-            <div className="text-sm text-slate-400 mb-1">Total</div>
+            <div className="text-sm text-[#6e6e73] mb-1">Total</div>
             <div className="text-xl font-medium">{formatMemory(memory.total_kb)}</div>
           </div>
           <div>
-            <div className="text-sm text-slate-400 mb-1">Available</div>
-            <div className="text-xl font-medium text-green-400">
+            <div className="text-sm text-[#6e6e73] mb-1">Available</div>
+            <div className="text-xl font-medium text-emerald-600">
               {formatMemory(memory.available_kb)}
             </div>
           </div>
           <div>
-            <div className="text-sm text-slate-400 mb-1">Usage</div>
+            <div className="text-sm text-[#6e6e73] mb-1">Usage</div>
             <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-800 rounded-full h-3 overflow-hidden">
+              <div className="flex-1 bg-white rounded-full h-3 overflow-hidden">
                 <div
                   className={`h-full ${
                     usagePercent > 90 ? 'bg-red-500' : usagePercent > 75 ? 'bg-yellow-500' : 'bg-blue-500'
@@ -481,13 +481,13 @@ function MemoryView({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-700/50">
+        <div className="grid grid-cols-2 gap-6 pt-4 border-t border-[#d2d2d7]">
           <div>
-            <div className="text-sm text-slate-400 mb-1">Buffers</div>
+            <div className="text-sm text-[#6e6e73] mb-1">Buffers</div>
             <div className="text-sm">{formatMemory(memory.buffers_kb)}</div>
           </div>
           <div>
-            <div className="text-sm text-slate-400 mb-1">Cached</div>
+            <div className="text-sm text-[#6e6e73] mb-1">Cached</div>
             <div className="text-sm">{formatMemory(memory.cached_kb)}</div>
           </div>
         </div>
@@ -497,58 +497,58 @@ function MemoryView({
         <div className="text-lg font-medium">Hugepages</div>
         <button
           onClick={() => setShowAllocateDialog(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm transition"
+          className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded text-sm transition"
         >
           Allocate Hugepages
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="text-lg font-medium mb-4">2MB Hugepages</div>
           {hugepages2mb ? (
             <div className="space-y-3">
               <div>
-                <div className="text-sm text-slate-400 mb-1">Total</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Total</div>
                 <div className="text-2xl font-bold">{hugepages2mb.total}</div>
-                <div className="text-sm text-slate-400">
+                <div className="text-sm text-[#6e6e73]">
                   {(hugepages2mb.total * 2).toFixed(0)} MB
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400 mb-1">Free</div>
-                <div className="text-xl text-green-400">{hugepages2mb.free}</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Free</div>
+                <div className="text-xl text-emerald-600">{hugepages2mb.free}</div>
               </div>
               <div>
-                <div className="text-sm text-slate-400 mb-1">Reserved</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Reserved</div>
                 <div className="text-sm">{hugepages2mb.reserved}</div>
               </div>
             </div>
           ) : (
-            <div className="text-slate-400">Not available</div>
+            <div className="text-[#6e6e73]">Not available</div>
           )}
         </div>
 
-        <div className="bg-slate-800/50 rounded-lg p-6">
+        <div className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="text-lg font-medium mb-4">1GB Hugepages</div>
           {hugepages1gb ? (
             <div className="space-y-3">
               <div>
-                <div className="text-sm text-slate-400 mb-1">Total</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Total</div>
                 <div className="text-2xl font-bold">{hugepages1gb.total}</div>
-                <div className="text-sm text-slate-400">{hugepages1gb.total} GB</div>
+                <div className="text-sm text-[#6e6e73]">{hugepages1gb.total} GB</div>
               </div>
               <div>
-                <div className="text-sm text-slate-400 mb-1">Free</div>
-                <div className="text-xl text-green-400">{hugepages1gb.free}</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Free</div>
+                <div className="text-xl text-emerald-600">{hugepages1gb.free}</div>
               </div>
               <div>
-                <div className="text-sm text-slate-400 mb-1">Reserved</div>
+                <div className="text-sm text-[#6e6e73] mb-1">Reserved</div>
                 <div className="text-sm">{hugepages1gb.reserved}</div>
               </div>
             </div>
           ) : (
-            <div className="text-slate-400">Not available</div>
+            <div className="text-[#6e6e73]">Not available</div>
           )}
         </div>
       </div>
@@ -576,25 +576,25 @@ function OptimizationView({
   if (recommendations.length === 0) {
     return (
       <div className="text-center py-12">
-        <Zap className="w-12 h-12 mx-auto mb-4 text-slate-600" />
-        <p className="text-lg text-slate-400 mb-2">No optimization recommendations</p>
-        <p className="text-sm text-slate-500">All running VMs are configured optimally, or no VMs are running.</p>
+        <Zap className="w-12 h-12 mx-auto mb-4 text-[#6e6e73]" />
+        <p className="text-lg text-[#6e6e73] mb-2">No optimization recommendations</p>
+        <p className="text-sm text-[#6e6e73]">All running VMs are configured optimally, or no VMs are running.</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-[#6e6e73]">
         Recommendations based on system topology analysis. Click "Apply" to auto-configure optimal settings.
       </p>
       {recommendations.map((rec) => (
-        <div key={rec.vm_name} className="bg-slate-800/50 rounded-lg p-6">
+        <div key={rec.vm_name} className="bg-[#f5f5f7] rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold">{rec.vm_name}</h3>
             <button
               onClick={() => onOptimize(rec.vm_name)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded text-sm transition"
             >
               <Zap className="w-4 h-4" />
               Apply
@@ -602,15 +602,15 @@ function OptimizationView({
           </div>
           <div className="space-y-3">
             {rec.recommendations.map((r, idx) => (
-              <div key={idx} className="bg-slate-800/50 rounded p-4">
+              <div key={idx} className="bg-[#f5f5f7] rounded p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-blue-400">{r.resource}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="font-medium text-[#0066cc]">{r.resource}</span>
+                  <span className="text-xs text-[#6e6e73]">
                     {r.current_value} &rarr; {r.recommended_value}
                   </span>
                 </div>
-                <p className="text-sm text-slate-400 mb-1">{r.reason}</p>
-                <p className="text-xs text-green-400">{r.impact}</p>
+                <p className="text-sm text-[#6e6e73] mb-1">{r.reason}</p>
+                <p className="text-xs text-emerald-600">{r.impact}</p>
               </div>
             ))}
           </div>
@@ -642,7 +642,7 @@ function AllocateHugepagesDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Allocate Hugepages</h2>
 
         <div className="mb-4">
@@ -650,7 +650,7 @@ function AllocateHugepagesDialog({
           <select
             value={size}
             onChange={(e) => setSize(e.target.value as any)}
-            className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2"
+            className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
           >
             <option value="Size2MB">2MB</option>
             <option value="Size1GB">1GB</option>
@@ -664,9 +664,9 @@ function AllocateHugepagesDialog({
             value={count}
             onChange={(e) => setCount(parseInt(e.target.value) || 0)}
             min="0"
-            className="w-full bg-slate-800 border border-slate-700/50 rounded px-4 py-2"
+            className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
           />
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm text-[#6e6e73] mt-1">
             Total: {size === 'Size2MB' ? (count * 2) / 1024 : count} GB
           </div>
         </div>
@@ -674,13 +674,13 @@ function AllocateHugepagesDialog({
         <div className="flex gap-4">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded transition"
+            className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded transition"
           >
             Cancel
           </button>
           <button
             onClick={handleAllocate}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+            className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded transition"
           >
             Allocate
           </button>

@@ -13,7 +13,7 @@ Performance Analytics — fleet-wide resource utilization, trends over time, and
 
 ## How to get there
 
-- Route / id: `/analytics`
+- Route / id: `/app/analytics`
 - Nav: **Monitoring → Analytics** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

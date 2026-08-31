@@ -2,24 +2,21 @@
 // Proprietary software — see LICENSE in the repository root.
 // https://zyvor.dev · info@zyvor.dev
 
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router'
-import { Suspense, lazy, ReactNode, useState, useCallback, useMemo } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router'
+import { Suspense, lazy, ReactNode } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { PlatformInfoProvider } from './contexts/PlatformInfoContext'
 import PageSkeleton from './components/PageSkeleton'
 import { PageErrorBoundary } from './components/ErrorBoundary'
-import Navbar from './components/Navbar'
-import Breadcrumb from './components/Breadcrumb'
-import CommandPalette from './components/CommandPalette'
-import HelpDialog, { type HelpTab } from './components/HelpDialog'
-import Login from './pages/Login'
+import ConsoleLayout from './components/ConsoleLayout'
+import SignIn from './pages/SignIn'
 import NotFound from './pages/NotFound'
-import { useSequenceShortcuts } from './hooks/useSequenceShortcut'
-import { useKeyboardShortcut, isInputFocused } from './hooks/useKeyboardShortcut'
-import { useRecordRecentPage } from './hooks/useRecordRecentPage'
+import Home from './pages/marketing/Home'
+import Product from './pages/marketing/Product'
+import Platform from './pages/marketing/Platform'
+import SecurityPage from './pages/marketing/Security'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const VMList = lazy(() => import('./pages/VMList'))
@@ -109,238 +106,175 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--zf-canvas)]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold text-slate-300 tracking-wide">
-            Loading Zyvor Fabric...
-          </span>
+          <div className="w-7 h-7 border-2 border-[var(--zf-ink)] border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium text-[var(--zf-muted)] tracking-wide">Loading…</span>
         </div>
       </div>
     )
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/sign-in" replace />
   }
 
   return <>{children}</>
 }
 
-function GlobalShortcuts({
-  helpOpen,
-  helpTab,
-  onOpenHelp,
-  onCloseHelp,
-  onHelpTabChange,
-}: {
-  helpOpen: boolean
-  helpTab: HelpTab
-  onOpenHelp: (tab?: HelpTab) => void
-  onCloseHelp: () => void
-  onHelpTabChange: (tab: HelpTab) => void
-}) {
-  const navigate = useNavigate()
-  const shortcuts = useMemo(
-    () => [
-      { sequence: ['g', 'd'] as [string, string], handler: () => navigate('/') },
-      { sequence: ['g', 'v'] as [string, string], handler: () => navigate('/vms') },
-      { sequence: ['g', 'n'] as [string, string], handler: () => navigate('/network') },
-      { sequence: ['g', 's'] as [string, string], handler: () => navigate('/storage') },
-      { sequence: ['g', 'c'] as [string, string], handler: () => navigate('/create') },
-      { sequence: ['g', 'l'] as [string, string], handler: () => navigate('/logs') },
-      { sequence: ['g', 'b'] as [string, string], handler: () => navigate('/backups') },
-      { sequence: ['g', 'i'] as [string, string], handler: () => navigate('/disk-images') },
-      { sequence: ['g', 'e'] as [string, string], handler: () => navigate('/live-metrics') },
-    ],
-    [navigate],
-  )
-
-  useSequenceShortcuts(shortcuts)
-
-  const toggleHelp = useCallback(
-    (e: KeyboardEvent) => {
-      if (isInputFocused()) return
-      e.preventDefault()
-      if (helpOpen) onCloseHelp()
-      else onOpenHelp('shortcuts')
-    },
-    [helpOpen, onCloseHelp, onOpenHelp],
-  )
-
-  useKeyboardShortcut({ key: '?', handler: toggleHelp })
-
+function ConsoleRoutes() {
   return (
-    <HelpDialog open={helpOpen} tab={helpTab} onClose={onCloseHelp} onTabChange={onHelpTabChange} />
+    <ConsoleLayout>
+      <PageErrorBoundary>
+        <Suspense fallback={<PageSkeleton />}>
+          <Routes>
+            <Route index element={<Dashboard />} />
+            <Route path="vms" element={<VMList />} />
+            <Route path="vms/:name" element={<VMDetails />} />
+            <Route path="vms/:name/console" element={<Console />} />
+            <Route path="create" element={<CreateVM />} />
+            <Route path="logs" element={<Logs />} />
+            <Route path="network" element={<Network />} />
+            <Route path="storage" element={<Storage />} />
+            <Route path="templates" element={<Templates />} />
+            <Route path="quotas" element={<Quotas />} />
+            <Route path="schedules" element={<Schedules />} />
+            <Route path="autoscale" element={<AutoscalePage />} />
+            <Route path="zones" element={<Zones />} />
+            <Route path="audit" element={<AuditLogs />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="backups" element={<Backups />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="storage-pools" element={<StoragePools />} />
+            <Route path="system" element={<SystemResources />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="datacenters" element={<Datacenters />} />
+            <Route path="resource-pools" element={<ResourcePools />} />
+            <Route path="vm-pools" element={<WarmPools />} />
+            <Route path="drs" element={<DRS />} />
+            <Route path="distributed-storage" element={<DistributedStorage />} />
+            <Route path="encryption" element={<Encryption />} />
+            <Route path="fault-tolerance" element={<FaultTolerance />} />
+            <Route path="replication" element={<Replication />} />
+            <Route path="site-recovery" element={<SiteRecovery />} />
+            <Route path="migrations" element={<Migrations />} />
+            <Route path="machines" element={<Machines />} />
+            <Route path="profiles" element={<Profiles />} />
+            <Route path="snapshots" element={<Snapshots />} />
+            <Route path="content-library" element={<ContentLibrary />} />
+            <Route path="lifecycle" element={<LifecycleManager />} />
+            <Route path="certificates" element={<Certificates />} />
+            <Route path="network-security" element={<NetworkSecurity />} />
+            <Route path="processes" element={<Processes />} />
+            <Route path="security-dashboard" element={<SecurityDashboard />} />
+            <Route path="kernel" element={<Kernel />} />
+            <Route path="alerts" element={<Alerts />} />
+            <Route path="debug" element={<Debug />} />
+            <Route path="explain" element={<Explain />} />
+            <Route path="timeline" element={<Timeline />} />
+            <Route path="webhooks" element={<Webhooks />} />
+            <Route path="playground" element={<APIPlayground />} />
+            <Route path="cost-estimator" element={<CostEstimator />} />
+            <Route path="system-health" element={<SystemHealth />} />
+            <Route path="containers" element={<ContainersPage />} />
+            <Route path="disk-converter" element={<DiskConverter />} />
+            <Route path="vm-compare" element={<VMComparePage />} />
+            <Route path="vm-healthcheck" element={<VMHealthCheckPage />} />
+            <Route path="notification-center" element={<NotificationCenterPage />} />
+            <Route path="favorites" element={<FavoriteVMs />} />
+            <Route path="bulk-operations" element={<BulkOperationsPage />} />
+            <Route path="iso-images" element={<ISOImages />} />
+            <Route path="download-disk" element={<DownloadDisk />} />
+            <Route path="upload-disk" element={<UploadDiskPage />} />
+            <Route path="pipeline" element={<PipelineMonitorPage />} />
+            <Route path="migration-readiness" element={<MigrationReadinessPage />} />
+            <Route path="migration-history" element={<MigrationHistoryPage />} />
+            <Route path="migration-report" element={<MigrationReportPage />} />
+            <Route path="network-topology" element={<NetworkTopologyPage />} />
+            <Route path="backup-scheduler" element={<BackupSchedulerPage />} />
+            <Route path="batch-import" element={<BatchImportPage />} />
+            <Route path="resource-optimizer" element={<ResourceOptimizerPage />} />
+            <Route path="capacity-planning" element={<CapacityPlanningPage />} />
+            <Route path="compliance" element={<ComplianceDashboardPage />} />
+            <Route path="live-metrics" element={<LiveMetricsPage />} />
+            <Route path="access-control" element={<AccessControlPage />} />
+            <Route path="plugins" element={<PluginManagerPage />} />
+            <Route path="service-map" element={<ServiceMapPage />} />
+            <Route path="event-stream" element={<EventStreamPage />} />
+            <Route path="job-monitor" element={<JobMonitorPage />} />
+            <Route path="manifest-builder" element={<ManifestBuilderPage />} />
+            <Route path="disk-images" element={<DiskImagesPage />} />
+            <Route path="vm-browser" element={<VMBrowserPage />} />
+            <Route path="migration-wizard" element={<MigrationWizardPage />} />
+            <Route path="batch-migration" element={<BatchMigrationBuilderPage />} />
+            <Route path="migration-templates" element={<MigrationTemplatesPage />} />
+            <Route path="snapshot-manager" element={<SnapshotManagerPage />} />
+            <Route path="storage-manager" element={<StorageManagerPage />} />
+            <Route path="vm-wizard" element={<Navigate to="/app/create" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </PageErrorBoundary>
+    </ConsoleLayout>
   )
 }
 
-function MainLayout() {
-  const { theme } = useTheme()
-  const [helpOpen, setHelpOpen] = useState(false)
-  const [helpTab, setHelpTab] = useState<HelpTab>('shortcuts')
-  useRecordRecentPage()
-
-  const openHelp = useCallback((tab: HelpTab = 'shortcuts') => {
-    setHelpTab(tab)
-    setHelpOpen(true)
-  }, [])
-
-  const closeHelp = useCallback(() => setHelpOpen(false), [])
-
-  const shellClass =
-    theme === 'steel'
-      ? 'dashboard-steel min-h-screen flex flex-col text-[#d7dde5]'
-      : theme === 'aurora'
-        ? 'dashboard-aurora min-h-screen flex flex-col text-[#e8e4f8]'
-        : 'min-h-screen text-[#e7ecf3]'
-
-  const contentClass =
-    theme === 'steel' ? ' steel-content' : theme === 'aurora' ? ' aurora-content' : ''
-
-  return (
-    <div className={`${shellClass} flex flex-col min-h-screen`}>
-      <GlobalShortcuts
-        helpOpen={helpOpen}
-        helpTab={helpTab}
-        onOpenHelp={openHelp}
-        onCloseHelp={closeHelp}
-        onHelpTabChange={setHelpTab}
-      />
-      <Navbar onOpenHelp={openHelp} />
-      <CommandPalette onOpenHelp={openHelp} />
-      <main
-        id="main-content"
-        className={`app-shell flex-1 min-w-0 py-6 lg:py-8${contentClass}`}
-        role="main"
-      >
-        <Breadcrumb />
-        <PageErrorBoundary>
-          <Suspense fallback={<PageSkeleton />}>
-            <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/vms" element={<VMList />} />
-                <Route path="/vms/:name" element={<VMDetails />} />
-                <Route path="/vms/:name/console" element={<Console />} />
-                <Route path="/create" element={<CreateVM />} />
-                <Route path="/logs" element={<Logs />} />
-                <Route path="/network" element={<Network />} />
-                <Route path="/storage" element={<Storage />} />
-                <Route path="/templates" element={<Templates />} />
-                <Route path="/quotas" element={<Quotas />} />
-                <Route path="/schedules" element={<Schedules />} />
-                <Route path="/autoscale" element={<AutoscalePage />} />
-                <Route path="/zones" element={<Zones />} />
-                <Route path="/audit" element={<AuditLogs />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/backups" element={<Backups />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/storage-pools" element={<StoragePools />} />
-                <Route path="/system" element={<SystemResources />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/datacenters" element={<Datacenters />} />
-                <Route path="/resource-pools" element={<ResourcePools />} />
-                <Route path="/vm-pools" element={<WarmPools />} />
-                <Route path="/drs" element={<DRS />} />
-                <Route path="/distributed-storage" element={<DistributedStorage />} />
-                <Route path="/encryption" element={<Encryption />} />
-                <Route path="/fault-tolerance" element={<FaultTolerance />} />
-                <Route path="/replication" element={<Replication />} />
-                <Route path="/site-recovery" element={<SiteRecovery />} />
-                <Route path="/migrations" element={<Migrations />} />
-                <Route path="/machines" element={<Machines />} />
-                <Route path="/profiles" element={<Profiles />} />
-                <Route path="/snapshots" element={<Snapshots />} />
-                <Route path="/content-library" element={<ContentLibrary />} />
-                <Route path="/lifecycle" element={<LifecycleManager />} />
-                <Route path="/certificates" element={<Certificates />} />
-                <Route path="/network-security" element={<NetworkSecurity />} />
-                <Route path="/processes" element={<Processes />} />
-                <Route path="/security-dashboard" element={<SecurityDashboard />} />
-                <Route path="/kernel" element={<Kernel />} />
-                <Route path="/alerts" element={<Alerts />} />
-                <Route path="/debug" element={<Debug />} />
-                <Route path="/explain" element={<Explain />} />
-                <Route path="/timeline" element={<Timeline />} />
-                <Route path="/webhooks" element={<Webhooks />} />
-                <Route path="/playground" element={<APIPlayground />} />
-                <Route path="/cost-estimator" element={<CostEstimator />} />
-                <Route path="/system-health" element={<SystemHealth />} />
-                <Route path="/containers" element={<ContainersPage />} />
-                <Route path="/disk-converter" element={<DiskConverter />} />
-                <Route path="/vm-compare" element={<VMComparePage />} />
-                <Route path="/vm-healthcheck" element={<VMHealthCheckPage />} />
-                <Route path="/notification-center" element={<NotificationCenterPage />} />
-                <Route path="/favorites" element={<FavoriteVMs />} />
-                <Route path="/bulk-operations" element={<BulkOperationsPage />} />
-                <Route path="/iso-images" element={<ISOImages />} />
-                <Route path="/download-disk" element={<DownloadDisk />} />
-                <Route path="/upload-disk" element={<UploadDiskPage />} />
-                <Route path="/pipeline" element={<PipelineMonitorPage />} />
-                <Route path="/migration-readiness" element={<MigrationReadinessPage />} />
-                <Route path="/migration-history" element={<MigrationHistoryPage />} />
-                <Route path="/migration-report" element={<MigrationReportPage />} />
-                <Route path="/network-topology" element={<NetworkTopologyPage />} />
-                <Route path="/backup-scheduler" element={<BackupSchedulerPage />} />
-                <Route path="/batch-import" element={<BatchImportPage />} />
-                <Route path="/resource-optimizer" element={<ResourceOptimizerPage />} />
-                <Route path="/capacity-planning" element={<CapacityPlanningPage />} />
-                <Route path="/compliance" element={<ComplianceDashboardPage />} />
-                <Route path="/live-metrics" element={<LiveMetricsPage />} />
-                <Route path="/access-control" element={<AccessControlPage />} />
-                <Route path="/plugins" element={<PluginManagerPage />} />
-                <Route path="/service-map" element={<ServiceMapPage />} />
-                <Route path="/event-stream" element={<EventStreamPage />} />
-                <Route path="/job-monitor" element={<JobMonitorPage />} />
-                <Route path="/manifest-builder" element={<ManifestBuilderPage />} />
-                <Route path="/disk-images" element={<DiskImagesPage />} />
-                <Route path="/vm-browser" element={<VMBrowserPage />} />
-                <Route path="/migration-wizard" element={<MigrationWizardPage />} />
-                <Route path="/batch-migration" element={<BatchMigrationBuilderPage />} />
-                <Route path="/migration-templates" element={<MigrationTemplatesPage />} />
-                <Route path="/snapshot-manager" element={<SnapshotManagerPage />} />
-                <Route path="/storage-manager" element={<StorageManagerPage />} />
-                <Route path="/vm-wizard" element={<Navigate to="/create" replace />} />
-                <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </PageErrorBoundary>
-      </main>
-    </div>
-  )
+/** Legacy bookmark → /app/... */
+function LegacyRedirect() {
+  const { pathname } = useLocation()
+  if (pathname === '/' || pathname === '') return <Navigate to="/app" replace />
+  if (pathname.startsWith('/app')) return <Navigate to="/app" replace />
+  return <Navigate to={`/app${pathname}`} replace />
 }
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/product" element={<Product />} />
+      <Route path="/platform" element={<Platform />} />
+      <Route path="/security" element={<SecurityPage />} />
+      <Route path="/sign-in" element={<SignIn />} />
+      <Route path="/login" element={<Navigate to="/sign-in" replace />} />
       <Route
-        path="*"
+        path="/app/*"
         element={
           <ProtectedRoute>
-            <MainLayout />
+            <ConsoleRoutes />
           </ProtectedRoute>
         }
       />
+      {/* Legacy ops paths (pre-/app) */}
+      <Route path="/vms/*" element={<LegacyRedirect />} />
+      <Route path="/create" element={<Navigate to="/app/create" replace />} />
+      <Route path="/network" element={<Navigate to="/app/network" replace />} />
+      <Route path="/storage" element={<Navigate to="/app/storage" replace />} />
+      <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+      <Route path="/vms" element={<Navigate to="/app/vms" replace />} />
+      <Route path="/logs" element={<Navigate to="/app/logs" replace />} />
+      <Route path="/templates" element={<Navigate to="/app/templates" replace />} />
+      <Route path="/backups" element={<Navigate to="/app/backups" replace />} />
+      <Route path="/favorites" element={<Navigate to="/app/favorites" replace />} />
+      <Route path="/network-security" element={<Navigate to="/app/network-security" replace />} />
+      <Route path="/playground" element={<Navigate to="/app/playground" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <ToastProvider>
-          <WebSocketProvider>
-            <PlatformInfoProvider>
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </PlatformInfoProvider>
-          </WebSocketProvider>
-        </ToastProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <WebSocketProvider>
+          <PlatformInfoProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </PlatformInfoProvider>
+        </WebSocketProvider>
+      </ToastProvider>
+    </AuthProvider>
   )
 }
 

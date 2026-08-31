@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "zyvor-fabricd",
     "zyvorctl",
-    "zyvorctl-tui",
     "vm-model",
     "state-store",
     "vnc-proxy",
@@ -67,9 +66,6 @@ thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 clap = { version = "4.5", features = ["derive"] }
-ratatui = "0.29"
-crossterm = "0.28"
-tui-input = "0.11"
 toml = "0.8"
 futures = "0.3"
 uuid = { version = "1.16", features = ["v4", "v5", "serde"] }

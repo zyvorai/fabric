@@ -61,7 +61,7 @@
   <h1>System Architecture</h1>
   <p class="subtitle">Layered design with clean separation of concerns</p>
   <pre style="font-size: 1.05em; line-height: 1.5;"><code>
-  Client Layer          CLI (zyvorctl)    TUI (zyvorctl-tui)    Web UI (React)
+  Client Layer          CLI (zyvorctl)    Web UI    Web UI (React)
                               \              |              /
   Automation Layer       K8s Operator        |        Terraform Provider
                               \              |              /
@@ -101,7 +101,7 @@
         <tr><td>Serialization</td><td>serde + serde_json</td></tr>
         <tr><td>Error Handling</td><td>anyhow + thiserror</td></tr>
         <tr><td>CLI Parsing</td><td>clap 4.5</td></tr>
-        <tr><td>Terminal UI</td><td>ratatui 0.29 + crossterm</td></tr>
+        <tr><td>Web UI</td><td>React 19 + Vite (marketing + /app console)</td></tr>
         <tr><td>UUID Generation</td><td>uuid (v4, v5)</td></tr>
         <tr><td>Date/Time</td><td>chrono</td></tr>
         <tr><td>Regex</td><td>regex 1.11</td></tr>
@@ -137,7 +137,7 @@
       <ul>
         <li><code>Zyvor Fabric</code> - Main daemon</li>
         <li><code>zyvorctl</code> - CLI tool</li>
-        <li><code>zyvorctl-tui</code> - Terminal UI</li>
+        <li>Web UI — marketing + <code>/app</code> console</li>
         <li><code>vm-model</code> - Data models</li>
         <li><code>state-store</code> - Persistence</li>
         <li><code>security</code> - Auth and RBAC</li>

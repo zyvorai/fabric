@@ -319,7 +319,7 @@ cmd_build() {
     info "Building backend (Rust)..."
     cd "$SCRIPT_DIR/backend"
     cargo build --release 2>&1
-    ok "Backend built: target/release/zyvor-fabricd, zyvorctl, zyvorctl-tui"
+    ok "Backend built: target/release/zyvor-fabricd, zyvorctl,"
 
     if [[ $build_web -eq 1 ]] && [[ -d "$SCRIPT_DIR/web" ]]; then
         if command -v node &>/dev/null; then
@@ -1058,7 +1058,6 @@ cmd_demo() {
     echo -e "  API:       ${CYAN}$API_URL${NC}"
     echo -e "  Web UI:    ${CYAN}$API_URL${NC}"
     echo -e "  CLI:       ${CYAN}zyvorctl list${NC}"
-    echo -e "  TUI:       ${CYAN}zyvorctl-tui${NC}"
     echo -e "  Docs:      ${CYAN}$API_URL/api${NC}"
     echo -e "  Metrics:   ${CYAN}$API_URL/metrics${NC}"
     echo ""

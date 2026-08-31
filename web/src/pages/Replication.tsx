@@ -81,7 +81,7 @@ export default function Replication() {
       paused: 'bg-yellow-100 text-yellow-800', error: 'bg-red-100 text-red-800',
       initial_sync: 'bg-blue-100 text-blue-800',
     }
-    return m[status] || 'bg-slate-500/20 text-slate-400'
+    return m[status] || 'bg-black/[0.06] text-[#6e6e73]'
   }
 
 
@@ -96,10 +96,10 @@ export default function Replication() {
 
       <PageLoadBanner title="Could not load replication data" headline={loadError} onRetry={() => void loadData()} />
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-[#f5f5f7] rounded-lg p-1">
         {(['dashboard', 'sites', 'configs', 'violations'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
             {tab === 'configs' ? 'Replications' : tab === 'violations' ? 'RPO Violations' : tab}
           </button>
         ))}
@@ -107,7 +107,7 @@ export default function Replication() {
 
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && !health && !loading && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-8 text-center text-slate-400">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-8 text-center text-[#6e6e73]">
           No replication data available.
         </div>
       )}
@@ -115,33 +115,33 @@ export default function Replication() {
       {activeTab === 'dashboard' && health && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-              <div className="text-slate-400 text-sm mb-1">Active Replications</div>
-              <div className="text-2xl font-bold text-green-400">{health.active}</div>
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+              <div className="text-[#6e6e73] text-sm mb-1">Active Replications</div>
+              <div className="text-2xl font-bold text-emerald-600">{health.active}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-              <div className="text-slate-400 text-sm mb-1">RPO Violations</div>
-              <div className="text-2xl font-bold text-red-400">{health.rpo_violations}</div>
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+              <div className="text-[#6e6e73] text-sm mb-1">RPO Violations</div>
+              <div className="text-2xl font-bold text-red-600">{health.rpo_violations}</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-              <div className="text-slate-400 text-sm mb-1">Avg RPO</div>
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+              <div className="text-[#6e6e73] text-sm mb-1">Avg RPO</div>
               <div className="text-2xl font-bold">{health.avg_rpo_minutes.toFixed(0)} min</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-              <div className="text-slate-400 text-sm mb-1">Paused / Error</div>
-              <div className="text-2xl font-bold text-yellow-400">{health.paused} / {health.error}</div>
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+              <div className="text-[#6e6e73] text-sm mb-1">Paused / Error</div>
+              <div className="text-2xl font-bold text-amber-600">{health.paused} / {health.error}</div>
             </div>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Site Health</h2>
             <div className="space-y-3">
               {health.sites.map(site => (
-                <div key={site.site_id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded">
+                <div key={site.site_id} className="flex items-center justify-between p-3 bg-[#f5f5f7] rounded">
                   <div className="flex items-center gap-3">
                     <div className={`w-3.5 h-3.5 rounded-full ${site.health === 'healthy' ? 'bg-green-500' : site.health === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'}`} />
                     <span className="font-medium">{site.site_name}</span>
                   </div>
-                  <span className="text-sm text-slate-400">{site.replication_count} replications</span>
+                  <span className="text-sm text-[#6e6e73]">{site.replication_count} replications</span>
                 </div>
               ))}
             </div>
@@ -154,14 +154,14 @@ export default function Replication() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateSite(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Add Site
             </button>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-            <table className="min-w-full divide-y divide-slate-700/50">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+            <table className="min-w-full divide-y divide-[#d2d2d7]">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase">
+                <tr className="text-left text-xs text-[#6e6e73] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Type</th>
                   <th className="p-4">Endpoint</th>
@@ -171,19 +171,19 @@ export default function Replication() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {sites.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No replication sites.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-[#6e6e73]">No replication sites.</td></tr>
                 ) : sites.map(site => (
-                  <tr key={site.id} className="hover:bg-slate-900">
+                  <tr key={site.id} className="hover:bg-white">
                     <td className="p-4 font-medium">{site.name}</td>
                     <td className="p-4 text-sm">{site.site_type}</td>
-                    <td className="p-4 text-sm font-mono text-slate-400">{site.endpoint}</td>
+                    <td className="p-4 text-sm font-mono text-[#6e6e73]">{site.endpoint}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(site.status)}`}>{site.status}</span>
                     </td>
                     <td className="p-4 text-sm">{site.replication_count}</td>
-                    <td className="p-4 text-sm text-slate-400">{site.last_sync ? new Date(site.last_sync).toLocaleString() : '-'}</td>
+                    <td className="p-4 text-sm text-[#6e6e73]">{site.last_sync ? new Date(site.last_sync).toLocaleString() : '-'}</td>
                     <td className="p-4">
                       <button onClick={() => handleRemoveSite(site.id)} className="text-red-600 hover:text-red-800">
                         <Trash2 className="w-4 h-4" />
@@ -202,14 +202,14 @@ export default function Replication() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateConfig(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Configure Replication
             </button>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-            <table className="min-w-full divide-y divide-slate-700/50">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+            <table className="min-w-full divide-y divide-[#d2d2d7]">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase">
+                <tr className="text-left text-xs text-[#6e6e73] uppercase">
                   <th className="p-4">VM</th>
                   <th className="p-4">RPO</th>
                   <th className="p-4">Status</th>
@@ -219,11 +219,11 @@ export default function Replication() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {replications.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">No replication configurations.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-[#6e6e73]">No replication configurations.</td></tr>
                 ) : replications.map(rep => (
-                  <tr key={rep.id} className="hover:bg-slate-900">
+                  <tr key={rep.id} className="hover:bg-white">
                     <td className="p-4 font-medium">{rep.vm_name}</td>
                     <td className="p-4 text-sm">{rep.rpo_minutes} min</td>
                     <td className="p-4">
@@ -232,23 +232,23 @@ export default function Replication() {
                     <td className="p-4">
                       {rep.sync_progress_pct !== undefined && rep.sync_progress_pct !== null ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-20 bg-slate-800 rounded-full h-2">
+                          <div className="w-20 bg-white rounded-full h-2">
                             <div className="h-2 rounded-full bg-blue-500" style={{ width: `${rep.sync_progress_pct}%` }} />
                           </div>
-                          <span className="text-xs text-slate-400">{rep.sync_progress_pct}%</span>
+                          <span className="text-xs text-[#6e6e73]">{rep.sync_progress_pct}%</span>
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="p-4 text-sm text-slate-400">{rep.last_sync ? new Date(rep.last_sync).toLocaleString() : '-'}</td>
-                    <td className="p-4 text-sm text-slate-400">{rep.next_sync ? new Date(rep.next_sync).toLocaleString() : '-'}</td>
+                    <td className="p-4 text-sm text-[#6e6e73]">{rep.last_sync ? new Date(rep.last_sync).toLocaleString() : '-'}</td>
+                    <td className="p-4 text-sm text-[#6e6e73]">{rep.next_sync ? new Date(rep.next_sync).toLocaleString() : '-'}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {rep.status === 'active' ? (
-                          <button onClick={() => handlePause(rep.id)} className="text-yellow-400 hover:text-yellow-300 p-1" title="Pause">
+                          <button onClick={() => handlePause(rep.id)} className="text-amber-600 hover:text-yellow-300 p-1" title="Pause">
                             <Pause className="w-4 h-4" />
                           </button>
                         ) : rep.status === 'paused' ? (
-                          <button onClick={() => handleResume(rep.id)} className="text-green-400 hover:text-green-300 p-1" title="Resume">
+                          <button onClick={() => handleResume(rep.id)} className="text-emerald-600 hover:text-green-300 p-1" title="Resume">
                             <Play className="w-4 h-4" />
                           </button>
                         ) : null}
@@ -264,10 +264,10 @@ export default function Replication() {
 
       {/* RPO Violations Tab */}
       {activeTab === 'violations' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-          <table className="min-w-full divide-y divide-slate-700/50">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+          <table className="min-w-full divide-y divide-[#d2d2d7]">
             <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase">
+              <tr className="text-left text-xs text-[#6e6e73] uppercase">
                 <th className="p-4">VM</th>
                 <th className="p-4">Target RPO</th>
                 <th className="p-4">Current RPO</th>
@@ -277,14 +277,14 @@ export default function Replication() {
                 <th className="p-4">Failures</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {violations.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-400">No RPO violations. All replications are compliant.</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-[#6e6e73]">No RPO violations. All replications are compliant.</td></tr>
               ) : violations.map(v => (
-                <tr key={v.replication_id} className="hover:bg-slate-900">
+                <tr key={v.replication_id} className="hover:bg-white">
                   <td className="p-4 font-medium">{v.vm_name}</td>
                   <td className="p-4 text-sm">{v.rpo_target_minutes} min</td>
-                  <td className="p-4 text-sm text-red-400 font-bold">{v.current_rpo_minutes.toFixed(0)} min</td>
+                  <td className="p-4 text-sm text-red-600 font-bold">{v.current_rpo_minutes.toFixed(0)} min</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${v.rpo_compliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {v.rpo_compliant ? 'Yes' : 'No'}
@@ -292,7 +292,7 @@ export default function Replication() {
                   </td>
                   <td className="p-4 text-sm">{v.bandwidth_usage_mbps.toFixed(1)} Mbps</td>
                   <td className="p-4 text-sm">{v.sync_count}</td>
-                  <td className="p-4 text-sm text-red-400">{v.failure_count}</td>
+                  <td className="p-4 text-sm text-red-600">{v.failure_count}</td>
                 </tr>
               ))}
             </tbody>
@@ -335,31 +335,31 @@ function CreateSiteModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Add Replication Site</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Site Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Endpoint</label>
             <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" placeholder="https://site.example.com" required />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://site.example.com" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
             <select value={siteType} onChange={e => setSiteType(e.target.value as 'primary' | 'secondary' | 'bidirectional')}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               <option value="primary">Primary</option>
               <option value="secondary">Recovery (secondary)</option>
               <option value="bidirectional">Bidirectional</option>
             </select>
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Add Site</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Add Site</button>
           </div>
         </form>
       </div>
@@ -384,36 +384,36 @@ function CreateConfigModal({ sites, onClose, onCreated }: { sites: ReplicationSi
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Configure Replication</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">VM ID</label>
             <input type="text" value={vmId} onChange={e => setVmId(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Source Site</label>
             <select value={sourceSite} onChange={e => setSourceSite(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Target Site</label>
             <select value={targetSite} onChange={e => setTargetSite(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">RPO (minutes)</label>
             <input type="number" value={rpo} onChange={e => setRpo(Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" min={1} required />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" min={1} required />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Configure</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Configure</button>
           </div>
         </form>
       </div>

@@ -1,24 +1,32 @@
 # Web UI Guide
 
-Zyvor Fabric includes a React-based web dashboard for managing virtual machines through your browser. The dashboard provides real-time VM status, lifecycle management, console access, and bulk operations.
+Zyvor Fabric serves an Apple-style hybrid web UI from the daemon: public marketing pages plus a light authenticated console under `/app`.
 
 ---
 
-## Accessing the Dashboard
+## Surfaces
+
+| Surface | Routes | Notes |
+|---------|--------|--------|
+| Marketing | `/`, `/product`, `/platform`, `/security` | Public product storytelling |
+| Sign-in | `/sign-in` | `/login` redirects here |
+| Console | `/app/*` | Dashboard, VMs, network, storage, ops, … |
+
+Legacy bookmarks such as `/vms` redirect to `/app/vms`.
+
+---
+
+## Accessing the UI
 
 ### Default URL
-
-After starting Zyvor Fabric, open your browser and navigate to:
 
 ```
 http://127.0.0.1:9095
 ```
 
-The web UI is served directly by the zyvor-fabricd daemon on the same port as the API. No separate web server is required.
+The UI is served by `zyvor-fabricd` on the same port as the API. No separate web server is required.
 
 ### Remote Access
-
-If Zyvor Fabric is configured to listen on a non-localhost address:
 
 ```toml
 [daemon]
@@ -26,150 +34,65 @@ listen = "0.0.0.0:9095"
 cors_origins = ["http://your-server-ip:9095"]
 ```
 
-Access it at `http://your-server-ip:9095`.
-
-For HTTPS access, generate a TLS certificate:
-
-```bash
-./zyvor-fabricd-ctl tls
-```
+For HTTPS, generate a TLS certificate with `./zyvor-fabricd-ctl tls`.
 
 ---
 
-## Login and Authentication
+## Sign-in
 
-### Initial Login
+1. Open `/sign-in` (or click **Sign in** on the marketing site).
+2. Username `admin`; password from `./zyvor-fabricd-ctl password` or `/var/lib/zyvor-fabricd/.admin_password`.
+3. After login you land on `/app`.
 
-On the login page, enter:
+JWT sessions last `auth.token_expiration_hours` (default 24h). Expired sessions redirect to `/sign-in`.
 
-- **Username:** `admin`
-- **Password:** the generated admin password
-
-Retrieve the admin password:
-
-```bash
-./zyvor-fabricd-ctl password
-# Or: sudo cat /var/lib/zyvor-fabricd/.admin_password
-```
-
-### Session Management
-
-After login, the dashboard stores a JWT token in the browser. The token is valid for the duration configured in `auth.token_expiration_hours` (default: 24 hours). When the token expires, you will be redirected to the login page.
-
-### User Roles
-
-The dashboard adapts its interface based on the authenticated user's role:
-
-| Role | Dashboard Capabilities |
-|------|----------------------|
-| **Admin** | Full access: create, start, stop, delete VMs, manage users, system settings |
-| **User** | Create, start, stop, restart VMs; view metrics and events |
-| **Viewer** | Read-only: view VM list, metrics, and events |
+| Role | Capabilities |
+|------|----------------|
+| **Admin** | Full access |
+| **User** | Create/start/stop VMs; view metrics |
+| **Viewer** | Read-only |
 
 ---
 
-## Dashboard Overview
+## Console overview
 
-The main dashboard displays:
+- **Left nav** — Core, Infra, Ops, Observe, Secure, Tools, More
+- **Top bar** — brand, search / ⌘K, live WebSocket badge, account, sign out
+- **Dashboard** (`/app`) — fleet health, capabilities, getting-started when empty
+- **VMs** (`/app/vms`) — list, detail tabs, console/VNC at `/app/vms/:name/console`
+- **Create** (`/app/create`) — multi-step wizard
 
-- **VM List** -- all virtual machines with name, state, CPU, memory, disk, IP address, and creation time
-- **State Indicators** -- color-coded status badges: running (green), stopped (gray), paused (yellow), failed (red), starting/stopping (blue)
-- **Quick Actions** -- per-VM action buttons for common operations
-- **Search and Filter** -- filter VMs by name, state, tags, or labels
+### Command palette
 
-### Command Palette
+`Ctrl+K` / `Cmd+K` — fuzzy search pages and VMs.
 
-Press **Ctrl+K** to open the command palette for quick navigation and actions. Type to search for VMs, pages, or operations.
+### Sequence shortcuts
 
----
-
-## VM Management
-
-### Creating a VM
-
-1. Click **Create VM** in the top navigation
-2. Fill in the form:
-   - **Name** -- unique VM identifier (alphanumeric, hyphens, underscores)
-   - **Image** -- disk image filename (must exist in the images directory)
-   - **CPUs** -- number of virtual CPUs (1-256)
-   - **Memory** -- RAM in MB (128-1,048,576)
-   - **Disk** -- disk size in GB (1-65,536, default: 20)
-   - **Hostname** -- optional guest hostname
-   - **Tags** -- optional tags for organization
-   - **Labels** -- optional key-value labels
-3. Click **Create**
-
-### Lifecycle Actions
-
-For each VM, the following actions are available through the UI:
-
-| Action | Description | Required Role |
-|--------|-------------|---------------|
-| **Start** | Boot the VM | User |
-| **Stop** | Graceful shutdown | User |
-| **Restart** | Reboot the VM | User |
-| **Pause** | Suspend in memory | User |
-| **Resume** | Resume from pause | User |
-| **Backup** | Create a backup snapshot | User |
-| **Console** | Open browser terminal | User |
-| **Delete** | Permanently remove the VM | Admin |
-
-### Bulk Operations
-
-Select multiple VMs using checkboxes, then use the bulk action toolbar:
-
-- **Start All** -- start all selected VMs
-- **Stop All** -- stop all selected VMs
-- **Backup All** -- create backups for all selected VMs
-- **Delete All** -- delete all selected VMs (admin only)
-
-### VM Details
-
-Click a VM name to view its detail page:
-
-- **Overview** -- state, resources, IP, PID, creation time, last update
-- **Metrics** -- CPU usage, memory usage, disk I/O, network I/O
-- **Snapshots** -- list, create, revert, and delete snapshots
-- **Events** -- VM lifecycle event history
-- **Configuration** -- cloud-init settings, start options
+`g` then `d` / `v` / `n` / `s` / `c` / `l` / `b` / `i` / `e` jumps within `/app`. Press `?` for help.
 
 ---
 
-## Console Access
+## Visual system
 
-The web UI provides browser-based console access to running VMs using xterm.js over WebSocket.
-
-### Opening a Console
-
-1. Navigate to a running VM
-2. Click the **Console** button
-3. A terminal window opens in your browser
-
-The console session uses the same JWT authentication as the dashboard. No additional credentials are required to establish the WebSocket connection.
-
-### Console Modes
-
-| Mode | Description |
-|------|-------------|
-| **Interactive** | Full read-write terminal access (default) |
-| **Read-only** | View-only terminal output |
+Light Apple-style console using **SF Pro / system UI** fonts and high-contrast tokens (`#1d1d1f` / `#333336` / `#6e6e73` on `#f5f5f7`). Themes `dark` / `steel` / `aurora` are removed. See [ux.md](../ux.md).
 
 ---
 
-## Real-Time Updates
+## Other interfaces
 
-The dashboard receives real-time updates via Server-Sent Events (SSE) from the `/api/events/stream` endpoint. VM state changes, creation, deletion, and error events appear immediately without page refresh.
+Human UI is **web only**. Automation remains via:
+
+- CLI — `zyvorctl`
+- Kubernetes operator
+- Terraform provider
+
+The former terminal UI (`zyvorctl-tui`) has been removed.
 
 ---
 
-## Dark Theme
+## Related
 
-The web UI uses a dark theme by default, designed for extended monitoring sessions and server room environments. The interface follows the hypersdk design system with consistent color coding for VM states and resource utilization levels.
-
----
-
-## Next Steps
-
-- [API Reference](../api.md) -- integrate with the REST API programmatically
-- [TUI Guide](../tui.md) -- use the terminal-based dashboard
-- [Configuration Reference](03-Configuration.md) -- customize dashboard access and CORS
+- [Customer page index](../customer/PAGE_INDEX.md)
+- [UX conventions](../ux.md)
+- [Web UI summary](../web-ui.md)
+- [API reference](../api.md)

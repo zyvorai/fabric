@@ -123,7 +123,7 @@ export default function Notifications() {
       case 'slack': return <MessageSquare className="w-5 h-5 text-purple-500" />
       case 'webhook': return <Webhook className="w-5 h-5 text-green-500" />
       case 'teams': return <MessageSquare className="w-5 h-5 text-cyan-500" />
-      default: return <Bell className="w-5 h-5 text-slate-500" />
+      default: return <Bell className="w-5 h-5 text-[#6e6e73]" />
     }
   }
 
@@ -131,8 +131,8 @@ export default function Notifications() {
     switch (severity) {
       case 'critical': return 'bg-red-600'
       case 'warning': return 'bg-yellow-600'
-      case 'info': return 'bg-blue-600'
-      default: return 'bg-slate-600'
+      case 'info': return 'bg-[#0066cc]'
+      default: return 'bg-[#e8e8ed]'
     }
   }
 
@@ -156,13 +156,13 @@ export default function Notifications() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-slate-700/50">
+      <div className="flex gap-4 mb-6 border-b border-[#d2d2d7]">
         <button
           onClick={() => setActiveTab('channels')}
           className={`px-4 py-2 font-medium transition ${
             activeTab === 'channels'
               ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-400 hover:text-white'
+              : 'text-[#6e6e73] hover:text-[#1d1d1f]'
           }`}
         >
           Channels ({channels.length})
@@ -172,7 +172,7 @@ export default function Notifications() {
           className={`px-4 py-2 font-medium transition ${
             activeTab === 'rules'
               ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-400 hover:text-white'
+              : 'text-[#6e6e73] hover:text-[#1d1d1f]'
           }`}
         >
           Rules ({rules.length})
@@ -182,7 +182,7 @@ export default function Notifications() {
           className={`px-4 py-2 font-medium transition ${
             activeTab === 'history'
               ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-slate-400 hover:text-white'
+              : 'text-[#6e6e73] hover:text-[#1d1d1f]'
           }`}
         >
           History ({history.length})
@@ -196,7 +196,7 @@ export default function Notifications() {
             <h2 className="text-xl font-bold">Notification Channels</h2>
             <button
               onClick={() => setShowCreateChannel(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
             >
               <Plus className="w-4 h-4" />
               Add Channel
@@ -204,13 +204,13 @@ export default function Notifications() {
           </div>
 
           {channels.length === 0 ? (
-            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
-              <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-xl text-slate-400 mb-4">No notification channels</p>
-              <p className="text-slate-500 mb-6">Add a channel to receive notifications</p>
+            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+              <Bell className="w-16 h-16 text-[#6e6e73] mx-auto mb-4" />
+              <p className="text-xl text-[#6e6e73] mb-4">No notification channels</p>
+              <p className="text-[#6e6e73] mb-6">Add a channel to receive notifications</p>
               <button
                 onClick={() => setShowCreateChannel(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
               >
                 <Plus className="w-4 h-4" />
                 Add First Channel
@@ -221,19 +221,19 @@ export default function Notifications() {
               {channels.map((channel) => (
                 <div
                   key={channel.id}
-                  className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4"
+                  className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       {getChannelIcon(channel.type)}
                       <div>
                         <h3 className="font-bold">{channel.name}</h3>
-                        <p className="text-xs text-slate-400 capitalize">{channel.type}</p>
+                        <p className="text-xs text-[#6e6e73] capitalize">{channel.type}</p>
                       </div>
                     </div>
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${
-                        channel.enabled ? 'bg-green-600' : 'bg-slate-600'
+                        channel.enabled ? 'bg-green-600' : 'bg-[#e8e8ed]'
                       }`}
                     >
                       {channel.enabled ? 'Enabled' : 'Disabled'}
@@ -271,7 +271,7 @@ export default function Notifications() {
             <h2 className="text-xl font-bold">Notification Rules</h2>
             <button
               onClick={() => setShowCreateRule(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
             >
               <Plus className="w-4 h-4" />
               Create Rule
@@ -279,13 +279,13 @@ export default function Notifications() {
           </div>
 
           {rules.length === 0 ? (
-            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
-              <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-xl text-slate-400 mb-4">No notification rules</p>
-              <p className="text-slate-500 mb-6">Create rules to trigger notifications</p>
+            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+              <Bell className="w-16 h-16 text-[#6e6e73] mx-auto mb-4" />
+              <p className="text-xl text-[#6e6e73] mb-4">No notification rules</p>
+              <p className="text-[#6e6e73] mb-6">Create rules to trigger notifications</p>
               <button
                 onClick={() => setShowCreateRule(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
               >
                 <Plus className="w-4 h-4" />
                 Create First Rule
@@ -296,7 +296,7 @@ export default function Notifications() {
               {rules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4"
+                  className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -304,31 +304,31 @@ export default function Notifications() {
                         <h3 className="font-bold">{rule.name}</h3>
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium ${
-                            rule.enabled ? 'bg-green-600' : 'bg-slate-600'
+                            rule.enabled ? 'bg-green-600' : 'bg-[#e8e8ed]'
                           }`}
                         >
                           {rule.enabled ? 'Enabled' : 'Disabled'}
                         </span>
                       </div>
                       {rule.description && (
-                        <p className="text-sm text-slate-400 mb-2">{rule.description}</p>
+                        <p className="text-sm text-[#6e6e73] mb-2">{rule.description}</p>
                       )}
                       <div className="flex flex-wrap gap-2 mb-2">
                         {rule.event_types.slice(0, 3).map((event) => (
                           <span
                             key={event}
-                            className="px-2 py-1 bg-blue-600 rounded text-xs"
+                            className="px-2 py-1 bg-[#0066cc] rounded text-xs"
                           >
                             {event}
                           </span>
                         ))}
                         {rule.event_types.length > 3 && (
-                          <span className="px-2 py-1 bg-slate-800 rounded text-xs">
+                          <span className="px-2 py-1 bg-white rounded text-xs">
                             +{rule.event_types.length - 3} more
                           </span>
                         )}
                       </div>
-                      <div className="flex gap-2 text-xs text-slate-400">
+                      <div className="flex gap-2 text-xs text-[#6e6e73]">
                         <span>Triggered: {rule.triggered_count} times</span>
                         {rule.last_triggered && (
                           <span>• Last: <RelativeTime date={rule.last_triggered} /></span>
@@ -373,39 +373,39 @@ export default function Notifications() {
         <div>
           <h2 className="text-xl font-bold mb-4">Notification History</h2>
           {history.length === 0 ? (
-            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
-              <p className="text-slate-400">No notification history yet</p>
+            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+              <p className="text-[#6e6e73]">No notification history yet</p>
             </div>
           ) : (
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
+            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-900">
+                  <thead className="bg-white">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
                         Timestamp
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
                         Rule
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
                         Event
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
                         VM
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
                         Channel
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
                         Status
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody className="divide-y divide-[#d2d2d7]">
                     {history.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-900">
-                        <td className="px-4 py-3 text-sm text-slate-400">
+                      <tr key={item.id} className="hover:bg-white">
+                        <td className="px-4 py-3 text-sm text-[#6e6e73]">
                           <RelativeTime date={item.sent_at} />
                         </td>
                         <td className="px-4 py-3 text-sm">{item.rule_name}</td>
@@ -415,7 +415,7 @@ export default function Notifications() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{item.vm_name || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-400">{item.channel}</td>
+                        <td className="px-4 py-3 text-sm text-[#6e6e73]">{item.channel}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-1 rounded text-xs font-medium ${
@@ -509,18 +509,18 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-md w-full">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-6 max-w-md w-full">
         <h2 className="text-xl font-bold mb-4">Add Notification Channel</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="e.g. ops-slack" />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="e.g. ops-slack" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
             <select value={type} onChange={(e) => setType(e.target.value as ChannelType)}
-              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2">
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               <option value="webhook">Webhook</option>
               <option value="slack">Slack</option>
               <option value="teams">Microsoft Teams</option>
@@ -532,7 +532,7 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
             <div>
               <label className="block text-sm font-medium mb-1">Webhook URL</label>
               <input type="url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} required
-                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="https://..." />
+                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://..." />
             </div>
           )}
 
@@ -540,7 +540,7 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
             <div>
               <label className="block text-sm font-medium mb-1">Slack Webhook URL</label>
               <input type="url" value={slackWebhookUrl} onChange={(e) => setSlackWebhookUrl(e.target.value)} required
-                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="https://hooks.slack.com/services/..." />
+                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://hooks.slack.com/services/..." />
             </div>
           )}
 
@@ -548,7 +548,7 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
             <div>
               <label className="block text-sm font-medium mb-1">Teams Webhook URL</label>
               <input type="url" value={teamsWebhookUrl} onChange={(e) => setTeamsWebhookUrl(e.target.value)} required
-                className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="https://xxx.webhook.office.com/..." />
+                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://xxx.webhook.office.com/..." />
             </div>
           )}
 
@@ -558,33 +558,33 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
                 <div>
                   <label className="block text-sm font-medium mb-1">SMTP Host</label>
                   <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} required
-                    className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="smtp.example.com" />
+                    className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="smtp.example.com" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">SMTP Port</label>
                   <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} required
-                    className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" />
+                    className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">From Address</label>
                 <input type="email" value={fromAddress} onChange={(e) => setFromAddress(e.target.value)} required
-                  className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="alerts@example.com" />
+                  className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="alerts@example.com" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">To Address</label>
                 <input type="email" value={toAddress} onChange={(e) => setToAddress(e.target.value)} required
-                  className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="oncall@example.com" />
+                  className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="oncall@example.com" />
               </div>
             </div>
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition">
               Cancel
             </button>
             <button type="submit" disabled={saving}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50">
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50">
               {saving ? 'Creating…' : 'Create Channel'}
             </button>
           </div>
@@ -639,25 +639,25 @@ function CreateRuleModal({ channels, onClose, onCreated }: { channels: Notificat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">Create Notification Rule</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" placeholder="e.g. vm-failures-to-oncall" />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="e.g. vm-failures-to-oncall" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description (optional)</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/50 rounded px-3 py-2" />
+              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Event types</label>
             <div className="flex flex-wrap gap-2">
               {RULE_EVENT_TYPES.map((et) => (
                 <button type="button" key={et} onClick={() => toggle(eventTypes, et, setEventTypes)}
-                  className={`px-2.5 py-1 rounded text-xs font-mono transition ${eventTypes.includes(et) ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700/50'}`}>
+                  className={`px-2.5 py-1 rounded text-xs font-mono transition ${eventTypes.includes(et) ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
                   {et}
                 </button>
               ))}
@@ -668,7 +668,7 @@ function CreateRuleModal({ channels, onClose, onCreated }: { channels: Notificat
             <div className="flex gap-2">
               {RULE_SEVERITIES.map((sev) => (
                 <button type="button" key={sev} onClick={() => toggle(severityLevels, sev, setSeverityLevels)}
-                  className={`px-3 py-1.5 rounded text-sm capitalize transition ${severityLevels.includes(sev) ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700/50'}`}>
+                  className={`px-3 py-1.5 rounded text-sm capitalize transition ${severityLevels.includes(sev) ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
                   {sev}
                 </button>
               ))}
@@ -677,12 +677,12 @@ function CreateRuleModal({ channels, onClose, onCreated }: { channels: Notificat
           <div>
             <label className="block text-sm font-medium mb-1">Channels</label>
             {channels.length === 0 ? (
-              <p className="text-sm text-slate-500">No channels yet — add one first.</p>
+              <p className="text-sm text-[#6e6e73]">No channels yet — add one first.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {channels.map((ch) => (
                   <button type="button" key={ch.id} onClick={() => toggle(selectedChannels, ch.id, setSelectedChannels)}
-                    className={`px-3 py-1.5 rounded text-sm transition ${selectedChannels.includes(ch.id) ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700/50'}`}>
+                    className={`px-3 py-1.5 rounded text-sm transition ${selectedChannels.includes(ch.id) ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
                     {ch.name}
                   </button>
                 ))}
@@ -690,11 +690,11 @@ function CreateRuleModal({ channels, onClose, onCreated }: { channels: Notificat
             )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg transition">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition">
               Cancel
             </button>
             <button type="submit" disabled={saving || channels.length === 0}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50">
+              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50">
               {saving ? 'Creating…' : 'Create Rule'}
             </button>
           </div>

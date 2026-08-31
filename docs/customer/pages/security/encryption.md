@@ -13,7 +13,7 @@ Encryption — manage VM disk and vMotion encryption: register key management pr
 
 ## How to get there
 
-- Route / id: `/encryption`
+- Route / id: `/app/encryption`
 - Nav: **Security → Encryption** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

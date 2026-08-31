@@ -170,21 +170,21 @@ export default function SnapshotManager() {
       )}
 
       {success && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-emerald-600">
           {success}
         </div>
       )}
 
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Select VM</label>
+            <label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Select VM</label>
             <select
               value={selectedVM}
               onChange={(e) => setSelectedVM(e.target.value)}
               aria-label="Select VM"
               disabled={loading || !!loadError}
-              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+              className="w-full bg-[#e8e8ed] border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
             >
               <option value="">Select a VM…</option>
               {vms.map((name) => (
@@ -199,7 +199,7 @@ export default function SnapshotManager() {
             onClick={fetchSnapshots}
             disabled={!selectedVM || snapshotsLoading}
             title="Refresh snapshots"
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] text-sm rounded-lg transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${snapshotsLoading ? 'animate-spin' : ''}`} /> Refresh
           </button>
@@ -207,8 +207,8 @@ export default function SnapshotManager() {
       </div>
 
       {selectedVM && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
-          <h3 className="text-sm font-semibold text-white mb-3">Create Snapshot</h3>
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
+          <h3 className="text-sm font-semibold text-[#1d1d1f] mb-3">Create Snapshot</h3>
           <div className="flex gap-3">
             <input
               type="text"
@@ -216,14 +216,14 @@ export default function SnapshotManager() {
               onChange={(e) => setNewName(e.target.value)}
               placeholder="snapshot-name"
               aria-label="Snapshot name"
-              className="flex-1 bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              className="flex-1 bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-purple-500"
             />
             <button
               type="button"
               onClick={handleCreate}
               disabled={creating || !newName.trim()}
               title="Create snapshot"
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
             </button>
@@ -232,10 +232,10 @@ export default function SnapshotManager() {
       )}
 
       {selectedVM && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-white">Snapshots for {selectedVM}</h3>
-            <span className="text-xs font-medium text-slate-400 bg-slate-700/50 px-2.5 py-1 rounded-full">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#d2d2d7] flex items-center justify-between">
+            <h3 className="text-base font-semibold text-[#1d1d1f]">Snapshots for {selectedVM}</h3>
+            <span className="text-xs font-medium text-[#6e6e73] bg-[#e8e8ed] px-2.5 py-1 rounded-full">
               {snapshots.length}
             </span>
           </div>
@@ -252,34 +252,34 @@ export default function SnapshotManager() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase">Name</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase">Created</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase">State</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase">Parent</th>
-                  <th className="text-right px-5 py-3 text-xs font-medium text-slate-400 uppercase">Actions</th>
+                <tr className="border-b border-[#d2d2d7]">
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase">Name</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase">Created</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase">State</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase">Parent</th>
+                  <th className="text-right px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-[#d2d2d7]/30">
                 {snapshots.map((snap) => (
-                  <tr key={snap.name} className="hover:bg-slate-700/20 transition-colors">
-                    <td className="px-5 py-3 text-white font-medium">{snap.name}</td>
-                    <td className="px-5 py-3 text-slate-400 text-xs">
+                  <tr key={snap.name} className="hover:bg-black/[0.04] transition-colors">
+                    <td className="px-5 py-3 text-[#1d1d1f] font-medium">{snap.name}</td>
+                    <td className="px-5 py-3 text-[#6e6e73] text-xs">
                       {snap.created_at ? new Date(snap.created_at).toLocaleString() : '-'}
                     </td>
                     <td className="px-5 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-500/20 text-slate-400">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-black/[0.06] text-[#6e6e73]">
                         {snap.state || '-'}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-slate-500 text-xs">{snap.parent || '-'}</td>
+                    <td className="px-5 py-3 text-[#6e6e73] text-xs">{snap.parent || '-'}</td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           type="button"
                           onClick={() => handleRevert(snap.name)}
                           title="Revert to this snapshot"
-                          className="p-1.5 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                          className="p-1.5 text-[#6e6e73] hover:text-[#0066cc] hover:bg-[#0077ed]/10 rounded-lg transition-colors"
                         >
                           <RotateCcw className="w-4 h-4" />
                         </button>
@@ -287,7 +287,7 @@ export default function SnapshotManager() {
                           type="button"
                           onClick={() => handleDelete(snap.name)}
                           title="Delete snapshot"
-                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                          className="p-1.5 text-[#6e6e73] hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -302,7 +302,7 @@ export default function SnapshotManager() {
       )}
 
       {!selectedVM && !loading && !loadError && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
           <EmptyState
             icon={<Camera className="w-10 h-10" />}
             title="Select a VM"

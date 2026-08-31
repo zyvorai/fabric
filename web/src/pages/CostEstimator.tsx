@@ -121,13 +121,13 @@ export default function CostEstimator() {
         description="Compare cloud storage costs for your VM infrastructure"
       />
 
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-5">
-        <h3 className="text-sm font-semibold text-slate-200">Configuration</h3>
+      <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5 space-y-5">
+        <h3 className="text-sm font-semibold text-[#1d1d1f]">Configuration</h3>
 
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <label className="text-slate-400">Number of VMs</label>
-            <span className="text-slate-200 font-medium">{vmCount}</span>
+            <label className="text-[#6e6e73]">Number of VMs</label>
+            <span className="text-[#1d1d1f] font-medium">{vmCount}</span>
           </div>
           <input
             type="range"
@@ -135,9 +135,9 @@ export default function CostEstimator() {
             max={1000}
             value={vmCount}
             onChange={(e) => setVmCount(parseInt(e.target.value, 10))}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+            className="w-full h-1.5 bg-[#e8e8ed] rounded-lg appearance-none cursor-pointer accent-green-500"
           />
-          <div className="flex justify-between text-xs text-slate-600 mt-0.5">
+          <div className="flex justify-between text-xs text-[#6e6e73] mt-0.5">
             <span>1</span>
             <span>1000</span>
           </div>
@@ -145,8 +145,8 @@ export default function CostEstimator() {
 
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <label className="text-slate-400">Average VM Size (GB)</label>
-            <span className="text-slate-200 font-medium">{avgSizeGB} GB</span>
+            <label className="text-[#6e6e73]">Average VM Size (GB)</label>
+            <span className="text-[#1d1d1f] font-medium">{avgSizeGB} GB</span>
           </div>
           <input
             type="range"
@@ -155,9 +155,9 @@ export default function CostEstimator() {
             step={10}
             value={avgSizeGB}
             onChange={(e) => setAvgSizeGB(parseInt(e.target.value, 10))}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+            className="w-full h-1.5 bg-[#e8e8ed] rounded-lg appearance-none cursor-pointer accent-green-500"
           />
-          <div className="flex justify-between text-xs text-slate-600 mt-0.5">
+          <div className="flex justify-between text-xs text-[#6e6e73] mt-0.5">
             <span>10 GB</span>
             <span>2 TB</span>
           </div>
@@ -165,8 +165,8 @@ export default function CostEstimator() {
 
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <label className="text-slate-400">Storage Duration (months)</label>
-            <span className="text-slate-200 font-medium">{durationMonths} months</span>
+            <label className="text-[#6e6e73]">Storage Duration (months)</label>
+            <span className="text-[#1d1d1f] font-medium">{durationMonths} months</span>
           </div>
           <input
             type="range"
@@ -174,9 +174,9 @@ export default function CostEstimator() {
             max={36}
             value={durationMonths}
             onChange={(e) => setDurationMonths(parseInt(e.target.value, 10))}
-            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+            className="w-full h-1.5 bg-[#e8e8ed] rounded-lg appearance-none cursor-pointer accent-green-500"
           />
-          <div className="flex justify-between text-xs text-slate-600 mt-0.5">
+          <div className="flex justify-between text-xs text-[#6e6e73] mt-0.5">
             <span>1 mo</span>
             <span>36 mo</span>
           </div>
@@ -184,15 +184,15 @@ export default function CostEstimator() {
 
         <label className="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" checked={includeSnapshots} onChange={() => setIncludeSnapshots(!includeSnapshots)} className="sr-only peer" />
-          <div className={`relative w-10 h-5 rounded-full transition-colors ${includeSnapshots ? 'bg-green-600' : 'bg-slate-600'}`}>
+          <div className={`relative w-10 h-5 rounded-full transition-colors ${includeSnapshots ? 'bg-green-600' : 'bg-[#e8e8ed]'}`}>
             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${includeSnapshots ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </div>
-          <span className="text-sm text-slate-300">Include snapshots (+50% storage)</span>
+          <span className="text-sm text-[#1d1d1f]">Include snapshots (+50% storage)</span>
         </label>
 
-        <div className="bg-slate-900/40 rounded-lg px-3 py-2 text-xs text-slate-400">
+        <div className="bg-[#f5f5f7] rounded-lg px-3 py-2 text-xs text-[#6e6e73]">
           Total estimated storage:{' '}
-          <span className="text-green-400 font-medium">
+          <span className="text-emerald-600 font-medium">
             {totalGB >= 1000 ? `${(totalGB / 1000).toFixed(1)} TB` : `${totalGB.toFixed(0)} GB`}
           </span>
         </div>
@@ -214,31 +214,31 @@ export default function CostEstimator() {
               return (
                 <div
                   key={est.name}
-                  className={`bg-slate-800/50 rounded-xl p-5 border transition-colors ${
+                  className={`bg-[#f5f5f7] rounded-xl p-5 border transition-colors ${
                     isCheapest
                       ? 'border-green-500/60 ring-1 ring-green-500/20'
-                      : 'border-slate-700/50'
+                      : 'border-[#d2d2d7]'
                   }`}
                 >
                   {isCheapest && (
-                    <span className="text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded mb-2 inline-block">
+                    <span className="text-xs font-semibold text-emerald-600 bg-green-500/10 px-2 py-0.5 rounded mb-2 inline-block">
                       Cheapest
                     </span>
                   )}
-                  <h4 className="text-lg font-bold text-slate-200">{est.name}</h4>
-                  <p className="text-xs text-slate-500 mb-3">${est.pricePerGB}/GB/month</p>
+                  <h4 className="text-lg font-bold text-[#1d1d1f]">{est.name}</h4>
+                  <p className="text-xs text-[#6e6e73] mb-3">${est.pricePerGB}/GB/month</p>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Monthly</span>
-                      <span className="text-slate-200 font-medium">{formatCurrency(est.monthly)}</span>
+                      <span className="text-[#6e6e73]">Monthly</span>
+                      <span className="text-[#1d1d1f] font-medium">{formatCurrency(est.monthly)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Annual</span>
-                      <span className="text-slate-200 font-medium">{formatCurrency(est.annual)}</span>
+                      <span className="text-[#6e6e73]">Annual</span>
+                      <span className="text-[#1d1d1f] font-medium">{formatCurrency(est.annual)}</span>
                     </div>
-                    <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2">
-                      <span className="text-slate-400">Total ({durationMonths}mo)</span>
-                      <span className="text-white font-semibold">{formatCurrency(est.total)}</span>
+                    <div className="flex justify-between text-sm border-t border-[#d2d2d7] pt-2">
+                      <span className="text-[#6e6e73]">Total ({durationMonths}mo)</span>
+                      <span className="text-[#1d1d1f] font-semibold">{formatCurrency(est.total)}</span>
                     </div>
                   </div>
                 </div>
@@ -248,16 +248,16 @@ export default function CostEstimator() {
 
           {cheapest && (
             <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-5">
-              <h4 className="text-sm font-semibold text-green-400 mb-2">
+              <h4 className="text-sm font-semibold text-emerald-600 mb-2">
                 Savings vs On-Premises Storage
               </h4>
-              <p className="text-xs text-slate-400 mb-1">
+              <p className="text-xs text-[#6e6e73] mb-1">
                 On-prem estimated cost: {formatCurrency(onPremMonthly)}/month ($
                 {ON_PREM_PRICE}/GB/mo)
               </p>
-              <p className="text-sm text-slate-200">
-                Using <span className="text-green-400 font-semibold">{cheapest.name}</span> saves{' '}
-                <span className="text-green-400 font-semibold">
+              <p className="text-sm text-[#1d1d1f]">
+                Using <span className="text-emerald-600 font-semibold">{cheapest.name}</span> saves{' '}
+                <span className="text-emerald-600 font-semibold">
                   {formatCurrency(onPremMonthly - cheapest.monthly)}
                 </span>
                 /month (
@@ -266,18 +266,18 @@ export default function CostEstimator() {
             </div>
           )}
 
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-slate-200 mb-4">Monthly Cost Comparison</h4>
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5">
+            <h4 className="text-sm font-semibold text-[#1d1d1f] mb-4">Monthly Cost Comparison</h4>
             <div className="space-y-3">
               {estimates.map((est) => (
                 <div key={est.name} className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400 w-24 shrink-0">{est.name}</span>
-                  <div className="flex-1 bg-slate-900/60 rounded-full h-6 overflow-hidden">
+                  <span className="text-xs text-[#6e6e73] w-24 shrink-0">{est.name}</span>
+                  <div className="flex-1 bg-[#f5f5f7] rounded-full h-6 overflow-hidden">
                     <div
                       className={`${est.color} h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
                       style={{ width: `${Math.max(5, (est.monthly / maxMonthly) * 100)}%` }}
                     >
-                      <span className="text-xs text-white font-medium whitespace-nowrap">
+                      <span className="text-xs text-[#1d1d1f] font-medium whitespace-nowrap">
                         {formatCurrency(est.monthly)}
                       </span>
                     </div>
@@ -285,13 +285,13 @@ export default function CostEstimator() {
                 </div>
               ))}
               <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 w-24 shrink-0">On-Prem</span>
-                <div className="flex-1 bg-slate-900/60 rounded-full h-6 overflow-hidden">
+                <span className="text-xs text-[#6e6e73] w-24 shrink-0">On-Prem</span>
+                <div className="flex-1 bg-[#f5f5f7] rounded-full h-6 overflow-hidden">
                   <div
-                    className="bg-slate-500 h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                    className="bg-[#6e6e73] h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
                     style={{ width: `${Math.max(5, (onPremMonthly / maxMonthly) * 100)}%` }}
                   >
-                    <span className="text-xs text-white font-medium whitespace-nowrap">
+                    <span className="text-xs text-[#1d1d1f] font-medium whitespace-nowrap">
                       {formatCurrency(onPremMonthly)}
                     </span>
                   </div>
@@ -303,7 +303,7 @@ export default function CostEstimator() {
           <div className="flex justify-end">
             <button
               onClick={handleCopy}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] transition-colors"
             >
               {copied ? 'Copied!' : 'Copy Estimate to Clipboard'}
             </button>

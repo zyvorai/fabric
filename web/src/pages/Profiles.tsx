@@ -43,11 +43,11 @@ export default function Profiles() {
   }
 
   const categoryColors: Record<string, string> = {
-    general: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    general: 'bg-blue-500/20 text-[#0066cc] border-blue-500/30',
     compute: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
     memory: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    storage: 'bg-green-500/20 text-green-400 border-green-500/30',
-    gpu: 'bg-red-500/20 text-red-400 border-red-500/30',
+    storage: 'bg-green-500/20 text-emerald-600 border-green-500/30',
+    gpu: 'bg-red-500/20 text-red-600 border-red-500/30',
   }
 
   return (
@@ -57,7 +57,7 @@ export default function Profiles() {
         onRefresh={() => void loadProfiles()}
         refreshing={loading}
         actions={
-          <button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"><Plus className="w-4 h-4" />Create Profile</button>
+          <button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"><Plus className="w-4 h-4" />Create Profile</button>
         }
       />
       <PageLoadBanner title="Could not load profiles" headline={loadError} onRetry={() => void loadProfiles()} />
@@ -68,7 +68,7 @@ export default function Profiles() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {profiles.map(p => (
-          <div key={p.name} className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-slate-700/50 transition">
+          <div key={p.name} className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7] hover:border-[#d2d2d7] transition">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h3 className="text-lg font-bold">{p.name}</h3>
@@ -76,14 +76,14 @@ export default function Profiles() {
               </div>
               {!p.builtin && <button onClick={() => handleDelete(p.name)} className="p-1 hover:bg-red-600 rounded"><Trash2 className="w-4 h-4" /></button>}
             </div>
-            <p className="text-sm text-slate-400 mb-4">{p.description}</p>
+            <p className="text-sm text-[#6e6e73] mb-4">{p.description}</p>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><Cpu className="w-3.5 h-3.5" />CPUs</span><span className="font-medium">{p.cpus}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><MemoryStick className="w-3.5 h-3.5" />Memory</span><span className="font-medium">{p.memory >= 1024 ? `${p.memory / 1024} GB` : `${p.memory} MB`}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400 flex items-center gap-1"><HardDrive className="w-3.5 h-3.5" />Disk</span><span className="font-medium">{p.disk} GB</span></div>
-              {p.network_bandwidth && <div className="flex justify-between"><span className="text-slate-400">Network</span><span className="font-medium">{p.network_bandwidth}</span></div>}
+              <div className="flex justify-between"><span className="text-[#6e6e73] flex items-center gap-1"><Cpu className="w-3.5 h-3.5" />CPUs</span><span className="font-medium">{p.cpus}</span></div>
+              <div className="flex justify-between"><span className="text-[#6e6e73] flex items-center gap-1"><MemoryStick className="w-3.5 h-3.5" />Memory</span><span className="font-medium">{p.memory >= 1024 ? `${p.memory / 1024} GB` : `${p.memory} MB`}</span></div>
+              <div className="flex justify-between"><span className="text-[#6e6e73] flex items-center gap-1"><HardDrive className="w-3.5 h-3.5" />Disk</span><span className="font-medium">{p.disk} GB</span></div>
+              {p.network_bandwidth && <div className="flex justify-between"><span className="text-[#6e6e73]">Network</span><span className="font-medium">{p.network_bandwidth}</span></div>}
             </div>
-            {p.builtin && <div className="mt-3 text-xs text-slate-500">Built-in</div>}
+            {p.builtin && <div className="mt-3 text-xs text-[#6e6e73]">Built-in</div>}
           </div>
         ))}
       </div>
@@ -125,20 +125,20 @@ function CreateProfileDialog({ onClose, onSuccess }: { onClose: () => void; onSu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800/50 rounded-lg shadow-2xl border border-slate-700/50 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50"><h2 className="text-xl font-bold">Create Profile</h2><button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded"><span className="text-2xl">&times;</span></button></div>
+      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]"><h2 className="text-xl font-bold">Create Profile</h2><button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded"><span className="text-2xl">&times;</span></button></div>
         <div className="p-6 space-y-4">
-          <div><label className="block text-sm font-medium text-slate-300 mb-2">Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="my-profile" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-blue-500" autoFocus /></div>
-          <div><label className="block text-sm font-medium text-slate-300 mb-2">Category</label><select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-4 text-white"><option value="general">General</option><option value="compute">Compute</option><option value="memory">Memory</option><option value="storage">Storage</option></select></div>
+          <div><label className="block text-sm font-medium text-[#1d1d1f] mb-2">Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="my-profile" className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500" autoFocus /></div>
+          <div><label className="block text-sm font-medium text-[#1d1d1f] mb-2">Category</label><select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f]"><option value="general">General</option><option value="compute">Compute</option><option value="memory">Memory</option><option value="storage">Storage</option></select></div>
           <div className="grid grid-cols-3 gap-3">
-            <div><label className="block text-sm text-slate-300 mb-1">CPUs</label><input type="number" value={cpus} onChange={e => setCpus(+e.target.value)} min={1} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white" /></div>
-            <div><label className="block text-sm text-slate-300 mb-1">Memory (MB)</label><input type="number" value={memory} onChange={e => setMemory(+e.target.value)} min={256} step={256} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white" /></div>
-            <div><label className="block text-sm text-slate-300 mb-1">Disk (GB)</label><input type="number" value={disk} onChange={e => setDisk(+e.target.value)} min={1} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg py-2 px-3 text-white" /></div>
+            <div><label className="block text-sm text-[#1d1d1f] mb-1">CPUs</label><input type="number" value={cpus} onChange={e => setCpus(+e.target.value)} min={1} className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f]" /></div>
+            <div><label className="block text-sm text-[#1d1d1f] mb-1">Memory (MB)</label><input type="number" value={memory} onChange={e => setMemory(+e.target.value)} min={256} step={256} className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f]" /></div>
+            <div><label className="block text-sm text-[#1d1d1f] mb-1">Disk (GB)</label><input type="number" value={disk} onChange={e => setDisk(+e.target.value)} min={1} className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-3 text-[#1d1d1f]" /></div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 p-6 border-t border-slate-700/50">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded-lg">Cancel</button>
-          <button onClick={handleCreate} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">Create</button>
+        <div className="flex justify-end gap-2 p-6 border-t border-[#d2d2d7]">
+          <button onClick={onClose} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg">Cancel</button>
+          <button onClick={handleCreate} className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg">Create</button>
         </div>
       </div>
     </div>

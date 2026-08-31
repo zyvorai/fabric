@@ -27,23 +27,23 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
   const readOnly = useReadOnly()
   const [view, setView] = useState<'zones' | 'policies'>('zones')
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">DNS Policy</h2>
-          <div className="flex bg-slate-800 rounded-lg p-0.5">
+          <div className="flex bg-white rounded-lg p-0.5">
             {(['zones', 'policies'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-[#e8e8ed] text-[#1d1d1f]' : 'text-[#6e6e73] hover:text-[#1d1d1f]'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
             ))}
           </div>
         </div>
         <div className="flex gap-2">
-          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onSync} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
-          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-[#0066cc] hover:bg-[#0077ed] text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add {view === 'zones' ? 'Zone' : 'Policy'}
           </button>}
         </div>
@@ -51,28 +51,28 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
 
       {view === 'zones' && (
         zones.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">No DNS zones configured.</div>
+          <div className="p-12 text-center text-[#6e6e73]">No DNS zones configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-800">
+              <thead className="bg-white">
                 <tr>
-                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Domain</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Records</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Domain</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Records</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Status</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {zones.map(z => (
                   <tr key={z.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">
                       {z.name}
                       {isHostManaged(z) && <HostBadge />}
-                      {z.description && <div className="text-xs text-slate-500 font-normal mt-0.5">{z.description}</div>}
+                      {z.description && <div className="text-xs text-[#6e6e73] font-normal mt-0.5">{z.description}</div>}
                     </td>
-                    <td className="p-4 font-mono text-sm text-blue-400">{z.domain ?? z.name}</td>
+                    <td className="p-4 font-mono text-sm text-[#0066cc]">{z.domain ?? z.name}</td>
                     <td className="p-4 font-medium text-cyan-400">{z.records?.length ?? '—'}</td>
                     <td className="p-4">
                       <StatusBadge status={z.enabled === false ? 'disabled' : 'active'} color={z.enabled === false ? 'gray' : 'green'} />
@@ -80,7 +80,7 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
                     <td className="p-4">
                       <div className="flex items-center gap-1">
                         {!readOnly && !isHostManaged(z) && onEditZone && (
-                          <button onClick={() => onEditZone(z.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                          <button onClick={() => onEditZone(z.id)} className="p-2 hover:bg-[#d2d2d7] rounded transition" title="Edit">
                             <Pencil className="w-4 h-4" />
                           </button>
                         )}
@@ -101,40 +101,40 @@ function DnsTabContent({ zones, policies, onDeleteZone, onDeletePolicy, onAdoptZ
 
       {view === 'policies' && (
         policies.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">No DNS policies configured.</div>
+          <div className="p-12 text-center text-[#6e6e73]">No DNS policies configured.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-800">
+              <thead className="bg-white">
                 <tr>
-                  <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Zone / Template</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Labels</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Type</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Status</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Zone / Template</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Labels</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Type</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Status</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {policies.map(p => (
                   <tr key={p.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-medium">
                       {p.name}
                       {isHostManaged(p) && <HostBadge />}
-                      {p.description && <div className="text-xs text-slate-500 font-normal mt-0.5">{p.description}</div>}
+                      {p.description && <div className="text-xs text-[#6e6e73] font-normal mt-0.5">{p.description}</div>}
                     </td>
-                    <td className="p-4 font-mono text-sm text-slate-400">
+                    <td className="p-4 font-mono text-sm text-[#6e6e73]">
                       {p.record_template ?? p.upstream_servers?.join(', ') ?? '—'}
                     </td>
                     <td className="p-4"><LabelTags labels={p.selector?.match_labels ?? p.labels} /></td>
-                    <td className="p-4 text-slate-400">{p.record_type ?? '—'}</td>
+                    <td className="p-4 text-[#6e6e73]">{p.record_type ?? '—'}</td>
                     <td className="p-4">
                       <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1">
                         {!readOnly && !isHostManaged(p) && onEditPolicy && (
-                          <button onClick={() => onEditPolicy(p.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                          <button onClick={() => onEditPolicy(p.id)} className="p-2 hover:bg-[#d2d2d7] rounded transition" title="Edit">
                             <Pencil className="w-4 h-4" />
                           </button>
                         )}
@@ -201,13 +201,13 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
         <InputField label="Name" value={name} onChange={setName} placeholder="internal-zone" />
         <InputField label="Domain" value={domain} onChange={setDomain} placeholder="internal.local" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Internal DNS zone" />
-        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-slate-300">Add Record</div>
+        <div className="border border-[#d2d2d7] rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-[#1d1d1f]">Add Record</div>
           <div className="grid grid-cols-2 gap-2">
             <InputField label="Record Name" value={recName} onChange={setRecName} placeholder="web" />
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Type</label>
-              <select value={recType} onChange={e => setRecType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <label className="block text-xs text-[#6e6e73] mb-1">Type</label>
+              <select value={recType} onChange={e => setRecType(e.target.value as DnsRecordType)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
                 {(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'PTR'] as DnsRecordType[]).map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -218,18 +218,18 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
             <InputField label="Value" value={recValue} onChange={setRecValue} placeholder="10.0.0.1" />
             <InputField label="TTL" value={recTtl} onChange={setRecTtl} placeholder="300" type="number" />
           </div>
-          <button type="button" onClick={addRecord} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+          <button type="button" onClick={addRecord} className="flex items-center gap-1 text-sm text-[#0066cc] hover:text-blue-300 transition">
             <Plus className="w-3.5 h-3.5" /> Add Record
           </button>
           {records.length > 0 && (
             <div className="space-y-1 mt-2">
               {records.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-white rounded px-2 py-1">
                   <StatusBadge status={r.record_type} color="blue" />
-                  <span className="text-slate-300">{r.name}</span>
-                  <span className="text-slate-400">{r.value}</span>
-                  <span className="text-slate-500">TTL:{r.ttl}</span>
-                  <button onClick={() => setRecords(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                  <span className="text-[#1d1d1f]">{r.name}</span>
+                  <span className="text-[#6e6e73]">{r.value}</span>
+                  <span className="text-[#6e6e73]">TTL:{r.ttl}</span>
+                  <button onClick={() => setRecords(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-600 hover:text-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -237,8 +237,8 @@ export function CreateDnsZoneModal({ onClose, onCreated }: { onClose: () => void
             </div>
           )}
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Zone'}
         </button>
       </div>
@@ -285,8 +285,8 @@ export function CreateDnsPolicyModal({ zones, onClose, onCreated }: { zones: Dns
       <div className="space-y-4">
         <InputField label="Name" value={name} onChange={setName} placeholder="vm-a-records" />
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Zone</label>
-          <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+          <label className="block text-xs text-[#6e6e73] mb-1">Zone</label>
+          <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
             {zones.length === 0 ? <option value="">No zones — create a zone first</option> : zones.map(z => (
               <option key={z.id} value={z.id}>{z.name}</option>
             ))}
@@ -295,19 +295,19 @@ export function CreateDnsPolicyModal({ zones, onClose, onCreated }: { zones: Dns
         <LabelSelectorInput labels={labels} onChange={setLabels} />
         <InputField label="Record Template" value={recordTemplate} onChange={setRecordTemplate} placeholder="{name}.zyvor-fabricd.local" />
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Record Type</label>
-          <select value={recordType} onChange={e => setRecordType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+          <label className="block text-xs text-[#6e6e73] mb-1">Record Type</label>
+          <select value={recordType} onChange={e => setRecordType(e.target.value as DnsRecordType)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
             {(['A', 'CNAME', 'SRV'] as DnsRecordType[]).map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-300">
-          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="rounded border-slate-600" />
+        <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="rounded border-[#d2d2d7]" />
           Enabled
         </label>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting || !zoneId} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting || !zoneId} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create DNS Policy'}
         </button>
       </div>
@@ -376,14 +376,14 @@ export function EditDnsZoneModal({ id, onClose, onUpdated }: { id: string; onClo
   if (loading) {
     return (
       <ModalWrapper title="Edit DNS Zone" onClose={onClose}>
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-[#6e6e73] text-sm">Loading...</div>
       </ModalWrapper>
     )
   }
   if (loadErr) {
     return (
       <ModalWrapper title="Edit DNS Zone" onClose={onClose}>
-        <p className="text-red-400 text-sm">{loadErr}</p>
+        <p className="text-red-600 text-sm">{loadErr}</p>
       </ModalWrapper>
     )
   }
@@ -394,13 +394,13 @@ export function EditDnsZoneModal({ id, onClose, onUpdated }: { id: string; onClo
         <InputField label="Name" value={name} onChange={setName} placeholder="internal-zone" />
         <InputField label="Domain" value={domain} onChange={setDomain} placeholder="internal.local" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Internal DNS zone" />
-        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-slate-300">Add Record</div>
+        <div className="border border-[#d2d2d7] rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-[#1d1d1f]">Add Record</div>
           <div className="grid grid-cols-2 gap-2">
             <InputField label="Record Name" value={recName} onChange={setRecName} placeholder="web" />
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Type</label>
-              <select value={recType} onChange={e => setRecType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+              <label className="block text-xs text-[#6e6e73] mb-1">Type</label>
+              <select value={recType} onChange={e => setRecType(e.target.value as DnsRecordType)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
                 {(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'PTR'] as DnsRecordType[]).map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -411,18 +411,18 @@ export function EditDnsZoneModal({ id, onClose, onUpdated }: { id: string; onClo
             <InputField label="Value" value={recValue} onChange={setRecValue} placeholder="10.0.0.1" />
             <InputField label="TTL" value={recTtl} onChange={setRecTtl} placeholder="300" type="number" />
           </div>
-          <button type="button" onClick={addRecord} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+          <button type="button" onClick={addRecord} className="flex items-center gap-1 text-sm text-[#0066cc] hover:text-blue-300 transition">
             <Plus className="w-3.5 h-3.5" /> Add Record
           </button>
           {records.length > 0 && (
             <div className="space-y-1 mt-2">
               {records.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-white rounded px-2 py-1">
                   <StatusBadge status={r.record_type} color="blue" />
-                  <span className="text-slate-300">{r.name}</span>
-                  <span className="text-slate-400">{r.value}</span>
-                  <span className="text-slate-500">TTL:{r.ttl}</span>
-                  <button onClick={() => setRecords(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                  <span className="text-[#1d1d1f]">{r.name}</span>
+                  <span className="text-[#6e6e73]">{r.value}</span>
+                  <span className="text-[#6e6e73]">TTL:{r.ttl}</span>
+                  <button onClick={() => setRecords(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-600 hover:text-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -430,8 +430,8 @@ export function EditDnsZoneModal({ id, onClose, onUpdated }: { id: string; onClo
             </div>
           )}
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
@@ -498,14 +498,14 @@ export function EditDnsPolicyModal({ id, zones, onClose, onUpdated }: { id: stri
   if (loading) {
     return (
       <ModalWrapper title="Edit DNS Policy" onClose={onClose}>
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-[#6e6e73] text-sm">Loading...</div>
       </ModalWrapper>
     )
   }
   if (loadErr) {
     return (
       <ModalWrapper title="Edit DNS Policy" onClose={onClose}>
-        <p className="text-red-400 text-sm">{loadErr}</p>
+        <p className="text-red-600 text-sm">{loadErr}</p>
       </ModalWrapper>
     )
   }
@@ -515,8 +515,8 @@ export function EditDnsPolicyModal({ id, zones, onClose, onUpdated }: { id: stri
       <div className="space-y-4">
         <InputField label="Name" value={name} onChange={setName} placeholder="vm-a-records" />
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Zone</label>
-          <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+          <label className="block text-xs text-[#6e6e73] mb-1">Zone</label>
+          <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
             {zones.length === 0 ? <option value="">No zones — create a zone first</option> : zones.map(z => (
               <option key={z.id} value={z.id}>{z.name}</option>
             ))}
@@ -525,19 +525,19 @@ export function EditDnsPolicyModal({ id, zones, onClose, onUpdated }: { id: stri
         <LabelSelectorInput labels={labels} onChange={setLabels} />
         <InputField label="Record Template" value={recordTemplate} onChange={setRecordTemplate} placeholder="{name}.zyvor-fabricd.local" />
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Record Type</label>
-          <select value={recordType} onChange={e => setRecordType(e.target.value as DnsRecordType)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+          <label className="block text-xs text-[#6e6e73] mb-1">Record Type</label>
+          <select value={recordType} onChange={e => setRecordType(e.target.value as DnsRecordType)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
             {(['A', 'CNAME', 'SRV'] as DnsRecordType[]).map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-300">
-          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="rounded border-slate-600" />
+        <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="rounded border-[#d2d2d7]" />
           Enabled
         </label>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting || !zoneId} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting || !zoneId} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>

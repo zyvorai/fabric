@@ -12,7 +12,7 @@ Network — day-to-day VM networking: which mode a VM uses, its port forwards, a
 
 ## How to get there
 
-- Route / id: `/network`
+- Route / id: `/app/network`
 - Nav: **Infrastructure → Network** (sidebar, command palette, or desktop nav)
 - Per-VM networking is also managed from that VM's own **Network** tab on its detail page
 

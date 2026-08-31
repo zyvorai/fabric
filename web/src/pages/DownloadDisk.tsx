@@ -21,12 +21,12 @@ function formatBytes(bytes: number): string {
 }
 
 const formatBadgeColor: Record<string, string> = {
-  qcow2: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  qcow2: 'bg-blue-500/20 text-[#0066cc] border-blue-500/30',
   vmdk: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   vhd: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
   vhdx: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  raw: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-  img: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+  raw: 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]',
+  img: 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]',
 }
 
 export default function DownloadDisk() {
@@ -82,8 +82,8 @@ export default function DownloadDisk() {
   }
 
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button onClick={() => handleSort(field)} className="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors">
-      {label} <ArrowUpDown className={`w-3.5 h-3.5 ${sortField === field ? 'text-blue-400' : ''}`} />
+    <button onClick={() => handleSort(field)} className="flex items-center gap-1 text-xs font-medium text-[#6e6e73] hover:text-[#1d1d1f] transition-colors">
+      {label} <ArrowUpDown className={`w-3.5 h-3.5 ${sortField === field ? 'text-[#0066cc]' : ''}`} />
     </button>
   )
 
@@ -92,64 +92,64 @@ export default function DownloadDisk() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20"><Download className="w-5 h-5 text-cyan-400" /></div>
-          <div><h2 className="text-xl font-bold text-white">Download Disk Images</h2><p className="text-sm text-slate-400">Browse and download VM disk images</p></div>
+          <div><h2 className="text-xl font-bold text-[#1d1d1f]">Download Disk Images</h2><p className="text-sm text-[#6e6e73]">Browse and download VM disk images</p></div>
         </div>
-        <button onClick={() => fetchImages()} className="px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">Refresh</button>
+        <button onClick={() => fetchImages()} className="px-3 py-1.5 text-xs rounded-lg bg-[#e8e8ed] text-[#1d1d1f] hover:bg-[#d2d2d7] transition-colors">Refresh</button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3"><p className="text-xs text-slate-400 mb-1">Total Images</p><p className="text-2xl font-bold text-white">{images.length}</p></div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3"><p className="text-xs text-slate-400 mb-1">Total Size</p><p className="text-2xl font-bold text-white">{formatBytes(totalSize)}</p></div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3"><p className="text-xs text-slate-400 mb-1">Formats</p><p className="text-2xl font-bold text-white">{new Set(images.map((i) => i.format)).size}</p></div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-3"><p className="text-xs text-[#6e6e73] mb-1">Total Images</p><p className="text-2xl font-bold text-[#1d1d1f]">{images.length}</p></div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-3"><p className="text-xs text-[#6e6e73] mb-1">Total Size</p><p className="text-2xl font-bold text-[#1d1d1f]">{formatBytes(totalSize)}</p></div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-3"><p className="text-xs text-[#6e6e73] mb-1">Formats</p><p className="text-2xl font-bold text-[#1d1d1f]">{new Set(images.map((i) => i.format)).size}</p></div>
       </div>
 
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-        <label className="block text-sm font-medium text-slate-300 mb-2">Custom Path</label>
+      <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-4">
+        <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Custom Path</label>
         <div className="flex gap-2">
           <input type="text" value={customPath} onChange={(e) => setCustomPath(e.target.value)} placeholder="/path/to/disk-image.qcow2 or /path/to/directory/"
-            className="flex-1 px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            className="flex-1 px-3 py-2 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-1 focus:ring-cyan-500"
             onKeyDown={(e) => { if (e.key === 'Enter') handleDownload(customPath.trim()) }} />
-          <button onClick={() => fetchImages(customPath.trim())} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors text-sm flex items-center gap-1.5">
+          <button onClick={() => fetchImages(customPath.trim())} className="px-3 py-2 rounded-lg bg-[#e8e8ed] text-[#1d1d1f] hover:bg-[#d2d2d7] transition-colors text-sm flex items-center gap-1.5">
             <FolderSearch className="w-4 h-4" /> Browse
           </button>
           <button onClick={() => handleDownload(customPath.trim())} disabled={!customPath.trim()}
-            className="px-4 py-2 rounded-lg bg-cyan-600 text-white hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm flex items-center gap-1.5">
+            className="px-4 py-2 rounded-lg bg-cyan-600 text-[#1d1d1f] hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm flex items-center gap-1.5">
             <Download className="w-4 h-4" /> Download
           </button>
         </div>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6e6e73]" />
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filter by name, format, or path..." aria-label="Filter disk images"
-          className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+          className="w-full pl-10 pr-4 py-2.5 bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-1 focus:ring-cyan-500" />
       </div>
 
       <PageLoadBanner title="Could not load disk images" headline={loadError} onRetry={() => void fetchImages()} />
       {loading && <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>}
 
-      {!loading && filtered.length === 0 && <div className="text-center py-12 text-slate-500"><HardDrive className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No disk images found</p></div>}
+      {!loading && filtered.length === 0 && <div className="text-center py-12 text-[#6e6e73]"><HardDrive className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No disk images found</p></div>}
 
       {!loading && filtered.length > 0 && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-700/50">
+              <thead><tr className="border-b border-[#d2d2d7]">
                 <th className="text-left px-4 py-3"><SortButton field="name" label="Name" /></th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400">Format</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73]">Format</th>
                 <th className="text-left px-4 py-3"><SortButton field="size_bytes" label="Size" /></th>
                 <th className="text-left px-4 py-3"><SortButton field="mod_time" label="Modified" /></th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400">Path</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-slate-400">Action</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73]">Path</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-[#6e6e73]">Action</th>
               </tr></thead>
               <tbody>
                 {filtered.map((img, idx) => (
-                  <tr key={img.path} className={`border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-800/30'}`}>
-                    <td className="px-4 py-3 font-medium text-white">{img.name}</td>
-                    <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${formatBadgeColor[img.format] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'}`}>{img.format}</span></td>
-                    <td className="px-4 py-3 text-slate-300 font-mono text-xs">{formatBytes(img.size_bytes)}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{new Date(img.mod_time).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs font-mono max-w-[200px] truncate" title={img.path}>{img.path}</td>
+                  <tr key={img.path} className={`border-b border-[#d2d2d7]/60 hover:bg-black/[0.04] transition-colors ${idx % 2 === 0 ? '' : 'bg-[#f5f5f7]'}`}>
+                    <td className="px-4 py-3 font-medium text-[#1d1d1f]">{img.name}</td>
+                    <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${formatBadgeColor[img.format] || 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]'}`}>{img.format}</span></td>
+                    <td className="px-4 py-3 text-[#1d1d1f] font-mono text-xs">{formatBytes(img.size_bytes)}</td>
+                    <td className="px-4 py-3 text-[#6e6e73] text-xs">{new Date(img.mod_time).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-[#6e6e73] text-xs font-mono max-w-[200px] truncate" title={img.path}>{img.path}</td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => handleDownload(img.path)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/30 transition-colors text-xs font-medium">
                         <Download className="w-3.5 h-3.5" /> Download

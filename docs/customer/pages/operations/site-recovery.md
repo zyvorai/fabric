@@ -13,7 +13,7 @@ Site Recovery — define disaster recovery plans that group VMs by source and ta
 
 ## How to get there
 
-- Route / id: `/site-recovery`
+- Route / id: `/app/site-recovery`
 - Nav: **Operations → Site Recovery** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

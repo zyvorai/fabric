@@ -348,12 +348,12 @@ export default function Network() {
           Network Configuration
         </h1>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowScanModal(true)} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+          <button onClick={() => setShowScanModal(true)} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition">
             <ScanSearch className="w-4 h-4" />
             Scan Configs
           </button>
           {canWrite && (
-            <button onClick={handleReload} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition">
+            <button onClick={handleReload} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition">
               <RefreshCw className="w-4 h-4" />
               Reload networkd
             </button>
@@ -372,53 +372,53 @@ export default function Network() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-3">
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Bridges</div>
-          <div className="text-2xl font-bold text-blue-400">{bridges.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Bridges</div>
+          <div className="text-2xl font-bold text-[#0066cc]">{bridges.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Bonds</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Bonds</div>
           <div className="text-2xl font-bold text-cyan-400">{bonds.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">VLANs</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">VLANs</div>
           <div className="text-2xl font-bold text-purple-400">{vlans.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Macvtap</div>
-          <div className="text-2xl font-bold text-green-400">{macvtaps.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Macvtap</div>
+          <div className="text-2xl font-bold text-emerald-600">{macvtaps.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Tap</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Tap</div>
           <div className="text-2xl font-bold text-orange-400">{taps.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Interfaces</div>
-          <div className="text-2xl font-bold text-yellow-400">{netfileCounts.total}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Interfaces</div>
+          <div className="text-2xl font-bold text-amber-600">{netfileCounts.total}</div>
+          <div className="text-[10px] text-[#6e6e73] mt-0.5">
             {netfileCounts.physical} phys · {netfileCounts.container} ctr
           </div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Link Files</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Link Files</div>
           <div className="text-2xl font-bold text-pink-400">{linkfiles.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">Port Forwards</div>
-          <div className="text-2xl font-bold text-red-400">{portForwards.length}</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">Port Forwards</div>
+          <div className="text-2xl font-bold text-red-600">{portForwards.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">VXLAN</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">VXLAN</div>
           <div className="text-2xl font-bold text-indigo-400">{vxlans.length}</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-700/50">
-          <div className="text-slate-400 text-xs mb-1">SR-IOV</div>
+        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
+          <div className="text-[#6e6e73] text-xs mb-1">SR-IOV</div>
           <div className="text-2xl font-bold text-violet-400">{sriov.length}</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-700/50">
+      <div className="border-b border-[#d2d2d7]">
         <div className="flex gap-1">
           {tabs.map(t => (
             <button
@@ -426,8 +426,8 @@ export default function Network() {
               onClick={() => setActiveTab(t.key)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
                 activeTab === t.key
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-blue-500 text-[#0066cc]'
+                  : 'border-transparent text-[#6e6e73] hover:text-[#1d1d1f]'
               }`}
             >
               {t.icon}
@@ -438,7 +438,7 @@ export default function Network() {
       </div>
 
       {loading ? (
-        <div className="text-center text-slate-400 py-12">Loading...</div>
+        <div className="text-center text-[#6e6e73] py-12">Loading...</div>
       ) : (
         <>
           {activeTab === 'bridges' && (
@@ -600,25 +600,25 @@ function ScanConfigsModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalWrapper title="Scanned Host Configs" onClose={onClose}>
       <div className="space-y-3">
-        {loading && <p className="text-slate-400 text-sm">Scanning host configuration files…</p>}
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        {data && data.length === 0 && <p className="text-slate-400 text-sm">No existing config files found on host.</p>}
+        {loading && <p className="text-[#6e6e73] text-sm">Scanning host configuration files…</p>}
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        {data && data.length === 0 && <p className="text-[#6e6e73] text-sm">No existing config files found on host.</p>}
         {data && data.map(f => (
-          <div key={f.filename} className="border border-slate-700/50 rounded-lg">
+          <div key={f.filename} className="border border-[#d2d2d7] rounded-lg">
             <button
               type="button"
               onClick={() => toggle(f.filename)}
               className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.03] transition"
             >
               <span className="font-mono text-sm">{f.filename}</span>
-              <span className="text-xs text-slate-400">{f.file_type}</span>
+              <span className="text-xs text-[#6e6e73]">{f.file_type}</span>
             </button>
             {expanded.has(f.filename) && (
               <div className="px-3 pb-3 space-y-2">
                 {f.sections.map((s, i) => (
                   <div key={i} className="text-xs">
-                    <div className="text-slate-400 font-medium mb-1">[{s.name}]</div>
-                    <div className="pl-3 space-y-0.5 font-mono text-slate-500">
+                    <div className="text-[#6e6e73] font-medium mb-1">[{s.name}]</div>
+                    <div className="pl-3 space-y-0.5 font-mono text-[#6e6e73]">
                       {s.entries.map(([k, v], j) => <div key={j}>{k}={v}</div>)}
                     </div>
                   </div>

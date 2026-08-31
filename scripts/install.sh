@@ -24,7 +24,6 @@ echo "[3/6] Installing binaries..."
 sudo install -d /usr/bin
 sudo install -m 0755 backend/target/release/zyvor-fabricd  /usr/bin/zyvor-fabricd
 sudo install -m 0755 backend/target/release/zyvorctl      /usr/bin/zyvorctl
-sudo install -m 0755 backend/target/release/zyvorctl-tui  /usr/bin/zyvorctl-tui
 
 # Install config
 echo "[4/6] Installing configuration..."
@@ -75,4 +74,4 @@ echo "To enable debug logging:"
 echo "  echo 'ZYVOR_FABRICD_LOG_LEVEL=debug' | sudo tee -a /etc/zyvor-fabricd/zyvor-fabricd.env"
 echo ""
 echo "Access web UI at http://localhost:9095"
-echo "Use zyvorctl or zyvorctl-tui from the command line"
+echo "Use zyvorctl from the command line"

@@ -13,7 +13,7 @@ Replication — register remote replication sites, configure per-VM replication 
 
 ## How to get there
 
-- Route / id: `/replication`
+- Route / id: `/app/replication`
 - Nav: **Operations → Replication** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

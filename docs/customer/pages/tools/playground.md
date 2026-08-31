@@ -12,12 +12,12 @@ API Playground — try Fabric APIs interactively.
 
 ## How to get there
 
-- Route / id: `/playground`
+- Route / id: `/app/playground`
 - Nav: **Tools → API Playground** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)
 
-1. Open `/playground` and wait for live data from Zyvor Fabric.
+1. Open `/app/playground` and wait for live data from Zyvor Fabric.
 2. Use filters and search when the page provides them.
 3. Drill into a row or card for detail, then jump to related surfaces.
 4. For mutating actions: review impact, role gates, and confirmation dialogs first.

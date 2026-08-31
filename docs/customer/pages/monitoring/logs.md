@@ -12,7 +12,7 @@ Logs — a searchable, filterable console view of Zyvor Fabric's audit log: ever
 
 ## How to get there
 
-- Route / id: `/logs`
+- Route / id: `/app/logs`
 - Nav: **Monitoring → Logs** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

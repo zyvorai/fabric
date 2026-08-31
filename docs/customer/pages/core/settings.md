@@ -12,12 +12,12 @@ Settings — Core product and console preferences.
 
 ## How to get there
 
-- Route / id: `/settings`
+- Route / id: `/app/settings`
 - Nav: **Core → Settings** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)
 
-1. Open `/settings` and wait for live data from Zyvor Fabric.
+1. Open `/app/settings` and wait for live data from Zyvor Fabric.
 2. Use filters and search when the page provides them.
 3. Drill into a row or card for detail, then jump to related surfaces.
 4. For mutating actions: review impact, role gates, and confirmation dialogs first.

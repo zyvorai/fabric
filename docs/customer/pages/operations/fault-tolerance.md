@@ -13,7 +13,7 @@ Fault Tolerance (FT) — protect individual VMs with a live secondary replica on
 
 ## How to get there
 
-- Route / id: `/fault-tolerance`
+- Route / id: `/app/fault-tolerance`
 - Nav: **Operations → Fault Tolerance** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

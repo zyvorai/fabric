@@ -26,7 +26,7 @@ echo ""
 
 echo "[1/7] Installing zyvor-fabric binaries..."
 install -d /usr/bin
-for bin in zyvor-fabricd zyvorctl zyvorctl-tui; do
+for bin in zyvor-fabricd zyvorctl; do
     [[ -f "$PKG_DIR/bin/$bin" ]] && install -m 0755 "$PKG_DIR/bin/$bin" "/usr/bin/$bin" && echo "  + /usr/bin/$bin"
 done
 

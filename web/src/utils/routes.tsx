@@ -28,7 +28,7 @@ export function navItemActive(item: NavItem, pathname: string, search = ''): boo
     }
     return true
   }
-  if (path === '/') return pathname === '/'
+  if (path === '/' || path === '/app') return pathname === path || pathname === '/app/'
   return pathname === path || pathname.startsWith(path + '/')
 }
 

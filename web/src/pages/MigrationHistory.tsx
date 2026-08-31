@@ -25,9 +25,9 @@ interface HistoryEntry {
 }
 
 const statusBadge: Record<string, string> = {
-  completed: 'bg-green-500/20 text-green-400',
-  failed: 'bg-red-500/20 text-red-400',
-  running: 'bg-blue-500/20 text-blue-400',
+  completed: 'bg-green-500/20 text-emerald-600',
+  failed: 'bg-red-500/20 text-red-600',
+  running: 'bg-blue-500/20 text-[#0066cc]',
 }
 
 function formatTime(dateStr?: string): string {
@@ -89,12 +89,12 @@ export default function MigrationHistory() {
       )}
 
       {loading && !loadError ? (
-        <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3">
-          <div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
+          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
           <span className="text-sm">Loading migration history…</span>
         </div>
       ) : !loadError && history.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
           <EmptyState
             icon={<History className="w-12 h-12" />}
             title="No migration history yet"
@@ -102,42 +102,42 @@ export default function MigrationHistory() {
           />
         </div>
       ) : !loadError ? (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase tracking-wider">VM</th>
-                <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Started</th>
-                <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Duration</th>
-                <th className="text-left p-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Output</th>
+              <tr className="border-b border-[#d2d2d7]">
+                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Name</th>
+                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">VM</th>
+                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Status</th>
+                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Started</th>
+                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Duration</th>
+                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Output</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody className="divide-y divide-[#d2d2d7]/30">
               {history.map((entry, idx) => (
-                <tr key={`${entry.id}-${idx}`} className="hover:bg-slate-700/30 transition-colors">
+                <tr key={`${entry.id}-${idx}`} className="hover:bg-black/[0.04] transition-colors">
                   <td className="p-3">
-                    <div className="font-medium text-white">{entry.name || entry.id}</div>
+                    <div className="font-medium text-[#1d1d1f]">{entry.name || entry.id}</div>
                   </td>
-                  <td className="p-3 text-slate-400 text-xs truncate max-w-xs">{entry.vm_name || '-'}</td>
+                  <td className="p-3 text-[#6e6e73] text-xs truncate max-w-xs">{entry.vm_name || '-'}</td>
                   <td className="p-3">
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        statusBadge[entry.status] || 'bg-slate-500/20 text-slate-400'
+                        statusBadge[entry.status] || 'bg-black/[0.06] text-[#6e6e73]'
                       }`}
                     >
                       {entry.status}
                     </span>
                     {entry.error && (
-                      <div className="text-xs text-red-400 mt-1 truncate max-w-xs" title={entry.error}>
+                      <div className="text-xs text-red-600 mt-1 truncate max-w-xs" title={entry.error}>
                         {entry.error}
                       </div>
                     )}
                   </td>
-                  <td className="p-3 text-slate-400 whitespace-nowrap text-xs">{formatTime(entry.started_at)}</td>
-                  <td className="p-3 text-slate-300 whitespace-nowrap text-xs">{entry.duration || '-'}</td>
-                  <td className="p-3 text-slate-500 text-xs truncate max-w-xs">{entry.output_path || '-'}</td>
+                  <td className="p-3 text-[#6e6e73] whitespace-nowrap text-xs">{formatTime(entry.started_at)}</td>
+                  <td className="p-3 text-[#1d1d1f] whitespace-nowrap text-xs">{entry.duration || '-'}</td>
+                  <td className="p-3 text-[#6e6e73] text-xs truncate max-w-xs">{entry.output_path || '-'}</td>
                 </tr>
               ))}
             </tbody>

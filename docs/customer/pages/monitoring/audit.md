@@ -12,7 +12,7 @@ Audit Logs — the security and compliance trail of who did what: every tracked 
 
 ## How to get there
 
-- Route / id: `/audit`
+- Route / id: `/app/audit`
 - Nav: **Monitoring → Audit** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

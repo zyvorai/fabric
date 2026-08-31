@@ -413,8 +413,6 @@ hardware (CPU, memory, disk, network), running its own operating system.
 
 **zyvorctl**: The Zyvor Fabric command-line client for managing VMs via the REST API.
 
-**zyvorctl-tui**: The Zyvor Fabric terminal UI client using ratatui for a full-screen
-interactive management interface.
 
 **VMDriver**: The trait defined in `Zyvor Fabric-driver-core` that abstracts VM
 lifecycle operations (start, stop, reboot, state query).
@@ -463,3 +461,8 @@ interfaces, similar to firewalld zones.
 
 **ZFS**: A combined file system and volume manager originally designed by Sun
 Microsystems. Zyvor Fabric supports ZFS as a storage pool backend.
+
+
+**/app**: Authenticated Zyvor Fabric console (VMs, network, storage, ops).
+
+**/sign-in**: Sign-in page for the console (legacy `/sign-in` redirects here).

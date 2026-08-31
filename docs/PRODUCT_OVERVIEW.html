@@ -265,7 +265,7 @@ complete management layer:</p>
 deploys in under 5 minutes</li>
 <li><strong>520+ REST API endpoints</strong> with JWT authentication,
 RBAC, and audit logging</li>
-<li><strong>5 management interfaces</strong> — CLI, terminal UI, web
+<li><strong>4 management interfaces</strong> — CLI, web
 dashboard, Kubernetes operator, Terraform provider</li>
 <li><strong>Enterprise features</strong> — HA clustering, live
 migration, GPU passthrough, backup/restore, network policies</li>
@@ -461,7 +461,7 @@ cleanup</li>
 retry + backoff</strong>, Microsoft Teams</li>
 <li>VM scheduling (once, daily, weekly)</li>
 <li>Backup/restore with retention policies and incremental backups</li>
-<li><strong>Per-VM backup</strong> from web UI and TUI (single or
+<li><strong>Per-VM backup</strong> from web UI (single or
 bulk)</li>
 <li><strong>Automated daily backups</strong> via systemd timer
 (configurable schedule, retention, cleanup)</li>
@@ -512,13 +512,13 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> apply <span class="at">-f</span> infrastructure.yaml</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> policy list</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">zyvorctl</span> ceph health my-pool</span></code></pre></div>
-<h3 id="terminal-ui-zyvorctl-tui">Terminal UI (<code>zyvorctl-tui</code>)</h3>
-<p>k9s-style dashboard with 8 views, vim keybindings, sparkline graphs,
-and live API data. Per-VM actions: <code>s</code> start, <code>t</code>
+<h3 id="terminal-ui-removed">Terminal UI (removed)</h3>
+<p>The former <code>zyvorctl</code> has been removed. Use the web console under <code>/app</code> or <code>zyvorctl</code>.</p>
+<p> Per-VM actions: <code>s</code> start, <code>t</code>
 stop, <code>r</code> restart, <code>b</code> backup, <code>d</code>
 delete.</p>
 <h3 id="web-dashboard">Web Dashboard</h3>
-<p>React-based UI with 37+ pages, command palette (Ctrl+K), dark theme,
+<p>React-based UI with 37+ pages, command palette (Ctrl+K), light Apple console,
 real-time WebSocket updates, and bulk operations. Per-VM actions: start,
 stop, pause, backup, console, details. Bulk actions: start, stop,
 backup, delete.</p>
@@ -545,8 +545,8 @@ class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="
 <hr />
 <h2 id="architecture">Architecture</h2>
 <pre><code>                    +-----------+    +-----------+    +----------+
-                    |   zyvorctl   |    | zyvorctl-tui |    |  Web UI  |
-                    |   (CLI)   |    |   (TUI)   |    | (React)  |
+                    |   zyvorctl   |    | zyvorctl |    |  Web UI  |
+                    |   (CLI)   |    |            |    | (React)  |
                     +-----+-----+    +-----+-----+    +----+-----+
                           |                |               |
                 +---------+----------+     |      +--------+
@@ -621,7 +621,7 @@ operator deployed</p>
 <td style="text-align: center;">Yes</td>
 </tr>
 <tr>
-<td>Terminal UI</td>
+<td>Web console</td>
 <td style="text-align: center;">Yes</td>
 <td style="text-align: center;">No</td>
 <td style="text-align: center;">No</td>
@@ -778,82 +778,8 @@ operator deployed</p>
 <td>Axum 0.8</td>
 </tr>
 <tr>
-<td>Terminal UI</td>
-<td>ratatui + crossterm</td>
-</tr>
-<tr>
-<td>Web UI</td>
-<td>React 18 + TypeScript + Vite + TailwindCSS</td>
-</tr>
-<tr>
-<td>VM Backend</td>
-<td>systemd-vmspawn + systemd-machined</td>
-</tr>
-<tr>
-<td>D-Bus</td>
-<td>zbus 4</td>
-</tr>
-<tr>
-<td>Monitoring</td>
-<td>Prometheus</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="project-statistics">Project Statistics</h2>
-<table>
-<thead>
-<tr>
-<th>Metric</th>
-<th>Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Backend crates</td>
-<td>40</td>
-</tr>
-<tr>
-<td>Rust source files</td>
-<td>165</td>
-</tr>
-<tr>
-<td>TypeScript source files</td>
-<td>130</td>
-</tr>
-<tr>
-<td>Total lines of code</td>
-<td>~87,000</td>
-</tr>
-<tr>
-<td>REST API endpoints</td>
-<td>520+</td>
-</tr>
-<tr>
-<td>WebSocket endpoints</td>
-<td>3</td>
-</tr>
-<tr>
-<td>Web pages</td>
-<td>37+</td>
-</tr>
-<tr>
-<td>Security audit rounds</td>
-<td>30 (9 consecutive clean — complete)</td>
-</tr>
-<tr>
-<td>Security issues fixed</td>
-<td>174</td>
-</tr>
-<tr>
-<td>Test suite</td>
-<td>Passing</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="license">License</h2>
-<p>MIT — free for commercial use, modification, and distribution.</p>
+<td>Web console</td>
+<td></p>
 <hr />
 <h2 id="getting-started">Getting Started</h2>
 <h3 id="one-command-deployment">One-Command Deployment</h3>

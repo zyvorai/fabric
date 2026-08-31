@@ -102,9 +102,9 @@ export default function DevicesTab({ vm }: { vm: VM }) {
 
   if (loading) {
     return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 text-center">
-        <Loader2 className="w-6 h-6 text-slate-500 mx-auto mb-2 animate-spin" />
-        <p className="text-slate-500 text-sm">Loading host devices...</p>
+      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
+        <Loader2 className="w-6 h-6 text-[#6e6e73] mx-auto mb-2 animate-spin" />
+        <p className="text-[#6e6e73] text-sm">Loading host devices...</p>
       </div>
     )
   }
@@ -117,7 +117,7 @@ export default function DevicesTab({ vm }: { vm: VM }) {
       <div className="flex justify-end">
         <button
           onClick={() => void load()}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-slate-300 text-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[#6e6e73] hover:text-[#1d1d1f] text-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh
@@ -194,20 +194,20 @@ function DeviceTable({
   canWrite: boolean
 }) {
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-700/50 flex items-center gap-2">
+    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+      <div className="px-5 py-3 border-b border-[#d2d2d7] flex items-center gap-2">
         <Icon className="w-4 h-4 text-teal-400" />
-        <h3 className="text-sm font-medium text-slate-300">{title}</h3>
+        <h3 className="text-sm font-medium text-[#1d1d1f]">{title}</h3>
       </div>
       {rows.length === 0 ? (
-        <p className="p-6 text-sm text-slate-500 text-center">{empty}</p>
+        <p className="p-6 text-sm text-[#6e6e73] text-center">{empty}</p>
       ) : (
-        <div className="divide-y divide-slate-700/50">
+        <div className="divide-y divide-[#d2d2d7]">
           {rows.map((row) => (
             <div key={row.key} className="flex items-center justify-between gap-4 px-5 py-3">
               <div className="min-w-0">
-                <div className="text-sm text-white truncate">{row.name}</div>
-                <div className="text-xs text-slate-500 truncate">{row.detail}</div>
+                <div className="text-sm text-[#1d1d1f] truncate">{row.name}</div>
+                <div className="text-xs text-[#6e6e73] truncate">{row.detail}</div>
               </div>
               <div className="shrink-0">
                 {row.attached ? (
@@ -215,18 +215,18 @@ function DeviceTable({
                     type="button"
                     disabled={!canWrite || row.busy}
                     onClick={row.onDetach}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600/20 text-red-400 hover:bg-red-600/30 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600/20 text-red-600 hover:bg-red-600/30 disabled:opacity-50"
                   >
                     {row.busy ? '…' : 'Detach'}
                   </button>
                 ) : row.attachedElsewhere ? (
-                  <span className="text-xs text-slate-500">In use</span>
+                  <span className="text-xs text-[#6e6e73]">In use</span>
                 ) : (
                   <button
                     type="button"
                     disabled={!canWrite || row.busy}
                     onClick={row.onAttach}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#0066cc]/20 text-[#0066cc] hover:bg-[#0066cc]/30 disabled:opacity-50"
                   >
                     {row.busy ? '…' : 'Attach'}
                   </button>

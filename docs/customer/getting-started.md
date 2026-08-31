@@ -2,37 +2,27 @@
 
 ## What you need
 
-See [Admin basics](admin-basics.md) for ports and auth. Summary:
-
-Open the Fabric web UI against the daemon API (`:9095`).
+See [Admin basics](admin-basics.md) for ports and auth. Summary: open the Fabric web UI against the daemon API (`:9095`).
 
 ## 1. Open the product
 
-Open the Fabric web UI against the daemon API (`:9095`).
+Browse to `http://127.0.0.1:9095/` — the marketing home. Product pages: `/product`, `/platform`, `/security`.
 
-## 2. Sign in / authenticate
+## 2. Sign in
 
-External OIDC + JWT bearer.
+Open `/sign-in` (legacy `/login` redirects here). Use `admin` and the generated password (`./zyvor-fabricd-ctl password`).
 
 ## 3. Orient yourself
 
-Use the quick map on the [customer docs home](README.md), then open the home surface (`/`).
+After sign-in you land on the console at `/app`. Use the left nav or `Ctrl/Cmd+K`. See [Using the Dashboard](using-the-dashboard.md) and the [page index](PAGE_INDEX.md).
 
 ## 4. First workflows
 
-Follow [Common workflows](workflows.md) for the shortest useful paths.
+Follow [Common workflows](workflows.md) for the shortest useful paths (create a VM at `/app/create`, open `/app/vms`).
 
 ## Next steps
 
 - [Using the Dashboard](using-the-dashboard.md)
 - [Admin basics](admin-basics.md)
 - [Page guides](pages/README.md)
-
-## Operate from the console (UX)
-
-1. Open this route from the nav or command palette and wait for live API data.
-2. Use filters/search when present; drill into a row for detail.
-3. For mutating actions: confirm role gates and impact before applying.
-4. **Empty / fail:** Check service health, auth, and that required CRDs/backends for this domain are installed.
-5. **Success:** Live data loads; created/updated objects appear without error toasts.
-
+- [Web UI guide](../getting-started/04-Web-UI.md)

@@ -107,69 +107,69 @@ export default function CloudInitTab({ vm }: { vm: VM }) {
         <ErrorBanner title="Could not configure cloud-init" headline={submitError} />
       )}
 
-      <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-300">
+      <form onSubmit={handleSubmit} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f]">
           <Cloud className="w-4 h-4 text-sky-400" />
           NoCloud datasource
         </div>
 
-        <p className="text-xs text-slate-500 -mt-2">
-          Hostname and, from User data, any <code className="text-slate-400">ssh_authorized_keys</code>,{' '}
-          <code className="text-slate-400">packages</code>, <code className="text-slate-400">runcmd</code>, and{' '}
-          <code className="text-slate-400">write_files</code> are applied on this VM's next (re)start. Instance ID
+        <p className="text-xs text-[#6e6e73] -mt-2">
+          Hostname and, from User data, any <code className="text-[#6e6e73]">ssh_authorized_keys</code>,{' '}
+          <code className="text-[#6e6e73]">packages</code>, <code className="text-[#6e6e73]">runcmd</code>, and{' '}
+          <code className="text-[#6e6e73]">write_files</code> are applied on this VM's next (re)start. Instance ID
           and Network config below are not currently applied to a live guest.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Instance ID</label>
+            <label className="block text-xs text-[#6e6e73] mb-1">Instance ID</label>
             <input
               value={instanceId}
               onChange={(e) => setInstanceId(e.target.value)}
               disabled={!canWrite}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] disabled:opacity-50"
               required
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Hostname</label>
+            <label className="block text-xs text-[#6e6e73] mb-1">Hostname</label>
             <input
               value={hostname}
               onChange={(e) => setHostname(e.target.value)}
               disabled={!canWrite}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] disabled:opacity-50"
               required
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">User data (cloud-config YAML)</label>
+          <label className="block text-xs text-[#6e6e73] mb-1">User data (cloud-config YAML)</label>
           <textarea
             value={userData}
             onChange={(e) => setUserData(e.target.value)}
             disabled={!canWrite}
             rows={12}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono disabled:opacity-50"
+            className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] font-mono disabled:opacity-50"
           />
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Network config (JSON, optional)</label>
+          <label className="block text-xs text-[#6e6e73] mb-1">Network config (JSON, optional)</label>
           <textarea
             value={networkConfig}
             onChange={(e) => setNetworkConfig(e.target.value)}
             disabled={!canWrite}
             rows={4}
             placeholder='{"version": 2, "ethernets": { ... }}'
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono disabled:opacity-50"
+            className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] font-mono disabled:opacity-50"
           />
         </div>
 
         <button
           type="submit"
           disabled={!canWrite || saving}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm font-medium text-white disabled:opacity-50"
         >
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           Generate and attach ISO

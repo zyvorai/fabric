@@ -33,7 +33,7 @@ function navIconBtnClass(theme: AppTheme, active: boolean): string {
   return `flex h-9 w-9 items-center justify-center rounded-lg transition-colors shrink-0 ${
     active
       ? 'bg-blue-600/25 text-blue-400 ring-1 ring-blue-500/35'
-      : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+      : 'text-slate-400 hover:text-white hover:bg-[#d2d2d7]'
   }`
 }
 
@@ -60,7 +60,7 @@ function dropdownLinkClass(theme: AppTheme, active: boolean): string {
     }`
   }
   return `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors no-underline ${
-    active ? 'bg-blue-600/80 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+    active ? 'bg-blue-600/80 text-white' : 'text-slate-300 hover:bg-[#d2d2d7] hover:text-white'
   }`
 }
 
@@ -201,7 +201,7 @@ export function NavLink({
       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors no-underline ${
         active
           ? 'bg-blue-600/90 text-white shadow-lg shadow-blue-600/20'
-          : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+          : 'text-slate-300 hover:bg-[#d2d2d7] hover:text-white'
       }`}
     >
       <Icon className="w-4 h-4 shrink-0" aria-hidden />
@@ -242,7 +242,7 @@ export default function NavIconCluster({
               ? 'border-r border-[rgba(140,160,190,0.2)]'
               : aurora
                 ? 'border-r border-[rgba(167,139,250,0.2)]'
-                : 'border-r border-slate-700/60'
+                : 'border-r border-[#d2d2d7]'
           }`}
         >
           {pinnedPaths.slice(0, 3).map((path) => (
@@ -277,7 +277,7 @@ export default function NavIconCluster({
 
       <div
         className={`flex flex-shrink-0 items-center gap-0.5 border-l pl-2 ${
-          steel ? 'border-[rgba(140,160,190,0.2)]' : aurora ? 'border-[rgba(167,139,250,0.2)]' : 'border-slate-700/60'
+          steel ? 'border-[rgba(140,160,190,0.2)]' : aurora ? 'border-[rgba(167,139,250,0.2)]' : 'border-[#d2d2d7]'
         }`}
         aria-label="Toolbar shortcuts"
       >

@@ -67,13 +67,13 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
   const handleSyncClick = async () => { await onSync(); refreshStatus() }
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">Network Policies</h2>
-          <div className="flex bg-slate-800 rounded-lg p-0.5">
+          <div className="flex bg-white rounded-lg p-0.5">
             {(['policies', 'identities'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded text-sm transition ${view === v ? 'bg-[#e8e8ed] text-[#1d1d1f]' : 'text-[#6e6e73] hover:text-[#1d1d1f]'}`}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
             ))}
@@ -81,15 +81,15 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
         </div>
         <div className="flex items-center gap-2">
           {status && (
-            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+            <span className="text-xs text-[#6e6e73] bg-white rounded-lg px-3 py-1.5 border border-[#d2d2d7]">
               {status.enforced} enforced &middot; {status.pending} pending
             </span>
           )}
-          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
           {view === 'policies' && !readOnly && (
-            <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+            <button onClick={onCreate} className="flex items-center gap-2 bg-[#0066cc] hover:bg-[#0077ed] text-white py-2 px-4 rounded-lg transition text-sm">
               <Plus className="w-4 h-4" /> Add Policy
             </button>
           )}
@@ -98,22 +98,22 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
 
       {view === 'policies' && (
       policies.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No network policies configured. Create one to define ingress/egress rules with label selectors.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No network policies configured. Create one to define ingress/egress rules with label selectors.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-800">
+            <thead className="bg-white">
               <tr>
-                <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">Labels</th>
-                <th className="text-left p-4 font-medium text-slate-300">Ingress</th>
-                <th className="text-left p-4 font-medium text-slate-300">Egress</th>
-                <th className="text-left p-4 font-medium text-slate-300">VMs</th>
-                <th className="text-left p-4 font-medium text-slate-300">Status</th>
-                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Labels</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Ingress</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Egress</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">VMs</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Status</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {policies.map(p => {
                 const ingressCount = p.ingress?.length ?? 0
                 const egressCount = p.egress?.length ?? 0
@@ -122,7 +122,7 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
                     <div className="font-medium">{p.name}{isHostManaged(p) && <HostBadge />}</div>
-                    {p.description && <div className="text-xs text-slate-500 mt-1">{p.description}</div>}
+                    {p.description && <div className="text-xs text-[#6e6e73] mt-1">{p.description}</div>}
                   </td>
                   <td className="p-4"><LabelTags labels={labels} /></td>
                   <td className="p-4">
@@ -131,14 +131,14 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
                   <td className="p-4">
                     <StatusBadge status={`${egressCount} rules`} color="yellow" />
                   </td>
-                  <td className="p-4 text-blue-400 font-medium">{p.matched_vms ?? (isHostManaged(p) ? 'host' : '—')}</td>
+                  <td className="p-4 text-[#0066cc] font-medium">{p.matched_vms ?? (isHostManaged(p) ? 'host' : '—')}</td>
                   <td className="p-4">
                     <StatusBadge status={p.enabled ? 'active' : 'disabled'} color={p.enabled ? 'green' : 'gray'} />
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-1">
                       {!readOnly && !isHostManaged(p) && onEdit && (
-                        <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                        <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-[#d2d2d7] rounded transition" title="Edit">
                           <Pencil className="w-4 h-4" />
                         </button>
                       )}
@@ -159,33 +159,33 @@ function PoliciesTabContent({ policies, identities, onDelete, onAdopt, onAdoptId
 
       {view === 'identities' && (
         identities.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">No security identities yet. Identities are created from VM labels or discovered from firewalld zones and nftables sets on the host.</div>
+          <div className="p-12 text-center text-[#6e6e73]">No security identities yet. Identities are created from VM labels or discovered from firewalld zones and nftables sets on the host.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-800">
+              <thead className="bg-white">
                 <tr>
-                  <th className="text-left p-4 font-medium text-slate-300">ID</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Labels</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Endpoints</th>
-                  <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">ID</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Labels</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Endpoints</th>
+                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {identities.map(i => (
                   <tr key={i.id} className="hover:bg-white/[0.03] transition">
                     <td className="p-4 font-mono text-sm">
                       {i.id}
                       {isHostManaged({ managed: i.managed, id: String(i.id) }) && <HostBadge />}
-                      {i.description && <div className="text-xs text-slate-500 font-normal mt-0.5 max-w-xs">{i.description}</div>}
+                      {i.description && <div className="text-xs text-[#6e6e73] font-normal mt-0.5 max-w-xs">{i.description}</div>}
                     </td>
                     <td className="p-4"><LabelTags labels={i.labels} /></td>
-                    <td className="p-4 font-mono text-xs text-slate-400 max-w-md truncate" title={i.endpoints.join(', ')}>
+                    <td className="p-4 font-mono text-xs text-[#6e6e73] max-w-md truncate" title={i.endpoints.join(', ')}>
                       {i.endpoints.length > 0 ? i.endpoints.join(', ') : '—'}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setViewingIdentityId(i.id)} className="p-2 hover:bg-slate-600 rounded transition" title="View details">
+                        <button onClick={() => setViewingIdentityId(i.id)} className="p-2 hover:bg-[#d2d2d7] rounded transition" title="View details">
                           <Eye className="w-4 h-4" />
                         </button>
                         <HostManagedActions readOnly={readOnly}
@@ -232,38 +232,38 @@ function IdentityDetailModal({ id, onClose }: { id: number; onClose: () => void 
   return (
     <ModalWrapper title={`Identity ${id}`} onClose={onClose}>
       {loading ? (
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-[#6e6e73] text-sm">Loading...</div>
       ) : err ? (
-        <p className="text-red-400 text-sm">{err}</p>
+        <p className="text-red-600 text-sm">{err}</p>
       ) : identity ? (
         <div className="space-y-4">
           <div>
-            <div className="text-xs text-slate-400 mb-1">ID</div>
+            <div className="text-xs text-[#6e6e73] mb-1">ID</div>
             <div className="font-mono text-sm">{identity.id}{isHostManaged({ managed: identity.managed, id: String(identity.id) }) && <HostBadge />}</div>
           </div>
           {identity.description && (
             <div>
-              <div className="text-xs text-slate-400 mb-1">Description</div>
-              <div className="text-sm text-slate-300">{identity.description}</div>
+              <div className="text-xs text-[#6e6e73] mb-1">Description</div>
+              <div className="text-sm text-[#1d1d1f]">{identity.description}</div>
             </div>
           )}
           <div>
-            <div className="text-xs text-slate-400 mb-1">Labels</div>
+            <div className="text-xs text-[#6e6e73] mb-1">Labels</div>
             <LabelTags labels={identity.labels} />
           </div>
           <div>
-            <div className="text-xs text-slate-400 mb-1">Endpoints</div>
+            <div className="text-xs text-[#6e6e73] mb-1">Endpoints</div>
             {identity.endpoints.length > 0 ? (
               <div className="space-y-1">
                 {identity.endpoints.map((ep, idx) => (
-                  <div key={idx} className="font-mono text-xs text-slate-300 bg-slate-800 rounded px-2 py-1">{ep}</div>
+                  <div key={idx} className="font-mono text-xs text-[#1d1d1f] bg-white rounded px-2 py-1">{ep}</div>
                 ))}
               </div>
             ) : (
-              <span className="text-slate-500 text-sm">none</span>
+              <span className="text-[#6e6e73] text-sm">none</span>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
+          <div className="grid grid-cols-2 gap-4 text-xs text-[#6e6e73]">
             <div>
               <div className="mb-1">Created</div>
               <div>{new Date(identity.created).toLocaleString()}</div>
@@ -331,11 +331,11 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
         <InputField label="Name" value={name} onChange={setName} placeholder="allow-web-traffic" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Allow HTTP/HTTPS ingress" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
-        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-slate-300">Add Rule (allow)</div>
+        <div className="border border-[#d2d2d7] rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-[#1d1d1f]">Add Rule (allow)</div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Direction</label>
-            <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label className="block text-xs text-[#6e6e73] mb-1">Direction</label>
+            <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
               <option value="ingress">Ingress</option>
               <option value="egress">Egress</option>
             </select>
@@ -345,18 +345,18 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
             <InputField label="Port" value={rulePort} onChange={setRulePort} placeholder="443" type="number" />
             <InputField label="CIDR" value={ruleCidr} onChange={setRuleCidr} placeholder="10.0.0.0/8" />
           </div>
-          <button type="button" onClick={addRule} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+          <button type="button" onClick={addRule} className="flex items-center gap-1 text-sm text-[#0066cc] hover:text-blue-300 transition">
             <Plus className="w-3.5 h-3.5" /> Add Rule
           </button>
           {rules.length > 0 && (
             <div className="space-y-1 mt-2">
               {rules.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-white rounded px-2 py-1">
                   <StatusBadge status={r.direction} color={r.direction === 'ingress' ? 'green' : 'yellow'} />
-                  {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
-                  {r.port && <span className="text-slate-400">:{r.port}</span>}
-                  {r.cidr && <span className="text-slate-400">{r.cidr}</span>}
-                  <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                  {r.protocol && <span className="text-[#6e6e73]">{r.protocol}</span>}
+                  {r.port && <span className="text-[#6e6e73]">:{r.port}</span>}
+                  {r.cidr && <span className="text-[#6e6e73]">{r.cidr}</span>}
+                  <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-600 hover:text-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -364,8 +364,8 @@ export function CreatePolicyModal({ onClose, onCreated }: { onClose: () => void;
             </div>
           )}
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create Policy'}
         </button>
       </div>
@@ -441,14 +441,14 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
   if (loading) {
     return (
       <ModalWrapper title="Edit Network Policy" onClose={onClose}>
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-[#6e6e73] text-sm">Loading...</div>
       </ModalWrapper>
     )
   }
   if (loadErr) {
     return (
       <ModalWrapper title="Edit Network Policy" onClose={onClose}>
-        <p className="text-red-400 text-sm">{loadErr}</p>
+        <p className="text-red-600 text-sm">{loadErr}</p>
       </ModalWrapper>
     )
   }
@@ -459,11 +459,11 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
         <InputField label="Name" value={name} onChange={setName} placeholder="allow-web-traffic" />
         <InputField label="Description" value={description} onChange={setDescription} placeholder="Allow HTTP/HTTPS ingress" />
         <LabelSelectorInput labels={labels} onChange={setLabels} />
-        <div className="border border-slate-700/50 rounded-lg p-4 space-y-3">
-          <div className="text-sm font-medium text-slate-300">Add Rule (allow)</div>
+        <div className="border border-[#d2d2d7] rounded-lg p-4 space-y-3">
+          <div className="text-sm font-medium text-[#1d1d1f]">Add Rule (allow)</div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Direction</label>
-            <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label className="block text-xs text-[#6e6e73] mb-1">Direction</label>
+            <select value={ruleDir} onChange={e => setRuleDir(e.target.value as PolicyDirection)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-[#1d1d1f] text-sm focus:outline-none focus:border-blue-500">
               <option value="ingress">Ingress</option>
               <option value="egress">Egress</option>
             </select>
@@ -473,18 +473,18 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
             <InputField label="Port" value={rulePort} onChange={setRulePort} placeholder="443" type="number" />
             <InputField label="CIDR" value={ruleCidr} onChange={setRuleCidr} placeholder="10.0.0.0/8" />
           </div>
-          <button type="button" onClick={addRule} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition">
+          <button type="button" onClick={addRule} className="flex items-center gap-1 text-sm text-[#0066cc] hover:text-blue-300 transition">
             <Plus className="w-3.5 h-3.5" /> Add Rule
           </button>
           {rules.length > 0 && (
             <div className="space-y-1 mt-2">
               {rules.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-slate-800 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-white rounded px-2 py-1">
                   <StatusBadge status={r.direction} color={r.direction === 'ingress' ? 'green' : 'yellow'} />
-                  {r.protocol && <span className="text-slate-400">{r.protocol}</span>}
-                  {r.port && <span className="text-slate-400">:{r.port}</span>}
-                  {r.cidr && <span className="text-slate-400">{r.cidr}</span>}
-                  <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                  {r.protocol && <span className="text-[#6e6e73]">{r.protocol}</span>}
+                  {r.port && <span className="text-[#6e6e73]">:{r.port}</span>}
+                  {r.cidr && <span className="text-[#6e6e73]">{r.cidr}</span>}
+                  <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-red-600 hover:text-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -492,8 +492,8 @@ export function EditPolicyModal({ id, onClose, onUpdated }: { id: string; onClos
             </div>
           )}
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>

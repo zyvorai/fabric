@@ -37,8 +37,8 @@ export default function ConfirmDialog({
 
   const confirmColors = {
     danger: 'bg-red-600 hover:bg-red-500 text-white',
-    warning: 'bg-yellow-600 hover:bg-yellow-500 text-white',
-    info: 'bg-blue-600 hover:bg-blue-500 text-white',
+    warning: 'bg-yellow-600 hover:bg-yellow-500 text-[#1d1d1f]',
+    info: 'bg-[#0066cc] hover:bg-[#0077ed] text-white',
   }[variant]
 
   const iconBg = {
@@ -48,9 +48,9 @@ export default function ConfirmDialog({
   }[variant]
 
   const iconColor = {
-    danger: 'text-red-400',
-    warning: 'text-yellow-400',
-    info: 'text-blue-400',
+    danger: 'text-red-600',
+    warning: 'text-amber-600',
+    info: 'text-[#0066cc]',
   }[variant]
 
   return (
@@ -63,7 +63,7 @@ export default function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="bg-slate-800/50 rounded-xl shadow-2xl border border-slate-700/50 w-full max-w-md p-6"
+        className="bg-[#f5f5f7] rounded-xl shadow-2xl border border-[#d2d2d7] w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-4 mb-5">
@@ -71,10 +71,10 @@ export default function ConfirmDialog({
             <AlertTriangle className={`w-5 h-5 ${iconColor}`} />
           </div>
           <div>
-            <h3 id="confirm-title" className="text-base font-semibold text-white">
+            <h3 id="confirm-title" className="text-base font-semibold text-[#1d1d1f]">
               {title}
             </h3>
-            <p id="confirm-message" className="text-sm text-slate-400 mt-1 leading-relaxed">
+            <p id="confirm-message" className="text-sm text-[#6e6e73] mt-1 leading-relaxed">
               {message}
             </p>
           </div>
@@ -83,7 +83,7 @@ export default function ConfirmDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-lg transition-colors text-sm text-slate-300"
+            className="px-4 py-2 bg-white hover:bg-black/[0.04] border border-[#d2d2d7] rounded-lg transition-colors text-sm text-[#1d1d1f]"
           >
             {cancelLabel}
           </button>

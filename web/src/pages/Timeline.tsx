@@ -23,10 +23,10 @@ interface TimelineEntry {
 type FilterType = 'all' | 'action' | 'alert' | 'deploy' | 'error'
 
 const typeConfig: Record<TimelineEntry['type'], { icon: typeof Clock; color: string; bg: string; border: string }> = {
-  action: { icon: Upload, color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/40' },
+  action: { icon: Upload, color: 'text-[#0066cc]', bg: 'bg-blue-500/20', border: 'border-blue-500/40' },
   alert: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/40' },
-  deploy: { icon: Rocket, color: 'text-green-400', bg: 'bg-green-500/20', border: 'border-green-500/40' },
-  error: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/40' },
+  deploy: { icon: Rocket, color: 'text-emerald-600', bg: 'bg-green-500/20', border: 'border-green-500/40' },
+  error: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-500/20', border: 'border-red-500/40' },
 }
 
 function classifyEntry(entry: Record<string, unknown>): TimelineEntry['type'] {
@@ -158,7 +158,7 @@ export default function Timeline() {
       )}
 
       <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-slate-500" />
+        <Filter className="w-4 h-4 text-[#6e6e73]" />
         {filters.map((f) => (
           <button
             key={f.value}
@@ -166,7 +166,7 @@ export default function Timeline() {
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
               filter === f.value
                 ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
-                : 'text-slate-400 hover:text-slate-200 bg-slate-800/50 border border-slate-700 hover:border-slate-600'
+                : 'text-[#6e6e73] hover:text-[#1d1d1f] bg-[#f5f5f7] border border-[#d2d2d7] hover:border-[#d2d2d7]'
             }`}
           >
             {f.label}
@@ -179,13 +179,13 @@ export default function Timeline() {
           <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-slate-500">
+        <div className="text-center py-16 text-[#6e6e73]">
           <Clock className="w-10 h-10 mx-auto mb-3 opacity-50" />
           <p className="text-sm">No activity found{filter !== 'all' ? ` for "${filter}" filter` : ''}.</p>
         </div>
       ) : (
         <div className="relative">
-          <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-slate-700/60" />
+          <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-[#d2d2d7]" />
 
           <div className="space-y-1">
             {filtered.map((entry) => {
@@ -198,9 +198,9 @@ export default function Timeline() {
                   </div>
 
                   <div className="flex-1 min-w-0 pt-1">
-                    <p className="text-sm text-slate-200 leading-snug">{entry.description}</p>
+                    <p className="text-sm text-[#1d1d1f] leading-snug">{entry.description}</p>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-slate-500">{formatTimestamp(entry.timestamp)}</span>
+                      <span className="text-xs text-[#6e6e73]">{formatTimestamp(entry.timestamp)}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${config.bg} ${config.color} capitalize`}>
                         {entry.type}
                       </span>

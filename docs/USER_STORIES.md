@@ -8,9 +8,9 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 | Persona | Name | Focus |
 |---------|------|-------|
-| Private Cloud Admin | Alex | VM lifecycle via the active driver (systemd-vmspawn by default, or Ephemera) |
+| Private Cloud Admin | Alex | VM lifecycle via the active driver (Ephemera by default, or Ephemera) |
 | Platform Engineer | Morgan | K8s operator and Terraform |
-| Developer | Jordan | CLI/TUI/API for VM operations |
+| Developer | Jordan | CLI/web console/API for VM operations |
 
 ---
 

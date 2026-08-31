@@ -1,6 +1,6 @@
 .PHONY: all build build-backend build-web \
        install install-bin install-conf install-systemd install-web install-modules install-libexec \
-       uninstall run dev tui cli test clean fmt lint \
+       uninstall run dev cli test clean fmt lint \
        docker-build docker-up docker-down rpm deb help
 
 PREFIX     ?= /usr
@@ -31,7 +31,6 @@ install-bin:
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 0755 backend/target/release/zyvor-fabricd  $(DESTDIR)$(BINDIR)/zyvor-fabricd
 	install -m 0755 backend/target/release/zyvorctl      $(DESTDIR)$(BINDIR)/zyvorctl
-	install -m 0755 backend/target/release/zyvorctl-tui  $(DESTDIR)$(BINDIR)/zyvorctl-tui
 
 # Directories are also created defensively by the daemon itself at startup
 # (see daemon.rs::ensure_runtime_dirs) — installed here too so they exist
@@ -75,7 +74,6 @@ install-modules:
 uninstall:
 	rm -f  $(DESTDIR)$(BINDIR)/zyvor-fabricd
 	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl
-	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl-tui
 	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
 	rm -f  $(DESTDIR)$(UNITDIR)/vm@.service
 	rm -f  $(DESTDIR)/etc/logrotate.d/zyvor-fabricd
@@ -94,9 +92,6 @@ dev:
 	@echo "Starting Zyvor Fabric (zyvor-fabricd) in development mode..."
 	@cd backend && ZYVOR_FABRICD_LOG_LEVEL=debug cargo run --bin zyvor-fabricd &
 	@cd web && npm run dev
-
-tui:
-	cd backend && cargo run --bin zyvorctl-tui
 
 cli:
 	cd backend && cargo run --bin zyvorctl
@@ -144,7 +139,6 @@ help:
 	@echo "  run             - Run daemon (info log level)"
 	@echo "  run-debug       - Run daemon (debug log level)"
 	@echo "  dev             - Run in development mode (debug + web dev server)"
-	@echo "  tui             - Run TUI"
 	@echo "  cli             - Run CLI"
 	@echo "  test            - Run tests"
 	@echo "  clean           - Clean build artifacts"

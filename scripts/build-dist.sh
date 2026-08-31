@@ -60,7 +60,6 @@ export PATH="${HOME}/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:${P
 cd ~/zyvor-fabric/backend
 cargo build --release -p zyvor-fabricd -p zyvorctl
 echo "  built zyvor-fabricd, zyvorctl"
-echo "  (zyvorctl-tui skipped: crate does not currently compile)"
 EOS
 ok "zyvor-fabric built"
 
@@ -111,7 +110,6 @@ mkdir -p "\$STAGE"/{bin,vendor,web,configs/pam.d,configs/modules-load.d,configs/
 
 cp ~/zyvor-fabric/backend/target/release/zyvor-fabricd "\$STAGE/bin/"
 cp ~/zyvor-fabric/backend/target/release/zyvorctl "\$STAGE/bin/"
-[ -f ~/zyvor-fabric/backend/target/release/zyvorctl-tui ] && cp ~/zyvor-fabric/backend/target/release/zyvorctl-tui "\$STAGE/bin/"
 cp ~/Ephemera/target/release/ephemera "\$STAGE/bin/"
 
 cp ~/guestkit/target/release/guestkit "\$STAGE/vendor/guestkit-agent-cli"

@@ -12,7 +12,7 @@ Alerts — a live view of currently firing system alerts and the notification ru
 
 ## How to get there
 
-- Route / id: `/alerts`
+- Route / id: `/app/alerts`
 - Nav: **Monitoring → Alerts** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

@@ -95,20 +95,20 @@ export default function LifecycleManager() {
       critical: 'bg-red-100 text-red-800', important: 'bg-orange-100 text-orange-800',
       moderate: 'bg-yellow-100 text-yellow-800', low: 'bg-blue-100 text-blue-800',
     }
-    return m[severity] || 'bg-slate-500/20 text-slate-400'
+    return m[severity] || 'bg-black/[0.06] text-[#6e6e73]'
   }
 
   const getStatusColor = (status: string) => {
     const m: Record<string, string> = {
       compliant: 'bg-green-100 text-green-800', non_compliant: 'bg-red-100 text-red-800',
-      incompatible: 'bg-yellow-100 text-yellow-800', unknown: 'bg-slate-500/20 text-slate-400',
-      pending: 'bg-slate-500/20 text-slate-400', pre_check: 'bg-blue-100 text-blue-800',
+      incompatible: 'bg-yellow-100 text-yellow-800', unknown: 'bg-black/[0.06] text-[#6e6e73]',
+      pending: 'bg-black/[0.06] text-[#6e6e73]', pre_check: 'bg-blue-100 text-blue-800',
       maintenance_mode: 'bg-yellow-100 text-yellow-800', remediating: 'bg-blue-100 text-blue-800',
       rebooting: 'bg-orange-100 text-orange-800', completed: 'bg-green-100 text-green-800',
       failed: 'bg-red-100 text-red-800', running: 'bg-blue-100 text-blue-800',
       paused: 'bg-yellow-100 text-yellow-800',
     }
-    return m[status] || 'bg-slate-500/20 text-slate-400'
+    return m[status] || 'bg-black/[0.06] text-[#6e6e73]'
   }
 
 
@@ -116,7 +116,7 @@ export default function LifecycleManager() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Lifecycle Manager</h1>
-        <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded disabled:opacity-50">
+        <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
@@ -125,33 +125,33 @@ export default function LifecycleManager() {
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Baselines</div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Baselines</div>
           <div className="text-2xl font-bold">{baselines.length}</div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Non-Compliant Hosts</div>
-          <div className="text-2xl font-bold text-red-400">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Non-Compliant Hosts</div>
+          <div className="text-2xl font-bold text-red-600">
             {scans.filter(s => s.status === 'non_compliant').length}
           </div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Active Tasks</div>
-          <div className="text-2xl font-bold text-blue-400">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Active Tasks</div>
+          <div className="text-2xl font-bold text-[#0066cc]">
             {tasks.filter(t => t.status !== 'completed' && t.status !== 'failed').length}
           </div>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
-          <div className="text-slate-400 text-sm mb-1">Rolling Updates</div>
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="text-[#6e6e73] text-sm mb-1">Rolling Updates</div>
           <div className="text-2xl font-bold">{updates.filter(u => u.status === 'running').length} active</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-[#f5f5f7] rounded-lg p-1">
         {(['baselines', 'compliance', 'remediation', 'updates'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-blue-600' : 'hover:bg-white/[0.03]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
             {tab === 'updates' ? 'Rolling Updates' : tab === 'compliance' ? 'Compliance Scans' : tab}
           </button>
         ))}
@@ -162,14 +162,14 @@ export default function LifecycleManager() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateBaseline(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Baseline
             </button>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-            <table className="min-w-full divide-y divide-slate-700/50">
+          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+            <table className="min-w-full divide-y divide-[#d2d2d7]">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase">
+                <tr className="text-left text-xs text-[#6e6e73] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Type</th>
                   <th className="p-4">Severity</th>
@@ -180,36 +180,36 @@ export default function LifecycleManager() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-[#d2d2d7]">
                 {baselines.length === 0 ? (
-                  <tr><td colSpan={8} className="p-8 text-center text-slate-400">No baselines configured.</td></tr>
+                  <tr><td colSpan={8} className="p-8 text-center text-[#6e6e73]">No baselines configured.</td></tr>
                 ) : baselines.map(bl => {
                   const compPct = bl.host_count > 0 ? (bl.compliant_count / bl.host_count * 100) : 0
                   return (
-                    <tr key={bl.id} className="hover:bg-slate-900">
+                    <tr key={bl.id} className="hover:bg-white">
                       <td className="p-4">
                         <div className="font-medium">{bl.name}</div>
-                        {bl.description && <div className="text-xs text-slate-400">{bl.description}</div>}
+                        {bl.description && <div className="text-xs text-[#6e6e73]">{bl.description}</div>}
                       </td>
                       <td className="p-4 text-sm">{bl.baseline_type}</td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(bl.severity)}`}>{bl.severity}</span>
                       </td>
-                      <td className="p-4 text-sm text-slate-400">{new Date(bl.release_date).toLocaleDateString()}</td>
+                      <td className="p-4 text-sm text-[#6e6e73]">{new Date(bl.release_date).toLocaleDateString()}</td>
                       <td className="p-4 text-sm">{bl.host_count}</td>
-                      <td className="p-4 text-sm text-green-400">{bl.compliant_count}</td>
+                      <td className="p-4 text-sm text-emerald-600">{bl.compliant_count}</td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-20 bg-slate-800 rounded-full h-2">
+                          <div className="w-20 bg-white rounded-full h-2">
                             <div className={`h-2 rounded-full ${compPct === 100 ? 'bg-green-500' : compPct > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
                               style={{ width: `${compPct}%` }} />
                           </div>
-                          <span className="text-xs text-slate-400">{compPct.toFixed(0)}%</span>
+                          <span className="text-xs text-[#6e6e73]">{compPct.toFixed(0)}%</span>
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <button onClick={() => handleRunScan(bl.id)} className="text-blue-400 hover:text-blue-300 p-1" title="Run scan">
+                          <button onClick={() => handleRunScan(bl.id)} className="text-[#0066cc] hover:text-blue-300 p-1" title="Run scan">
                             <Play className="w-4 h-4" />
                           </button>
                           <button onClick={() => handleDeleteBaseline(bl.id)} className="text-red-600 hover:text-red-800 p-1">
@@ -228,10 +228,10 @@ export default function LifecycleManager() {
 
       {/* Compliance Scans Tab */}
       {activeTab === 'compliance' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-          <table className="min-w-full divide-y divide-slate-700/50">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+          <table className="min-w-full divide-y divide-[#d2d2d7]">
             <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase">
+              <tr className="text-left text-xs text-[#6e6e73] uppercase">
                 <th className="p-4">Host</th>
                 <th className="p-4">Baseline</th>
                 <th className="p-4">Status</th>
@@ -239,22 +239,22 @@ export default function LifecycleManager() {
                 <th className="p-4">Scanned</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {scans.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-slate-400">No compliance scan results.</td></tr>
+                <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">No compliance scan results.</td></tr>
               ) : scans.map(scan => (
-                <tr key={scan.id} className="hover:bg-slate-900">
+                <tr key={scan.id} className="hover:bg-white">
                   <td className="p-4 font-medium">{scan.hostname}</td>
-                  <td className="p-4 text-sm text-slate-400">{scan.baseline_name}</td>
+                  <td className="p-4 text-sm text-[#6e6e73]">{scan.baseline_name}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(scan.status)}`}>{scan.status.replace(/_/g, ' ')}</span>
                   </td>
                   <td className="p-4 text-sm">
                     {scan.missing_patches.length > 0 ? (
-                      <span className="text-red-400">{scan.missing_patches.length} patches</span>
-                    ) : <span className="text-green-400">None</span>}
+                      <span className="text-red-600">{scan.missing_patches.length} patches</span>
+                    ) : <span className="text-emerald-600">None</span>}
                   </td>
-                  <td className="p-4 text-sm text-slate-400">{new Date(scan.last_scanned).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-[#6e6e73]">{new Date(scan.last_scanned).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -264,10 +264,10 @@ export default function LifecycleManager() {
 
       {/* Remediation Tab */}
       {activeTab === 'remediation' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg">
-          <table className="min-w-full divide-y divide-slate-700/50">
+        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+          <table className="min-w-full divide-y divide-[#d2d2d7]">
             <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase">
+              <tr className="text-left text-xs text-[#6e6e73] uppercase">
                 <th className="p-4">Host</th>
                 <th className="p-4">Baseline</th>
                 <th className="p-4">Status</th>
@@ -276,26 +276,26 @@ export default function LifecycleManager() {
                 <th className="p-4">Error</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {tasks.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-slate-400">No remediation tasks.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No remediation tasks.</td></tr>
               ) : tasks.map(task => (
-                <tr key={task.id} className="hover:bg-slate-900">
+                <tr key={task.id} className="hover:bg-white">
                   <td className="p-4 font-medium">{task.hostname}</td>
-                  <td className="p-4 text-sm text-slate-400">{task.baseline_name}</td>
+                  <td className="p-4 text-sm text-[#6e6e73]">{task.baseline_name}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(task.status)}`}>{task.status.replace(/_/g, ' ')}</span>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-24 bg-slate-800 rounded-full h-2">
+                      <div className="w-24 bg-white rounded-full h-2">
                         <div className="h-2 rounded-full bg-blue-500" style={{ width: `${task.progress}%` }} />
                       </div>
-                      <span className="text-xs text-slate-400">{task.progress}%</span>
+                      <span className="text-xs text-[#6e6e73]">{task.progress}%</span>
                     </div>
                   </td>
                   <td className="p-4 text-sm">{task.patches_applied}/{task.patches_total}</td>
-                  <td className="p-4 text-sm text-red-400">{task.error || '-'}</td>
+                  <td className="p-4 text-sm text-red-600">{task.error || '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -309,33 +309,33 @@ export default function LifecycleManager() {
           <div className="flex justify-end">
             <button onClick={() => setShowCreateUpdate(true)} disabled={baselines.length === 0 || hosts.length === 0}
               title={baselines.length === 0 ? 'Create a baseline first' : hosts.length === 0 ? 'No hosts registered' : undefined}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <Plus className="w-4 h-4" /> Create Rolling Update
             </button>
           </div>
           {updates.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 bg-slate-800/50 rounded-lg">No rolling updates.</div>
+            <div className="text-center py-12 text-[#6e6e73] bg-[#f5f5f7] rounded-lg">No rolling updates.</div>
           ) : updates.map(update => {
             const updatePct = update.total_hosts > 0 ? (update.completed_hosts / update.total_hosts) * 100 : 0
             return (
-            <div key={update.id} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+            <div key={update.id} className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold">{update.name}</span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(update.status)}`}>{update.status}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-slate-400">
+                  <span className="text-sm text-[#6e6e73]">
                     {update.completed_hosts}/{update.total_hosts} hosts | Parallel: {update.parallel_count}
                   </span>
                   {update.status === 'pending' && (
-                    <button onClick={() => handleStartUpdate(update.id)} className="flex items-center gap-1 text-green-400 hover:text-green-300 text-sm">
+                    <button onClick={() => handleStartUpdate(update.id)} className="flex items-center gap-1 text-emerald-600 hover:text-green-300 text-sm">
                       <Play className="w-3.5 h-3.5" /> Start
                     </button>
                   )}
                   {update.status === 'running' && (
                     <>
-                      <button onClick={() => handleAdvanceUpdate(update.id)} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm" title="Advance to next host">
+                      <button onClick={() => handleAdvanceUpdate(update.id)} className="flex items-center gap-1 text-[#0066cc] hover:text-blue-300 text-sm" title="Advance to next host">
                         <SkipForward className="w-3.5 h-3.5" /> Advance
                       </button>
                       <button onClick={() => handlePauseUpdate(update.id)} className="flex items-center gap-1 text-amber-400 hover:text-amber-300 text-sm">
@@ -344,26 +344,26 @@ export default function LifecycleManager() {
                     </>
                   )}
                   {update.status === 'paused' && (
-                    <button onClick={() => handleStartUpdate(update.id)} className="flex items-center gap-1 text-green-400 hover:text-green-300 text-sm">
+                    <button onClick={() => handleStartUpdate(update.id)} className="flex items-center gap-1 text-emerald-600 hover:text-green-300 text-sm">
                       <Play className="w-3.5 h-3.5" /> Resume
                     </button>
                   )}
                 </div>
               </div>
               <div className="mb-2">
-                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                <div className="flex justify-between text-xs text-[#6e6e73] mb-1">
                   <span>{update.current_host ? `Current: ${update.current_host}` : 'Waiting...'}</span>
                   <span>{updatePct.toFixed(0)}%</span>
                 </div>
-                <div className="w-full bg-slate-800 rounded-full h-3">
+                <div className="w-full bg-white rounded-full h-3">
                   <div className={`h-3 rounded-full ${update.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'}`}
                     style={{ width: `${updatePct}%` }} />
                 </div>
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-[#6e6e73]">
                 {update.started_at && `Started: ${new Date(update.started_at).toLocaleString()}`}
                 {update.completed_at && ` | Completed: ${new Date(update.completed_at).toLocaleString()}`}
-                {update.failed_hosts > 0 && <span className="text-red-400"> | {update.failed_hosts} failed</span>}
+                {update.failed_hosts > 0 && <span className="text-red-600"> | {update.failed_hosts} failed</span>}
               </div>
             </div>
           )})}
@@ -407,24 +407,24 @@ function CreateBaselineModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Baseline</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required /></div>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required /></div>
           <div><label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
           <div><label className="block text-sm font-medium mb-1">Type</label>
-            <select value={baselineType} onChange={e => setBaselineType(e.target.value as 'patch' | 'upgrade' | 'extension')} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+            <select value={baselineType} onChange={e => setBaselineType(e.target.value as 'patch' | 'upgrade' | 'extension')} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               <option value="patch">Patch</option><option value="upgrade">Upgrade</option><option value="extension">Extension</option>
             </select></div>
           <div><label className="block text-sm font-medium mb-1">Severity</label>
-            <select value={severity} onChange={e => setSeverity(e.target.value as 'critical' | 'important' | 'moderate' | 'low')} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+            <select value={severity} onChange={e => setSeverity(e.target.value as 'critical' | 'important' | 'moderate' | 'low')} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               <option value="critical">Critical</option><option value="important">Important</option><option value="moderate">Moderate</option><option value="low">Low</option>
             </select></div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Create</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
           </div>
         </form>
       </div>
@@ -472,21 +472,21 @@ function CreateRollingUpdateModal({ baselines, hosts, onClose, onCreated }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800/50 rounded-lg p-6 w-full max-w-lg">
+      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-lg">
         <h2 className="text-xl font-bold mb-4">Create Rolling Update</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. patch-cluster-2026-08" className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" required /></div>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. patch-cluster-2026-08" className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required /></div>
           <div><label className="block text-sm font-medium mb-1">Baseline</label>
-            <select value={baselineId} onChange={e => setBaselineId(e.target.value)} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2">
+            <select value={baselineId} onChange={e => setBaselineId(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
               {baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select></div>
           <div>
             <label className="block text-sm font-medium mb-1">Hosts</label>
-            <div className="max-h-40 overflow-y-auto space-y-1 bg-slate-900/40 rounded p-2">
+            <div className="max-h-40 overflow-y-auto space-y-1 bg-[#f5f5f7] rounded p-2">
               {hosts.map(h => (
-                <label key={h.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800/50 cursor-pointer">
-                  <input type="checkbox" checked={selectedHosts.has(h.id)} onChange={() => toggleHost(h.id)} className="rounded border-slate-600 bg-slate-700 text-blue-500" />
+                <label key={h.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#f5f5f7] cursor-pointer">
+                  <input type="checkbox" checked={selectedHosts.has(h.id)} onChange={() => toggleHost(h.id)} className="rounded border-[#d2d2d7] bg-[#e8e8ed] text-blue-500" />
                   <span className="text-sm">{h.hostname}</span>
                 </label>
               ))}
@@ -494,15 +494,15 @@ function CreateRollingUpdateModal({ baselines, hosts, onClose, onCreated }: {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium mb-1">Parallel Hosts</label>
-              <input type="number" value={parallelCount} onChange={e => setParallelCount(Math.max(1, Number(e.target.value)))} min={1} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+              <input type="number" value={parallelCount} onChange={e => setParallelCount(Math.max(1, Number(e.target.value)))} min={1} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
             <div><label className="block text-sm font-medium mb-1">Failure Threshold</label>
-              <input type="number" value={failureThreshold} onChange={e => setFailureThreshold(Math.max(0, Number(e.target.value)))} min={0} className="w-full bg-slate-800 border border-slate-700/50 rounded px-3 py-2" /></div>
+              <input type="number" value={failureThreshold} onChange={e => setFailureThreshold(Math.max(0, Number(e.target.value)))} min={0} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" /></div>
           </div>
           <label className="flex items-center gap-2"><input type="checkbox" checked={preCheckEnabled} onChange={e => setPreCheckEnabled(e.target.checked)} /><span className="text-sm">Run pre-checks before each host</span></label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={autoRemediate} onChange={e => setAutoRemediate(e.target.checked)} /><span className="text-sm">Auto-remediate on failure</span></label>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-600 rounded">Cancel</button>
-            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{submitting ? 'Creating...' : 'Create'}</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{submitting ? 'Creating...' : 'Create'}</button>
           </div>
         </form>
       </div>

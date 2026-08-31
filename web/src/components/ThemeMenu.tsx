@@ -43,7 +43,7 @@ export default function ThemeMenu() {
             ? 'text-[#9aa8b8] hover:text-white hover:bg-white/5'
             : aurora
               ? 'text-[#a89ec8] hover:text-[#f5f3ff] hover:bg-white/5'
-              : 'hover:bg-slate-700/60 text-slate-400 hover:text-white'
+              : 'hover:bg-[#d2d2d7] text-slate-400 hover:text-white'
         }`}
         title="Cycle theme (dark → steel → aurora)"
         aria-label="Cycle theme"

@@ -20,10 +20,10 @@ interface StreamEvent {
 
 function levelColor(level: string): string {
   switch (level) {
-    case 'error': return 'text-red-400'
+    case 'error': return 'text-red-600'
     case 'warning': return 'text-amber-400'
-    case 'debug': return 'text-slate-500'
-    default: return 'text-blue-400'
+    case 'debug': return 'text-[#6e6e73]'
+    default: return 'text-[#0066cc]'
   }
 }
 
@@ -104,7 +104,7 @@ export default function EventStream() {
 
       <div className="flex flex-wrap items-center gap-3">
         <span
-          className={`inline-flex items-center gap-2 text-sm ${connected ? 'text-emerald-400' : 'text-amber-400'}`}
+          className={`inline-flex items-center gap-2 text-sm ${connected ? 'text-emerald-600' : 'text-amber-400'}`}
         >
           <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
           {connected ? 'Connected' : 'Reconnecting…'}
@@ -125,7 +125,7 @@ export default function EventStream() {
           <Trash2 className="w-4 h-4" />
           Clear
         </button>
-        <div className="flex items-center gap-2 text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-[#6e6e73]">
           <Filter className="w-4 h-4" />
           <select
             value={levelFilter}
@@ -143,20 +143,20 @@ export default function EventStream() {
 
       <div
         ref={containerRef}
-        className="rounded-xl border border-slate-700/50 bg-slate-900/50 max-h-[70vh] overflow-y-auto font-mono text-sm"
+        className="rounded-xl border border-[#d2d2d7] bg-white max-h-[70vh] overflow-y-auto font-mono text-sm"
       >
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">Waiting for events…</div>
+          <div className="p-8 text-center text-[#6e6e73]">Waiting for events…</div>
         ) : (
           filtered.map((ev) => (
             <div
               key={ev.id}
-              className={`flex gap-3 px-4 py-2 border-b border-slate-800/50 ${levelBg(ev.level)}`}
+              className={`flex gap-3 px-4 py-2 border-b border-[#d2d2d7] ${levelBg(ev.level)}`}
             >
-              <span className="text-slate-500 shrink-0">{ev.timestamp.toLocaleTimeString()}</span>
+              <span className="text-[#6e6e73] shrink-0">{ev.timestamp.toLocaleTimeString()}</span>
               <span className={`shrink-0 uppercase text-xs font-bold ${levelColor(ev.level)}`}>{ev.level}</span>
               <span className="text-cyan-400 shrink-0">{ev.source}</span>
-              <span className="text-slate-300 truncate">{ev.message}</span>
+              <span className="text-[#1d1d1f] truncate">{ev.message}</span>
             </div>
           ))
         )}

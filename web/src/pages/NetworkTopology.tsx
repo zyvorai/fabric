@@ -191,12 +191,12 @@ export default function NetworkTopology() {
       )}
 
       {loading && !loadError ? (
-        <div className="bg-slate-800/50 rounded-xl p-10 border border-slate-700/50 flex flex-col items-center justify-center text-slate-500 gap-3">
-          <div className="w-6 h-6 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
+          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
           <span className="text-sm">Loading network topology…</span>
         </div>
       ) : !loadError && !hasContent ? (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50">
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
           <EmptyState
             icon={<Network className="w-10 h-10" />}
             title="No networks or VMs found"
@@ -205,7 +205,7 @@ export default function NetworkTopology() {
         </div>
       ) : !loadError ? (
         <div className="flex flex-col gap-6">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center justify-between text-xs text-[#6e6e73]">
             <span>
               {networks.length} virtual network{networks.length !== 1 ? 's' : ''} · {bridges.length} host bridge
               {bridges.length !== 1 ? 's' : ''} · {vms.length} VM{vms.length !== 1 ? 's' : ''}
@@ -214,7 +214,7 @@ export default function NetworkTopology() {
 
           {hostNodes.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
                 <Server className="w-4 h-4" />
                 Host interfaces
               </h2>
@@ -222,19 +222,19 @@ export default function NetworkTopology() {
                 {hostNodes.map(node => (
                   <div
                     key={node.name}
-                    className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3"
+                    className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-3"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-white">{node.name}</span>
+                      <span className="font-medium text-[#1d1d1f]">{node.name}</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${
-                        node.isBridge ? 'bg-blue-500/10 text-blue-400' : 'bg-slate-500/10 text-slate-400'
+                        node.isBridge ? 'bg-blue-500/10 text-[#0066cc]' : 'bg-black/[0.04] text-[#6e6e73]'
                       }`}>
                         {node.isBridge ? 'bridge' : node.kind}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">{node.operational_state}</div>
+                    <div className="text-xs text-[#6e6e73] mt-1">{node.operational_state}</div>
                     {node.addresses.length > 0 && (
-                      <div className="text-xs font-mono text-slate-400 mt-1">{node.addresses.join(', ')}</div>
+                      <div className="text-xs font-mono text-[#6e6e73] mt-1">{node.addresses.join(', ')}</div>
                     )}
                   </div>
                 ))}
@@ -244,10 +244,10 @@ export default function NetworkTopology() {
 
           {attachmentEdges.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-slate-300 mb-3">VM → network connections</h2>
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+              <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3">VM → network connections</h2>
+              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-800 text-slate-400 text-xs">
+                  <thead className="bg-white text-[#6e6e73] text-xs">
                     <tr>
                       <th className="text-left p-3 font-medium">VM</th>
                       <th className="text-left p-3 font-medium w-8" />
@@ -256,17 +256,17 @@ export default function NetworkTopology() {
                       <th className="text-left p-3 font-medium">MAC</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody className="divide-y divide-[#d2d2d7]">
                     {attachmentEdges.map((e, i) => (
                       <tr key={`${e.vm}-${e.network}-${i}`} className="hover:bg-white/[0.03]">
                         <td className="p-3">
-                          <span className="font-medium text-white">{e.vm}</span>
-                          <span className="text-xs text-slate-500 ml-2">{e.vmState}</span>
+                          <span className="font-medium text-[#1d1d1f]">{e.vm}</span>
+                          <span className="text-xs text-[#6e6e73] ml-2">{e.vmState}</span>
                         </td>
-                        <td className="p-3 text-slate-500">→</td>
-                        <td className="p-3 font-medium text-blue-400">{e.network}</td>
-                        <td className="p-3 text-slate-400">{e.ifaceType}</td>
-                        <td className="p-3 font-mono text-xs text-slate-500">{e.mac}</td>
+                        <td className="p-3 text-[#6e6e73]">→</td>
+                        <td className="p-3 font-medium text-[#0066cc]">{e.network}</td>
+                        <td className="p-3 text-[#6e6e73]">{e.ifaceType}</td>
+                        <td className="p-3 font-mono text-xs text-[#6e6e73]">{e.mac}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -276,42 +276,42 @@ export default function NetworkTopology() {
           )}
 
           <section>
-            <h2 className="text-sm font-semibold text-slate-300 mb-3">VM attachments</h2>
+            <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3">VM attachments</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {networkNames.map(netName => {
                 const netVMs = vmsByNetwork[netName] || []
                 const netInfo = networks.find(n => n.name === netName)
                 const hostBridge = bridges.find(b => b.name === netName)
                 return (
-                  <div key={netName} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+                  <div key={netName} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-white capitalize">
+                      <h3 className="text-sm font-semibold text-[#1d1d1f] capitalize">
                         {netName === 'unattached' ? 'Unattached VMs' : netName}
                       </h3>
                       {netInfo && (
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-[#6e6e73]">
                           {netInfo.state} · autostart {netInfo.autostart}
                         </span>
                       )}
                       {!netInfo && hostBridge && (
-                        <span className="text-xs text-blue-400">host bridge · {hostBridge.operational_state ?? '—'}</span>
+                        <span className="text-xs text-[#0066cc]">host bridge · {hostBridge.operational_state ?? '—'}</span>
                       )}
                     </div>
                     {netVMs.length === 0 ? (
-                      <p className="text-xs text-slate-500">No VMs on this network</p>
+                      <p className="text-xs text-[#6e6e73]">No VMs on this network</p>
                     ) : (
                       <ul className="space-y-2">
                         {netVMs.map(vm => (
                           <li
                             key={vm.name}
-                            className="text-sm bg-slate-900/40 rounded-lg px-3 py-2 border border-slate-700/30"
+                            className="text-sm bg-[#f5f5f7] rounded-lg px-3 py-2 border border-[#d2d2d7]/60"
                           >
-                            <div className="font-medium text-white">{vm.name}</div>
-                            <div className="text-xs text-slate-500 mt-0.5">{vm.state}</div>
+                            <div className="font-medium text-[#1d1d1f]">{vm.name}</div>
+                            <div className="text-xs text-[#6e6e73] mt-0.5">{vm.state}</div>
                             {vm.interfaces?.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {vm.interfaces.map((iface, i) => (
-                                  <div key={i} className="text-[11px] text-slate-400 font-mono">
+                                  <div key={i} className="text-[11px] text-[#6e6e73] font-mono">
                                     {iface.type} → {iface.source || '—'} · {iface.model} · {iface.mac || 'no MAC'}
                                   </div>
                                 ))}

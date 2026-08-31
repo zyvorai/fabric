@@ -12,7 +12,7 @@ System — the physical host's hardware topology (CPU sockets/cores/threads, NUM
 
 ## How to get there
 
-- Route / id: `/system`
+- Route / id: `/app/system`
 - Nav: **Infrastructure → System** (sidebar, command palette, or desktop nav)
 
 ## Operate from the console (UX)

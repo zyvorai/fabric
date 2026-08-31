@@ -32,53 +32,53 @@ function QosTabContent({ policies, onDelete, onAdopt, onEdit, onCreate, onSync }
   const handleSyncClick = async () => { await onSync(); refreshStatus() }
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-      <div className="p-6 border-b border-slate-700/50 flex items-center justify-between">
+    <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+      <div className="p-6 border-b border-[#d2d2d7] flex items-center justify-between">
         <h2 className="text-xl font-semibold">QoS / Traffic Shaping</h2>
         <div className="flex items-center gap-2">
           {status && (
-            <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-700/50">
+            <span className="text-xs text-[#6e6e73] bg-white rounded-lg px-3 py-1.5 border border-[#d2d2d7]">
               {status.active_policies} active &middot; {status.shaped_vms} shaped VMs
             </span>
           )}
-          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={handleSyncClick} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm">
             <RefreshCw className="w-4 h-4" /> Sync
           </button>}
-          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm">
+          {!readOnly && <button onClick={onCreate} className="flex items-center gap-2 bg-[#0066cc] hover:bg-[#0077ed] text-white py-2 px-4 rounded-lg transition text-sm">
             <Plus className="w-4 h-4" /> Add QoS Policy
           </button>}
         </div>
       </div>
       {policies.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">No QoS policies configured. Create one to shape VM network traffic.</div>
+        <div className="p-12 text-center text-[#6e6e73]">No QoS policies configured. Create one to shape VM network traffic.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-800">
+            <thead className="bg-white">
               <tr>
-                <th className="text-left p-4 font-medium text-slate-300">Name</th>
-                <th className="text-left p-4 font-medium text-slate-300">Interface</th>
-                <th className="text-left p-4 font-medium text-slate-300">Class</th>
-                <th className="text-left p-4 font-medium text-slate-300">Guaranteed</th>
-                <th className="text-left p-4 font-medium text-slate-300">Max Rate</th>
-                <th className="text-left p-4 font-medium text-slate-300">Priority</th>
-                <th className="text-left p-4 font-medium text-slate-300">Status</th>
-                <th className="text-left p-4 font-medium text-slate-300">Actions</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Interface</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Class</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Guaranteed</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Max Rate</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Priority</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Status</th>
+                <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-[#d2d2d7]">
               {policies.map(p => (
                 <tr key={p.id} className="hover:bg-white/[0.03] transition">
                   <td className="p-4">
                     <div className="font-medium">{p.name}{isHostManaged(p) && <HostBadge />}</div>
-                    {p.description && <div className="text-xs text-slate-500 mt-1 max-w-xs truncate">{p.description}</div>}
+                    {p.description && <div className="text-xs text-[#6e6e73] mt-1 max-w-xs truncate">{p.description}</div>}
                   </td>
                   <td className="p-4 font-mono text-sm text-cyan-400">{p.interface}</td>
                   <td className="p-4 font-mono text-sm">{p.traffic_class?.name ?? '-'}</td>
-                  <td className="p-4 font-mono text-sm text-green-400">
+                  <td className="p-4 font-mono text-sm text-emerald-600">
                     {p.traffic_class ? formatRate(p.traffic_class.guaranteed_rate) : '-'}
                   </td>
-                  <td className="p-4 font-mono text-sm text-yellow-400">
+                  <td className="p-4 font-mono text-sm text-amber-600">
                     {p.traffic_class ? formatRate(p.traffic_class.max_rate) : '-'}
                   </td>
                   <td className="p-4 font-mono text-sm">{p.traffic_class?.priority ?? '-'}</td>
@@ -88,7 +88,7 @@ function QosTabContent({ policies, onDelete, onAdopt, onEdit, onCreate, onSync }
                   <td className="p-4">
                     <div className="flex items-center gap-1">
                       {!readOnly && !isHostManaged(p) && onEdit && (
-                        <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-slate-600 rounded transition" title="Edit">
+                        <button onClick={() => onEdit(p.id)} className="p-2 hover:bg-[#d2d2d7] rounded transition" title="Edit">
                           <Pencil className="w-4 h-4" />
                         </button>
                       )}
@@ -163,8 +163,8 @@ export function CreateQosModal({ onClose, onCreated }: { onClose: () => void; on
           <InputField label="Burst" value={burst} onChange={setBurst} placeholder="32kbit" />
           <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Creating...' : 'Create QoS Policy'}
         </button>
       </div>
@@ -237,14 +237,14 @@ export function EditQosModal({ id, onClose, onUpdated }: { id: string; onClose: 
   if (loading) {
     return (
       <ModalWrapper title="Edit QoS Policy" onClose={onClose}>
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-[#6e6e73] text-sm">Loading...</div>
       </ModalWrapper>
     )
   }
   if (loadErr) {
     return (
       <ModalWrapper title="Edit QoS Policy" onClose={onClose}>
-        <p className="text-red-400 text-sm">{loadErr}</p>
+        <p className="text-red-600 text-sm">{loadErr}</p>
       </ModalWrapper>
     )
   }
@@ -264,8 +264,8 @@ export function EditQosModal({ id, onClose, onUpdated }: { id: string; onClose: 
           <InputField label="Burst" value={burst} onChange={setBurst} placeholder="32kbit" />
           <InputField label="Priority" value={priority} onChange={setPriority} placeholder="100" type="number" />
         </div>
-        {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <button onClick={handleSubmit} disabled={submitting} className="w-full bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white py-2 px-4 rounded-lg transition">
           {submitting ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
