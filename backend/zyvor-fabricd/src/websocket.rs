@@ -90,18 +90,40 @@ pub async fn console_handler(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Open the console *before* upgrading, so a failure (guest agent
-    // disabled, VM unreachable, VM not found) comes back as a normal HTTP
-    // error instead of a WebSocket that opens and immediately closes with
-    // no useful diagnostic for the browser to show.
-    let console = state.driver.open_console(&vm_name, query.cols, query.rows).await.map_err(|e| {
-        tracing::warn!("Failed to open console for VM '{}': {:#}", vm_name, e);
-        StatusCode::BAD_GATEWAY
-    })?;
+    // Opening the console before upgrading (the old approach) would let a
+    // failure come back as a normal HTTP status -- except the browser's
+    // `WebSocket` object never exposes the failed handshake's status or
+    // body, so that "diagnostic" was invisible to the UI regardless of
+    // what the server sent. Upgrading unconditionally and reporting a
+    // failure as a text frame instead means the browser's `onmessage`
+    // actually sees it before `onclose` fires -- same pattern already used
+    // for the idle-timeout notice below.
+    Ok(ws.max_message_size(MAX_MESSAGE_SIZE).on_upgrade(move |socket| async move {
+        match state.driver.open_console(&vm_name, query.cols, query.rows).await {
+            Ok(console) => handle_console(socket, vm_name, console).await,
+            Err(e) => {
+                tracing::warn!("Failed to open console for VM '{}': {:#}", vm_name, e);
+                send_console_open_error(socket, &vm_name, &e).await;
+            }
+        }
+    }))
+}
 
-    Ok(ws
-        .max_message_size(MAX_MESSAGE_SIZE)
-        .on_upgrade(move |socket| handle_console(socket, vm_name, console)))
+/// Reports a console-open failure as a readable message inside the
+/// terminal itself, then closes -- see `console_handler`'s doc comment for
+/// why this replaces a pre-upgrade HTTP error.
+async fn send_console_open_error(mut socket: WebSocket, vm_name: &str, err: &anyhow::Error) {
+    let hint = if err.to_string().contains("Connection reset by peer")
+        || err.to_string().contains("connect(vsock")
+    {
+        "\r\n[The in-guest agent isn't responding. This usually means the VM's image doesn't \
+         have ephemera-guest-agent installed/enabled, or the guest hasn't finished booting yet.]\r\n"
+    } else {
+        ""
+    };
+    let msg = format!("\r\n[Console unavailable for '{vm_name}': {err:#}]\r\n{hint}");
+    let _ = socket.send(Message::Text(msg.into())).await;
+    let _ = socket.close().await;
 }
 
 async fn handle_console(

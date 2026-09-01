@@ -626,9 +626,29 @@ impl EphemeraClient {
         }
         let request = request.body(()).context("building console WebSocket request")?;
 
-        let (stream, _response) = tokio_tungstenite::connect_async(request)
-            .await
-            .with_context(|| format!("connecting to console WebSocket for VM {id}"))?;
+        let (stream, _response) = tokio_tungstenite::connect_async(request).await.map_err(|e| {
+            // tungstenite's `Error::Http` Display only prints the status
+            // line ("HTTP error: 400 Bad Request") -- the actual reason
+            // (e.g. Ephemera's own `{"error": "connect(vsock ...): ..."}`
+            // body) is right there in the response but silently dropped
+            // unless pulled out explicitly. Without this, every console
+            // failure looked identical to the browser regardless of cause.
+            if let tokio_tungstenite::tungstenite::Error::Http(resp) = &e {
+                if let Some(body) = resp.body() {
+                    let detail = String::from_utf8_lossy(body);
+                    let detail = serde_json::from_str::<serde_json::Value>(&detail)
+                        .ok()
+                        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_owned))
+                        .unwrap_or_else(|| detail.into_owned());
+                    return anyhow::anyhow!(
+                        "connecting to console WebSocket for VM {id}: {} {}: {detail}",
+                        resp.status().as_u16(),
+                        resp.status().canonical_reason().unwrap_or(""),
+                    );
+                }
+            }
+            anyhow::Error::new(e).context(format!("connecting to console WebSocket for VM {id}"))
+        })?;
         Ok(ConsoleWs { stream, read_buf: Vec::new() })
     }
 
