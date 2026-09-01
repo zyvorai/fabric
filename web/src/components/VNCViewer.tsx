@@ -128,8 +128,15 @@ export default function VNCViewer({ vmName }: VNCViewerProps) {
       </div>
 
       {/* Display */}
-      <div className="relative" style={{ minHeight: fullscreen ? 'calc(100vh - 45px)' : '500px' }}>
-        <div ref={containerRef} className="w-full h-full" style={{ minHeight: fullscreen ? 'calc(100vh - 45px)' : '500px' }} />
+      {/* noVNC's own wrapper div sets `height: 100%` on itself (see
+          @novnc/novnc's rfb.js) -- a percentage height resolves against
+          the *computed* `height` of its ancestors, not against a
+          min-height-only box (which computes to `auto`), so every div in
+          this chain needs a real `height`, not just `minHeight`. Without
+          it the canvas silently renders at 0x0 despite real framebuffer
+          data arriving -- "Connected" shows, nothing is ever visible. */}
+      <div className="relative" style={{ height: fullscreen ? 'calc(100vh - 45px)' : '500px' }}>
+        <div ref={containerRef} className="w-full h-full" style={{ height: fullscreen ? 'calc(100vh - 45px)' : '500px' }} />
         {status !== 'connected' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
             {status === 'connecting' && (
