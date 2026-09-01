@@ -1826,7 +1826,7 @@ dependencies = [
  "tauri-build",
  "tokio",
  "vm-model",
- "vmspawn-sdk",
+ "zyvor-fabric-sdk",
 ]
 
 [[package]]
@@ -4123,20 +4123,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vmspawn-sdk"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "eventsource-stream",
- "futures-util",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "vm-model",
-]
-
-[[package]]
 name = "vswhom"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5074,3 +5060,17 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[package]]
+name = "zyvor-fabric-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "eventsource-stream",
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "vm-model",
+]

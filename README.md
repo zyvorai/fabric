@@ -124,4 +124,4 @@ See project docs for CI, testing, and contribution guidelines. Historical build 
 
 ## License
 
-See [LICENSE](LICENSE) or project-specific licensing files in `docs/legal/`.
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
