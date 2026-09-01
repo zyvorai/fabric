@@ -312,6 +312,7 @@ mod tests {
                     description: "HTTPS".to_string(),
                 },
             ],
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };

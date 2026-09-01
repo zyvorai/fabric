@@ -82,6 +82,7 @@ mod tests {
             description: String::new(),
             default_action: default,
             rules,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

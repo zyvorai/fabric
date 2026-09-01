@@ -794,9 +794,9 @@ mod tests {
                     "rule": {
                         "chain": "prerouting",
                         "handle": 5,
+                        "comment": "web-server",
                         "expr": [
-                            {"match": {"left": {"payload": {"protocol": "tcp"}}}},
-                            {"comment": "web-server"}
+                            {"match": {"left": {"payload": {"protocol": "tcp"}}}}
                         ]
                     }
                 },

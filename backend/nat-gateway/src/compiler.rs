@@ -279,6 +279,7 @@ mod tests {
             pool_id: None,
             outbound_interface: Some("eth0".to_string()),
             enabled,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

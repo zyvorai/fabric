@@ -130,6 +130,7 @@ mod tests {
                 priority,
             },
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }

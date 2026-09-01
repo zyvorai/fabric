@@ -278,6 +278,7 @@ mod tests {
             algorithm: LoadBalancerAlgorithm::RoundRobin,
             health_check: HealthCheck::default(),
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         };

@@ -165,6 +165,7 @@ mod tests {
             algorithm,
             health_check: HealthCheck::default(),
             enabled: true,
+            managed: true,
             created: Utc::now(),
             updated: Utc::now(),
         }
