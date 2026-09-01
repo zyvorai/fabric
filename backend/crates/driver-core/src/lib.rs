@@ -201,13 +201,24 @@ pub struct ShellOutput {
 /// Not a substitute for a real interactive console/PTY.
 #[async_trait]
 pub trait ShellDriver: Send + Sync {
-    async fn shell(&self, name: &str, command: &str, timeout_seconds: Option<u64>) -> Result<ShellOutput>;
+    async fn shell(
+        &self,
+        name: &str,
+        command: &str,
+        timeout_seconds: Option<u64>,
+    ) -> Result<ShellOutput>;
 
     /// Copy a file from the host into the machine — Ephemera's vsock
     /// guest-agent `PutFile` op (same agent-enabled requirement as
     /// [`Self::shell`]). `mode` is Unix permission bits (e.g. `0o644`);
     /// `None` lets the backend pick its own default.
-    async fn copy_to(&self, name: &str, host_path: &str, machine_path: &str, mode: Option<u32>) -> Result<()>;
+    async fn copy_to(
+        &self,
+        name: &str,
+        host_path: &str,
+        machine_path: &str,
+        mode: Option<u32>,
+    ) -> Result<()>;
 
     /// Copy a file from the machine to the host — Ephemera's vsock
     /// guest-agent `GetFile` op.
@@ -272,7 +283,14 @@ pub struct PoolInfo {
 /// rather than silently no-op'ing, same convention as `ImageDriver`.
 #[async_trait]
 pub trait PoolDriver: Send + Sync {
-    async fn create_pool(&self, name: &str, size: usize, image: &str, cpus: u32, memory: u64) -> Result<PoolInfo>;
+    async fn create_pool(
+        &self,
+        name: &str,
+        size: usize,
+        image: &str,
+        cpus: u32,
+        memory: u64,
+    ) -> Result<PoolInfo>;
     async fn list_pools(&self) -> Result<Vec<PoolInfo>>;
     async fn get_pool(&self, name: &str) -> Result<PoolInfo>;
     async fn delete_pool(&self, name: &str) -> Result<()>;
@@ -280,7 +298,12 @@ pub trait PoolDriver: Send + Sync {
     /// returns the resulting VM. Fails with a clear error if the pool has
     /// no ready member right now rather than falling back to a slow
     /// synchronous create.
-    async fn claim_pool(&self, pool_name: &str, new_name: &str, ttl_seconds: Option<u64>) -> Result<VM>;
+    async fn claim_pool(
+        &self,
+        pool_name: &str,
+        new_name: &str,
+        ttl_seconds: Option<u64>,
+    ) -> Result<VM>;
 }
 
 /// Feature detection for optional capabilities.

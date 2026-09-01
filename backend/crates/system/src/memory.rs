@@ -31,7 +31,9 @@ pub enum MemoryError {
 impl From<zyvor_fabric_cgroup::CgroupError> for MemoryError {
     fn from(e: zyvor_fabric_cgroup::CgroupError) -> Self {
         match &e {
-            zyvor_fabric_cgroup::CgroupError::NotFound(_) => MemoryError::CgroupNotFound(e.to_string()),
+            zyvor_fabric_cgroup::CgroupError::NotFound(_) => {
+                MemoryError::CgroupNotFound(e.to_string())
+            }
             zyvor_fabric_cgroup::CgroupError::ReadFailed { .. } => {
                 MemoryError::ReadStatsFailed(e.to_string())
             }

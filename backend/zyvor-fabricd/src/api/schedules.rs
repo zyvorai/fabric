@@ -601,7 +601,8 @@ pub async fn run_schedule_now(
                 }
                 Err(e) => Err(anyhow::anyhow!(
                     "No disk image found for VM '{}': {}",
-                    vm_name_clone, e
+                    vm_name_clone,
+                    e
                 )),
             }
         })

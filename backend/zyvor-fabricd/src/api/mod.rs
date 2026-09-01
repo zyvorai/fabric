@@ -80,8 +80,8 @@ pub mod webhook_retry;
 // Phase 3 infrastructure modules
 pub mod compliance;
 pub mod host_insight;
-pub mod processes;
 pub mod pci;
+pub mod processes;
 pub mod usb;
-pub mod vm_advanced_config;
 pub mod ux_extensions;
+pub mod vm_advanced_config;

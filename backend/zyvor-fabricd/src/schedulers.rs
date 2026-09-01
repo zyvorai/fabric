@@ -31,7 +31,9 @@ fn duration_until_daily(time: NaiveTime) -> std::time::Duration {
     if next <= now {
         next += ChronoDuration::days(1);
     }
-    (next - now).to_std().unwrap_or(std::time::Duration::from_secs(60))
+    (next - now)
+        .to_std()
+        .unwrap_or(std::time::Duration::from_secs(60))
 }
 
 /// Time until the next occurrence of `weekday` at `time` — matches
@@ -39,13 +41,16 @@ fn duration_until_daily(time: NaiveTime) -> std::time::Duration {
 fn duration_until_weekly(weekday: Weekday, time: NaiveTime) -> std::time::Duration {
     let now = Utc::now();
     let mut next = now.date_naive().and_time(time).and_utc();
-    let days_ahead =
-        (7 + weekday.num_days_from_monday() as i64 - next.weekday().num_days_from_monday() as i64) % 7;
+    let days_ahead = (7 + weekday.num_days_from_monday() as i64
+        - next.weekday().num_days_from_monday() as i64)
+        % 7;
     next += ChronoDuration::days(days_ahead);
     if next <= now {
         next += ChronoDuration::days(7);
     }
-    (next - now).to_std().unwrap_or(std::time::Duration::from_secs(60))
+    (next - now)
+        .to_std()
+        .unwrap_or(std::time::Duration::from_secs(60))
 }
 
 /// Run one of the libexec scheduler scripts, pointed at this daemon's own
@@ -62,8 +67,10 @@ async fn run_script(name: &str, script: &str, api_url: &str) {
     }
 
     tracing::info!("{name} scheduler: running {}", path.display());
-    let output =
-        tokio::process::Command::new(&path).env("ZYVOR_FABRICD_URL", api_url).output().await;
+    let output = tokio::process::Command::new(&path)
+        .env("ZYVOR_FABRICD_URL", api_url)
+        .output()
+        .await;
 
     match output {
         Ok(out) if out.status.success() => {
@@ -84,7 +91,13 @@ async fn run_script(name: &str, script: &str, api_url: &str) {
 }
 
 fn local_api_url(state: &AppState) -> String {
-    let port = state.config.daemon.listen.rsplit(':').next().unwrap_or("9095");
+    let port = state
+        .config
+        .daemon
+        .listen
+        .rsplit(':')
+        .next()
+        .unwrap_or("9095");
     format!("http://127.0.0.1:{port}")
 }
 

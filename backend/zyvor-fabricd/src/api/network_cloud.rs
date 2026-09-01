@@ -517,20 +517,39 @@ pub async fn update_dhcp_server(
     let existing = state
         .store
         .get_entity::<DhcpServerConfig>("dhcp_servers", &id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({ "error": "DHCP server config not found" }))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "DHCP server config not found" })),
+            )
+        })?;
 
     crate::validation::validate_hostname(&req.bridge).map_err(|msg| {
-        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid bridge name: {}", msg) })))
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid bridge name: {}", msg) })),
+        )
     })?;
     for dns in &req.dns_servers {
         crate::validation::validate_ip_address(dns).map_err(|msg| {
-            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid DNS server: {}", msg) })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid DNS server: {}", msg) })),
+            )
         })?;
     }
     if let Some(ref gw) = req.gateway {
         crate::validation::validate_ip_address(gw).map_err(|msg| {
-            (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid gateway: {}", msg) })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid gateway: {}", msg) })),
+            )
         })?;
     }
 
@@ -548,7 +567,11 @@ pub async fn update_dhcp_server(
 
     if existing.bridge != req.bridge {
         if let Err(e) = state.dnsmasq_manager.stop(&existing.bridge).await {
-            tracing::warn!("Failed to stop DHCP server for {}: {:#}", existing.bridge, e);
+            tracing::warn!(
+                "Failed to stop DHCP server for {}: {:#}",
+                existing.bridge,
+                e
+            );
         }
     }
 
@@ -591,7 +614,12 @@ pub async fn update_dhcp_server(
     state
         .store
         .save_entity("dhcp_servers", &config.id, &config)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
 
     Ok(Json(config))
 }
@@ -948,11 +976,17 @@ mod resolv_conf_tests {
             dns_config(&["1.1.1.1", "9.9.9.9"], &["b.local"], true),
         ];
 
-        write_resolv_conf(&configs, path.to_str().unwrap()).await.unwrap();
+        write_resolv_conf(&configs, path.to_str().unwrap())
+            .await
+            .unwrap();
         let content = tokio::fs::read_to_string(&path).await.unwrap();
 
         assert_eq!(content.matches("nameserver 8.8.8.8").count(), 1);
-        assert_eq!(content.matches("nameserver 1.1.1.1").count(), 1, "duplicate nameserver should be deduped");
+        assert_eq!(
+            content.matches("nameserver 1.1.1.1").count(),
+            1,
+            "duplicate nameserver should be deduped"
+        );
         assert!(content.contains("nameserver 9.9.9.9"));
         assert!(content.contains("search a.local b.local"));
     }
@@ -963,7 +997,9 @@ mod resolv_conf_tests {
         let path = dir.path().join("resolv.conf");
         let configs = vec![dns_config(&["8.8.8.8"], &["a.local"], false)];
 
-        write_resolv_conf(&configs, path.to_str().unwrap()).await.unwrap();
+        write_resolv_conf(&configs, path.to_str().unwrap())
+            .await
+            .unwrap();
         let content = tokio::fs::read_to_string(&path).await.unwrap();
 
         assert!(!content.contains("nameserver"));
@@ -977,14 +1013,24 @@ mod resolv_conf_tests {
         // a plain file, not follow it and clobber whatever it points to.
         let dir = tempfile::tempdir().unwrap();
         let target = dir.path().join("stub-resolv.conf");
-        tokio::fs::write(&target, "should not be touched").await.unwrap();
+        tokio::fs::write(&target, "should not be touched")
+            .await
+            .unwrap();
         let link = dir.path().join("resolv.conf");
         #[cfg(unix)]
         std::os::unix::fs::symlink(&target, &link).unwrap();
 
-        write_resolv_conf(&[dns_config(&["8.8.8.8"], &[], true)], link.to_str().unwrap()).await.unwrap();
+        write_resolv_conf(
+            &[dns_config(&["8.8.8.8"], &[], true)],
+            link.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
 
-        assert!(!link.is_symlink(), "resolv.conf should now be a plain file, not the old symlink");
+        assert!(
+            !link.is_symlink(),
+            "resolv.conf should now be a plain file, not the old symlink"
+        );
         let target_content = tokio::fs::read_to_string(&target).await.unwrap();
         assert_eq!(target_content, "should not be touched");
     }

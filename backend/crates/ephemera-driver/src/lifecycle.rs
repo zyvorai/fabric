@@ -8,14 +8,21 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
-use zyvor_fabric_ephemera_client::{BackendKind, CreateVmRequest, NetworkSpec, PortForward, VmRecord, VmStatus};
+use zyvor_fabric_ephemera_client::{
+    BackendKind, CreateVmRequest, NetworkSpec, PortForward, VmRecord, VmStatus,
+};
 
 use crate::EphemeraDriver;
 
 fn generate_mac_address() -> String {
     use rand::Rng;
     let mut rng = rand::rng();
-    format!("52:54:00:{:02x}:{:02x}:{:02x}", rng.random::<u8>(), rng.random::<u8>(), rng.random::<u8>())
+    format!(
+        "52:54:00:{:02x}:{:02x}:{:02x}",
+        rng.random::<u8>(),
+        rng.random::<u8>(),
+        rng.random::<u8>()
+    )
 }
 
 #[async_trait]
@@ -39,7 +46,10 @@ impl VMDriver for EphemeraDriver {
 
     async fn start_from_snapshot(&self, name: &str, tag: &str) -> Result<()> {
         let vm = self.resolve(name).await?;
-        self.client.start_vm_from_snapshot(vm.id, tag).await.map(|_| ())
+        self.client
+            .start_vm_from_snapshot(vm.id, tag)
+            .await
+            .map(|_| ())
     }
 
     async fn poweroff(&self, name: &str) -> Result<()> {
@@ -80,7 +90,13 @@ impl VMDriver for EphemeraDriver {
     }
 
     async fn list_machines(&self) -> Result<Vec<MachineInfo>> {
-        Ok(self.client.list_vms().await?.into_iter().map(to_machine_info).collect())
+        Ok(self
+            .client
+            .list_vms()
+            .await?
+            .into_iter()
+            .map(to_machine_info)
+            .collect())
     }
 
     async fn get_properties(&self, name: &str) -> Result<HashMap<String, String>> {
@@ -90,7 +106,8 @@ impl VMDriver for EphemeraDriver {
 
     async fn get_leader_pid(&self, name: &str) -> Result<u32> {
         let vm = self.resolve(name).await?;
-        vm.pid.with_context(|| format!("VM '{name}' has no leader pid (not running)"))
+        vm.pid
+            .with_context(|| format!("VM '{name}' has no leader pid (not running)"))
     }
 
     async fn enable(&self, _name: &str) -> Result<()> {
@@ -151,8 +168,14 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
     props.insert("Name".to_string(), vm.name.clone());
     props.insert("Class".to_string(), "vm".to_string());
     props.insert("Service".to_string(), "ephemera".to_string());
-    props.insert("State".to_string(), format!("{:?}", vm.status).to_lowercase());
-    props.insert("Leader".to_string(), vm.pid.map_or_else(String::new, |p| p.to_string()));
+    props.insert(
+        "State".to_string(),
+        format!("{:?}", vm.status).to_lowercase(),
+    );
+    props.insert(
+        "Leader".to_string(),
+        vm.pid.map_or_else(String::new, |p| p.to_string()),
+    );
     props.insert("Backend".to_string(), format!("{:?}", vm.backend));
     props.insert("Id".to_string(), vm.id.to_string());
     props.insert("Disk".to_string(), vm.disk.display().to_string());
@@ -177,7 +200,9 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
 /// caller has no way to notice.
 fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmRequest> {
     if opts.directory.is_some() {
-        bail!("the ephemera backend does not support directory-based boot (VMStartOptions.directory)");
+        bail!(
+            "the ephemera backend does not support directory-based boot (VMStartOptions.directory)"
+        );
     }
     if opts.tpm == Some(true) {
         bail!("the ephemera backend does not yet support TPM (VMStartOptions.tpm)");
@@ -207,10 +232,12 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         bail!("the ephemera backend does not support SMBIOS injection (VMStartOptions.smbios11)");
     }
 
-    let vcpus: u8 = vm
-        .cpus
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("vcpu count {} exceeds the ephemera backend's limit", vm.cpus))?;
+    let vcpus: u8 = vm.cpus.try_into().map_err(|_| {
+        anyhow::anyhow!(
+            "vcpu count {} exceeds the ephemera backend's limit",
+            vm.cpus
+        )
+    })?;
 
     let network = if opts.network_tap {
         // Always pin an explicit MAC rather than letting QEMU auto-assign
@@ -224,7 +251,12 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         // externally-reachable IP with zero host bridge configuration
         // needed on this end. `bridge` is ignored by Ephemera when netns
         // is set.
-        NetworkSpec::Tap { tap_name: None, bridge: None, mac: Some(mac), netns: true }
+        NetworkSpec::Tap {
+            tap_name: None,
+            bridge: None,
+            mac: Some(mac),
+            netns: true,
+        }
     } else {
         NetworkSpec::User {
             forwards: opts
@@ -249,7 +281,11 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         kernel: opts.linux.clone().map(PathBuf::from),
         initrd: opts.initrd.first().cloned().map(PathBuf::from),
         firmware: opts.firmware.clone().map(PathBuf::from),
-        kernel_args: if opts.extra_args.is_empty() { None } else { Some(opts.extra_args.join(" ")) },
+        kernel_args: if opts.extra_args.is_empty() {
+            None
+        } else {
+            Some(opts.extra_args.join(" "))
+        },
         network,
         // Always attach a cloud-init seed, even an empty one, not just when
         // there's an ssh key/hostname to inject -- without ANY NoCloud
@@ -286,7 +322,10 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         // gated off pending a real, live-verified fix for an intermittent
         // guest-agent vsock listener bug — see Ephemera's README
         // ("Interactive console" section) and docs/guides/vm-drivers/ephemera.md.
-        agent: Some(zyvor_fabric_ephemera_client::AgentSpec { enabled: true, ..Default::default() }),
+        agent: Some(zyvor_fabric_ephemera_client::AgentSpec {
+            enabled: true,
+            ..Default::default()
+        }),
         shared_folders: opts
             .bind_mounts
             .iter()
@@ -306,11 +345,24 @@ mod tests {
 
     #[test]
     fn bind_mounts_translate_to_shared_folders() {
-        let vm = VM::new("fixture".to_string(), "/tmp/base.qcow2".to_string(), 2, 2048);
+        let vm = VM::new(
+            "fixture".to_string(),
+            "/tmp/base.qcow2".to_string(),
+            2,
+            2048,
+        );
         let opts = VMStartOptions {
             bind_mounts: vec![
-                BindMount { source: "/srv/data".to_string(), destination: Some("/mnt/data".to_string()), read_only: true },
-                BindMount { source: "/srv/scratch".to_string(), destination: None, read_only: false },
+                BindMount {
+                    source: "/srv/data".to_string(),
+                    destination: Some("/mnt/data".to_string()),
+                    read_only: true,
+                },
+                BindMount {
+                    source: "/srv/scratch".to_string(),
+                    destination: None,
+                    read_only: false,
+                },
             ],
             ..Default::default()
         };
@@ -326,7 +378,12 @@ mod tests {
 
     #[test]
     fn no_bind_mounts_means_no_shared_folders() {
-        let vm = VM::new("fixture".to_string(), "/tmp/base.qcow2".to_string(), 2, 2048);
+        let vm = VM::new(
+            "fixture".to_string(),
+            "/tmp/base.qcow2".to_string(),
+            2,
+            2048,
+        );
         let req = translate_start_options(&vm, &VMStartOptions::default()).unwrap();
         assert!(req.shared_folders.is_empty());
     }

@@ -25,7 +25,8 @@ async fn main() -> Result<()> {
     // dial down the known-noisiest transport/runtime dependencies
     // explicitly rather than trying to allowlist every first-party crate
     // by name.
-    let noisy_deps = "h2=warn,hyper=warn,hyper_util=warn,tokio_util=warn,rustls=warn,want=warn,mio=warn";
+    let noisy_deps =
+        "h2=warn,hyper=warn,hyper_util=warn,tokio_util=warn,rustls=warn,want=warn,mio=warn";
     let env_filter = if let Ok(level) = std::env::var("ZYVOR_FABRICD_LOG_LEVEL") {
         tracing_subscriber::EnvFilter::new(format!("{level},{noisy_deps}"))
     } else {

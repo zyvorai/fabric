@@ -91,7 +91,12 @@ impl NetworkdManager {
     pub fn apply_bridge(&self, cfg: &BridgeConfig) -> Result<()> {
         block_on_netlink(netlink::create_bridge(&cfg.name))?;
         let result: Result<()> = (|| {
-            self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses)?;
+            self.apply_common_link_settings(
+                &cfg.name,
+                cfg.mtu,
+                cfg.mac_address.as_deref(),
+                &cfg.addresses,
+            )?;
             let bridge_opts = netlink::BridgeOptions {
                 stp: cfg.stp,
                 forward_delay_sec: cfg.forward_delay_sec,
@@ -105,8 +110,14 @@ impl NetworkdManager {
                 let addr: IpAddr = gateway
                     .parse()
                     .with_context(|| format!("invalid gateway address '{gateway}'"))?;
-                block_on_netlink(netlink::add_default_route(&cfg.name, addr))
-                    .with_context(|| format!("failed to add default route via '{gateway}' on '{}'", cfg.name))?;
+                block_on_netlink(netlink::add_default_route(&cfg.name, addr)).with_context(
+                    || {
+                        format!(
+                            "failed to add default route via '{gateway}' on '{}'",
+                            cfg.name
+                        )
+                    },
+                )?;
             }
             if cfg.dhcp != DhcpMode::No {
                 run_dhcp_client(&cfg.name)
@@ -121,7 +132,11 @@ impl NetworkdManager {
 
     /// Create a VLAN sub-interface via netlink.
     pub fn apply_vlan(&self, cfg: &VlanConfig) -> Result<()> {
-        block_on_netlink(netlink::create_vlan(&cfg.parent_interface, cfg.vlan_id, &cfg.name))?;
+        block_on_netlink(netlink::create_vlan(
+            &cfg.parent_interface,
+            cfg.vlan_id,
+            &cfg.name,
+        ))?;
         let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, None, &cfg.addresses);
         self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!(
@@ -135,8 +150,13 @@ impl NetworkdManager {
 
     /// Create a macvtap device via netlink.
     pub fn apply_macvtap(&self, cfg: &MacvtapConfig) -> Result<()> {
-        block_on_netlink(netlink::create_macvtap(&cfg.parent_interface, &cfg.name, cfg.mode.as_str()))?;
-        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &[]);
+        block_on_netlink(netlink::create_macvtap(
+            &cfg.parent_interface,
+            &cfg.name,
+            cfg.mode.as_str(),
+        ))?;
+        let result =
+            self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &[]);
         self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!(
             "Applied macvtap config: {} (parent={}, mode={:?})",
@@ -160,7 +180,9 @@ impl NetworkdManager {
                     let master_index = netlink::link_index_by_name(&handle, bridge).await?;
                     netlink::set_master(&cfg.name, master_index).await
                 })
-                .with_context(|| format!("failed to attach tap '{}' to bridge '{bridge}'", cfg.name))?;
+                .with_context(|| {
+                    format!("failed to attach tap '{}' to bridge '{bridge}'", cfg.name)
+                })?;
             }
             Ok(())
         })();
@@ -171,8 +193,17 @@ impl NetworkdManager {
 
     /// Create a bond device and enslave its members via netlink.
     pub fn apply_bond(&self, cfg: &BondConfig) -> Result<()> {
-        block_on_netlink(netlink::create_bond(&cfg.name, cfg.mode.as_str(), &cfg.slave_interfaces))?;
-        let result = self.apply_common_link_settings(&cfg.name, cfg.mtu, cfg.mac_address.as_deref(), &cfg.addresses);
+        block_on_netlink(netlink::create_bond(
+            &cfg.name,
+            cfg.mode.as_str(),
+            &cfg.slave_interfaces,
+        ))?;
+        let result = self.apply_common_link_settings(
+            &cfg.name,
+            cfg.mtu,
+            cfg.mac_address.as_deref(),
+            &cfg.addresses,
+        );
         self.cleanup_on_failure(&cfg.name, result)?;
         tracing::info!(
             "Applied bond config: {} (mode={}, slaves={:?})",
@@ -193,7 +224,9 @@ impl NetworkdManager {
                 let master_index = netlink::link_index_by_name(&handle, bridge).await?;
                 netlink::set_master(&cfg.match_name, master_index).await
             })
-            .with_context(|| format!("failed to attach '{}' to bridge '{bridge}'", cfg.match_name))?;
+            .with_context(|| {
+                format!("failed to attach '{}' to bridge '{bridge}'", cfg.match_name)
+            })?;
         } else if let Some(bond) = &cfg.bond {
             block_on_netlink(async {
                 let handle = netlink::connect().await?;
@@ -232,16 +265,25 @@ impl NetworkdManager {
     pub fn apply_vxlan(&self, cfg: &VxlanConfig) -> Result<()> {
         let local = cfg.local.as_deref().and_then(parse_addr);
         let remote = cfg.remote.as_deref().and_then(parse_addr);
-        block_on_netlink(netlink::create_vxlan(&cfg.name, cfg.vni, local, remote, cfg.port))?;
+        block_on_netlink(netlink::create_vxlan(
+            &cfg.name, cfg.vni, local, remote, cfg.port,
+        ))?;
         let result: Result<()> = (|| {
-            self.apply_common_link_settings(&cfg.name, cfg.mtu.map(|m| m as u16), None, &cfg.addresses)?;
+            self.apply_common_link_settings(
+                &cfg.name,
+                cfg.mtu.map(|m| m as u16),
+                None,
+                &cfg.addresses,
+            )?;
             if let Some(parent) = &cfg.parent_interface {
                 block_on_netlink(async {
                     let handle = netlink::connect().await?;
                     let parent_index = netlink::link_index_by_name(&handle, parent).await?;
                     netlink::set_master(&cfg.name, parent_index).await
                 })
-                .with_context(|| format!("failed to attach VXLAN '{}' to parent '{parent}'", cfg.name))?;
+                .with_context(|| {
+                    format!("failed to attach VXLAN '{}' to parent '{parent}'", cfg.name)
+                })?;
             }
             Ok(())
         })();
@@ -407,7 +449,10 @@ impl NetworkdManager {
     /// never be deleted, only detached from whatever bridge/bond it was
     /// enslaved to.
     pub fn remove_device(&self, name: &str) -> Result<()> {
-        if let Some(iface) = name.strip_prefix("net-").or_else(|| name.strip_prefix("link-")) {
+        if let Some(iface) = name
+            .strip_prefix("net-")
+            .or_else(|| name.strip_prefix("link-"))
+        {
             block_on_netlink(netlink::unset_master(iface))
                 .with_context(|| format!("failed to detach '{iface}' from its master"))?;
             tracing::info!("Detached {} from its bridge/bond", iface);
@@ -593,7 +638,6 @@ impl NetworkdManager {
             rng.random::<u8>()
         )
     }
-
 }
 
 #[cfg(test)]
@@ -646,8 +690,18 @@ mod tests {
         // itself (net-X / link-X -> detach, everything else -> delete) is
         // pure and worth pinning down independent of that.
         assert_eq!("net-enp3s0".strip_prefix("net-"), Some("enp3s0"));
-        assert_eq!("link-lan0".strip_prefix("net-").or_else(|| "link-lan0".strip_prefix("link-")), Some("lan0"));
-        assert_eq!("br0".strip_prefix("net-").or_else(|| "br0".strip_prefix("link-")), None);
+        assert_eq!(
+            "link-lan0"
+                .strip_prefix("net-")
+                .or_else(|| "link-lan0".strip_prefix("link-")),
+            Some("lan0")
+        );
+        assert_eq!(
+            "br0"
+                .strip_prefix("net-")
+                .or_else(|| "br0".strip_prefix("link-")),
+            None
+        );
     }
 
     /// End-to-end against the real kernel: create a bridge (+ up, mtu, mac,
@@ -701,11 +755,16 @@ mod tests {
         mgr.apply_vlan(&vlan).unwrap();
 
         let seen = rt.block_on(netlink::list_interfaces()).unwrap();
-        let br = seen.iter().find(|i| i.name == "zftbr0").expect("bridge should be visible via netlink");
+        let br = seen
+            .iter()
+            .find(|i| i.name == "zftbr0")
+            .expect("bridge should be visible via netlink");
         assert_eq!(br.kind.as_deref(), Some("bridge"));
         assert_eq!(br.mtu, 1400);
         assert!(br.addresses.iter().any(|a| a.address == "10.250.251.1"));
-        assert!(seen.iter().any(|i| i.name == "zftbr0.99" && i.kind.as_deref() == Some("vlan")));
+        assert!(seen
+            .iter()
+            .any(|i| i.name == "zftbr0.99" && i.kind.as_deref() == Some("vlan")));
 
         mgr.remove_device("zftbr0.99").unwrap();
         mgr.remove_device("zftbr0").unwrap();

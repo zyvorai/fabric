@@ -55,7 +55,9 @@ pub struct EphemeraDriver {
 impl EphemeraDriver {
     /// `base_url` is Ephemera's listen address, e.g. `http://127.0.0.1:7788`.
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
-        Ok(Self { client: EphemeraClient::new(base_url)? })
+        Ok(Self {
+            client: EphemeraClient::new(base_url)?,
+        })
     }
 
     pub fn with_token(mut self, token: impl Into<String>) -> Self {

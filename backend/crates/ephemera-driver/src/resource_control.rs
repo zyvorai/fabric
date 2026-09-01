@@ -10,12 +10,21 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::StreamExt;
 use vm_model::{PressureRecord, VMMetrics, VMPressure};
-use zyvor_fabric_driver_core::{LogDriver, LogEntry, LogStream, ResourceControlDriver, ResourceStatsDriver};
+use zyvor_fabric_driver_core::{
+    LogDriver, LogEntry, LogStream, ResourceControlDriver, ResourceStatsDriver,
+};
 
 use crate::EphemeraDriver;
 
-fn convert_pressure(p: Option<zyvor_fabric_ephemera_client::PressureRecord>) -> Option<PressureRecord> {
-    p.map(|p| PressureRecord { avg10: p.avg10, avg60: p.avg60, avg300: p.avg300, total: p.total })
+fn convert_pressure(
+    p: Option<zyvor_fabric_ephemera_client::PressureRecord>,
+) -> Option<PressureRecord> {
+    p.map(|p| PressureRecord {
+        avg10: p.avg10,
+        avg60: p.avg60,
+        avg300: p.avg300,
+        total: p.total,
+    })
 }
 
 #[async_trait]
@@ -74,8 +83,10 @@ impl ResourceControlDriver for EphemeraDriver {
 
     async fn set_io_weight(&self, name: &str, weight: u32) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch =
-            zyvor_fabric_ephemera_client::ResourcePatch { io_weight: Some(weight), ..Default::default() };
+        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+            io_weight: Some(weight),
+            ..Default::default()
+        };
         self.client.set_resources(record.id, &patch).await
     }
 
@@ -96,8 +107,10 @@ impl ResourceControlDriver for EphemeraDriver {
 
     async fn set_pids_max(&self, name: &str, max: u64) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch =
-            zyvor_fabric_ephemera_client::ResourcePatch { pids_max: Some(max), ..Default::default() };
+        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+            pids_max: Some(max),
+            ..Default::default()
+        };
         self.client.set_resources(record.id, &patch).await
     }
 
@@ -132,7 +145,12 @@ impl LogDriver for EphemeraDriver {
             let unit = unit.clone();
             async move {
                 match line {
-                    Ok(message) => Some(LogEntry { timestamp: chrono::Utc::now(), message, priority: 6, unit }),
+                    Ok(message) => Some(LogEntry {
+                        timestamp: chrono::Utc::now(),
+                        message,
+                        priority: 6,
+                        unit,
+                    }),
                     Err(e) => {
                         tracing::warn!("Ephemera log stream for '{unit}' ended with error: {e:#}");
                         None

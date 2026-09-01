@@ -328,12 +328,20 @@ impl FaultToleranceManager {
         })?;
 
         let (old_primary, new_primary) = {
-            let configs = self.configs.read().map_err(|e| anyhow!("lock poisoned: {e}"))?;
-            let config = configs.get(vm_name).ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
+            let configs = self
+                .configs
+                .read()
+                .map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            let config = configs
+                .get(vm_name)
+                .ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
             if config.status != FtStatus::Enabled {
                 return Err(FtError::NotEnabled(vm_name.to_string()).into());
             }
-            (config.primary_host_id.clone(), config.secondary_host_id.clone())
+            (
+                config.primary_host_id.clone(),
+                config.secondary_host_id.clone(),
+            )
         };
 
         let start_time = std::time::Instant::now();
@@ -367,8 +375,13 @@ impl FaultToleranceManager {
             "FT failover: promoting secondary host as primary"
         );
         {
-            let mut configs = self.configs.write().map_err(|e| anyhow!("lock poisoned: {e}"))?;
-            let config = configs.get_mut(vm_name).ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
+            let mut configs = self
+                .configs
+                .write()
+                .map_err(|e| anyhow!("lock poisoned: {e}"))?;
+            let config = configs
+                .get_mut(vm_name)
+                .ok_or_else(|| FtError::VmNotFound(vm_name.to_string()))?;
             config.primary_host_id = new_primary.clone();
             config.secondary_host_id = String::new();
             config.status = FtStatus::NeedSecondary;
@@ -811,7 +824,10 @@ mod tests {
         async fn list_machines(&self) -> Result<Vec<zyvor_fabric_driver_core::MachineInfo>> {
             Ok(vec![])
         }
-        async fn get_properties(&self, _name: &str) -> Result<std::collections::HashMap<String, String>> {
+        async fn get_properties(
+            &self,
+            _name: &str,
+        ) -> Result<std::collections::HashMap<String, String>> {
             Ok(Default::default())
         }
         async fn get_leader_pid(&self, _name: &str) -> Result<u32> {
@@ -880,7 +896,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl zyvor_fabric_driver_core::LogDriver for MockDriver {
-        async fn stream_logs(&self, _name: &str, _lines: u32) -> Result<zyvor_fabric_driver_core::LogStream> {
+        async fn stream_logs(
+            &self,
+            _name: &str,
+            _lines: u32,
+        ) -> Result<zyvor_fabric_driver_core::LogStream> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
     }
@@ -935,24 +955,47 @@ mod tests {
         ) -> Result<zyvor_fabric_driver_core::ShellOutput> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
-        async fn copy_to(&self, _name: &str, _host_path: &str, _machine_path: &str, _mode: Option<u32>) -> Result<()> {
+        async fn copy_to(
+            &self,
+            _name: &str,
+            _host_path: &str,
+            _machine_path: &str,
+            _mode: Option<u32>,
+        ) -> Result<()> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
-        async fn copy_from(&self, _name: &str, _machine_path: &str, _host_path: &str) -> Result<()> {
+        async fn copy_from(
+            &self,
+            _name: &str,
+            _machine_path: &str,
+            _host_path: &str,
+        ) -> Result<()> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
     }
 
     #[async_trait::async_trait]
     impl zyvor_fabric_driver_core::ConsoleDriver for MockDriver {
-        async fn open_console(&self, _name: &str, _cols: u16, _rows: u16) -> Result<zyvor_fabric_driver_core::ConsoleSession> {
+        async fn open_console(
+            &self,
+            _name: &str,
+            _cols: u16,
+            _rows: u16,
+        ) -> Result<zyvor_fabric_driver_core::ConsoleSession> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
     }
 
     #[async_trait::async_trait]
     impl zyvor_fabric_driver_core::PoolDriver for MockDriver {
-        async fn create_pool(&self, _name: &str, _size: usize, _image: &str, _cpus: u32, _memory: u64) -> Result<zyvor_fabric_driver_core::PoolInfo> {
+        async fn create_pool(
+            &self,
+            _name: &str,
+            _size: usize,
+            _image: &str,
+            _cpus: u32,
+            _memory: u64,
+        ) -> Result<zyvor_fabric_driver_core::PoolInfo> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
         async fn list_pools(&self) -> Result<Vec<zyvor_fabric_driver_core::PoolInfo>> {
@@ -964,7 +1007,12 @@ mod tests {
         async fn delete_pool(&self, _name: &str) -> Result<()> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
-        async fn claim_pool(&self, _pool_name: &str, _new_name: &str, _ttl_seconds: Option<u64>) -> Result<vm_model::VM> {
+        async fn claim_pool(
+            &self,
+            _pool_name: &str,
+            _new_name: &str,
+            _ttl_seconds: Option<u64>,
+        ) -> Result<vm_model::VM> {
             unimplemented!("not exercised by fault-tolerance tests")
         }
     }

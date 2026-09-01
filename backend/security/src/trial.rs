@@ -40,7 +40,10 @@ pub fn init(path: &Path) {
                 let _ = std::fs::create_dir_all(parent);
             }
             if let Err(e) = std::fs::write(path, now.to_rfc3339()) {
-                tracing::warn!("Failed to persist trial start marker at {}: {e:#}", path.display());
+                tracing::warn!(
+                    "Failed to persist trial start marker at {}: {e:#}",
+                    path.display()
+                );
             }
             now
         });
@@ -83,7 +86,10 @@ mod tests {
 
     #[test]
     fn ten_days_in_has_twenty_remaining() {
-        assert_eq!(days_remaining_from(Utc::now() - chrono::Duration::days(10)), TRIAL_DAYS - 10);
+        assert_eq!(
+            days_remaining_from(Utc::now() - chrono::Duration::days(10)),
+            TRIAL_DAYS - 10
+        );
     }
 
     #[test]
@@ -93,7 +99,10 @@ mod tests {
     }
 
     fn scratch_path(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("zyvor-fabricd-trial-test-{name}-{}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "zyvor-fabricd-trial-test-{name}-{}",
+            std::process::id()
+        ))
     }
 
     #[test]

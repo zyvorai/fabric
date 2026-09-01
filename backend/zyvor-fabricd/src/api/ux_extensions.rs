@@ -743,13 +743,7 @@ async fn run_convert_job(state: Arc<AppState>, job_id: String, req: ConvertReque
     // "auto" is not a real format driver name -- passing "-f auto"
     // fails with "Unknown driver 'auto'".
     let output = tokio::process::Command::new("qemu-img")
-        .args([
-            "convert",
-            "-O",
-            fmt,
-            &req.source_path,
-            &req.output_path,
-        ])
+        .args(["convert", "-O", fmt, &req.source_path, &req.output_path])
         .output()
         .await;
     match output {
@@ -818,7 +812,12 @@ pub async fn create_image_from_vm(
 
     // Configurable via storage.image_path in the daemon config (same
     // directory the catalog listing at GET /images scans), not hardcoded.
-    let dest_dir = state.config.storage.image_path.trim_end_matches('/').to_string();
+    let dest_dir = state
+        .config
+        .storage
+        .image_path
+        .trim_end_matches('/')
+        .to_string();
     tokio::fs::create_dir_all(&dest_dir)
         .await
         .map_err(|e| internal_err(format!("Failed to create directory: {}", e)))?;
@@ -897,24 +896,39 @@ const GUESTKIT_AGENT_BINARY: &str = "/var/lib/zyvor-fabricd/vendor/zyvor-guest-a
 /// access at boot (unlike a cloud-init curl install). No-ops quietly if
 /// the vendor binaries aren't present on this host.
 async fn inject_guest_agent(image_path: &str) {
-    if !tokio::fs::try_exists(GUESTKIT_AGENT_CLI).await.unwrap_or(false)
-        || !tokio::fs::try_exists(GUESTKIT_AGENT_BINARY).await.unwrap_or(false)
+    if !tokio::fs::try_exists(GUESTKIT_AGENT_CLI)
+        .await
+        .unwrap_or(false)
+        || !tokio::fs::try_exists(GUESTKIT_AGENT_BINARY)
+            .await
+            .unwrap_or(false)
     {
         tracing::debug!("GuestKit agent vendor binaries not present, skipping agent injection");
         return;
     }
     let output = tokio::process::Command::new(GUESTKIT_AGENT_CLI)
-        .args(["agent-inject", image_path, "--agent-binary", GUESTKIT_AGENT_BINARY, "-q"])
+        .args([
+            "agent-inject",
+            image_path,
+            "--agent-binary",
+            GUESTKIT_AGENT_BINARY,
+            "-q",
+        ])
         .output()
         .await;
     match output {
-        Ok(o) if o.status.success() => tracing::info!("Injected GuestKit agent into '{}'", image_path),
+        Ok(o) if o.status.success() => {
+            tracing::info!("Injected GuestKit agent into '{}'", image_path)
+        }
         Ok(o) => tracing::warn!(
             "guestkit agent-inject failed for '{}': {}",
             image_path,
             String::from_utf8_lossy(&o.stderr)
         ),
-        Err(e) => tracing::debug!("guestkit-agent-cli not runnable, skipping agent injection: {}", e),
+        Err(e) => tracing::debug!(
+            "guestkit-agent-cli not runnable, skipping agent injection: {}",
+            e
+        ),
     }
 }
 
@@ -922,7 +936,9 @@ async fn inject_guest_agent(image_path: &str) {
 /// image and stores the boot-readiness score on its job entity.
 async fn score_golden_image(state: &Arc<AppState>, job_id: &str, image_path: &str) {
     let output = tokio::process::Command::new("guestkit")
-        .args(["doctor", image_path, "--target", "kvm", "-o", "json", "-R", "-q"])
+        .args([
+            "doctor", image_path, "--target", "kvm", "-o", "json", "-R", "-q",
+        ])
         .output()
         .await;
 
@@ -939,7 +955,10 @@ async fn score_golden_image(state: &Arc<AppState>, job_id: &str, image_path: &st
             None
         }
         Err(e) => {
-            tracing::debug!("guestkit not available, skipping boot-readiness score: {}", e);
+            tracing::debug!(
+                "guestkit not available, skipping boot-readiness score: {}",
+                e
+            );
             None
         }
     };

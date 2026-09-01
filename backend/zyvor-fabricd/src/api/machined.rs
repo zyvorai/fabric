@@ -281,18 +281,26 @@ pub async fn ssh_info(
         )
     })?;
     let address = match &mac {
-        Some(mac) => state.dnsmasq_manager.lookup_lease_by_mac(mac).await.map_err(|e| {
-            tracing::error!("dnsmasq lease lookup failed: {}", e);
-            crate::api_error::json_error_code(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "driver_connection",
-                "Machine service operation failed",
-            )
-        })?,
+        Some(mac) => state
+            .dnsmasq_manager
+            .lookup_lease_by_mac(mac)
+            .await
+            .map_err(|e| {
+                tracing::error!("dnsmasq lease lookup failed: {}", e);
+                crate::api_error::json_error_code(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "driver_connection",
+                    "Machine service operation failed",
+                )
+            })?,
         None => None,
     };
     let ssh_command = address.as_ref().map(|addr| format!("ssh {addr}"));
-    Ok(Json(SshInfo { address, key_path: None, ssh_command }))
+    Ok(Json(SshInfo {
+        address,
+        key_path: None,
+        ssh_command,
+    }))
 }
 
 // ============================================================================

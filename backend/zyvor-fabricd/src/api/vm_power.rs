@@ -93,7 +93,10 @@ pub async fn hibernate_vm(
         // not a real second shutdown -- `poweroff`'s underlying
         // `process_alive` check skips straight past its kill logic.
         if let Err(e) = state.driver.poweroff(&vm_name).await {
-            tracing::warn!("Failed to sync Ephemera's own stopped-state after hibernate: {}", e);
+            tracing::warn!(
+                "Failed to sync Ephemera's own stopped-state after hibernate: {}",
+                e
+            );
         }
 
         // Update VM state
@@ -175,7 +178,11 @@ pub async fn resume_hibernate(
     // external `qemu-img snapshot -a` to revert disk content only, then
     // an ordinary `start()` -- a cold boot that silently discarded
     // everything hibernate had just captured beyond the disk itself.
-    if let Err(e) = state.driver.start_from_snapshot(&vm_name, &info.snapshot_name).await {
+    if let Err(e) = state
+        .driver
+        .start_from_snapshot(&vm_name, &info.snapshot_name)
+        .await
+    {
         return Err(crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to resume VM from hibernation snapshot: {}", e),

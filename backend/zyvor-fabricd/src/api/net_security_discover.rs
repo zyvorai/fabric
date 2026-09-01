@@ -137,7 +137,10 @@ fn host_dns_policy_uuid(key: &str) -> Uuid {
 }
 
 fn host_dns_upstream_zone_id() -> Uuid {
-    Uuid::new_v5(&Uuid::NAMESPACE_DNS, b"zyvor-fabricd:host:dns:upstream-zone")
+    Uuid::new_v5(
+        &Uuid::NAMESPACE_DNS,
+        b"zyvor-fabricd:host:dns:upstream-zone",
+    )
 }
 
 fn host_mirror_uuid(key: &str) -> Uuid {

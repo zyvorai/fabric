@@ -29,7 +29,14 @@ fn to_pool_info(pool: PoolRecord) -> PoolInfo {
 
 #[async_trait]
 impl PoolDriver for EphemeraDriver {
-    async fn create_pool(&self, name: &str, size: usize, image: &str, cpus: u32, memory: u64) -> Result<PoolInfo> {
+    async fn create_pool(
+        &self,
+        name: &str,
+        size: usize,
+        image: &str,
+        cpus: u32,
+        memory: u64,
+    ) -> Result<PoolInfo> {
         let template = CreateVmRequest {
             name: name.to_string(),
             backend: BackendKind::Qemu,
@@ -53,7 +60,13 @@ impl PoolDriver for EphemeraDriver {
     }
 
     async fn list_pools(&self) -> Result<Vec<PoolInfo>> {
-        Ok(self.client.list_pools().await?.into_iter().map(to_pool_info).collect())
+        Ok(self
+            .client
+            .list_pools()
+            .await?
+            .into_iter()
+            .map(to_pool_info)
+            .collect())
     }
 
     async fn get_pool(&self, name: &str) -> Result<PoolInfo> {
@@ -64,8 +77,16 @@ impl PoolDriver for EphemeraDriver {
         self.client.delete_pool(name).await
     }
 
-    async fn claim_pool(&self, pool_name: &str, new_name: &str, ttl_seconds: Option<u64>) -> Result<VM> {
-        let overrides = ClaimOverrides { name: Some(new_name.to_string()), ttl_seconds };
+    async fn claim_pool(
+        &self,
+        pool_name: &str,
+        new_name: &str,
+        ttl_seconds: Option<u64>,
+    ) -> Result<VM> {
+        let overrides = ClaimOverrides {
+            name: Some(new_name.to_string()),
+            ttl_seconds,
+        };
         let record = self.client.claim_pool(pool_name, overrides).await?;
         let mut vm = VM::new(
             record.name,

@@ -157,7 +157,11 @@ impl CloudInitGenerator {
 /// installing it means curling the binary from somewhere. Pass `None` to
 /// skip agent installation entirely rather than reference a package that
 /// doesn't exist.
-pub fn create_default_user_data(username: &str, ssh_key: Option<&str>, agent_url: Option<&str>) -> String {
+pub fn create_default_user_data(
+    username: &str,
+    ssh_key: Option<&str>,
+    agent_url: Option<&str>,
+) -> String {
     let user_data = UserData {
         users: Some(vec![User {
             name: username.to_string(),

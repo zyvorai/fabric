@@ -36,8 +36,12 @@ async fn stopped_disk_path(
     let vm = state
         .store
         .get_vm(name)
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .ok_or_else(|| crate::api_error::json_error(StatusCode::NOT_FOUND, format!("VM '{}' not found", name)))?;
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?
+        .ok_or_else(|| {
+            crate::api_error::json_error(StatusCode::NOT_FOUND, format!("VM '{}' not found", name))
+        })?;
     if vm.state != vm_model::VMState::Stopped {
         return Err(crate::api_error::json_error(
             StatusCode::CONFLICT,
@@ -72,11 +76,23 @@ async fn run_guestkit(args: &[&str]) -> Result<String, String> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "kebab-case")]
 pub enum RescueRequest {
-    InjectSshKey { user: String, key: String },
+    InjectSshKey {
+        user: String,
+        key: String,
+    },
     EnableSsh,
-    SetHostname { hostname: String },
-    ResetPassword { user: String, password: String },
-    InstallPackages { packages: Vec<String>, #[serde(default)] network: bool },
+    SetHostname {
+        hostname: String,
+    },
+    ResetPassword {
+        user: String,
+        password: String,
+    },
+    InstallPackages {
+        packages: Vec<String>,
+        #[serde(default)]
+        network: bool,
+    },
 }
 
 /// POST /api/vms/:name/rescue -- one-shot offline guest configuration via
@@ -91,20 +107,59 @@ pub async fn rescue(
 
     let result = match &req {
         RescueRequest::InjectSshKey { user, key } => {
-            run_guestkit(&["rescue", &disk, "-o", "inject-ssh-key", "--user", user, "--key", key, "-q"]).await
+            run_guestkit(&[
+                "rescue",
+                &disk,
+                "-o",
+                "inject-ssh-key",
+                "--user",
+                user,
+                "--key",
+                key,
+                "-q",
+            ])
+            .await
         }
         RescueRequest::EnableSsh => {
             run_guestkit(&["rescue", &disk, "-o", "enable-ssh", "-q"]).await
         }
         RescueRequest::SetHostname { hostname } => {
-            run_guestkit(&["rescue", &disk, "-o", "set-hostname", "--hostname", hostname, "-q"]).await
+            run_guestkit(&[
+                "rescue",
+                &disk,
+                "-o",
+                "set-hostname",
+                "--hostname",
+                hostname,
+                "-q",
+            ])
+            .await
         }
         RescueRequest::ResetPassword { user, password } => {
-            run_guestkit(&["rescue", &disk, "-o", "reset-password", "--user", user, "--password", password, "-q"]).await
+            run_guestkit(&[
+                "rescue",
+                &disk,
+                "-o",
+                "reset-password",
+                "--user",
+                user,
+                "--password",
+                password,
+                "-q",
+            ])
+            .await
         }
         RescueRequest::InstallPackages { packages, network } => {
             let pkg_list = packages.join(",");
-            let mut args = vec!["rescue", disk.as_str(), "-o", "install-packages", "--packages", pkg_list.as_str(), "-q"];
+            let mut args = vec![
+                "rescue",
+                disk.as_str(),
+                "-o",
+                "install-packages",
+                "--packages",
+                pkg_list.as_str(),
+                "-q",
+            ];
             if *network {
                 args.push("--network");
             }
@@ -119,7 +174,10 @@ pub async fn rescue(
         }
         Err(e) => {
             tracing::warn!("guestkit rescue failed for VM '{}': {}", name, e);
-            Err(crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e))
+            Err(crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                e,
+            ))
         }
     }
 }
@@ -136,7 +194,9 @@ pub async fn inspect(
         .args(["inspect", &disk, "-o", "json", "-R", "-q"])
         .output()
         .await
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
     if !output.status.success() {
         return Err(crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -145,5 +205,10 @@ pub async fn inspect(
     }
     serde_json::from_slice::<serde_json::Value>(&output.stdout)
         .map(Json)
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to parse guestkit output: {}", e)))
+        .map_err(|e| {
+            crate::api_error::json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to parse guestkit output: {}", e),
+            )
+        })
 }

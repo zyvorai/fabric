@@ -40,7 +40,11 @@ pub struct TlsConfig {
 
 impl Default for TlsConfig {
     fn default() -> Self {
-        Self { enabled: default_tls_enabled(), cert_path: default_tls_cert_path(), key_path: default_tls_key_path() }
+        Self {
+            enabled: default_tls_enabled(),
+            cert_path: default_tls_cert_path(),
+            key_path: default_tls_key_path(),
+        }
     }
 }
 
@@ -72,7 +76,10 @@ pub struct DriverConfig {
 
 impl Default for DriverConfig {
     fn default() -> Self {
-        Self { ephemera_url: default_ephemera_url(), ephemera_token: None }
+        Self {
+            ephemera_url: default_ephemera_url(),
+            ephemera_token: None,
+        }
     }
 }
 

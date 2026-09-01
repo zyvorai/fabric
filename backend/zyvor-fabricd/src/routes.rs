@@ -147,7 +147,9 @@ pub async fn add_tag(
     let mut vm = match state.store.get_vm(&name) {
         Ok(Some(vm)) => vm,
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     };
     let tags = vm.tags.get_or_insert_with(Vec::new);
     if !tags.contains(&req.tag) {
@@ -171,7 +173,9 @@ pub async fn remove_tag(
     let mut vm = match state.store.get_vm(&name) {
         Ok(Some(vm)) => vm,
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     };
     if let Some(tags) = vm.tags.as_mut() {
         tags.retain(|t| t != &tag);
@@ -198,7 +202,9 @@ pub async fn update_tags(
     let mut vm = match state.store.get_vm(&name) {
         Ok(Some(vm)) => vm,
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     };
     vm.tags = Some(req.tags);
     if let Err(e) = state.store.save_vm(&vm) {
@@ -242,11 +248,19 @@ pub async fn create_vm(
     // Allocate security identity if VM has labels
     if let Some(ref labels) = vm.labels {
         if !labels.is_empty() {
-            match state.policy_engine.allocator.allocate_or_get(labels, &vm.name) {
+            match state
+                .policy_engine
+                .allocator
+                .allocate_or_get(labels, &vm.name)
+            {
                 Ok(id) => {
                     if let Some(ref ip) = vm.ip {
                         if let Err(e) = state.policy_engine.allocator.update_ip_mapping(ip, id) {
-                            tracing::warn!("Failed to update IP mapping for VM '{}': {}", vm.name, e);
+                            tracing::warn!(
+                                "Failed to update IP mapping for VM '{}': {}",
+                                vm.name,
+                                e
+                            );
                         }
                     }
                     tracing::debug!("Allocated identity {} for VM '{}'", id, vm.name);
@@ -258,8 +272,19 @@ pub async fn create_vm(
         }
     }
 
-    audit(&state, &claims.sub, "CREATE", &format!("vm/{}", vm.name), "SUCCESS");
-    crate::api::events::record_event(&state, crate::api::events::VMEventType::Created, &vm.name, None);
+    audit(
+        &state,
+        &claims.sub,
+        "CREATE",
+        &format!("vm/{}", vm.name),
+        "SUCCESS",
+    );
+    crate::api::events::record_event(
+        &state,
+        crate::api::events::VMEventType::Created,
+        &vm.name,
+        None,
+    );
     (StatusCode::CREATED, Json(vm)).into_response()
 }
 
@@ -305,7 +330,13 @@ pub async fn delete_vm(
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
         if !msg.contains("known to Ephemera") {
-            audit(&state, &claims.sub, "DELETE", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "DELETE",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to destroy VM '{}': {}", name, msg),
@@ -379,8 +410,11 @@ pub async fn add_port_forward(
         return json_error(status, msg).into_response();
     }
     if req.host_port == 0 || req.guest_port == 0 {
-        return json_error(StatusCode::BAD_REQUEST, "host_port and guest_port must be nonzero")
-            .into_response();
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "host_port and guest_port must be nonzero",
+        )
+        .into_response();
     }
 
     let _lock = state.vm_lock(&name).lock_owned().await;
@@ -402,10 +436,17 @@ pub async fn add_port_forward(
         .into_response();
     }
 
-    if vm.port_forwards.iter().any(|f| f.host_port == req.host_port) {
+    if vm
+        .port_forwards
+        .iter()
+        .any(|f| f.host_port == req.host_port)
+    {
         return json_error(
             StatusCode::CONFLICT,
-            format!("host port {} is already forwarded on this VM", req.host_port),
+            format!(
+                "host port {} is already forwarded on this VM",
+                req.host_port
+            ),
         )
         .into_response();
     }
@@ -435,10 +476,19 @@ pub async fn add_port_forward(
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
         if !msg.contains("known to Ephemera") {
-            audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "ADD_PORT_FORWARD",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to clear VM '{}' for recreation with the new port forward: {}", name, msg),
+                format!(
+                    "Failed to clear VM '{}' for recreation with the new port forward: {}",
+                    name, msg
+                ),
             )
             .into_response();
         }
@@ -456,10 +506,19 @@ pub async fn add_port_forward(
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
-            audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "ADD_PORT_FORWARD",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Added the forward but failed to restart VM '{}': {}", name, e),
+                format!(
+                    "Added the forward but failed to restart VM '{}': {}",
+                    name, e
+                ),
             )
             .into_response();
         }
@@ -470,7 +529,13 @@ pub async fn add_port_forward(
         }
     }
 
-    audit(&state, &claims.sub, "ADD_PORT_FORWARD", &format!("vm/{}", name), "SUCCESS");
+    audit(
+        &state,
+        &claims.sub,
+        "ADD_PORT_FORWARD",
+        &format!("vm/{}", name),
+        "SUCCESS",
+    );
     (StatusCode::OK, Json(vm)).into_response()
 }
 
@@ -522,10 +587,19 @@ pub async fn remove_port_forward(
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
         if !msg.contains("known to Ephemera") {
-            audit(&state, &claims.sub, "REMOVE_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "REMOVE_PORT_FORWARD",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to clear VM '{}' for recreation without the removed port forward: {}", name, msg),
+                format!(
+                    "Failed to clear VM '{}' for recreation without the removed port forward: {}",
+                    name, msg
+                ),
             )
             .into_response();
         }
@@ -543,21 +617,39 @@ pub async fn remove_port_forward(
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
-            audit(&state, &claims.sub, "REMOVE_PORT_FORWARD", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "REMOVE_PORT_FORWARD",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Removed the forward but failed to restart VM '{}': {}", name, e),
+                format!(
+                    "Removed the forward but failed to restart VM '{}': {}",
+                    name, e
+                ),
             )
             .into_response();
         }
         vm.state = vm_model::VMState::Running;
         vm.last_error = None;
         if let Err(e) = state.store.save_vm(&vm) {
-            tracing::error!("Failed to save VM state after port-forward removal recreate: {}", e);
+            tracing::error!(
+                "Failed to save VM state after port-forward removal recreate: {}",
+                e
+            );
         }
     }
 
-    audit(&state, &claims.sub, "REMOVE_PORT_FORWARD", &format!("vm/{}", name), "SUCCESS");
+    audit(
+        &state,
+        &claims.sub,
+        "REMOVE_PORT_FORWARD",
+        &format!("vm/{}", name),
+        "SUCCESS",
+    );
     (StatusCode::OK, Json(vm)).into_response()
 }
 
@@ -805,7 +897,13 @@ pub async fn restart_vm(
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
         if !msg.contains("known to Ephemera") {
-            audit(&state, &claims.sub, "RESTART", &format!("vm/{}", name), "FAILED");
+            audit(
+                &state,
+                &claims.sub,
+                "RESTART",
+                &format!("vm/{}", name),
+                "FAILED",
+            );
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to clear VM '{}' for restart: {}", name, msg),
@@ -1177,7 +1275,11 @@ fn extract_packages_from_user_data(user_data: &str) -> Vec<String> {
     };
     doc.get("packages")
         .and_then(|v| v.as_sequence())
-        .map(|seq| seq.iter().filter_map(|p| p.as_str().map(String::from)).collect())
+        .map(|seq| {
+            seq.iter()
+                .filter_map(|p| p.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -1199,7 +1301,11 @@ fn extract_runcmd_from_user_data(user_data: &str) -> Vec<String> {
                 Some(s.to_string())
             } else {
                 entry.as_sequence().map(|parts| {
-                    parts.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join(" ")
+                    parts
+                        .iter()
+                        .filter_map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
                 })
             }
         })
@@ -1220,8 +1326,15 @@ fn extract_write_files_from_user_data(user_data: &str) -> Vec<vm_model::CloudIni
         .filter_map(|entry| {
             let path = entry.get("path")?.as_str()?.to_string();
             let content = entry.get("content")?.as_str()?.to_string();
-            let permissions = entry.get("permissions").and_then(|v| v.as_str()).map(String::from);
-            Some(vm_model::CloudInitFile { path, content, permissions })
+            let permissions = entry
+                .get("permissions")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            Some(vm_model::CloudInitFile {
+                path,
+                content,
+                permissions,
+            })
         })
         .collect()
 }
@@ -1258,7 +1371,11 @@ pub async fn configure_cloud_init(
             vm.cloud_init_write_files = extract_write_files_from_user_data(user_data);
         }
         if let Err(e) = state.store.save_vm(&vm) {
-            tracing::warn!("Failed to persist cloud-init settings for VM '{}': {}", vm_name, e);
+            tracing::warn!(
+                "Failed to persist cloud-init settings for VM '{}': {}",
+                vm_name,
+                e
+            );
         }
     }
 

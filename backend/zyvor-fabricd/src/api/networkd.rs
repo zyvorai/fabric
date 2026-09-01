@@ -2188,19 +2188,19 @@ pub async fn configure_dhcp_server(
     // gateway address assuming a /24 — this endpoint doesn't collect one
     // explicitly, so use the pool's own network base .1, the same
     // convention the old systemd-networkd config generator assumed.
-    let gateway = std::net::Ipv4Addr::new(
-        start.octets()[0],
-        start.octets()[1],
-        start.octets()[2],
-        1,
-    );
+    let gateway =
+        std::net::Ipv4Addr::new(start.octets()[0], start.octets()[1], start.octets()[2], 1);
 
     let lease_time = req.lease_time_sec.unwrap_or(3600);
     // See network_cloud::create_dhcp_server's matching comment: with no
     // explicit dns_servers, default to this bridge's own gateway, which
     // now also answers DNS for zone records (zone_hosts_dir below).
     let dns_servers = req.dns_servers.clone().unwrap_or_default();
-    let dns_servers = if dns_servers.is_empty() { vec![gateway.to_string()] } else { dns_servers };
+    let dns_servers = if dns_servers.is_empty() {
+        vec![gateway.to_string()]
+    } else {
+        dns_servers
+    };
     let dhcp_cfg = zyvor_fabric_dnsmasq_manager::DhcpConfig {
         bridge: req.bridge_name.clone(),
         gateway,

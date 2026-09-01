@@ -22,18 +22,43 @@ const MAX_FILE_TRANSFER_BYTES: u64 = 64 * 1024 * 1024;
 
 #[async_trait]
 impl ShellDriver for EphemeraDriver {
-    async fn shell(&self, name: &str, command: &str, timeout_seconds: Option<u64>) -> Result<ShellOutput> {
+    async fn shell(
+        &self,
+        name: &str,
+        command: &str,
+        timeout_seconds: Option<u64>,
+    ) -> Result<ShellOutput> {
         let vm = self.resolve(name).await?;
-        match self.client.agent_exec(vm.id, command, timeout_seconds).await? {
-            AgentResponse::Exec { exit_code, stdout, stderr } => Ok(ShellOutput { stdout, stderr, exit_code }),
+        match self
+            .client
+            .agent_exec(vm.id, command, timeout_seconds)
+            .await?
+        {
+            AgentResponse::Exec {
+                exit_code,
+                stdout,
+                stderr,
+            } => Ok(ShellOutput {
+                stdout,
+                stderr,
+                exit_code,
+            }),
             AgentResponse::Error { message } => bail!("guest agent error: {message}"),
             other => bail!("unexpected guest agent response to Exec: {other:?}"),
         }
     }
 
-    async fn copy_to(&self, name: &str, host_path: &str, machine_path: &str, mode: Option<u32>) -> Result<()> {
+    async fn copy_to(
+        &self,
+        name: &str,
+        host_path: &str,
+        machine_path: &str,
+        mode: Option<u32>,
+    ) -> Result<()> {
         let vm = self.resolve(name).await?;
-        let metadata = tokio::fs::metadata(host_path).await.with_context(|| format!("reading {host_path}"))?;
+        let metadata = tokio::fs::metadata(host_path)
+            .await
+            .with_context(|| format!("reading {host_path}"))?;
         if metadata.len() > MAX_FILE_TRANSFER_BYTES {
             bail!("{host_path} is {} bytes, exceeds the {MAX_FILE_TRANSFER_BYTES}-byte transfer limit", metadata.len());
         }
@@ -48,8 +73,14 @@ impl ShellDriver for EphemeraDriver {
                 None
             }
         });
-        let bytes = tokio::fs::read(host_path).await.with_context(|| format!("reading {host_path}"))?;
-        match self.client.agent_put_file(vm.id, machine_path, &B64.encode(&bytes), mode).await? {
+        let bytes = tokio::fs::read(host_path)
+            .await
+            .with_context(|| format!("reading {host_path}"))?;
+        match self
+            .client
+            .agent_put_file(vm.id, machine_path, &B64.encode(&bytes), mode)
+            .await?
+        {
             AgentResponse::FileWritten => Ok(()),
             AgentResponse::Error { message } => bail!("guest agent error: {message}"),
             other => bail!("unexpected guest agent response to PutFile: {other:?}"),
@@ -59,12 +90,21 @@ impl ShellDriver for EphemeraDriver {
     async fn copy_from(&self, name: &str, machine_path: &str, host_path: &str) -> Result<()> {
         let vm = self.resolve(name).await?;
         match self.client.agent_get_file(vm.id, machine_path).await? {
-            AgentResponse::FileContent { content_base64, mode } => {
-                let bytes = B64.decode(&content_base64).context("guest agent returned invalid base64")?;
+            AgentResponse::FileContent {
+                content_base64,
+                mode,
+            } => {
+                let bytes = B64
+                    .decode(&content_base64)
+                    .context("guest agent returned invalid base64")?;
                 if let Some(parent) = std::path::Path::new(host_path).parent() {
-                    tokio::fs::create_dir_all(parent).await.with_context(|| format!("creating {}", parent.display()))?;
+                    tokio::fs::create_dir_all(parent)
+                        .await
+                        .with_context(|| format!("creating {}", parent.display()))?;
                 }
-                tokio::fs::write(host_path, &bytes).await.with_context(|| format!("writing {host_path}"))?;
+                tokio::fs::write(host_path, &bytes)
+                    .await
+                    .with_context(|| format!("writing {host_path}"))?;
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;

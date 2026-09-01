@@ -40,7 +40,11 @@ pub fn ensure_self_signed_cert(cert_path: &str, key_path: &str) -> Result<()> {
         "no TLS cert found, generating a self-signed one"
     );
 
-    let mut sans = vec!["localhost".to_string(), "127.0.0.1".to_string(), "::1".to_string()];
+    let mut sans = vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        "::1".to_string(),
+    ];
     if let Ok(hostname) = std::process::Command::new("hostname").output() {
         if let Ok(name) = String::from_utf8(hostname.stdout) {
             let name = name.trim();
@@ -53,16 +57,20 @@ pub fn ensure_self_signed_cert(cert_path: &str, key_path: &str) -> Result<()> {
         sans.push(ip);
     }
 
-    let cert_key = rcgen::generate_simple_self_signed(sans).context("generating self-signed certificate")?;
+    let cert_key =
+        rcgen::generate_simple_self_signed(sans).context("generating self-signed certificate")?;
 
     if let Some(parent) = cert_path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
     }
     if let Some(parent) = key_path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
     }
 
-    std::fs::write(cert_path, cert_key.cert.pem()).with_context(|| format!("writing {}", cert_path.display()))?;
+    std::fs::write(cert_path, cert_key.cert.pem())
+        .with_context(|| format!("writing {}", cert_path.display()))?;
     std::fs::write(key_path, cert_key.key_pair.serialize_pem())
         .with_context(|| format!("writing {}", key_path.display()))?;
 

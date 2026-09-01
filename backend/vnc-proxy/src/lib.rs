@@ -40,7 +40,10 @@ where
     })?;
 
     let token = query.token.as_deref().ok_or_else(|| {
-        tracing::warn!("VNC connection rejected: no auth token for VM '{}'", vm_name);
+        tracing::warn!(
+            "VNC connection rejected: no auth token for VM '{}'",
+            vm_name
+        );
         StatusCode::UNAUTHORIZED
     })?;
 

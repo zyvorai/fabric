@@ -44,14 +44,20 @@ impl WireguardEnforcer {
     /// Full sync: create/update every interface in `interfaces`, tear down
     /// any managed interface no longer in the list.
     pub fn sync_all(&self, interfaces: &[CompiledWgInterface]) -> Result<()> {
-        let active_names: Vec<&str> = interfaces.iter().map(|i| i.interface_name.as_str()).collect();
+        let active_names: Vec<&str> = interfaces
+            .iter()
+            .map(|i| i.interface_name.as_str())
+            .collect();
         self.remove_stale(&active_names)?;
 
         for iface in interfaces {
             self.apply_interface(iface)?;
         }
 
-        tracing::info!("Synced {} WireGuard interfaces via netlink", interfaces.len());
+        tracing::info!(
+            "Synced {} WireGuard interfaces via netlink",
+            interfaces.len()
+        );
         Ok(())
     }
 
@@ -62,7 +68,11 @@ impl WireguardEnforcer {
 
         let exists = block_on_netlink(async {
             let handle = networking::netlink::connect().await?;
-            Ok::<bool, anyhow::Error>(networking::netlink::link_index_by_name(&handle, name).await.is_ok())
+            Ok::<bool, anyhow::Error>(
+                networking::netlink::link_index_by_name(&handle, name)
+                    .await
+                    .is_ok(),
+            )
         })?;
         if !exists {
             block_on_netlink(networking::netlink::create_wireguard_device(name))
@@ -90,14 +100,16 @@ impl WireguardEnforcer {
     /// <path>` — `wg` intentionally refuses to take key material as a plain
     /// CLI argument (it would be visible in the process list).
     fn wg_set(&self, iface: &CompiledWgInterface) -> Result<()> {
-        let key_file = tempfile::NamedTempFile::new().context("failed to create temp file for WireGuard private key")?;
+        let key_file = tempfile::NamedTempFile::new()
+            .context("failed to create temp file for WireGuard private key")?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(key_file.path(), std::fs::Permissions::from_mode(0o600))
                 .context("failed to restrict private key temp file permissions")?;
         }
-        std::fs::write(key_file.path(), &iface.private_key_ref).context("failed to write WireGuard private key to temp file")?;
+        std::fs::write(key_file.path(), &iface.private_key_ref)
+            .context("failed to write WireGuard private key to temp file")?;
 
         let mut args = vec![
             "set".to_string(),
@@ -116,14 +128,19 @@ impl WireguardEnforcer {
             .output()
             .context("failed to execute `wg set`")?;
         if !output.status.success() {
-            anyhow::bail!("wg set {} failed: {}", iface.interface_name, String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!(
+                "wg set {} failed: {}",
+                iface.interface_name,
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
         Ok(())
     }
 
     /// Delete a managed WireGuard interface.
     pub fn remove_interface(&self, name: &str) -> Result<()> {
-        block_on_netlink(networking::netlink::delete_link(name)).with_context(|| format!("failed to delete WireGuard device '{name}'"))?;
+        block_on_netlink(networking::netlink::delete_link(name))
+            .with_context(|| format!("failed to delete WireGuard device '{name}'"))?;
         tracing::info!("Removed WireGuard interface {}", name);
         Ok(())
     }
@@ -147,7 +164,11 @@ impl WireguardEnforcer {
         let managed = block_on_netlink(async {
             let ifaces = networking::netlink::list_interfaces().await?;
             Ok::<Vec<String>, anyhow::Error>(
-                ifaces.into_iter().filter(|i| i.kind.as_deref() == Some("wireguard")).map(|i| i.name).collect(),
+                ifaces
+                    .into_iter()
+                    .filter(|i| i.kind.as_deref() == Some("wireguard"))
+                    .map(|i| i.name)
+                    .collect(),
             )
         })?;
         for name in managed {
@@ -198,7 +219,12 @@ mod tests {
         }
     }
 
-    fn make_peer(key: &str, endpoint: Option<&str>, allowed_ips: &[&str], keepalive: u16) -> CompiledWgPeer {
+    fn make_peer(
+        key: &str,
+        endpoint: Option<&str>,
+        allowed_ips: &[&str],
+        keepalive: u16,
+    ) -> CompiledWgPeer {
         CompiledWgPeer {
             public_key: key.to_string(),
             endpoint: endpoint.map(|s| s.to_string()),
@@ -214,7 +240,14 @@ mod tests {
         assert_eq!(
             args,
             vec![
-                "peer", "pubkey-1", "endpoint", "1.2.3.4:51820", "allowed-ips", "10.0.0.2/32", "persistent-keepalive", "25"
+                "peer",
+                "pubkey-1",
+                "endpoint",
+                "1.2.3.4:51820",
+                "allowed-ips",
+                "10.0.0.2/32",
+                "persistent-keepalive",
+                "25"
             ]
         );
     }
@@ -230,7 +263,10 @@ mod tests {
     fn test_peer_args_multiple_allowed_ips_joined() {
         let peer = make_peer("pubkey-1", None, &["10.0.0.0/24", "10.0.1.0/24"], 0);
         let args = peer_args(&peer);
-        assert_eq!(args, vec!["peer", "pubkey-1", "allowed-ips", "10.0.0.0/24,10.0.1.0/24"]);
+        assert_eq!(
+            args,
+            vec!["peer", "pubkey-1", "allowed-ips", "10.0.0.0/24,10.0.1.0/24"]
+        );
     }
 
     #[test]
@@ -261,13 +297,20 @@ mod tests {
         // placeholder key (fine for the non-live tests above, which never
         // call `wg`) won't pass here — generate real ones.
         let real_private_key = String::from_utf8(
-            std::process::Command::new("wg").arg("genkey").output().unwrap().stdout,
+            std::process::Command::new("wg")
+                .arg("genkey")
+                .output()
+                .unwrap()
+                .stdout,
         )
         .unwrap()
         .trim()
         .to_string();
         let real_peer_pubkey = {
-            let genkey = std::process::Command::new("wg").arg("genkey").output().unwrap();
+            let genkey = std::process::Command::new("wg")
+                .arg("genkey")
+                .output()
+                .unwrap();
             let mut pubkey_cmd = std::process::Command::new("wg")
                 .arg("pubkey")
                 .stdin(std::process::Stdio::piped())
@@ -275,7 +318,12 @@ mod tests {
                 .spawn()
                 .unwrap();
             use std::io::Write;
-            pubkey_cmd.stdin.take().unwrap().write_all(&genkey.stdout).unwrap();
+            pubkey_cmd
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(&genkey.stdout)
+                .unwrap();
             let out = pubkey_cmd.wait_with_output().unwrap();
             String::from_utf8(out.stdout).unwrap().trim().to_string()
         };
@@ -287,9 +335,15 @@ mod tests {
 
         enforcer.sync_all(&[iface]).unwrap();
 
-        let output = std::process::Command::new("wg").args(["show", "zftwg0"]).output().unwrap();
+        let output = std::process::Command::new("wg")
+            .args(["show", "zftwg0"])
+            .output()
+            .unwrap();
         let shown = String::from_utf8_lossy(&output.stdout);
-        assert!(shown.contains("listening port: 51820"), "unexpected `wg show` output: {shown}");
+        assert!(
+            shown.contains("listening port: 51820"),
+            "unexpected `wg show` output: {shown}"
+        );
         assert!(shown.contains(&real_peer_pubkey));
 
         enforcer.remove_interface("zftwg0").unwrap();

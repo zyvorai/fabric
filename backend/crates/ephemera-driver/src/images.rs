@@ -37,11 +37,17 @@ impl ImageDriver for EphemeraDriver {
     }
 
     async fn clone_image(&self, source: &str, target: &str) -> Result<()> {
-        self.client.clone_catalog_entry(source, target).await.map(|_| ())
+        self.client
+            .clone_catalog_entry(source, target)
+            .await
+            .map(|_| ())
     }
 
     async fn rename_image(&self, old_name: &str, new_name: &str) -> Result<()> {
-        self.client.rename_catalog_entry(old_name, new_name).await.map(|_| ())
+        self.client
+            .rename_catalog_entry(old_name, new_name)
+            .await
+            .map(|_| ())
     }
 
     async fn remove_image(&self, name: &str) -> Result<()> {
@@ -49,7 +55,10 @@ impl ImageDriver for EphemeraDriver {
     }
 
     async fn set_image_read_only(&self, name: &str, read_only: bool) -> Result<()> {
-        self.client.set_catalog_read_only(name, read_only).await.map(|_| ())
+        self.client
+            .set_catalog_read_only(name, read_only)
+            .await
+            .map(|_| ())
     }
 
     async fn pull_raw_image(&self, url: &str, name: &str, verify: bool) -> Result<()> {
@@ -61,7 +70,10 @@ impl ImageDriver for EphemeraDriver {
                  is configured) — there's no per-request \"verify now\" equivalent",
             ));
         }
-        self.client.add_catalog_entry(name, url, "raw").await.map(|_| ())
+        self.client
+            .add_catalog_entry(name, url, "raw")
+            .await
+            .map(|_| ())
     }
 
     async fn pull_tar_image(&self, _url: &str, _name: &str, _verify: bool) -> Result<()> {
@@ -73,7 +85,10 @@ impl ImageDriver for EphemeraDriver {
     }
 
     async fn import_raw_image(&self, path: &str, name: &str) -> Result<()> {
-        self.client.add_catalog_entry(name, path, "raw").await.map(|_| ())
+        self.client
+            .add_catalog_entry(name, path, "raw")
+            .await
+            .map(|_| ())
     }
 
     async fn import_tar_image(&self, _path: &str, _name: &str) -> Result<()> {
@@ -84,7 +99,9 @@ impl ImageDriver for EphemeraDriver {
     }
 
     async fn export_raw_image(&self, name: &str, path: &str) -> Result<()> {
-        self.client.export_catalog_entry(name, std::path::Path::new(path)).await
+        self.client
+            .export_catalog_entry(name, std::path::Path::new(path))
+            .await
     }
 
     async fn export_tar_image(&self, _name: &str, _path: &str) -> Result<()> {
@@ -100,7 +117,10 @@ impl ImageDriver for EphemeraDriver {
         // real analog: cached URL downloads no longer referenced by any
         // entry (e.g. after a rename or remove). Clean those.
         let removed = self.client.clean_catalog().await?;
-        tracing::info!("ephemera clean_images: removed {} orphaned download(s)", removed.len());
+        tracing::info!(
+            "ephemera clean_images: removed {} orphaned download(s)",
+            removed.len()
+        );
         Ok(())
     }
 }

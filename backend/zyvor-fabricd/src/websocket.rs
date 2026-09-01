@@ -36,8 +36,12 @@ pub struct ConsoleQuery {
     #[serde(default = "default_console_rows")]
     pub rows: u16,
 }
-fn default_console_cols() -> u16 { 80 }
-fn default_console_rows() -> u16 { 24 }
+fn default_console_cols() -> u16 {
+    80
+}
+fn default_console_rows() -> u16 {
+    24
+}
 
 pub async fn console_handler(
     ws: WebSocketUpgrade,
@@ -97,15 +101,21 @@ pub async fn console_handler(
     // failure as a text frame instead means the browser's `onmessage`
     // actually sees it before `onclose` fires -- same pattern already used
     // for the idle-timeout notice below.
-    Ok(ws.max_message_size(MAX_MESSAGE_SIZE).on_upgrade(move |socket| async move {
-        match state.driver.open_console(&vm_name, query.cols, query.rows).await {
-            Ok(console) => handle_console(socket, vm_name, console).await,
-            Err(e) => {
-                tracing::warn!("Failed to open console for VM '{}': {:#}", vm_name, e);
-                send_console_open_error(socket, &vm_name, &e).await;
+    Ok(ws
+        .max_message_size(MAX_MESSAGE_SIZE)
+        .on_upgrade(move |socket| async move {
+            match state
+                .driver
+                .open_console(&vm_name, query.cols, query.rows)
+                .await
+            {
+                Ok(console) => handle_console(socket, vm_name, console).await,
+                Err(e) => {
+                    tracing::warn!("Failed to open console for VM '{}': {:#}", vm_name, e);
+                    send_console_open_error(socket, &vm_name, &e).await;
+                }
             }
-        }
-    }))
+        }))
 }
 
 /// Reports a console-open failure as a readable message inside the
@@ -195,7 +205,9 @@ async fn handle_console(
                         }
                     }
                     Ok(Message::Binary(data)) => {
-                        if console_tx.write_all(&data).await.is_err() || console_tx.flush().await.is_err() {
+                        if console_tx.write_all(&data).await.is_err()
+                            || console_tx.flush().await.is_err()
+                        {
                             break;
                         }
                     }

@@ -74,7 +74,10 @@ pub async fn get_boot_config(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
     }
-    match state.store.get_entity::<BootConfig>("vm_boot_config", &vm_name) {
+    match state
+        .store
+        .get_entity::<BootConfig>("vm_boot_config", &vm_name)
+    {
         Ok(Some(cfg)) => Json(cfg).into_response(),
         Ok(None) => Json(BootConfig::default()).into_response(),
         Err(e) => crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -238,10 +241,7 @@ pub async fn update_display(
     if patch.keymap.is_some() {
         cfg.keymap = patch.keymap;
     }
-    if let Err(e) = state
-        .store
-        .save_entity("vm_display_config", &vm_name, &cfg)
-    {
+    if let Err(e) = state.store.save_entity("vm_display_config", &vm_name, &cfg) {
         return crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             .into_response();
     }

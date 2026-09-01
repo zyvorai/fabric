@@ -328,7 +328,9 @@ pub async fn start_sync(
 
         if let Some(source_path) = disk_path.as_ref().filter(|p| p.exists()) {
             let source_path = source_path.display().to_string();
-            bytes_synced = std::fs::metadata(&source_path).map(|m| m.len()).unwrap_or(0);
+            bytes_synced = std::fs::metadata(&source_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
 
             let mut rsync_args = vec!["-a".to_string(), "--partial".to_string()];
             if compression {
@@ -503,11 +505,16 @@ pub async fn get_replication_health(
                 .iter()
                 .filter(|r| r.target_site_id == s.id || r.source_site_id == s.id)
                 .collect();
-            let health = if site_replications.iter().any(|r| r.status == ReplicationStatus::Error) {
+            let health = if site_replications
+                .iter()
+                .any(|r| r.status == ReplicationStatus::Error)
+            {
                 "critical"
             } else if site_replications.iter().any(|r| {
                 r.status == ReplicationStatus::Active
-                    && r.last_sync.map_or(true, |last| (now - last).num_minutes() as u32 > r.rpo_minutes)
+                    && r.last_sync.map_or(true, |last| {
+                        (now - last).num_minutes() as u32 > r.rpo_minutes
+                    })
             }) {
                 "degraded"
             } else {

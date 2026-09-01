@@ -178,16 +178,21 @@ pub async fn ws_auth_middleware(
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::to_string);
 
-    let query_token = header_token.is_none().then(|| {
-        req.uri().query().and_then(|query| {
-            query.split('&').find_map(|pair| {
-                let (key, value) = pair.split_once('=')?;
-                (key == "token").then(|| value.to_string())
+    let query_token = header_token
+        .is_none()
+        .then(|| {
+            req.uri().query().and_then(|query| {
+                query.split('&').find_map(|pair| {
+                    let (key, value) = pair.split_once('=')?;
+                    (key == "token").then(|| value.to_string())
+                })
             })
         })
-    }).flatten();
+        .flatten();
 
-    let token = header_token.or(query_token).ok_or(StatusCode::UNAUTHORIZED)?;
+    let token = header_token
+        .or(query_token)
+        .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let claims = jwt_config
         .validate_token(&token)

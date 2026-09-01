@@ -200,7 +200,10 @@ pub async fn trigger_failover(
 
     let (success, error) = match state.driver.start(&vm_name).await {
         Ok(()) => (true, None),
-        Err(e) => (false, Some(format!("failed to start VM on new primary: {e:#}"))),
+        Err(e) => (
+            false,
+            Some(format!("failed to start VM on new primary: {e:#}")),
+        ),
     };
 
     let downtime_ms = start_time.elapsed().as_millis() as u64;

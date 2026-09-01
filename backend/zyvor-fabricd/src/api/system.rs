@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::process::Command;
 
-use zyvor_fabric_system::{CpuTopology, HugepageManager, HugepageSize, MemoryController, NumaTopology};
+use zyvor_fabric_system::{
+    CpuTopology, HugepageManager, HugepageSize, MemoryController, NumaTopology,
+};
 
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
@@ -186,9 +188,7 @@ pub async fn set_cpu_pinning(
             // Would need to read socket topology
             vec![*value] // Simplified for now
         }
-        CpuPinningDto::Explicit { value } => {
-            value.iter().map(|pin| pin.physical_cpu).collect()
-        }
+        CpuPinningDto::Explicit { value } => value.iter().map(|pin| pin.physical_cpu).collect(),
     };
 
     state
@@ -232,7 +232,12 @@ pub async fn get_cpu_affinity(
         .get_cpuset(&vm_name)
         .await
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to read CPU affinity: {e}")))
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to read CPU affinity: {e}"),
+            )
+        })
 }
 
 /// PUT /api/vms/:name/memory/limit - Set memory limit for a VM
@@ -595,7 +600,11 @@ pub async fn optimize_vm(
                     .collect::<Vec<_>>()
                     .join(",");
 
-                match state.driver.set_cpuset(&vm_name, &placement.cpu_affinity).await {
+                match state
+                    .driver
+                    .set_cpuset(&vm_name, &placement.cpu_affinity)
+                    .await
+                {
                     Ok(()) => {
                         applied.push(format!(
                             "CPU pinning to NUMA node {} (cores: {})",

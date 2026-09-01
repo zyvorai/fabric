@@ -371,13 +371,17 @@ pub async fn get_containers(
         // that just stopped mid-scan) -- fall back to zeroed stats rather
         // than dropping the whole row, matching list_machines' own
         // unwrap_or_default() above.
-        let metrics = state.driver.get_metrics(&m.name).await.unwrap_or(vm_model::VMMetrics {
-            cpu_usage: 0.0,
-            memory_usage: 0,
-            disk_usage: 0,
-            network_rx: 0,
-            network_tx: 0,
-        });
+        let metrics = state
+            .driver
+            .get_metrics(&m.name)
+            .await
+            .unwrap_or(vm_model::VMMetrics {
+                cpu_usage: 0.0,
+                memory_usage: 0,
+                disk_usage: 0,
+                network_rx: 0,
+                network_tx: 0,
+            });
         let memory_limit = state
             .store
             .get_vm(&m.name)
@@ -398,7 +402,10 @@ pub async fn get_containers(
             "net_tx": metrics.network_tx,
         }));
     }
-    let running = machines.iter().filter(|m| matches!(m.state, vm_model::VMState::Running)).count();
+    let running = machines
+        .iter()
+        .filter(|m| matches!(m.state, vm_model::VMState::Running))
+        .count();
     Json(serde_json::json!({
         "summary": {
             "total": containers.len(),

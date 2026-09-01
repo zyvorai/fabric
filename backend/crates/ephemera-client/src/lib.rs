@@ -121,7 +121,11 @@ fn default_agent_port() -> u32 {
 
 impl Default for AgentSpec {
     fn default() -> Self {
-        Self { enabled: false, port: default_agent_port(), token: None }
+        Self {
+            enabled: false,
+            port: default_agent_port(),
+            token: None,
+        }
     }
 }
 
@@ -428,11 +432,20 @@ struct GetFileRequest {
 #[serde(tag = "result", rename_all = "kebab-case")]
 pub enum AgentResponse {
     Pong,
-    Exec { exit_code: i32, stdout: String, stderr: String },
+    Exec {
+        exit_code: i32,
+        stdout: String,
+        stderr: String,
+    },
     FileWritten,
-    FileContent { content_base64: String, mode: u32 },
+    FileContent {
+        content_base64: String,
+        mode: u32,
+    },
     ShuttingDown,
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 // ============================================================================
@@ -459,7 +472,11 @@ impl EphemeraClient {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .context("failed to build Ephemera HTTP client")?;
-        Ok(Self { base_url, http, token: None })
+        Ok(Self {
+            base_url,
+            http,
+            token: None,
+        })
     }
 
     /// Attach a bearer token, required once the target instance has
@@ -470,7 +487,9 @@ impl EphemeraClient {
     }
 
     fn url(&self, path: &str) -> Result<reqwest::Url> {
-        self.base_url.join(path).with_context(|| format!("failed to build Ephemera URL for {path}"))
+        self.base_url
+            .join(path)
+            .with_context(|| format!("failed to build Ephemera URL for {path}"))
     }
 
     fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -492,12 +511,19 @@ impl EphemeraClient {
     }
 
     pub async fn create_vm(&self, req: &CreateVmRequest) -> Result<VmRecord> {
-        let resp = self.authed(self.http.post(self.url("/v1/vms")?)).json(req).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url("/v1/vms")?))
+            .json(req)
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     pub async fn list_vms(&self) -> Result<Vec<VmRecord>> {
-        let resp = self.authed(self.http.get(self.url("/v1/vms")?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url("/v1/vms")?))
+            .send()
+            .await?;
         let body: VmListResponse = Self::parse(resp).await?;
         Ok(body.items)
     }
@@ -514,7 +540,10 @@ impl EphemeraClient {
     }
 
     pub async fn get_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}"))?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url(&format!("/v1/vms/{id}"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
@@ -522,12 +551,18 @@ impl EphemeraClient {
     /// disk (image cloning/cloud-init reseed are skipped server-side).
     /// Idempotent: a VM already `Running` is returned unchanged.
     pub async fn start_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/start"))?)).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/start"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     pub async fn stop_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/stop"))?)).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/stop"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
@@ -538,7 +573,10 @@ impl EphemeraClient {
     /// launch only.
     pub async fn start_vm_from_snapshot(&self, id: Uuid, tag: &str) -> Result<VmRecord> {
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/start-from-snapshot"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/start-from-snapshot"))?),
+            )
             .json(&serde_json::json!({"tag": tag}))
             .send()
             .await?;
@@ -546,17 +584,26 @@ impl EphemeraClient {
     }
 
     pub async fn pause_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/pause"))?)).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/pause"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     pub async fn resume_vm(&self, id: Uuid) -> Result<VmRecord> {
-        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/resume"))?)).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/resume"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     pub async fn delete_vm(&self, id: Uuid) -> Result<()> {
-        let resp = self.authed(self.http.delete(self.url(&format!("/v1/vms/{id}"))?)).send().await?;
+        let resp = self
+            .authed(self.http.delete(self.url(&format!("/v1/vms/{id}"))?))
+            .send()
+            .await?;
         if resp.status().is_success() {
             Ok(())
         } else {
@@ -576,17 +623,33 @@ impl EphemeraClient {
     ) -> Result<AgentResponse> {
         let resp = self
             .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent"))?))
-            .json(&ExecRequest { command: command.into(), timeout_seconds })
+            .json(&ExecRequest {
+                command: command.into(),
+                timeout_seconds,
+            })
             .send()
             .await?;
         Self::parse(resp).await
     }
 
     /// `POST /v1/vms/{id}/agent/put-file`
-    pub async fn agent_put_file(&self, id: Uuid, path: &str, content_base64: &str, mode: Option<u32>) -> Result<AgentResponse> {
+    pub async fn agent_put_file(
+        &self,
+        id: Uuid,
+        path: &str,
+        content_base64: &str,
+        mode: Option<u32>,
+    ) -> Result<AgentResponse> {
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent/put-file"))?))
-            .json(&PutFileRequest { path: path.to_string(), content_base64: content_base64.to_string(), mode })
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/agent/put-file"))?),
+            )
+            .json(&PutFileRequest {
+                path: path.to_string(),
+                content_base64: content_base64.to_string(),
+                mode,
+            })
             .send()
             .await?;
         Self::parse(resp).await
@@ -595,8 +658,13 @@ impl EphemeraClient {
     /// `POST /v1/vms/{id}/agent/get-file`
     pub async fn agent_get_file(&self, id: Uuid, path: &str) -> Result<AgentResponse> {
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/agent/get-file"))?))
-            .json(&GetFileRequest { path: path.to_string() })
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/agent/get-file"))?),
+            )
+            .json(&GetFileRequest {
+                path: path.to_string(),
+            })
             .send()
             .await?;
         Self::parse(resp).await
@@ -609,9 +677,19 @@ impl EphemeraClient {
     /// unwrapped transparently by [`ConsoleWs`]).
     pub async fn open_console(&self, id: Uuid, cols: u16, rows: u16) -> Result<ConsoleWs> {
         let mut ws_url = self.url(&format!("/v1/vms/{id}/console"))?;
-        ws_url.set_scheme(if self.base_url.scheme() == "https" { "wss" } else { "ws" })
-            .map_err(|_| anyhow::anyhow!("failed to convert Ephemera base URL to a ws(s):// scheme"))?;
-        ws_url.query_pairs_mut().append_pair("cols", &cols.to_string()).append_pair("rows", &rows.to_string());
+        ws_url
+            .set_scheme(if self.base_url.scheme() == "https" {
+                "wss"
+            } else {
+                "ws"
+            })
+            .map_err(|_| {
+                anyhow::anyhow!("failed to convert Ephemera base URL to a ws(s):// scheme")
+            })?;
+        ws_url
+            .query_pairs_mut()
+            .append_pair("cols", &cols.to_string())
+            .append_pair("rows", &rows.to_string());
 
         let mut request = tokio_tungstenite::tungstenite::http::Request::builder()
             .uri(ws_url.as_str())
@@ -619,43 +697,59 @@ impl EphemeraClient {
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")
             .header("Sec-WebSocket-Version", "13")
-            .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key());
+            .header(
+                "Sec-WebSocket-Key",
+                tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+            );
         if let Some(token) = &self.token {
             request = request.header("Authorization", format!("Bearer {token}"));
         }
-        let request = request.body(()).context("building console WebSocket request")?;
+        let request = request
+            .body(())
+            .context("building console WebSocket request")?;
 
-        let (stream, _response) = tokio_tungstenite::connect_async(request).await.map_err(|e| {
-            // tungstenite's `Error::Http` Display only prints the status
-            // line ("HTTP error: 400 Bad Request") -- the actual reason
-            // (e.g. Ephemera's own `{"error": "connect(vsock ...): ..."}`
-            // body) is right there in the response but silently dropped
-            // unless pulled out explicitly. Without this, every console
-            // failure looked identical to the browser regardless of cause.
-            if let tokio_tungstenite::tungstenite::Error::Http(resp) = &e {
-                if let Some(body) = resp.body() {
-                    let detail = String::from_utf8_lossy(body);
-                    let detail = serde_json::from_str::<serde_json::Value>(&detail)
-                        .ok()
-                        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_owned))
-                        .unwrap_or_else(|| detail.into_owned());
-                    return anyhow::anyhow!(
-                        "connecting to console WebSocket for VM {id}: {} {}: {detail}",
-                        resp.status().as_u16(),
-                        resp.status().canonical_reason().unwrap_or(""),
-                    );
+        let (stream, _response) = tokio_tungstenite::connect_async(request)
+            .await
+            .map_err(|e| {
+                // tungstenite's `Error::Http` Display only prints the status
+                // line ("HTTP error: 400 Bad Request") -- the actual reason
+                // (e.g. Ephemera's own `{"error": "connect(vsock ...): ..."}`
+                // body) is right there in the response but silently dropped
+                // unless pulled out explicitly. Without this, every console
+                // failure looked identical to the browser regardless of cause.
+                if let tokio_tungstenite::tungstenite::Error::Http(resp) = &e {
+                    if let Some(body) = resp.body() {
+                        let detail = String::from_utf8_lossy(body);
+                        let detail = serde_json::from_str::<serde_json::Value>(&detail)
+                            .ok()
+                            .and_then(|v| {
+                                v.get("error").and_then(|e| e.as_str()).map(str::to_owned)
+                            })
+                            .unwrap_or_else(|| detail.into_owned());
+                        return anyhow::anyhow!(
+                            "connecting to console WebSocket for VM {id}: {} {}: {detail}",
+                            resp.status().as_u16(),
+                            resp.status().canonical_reason().unwrap_or(""),
+                        );
+                    }
                 }
-            }
-            anyhow::Error::new(e).context(format!("connecting to console WebSocket for VM {id}"))
-        })?;
-        Ok(ConsoleWs { stream, read_buf: Vec::new() })
+                anyhow::Error::new(e)
+                    .context(format!("connecting to console WebSocket for VM {id}"))
+            })?;
+        Ok(ConsoleWs {
+            stream,
+            read_buf: Vec::new(),
+        })
     }
 
     /// `POST /v1/vms/{id}/resources` — apply a partial cgroup resource
     /// patch to a running VM. Only fields set on `patch` are changed.
     pub async fn set_resources(&self, id: Uuid, patch: &ResourcePatch) -> Result<()> {
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/resources"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/resources"))?),
+            )
             .json(patch)
             .send()
             .await?;
@@ -664,7 +758,10 @@ impl EphemeraClient {
 
     /// `GET /v1/vms/{id}/cpuset`
     pub async fn get_cpuset(&self, id: Uuid) -> Result<Vec<u32>> {
-        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/cpuset"))?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url(&format!("/v1/vms/{id}/cpuset"))?))
+            .send()
+            .await?;
         #[derive(Deserialize)]
         struct CpusetResponse {
             cpus: Vec<u32>,
@@ -676,30 +773,48 @@ impl EphemeraClient {
     /// `POST /v1/vms/{id}/freeze` — suspend the VM's cgroup via the v2
     /// freezer (`cgroup.freeze`), independent of guest-level pause/resume.
     pub async fn freeze(&self, id: Uuid) -> Result<()> {
-        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/freeze"))?)).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/freeze"))?))
+            .send()
+            .await?;
         Self::expect_no_content(resp).await
     }
 
     pub async fn thaw(&self, id: Uuid) -> Result<()> {
-        let resp = self.authed(self.http.post(self.url(&format!("/v1/vms/{id}/thaw"))?)).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/thaw"))?))
+            .send()
+            .await?;
         Self::expect_no_content(resp).await
     }
 
     pub async fn is_frozen(&self, id: Uuid) -> Result<bool> {
-        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/frozen"))?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url(&format!("/v1/vms/{id}/frozen"))?))
+            .send()
+            .await?;
         let body: serde_json::Value = Self::parse(resp).await?;
-        Ok(body.get("frozen").and_then(|v| v.as_bool()).unwrap_or(false))
+        Ok(body
+            .get("frozen")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false))
     }
 
     /// `GET /v1/vms/{id}/stats` — point-in-time cgroup usage.
     pub async fn stats(&self, id: Uuid) -> Result<VmMetrics> {
-        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/stats"))?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url(&format!("/v1/vms/{id}/stats"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     /// `GET /v1/vms/{id}/pressure` — PSI (cpu/memory/io) for the VM's cgroup.
     pub async fn pressure(&self, id: Uuid) -> Result<VmPressure> {
-        let resp = self.authed(self.http.get(self.url(&format!("/v1/vms/{id}/pressure"))?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url(&format!("/v1/vms/{id}/pressure"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
@@ -714,10 +829,9 @@ impl EphemeraClient {
         follow: bool,
     ) -> Result<impl Stream<Item = Result<String>>> {
         let mut url = self.url(&format!("/v1/vms/{id}/logs"))?;
-        url.query_pairs_mut().append_pair("lines", &lines.to_string()).append_pair(
-            "follow",
-            &follow.to_string(),
-        );
+        url.query_pairs_mut()
+            .append_pair("lines", &lines.to_string())
+            .append_pair("follow", &follow.to_string());
 
         let mut builder = self.authed(self.http.get(url));
         if follow {
@@ -730,8 +844,9 @@ impl EphemeraClient {
             bail!("Ephemera request failed: {status} — {body}");
         }
 
-        let byte_stream =
-            resp.bytes_stream().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+        let byte_stream = resp
+            .bytes_stream()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
         let reader = tokio_util::io::StreamReader::new(byte_stream);
         let mut lines_reader = reader.lines();
 
@@ -751,26 +866,41 @@ impl EphemeraClient {
 
     /// `GET /v1/images/catalog`
     pub async fn list_catalog(&self) -> Result<Vec<CatalogEntry>> {
-        let resp = self.authed(self.http.get(self.url("/v1/images/catalog")?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url("/v1/images/catalog")?))
+            .send()
+            .await?;
         let body: CatalogListResponse = Self::parse(resp).await?;
         Ok(body.items)
     }
 
     /// `POST /v1/images/catalog`
-    pub async fn add_catalog_entry(&self, name: &str, source: &str, format: &str) -> Result<CatalogEntry> {
+    pub async fn add_catalog_entry(
+        &self,
+        name: &str,
+        source: &str,
+        format: &str,
+    ) -> Result<CatalogEntry> {
         let req = AddCatalogEntryRequest {
             name: name.to_string(),
             source: source.to_string(),
             format: format.to_string(),
         };
-        let resp = self.authed(self.http.post(self.url("/v1/images/catalog")?)).json(&req).send().await?;
+        let resp = self
+            .authed(self.http.post(self.url("/v1/images/catalog")?))
+            .json(&req)
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     /// `DELETE /v1/images/catalog/{name}`
     pub async fn remove_catalog_entry(&self, name: &str) -> Result<()> {
         let resp = self
-            .authed(self.http.delete(self.url(&format!("/v1/images/catalog/{name}"))?))
+            .authed(
+                self.http
+                    .delete(self.url(&format!("/v1/images/catalog/{name}"))?),
+            )
             .send()
             .await?;
         Self::expect_no_content(resp).await
@@ -778,9 +908,14 @@ impl EphemeraClient {
 
     /// `POST /v1/images/catalog/{name}/rename`
     pub async fn rename_catalog_entry(&self, name: &str, new_name: &str) -> Result<CatalogEntry> {
-        let req = RenameCatalogEntryRequest { new_name: new_name.to_string() };
+        let req = RenameCatalogEntryRequest {
+            new_name: new_name.to_string(),
+        };
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/rename"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/images/catalog/{name}/rename"))?),
+            )
             .json(&req)
             .send()
             .await?;
@@ -789,9 +924,14 @@ impl EphemeraClient {
 
     /// `POST /v1/images/catalog/{name}/clone`
     pub async fn clone_catalog_entry(&self, name: &str, target_name: &str) -> Result<CatalogEntry> {
-        let req = CloneCatalogEntryRequest { target_name: target_name.to_string() };
+        let req = CloneCatalogEntryRequest {
+            target_name: target_name.to_string(),
+        };
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/clone"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/images/catalog/{name}/clone"))?),
+            )
             .json(&req)
             .send()
             .await?;
@@ -800,9 +940,14 @@ impl EphemeraClient {
 
     /// `POST /v1/images/catalog/{name}/export`
     pub async fn export_catalog_entry(&self, name: &str, path: &std::path::Path) -> Result<()> {
-        let req = ExportCatalogEntryRequest { path: path.to_path_buf() };
+        let req = ExportCatalogEntryRequest {
+            path: path.to_path_buf(),
+        };
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/export"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/images/catalog/{name}/export"))?),
+            )
             .json(&req)
             .send()
             .await?;
@@ -813,7 +958,10 @@ impl EphemeraClient {
     pub async fn set_catalog_read_only(&self, name: &str, read_only: bool) -> Result<CatalogEntry> {
         let req = SetCatalogReadOnlyRequest { read_only };
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/images/catalog/{name}/read-only"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/images/catalog/{name}/read-only"))?),
+            )
             .json(&req)
             .send()
             .await?;
@@ -833,22 +981,41 @@ impl EphemeraClient {
     /// `POST /v1/pools` — pre-boots `size` VMs from `template`, then pauses
     /// each once ready. Members sit paused (booted, not cold) until
     /// claimed.
-    pub async fn create_pool(&self, name: &str, size: usize, template: CreateVmRequest) -> Result<PoolRecord> {
-        let req = PoolSpecRequest { name: name.to_string(), size, template };
-        let resp = self.authed(self.http.post(self.url("/v1/pools")?)).json(&req).send().await?;
+    pub async fn create_pool(
+        &self,
+        name: &str,
+        size: usize,
+        template: CreateVmRequest,
+    ) -> Result<PoolRecord> {
+        let req = PoolSpecRequest {
+            name: name.to_string(),
+            size,
+            template,
+        };
+        let resp = self
+            .authed(self.http.post(self.url("/v1/pools")?))
+            .json(&req)
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
     /// `GET /v1/pools`
     pub async fn list_pools(&self) -> Result<Vec<PoolRecord>> {
-        let resp = self.authed(self.http.get(self.url("/v1/pools")?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url("/v1/pools")?))
+            .send()
+            .await?;
         let body: PoolListResponse = Self::parse(resp).await?;
         Ok(body.items)
     }
 
     /// `GET /v1/pools/{name}`
     pub async fn get_pool(&self, name: &str) -> Result<PoolRecord> {
-        let resp = self.authed(self.http.get(self.url(&format!("/v1/pools/{name}"))?)).send().await?;
+        let resp = self
+            .authed(self.http.get(self.url(&format!("/v1/pools/{name}"))?))
+            .send()
+            .await?;
         Self::parse(resp).await
     }
 
@@ -867,7 +1034,10 @@ impl EphemeraClient {
     /// than falling back to a slow cold create.
     pub async fn claim_pool(&self, name: &str, overrides: ClaimOverrides) -> Result<VmRecord> {
         let resp = self
-            .authed(self.http.post(self.url(&format!("/v1/pools/{name}/claim"))?))
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/pools/{name}/claim"))?),
+            )
             .json(&overrides)
             .send()
             .await?;
@@ -886,7 +1056,10 @@ impl EphemeraClient {
 
     async fn parse<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
         let status = resp.status();
-        let bytes = resp.bytes().await.context("failed to read Ephemera response body")?;
+        let bytes = resp
+            .bytes()
+            .await
+            .context("failed to read Ephemera response body")?;
         if !status.is_success() {
             let body = String::from_utf8_lossy(&bytes);
             bail!("Ephemera request failed: {status} — {body}");
@@ -903,7 +1076,9 @@ impl EphemeraClient {
 /// `ephemera_api::relay_console`'s doc comment on the other end of this
 /// connection).
 pub struct ConsoleWs {
-    stream: tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    stream: tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
     read_buf: Vec<u8>,
 }
 
@@ -948,7 +1123,12 @@ impl tokio::io::AsyncWrite for ConsoleWs {
         if let Err(e) = std::task::ready!(self.stream.poll_ready_unpin(cx)) {
             return std::task::Poll::Ready(Err(std::io::Error::other(e)));
         }
-        if let Err(e) = self.stream.start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(buf.to_vec().into())) {
+        if let Err(e) =
+            self.stream
+                .start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(
+                    buf.to_vec().into(),
+                ))
+        {
             return std::task::Poll::Ready(Err(std::io::Error::other(e)));
         }
         // `start_send` only queues the frame in the WS sink; nothing puts
@@ -963,12 +1143,22 @@ impl tokio::io::AsyncWrite for ConsoleWs {
         let _ = self.stream.poll_flush_unpin(cx);
         std::task::Poll::Ready(Ok(buf.len()))
     }
-    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
         use futures::SinkExt;
-        self.stream.poll_flush_unpin(cx).map_err(std::io::Error::other)
+        self.stream
+            .poll_flush_unpin(cx)
+            .map_err(std::io::Error::other)
     }
-    fn poll_shutdown(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
         use futures::SinkExt;
-        self.stream.poll_close_unpin(cx).map_err(std::io::Error::other)
+        self.stream
+            .poll_close_unpin(cx)
+            .map_err(std::io::Error::other)
     }
 }

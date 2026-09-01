@@ -38,7 +38,10 @@ pub async fn list_images(
     // (VM lifecycle -- and image storage -- is handled entirely by
     // Ephemera; /var/lib/machines was systemd-machined's directory and no
     // longer exists post-migration).
-    for dir in &[state.config.storage.image_path.as_str(), "/var/lib/ephemera/images"] {
+    for dir in &[
+        state.config.storage.image_path.as_str(),
+        "/var/lib/ephemera/images",
+    ] {
         let mut entries = match tokio::fs::read_dir(dir).await {
             Ok(e) => e,
             Err(_) => continue,

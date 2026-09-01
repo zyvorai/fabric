@@ -58,7 +58,10 @@ pub async fn create_test_app() -> Router {
             ..AuthConfig::default()
         },
         driver: DriverConfig::default(),
-        tls: TlsConfig { enabled: false, ..TlsConfig::default() },
+        tls: TlsConfig {
+            enabled: false,
+            ..TlsConfig::default()
+        },
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -85,7 +88,9 @@ pub async fn create_test_app() -> Router {
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(zyvor_fabricd::plugins::PluginRegistry::new())),
         driver: Arc::new(driver),
-        dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(tmp_dir.join("dnsmasq"))),
+        dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(
+            tmp_dir.join("dnsmasq"),
+        )),
         lock_manager,
         policy_engine: Arc::new(network_policy::PolicyEngine::new()),
         service_mesh: Arc::new(service_mesh::ServiceMesh::new()),
@@ -145,7 +150,10 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
             ..AuthConfig::default()
         },
         driver: DriverConfig::default(),
-        tls: TlsConfig { enabled: false, ..TlsConfig::default() },
+        tls: TlsConfig {
+            enabled: false,
+            ..TlsConfig::default()
+        },
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -172,7 +180,9 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         jwt_config: None,
         plugin_registry: Arc::new(RwLock::new(zyvor_fabricd::plugins::PluginRegistry::new())),
         driver: Arc::new(driver),
-        dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(tmp_dir.join("dnsmasq"))),
+        dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(
+            tmp_dir.join("dnsmasq"),
+        )),
         lock_manager,
         policy_engine: Arc::new(network_policy::PolicyEngine::new()),
         service_mesh: Arc::new(service_mesh::ServiceMesh::new()),

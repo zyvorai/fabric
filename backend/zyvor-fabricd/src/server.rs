@@ -16,11 +16,7 @@ use zyvor_fabric_storage::StorageManager;
 
 use zyvor_fabric_driver_core::VmDriver;
 
-use crate::{
-    api,
-    config::Config,
-    plugins, routes, websocket,
-};
+use crate::{api, config::Config, plugins, routes, websocket};
 
 pub struct AppState {
     pub store: StateStore,
@@ -133,8 +129,9 @@ impl Server {
         // The systemd-machined/D-Bus backend this replaced is gone; Ephemera
         // is the only `VmDriver` implementation left.
         let driver: Arc<dyn VmDriver> = {
-            let mut d = zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.driver.ephemera_url)
-                .map_err(|e| anyhow::anyhow!("Failed to initialize Ephemera driver: {}", e))?;
+            let mut d =
+                zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.driver.ephemera_url)
+                    .map_err(|e| anyhow::anyhow!("Failed to initialize Ephemera driver: {}", e))?;
             if let Some(token) = &config.driver.ephemera_token {
                 d = d.with_token(token.clone());
             }
@@ -167,7 +164,9 @@ impl Server {
             nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
             net_monitor: Arc::new(net_monitor::NetMonitor::new()),
             secrets_manager: Arc::new(secrets_manager::SecretsManager::new()),
-            dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new("/run/zyvor-fabricd/dnsmasq")),
+            dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(
+                "/run/zyvor-fabricd/dnsmasq",
+            )),
             vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             event_tx: {
                 let (tx, _) = tokio::sync::broadcast::channel(256);
@@ -189,7 +188,9 @@ impl Server {
             let rustls_config =
                 axum_server::tls_rustls::RustlsConfig::from_pem_file(&tls.cert_path, &tls.key_path)
                     .await
-                    .with_context(|| format!("loading TLS cert {} / key {}", tls.cert_path, tls.key_path))?;
+                    .with_context(|| {
+                        format!("loading TLS cert {} / key {}", tls.cert_path, tls.key_path)
+                    })?;
             tracing::info!("Listening on https://{}", addr);
             Some(rustls_config)
         } else {
@@ -255,8 +256,16 @@ impl Server {
         spawn_bg!(self.state, "snapshot_retention", run_snapshot_retention);
         // Replaces zyvor-fabricd-backup.timer/-cleanup.timer (systemd-removal
         // migration plan, Phase 6) — see schedulers.rs.
-        spawn_bg!(self.state, "backup_scheduler", crate::schedulers::run_backup_scheduler);
-        spawn_bg!(self.state, "cleanup_scheduler", crate::schedulers::run_cleanup_scheduler);
+        spawn_bg!(
+            self.state,
+            "backup_scheduler",
+            crate::schedulers::run_backup_scheduler
+        );
+        spawn_bg!(
+            self.state,
+            "cleanup_scheduler",
+            crate::schedulers::run_cleanup_scheduler
+        );
 
         let handle = axum_server::Handle::new();
         let shutdown_handle = handle.clone();
@@ -789,7 +798,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/dhcp-servers/{id}",
-            put(api::network_cloud::update_dhcp_server).delete(api::network_cloud::delete_dhcp_server),
+            put(api::network_cloud::update_dhcp_server)
+                .delete(api::network_cloud::delete_dhcp_server),
         )
         // DNS routes (systemd-resolved)
         .route(
@@ -2078,20 +2088,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         // USB passthrough routes
         .route("/system/usb-devices", get(api::usb::list_usb_devices))
-        .route(
-            "/vms/{name}/devices/usb",
-            post(api::usb::attach_usb),
-        )
+        .route("/vms/{name}/devices/usb", post(api::usb::attach_usb))
         .route(
             "/vms/{name}/devices/usb/{ids}",
             delete(api::usb::detach_usb),
         )
         // PCI passthrough routes
         .route("/system/pci-devices", get(api::pci::list_pci_devices))
-        .route(
-            "/vms/{name}/devices/pci",
-            post(api::pci::attach_pci),
-        )
+        .route("/vms/{name}/devices/pci", post(api::pci::attach_pci))
         .route(
             "/vms/{name}/devices/pci/{address}",
             delete(api::pci::detach_pci),
@@ -2104,24 +2108,24 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/vms/{name}/display",
-            get(api::vm_advanced_config::get_display)
-                .post(api::vm_advanced_config::update_display),
+            get(api::vm_advanced_config::get_display).post(api::vm_advanced_config::update_display),
         )
         .route(
             "/vms/{name}/cpu-model",
             get(api::vm_advanced_config::get_cpu_config)
                 .post(api::vm_advanced_config::update_cpu_config),
         )
-        .route("/system/cpu-models", get(api::vm_advanced_config::list_cpu_models))
+        .route(
+            "/system/cpu-models",
+            get(api::vm_advanced_config::list_cpu_models),
+        )
         .route(
             "/vms/{name}/watchdog",
-            get(api::vm_advanced_config::get_watchdog)
-                .post(api::vm_advanced_config::set_watchdog),
+            get(api::vm_advanced_config::get_watchdog).post(api::vm_advanced_config::set_watchdog),
         )
         .route(
             "/vms/{name}/serials",
-            get(api::vm_advanced_config::list_serials)
-                .post(api::vm_advanced_config::add_serial),
+            get(api::vm_advanced_config::list_serials).post(api::vm_advanced_config::add_serial),
         )
         // DHCP server config
         .route("/networkd/dhcp", post(api::networkd::configure_dhcp_server))
@@ -2347,15 +2351,20 @@ async fn run_schedule_checker(state: Arc<AppState>) {
                             }
                             Err(e) => Err(anyhow::anyhow!(
                                 "No disk image found for VM '{}': {}",
-                                schedule_vm, e
+                                schedule_vm,
+                                e
                             )),
                         }
                     })
                     .await
                     .unwrap_or_else(|e| Err(anyhow::anyhow!("Task panicked: {}", e)))
                 } else {
-                    crate::api::schedules::run_vm_action(&state_clone.driver, &schedule_action, &schedule_vm)
-                        .await
+                    crate::api::schedules::run_vm_action(
+                        &state_clone.driver,
+                        &schedule_action,
+                        &schedule_vm,
+                    )
+                    .await
                 };
 
                 let executed_at = Utc::now();
@@ -3490,7 +3499,8 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_cpu(&state.driver, &vm.name, old_cpus, new_cpus).await;
+                                autoscaler_hotplug_cpu(&state.driver, &vm.name, old_cpus, new_cpus)
+                                    .await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3528,7 +3538,8 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_cpu(&state.driver, &vm.name, old_cpus, new_cpus).await;
+                                autoscaler_hotplug_cpu(&state.driver, &vm.name, old_cpus, new_cpus)
+                                    .await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3573,7 +3584,13 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_memory(&state.driver, &vm.name, old_mem, new_mem).await;
+                                autoscaler_hotplug_memory(
+                                    &state.driver,
+                                    &vm.name,
+                                    old_mem,
+                                    new_mem,
+                                )
+                                .await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3613,7 +3630,13 @@ async fn run_autoscaler(state: Arc<AppState>) {
                             if let Err(e) = state.store.save_vm(&vm) {
                                 tracing::error!("Failed to save VM: {}", e);
                             } else if matches!(vm.state, vm_model::VMState::Running) {
-                                autoscaler_hotplug_memory(&state.driver, &vm.name, old_mem, new_mem).await;
+                                autoscaler_hotplug_memory(
+                                    &state.driver,
+                                    &vm.name,
+                                    old_mem,
+                                    new_mem,
+                                )
+                                .await;
                             }
                         }
                         policy.last_scale_action = Some(now);
@@ -3633,7 +3656,12 @@ async fn run_autoscaler(state: Arc<AppState>) {
 
 /// Apply CPU changes to a running VM via QMP hotplug.
 /// Best-effort: logs warnings on failure but does not propagate errors.
-async fn autoscaler_hotplug_cpu(driver: &Arc<dyn VmDriver>, vm_name: &str, old_cpus: u32, new_cpus: u32) {
+async fn autoscaler_hotplug_cpu(
+    driver: &Arc<dyn VmDriver>,
+    vm_name: &str,
+    old_cpus: u32,
+    new_cpus: u32,
+) {
     if new_cpus == old_cpus {
         return;
     }
@@ -3644,7 +3672,11 @@ async fn autoscaler_hotplug_cpu(driver: &Arc<dyn VmDriver>, vm_name: &str, old_c
             return;
         }
         Err(e) => {
-            tracing::warn!("Autoscaler: failed to resolve QMP socket for '{}': {:#}", vm_name, e);
+            tracing::warn!(
+                "Autoscaler: failed to resolve QMP socket for '{}': {:#}",
+                vm_name,
+                e
+            );
             return;
         }
     };
@@ -3728,7 +3760,11 @@ async fn autoscaler_hotplug_memory(
             return;
         }
         Err(e) => {
-            tracing::warn!("Autoscaler: failed to resolve QMP socket for '{}': {:#}", vm_name, e);
+            tracing::warn!(
+                "Autoscaler: failed to resolve QMP socket for '{}': {:#}",
+                vm_name,
+                e
+            );
             return;
         }
     };

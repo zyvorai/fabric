@@ -50,7 +50,9 @@ pub struct DnsmasqManager {
 
 impl DnsmasqManager {
     pub fn new(run_dir: impl Into<PathBuf>) -> Self {
-        Self { run_dir: run_dir.into() }
+        Self {
+            run_dir: run_dir.into(),
+        }
     }
 
     /// Start (or restart, if one is already running for this bridge) the
@@ -66,7 +68,9 @@ impl DnsmasqManager {
         // (unlike the files inside it, which it's fine to watch appear
         // later) -- ensure it's there even if no zone has been created yet.
         if let Some(dir) = &cfg.zone_hosts_dir {
-            tokio::fs::create_dir_all(dir).await.with_context(|| format!("failed to create {}", dir.display()))?;
+            tokio::fs::create_dir_all(dir)
+                .await
+                .with_context(|| format!("failed to create {}", dir.display()))?;
         }
 
         // Idempotent: tear down any prior instance for this bridge first.
@@ -76,7 +80,9 @@ impl DnsmasqManager {
         let pid_path = self.pid_path(&cfg.bridge);
         let lease_path = self.lease_path(&cfg.bridge);
         let conf = render_config(cfg, &pid_path, &lease_path)?;
-        tokio::fs::write(&conf_path, conf).await.with_context(|| format!("failed to write {}", conf_path.display()))?;
+        tokio::fs::write(&conf_path, conf)
+            .await
+            .with_context(|| format!("failed to write {}", conf_path.display()))?;
 
         let output = tokio::process::Command::new("dnsmasq")
             // dnsmasq drops privileges to `nobody` by default after
@@ -113,7 +119,10 @@ impl DnsmasqManager {
         let pid_path = self.pid_path(bridge);
         if let Ok(pid_str) = tokio::fs::read_to_string(&pid_path).await {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                let _ = tokio::process::Command::new("kill").arg(pid.to_string()).status().await;
+                let _ = tokio::process::Command::new("kill")
+                    .arg(pid.to_string())
+                    .status()
+                    .await;
             }
             let _ = tokio::fs::remove_file(&pid_path).await;
         }
@@ -153,11 +162,15 @@ impl DnsmasqManager {
             if path.extension().and_then(|e| e.to_str()) != Some("leases") {
                 continue;
             }
-            let Ok(content) = tokio::fs::read_to_string(&path).await else { continue };
+            let Ok(content) = tokio::fs::read_to_string(&path).await else {
+                continue;
+            };
             for line in content.lines() {
                 let mut fields = line.split_whitespace();
                 let _expiry = fields.next();
-                let Some(line_mac) = fields.next() else { continue };
+                let Some(line_mac) = fields.next() else {
+                    continue;
+                };
                 let Some(ip) = fields.next() else { continue };
                 if line_mac.eq_ignore_ascii_case(&mac) {
                     return Ok(Some(ip.to_string()));
@@ -198,10 +211,16 @@ fn render_config(cfg: &DhcpConfig, pid_path: &Path, lease_path: &Path) -> Result
         // systemd-networkd's [DHCPServer] directive originally provided.
         None => out.push_str("port=0\n"),
     }
-    out.push_str(&format!("dhcp-range={start_ip},{end_ip},255.255.255.0,{}\n", cfg.default_lease_time_sec));
+    out.push_str(&format!(
+        "dhcp-range={start_ip},{end_ip},255.255.255.0,{}\n",
+        cfg.default_lease_time_sec
+    ));
     out.push_str(&format!("dhcp-option=option:router,{}\n", cfg.gateway));
     if !cfg.dns_servers.is_empty() {
-        out.push_str(&format!("dhcp-option=option:dns-server,{}\n", cfg.dns_servers.join(",")));
+        out.push_str(&format!(
+            "dhcp-option=option:dns-server,{}\n",
+            cfg.dns_servers.join(",")
+        ));
     }
     if let Some(domain) = &cfg.domain {
         out.push_str(&format!("domain={domain}\n"));
@@ -236,7 +255,12 @@ mod tests {
 
     #[test]
     fn test_render_config_pool_range() {
-        let out = render_config(&cfg(), Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).unwrap();
+        let out = render_config(
+            &cfg(),
+            Path::new("/run/x/br0.pid"),
+            Path::new("/run/x/br0.leases"),
+        )
+        .unwrap();
         assert!(out.contains("dhcp-range=10.0.0.100,10.0.0.149,255.255.255.0,3600"));
         assert!(out.contains("interface=br0"));
         assert!(out.contains("port=0"));
@@ -252,7 +276,12 @@ mod tests {
         let mut c = cfg();
         c.dns_servers.clear();
         c.domain = None;
-        let out = render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).unwrap();
+        let out = render_config(
+            &c,
+            Path::new("/run/x/br0.pid"),
+            Path::new("/run/x/br0.leases"),
+        )
+        .unwrap();
         assert!(!out.contains("dns-server"));
         assert!(!out.contains("domain="));
     }
@@ -261,7 +290,12 @@ mod tests {
     fn test_render_config_with_zone_hosts_dir_serves_dns_instead_of_port_zero() {
         let mut c = cfg();
         c.zone_hosts_dir = Some(PathBuf::from("/etc/zyvor-fabricd/dns"));
-        let out = render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).unwrap();
+        let out = render_config(
+            &c,
+            Path::new("/run/x/br0.pid"),
+            Path::new("/run/x/br0.leases"),
+        )
+        .unwrap();
         assert!(out.contains("hostsdir=/etc/zyvor-fabricd/dns"));
         assert!(!out.contains("port=0"));
     }
@@ -270,7 +304,12 @@ mod tests {
     fn test_render_config_rejects_zero_offset() {
         let mut c = cfg();
         c.pool_offset = 0;
-        assert!(render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).is_err());
+        assert!(render_config(
+            &c,
+            Path::new("/run/x/br0.pid"),
+            Path::new("/run/x/br0.leases")
+        )
+        .is_err());
     }
 
     #[test]
@@ -278,7 +317,12 @@ mod tests {
         let mut c = cfg();
         c.pool_offset = 200;
         c.pool_size = 100; // 200 + 99 = 299 > 254
-        assert!(render_config(&c, Path::new("/run/x/br0.pid"), Path::new("/run/x/br0.leases")).is_err());
+        assert!(render_config(
+            &c,
+            Path::new("/run/x/br0.pid"),
+            Path::new("/run/x/br0.leases")
+        )
+        .is_err());
     }
 
     #[tokio::test]
@@ -290,20 +334,28 @@ mod tests {
         )
         .await
         .unwrap();
-        tokio::fs::write(dir.path().join("br1.leases"), "").await.unwrap();
+        tokio::fs::write(dir.path().join("br1.leases"), "")
+            .await
+            .unwrap();
 
         let mgr = DnsmasqManager::new(dir.path());
         assert_eq!(
             mgr.lookup_lease_by_mac("AA:BB:CC:DD:EE:FF").await.unwrap(),
             Some("10.0.0.42".to_string())
         );
-        assert_eq!(mgr.lookup_lease_by_mac("00:00:00:00:00:00").await.unwrap(), None);
+        assert_eq!(
+            mgr.lookup_lease_by_mac("00:00:00:00:00:00").await.unwrap(),
+            None
+        );
     }
 
     #[tokio::test]
     async fn lookup_lease_by_mac_missing_run_dir_returns_none() {
         let dir = tempfile::tempdir().unwrap();
         let mgr = DnsmasqManager::new(dir.path().join("does-not-exist"));
-        assert_eq!(mgr.lookup_lease_by_mac("aa:bb:cc:dd:ee:ff").await.unwrap(), None);
+        assert_eq!(
+            mgr.lookup_lease_by_mac("aa:bb:cc:dd:ee:ff").await.unwrap(),
+            None
+        );
     }
 }

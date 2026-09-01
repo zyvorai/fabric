@@ -457,8 +457,8 @@ pub async fn setup_2fa(
         ));
     }
 
-    let (secret, otpauth_url) =
-        security::totp::generate_secret(&claims.sub, "zyvor-fabricd").map_err(|_| {
+    let (secret, otpauth_url) = security::totp::generate_secret(&claims.sub, "zyvor-fabricd")
+        .map_err(|_| {
             crate::api_error::json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to generate TOTP secret",

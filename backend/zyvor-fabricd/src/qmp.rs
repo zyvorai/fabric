@@ -83,7 +83,9 @@ pub struct QmpClient {
 impl QmpClient {
     /// Create a QMP client for an already-resolved control socket path.
     pub fn for_socket(socket_path: impl Into<String>) -> Self {
-        Self { socket_path: socket_path.into() }
+        Self {
+            socket_path: socket_path.into(),
+        }
     }
 
     /// Check if the QMP socket exists and is accessible

@@ -835,7 +835,10 @@ impl SiteRecoveryManager {
                     .driver
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("recovery execution requires a VM driver — construct via SiteRecoveryManager::with_driver()"))?;
-                driver.poweroff(target).await.map_err(|e| anyhow::anyhow!("failed to power off '{target}': {e:#}"))
+                driver
+                    .poweroff(target)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed to power off '{target}': {e:#}"))
             }
             StepType::PowerOn => {
                 tracing::info!(vm = target, "step {}: powering on VM", step.step_number);
@@ -843,7 +846,10 @@ impl SiteRecoveryManager {
                     .driver
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("recovery execution requires a VM driver — construct via SiteRecoveryManager::with_driver()"))?;
-                driver.start(target).await.map_err(|e| anyhow::anyhow!("failed to start '{target}': {e:#}"))
+                driver
+                    .start(target)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed to start '{target}': {e:#}"))
             }
             StepType::Sync => {
                 // Sync the VM image to the target site using rsync.

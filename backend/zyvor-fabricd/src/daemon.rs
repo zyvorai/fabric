@@ -21,7 +21,10 @@ impl Daemon {
     }
 
     pub async fn start(self) -> Result<()> {
-        tracing::info!("zyvor-fabricd daemon starting on {}", self.config.daemon.listen);
+        tracing::info!(
+            "zyvor-fabricd daemon starting on {}",
+            self.config.daemon.listen
+        );
 
         let server = Server::new(self.state, self.config).await?;
         server.run().await

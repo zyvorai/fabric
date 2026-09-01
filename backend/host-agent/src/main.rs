@@ -167,7 +167,12 @@ impl Agent {
             read_memory_info().unwrap_or((0, 0, 0.0));
         let uptime_secs = read_uptime().unwrap_or(0);
         let load_average = read_loadavg().unwrap_or([0.0; 3]);
-        let vm_count = self.driver.list_machines().await.map(|v| v.len() as u32).unwrap_or(0);
+        let vm_count = self
+            .driver
+            .list_machines()
+            .await
+            .map(|v| v.len() as u32)
+            .unwrap_or(0);
 
         SystemMetrics {
             cpu_usage_pct,
@@ -332,7 +337,9 @@ impl Agent {
                     warn!(vm = %vm_name, error = %e, "graceful stop failed, force-terminating");
                     match self.driver.terminate(&vm_name).await {
                         Ok(()) => info!(vm = %vm_name, "VM forcefully terminated"),
-                        Err(e) => error!(vm = %vm_name, error = %e, "failed to fence VM – all methods exhausted"),
+                        Err(e) => {
+                            error!(vm = %vm_name, error = %e, "failed to fence VM – all methods exhausted")
+                        }
                     }
                 } else {
                     info!(vm = %vm_name, "VM fenced (graceful stop)");
@@ -538,7 +545,6 @@ fn read_loadavg() -> Result<[f64; 3]> {
         fields[2].parse().unwrap_or(0.0),
     ])
 }
-
 
 // ---------------------------------------------------------------------------
 // Host-ID persistence

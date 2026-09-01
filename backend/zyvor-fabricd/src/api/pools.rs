@@ -27,7 +27,14 @@ pub struct PoolResponse {
 
 impl From<zyvor_fabric_driver_core::PoolInfo> for PoolResponse {
     fn from(p: zyvor_fabric_driver_core::PoolInfo) -> Self {
-        Self { name: p.name, size: p.size, image: p.image, cpus: p.cpus, memory: p.memory, ready_members: p.ready_members }
+        Self {
+            name: p.name,
+            size: p.size,
+            image: p.image,
+            cpus: p.cpus,
+            memory: p.memory,
+            ready_members: p.ready_members,
+        }
     }
 }
 
@@ -42,8 +49,12 @@ pub struct CreatePoolRequest {
     pub memory: u64,
 }
 
-fn default_cpus() -> u32 { 2 }
-fn default_memory() -> u64 { 2048 }
+fn default_cpus() -> u32 {
+    2
+}
+fn default_memory() -> u64 {
+    2048
+}
 
 /// POST /api/vm-pools
 pub async fn create_pool(
@@ -59,13 +70,18 @@ pub async fn create_pool(
         ));
     }
     if req.image.trim().is_empty() {
-        return Err(crate::api_error::json_error(StatusCode::BAD_REQUEST, "Image path is required"));
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Image path is required",
+        ));
     }
     let pool = state
         .driver
         .create_pool(&req.name, req.size, &req.image, req.cpus, req.memory)
         .await
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
     tracing::info!("Created warm pool '{}' (size {})", req.name, req.size);
     Ok((StatusCode::CREATED, Json(pool.into())))
 }
@@ -75,11 +91,9 @@ pub async fn list_pools(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<PoolResponse>>, (StatusCode, Json<serde_json::Value>)> {
-    let pools = state
-        .driver
-        .list_pools()
-        .await
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let pools = state.driver.list_pools().await.map_err(|e| {
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
     Ok(Json(pools.into_iter().map(Into::into).collect()))
 }
 
@@ -91,7 +105,10 @@ pub async fn get_pool(
 ) -> Result<Json<PoolResponse>, (StatusCode, Json<serde_json::Value>)> {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let pool = state.driver.get_pool(&name).await.map_err(|e| {
-        crate::api_error::json_error(StatusCode::NOT_FOUND, format!("Pool '{}' not found: {}", name, e))
+        crate::api_error::json_error(
+            StatusCode::NOT_FOUND,
+            format!("Pool '{}' not found: {}", name, e),
+        )
     })?;
     Ok(Json(pool.into()))
 }
@@ -109,7 +126,10 @@ pub async fn delete_pool(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     state.driver.get_pool(&name).await.map_err(|e| {
-        crate::api_error::json_error(StatusCode::NOT_FOUND, format!("Pool '{}' not found: {}", name, e))
+        crate::api_error::json_error(
+            StatusCode::NOT_FOUND,
+            format!("Pool '{}' not found: {}", name, e),
+        )
     })?;
 
     let driver = state.driver.clone();
@@ -142,21 +162,35 @@ pub async fn claim_pool(
 
     let _lock = state.vm_lock(&req.name).lock_owned().await;
     if let Ok(Some(_)) = state.store.get_vm(&req.name) {
-        return Err(crate::api_error::json_error(StatusCode::CONFLICT, "VM with this name already exists"));
+        return Err(crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            "VM with this name already exists",
+        ));
     }
 
-    let vm = state.driver.claim_pool(&pool_name, &req.name, req.ttl_seconds).await.map_err(|e| {
-        crate::api_error::json_error(StatusCode::CONFLICT, format!("Failed to claim from pool '{}': {}", pool_name, e))
-    })?;
+    let vm = state
+        .driver
+        .claim_pool(&pool_name, &req.name, req.ttl_seconds)
+        .await
+        .map_err(|e| {
+            crate::api_error::json_error(
+                StatusCode::CONFLICT,
+                format!("Failed to claim from pool '{}': {}", pool_name, e),
+            )
+        })?;
 
     // The claimed VM is already running in Ephemera -- mirror it into
     // zyvor-fabric's own store so it shows up like any other VM from here.
-    state
-        .store
-        .save_vm(&vm)
-        .map_err(|e| crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    state.store.save_vm(&vm).map_err(|e| {
+        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
 
-    crate::api::events::record_event(&state, crate::api::events::VMEventType::Created, &vm.name, None);
+    crate::api::events::record_event(
+        &state,
+        crate::api::events::VMEventType::Created,
+        &vm.name,
+        None,
+    );
     tracing::info!("Claimed '{}' from warm pool '{}'", vm.name, pool_name);
     Ok((StatusCode::CREATED, Json(vm)))
 }

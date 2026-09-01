@@ -886,8 +886,10 @@ pub async fn logout_iscsi_target(
 /// GET /api/storage/iscsi/sessions - List active iSCSI sessions
 pub async fn list_iscsi_sessions(
     RequireRead(_claims): RequireRead,
-) -> Result<Json<Vec<zyvor_fabric_storage::iscsi::IscsiTarget>>, (StatusCode, Json<serde_json::Value>)>
-{
+) -> Result<
+    Json<Vec<zyvor_fabric_storage::iscsi::IscsiTarget>>,
+    (StatusCode, Json<serde_json::Value>),
+> {
     tracing::debug!("storage::{}", stringify!(list_iscsi_sessions));
     zyvor_fabric_storage::iscsi::list_sessions()
         .map(Json)

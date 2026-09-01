@@ -526,7 +526,10 @@ impl EncryptionManager {
             let encrypted_path = format!("{}.encrypted", image_path);
 
             // Write the encryption key to a temporary file for qemu-img --object
-            let secret_file = format!("/tmp/zyvor-fabricd-encrypt-{}", uuid::Uuid::new_v4().simple());
+            let secret_file = format!(
+                "/tmp/zyvor-fabricd-encrypt-{}",
+                uuid::Uuid::new_v4().simple()
+            );
             if let Err(e) = std::fs::write(&secret_file, &key_id_for_disk) {
                 tracing::error!(
                     "Failed to write encryption secret file for VM '{}': {}",
@@ -642,8 +645,10 @@ impl EncryptionManager {
         if std::path::Path::new(&image_path).exists() {
             if let Some(ref key_id) = key_for_decrypt {
                 let decrypted_path = format!("{}.decrypted", image_path);
-                let secret_file =
-                    format!("/tmp/zyvor-fabricd-decrypt-{}", uuid::Uuid::new_v4().simple());
+                let secret_file = format!(
+                    "/tmp/zyvor-fabricd-decrypt-{}",
+                    uuid::Uuid::new_v4().simple()
+                );
 
                 if let Err(e) = std::fs::write(&secret_file, key_id) {
                     tracing::error!(

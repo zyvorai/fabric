@@ -68,12 +68,16 @@ pub async fn get_vm_logs(
     // hang this one-shot GET waiting for more output than currently
     // exists. Drain what's immediately available within a short deadline
     // instead of awaiting the stream to completion.
-    let mut stream = state.driver.stream_logs(&vm_name, lines).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to read VM logs: {:#}", e)})),
-        )
-    })?;
+    let mut stream = state
+        .driver
+        .stream_logs(&vm_name, lines)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to read VM logs: {:#}", e)})),
+            )
+        })?;
 
     let mut raw = Vec::new();
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(3);
@@ -91,7 +95,13 @@ pub async fn get_vm_logs(
     let entries: Vec<LogEntry> = raw
         .into_iter()
         .filter(|e| query.priority.map(|p| e.priority <= p).unwrap_or(true))
-        .filter(|e| query.grep.as_ref().map(|g| e.message.contains(g.as_str())).unwrap_or(true))
+        .filter(|e| {
+            query
+                .grep
+                .as_ref()
+                .map(|g| e.message.contains(g.as_str()))
+                .unwrap_or(true)
+        })
         .map(|e| LogEntry {
             timestamp: e.timestamp.to_rfc3339(),
             hostname: String::new(),

@@ -77,7 +77,11 @@ const HOTPLUG_PCIE_PORTS: u8 = 4;
 /// `device_add` onto the first of `bus_candidates` that accepts it, trying
 /// each in turn -- used for PCIe hotplug (`hotplug-pcie-0..N`, one device
 /// per port).
-fn device_add_trying_buses(qmp: &QmpClient, mut device_args: serde_json::Value, bus_candidates: &[String]) -> Result<String, String> {
+fn device_add_trying_buses(
+    qmp: &QmpClient,
+    mut device_args: serde_json::Value,
+    bus_candidates: &[String],
+) -> Result<String, String> {
     let mut last_err = String::from("no candidate buses given");
     for bus in bus_candidates {
         if let Some(obj) = device_args.as_object_mut() {
@@ -112,8 +116,15 @@ fn occupied_hotplug_buses(qmp: &QmpClient) -> std::collections::HashSet<String> 
         return occupied;
     };
     for bus_info in pci.as_array().into_iter().flatten() {
-        for dev in bus_info.get("devices").and_then(|d| d.as_array()).into_iter().flatten() {
-            let Some(qdev_id) = dev.get("qdev_id").and_then(|v| v.as_str()) else { continue };
+        for dev in bus_info
+            .get("devices")
+            .and_then(|d| d.as_array())
+            .into_iter()
+            .flatten()
+        {
+            let Some(qdev_id) = dev.get("qdev_id").and_then(|v| v.as_str()) else {
+                continue;
+            };
             if !qdev_id.starts_with("hotplug-pcie-") {
                 continue;
             }
@@ -138,7 +149,10 @@ fn occupied_hotplug_buses(qmp: &QmpClient) -> std::collections::HashSet<String> 
 /// supports it, and only one device per port is actually visible to the
 /// guest (see `occupied_hotplug_buses`), so a previous hotplug may have
 /// already filled some of them.
-fn device_add_on_hotplug_bus(qmp: &QmpClient, device_args: serde_json::Value) -> Result<String, String> {
+fn device_add_on_hotplug_bus(
+    qmp: &QmpClient,
+    device_args: serde_json::Value,
+) -> Result<String, String> {
     let occupied = occupied_hotplug_buses(qmp);
     let candidates: Vec<String> = (0..HOTPLUG_PCIE_PORTS)
         .map(|i| format!("hotplug-pcie-{i}"))
@@ -157,7 +171,10 @@ fn device_add_on_hotplug_bus(qmp: &QmpClient, device_args: serde_json::Value) ->
 /// previous `format!("drive-hotplug-{}", Uuid::new_v4().simple())` was 46
 /// bytes and blockdev-add rejected it outright with "Node name too long".
 fn short_hotplug_id(prefix: &str) -> String {
-    format!("{prefix}-{}", &uuid::Uuid::new_v4().simple().to_string()[..8])
+    format!(
+        "{prefix}-{}",
+        &uuid::Uuid::new_v4().simple().to_string()[..8]
+    )
 }
 
 /// POST /api/vms/:name/hotplug/cpu - Hot-add vCPUs
@@ -394,7 +411,11 @@ pub async fn hotplug_disk(
     // port, scsi-hd through the single virtio-scsi controller Ephemera
     // adds at boot -- see device_add_on_hotplug_bus's doc comment. (`ide`
     // was already rejected above, before we got here.)
-    let driver = if req.bus == "scsi" { "scsi-hd" } else { "virtio-blk-pci" };
+    let driver = if req.bus == "scsi" {
+        "scsi-hd"
+    } else {
+        "virtio-blk-pci"
+    };
 
     let device_args = serde_json::json!({
         "driver": driver,
@@ -409,7 +430,9 @@ pub async fn hotplug_disk(
         if let Some(obj) = device_args.as_object_mut() {
             obj.insert("bus".to_string(), serde_json::json!("scsi0.0"));
         }
-        qmp.execute("device_add", device_args).map(|_| String::from("scsi0.0")).map_err(|e| e.to_string())
+        qmp.execute("device_add", device_args)
+            .map(|_| String::from("scsi0.0"))
+            .map_err(|e| e.to_string())
     };
 
     match result {

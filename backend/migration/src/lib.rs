@@ -50,7 +50,10 @@ impl MigrationManager {
     pub fn new<P: AsRef<Path>>(workspace_dir: P, driver: Arc<dyn VmDriver>) -> Result<Self> {
         let workspace_dir = workspace_dir.as_ref().to_path_buf();
         std::fs::create_dir_all(&workspace_dir)?;
-        Ok(Self { workspace_dir, driver })
+        Ok(Self {
+            workspace_dir,
+            driver,
+        })
     }
 
     /// Start VM migration
@@ -202,7 +205,10 @@ impl MigrationManager {
         tracing::info!("Pausing VM '{}' for final sync", config.vm_name);
 
         if let Err(e) = self.driver.poweroff(&config.vm_name).await {
-            tracing::warn!("Failed to stop source VM '{}' for final sync: {e:#}", config.vm_name);
+            tracing::warn!(
+                "Failed to stop source VM '{}' for final sync: {e:#}",
+                config.vm_name
+            );
         }
 
         // Final rsync pass (very fast — only changed blocks since last iteration)

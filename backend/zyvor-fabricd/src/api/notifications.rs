@@ -1312,7 +1312,11 @@ pub async fn dispatch_event_to_rules(state: &Arc<AppState>, event: &super::event
                 Ok(Some(c)) if c.enabled => c,
                 Ok(_) => continue,
                 Err(e) => {
-                    tracing::warn!("Failed to load channel {} for rule dispatch: {}", channel_id, e);
+                    tracing::warn!(
+                        "Failed to load channel {} for rule dispatch: {}",
+                        channel_id,
+                        e
+                    );
                     continue;
                 }
             };
@@ -1361,7 +1365,11 @@ pub async fn dispatch_event_to_rules(state: &Arc<AppState>, event: &super::event
                 .store
                 .save_entity("notifications/rules", &rule.id, &rule)
             {
-                tracing::error!("Failed to update rule trigger stats for '{}': {}", rule.name, e);
+                tracing::error!(
+                    "Failed to update rule trigger stats for '{}': {}",
+                    rule.name,
+                    e
+                );
             }
         }
     }

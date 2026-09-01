@@ -77,7 +77,10 @@ async fn spawn_ephemera(bin: &PathBuf, port: u16) -> anyhow::Result<EphemeraServ
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     while std::time::Instant::now() < deadline {
         if client.healthy().await {
-            return Ok(EphemeraServe { child, _workdir: workdir });
+            return Ok(EphemeraServe {
+                child,
+                _workdir: workdir,
+            });
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
@@ -93,21 +96,36 @@ async fn boots_and_serves_healthz() {
         return;
     };
 
-    let serve = spawn_ephemera(&bin, 17788).await.expect("ephemera serve failed to start");
+    let serve = spawn_ephemera(&bin, 17788)
+        .await
+        .expect("ephemera serve failed to start");
     let client = EphemeraClient::new("http://127.0.0.1:17788").unwrap();
 
     assert!(client.healthy().await, "healthz should report healthy");
 
-    let vms = client.list_vms().await.expect("list_vms should succeed against a fresh instance");
-    assert!(vms.is_empty(), "a fresh ephemera instance should have no VMs");
+    let vms = client
+        .list_vms()
+        .await
+        .expect("list_vms should succeed against a fresh instance");
+    assert!(
+        vms.is_empty(),
+        "a fresh ephemera instance should have no VMs"
+    );
 
     assert!(
-        client.find_by_name("does-not-exist").await.unwrap().is_none(),
+        client
+            .find_by_name("does-not-exist")
+            .await
+            .unwrap()
+            .is_none(),
         "find_by_name should return None, not error, for an unknown name"
     );
 
     let missing = client.get_vm(uuid::Uuid::new_v4()).await;
-    assert!(missing.is_err(), "getting a nonexistent VM id should error, not panic or hang");
+    assert!(
+        missing.is_err(),
+        "getting a nonexistent VM id should error, not panic or hang"
+    );
 
     drop(serve);
 }

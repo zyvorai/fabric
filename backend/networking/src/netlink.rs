@@ -265,17 +265,24 @@ pub async fn create_bridge(name: &str) -> Result<()> {
     let mut last_err = None;
     for attempt in 0..MAX_ATTEMPTS {
         let handle = connect().await?;
-        match handle.link().add(LinkBridge::new(name).build()).execute().await {
+        match handle
+            .link()
+            .add(LinkBridge::new(name).build())
+            .execute()
+            .await
+        {
             Ok(()) => return Ok(()),
             Err(e) => {
                 if attempt + 1 < MAX_ATTEMPTS {
-                    tokio::time::sleep(std::time::Duration::from_millis(50 * (attempt as u64 + 1))).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(50 * (attempt as u64 + 1)))
+                        .await;
                 }
                 last_err = Some(e);
             }
         }
     }
-    Err(last_err.unwrap()).with_context(|| format!("failed to create bridge '{name}' after {MAX_ATTEMPTS} attempts"))
+    Err(last_err.unwrap())
+        .with_context(|| format!("failed to create bridge '{name}' after {MAX_ATTEMPTS} attempts"))
 }
 
 /// Create an 802.1Q VLAN sub-interface on `parent` (`ip link add <name> link
@@ -325,7 +332,10 @@ pub async fn create_tap(name: &str) -> Result<()> {
         .await
         .context("failed to run `ip tuntap add`")?;
     if !output.status.success() {
-        bail!("ip tuntap add dev {name} failed: {}", String::from_utf8_lossy(&output.stderr));
+        bail!(
+            "ip tuntap add dev {name} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
     Ok(())
 }
@@ -350,7 +360,9 @@ pub async fn create_bond(name: &str, mode: &str, slaves: &[String]) -> Result<()
         .with_context(|| format!("failed to create bond '{name}'"))?;
     let bond_index = link_index_by_name(&handle, name).await?;
     for slave in slaves {
-        set_master(slave, bond_index).await.with_context(|| format!("failed to enslave '{slave}' to bond '{name}'"))?;
+        set_master(slave, bond_index)
+            .await
+            .with_context(|| format!("failed to enslave '{slave}' to bond '{name}'"))?;
     }
     Ok(())
 }
@@ -406,7 +418,11 @@ pub async fn set_master(iface: &str, master_index: u32) -> Result<()> {
     let handle = connect().await?;
     handle
         .link()
-        .set(LinkUnspec::new_with_name(iface).controller(master_index).build())
+        .set(
+            LinkUnspec::new_with_name(iface)
+                .controller(master_index)
+                .build(),
+        )
         .execute()
         .await
         .with_context(|| format!("failed to attach '{iface}' to master index {master_index}"))
@@ -427,11 +443,15 @@ pub async fn unset_master(iface: &str) -> Result<()> {
 /// Assign an IP address in CIDR form (`192.168.1.10/24`) to `iface` — `ip
 /// addr add <cidr> dev <iface>`.
 pub async fn set_addr(iface: &str, cidr: &str) -> Result<()> {
-    let (addr_str, prefix_str) = cidr
-        .split_once('/')
-        .with_context(|| format!("address '{cidr}' is not in CIDR form (expected e.g. 10.0.0.1/24)"))?;
-    let addr: IpAddr = addr_str.parse().with_context(|| format!("invalid IP address '{addr_str}'"))?;
-    let prefix_len: u8 = prefix_str.parse().with_context(|| format!("invalid prefix length '{prefix_str}'"))?;
+    let (addr_str, prefix_str) = cidr.split_once('/').with_context(|| {
+        format!("address '{cidr}' is not in CIDR form (expected e.g. 10.0.0.1/24)")
+    })?;
+    let addr: IpAddr = addr_str
+        .parse()
+        .with_context(|| format!("invalid IP address '{addr_str}'"))?;
+    let prefix_len: u8 = prefix_str
+        .parse()
+        .with_context(|| format!("invalid prefix length '{prefix_str}'"))?;
 
     let handle = connect().await?;
     let index = link_index_by_name(&handle, iface).await?;
@@ -473,7 +493,10 @@ pub async fn set_mac_address(iface: &str, mac: &str) -> Result<()> {
         .collect::<std::result::Result<Vec<u8>, _>>()
         .with_context(|| format!("invalid MAC address '{mac}'"))?;
     if bytes.len() != 6 {
-        bail!("invalid MAC address '{mac}': expected 6 octets, got {}", bytes.len());
+        bail!(
+            "invalid MAC address '{mac}': expected 6 octets, got {}",
+            bytes.len()
+        );
     }
     let handle = connect().await?;
     handle
@@ -548,7 +571,11 @@ pub async fn set_bridge_options(iface: &str, opts: &BridgeOptions) -> Result<()>
     let handle = connect().await?;
     handle
         .link()
-        .add(LinkBridge::new(iface).set_info_data(InfoData::Bridge(attrs)).build())
+        .add(
+            LinkBridge::new(iface)
+                .set_info_data(InfoData::Bridge(attrs))
+                .build(),
+        )
         .set_flags(NLM_F_REQUEST_ACK)
         .execute()
         .await
@@ -562,8 +589,14 @@ pub async fn add_default_route(iface: &str, gateway: IpAddr) -> Result<()> {
     let handle = connect().await?;
     let index = link_index_by_name(&handle, iface).await?;
     let route = match gateway {
-        IpAddr::V4(addr) => RouteMessageBuilder::<Ipv4Addr>::new().gateway(addr).output_interface(index).build(),
-        IpAddr::V6(addr) => RouteMessageBuilder::<Ipv6Addr>::new().gateway(addr).output_interface(index).build(),
+        IpAddr::V4(addr) => RouteMessageBuilder::<Ipv4Addr>::new()
+            .gateway(addr)
+            .output_interface(index)
+            .build(),
+        IpAddr::V6(addr) => RouteMessageBuilder::<Ipv6Addr>::new()
+            .gateway(addr)
+            .output_interface(index)
+            .build(),
     };
     handle
         .route()
@@ -585,7 +618,11 @@ pub async fn rename_link(iface: &str, new_name: &str) -> Result<()> {
         .with_context(|| format!("failed to bring down '{iface}' before rename"))?;
     handle
         .link()
-        .set(LinkUnspec::new_with_name(iface).name(new_name.to_string()).build())
+        .set(
+            LinkUnspec::new_with_name(iface)
+                .name(new_name.to_string())
+                .build(),
+        )
         .execute()
         .await
         .with_context(|| format!("failed to rename '{iface}' to '{new_name}'"))?;
