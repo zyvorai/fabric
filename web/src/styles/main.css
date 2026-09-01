@@ -300,6 +300,33 @@ a:hover {
   position: sticky;
   top: 52px;
   height: calc(100vh - 52px);
+  transition: width 0.15s ease;
+}
+.console-sidebar.collapsed {
+  width: 3.75rem;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.console-sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+  border-radius: var(--zf-radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--zf-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.console-sidebar-collapse-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--zf-ink);
+}
+.console-sidebar.collapsed .console-sidebar-collapse-btn {
+  justify-content: center;
 }
 .console-sidebar-group {
   margin-bottom: 22px;
@@ -323,6 +350,10 @@ a:hover {
   font-weight: 400;
   letter-spacing: -0.016em;
   text-decoration: none;
+}
+.console-sidebar.collapsed .console-nav-link {
+  justify-content: center;
+  padding: 10px;
 }
 .console-nav-link:hover {
   background: rgba(0, 0, 0, 0.04);

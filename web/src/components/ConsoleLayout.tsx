@@ -3,7 +3,7 @@
 
 import { ReactNode, useMemo, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router'
-import { LogOut, Menu, Search, X } from 'lucide-react'
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { NAV_GROUPS, flattenNavGroup } from '../navigation/navConfig'
 import ConnectionStatus from './ConnectionStatus'
@@ -66,6 +66,27 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [helpTab, setHelpTab] = useState<HelpTab>('shortcuts')
+  // Per-viewer preference, not app state -- localStorage rather than a
+  // backend setting. Defaults expanded; a bad/blocked accessor (private
+  // window, cleared storage) just falls back to that default.
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('zf-sidebar-collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('zf-sidebar-collapsed', next ? '1' : '0')
+      } catch {
+        // ignore -- private window / storage blocked
+      }
+      return next
+    })
+  }
   useRecordRecentPage()
 
   const onLogout = () => {
@@ -123,12 +144,23 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
       </header>
 
       <div className="console-body">
-        <aside className={`console-sidebar ${mobileNav ? '!block fixed inset-x-0 top-[52px] z-20 h-[calc(100vh-52px)]' : ''}`}>
+        <aside
+          className={`console-sidebar ${collapsed ? 'collapsed' : ''} ${mobileNav ? '!block fixed inset-x-0 top-[52px] z-20 h-[calc(100vh-52px)]' : ''}`}
+        >
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="console-sidebar-collapse-btn hidden lg:flex"
+          >
+            {collapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+            {!collapsed && <span>Collapse</span>}
+          </button>
           {NAV_GROUPS.map((group) => {
             const items = flattenNavGroup(group)
             return (
               <div key={group.name} className="console-sidebar-group">
-                <div className="console-sidebar-label">{group.compact}</div>
+                {!collapsed && <div className="console-sidebar-label">{group.compact}</div>}
                 {items.map((item) => {
                   const Icon = item.icon
                   return (
@@ -136,13 +168,14 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
                       key={item.path}
                       to={item.path}
                       end={item.path === '/app'}
+                      title={collapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         `console-nav-link${isActive ? ' active' : ''}`
                       }
                       onClick={() => setMobileNav(false)}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      {!collapsed && <span className="truncate">{item.label}</span>}
                     </NavLink>
                   )
                 })}
