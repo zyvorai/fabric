@@ -97,7 +97,7 @@ curl -X POST http://localhost:9095/api/auth/api-keys \
 
 ```json
 {
-  "api_key": "vmspawnd_xxxxxxxxxxxxx",
+  "api_key": "zf_xxxxxxxxxxxxx",
   "name": "ci-system",
   "role": "user"
 }
@@ -105,7 +105,7 @@ curl -X POST http://localhost:9095/api/auth/api-keys \
 
 ```bash
 # Use the API key
-curl -H "X-API-Key: vmspawnd_xxxxxxxxxxxxx" \
+curl -H "X-API-Key: zf_xxxxxxxxxxxxx" \
   http://localhost:9095/api/vms
 ```
 

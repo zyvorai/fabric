@@ -22,7 +22,7 @@ terraform {
 ```hcl
 provider "zyvor-fabricd" {
   endpoint = "http://localhost:9095"
-  # token  = var.vmspawnd_token    # Required when auth is enabled
+  # token  = var.zyvor_fabricd_token    # Required when auth is enabled
 }
 ```
 
@@ -33,12 +33,12 @@ provider "zyvor-fabricd" {
 
 ## Resources
 
-### zyvor_fabric_vm
+### zyvor-fabricd_vm
 
 Manages a virtual machine through its full lifecycle (create, update, delete).
 
 ```hcl
-resource "zyvor_fabric_vm" "web_server" {
+resource "zyvor-fabricd_vm" "web_server" {
   name   = "web-server"
   image  = "/var/lib/zyvor-fabricd/images/ubuntu-22.04.qcow2"
   cpus   = 4
@@ -88,21 +88,21 @@ resource "zyvor_fabric_vm" "web_server" {
 
 ## Data Sources
 
-### zyvor_fabric_vm
+### zyvor-fabricd_vm
 
 Read information about an existing VM.
 
 ```hcl
-data "zyvor_fabric_vm" "existing" {
+data "zyvor-fabricd_vm" "existing" {
   name = "my-vm"
 }
 
 output "vm_state" {
-  value = data.zyvor_fabric_vm.existing.state
+  value = data.zyvor-fabricd_vm.existing.state
 }
 
 output "vm_ip" {
-  value = data.zyvor_fabric_vm.existing.ip_address
+  value = data.zyvor-fabricd_vm.existing.ip_address
 }
 ```
 
@@ -113,7 +113,7 @@ variable "app_servers" {
   default = ["app-1", "app-2", "app-3"]
 }
 
-resource "zyvor_fabric_vm" "app" {
+resource "zyvor-fabricd_vm" "app" {
   for_each = toset(var.app_servers)
 
   name   = each.key

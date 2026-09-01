@@ -298,8 +298,8 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 
 ### Terraform Provider
 
-- Resource: zyvor_fabric_vm
-- Data source: vmspawnd_vms
+- Resources: `zyvor-fabricd_vm`, `zyvor-fabricd_storage_pool`, `zyvor-fabricd_network_policy`, `zyvor-fabricd_vm_snapshot`
+- Data source: `zyvor-fabricd_vm`
 - Example configurations
 
 ### Monitoring

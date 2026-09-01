@@ -1,6 +1,6 @@
 # zyvor-fabric Documentation
 
-Private cloud control plane with a pluggable VM driver (systemd-machined/systemd-vmspawn by default, or Ephemera -- no systemd dependency -- opt-in)
+Private cloud control plane driving VM lifecycle over Ephemera's REST API -- no libvirt, no systemd-machined dependency for VM lifecycle itself
 
 ## Start Here
 
@@ -18,7 +18,7 @@ Persona-based journeys with acceptance criteria: **[USER_STORIES.md](USER_STORIE
 
 | Persona | Focus |
 |---------|-------|
-| Alex (Private Cloud Admin) | VM lifecycle via the pluggable driver (systemd-vmspawn or Ephemera) |
+| Alex (Private Cloud Admin) | VM lifecycle via the Ephemera driver |
 | Morgan (Platform Engineer) | K8s operator and Terraform |
 | Jordan (Developer) | CLI/API for VM operations |
 

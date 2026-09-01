@@ -59,7 +59,7 @@ options:
     api_url:
         description: URL of the zyvor-fabricd API server.
         type: str
-        default: "http://127.0.0.1:8080"
+        default: "http://127.0.0.1:9095"
     api_token:
         description: Bearer token for API authentication.
         type: str
@@ -265,7 +265,7 @@ def run_module():
         drs_mode=dict(type='str', default=None),
         evc_mode=dict(type='str', default=None),
         resource_id=dict(type='str', default=None),
-        api_url=dict(type='str', default='http://127.0.0.1:8080'),
+        api_url=dict(type='str', default='http://127.0.0.1:9095'),
         api_token=dict(type='str', no_log=True, default=None),
     )
 
