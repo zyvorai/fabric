@@ -129,7 +129,7 @@ describe('apiFetch', () => {
     await apiFetch('/api/test')
 
     expect(getToken()).toBeNull()
-    expect(locationMock.href).toBe('/login')
+    expect(locationMock.href).toBe('/sign-in')
   })
 
   it('does not redirect to /login if already on /login', async () => {
