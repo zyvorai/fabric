@@ -1,6 +1,5 @@
-// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
-// Proprietary software — see LICENSE in the repository root.
-// https://zyvor.dev · info@zyvor.dev
+// Copyright 2026 Zyvor
+// SPDX-License-Identifier: Apache-2.0
 
 import { useState } from 'react'
 import { Cpu, MemoryStick, HardDrive, Network, Loader2, AlertCircle } from 'lucide-react'

@@ -1,6 +1,5 @@
-// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
-// Proprietary software — see LICENSE in the repository root.
-// https://zyvor.dev · info@zyvor.dev
+// Copyright 2026 Zyvor
+// SPDX-License-Identifier: Apache-2.0
 
 /** Parse JSON from a fetch Response; rejects HTML SPA fallthrough. */
 export async function parseJsonResponse<T>(res: Response): Promise<T> {

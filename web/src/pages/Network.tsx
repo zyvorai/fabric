@@ -1,6 +1,5 @@
-// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
-// Proprietary software — see LICENSE in the repository root.
-// https://zyvor.dev · info@zyvor.dev
+// Copyright 2026 Zyvor
+// SPDX-License-Identifier: Apache-2.0
 
 import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
 import { RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu, Globe, ScanSearch } from 'lucide-react'

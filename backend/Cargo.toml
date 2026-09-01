@@ -53,7 +53,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "LicenseRef-Zyvor-Proprietary"
+license = "Apache-2.0"
 authors = ["zyvor-fabricd contributors"]
 
 [workspace.dependencies]

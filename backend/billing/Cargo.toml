@@ -1,5 +1,5 @@
 [package]
-license = "LicenseRef-Zyvor-Proprietary"
+license = "Apache-2.0"
 name = "billing"
 version = "0.1.0"
 edition = "2021"

@@ -1,6 +1,5 @@
-// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
-// Proprietary software — see LICENSE in the repository root.
-// https://zyvor.dev · info@zyvor.dev
+// Copyright 2026 Zyvor
+// SPDX-License-Identifier: Apache-2.0
 
 // @novnc/novnc ships no type declarations. Typed here to the actual surface
 // VNCViewer.tsx uses, rather than silencing it with a bare `declare module`.

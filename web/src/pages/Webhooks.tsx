@@ -1,6 +1,5 @@
-// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
-// Proprietary software — see LICENSE in the repository root.
-// https://zyvor.dev · info@zyvor.dev
+// Copyright 2026 Zyvor
+// SPDX-License-Identifier: Apache-2.0
 
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, Plus, Trash2, Send, CheckCircle, XCircle, Loader2, Globe, ToggleLeft, ToggleRight } from 'lucide-react'

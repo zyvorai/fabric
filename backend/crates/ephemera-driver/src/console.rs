@@ -1,6 +1,5 @@
-// Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
-// Proprietary software — see LICENSE in the repository root.
-// https://zyvor.dev · info@zyvor.dev
+// Copyright 2026 Zyvor
+// SPDX-License-Identifier: Apache-2.0
 
 //! `ConsoleDriver` backed by Ephemera's `GET /v1/vms/{id}/console`
 //! WebSocket (`EphemeraClient::open_console`), itself backed by the vsock
