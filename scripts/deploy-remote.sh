@@ -473,7 +473,7 @@ if ! command -v cargo &>/dev/null; then
 fi
 if [ \"\$IS_APT\" = 1 ]; then
     \$PKG systemd-container qemu-utils 2>&1 | tail -3
-    \$PKG gcc libssl-dev libpam0g-dev libdbus-1-dev libsystemd-dev clang 2>&1 | tail -1 || true
+    \$PKG gcc libssl-dev libpam0g-dev libdbus-1-dev libsystemd-dev clang libclang-dev 2>&1 | tail -1 || true
     \$PKG qemu-system-x86 ovmf 2>&1 | tail -1 || true
 else
     \$PKG systemd-container qemu-img 2>&1 | tail -3
