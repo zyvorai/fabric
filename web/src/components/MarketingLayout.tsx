@@ -4,6 +4,7 @@
 import { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
+import ZyvorMark from './ZyvorMark'
 
 const LINKS = [
   { label: 'Product', to: '/product' },
@@ -20,7 +21,8 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         <div className="mkt-nav-inner">
           <nav className="flex items-center gap-7">
             <Link to="/" className="mkt-brand">
-              Zyvor Fabric
+              <ZyvorMark className="w-6 h-6 rounded-md" />
+              Fabric
             </Link>
             {LINKS.map((l) => (
               <Link key={l.to} to={l.to} className="hidden sm:inline">

@@ -151,7 +151,7 @@ export default function LifecycleManager() {
       <div className="flex gap-1 mb-4 bg-[var(--zf-canvas)] rounded-lg p-1">
         {(['baselines', 'compliance', 'remediation', 'updates'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[var(--zf-ink)] text-white' : 'text-[var(--zf-ink)] hover:bg-black/[0.04]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[var(--zf-link)] text-white' : 'text-[var(--zf-ink)] hover:bg-black/[0.04]'}`}>
             {tab === 'updates' ? 'Rolling Updates' : tab === 'compliance' ? 'Compliance Scans' : tab}
           </button>
         ))}
