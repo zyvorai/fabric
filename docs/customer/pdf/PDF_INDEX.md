@@ -1,6 +1,6 @@
 # Zyvor Fabric customer PDFs
 
-Generated: 2026-08-29
+Generated: 2026-09-01
 
 Rebuild: `node scripts/customer-docs/build-customer-pdfs.mjs`
 

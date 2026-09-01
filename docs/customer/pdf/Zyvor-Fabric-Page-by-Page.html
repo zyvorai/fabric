@@ -24,8 +24,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
 <h1>Zyvor <span>Fabric</span></h1>
 <div class="sub">Page-by-Page Product Manual</div>
-<div class="badge">2026-08-29</div>
-<div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
+<div class="badge">2026-09-01</div>
+<div class="foot">zyvor.dev · Apache License 2.0</div></section>
 <main><h2>Page-by-page guides</h2>
 <p>Each guide follows: Purpose → When to use it → How to get there → What you can do → Related pages.</p>
 <p>Every route is also listed in the <a href="../PAGE_INDEX.md">complete page index</a>.</p>
@@ -38,8 +38,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </tr>
 </thead>
 <tbody><tr>
-<td><a href="auth/sign-in.md">Login</a></td>
-<td>Login — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host.</td>
+<td><a href="auth/login.md">Sign in</a></td>
+<td>Sign-in screen for Zyvor Fabric. Authenticates against the local admin account or a configured identity provider / PAM user on the host.</td>
 </tr>
 </tbody></table>
 <h3>Core</h3>
@@ -440,34 +440,31 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <hr>
 <p>84 guides. Regenerate: <code>node scripts/customer-docs/generate-guide-index.mjs</code>.</p>
 <hr>
-<h2>Login</h2>
+<h2>Sign in</h2>
 <h3>Purpose</h3>
-<p>Login — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host.</p>
+<p>Sign-in screen for Zyvor Fabric. Authenticates against the local admin account or a configured identity provider / PAM user on the host.</p>
 <h3>When to use it</h3>
 <ul>
-<li>Whenever you&#39;re not signed in — it&#39;s what loads for any route if your session is missing or has expired</li>
-<li>To sign in as the local admin, or with your own Linux system account instead</li>
+<li>Whenever you&#39;re not signed in — protected <code>/app</code> routes redirect here if the session is missing or expired</li>
+<li>To sign in as the local admin, or with your own system account</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/sign-in</code></li>
-<li>Nav: <strong>Auth → Login</strong> (sidebar, command palette, or desktop nav)</li>
+<li>Route: <code>/sign-in</code> (legacy <code>/login</code> redirects here)</li>
+<li>From marketing pages: <strong>Sign in</strong> in the top nav</li>
+<li>After signing in you land on the console at <code>/app</code></li>
 </ul>
 <h3>Operate from the console (UX)</h3>
 <ol>
-<li>Enter a username and password and sign in — a failed attempt shows an inline error and clears the password field.</li>
-<li>Check <strong>Remember me</strong> to save your login in the browser (locally, not on the server) so it&#39;s pre-filled next time; unchecking it clears any saved login.</li>
-<li>Toggle the eye icon to show or hide the password as you type.</li>
-<li>Switch the dashboard&#39;s visual theme (Dark, Steel, Aurora) from the top-right control — cosmetic only, unrelated to signing in.</li>
-<li>Two ways to sign in, both explained on the page: <strong>local admin</strong> — username <code>admin</code>, password from <code>.admin_password</code> on the host — or your own <strong>system user</strong> account (same password as SSH; accounts that only use SSH keys need a password set with <code>passwd</code> on the server first).</li>
+<li>Enter a username and password and sign in — a failed attempt shows an inline error.</li>
+<li>On success you are taken to <code>/app</code> (dashboard).</li>
+<li>Two common ways to sign in: <strong>local admin</strong> — username <code>admin</code>, password from <code>.admin_password</code> on the host — or your own <strong>system user</strong> account when PAM/OIDC is configured.</li>
 </ol>
-<p>If you can&#39;t sign in, confirm the account exists on the host and that the authentication service is reachable.</p>
-<ol start="5">
-<li><strong>Empty / fail:</strong> Check health, auth, and domain dependencies.</li>
-<li><strong>Success:</strong> Live data loads; mutations complete without error toasts.</li>
-</ol>
+<p>If you can&#39;t sign in, confirm the account exists and that <code>zyvor-fabricd</code> is reachable.</p>
 <h3>Related pages</h3>
 <ul>
+<li>Marketing home: <code>/</code></li>
+<li>Console dashboard: <code>/app</code></li>
 <li><a href="../../getting-started.md">Getting Started</a></li>
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
@@ -483,7 +480,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/create</code></li>
+<li>Route / id: <code>/app/create</code></li>
 <li>Nav: <strong>Core → Create VM</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -520,7 +517,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/datacenters</code></li>
+<li>Route / id: <code>/app/datacenters</code></li>
 <li>Nav: <strong>Core → Datacenters</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -551,7 +548,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/favorites</code></li>
+<li>Route / id: <code>/app/favorites</code></li>
 <li>Nav: <strong>Core → Favorites</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -573,24 +570,24 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <p>Dashboard — the fabric at a glance: how many VMs exist and in what state, live CPU/memory trends, and whether each backend subsystem is actually reachable.</p>
 <h3>When to use it</h3>
 <ul>
-<li>As your landing page — it&#39;s what loads at <code>/</code></li>
+<li>As your console landing page — it loads at <code>/app</code></li>
 <li>To check overall health before digging into a specific VM or subsystem</li>
 <li>Start here if you&#39;re new to the product; a first-time install lands somewhere useful, not an empty table</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/</code></li>
-<li>Nav: <strong>Core → Dashboard</strong> (sidebar, command palette, or desktop nav), or the logo in the top left</li>
+<li>Route: <code>/app</code></li>
+<li>Nav: <strong>Core → Dashboard</strong> (sidebar or command palette), or the wordmark in the top bar</li>
+<li>After sign-in at <code>/sign-in</code> you land here</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
 <ol>
-<li>Check subsystem status (VM driver, storage, network security, authentication, events) — each shows Live, Unreachable, or Off, with a short detail line.</li>
+<li>Check subsystem status (VM driver, storage, network security, authentication, events) — each shows Live, Unreachable, or Off.</li>
 <li>Read the stat cards: total VMs, running, stopped, and total allocated memory/vCPUs.</li>
-<li>Watch live CPU and memory usage charts, averaged across running VMs and updated continuously over WebSocket.</li>
-<li>Scan the VM table for a quick status check, or click <strong>View all</strong> to go to the full <a href="vms.md">Virtual Machines</a> list.</li>
-<li><strong>On a fresh install with no VMs yet</strong>, the empty table is replaced by a short &quot;Getting Started&quot; panel with direct links to the four places people usually go first: create your first VM, start from a template, try the API playground, or set up access control for your team.</li>
+<li>Watch live CPU and memory usage charts when VMs are running.</li>
+<li>Scan the VM table, or open <a href="vms.md">Virtual Machines</a>.</li>
+<li><strong>On a fresh install with no VMs yet</strong>, use Getting Started links to create a VM, templates, API playground, or access control.</li>
 </ol>
-<p>If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.</p>
 <h3>Related pages</h3>
 <ul>
 <li><a href="vms.md">Virtual Machines</a></li>
@@ -611,7 +608,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/machines</code></li>
+<li>Route / id: <code>/app/machines</code></li>
 <li>Nav: <strong>Core → Machines</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -645,7 +642,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/profiles</code></li>
+<li>Route / id: <code>/app/profiles</code></li>
 <li>Nav: <strong>Core → Profiles</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -672,12 +669,12 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/settings</code></li>
+<li>Route / id: <code>/app/settings</code></li>
 <li>Nav: <strong>Core → Settings</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
 <ol>
-<li>Open <code>/settings</code> and wait for live data from Zyvor Fabric.</li>
+<li>Open <code>/app/settings</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
 <li>Drill into a row or card for detail, then jump to related surfaces.</li>
 <li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
@@ -699,7 +696,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/vm-browser</code></li>
+<li>Route / id: <code>/app/vm-browser</code></li>
 <li>Nav: <strong>Core → VM Browser</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -755,7 +752,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/vms/:name/console</code></li>
+<li>Route / id: <code>/app/vms/:name/console</code></li>
 <li>From a VM&#39;s detail page, click <strong>Console</strong> in the header</li>
 <li>Nav: reached via <strong>Core → Virtual Machines</strong>, not linked directly from the top nav</li>
 </ul>
@@ -790,9 +787,9 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/vms</code></li>
+<li>Route / id: <code>/app/vms</code></li>
 <li>Nav: <strong>Core → Virtual Machines</strong> (sidebar, command palette, or desktop nav)</li>
-<li>A single VM&#39;s detail page is <code>/vms/:name</code>, reached by clicking its name here</li>
+<li>A single VM&#39;s detail page is <code>/app/vms/:name</code>, reached by clicking its name here</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
 <p><strong>On the list</strong></p>
@@ -804,7 +801,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Copy a VM&#39;s name straight from the list — hover the name and click the copy icon that appears next to it.</li>
 <li>Click a VM&#39;s name to open its detail page.</li>
 </ol>
-<p><strong>On a VM&#39;s detail page</strong> (<code>/vms/:name</code>)</p>
+<p><strong>On a VM&#39;s detail page</strong> (<code>/app/vms/:name</code>)</p>
 <ol>
 <li>Start, stop, pause, resume, restart, or clone the VM from the header actions.</li>
 <li>Open a real console — either the browser terminal (xterm.js) or a graphical VNC session — from the Console tab.</li>
@@ -831,7 +828,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/containers</code></li>
+<li>Route / id: <code>/app/containers</code></li>
 <li>Nav: <strong>Infrastructure → Containers</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -891,7 +888,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/network-security</code></li>
+<li>Route / id: <code>/app/network-security</code></li>
 <li>Nav: <strong>Infrastructure → Net Security</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -926,7 +923,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/network</code></li>
+<li>Route / id: <code>/app/network</code></li>
 <li>Nav: <strong>Infrastructure → Network</strong> (sidebar, command palette, or desktop nav)</li>
 <li>Per-VM networking is also managed from that VM&#39;s own <strong>Network</strong> tab on its detail page</li>
 </ul>
@@ -994,7 +991,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/storage-pools</code></li>
+<li>Route / id: <code>/app/storage-pools</code></li>
 <li>Nav: <strong>Infrastructure → Storage Pools</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1023,7 +1020,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/storage</code></li>
+<li>Route / id: <code>/app/storage</code></li>
 <li>Nav: <strong>Infrastructure → Storage</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1052,7 +1049,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/system-health</code></li>
+<li>Route / id: <code>/app/system-health</code></li>
 <li>Nav: <strong>Infrastructure → System Health</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1084,7 +1081,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/system</code></li>
+<li>Route / id: <code>/app/system</code></li>
 <li>Nav: <strong>Infrastructure → System</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1113,12 +1110,12 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/vm-pools</code></li>
+<li>Route / id: <code>/app/vm-pools</code></li>
 <li>Nav: <strong>Infrastructure → VM Pools</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
 <ol>
-<li>Open <code>/vm-pools</code> and wait for live data from Zyvor Fabric.</li>
+<li>Open <code>/app/vm-pools</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
 <li>Drill into a row or card for detail, then jump to related surfaces.</li>
 <li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
@@ -1169,7 +1166,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/alerts</code></li>
+<li>Route / id: <code>/app/alerts</code></li>
 <li>Nav: <strong>Monitoring → Alerts</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1199,7 +1196,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/analytics</code></li>
+<li>Route / id: <code>/app/analytics</code></li>
 <li>Nav: <strong>Monitoring → Analytics</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1230,7 +1227,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/audit</code></li>
+<li>Route / id: <code>/app/audit</code></li>
 <li>Nav: <strong>Monitoring → Audit</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1404,7 +1401,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/live-metrics</code></li>
+<li>Route / id: <code>/app/live-metrics</code></li>
 <li>Nav: <strong>Monitoring → Live Metrics</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -1434,7 +1431,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/logs</code></li>
+<li>Route / id: <code>/app/logs</code></li>
 <li>Nav: <strong>Monitoring → Logs</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2240,7 +2237,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/backups</code></li>
+<li>Route / id: <code>/app/backups</code></li>
 <li>Nav: <strong>Operations → Backups</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2270,7 +2267,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/bulk-operations</code></li>
+<li>Route / id: <code>/app/bulk-operations</code></li>
 <li>Nav: <strong>Operations → Bulk Operations</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2299,7 +2296,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/content-library</code></li>
+<li>Route / id: <code>/app/content-library</code></li>
 <li>Nav: <strong>Operations → Content Library</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2329,7 +2326,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/drs</code></li>
+<li>Route / id: <code>/app/drs</code></li>
 <li>Nav: <strong>Operations → DRS</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2360,7 +2357,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/fault-tolerance</code></li>
+<li>Route / id: <code>/app/fault-tolerance</code></li>
 <li>Nav: <strong>Operations → Fault Tolerance</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2389,7 +2386,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/lifecycle</code></li>
+<li>Route / id: <code>/app/lifecycle</code></li>
 <li>Nav: <strong>Operations → Lifecycle</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2444,7 +2441,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/migrations</code></li>
+<li>Route / id: <code>/app/migrations</code></li>
 <li>Nav: <strong>Operations → Migrations</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2479,7 +2476,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/quotas</code></li>
+<li>Route / id: <code>/app/quotas</code></li>
 <li>Nav: <strong>Operations → Quotas</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2509,7 +2506,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/replication</code></li>
+<li>Route / id: <code>/app/replication</code></li>
 <li>Nav: <strong>Operations → Replication</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2538,7 +2535,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/schedules</code></li>
+<li>Route / id: <code>/app/schedules</code></li>
 <li>Nav: <strong>Operations → Schedules</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2574,7 +2571,7 @@ A checkbox enables the schedule immediately on creation.</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/site-recovery</code></li>
+<li>Route / id: <code>/app/site-recovery</code></li>
 <li>Nav: <strong>Operations → Site Recovery</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2609,7 +2606,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/snapshots</code></li>
+<li>Route / id: <code>/app/snapshots</code></li>
 <li>Nav: <strong>Operations → Snapshots</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2638,7 +2635,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/templates</code></li>
+<li>Route / id: <code>/app/templates</code></li>
 <li>Nav: <strong>Operations → Templates</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2668,7 +2665,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/access-control</code></li>
+<li>Route / id: <code>/app/access-control</code></li>
 <li>Nav: <strong>Security → Access Control</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2699,7 +2696,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/certificates</code></li>
+<li>Route / id: <code>/app/certificates</code></li>
 <li>Nav: <strong>Security → Certificates</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2731,7 +2728,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/compliance</code></li>
+<li>Route / id: <code>/app/compliance</code></li>
 <li>Nav: <strong>Security → Compliance</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2761,7 +2758,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/encryption</code></li>
+<li>Route / id: <code>/app/encryption</code></li>
 <li>Nav: <strong>Security → Encryption</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
@@ -2923,12 +2920,12 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </ul>
 <h3>How to get there</h3>
 <ul>
-<li>Route / id: <code>/playground</code></li>
+<li>Route / id: <code>/app/playground</code></li>
 <li>Nav: <strong>Tools → API Playground</strong> (sidebar, command palette, or desktop nav)</li>
 </ul>
 <h3>Operate from the console (UX)</h3>
 <ol>
-<li>Open <code>/playground</code> and wait for live data from Zyvor Fabric.</li>
+<li>Open <code>/app/playground</code> and wait for live data from Zyvor Fabric.</li>
 <li>Use filters and search when the page provides them.</li>
 <li>Drill into a row or card for detail, then jump to related surfaces.</li>
 <li>For mutating actions: review impact, role gates, and confirmation dialogs first.</li>
@@ -3030,7 +3027,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <hr>
 <h2>Zyvor Fabric — Complete page index</h2>
 <p>Every primary navigable dashboard route.</p>
-<p><em>Generated: 2026-08-29 · 84 routes</em></p>
+<p><em>Generated: 2026-09-01 · 84 routes</em></p>
 <p>Regenerate: <code>node scripts/customer-docs/generate-page-index.mjs</code></p>
 <h3>Core</h3>
 <table>
@@ -3619,9 +3616,9 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 </thead>
 <tbody><tr>
 <td>Login</td>
-<td><code>/sign-in</code></td>
+<td><code>/login</code></td>
 <td>Login — Auth surface.</td>
-<td><a href="pages/auth/sign-in.md">Open</a></td>
+<td><a href="pages/auth/login.md">Open</a></td>
 </tr>
 </tbody></table>
 <h3>Related</h3>

@@ -73,4 +73,4 @@ npm run build
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the proprietary (see LICENSE) License.
+By contributing, you agree that your contributions will be licensed under the Apache License, Version 2.0 (see [LICENSE](LICENSE)).

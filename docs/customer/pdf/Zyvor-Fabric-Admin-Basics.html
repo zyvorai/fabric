@@ -24,8 +24,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
 <h1>Zyvor <span>Fabric</span></h1>
 <div class="sub">Admin Basics</div>
-<div class="badge">2026-08-29</div>
-<div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
+<div class="badge">2026-09-01</div>
+<div class="foot">zyvor.dev · Apache License 2.0</div></section>
 <main><h2>Ports / access</h2>
 <table>
 <thead>
@@ -36,15 +36,17 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </thead>
 <tbody><tr>
 <td><strong>9095</strong></td>
-<td>Daemon / API</td>
+<td>Daemon / API / production web UI</td>
 </tr>
 <tr>
-<td><strong>3000</strong></td>
+<td><strong>5173</strong></td>
 <td>Vite UI (dev)</td>
 </tr>
 </tbody></table>
+<p>Web routes: marketing <code>/</code>, <code>/product</code>, <code>/platform</code>, <code>/security</code>; sign-in <code>/sign-in</code>; console <code>/app/*</code>.</p>
 <h2>Auth</h2>
-<p>External OIDC + JWT bearer.</p>
+<p>JWT bearer (local admin by default). Optional LDAP/OIDC.</p>
+<p>Sign in at <code>http://127.0.0.1:9095/sign-in</code>, then open <code>/app</code>.</p>
 <h3>JWT secret and admin password</h3>
 <p>Both are auto-generated (cryptographically random, 64 chars) on first start if unset, and
 persisted to disk so they survive restarts — never a hardcoded or predictable default:</p>

@@ -24,36 +24,29 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
 <h1>Zyvor <span>Fabric</span></h1>
 <div class="sub">Getting Started</div>
-<div class="badge">2026-08-29</div>
-<div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
+<div class="badge">2026-09-01</div>
+<div class="foot">zyvor.dev · Apache License 2.0</div></section>
 <main><h2>What you need</h2>
-<p>See <a href="admin-basics.md">Admin basics</a> for ports and auth. Summary:</p>
-<p>Open the Fabric web UI against the daemon API (<code>:9095</code>).</p>
+<p>See <a href="admin-basics.md">Admin basics</a> for ports and auth. Summary: open the Fabric web UI against the daemon API (<code>:9095</code>).</p>
 <h2>1. Open the product</h2>
-<p>Open the Fabric web UI against the daemon API (<code>:9095</code>).</p>
-<h2>2. Sign in / authenticate</h2>
-<p>External OIDC + JWT bearer.</p>
+<p>Browse to <code>http://127.0.0.1:9095/</code> — the marketing home. Product pages: <code>/product</code>, <code>/platform</code>, <code>/security</code>.</p>
+<h2>2. Sign in</h2>
+<p>Open <code>/sign-in</code> (legacy <code>/login</code> redirects here). Use <code>admin</code> and the generated password (<code>./zyvor-fabricd-ctl password</code>).</p>
 <h2>3. Orient yourself</h2>
-<p>Use the quick map on the <a href="README.md">customer docs home</a>, then open the home surface (<code>/</code>).</p>
+<p>After sign-in you land on the console at <code>/app</code>. Use the left nav or <code>Ctrl/Cmd+K</code>. See <a href="using-the-dashboard.md">Using the Dashboard</a> and the <a href="PAGE_INDEX.md">page index</a>.</p>
 <h2>4. First workflows</h2>
-<p>Follow <a href="workflows.md">Common workflows</a> for the shortest useful paths.</p>
+<p>Follow <a href="workflows.md">Common workflows</a> for the shortest useful paths (create a VM at <code>/app/create</code>, open <code>/app/vms</code>).</p>
 <h2>Next steps</h2>
 <ul>
 <li><a href="using-the-dashboard.md">Using the Dashboard</a></li>
 <li><a href="admin-basics.md">Admin basics</a></li>
 <li><a href="pages/README.md">Page guides</a></li>
+<li><a href="../getting-started/04-Web-UI.md">Web UI guide</a></li>
 </ul>
-<h2>Operate from the console (UX)</h2>
-<ol>
-<li>Open this route from the nav or command palette and wait for live API data.</li>
-<li>Use filters/search when present; drill into a row for detail.</li>
-<li>For mutating actions: confirm role gates and impact before applying.</li>
-<li><strong>Empty / fail:</strong> Check service health, auth, and that required CRDs/backends for this domain are installed.</li>
-<li><strong>Success:</strong> Live data loads; created/updated objects appear without error toasts.</li>
-</ol>
 <hr>
 <p>Zyvor Fabric is organized by navigation groups (sidebar, desktop nav, or CLI command groups). Use search / command palette when available.</p>
 <h2>Surfaces</h2>
+<p>Public marketing: <code>/</code>, <code>/product</code>, <code>/platform</code>, <code>/security</code>. Sign in at <code>/sign-in</code>. Console lives under <code>/app</code>.</p>
 <table>
 <thead>
 <tr>
@@ -63,23 +56,23 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </thead>
 <tbody><tr>
 <td>Dashboard</td>
-<td><code>/</code></td>
+<td><code>/app</code></td>
 </tr>
 <tr>
 <td>VMs</td>
-<td><code>/vms</code></td>
+<td><code>/app/vms</code></td>
 </tr>
 <tr>
 <td>DRS / FT</td>
-<td><code>/drs</code>, <code>/fault-tolerance</code></td>
+<td><code>/app/drs</code>, <code>/app/fault-tolerance</code></td>
 </tr>
 <tr>
 <td>Site Recovery</td>
-<td><code>/site-recovery</code></td>
+<td><code>/app/site-recovery</code></td>
 </tr>
 <tr>
 <td>Settings</td>
-<td><code>/settings</code></td>
+<td><code>/app/settings</code></td>
 </tr>
 </tbody></table>
 <h2>Browse vs act</h2>
