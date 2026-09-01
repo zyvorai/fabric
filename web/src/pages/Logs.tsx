@@ -3,9 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Terminal, Filter, Download, Trash2, RefreshCw } from 'lucide-react'
+import { Filter, Download, Trash2 } from 'lucide-react'
 import { apiGet } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -97,26 +98,32 @@ export default function Logs() {
 
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'INFO': return 'text-cyan-400'
-      case 'WARN': case 'WARNING': return 'text-amber-600'
-      case 'ERROR': case 'CRITICAL': return 'text-red-600'
-      case 'DEBUG': return 'text-[#6e6e73]'
-      default: return 'text-[#1d1d1f]'
+      case 'INFO': return 'text-[var(--zf-link)]'
+      case 'WARN': case 'WARNING': return 'text-amber-800'
+      case 'ERROR': case 'CRITICAL': return 'text-red-700'
+      case 'DEBUG': return 'text-[var(--zf-muted)]'
+      default: return 'text-[var(--zf-ink)]'
     }
   }
 
   const getLevelBg = (level: string) => {
     switch (level) {
-      case 'INFO': return 'bg-cyan-500/10 border-cyan-500/20'
-      case 'WARN': case 'WARNING': return 'bg-yellow-500/10 border-yellow-500/20'
-      case 'ERROR': case 'CRITICAL': return 'bg-red-500/10 border-red-500/20'
-      case 'DEBUG': return 'bg-black/[0.04] border-[#d2d2d7]'
-      default: return 'bg-white'
+      case 'INFO': return 'bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
+      case 'WARN': case 'WARNING': return 'bg-amber-50 border-amber-200'
+      case 'ERROR': case 'CRITICAL': return 'bg-red-50 border-red-200'
+      case 'DEBUG': return 'bg-black/[0.04] border-[var(--zf-hairline)]'
+      default: return 'bg-[var(--zf-surface)] border-[var(--zf-hairline)]'
     }
   }
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Logs"
+        description="Live audit and system event stream"
+        onRefresh={() => void loadLogs()}
+        actions={<span className="text-sm text-[var(--zf-muted)]">{filteredLogs.length} entries</span>}
+      />
       {loadError && (
         <ErrorBanner
           title="Could not load logs"
@@ -125,36 +132,20 @@ export default function Logs() {
           onRetry={loadLogs}
         />
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <Terminal className="w-8 h-8" />
-          System Logs
-        </h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => void loadLogs()}
-            className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition text-sm"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-          <span className="text-sm text-[#6e6e73]">{filteredLogs.length} entries</span>
-        </div>
-      </div>
 
       {/* Controls */}
-      <div className="bg-[#f5f5f7] rounded-lg p-4 border border-[#d2d2d7]">
+      <div className="bg-[var(--zf-canvas)] rounded-lg p-4 border border-[var(--zf-hairline)]">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#6e6e73]" />
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--zf-muted)]" />
               <input
                 type="text"
                 placeholder="Filter logs..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 pl-10 pr-4 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
+                className="input-field pl-10"
               />
             </div>
           </div>
@@ -164,7 +155,7 @@ export default function Logs() {
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="input-field"
             >
               <option value="ALL">All Levels</option>
               <option value="INFO">INFO</option>
@@ -178,14 +169,14 @@ export default function Logs() {
           <div className="flex gap-2">
             <button
               onClick={exportLogs}
-              className="flex-1 flex items-center justify-center gap-2 bg-[#0066cc] hover:bg-[#0077ed] text-white py-2 px-4 rounded-lg transition"
+              className="zf-btn zf-btn-primary flex-1"
             >
               <Download className="w-4 h-4" />
               Export
             </button>
             <button
               onClick={clearLogs}
-              className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition"
+              className="zf-btn zf-btn-danger"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -199,43 +190,43 @@ export default function Logs() {
             id="autoScroll"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-white border-[#d2d2d7] rounded focus:ring-blue-500"
+            className="w-4 h-4 rounded border-[var(--zf-hairline)]"
           />
-          <label htmlFor="autoScroll" className="text-sm text-[#6e6e73]">
+          <label htmlFor="autoScroll" className="text-sm text-[var(--zf-muted)]">
             Auto-scroll to new logs
           </label>
         </div>
       </div>
 
       {/* Log Stream */}
-      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] overflow-hidden">
+      <div className="bg-[var(--zf-canvas)] rounded-lg border border-[var(--zf-hairline)] overflow-hidden">
         <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-[#6e6e73]">
+            <div className="flex items-center justify-center h-full text-[var(--zf-muted)]">
               Loading logs...
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-[#6e6e73]">
+            <div className="flex items-center justify-center h-full text-[var(--zf-muted)]">
               No logs to display
             </div>
           ) : (
-            <div className="divide-y divide-[#d2d2d7]">
+            <div className="divide-y divide-[var(--zf-hairline)]">
               {filteredLogs.map((log, index) => (
                 <div
                   key={log.id || index}
-                  className={`p-3 hover:bg-white/[0.03] transition ${getLevelBg(log.level)} border-l-4`}
+                  className={`p-3 hover:bg-black/[0.02] transition ${getLevelBg(log.level)} border-l-4`}
                 >
                   <div className="flex items-start gap-4">
-                    <span className="text-[#6e6e73] text-xs whitespace-nowrap">
+                    <span className="text-[var(--zf-muted)] text-xs whitespace-nowrap">
                       {log.timestamp.length > 19 ? log.timestamp.slice(0, 19).replace('T', ' ') : log.timestamp}
                     </span>
                     <span className={`font-bold text-xs whitespace-nowrap ${getLevelColor(log.level)}`}>
                       {log.level}
                     </span>
-                    <span className="text-[#6e6e73] text-xs whitespace-nowrap">
+                    <span className="text-[var(--zf-muted)] text-xs whitespace-nowrap">
                       [{log.source}]
                     </span>
-                    <span className="text-[#1d1d1f] flex-1">
+                    <span className="text-[var(--zf-ink)] flex-1">
                       {log.message}
                     </span>
                   </div>

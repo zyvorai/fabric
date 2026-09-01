@@ -21,16 +21,16 @@ interface StreamEvent {
 function levelColor(level: string): string {
   switch (level) {
     case 'error': return 'text-red-600'
-    case 'warning': return 'text-amber-400'
-    case 'debug': return 'text-[#6e6e73]'
-    default: return 'text-[#0066cc]'
+    case 'warning': return 'text-amber-600'
+    case 'debug': return 'text-[var(--zf-muted)]'
+    default: return 'text-[var(--zf-link)]'
   }
 }
 
 function levelBg(level: string): string {
   switch (level) {
-    case 'error': return 'bg-red-500/10'
-    case 'warning': return 'bg-amber-500/10'
+    case 'error': return 'bg-red-50'
+    case 'warning': return 'bg-amber-50'
     default: return ''
   }
 }
@@ -104,15 +104,15 @@ export default function EventStream() {
 
       <div className="flex flex-wrap items-center gap-3">
         <span
-          className={`inline-flex items-center gap-2 text-sm ${connected ? 'text-emerald-600' : 'text-amber-400'}`}
+          className={`inline-flex items-center gap-2 text-sm ${connected ? 'text-emerald-600' : 'text-amber-600'}`}
         >
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
           {connected ? 'Connected' : 'Reconnecting…'}
         </span>
         <button
           type="button"
           onClick={() => setPaused(!paused)}
-          className="btn-secondary flex items-center gap-2 text-sm"
+          className="zf-btn zf-btn-ghost zf-btn-sm"
         >
           {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
           {paused ? 'Resume' : 'Pause'}
@@ -120,12 +120,12 @@ export default function EventStream() {
         <button
           type="button"
           onClick={() => setEvents([])}
-          className="btn-secondary flex items-center gap-2 text-sm"
+          className="zf-btn zf-btn-ghost zf-btn-sm"
         >
           <Trash2 className="w-4 h-4" />
           Clear
         </button>
-        <div className="flex items-center gap-2 text-sm text-[#6e6e73]">
+        <div className="flex items-center gap-2 text-sm text-[var(--zf-muted)]">
           <Filter className="w-4 h-4" />
           <select
             value={levelFilter}
@@ -143,20 +143,20 @@ export default function EventStream() {
 
       <div
         ref={containerRef}
-        className="rounded-xl border border-[#d2d2d7] bg-white max-h-[70vh] overflow-y-auto font-mono text-sm"
+        className="rounded-xl border border-[var(--zf-hairline)] bg-white max-h-[70vh] overflow-y-auto font-mono text-sm"
       >
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-[#6e6e73]">Waiting for events…</div>
+          <div className="p-8 text-center text-[var(--zf-muted)]">Waiting for events…</div>
         ) : (
           filtered.map((ev) => (
             <div
               key={ev.id}
-              className={`flex gap-3 px-4 py-2 border-b border-[#d2d2d7] ${levelBg(ev.level)}`}
+              className={`flex gap-3 px-4 py-2 border-b border-[var(--zf-hairline)] ${levelBg(ev.level)}`}
             >
-              <span className="text-[#6e6e73] shrink-0">{ev.timestamp.toLocaleTimeString()}</span>
+              <span className="text-[var(--zf-muted)] shrink-0">{ev.timestamp.toLocaleTimeString()}</span>
               <span className={`shrink-0 uppercase text-xs font-bold ${levelColor(ev.level)}`}>{ev.level}</span>
-              <span className="text-cyan-400 shrink-0">{ev.source}</span>
-              <span className="text-[#1d1d1f] truncate">{ev.message}</span>
+              <span className="text-[var(--zf-ink)] font-medium shrink-0">{ev.source}</span>
+              <span className="text-[var(--zf-ink)] truncate">{ev.message}</span>
             </div>
           ))
         )}

@@ -22,7 +22,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { PageHeader } from '../components/ui'
+import { PageHeader, Modal, EmptyState } from '../components/ui'
 import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
@@ -119,20 +119,20 @@ export default function Notifications() {
 
   const getChannelIcon = (type: string) => {
     switch (type) {
-      case 'email': return <Mail className="w-5 h-5 text-blue-500" />
-      case 'slack': return <MessageSquare className="w-5 h-5 text-purple-500" />
-      case 'webhook': return <Webhook className="w-5 h-5 text-green-500" />
-      case 'teams': return <MessageSquare className="w-5 h-5 text-cyan-500" />
-      default: return <Bell className="w-5 h-5 text-[#6e6e73]" />
+      case 'email': return <Mail className="w-5 h-5 text-[var(--zf-ink)]" />
+      case 'slack': return <MessageSquare className="w-5 h-5 text-[var(--zf-ink)]" />
+      case 'webhook': return <Webhook className="w-5 h-5 text-[var(--zf-ink)]" />
+      case 'teams': return <MessageSquare className="w-5 h-5 text-[var(--zf-ink)]" />
+      default: return <Bell className="w-5 h-5 text-[var(--zf-muted)]" />
     }
   }
 
   const getSeverityColor = (severity: string): string => {
     switch (severity) {
-      case 'critical': return 'bg-red-600'
-      case 'warning': return 'bg-yellow-600'
-      case 'info': return 'bg-[#0066cc]'
-      default: return 'bg-[#e8e8ed]'
+      case 'critical': return 'text-red-700 bg-red-50 border-red-200'
+      case 'warning': return 'text-amber-800 bg-amber-50 border-amber-200'
+      case 'info': return 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
+      default: return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
     }
   }
 
@@ -156,13 +156,13 @@ export default function Notifications() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-[#d2d2d7]">
+      <div className="flex gap-4 mb-6 border-b border-[var(--zf-hairline)]">
         <button
           onClick={() => setActiveTab('channels')}
           className={`px-4 py-2 font-medium transition ${
             activeTab === 'channels'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+              ? 'text-[var(--zf-link)] border-b-2 border-[var(--zf-link)]'
+              : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
           }`}
         >
           Channels ({channels.length})
@@ -171,8 +171,8 @@ export default function Notifications() {
           onClick={() => setActiveTab('rules')}
           className={`px-4 py-2 font-medium transition ${
             activeTab === 'rules'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+              ? 'text-[var(--zf-link)] border-b-2 border-[var(--zf-link)]'
+              : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
           }`}
         >
           Rules ({rules.length})
@@ -181,8 +181,8 @@ export default function Notifications() {
           onClick={() => setActiveTab('history')}
           className={`px-4 py-2 font-medium transition ${
             activeTab === 'history'
-              ? 'text-blue-500 border-b-2 border-blue-500'
-              : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+              ? 'text-[var(--zf-link)] border-b-2 border-[var(--zf-link)]'
+              : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
           }`}
         >
           History ({history.length})
@@ -193,10 +193,10 @@ export default function Notifications() {
       {activeTab === 'channels' && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Notification Channels</h2>
+            <h2 className="text-xl font-bold text-[var(--zf-ink)]">Notification Channels</h2>
             <button
               onClick={() => setShowCreateChannel(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+              className="zf-btn zf-btn-primary"
             >
               <Plus className="w-4 h-4" />
               Add Channel
@@ -204,36 +204,40 @@ export default function Notifications() {
           </div>
 
           {channels.length === 0 ? (
-            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-              <Bell className="w-16 h-16 text-[#6e6e73] mx-auto mb-4" />
-              <p className="text-xl text-[#6e6e73] mb-4">No notification channels</p>
-              <p className="text-[#6e6e73] mb-6">Add a channel to receive notifications</p>
-              <button
-                onClick={() => setShowCreateChannel(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
-              >
-                <Plus className="w-4 h-4" />
-                Add First Channel
-              </button>
+            <div className="zf-panel">
+              <EmptyState
+                icon={<Bell className="w-6 h-6" />}
+                title="No notification channels"
+                description="Add a channel to receive notifications"
+                action={
+                  <button
+                    onClick={() => setShowCreateChannel(true)}
+                    className="zf-btn zf-btn-primary"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add First Channel
+                  </button>
+                }
+              />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {channels.map((channel) => (
                 <div
                   key={channel.id}
-                  className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4"
+                  className="zf-panel p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       {getChannelIcon(channel.type)}
                       <div>
-                        <h3 className="font-bold">{channel.name}</h3>
-                        <p className="text-xs text-[#6e6e73] capitalize">{channel.type}</p>
+                        <h3 className="font-bold text-[var(--zf-ink)]">{channel.name}</h3>
+                        <p className="text-xs text-[var(--zf-muted)] capitalize">{channel.type}</p>
                       </div>
                     </div>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        channel.enabled ? 'bg-green-600' : 'bg-[#e8e8ed]'
+                      className={`px-2 py-1 rounded text-xs font-medium border ${
+                        channel.enabled ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
                       }`}
                     >
                       {channel.enabled ? 'Enabled' : 'Disabled'}
@@ -244,17 +248,17 @@ export default function Notifications() {
                     <button
                       onClick={() => handleTestChannel(channel.id, channel.name)}
                       disabled={!channel.enabled}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      className="flex-1 zf-btn zf-btn-ghost zf-btn-sm"
                     >
-                      <Send className="w-4 h-4" />
+                      <Send className="w-3.5 h-3.5" />
                       Test
                     </button>
                     <button
                       onClick={() => handleDeleteChannel(channel.id)}
-                      className="p-2 bg-red-600 hover:bg-red-700 rounded transition"
+                      className="zf-btn zf-btn-danger zf-btn-sm"
                       title="Delete"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -268,10 +272,10 @@ export default function Notifications() {
       {activeTab === 'rules' && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Notification Rules</h2>
+            <h2 className="text-xl font-bold text-[var(--zf-ink)]">Notification Rules</h2>
             <button
               onClick={() => setShowCreateRule(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+              className="zf-btn zf-btn-primary"
             >
               <Plus className="w-4 h-4" />
               Create Rule
@@ -279,56 +283,60 @@ export default function Notifications() {
           </div>
 
           {rules.length === 0 ? (
-            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-              <Bell className="w-16 h-16 text-[#6e6e73] mx-auto mb-4" />
-              <p className="text-xl text-[#6e6e73] mb-4">No notification rules</p>
-              <p className="text-[#6e6e73] mb-6">Create rules to trigger notifications</p>
-              <button
-                onClick={() => setShowCreateRule(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
-              >
-                <Plus className="w-4 h-4" />
-                Create First Rule
-              </button>
+            <div className="zf-panel">
+              <EmptyState
+                icon={<Bell className="w-6 h-6" />}
+                title="No notification rules"
+                description="Create rules to trigger notifications"
+                action={
+                  <button
+                    onClick={() => setShowCreateRule(true)}
+                    className="zf-btn zf-btn-primary"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create First Rule
+                  </button>
+                }
+              />
             </div>
           ) : (
             <div className="space-y-4">
               {rules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4"
+                  className="zf-panel p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-bold">{rule.name}</h3>
+                        <h3 className="font-bold text-[var(--zf-ink)]">{rule.name}</h3>
                         <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            rule.enabled ? 'bg-green-600' : 'bg-[#e8e8ed]'
+                          className={`px-2 py-1 rounded text-xs font-medium border ${
+                            rule.enabled ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
                           }`}
                         >
                           {rule.enabled ? 'Enabled' : 'Disabled'}
                         </span>
                       </div>
                       {rule.description && (
-                        <p className="text-sm text-[#6e6e73] mb-2">{rule.description}</p>
+                        <p className="text-sm text-[var(--zf-muted)] mb-2">{rule.description}</p>
                       )}
                       <div className="flex flex-wrap gap-2 mb-2">
                         {rule.event_types.slice(0, 3).map((event) => (
                           <span
                             key={event}
-                            className="px-2 py-1 bg-[#0066cc] rounded text-xs"
+                            className="px-2 py-1 rounded text-xs border text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]"
                           >
                             {event}
                           </span>
                         ))}
                         {rule.event_types.length > 3 && (
-                          <span className="px-2 py-1 bg-white rounded text-xs">
+                          <span className="px-2 py-1 rounded text-xs border text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]">
                             +{rule.event_types.length - 3} more
                           </span>
                         )}
                       </div>
-                      <div className="flex gap-2 text-xs text-[#6e6e73]">
+                      <div className="flex gap-2 text-xs text-[var(--zf-muted)]">
                         <span>Triggered: {rule.triggered_count} times</span>
                         {rule.last_triggered && (
                           <span>• Last: <RelativeTime date={rule.last_triggered} /></span>
@@ -339,10 +347,10 @@ export default function Notifications() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleToggleRule(rule)}
-                        className={`p-2 rounded transition ${
+                        className={`p-2 rounded border transition ${
                           rule.enabled
-                            ? 'bg-yellow-600 hover:bg-yellow-700'
-                            : 'bg-green-600 hover:bg-green-700'
+                            ? 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100'
+                            : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
                         }`}
                         title={rule.enabled ? 'Disable' : 'Enable'}
                       >
@@ -354,10 +362,10 @@ export default function Notifications() {
                       </button>
                       <button
                         onClick={() => handleDeleteRule(rule.id)}
-                        className="p-2 bg-red-600 hover:bg-red-700 rounded transition"
+                        className="zf-btn zf-btn-danger zf-btn-sm"
                         title="Delete"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -371,55 +379,55 @@ export default function Notifications() {
       {/* History Tab */}
       {activeTab === 'history' && (
         <div>
-          <h2 className="text-xl font-bold mb-4">Notification History</h2>
+          <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Notification History</h2>
           {history.length === 0 ? (
-            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-              <p className="text-[#6e6e73]">No notification history yet</p>
+            <div className="text-center py-12 zf-panel">
+              <p className="text-[var(--zf-muted)]">No notification history yet</p>
             </div>
           ) : (
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg overflow-hidden">
+            <div className="zf-panel overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-white">
+                  <thead className="bg-[var(--zf-canvas)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                         Timestamp
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                         Rule
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                         Event
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                         VM
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                         Channel
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                         Status
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#d2d2d7]">
+                  <tbody className="divide-y divide-[var(--zf-hairline)]">
                     {history.map((item) => (
-                      <tr key={item.id} className="hover:bg-white">
-                        <td className="px-4 py-3 text-sm text-[#6e6e73]">
+                      <tr key={item.id} className="hover:bg-black/[0.03]">
+                        <td className="px-4 py-3 text-sm text-[var(--zf-muted)]">
                           <RelativeTime date={item.sent_at} />
                         </td>
-                        <td className="px-4 py-3 text-sm">{item.rule_name}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--zf-ink)]">{item.rule_name}</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(item.severity)}`}>
+                          <span className={`px-2 py-1 rounded text-xs font-medium border ${getSeverityColor(item.severity)}`}>
                             {item.event_type}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm">{item.vm_name || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-[#6e6e73]">{item.channel}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--zf-ink)]">{item.vm_name || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--zf-muted)]">{item.channel}</td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              item.status === 'sent' ? 'bg-green-600' : 'bg-red-600'
+                            className={`px-2 py-1 rounded text-xs font-medium border ${
+                              item.status === 'sent' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-red-700 bg-red-50 border-red-200'
                             }`}
                           >
                             {item.status.toUpperCase()}
@@ -508,89 +516,87 @@ function CreateChannelModal({ onClose, onCreated }: { onClose: () => void; onCre
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-6 max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Add Notification Channel</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Add Notification Channel</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
+            className="input-field" placeholder="e.g. ops-slack" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Type</label>
+          <select value={type} onChange={(e) => setType(e.target.value as ChannelType)}
+            className="input-field">
+            <option value="webhook">Webhook</option>
+            <option value="slack">Slack</option>
+            <option value="teams">Microsoft Teams</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+
+        {type === 'webhook' && (
           <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="e.g. ops-slack" />
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Webhook URL</label>
+            <input type="url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} required
+              className="input-field" placeholder="https://..." />
           </div>
+        )}
+
+        {type === 'slack' && (
           <div>
-            <label className="block text-sm font-medium mb-1">Type</label>
-            <select value={type} onChange={(e) => setType(e.target.value as ChannelType)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
-              <option value="webhook">Webhook</option>
-              <option value="slack">Slack</option>
-              <option value="teams">Microsoft Teams</option>
-              <option value="email">Email</option>
-            </select>
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Slack Webhook URL</label>
+            <input type="url" value={slackWebhookUrl} onChange={(e) => setSlackWebhookUrl(e.target.value)} required
+              className="input-field" placeholder="https://hooks.slack.com/services/..." />
           </div>
+        )}
 
-          {type === 'webhook' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Webhook URL</label>
-              <input type="url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} required
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://..." />
-            </div>
-          )}
+        {type === 'teams' && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Teams Webhook URL</label>
+            <input type="url" value={teamsWebhookUrl} onChange={(e) => setTeamsWebhookUrl(e.target.value)} required
+              className="input-field" placeholder="https://xxx.webhook.office.com/..." />
+          </div>
+        )}
 
-          {type === 'slack' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Slack Webhook URL</label>
-              <input type="url" value={slackWebhookUrl} onChange={(e) => setSlackWebhookUrl(e.target.value)} required
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://hooks.slack.com/services/..." />
-            </div>
-          )}
-
-          {type === 'teams' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Teams Webhook URL</label>
-              <input type="url" value={teamsWebhookUrl} onChange={(e) => setTeamsWebhookUrl(e.target.value)} required
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="https://xxx.webhook.office.com/..." />
-            </div>
-          )}
-
-          {type === 'email' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">SMTP Host</label>
-                  <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} required
-                    className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="smtp.example.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">SMTP Port</label>
-                  <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} required
-                    className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
-                </div>
+        {type === 'email' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">SMTP Host</label>
+                <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} required
+                  className="input-field" placeholder="smtp.example.com" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">From Address</label>
-                <input type="email" value={fromAddress} onChange={(e) => setFromAddress(e.target.value)} required
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="alerts@example.com" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">To Address</label>
-                <input type="email" value={toAddress} onChange={(e) => setToAddress(e.target.value)} required
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="oncall@example.com" />
+                <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">SMTP Port</label>
+                <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} required
+                  className="input-field" />
               </div>
             </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving}
-              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50">
-              {saving ? 'Creating…' : 'Create Channel'}
-            </button>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">From Address</label>
+              <input type="email" value={fromAddress} onChange={(e) => setFromAddress(e.target.value)} required
+                className="input-field" placeholder="alerts@example.com" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">To Address</label>
+              <input type="email" value={toAddress} onChange={(e) => setToAddress(e.target.value)} required
+                className="input-field" placeholder="oncall@example.com" />
+            </div>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving}
+            className="zf-btn zf-btn-primary">
+            {saving ? 'Creating…' : 'Create Channel'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -638,68 +644,66 @@ function CreateRuleModal({ channels, onClose, onCreated }: { channels: Notificat
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">Create Notification Rule</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="e.g. vm-failures-to-oncall" />
+    <Modal open onClose={onClose} className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Create Notification Rule</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required
+            className="input-field" placeholder="e.g. vm-failures-to-oncall" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Description (optional)</label>
+          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+            className="input-field" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Event types</label>
+          <div className="flex flex-wrap gap-2">
+            {RULE_EVENT_TYPES.map((et) => (
+              <button type="button" key={et} onClick={() => toggle(eventTypes, et, setEventTypes)}
+                className={`px-2.5 py-1 rounded text-xs font-mono transition border ${eventTypes.includes(et) ? 'bg-[var(--zf-ink)] text-white border-[var(--zf-ink)]' : 'bg-[var(--zf-surface)] text-[var(--zf-muted)] border-[var(--zf-hairline)]'}`}>
+                {et}
+              </button>
+            ))}
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Description (optional)</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Severity</label>
+          <div className="flex gap-2">
+            {RULE_SEVERITIES.map((sev) => (
+              <button type="button" key={sev} onClick={() => toggle(severityLevels, sev, setSeverityLevels)}
+                className={`px-3 py-1.5 rounded text-sm capitalize transition border ${severityLevels.includes(sev) ? 'bg-[var(--zf-ink)] text-white border-[var(--zf-ink)]' : 'bg-[var(--zf-surface)] text-[var(--zf-muted)] border-[var(--zf-hairline)]'}`}>
+                {sev}
+              </button>
+            ))}
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Event types</label>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Channels</label>
+          {channels.length === 0 ? (
+            <p className="text-sm text-[var(--zf-muted)]">No channels yet — add one first.</p>
+          ) : (
             <div className="flex flex-wrap gap-2">
-              {RULE_EVENT_TYPES.map((et) => (
-                <button type="button" key={et} onClick={() => toggle(eventTypes, et, setEventTypes)}
-                  className={`px-2.5 py-1 rounded text-xs font-mono transition ${eventTypes.includes(et) ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
-                  {et}
+              {channels.map((ch) => (
+                <button type="button" key={ch.id} onClick={() => toggle(selectedChannels, ch.id, setSelectedChannels)}
+                  className={`px-3 py-1.5 rounded text-sm transition border ${selectedChannels.includes(ch.id) ? 'bg-[var(--zf-ink)] text-white border-[var(--zf-ink)]' : 'bg-[var(--zf-surface)] text-[var(--zf-muted)] border-[var(--zf-hairline)]'}`}>
+                  {ch.name}
                 </button>
               ))}
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Severity</label>
-            <div className="flex gap-2">
-              {RULE_SEVERITIES.map((sev) => (
-                <button type="button" key={sev} onClick={() => toggle(severityLevels, sev, setSeverityLevels)}
-                  className={`px-3 py-1.5 rounded text-sm capitalize transition ${severityLevels.includes(sev) ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
-                  {sev}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Channels</label>
-            {channels.length === 0 ? (
-              <p className="text-sm text-[#6e6e73]">No channels yet — add one first.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {channels.map((ch) => (
-                  <button type="button" key={ch.id} onClick={() => toggle(selectedChannels, ch.id, setSelectedChannels)}
-                    className={`px-3 py-1.5 rounded text-sm transition ${selectedChannels.includes(ch.id) ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
-                    {ch.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving || channels.length === 0}
-              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition disabled:opacity-50">
-              {saving ? 'Creating…' : 'Create Rule'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving || channels.length === 0}
+            className="zf-btn zf-btn-primary">
+            {saving ? 'Creating…' : 'Create Rule'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }

@@ -18,6 +18,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import RelativeTime from '../components/RelativeTime'
+import { PageHeader } from '../components/ui'
 
 export default function Snapshots() {
   const { confirmState, confirm, cancel } = useConfirm()
@@ -77,15 +78,10 @@ export default function Snapshots() {
           onRetry={loadSnapshots}
         />
       )}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">VM Snapshots</h1>
-          <p className="text-[#6e6e73]">Create and manage VM snapshots</p>
-        </div>
-      </div>
+      <PageHeader title="VM Snapshots" description="Create and manage VM snapshots" />
 
       {/* VM selector */}
-      <div className="bg-[#f5f5f7] rounded-lg p-6 mb-8">
+      <div className="zf-panel p-6 mb-8">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium mb-2">VM Name</label>
@@ -93,21 +89,21 @@ export default function Snapshots() {
               type="text"
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
               placeholder="Enter VM name"
             />
           </div>
           <button
             onClick={loadSnapshots}
             disabled={!vmName}
-            className="mt-7 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] disabled:bg-[#e8e8ed] rounded transition"
+            className="zf-btn zf-btn-ghost mt-7"
           >
             Load Snapshots
           </button>
           <button
             onClick={() => setShowCreateDialog(true)}
             disabled={!vmName}
-            className="mt-7 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-[#e8e8ed] rounded transition"
+            className="zf-btn zf-btn-primary mt-7"
           >
             <Plus className="w-4 h-4" />
             Create
@@ -117,10 +113,10 @@ export default function Snapshots() {
 
       {/* Snapshots list */}
       {vmName && (
-        <div className="bg-[#f5f5f7] rounded-lg overflow-hidden">
+        <div className="zf-panel overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-[#6e6e73] text-sm">
+              <tr className="text-left text-[var(--zf-muted)] text-sm">
                 <th className="p-4">Name</th>
                 <th className="p-4">Type</th>
                 <th className="p-4">Description</th>
@@ -131,45 +127,45 @@ export default function Snapshots() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-[#6e6e73]">
+                  <td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">
                     Loading snapshots...
                   </td>
                 </tr>
               ) : snapshots.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-[#6e6e73]">
+                  <td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">
                     No snapshots found for this VM.
                   </td>
                 </tr>
               ) : (
                 snapshots.map((snap) => (
-                  <tr key={snap.id} className="border-t border-[#d2d2d7] hover:bg-white">
+                  <tr key={snap.id} className="border-t border-[var(--zf-hairline)] hover:bg-white">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <Camera className="w-4 h-4 text-[#0066cc]" />
+                        <Camera className="w-4 h-4 text-[var(--zf-link)]" />
                         <span className="font-medium">{snap.name}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-sm text-[#6e6e73]">{snap.snapshot_type}</td>
-                    <td className="p-4 text-sm text-[#6e6e73]">{snap.description || '-'}</td>
-                    <td className="p-4 text-sm text-[#6e6e73]">
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">{snap.snapshot_type}</td>
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">{snap.description || '-'}</td>
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">
                       <RelativeTime date={snap.created} />
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleRevert(snap.id)}
-                          className="p-2 hover:bg-white/[0.03] rounded transition"
+                          className="p-2 hover:bg-black/[0.04] rounded transition"
                           title="Revert to snapshot"
                         >
-                          <RotateCcw className="w-4 h-4 text-yellow-500" />
+                          <RotateCcw className="w-4 h-4 text-amber-600" />
                         </button>
                         <button
                           onClick={() => handleDelete(snap.id)}
-                          className="p-2 hover:bg-white/[0.03] rounded transition"
+                          className="p-2 hover:bg-black/[0.04] rounded transition"
                           title="Delete snapshot"
                         >
-                          <Trash2 className="w-4 h-4 text-red-500" />
+                          <Trash2 className="w-4 h-4 text-red-600" />
                         </button>
                       </div>
                     </td>
@@ -233,8 +229,8 @@ function CreateSnapshotDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-md">
         <h2 className="text-2xl font-bold mb-6">Create Snapshot</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -243,7 +239,7 @@ function CreateSnapshotDialog({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
               placeholder="my-snapshot"
               required
             />
@@ -254,7 +250,7 @@ function CreateSnapshotDialog({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
               placeholder="Optional description"
             />
           </div>
@@ -263,7 +259,7 @@ function CreateSnapshotDialog({
             <select
               value={snapshotType}
               onChange={(e) => setSnapshotType(e.target.value as 'Disk' | 'Full')}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
             >
               <option value="Disk">Disk Only</option>
               <option value="Full">Full (Disk + State)</option>
@@ -273,13 +269,13 @@ function CreateSnapshotDialog({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded transition"
+              className="zf-btn zf-btn-ghost flex-1"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded transition"
+              className="zf-btn zf-btn-primary flex-1"
             >
               Create
             </button>

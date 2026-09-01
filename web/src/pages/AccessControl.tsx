@@ -18,10 +18,10 @@ interface UserAccount { id: string; username: string; role: string; enabled: boo
 
 function roleBadge(role: string): string {
   switch (role?.toLowerCase()) {
-    case 'admin': return 'bg-red-500/20 text-red-600 border-red-500/30'
-    case 'operator': return 'bg-blue-500/20 text-[#0066cc] border-blue-500/30'
-    case 'viewer': return 'bg-green-500/20 text-emerald-600 border-green-500/30'
-    default: return 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]'
+    case 'admin': return 'text-red-700 bg-red-50 border-red-200'
+    case 'operator': return 'text-amber-800 bg-amber-50 border-amber-200'
+    case 'viewer': return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+    default: return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 }
 
@@ -124,7 +124,7 @@ export default function AccessControl() {
           <button
             type="button"
             onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors"
+            className="zf-btn zf-btn-primary zf-btn-sm"
           >
             <Plus className="w-4 h-4" /> Add User
           </button>
@@ -141,84 +141,84 @@ export default function AccessControl() {
       )}
 
       {loading && !loadError ? (
-        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
-          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+        <div className="flex items-center justify-center h-64 text-[var(--zf-muted)]">
+          <div className="animate-spin w-6 h-6 border-2 border-[var(--zf-ink)] border-t-transparent rounded-full mr-3" />
           Loading users…
         </div>
       ) : !loadError ? (
         <>
 
-      {addSuccess && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-emerald-600 flex items-center gap-2"><CheckCircle className="w-4 h-4" />{addSuccess}</div>}
+      {addSuccess && <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 flex items-center gap-2"><CheckCircle className="w-4 h-4" />{addSuccess}</div>}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{users.length}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Total Users</div>
+        <div className="stat-card-blue rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{users.length}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Total Users</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{adminCount}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Admins</div>
+        <div className="stat-card-red rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{adminCount}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Admins</div>
         </div>
-        <div className="stat-card-cyan rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-cyan transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{operatorCount}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Operators</div>
+        <div className="stat-card-cyan rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow-cyan transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{operatorCount}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Operators</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{viewerCount}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Viewers</div>
+        <div className="stat-card-green rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{viewerCount}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Viewers</div>
         </div>
       </div>
 
       {showAdd && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">New User</h3>
+        <div className="bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-xl p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-[var(--zf-ink)]">New User</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Username</label><input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="username" className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-indigo-500/50" /></div>
-            <div><label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="password" className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-indigo-500/50" /></div>
-            <div><label className="block text-xs font-medium text-[#6e6e73] mb-1.5">Role</label>
+            <div><label className="block text-xs font-medium text-[var(--zf-muted)] mb-1.5">Username</label><input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="username" className="input-field text-sm" /></div>
+            <div><label className="block text-xs font-medium text-[var(--zf-muted)] mb-1.5">Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="password" className="input-field text-sm" /></div>
+            <div><label className="block text-xs font-medium text-[var(--zf-muted)] mb-1.5">Role</label>
               <div className="flex gap-2">
                 {['admin', 'operator', 'viewer'].map(r => (
-                  <button key={r} onClick={() => setNewRole(r)} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors capitalize ${newRole === r ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/30' : 'text-[#6e6e73] bg-white border-[#d2d2d7] hover:border-[#d2d2d7]'}`}>{r}</button>
+                  <button key={r} onClick={() => setNewRole(r)} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors capitalize ${newRole === r ? 'bg-[var(--zf-ink)] text-white border-[var(--zf-ink)]' : 'text-[var(--zf-muted)] bg-white border-[var(--zf-hairline)] hover:border-[var(--zf-ink)]'}`}>{r}</button>
                 ))}
               </div>
             </div>
           </div>
           {addError && <p className="text-sm text-red-600">{addError}</p>}
           <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={adding} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-[#e8e8ed] text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors">{adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}{adding ? 'Adding...' : 'Add'}</button>
-            <button onClick={() => { setShowAdd(false); setAddError('') }} className="px-4 py-2 text-sm text-[#6e6e73] hover:text-[#1d1d1f] bg-white hover:bg-black/[0.04] rounded-lg transition-colors">Cancel</button>
+            <button onClick={handleAdd} disabled={adding} className="zf-btn zf-btn-primary zf-btn-sm">{adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}{adding ? 'Adding...' : 'Add'}</button>
+            <button onClick={() => { setShowAdd(false); setAddError('') }} className="zf-btn zf-btn-ghost zf-btn-sm">Cancel</button>
           </div>
         </div>
       )}
 
       {users.length === 0 ? (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73]"><Users className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No users configured</p></div>
+        <div className="bg-[var(--zf-surface)] rounded-xl p-10 border border-[var(--zf-hairline)] text-center text-[var(--zf-muted)]"><Users className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No users configured</p></div>
       ) : (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+        <div className="bg-[var(--zf-surface)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-[#d2d2d7]">
-              <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">User</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Role</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Created</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Last Login</th>
-              <th className="text-right px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Actions</th>
+            <thead><tr className="border-b border-[var(--zf-hairline)]">
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">User</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Role</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Status</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Created</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Last Login</th>
+              <th className="text-right px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Actions</th>
             </tr></thead>
-            <tbody className="divide-y divide-[#d2d2d7]/30">
+            <tbody className="divide-y divide-[var(--zf-hairline)]/30">
               {users.map(user => (
                 <tr key={user.id} className="hover:bg-black/[0.04] transition-colors">
-                  <td className="px-5 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white uppercase">{user.username.charAt(0)}</div><span className="text-[#1d1d1f] font-medium">{user.username}</span></div></td>
+                  <td className="px-5 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-[var(--zf-ink)] flex items-center justify-center text-xs font-bold text-white uppercase">{user.username.charAt(0)}</div><span className="text-[var(--zf-ink)] font-medium">{user.username}</span></div></td>
                   <td className="px-5 py-3"><span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize ${roleBadge(user.role)}`}>{user.role}</span></td>
                   <td className="px-5 py-3">
                     <button onClick={() => handleToggle(user.id, user.enabled)} className="flex items-center gap-1.5" aria-label={`${user.enabled ? 'Disable' : 'Enable'} user ${user.username}`}>
-                      <div className={`relative w-8 h-4 rounded-full transition-colors ${user.enabled ? 'bg-green-600' : 'bg-[#e8e8ed]'}`} role="switch" aria-checked={user.enabled}><div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${user.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} /></div>
-                      <span className={`text-xs ${user.enabled ? 'text-emerald-600' : 'text-[#6e6e73]'}`}>{user.enabled ? 'Active' : 'Disabled'}</span>
+                      <div className={`relative w-8 h-4 rounded-full transition-colors ${user.enabled ? 'bg-emerald-500' : 'bg-[var(--zf-hairline)]'}`} role="switch" aria-checked={user.enabled}><div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${user.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} /></div>
+                      <span className={`text-xs ${user.enabled ? 'text-emerald-700' : 'text-[var(--zf-muted)]'}`}>{user.enabled ? 'Active' : 'Disabled'}</span>
                     </button>
                   </td>
-                  <td className="px-5 py-3 text-xs text-[#6e6e73]">{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</td>
-                  <td className="px-5 py-3 text-xs text-[#6e6e73]">{user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
+                  <td className="px-5 py-3 text-xs text-[var(--zf-muted)]">{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</td>
+                  <td className="px-5 py-3 text-xs text-[var(--zf-muted)]">{user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
                   <td className="px-5 py-3 text-right">
-                    <button onClick={() => handleDelete(user.id, user.username)} className="p-1.5 text-[#6e6e73] hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete user"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(user.id, user.username)} className="p-1.5 text-[var(--zf-muted)] hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete user"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}

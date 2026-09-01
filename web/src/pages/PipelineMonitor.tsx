@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react'
 import { RefreshCw, Workflow } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
-import { PageHeader, EmptyState } from '../components/ui'
+import { PageHeader, EmptyState, StatusBadge } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -26,22 +26,12 @@ interface PipelineJob {
 
 const PIPELINE_STAGES = ['inspect', 'prepare', 'convert', 'validate', 'deploy']
 
-function getStatusClasses(status: string): string {
-  switch (status.toLowerCase()) {
-    case 'completed': return 'bg-green-500/20 text-emerald-600'
-    case 'running': return 'bg-blue-500/20 text-[#0066cc]'
-    case 'failed': return 'bg-red-500/20 text-red-600'
-    case 'pending': return 'bg-black/[0.06] text-[#6e6e73]'
-    default: return 'bg-black/[0.06] text-[#6e6e73]'
-  }
-}
-
 function getProgressBarColor(status: string): string {
   switch (status.toLowerCase()) {
-    case 'completed': return 'bg-green-500'
-    case 'running': return 'bg-blue-500'
+    case 'completed': return 'bg-emerald-500'
+    case 'running': return 'bg-[var(--zf-link)]'
     case 'failed': return 'bg-red-500'
-    default: return 'bg-[#6e6e73]'
+    default: return 'bg-[var(--zf-muted)]'
   }
 }
 
@@ -102,10 +92,10 @@ export default function PipelineMonitor() {
         />
       )}
 
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+      <div className="zf-panel-muted overflow-hidden">
       <div className="p-5">
         {loading && !loadError && (
-          <div className="flex items-center justify-center py-10 text-sm text-[#6e6e73]">
+          <div className="flex items-center justify-center py-10 text-sm text-[var(--zf-muted)]">
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Loading pipeline jobs…
           </div>
         )}
@@ -121,34 +111,34 @@ export default function PipelineMonitor() {
         {jobs.map((job) => {
           const currentStage = getStageIndex(job.pipeline_stage)
           return (
-            <div key={job.id} className="p-4 border-b border-[#d2d2d7]/60 last:border-b-0">
+            <div key={job.id} className="p-4 border-b border-[var(--zf-hairline)]/60 last:border-b-0">
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <div className="text-sm font-semibold text-[#1d1d1f] mb-0.5">{job.vm_name || job.id}</div>
-                  <div className="text-xs text-[#6e6e73]">Source: {job.source} | ID: {job.id}</div>
+                  <div className="text-sm font-semibold text-[var(--zf-ink)] mb-0.5">{job.vm_name || job.id}</div>
+                  <div className="text-xs text-[var(--zf-muted)]">Source: {job.source} | ID: {job.id}</div>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(job.status)}`}>{job.status.toUpperCase()}</span>
+                <StatusBadge status={job.status} />
               </div>
 
               <div className="mb-3">
                 <div className="flex justify-between mb-1">
-                  <span className="text-xs text-[#6e6e73]">Progress</span>
-                  <span className="text-xs font-semibold text-[#1d1d1f]">{job.progress}%</span>
+                  <span className="text-xs text-[var(--zf-muted)]">Progress</span>
+                  <span className="text-xs font-semibold text-[var(--zf-ink)]">{job.progress}%</span>
                 </div>
-                <div className="bg-[#e8e8ed] rounded-full h-2 overflow-hidden">
+                <div className="bg-[var(--zf-hairline)] rounded-full h-2 overflow-hidden">
                   <div className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(job.status)}`} style={{ width: `${job.progress}%` }} />
                 </div>
               </div>
 
               <div className="mb-3">
-                <div className="text-xs text-[#6e6e73] mb-2">Pipeline Stage</div>
+                <div className="text-xs text-[var(--zf-muted)] mb-2">Pipeline Stage</div>
                 <div className="flex items-center gap-0">
                   {PIPELINE_STAGES.map((stage, idx) => {
-                    let circleClasses = 'bg-[#e8e8ed] text-[#6e6e73]'
-                    let lineClasses = 'h-0.5 w-8 bg-[#e8e8ed]'
-                    if (idx < currentStage) circleClasses = 'bg-green-500 text-white'
-                    else if (idx === currentStage) circleClasses = job.status === 'failed' ? 'bg-red-500 text-white' : 'bg-blue-500 text-[#1d1d1f] animate-pulse'
-                    if (idx <= currentStage) lineClasses = 'h-0.5 w-8 bg-green-500'
+                    let circleClasses = 'bg-[var(--zf-hairline)] text-[var(--zf-muted)]'
+                    let lineClasses = 'h-0.5 w-8 bg-[var(--zf-hairline)]'
+                    if (idx < currentStage) circleClasses = 'bg-emerald-500 text-white'
+                    else if (idx === currentStage) circleClasses = job.status === 'failed' ? 'bg-red-500 text-white' : 'bg-[var(--zf-link)] text-white animate-pulse'
+                    if (idx <= currentStage) lineClasses = 'h-0.5 w-8 bg-emerald-500'
                     return (
                       <Fragment key={stage}>
                         {idx > 0 && <div className={lineClasses} />}
@@ -160,13 +150,13 @@ export default function PipelineMonitor() {
               </div>
 
               <div className="flex gap-4 flex-wrap">
-                {job.duration && <div><span className="text-xs text-[#6e6e73]">Duration: </span><span className="text-xs font-semibold text-[#1d1d1f]">{job.duration}</span></div>}
-                {job.output_path && <div><span className="text-xs text-[#6e6e73]">Output: </span><span className="text-xs font-semibold text-[#1d1d1f] font-mono">{job.output_path}</span></div>}
+                {job.duration && <div><span className="text-xs text-[var(--zf-muted)]">Duration: </span><span className="text-xs font-semibold text-[var(--zf-ink)]">{job.duration}</span></div>}
+                {job.output_path && <div><span className="text-xs text-[var(--zf-muted)]">Output: </span><span className="text-xs font-semibold text-[var(--zf-ink)] font-mono">{job.output_path}</span></div>}
               </div>
 
               {job.error && (
-                <div className="mt-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <p className="text-xs text-red-600 font-mono">{job.error}</p>
+                <div className="mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-700 font-mono">{job.error}</p>
                 </div>
               )}
             </div>

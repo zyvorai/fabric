@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../api/client'
 import { listVMs } from '../api/vm'
 import ErrorBanner from '../components/ErrorBanner'
-import { PageHeader } from '../components/ui'
+import { PageHeader, Card } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -130,73 +130,73 @@ export default function BackupScheduler() {
         />
       )}
       {actionError && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-600">{actionError}</div>
+        <div className="rounded-xl px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200">{actionError}</div>
       )}
-      {successMsg && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-emerald-600">{successMsg}</div>}
+      {successMsg && <div className="rounded-xl px-4 py-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200">{successMsg}</div>}
 
       {loading && !loadError && (
         <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[var(--zf-hairline)] border-t-[var(--zf-ink)] rounded-full animate-spin" />
         </div>
       )}
 
       {!loading && !loadError && (
       <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-[#1d1d1f] mb-3">Select VMs</h3>
-          {vms.length === 0 ? <p className="text-sm text-[#6e6e73]">No VMs available.</p> : (
-            <><button onClick={toggleAll} className="text-xs text-[#0066cc] hover:text-blue-300 mb-3">{selectedVMs.size === vms.length ? 'Deselect All' : 'Select All'}</button>
+        <Card><div className="p-5">
+          <h3 className="text-sm font-semibold text-[var(--zf-ink)] mb-3">Select VMs</h3>
+          {vms.length === 0 ? <p className="text-sm text-[var(--zf-muted)]">No VMs available.</p> : (
+            <><button onClick={toggleAll} className="text-xs text-[var(--zf-link)] hover:text-[var(--zf-link-hover)] mb-3">{selectedVMs.size === vms.length ? 'Deselect All' : 'Select All'}</button>
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {vms.map((vm) => (
                 <label key={vm.name} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-black/[0.04] cursor-pointer transition-colors">
-                  <input type="checkbox" checked={selectedVMs.has(vm.name)} onChange={() => toggleVM(vm.name)} className="w-4 h-4 rounded border-[#d2d2d7] text-teal-500 focus:ring-teal-500 bg-[#e8e8ed]" />
-                  <span className="text-sm text-[#1d1d1f]">{vm.name}</span>
-                  {vm.state && <span className={`text-xs px-1.5 py-0.5 rounded ${vm.state === 'running' ? 'bg-green-500/20 text-emerald-600' : 'bg-[#e8e8ed]/30 text-[#6e6e73]'}`}>{vm.state}</span>}
+                  <input type="checkbox" checked={selectedVMs.has(vm.name)} onChange={() => toggleVM(vm.name)} className="w-4 h-4 rounded border-[var(--zf-hairline)]" />
+                  <span className="text-sm text-[var(--zf-ink)]">{vm.name}</span>
+                  {vm.state && <span className={`text-xs px-1.5 py-0.5 rounded border ${vm.state === 'running' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'}`}>{vm.state}</span>}
                 </label>
               ))}
             </div></>
           )}
-        </div>
+        </div></Card>
 
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-[#1d1d1f] mb-1">Schedule Configuration</h3>
-          <div><label className="block text-xs text-[#6e6e73] mb-1">Schedule Name</label><input type="text" value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} placeholder="e.g. nightly-backup" className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-teal-500" /></div>
-          <div><label className="block text-xs text-[#6e6e73] mb-1">Frequency</label>
+        <Card><div className="p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-[var(--zf-ink)] mb-1">Schedule Configuration</h3>
+          <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Schedule Name</label><input type="text" value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} placeholder="e.g. nightly-backup" className="input-field" /></div>
+          <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Frequency</label>
             <div className="grid grid-cols-2 gap-2">
               {([['daily2am', 'Daily 2 AM'], ['weeklySunday', 'Weekly Sun 3 AM'], ['every6h', 'Every 6h'], ['custom', 'Custom']] as [Preset, string][]).map(([id, label]) => (
-                <button key={id} onClick={() => setPreset(id)} className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${preset === id ? 'bg-[#0066cc]/10 text-[#0066cc] border border-[#0066cc]/30' : 'bg-[#f5f5f7] text-[#6e6e73] border border-[#d2d2d7] hover:bg-black/[0.04]'}`}>{label}</button>
+                <button key={id} onClick={() => setPreset(id)} className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${preset === id ? 'bg-[var(--zf-link)]/10 text-[var(--zf-link)] border-[var(--zf-link)]/30' : 'bg-[var(--zf-canvas)] text-[var(--zf-muted)] border-[var(--zf-hairline)] hover:bg-black/[0.04]'}`}>{label}</button>
               ))}
             </div>
           </div>
-          {preset === 'custom' && <div><label className="block text-xs text-[#6e6e73] mb-1">Cron Expression</label><input type="text" value={customCron} onChange={(e) => setCustomCron(e.target.value)} placeholder="0 2 * * *" className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] font-mono placeholder-[#6e6e73] focus:outline-none focus:border-teal-500" /></div>}
-          <div className="bg-[#f5f5f7] rounded-lg px-3 py-2 text-xs text-[#6e6e73]"><span className="text-[#6e6e73]">Schedule:</span> <span className="text-teal-400">{parseCronToHuman(activeCron)}</span></div>
-          <div><label className="block text-xs text-[#6e6e73] mb-1">Output Directory</label><input type="text" value={outputDir} onChange={(e) => setOutputDir(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] font-mono focus:outline-none focus:border-teal-500" /></div>
+          {preset === 'custom' && <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Cron Expression</label><input type="text" value={customCron} onChange={(e) => setCustomCron(e.target.value)} placeholder="0 2 * * *" className="input-field font-mono" /></div>}
+          <div className="bg-[var(--zf-canvas)] rounded-lg px-3 py-2 text-xs text-[var(--zf-muted)]"><span className="text-[var(--zf-muted)]">Schedule:</span> <span className="text-[var(--zf-ink)] font-medium">{parseCronToHuman(activeCron)}</span></div>
+          <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Output Directory</label><input type="text" value={outputDir} onChange={(e) => setOutputDir(e.target.value)} className="input-field font-mono" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-xs text-[#6e6e73] mb-1">Retention (keep last N)</label><input type="number" value={retention} onChange={(e) => setRetention(Math.max(1, parseInt(e.target.value, 10) || 1))} min={1} max={365} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:border-teal-500" /></div>
-            <div><label className="block text-xs text-[#6e6e73] mb-1">Format</label><select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:border-teal-500"><option value="qcow2">QCOW2</option><option value="raw">RAW</option><option value="vmdk">VMDK</option></select></div>
+            <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Retention (keep last N)</label><input type="number" value={retention} onChange={(e) => setRetention(Math.max(1, parseInt(e.target.value, 10) || 1))} min={1} max={365} className="input-field" /></div>
+            <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Format</label><select value={format} onChange={(e) => setFormat(e.target.value)} className="input-field"><option value="qcow2">QCOW2</option><option value="raw">RAW</option><option value="vmdk">VMDK</option></select></div>
           </div>
-          <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={compression} onChange={() => setCompression(!compression)} className="sr-only" /><div className={`relative w-10 h-5 rounded-full transition-colors ${compression ? 'bg-teal-600' : 'bg-[#e8e8ed]'}`}><div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${compression ? 'translate-x-5' : 'translate-x-0.5'}`} /></div><span className="text-sm text-[#1d1d1f]">Enable compression</span></label>
-          <button onClick={handleCreate} disabled={creating} className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-[#1d1d1f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{creating ? 'Creating...' : 'Create Schedule'}</button>
-        </div>
+          <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={compression} onChange={() => setCompression(!compression)} className="sr-only" /><div className={`relative w-10 h-5 rounded-full transition-colors ${compression ? 'bg-[var(--zf-ink)]' : 'bg-[var(--zf-hairline)]'}`}><div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${compression ? 'translate-x-5' : 'translate-x-0.5'}`} /></div><span className="text-sm text-[var(--zf-ink)]">Enable compression</span></label>
+          <button onClick={handleCreate} disabled={creating} className="zf-btn zf-btn-primary w-full">{creating ? 'Creating...' : 'Create Schedule'}</button>
+        </div></Card>
       </div>
 
-      <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-[#1d1d1f] mb-4">Existing Schedules</h3>
-        {schedules.length === 0 ? <p className="text-sm text-[#6e6e73]">No backup schedules configured yet.</p> : (
+      <Card><div className="p-5">
+        <h3 className="text-sm font-semibold text-[var(--zf-ink)] mb-4">Existing Schedules</h3>
+        {schedules.length === 0 ? <p className="text-sm text-[var(--zf-muted)]">No backup schedules configured yet.</p> : (
           <div className="space-y-3">
             {schedules.map((sched) => (
-              <div key={sched.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]/60">
+              <div key={sched.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]/60">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2"><span className="text-sm font-medium text-[#1d1d1f]">{sched.name}</span><span className={`text-xs px-1.5 py-0.5 rounded ${sched.enabled ? 'bg-green-500/20 text-emerald-600' : 'bg-[#e8e8ed]/30 text-[#6e6e73]'}`}>{sched.enabled ? 'Enabled' : 'Disabled'}</span></div>
-                  <div className="text-xs text-[#6e6e73] mt-0.5"><span className="font-mono">{sched.cron}</span><span className="mx-1.5">-</span><span>{parseCronToHuman(sched.cron)}</span></div>
+                  <div className="flex items-center gap-2"><span className="text-sm font-medium text-[var(--zf-ink)]">{sched.name}</span><span className={`text-xs px-1.5 py-0.5 rounded border ${sched.enabled ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'}`}>{sched.enabled ? 'Enabled' : 'Disabled'}</span></div>
+                  <div className="text-xs text-[var(--zf-muted)] mt-0.5"><span className="font-mono">{sched.cron}</span><span className="mx-1.5">-</span><span>{parseCronToHuman(sched.cron)}</span></div>
                 </div>
-                <div className="text-xs text-[#6e6e73] sm:text-right"><div>VMs: {sched.vms?.length || 0}</div>{sched.next_run && <div>Next: {sched.next_run}</div>}</div>
+                <div className="text-xs text-[var(--zf-muted)] sm:text-right"><div>VMs: {sched.vms?.length || 0}</div>{sched.next_run && <div>Next: {sched.next_run}</div>}</div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </div></Card>
       </>
       )}
     </div>

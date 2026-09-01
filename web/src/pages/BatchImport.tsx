@@ -3,9 +3,10 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useCallback, useRef } from 'react'
-import { FileUp, Upload, Download, Eye, Send, CheckCircle, XCircle, Clock, Loader2, FileText } from 'lucide-react'
+import { Upload, Download, Eye, Send, CheckCircle, XCircle, Clock, Loader2, FileText } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 
 interface VMEntry { name: string; cpus: number; memory: string; image: string }
@@ -84,55 +85,60 @@ export default function BatchImport() {
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => setInputText(ev.target?.result as string); reader.readAsText(file) } }, [])
   const handleDownloadTemplate = useCallback(() => { const blob = new Blob([exampleYAML], { type: 'text/yaml' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'batch-import-template.yaml'; a.click(); URL.revokeObjectURL(url) }, [])
 
-  const statusIcon = (status: VMStatus) => { switch (status) { case 'pending': return <Clock className="w-4 h-4 text-[#6e6e73]" />; case 'submitting': return <Loader2 className="w-4 h-4 text-[#0066cc] animate-spin" />; case 'submitted': return <CheckCircle className="w-4 h-4 text-emerald-600" />; case 'error': return <XCircle className="w-4 h-4 text-red-600" /> } }
+  const statusIcon = (status: VMStatus) => { switch (status) { case 'pending': return <Clock className="w-4 h-4 text-[var(--zf-muted)]" />; case 'submitting': return <Loader2 className="w-4 h-4 text-[var(--zf-link)] animate-spin" />; case 'submitted': return <CheckCircle className="w-4 h-4 text-emerald-600" />; case 'error': return <XCircle className="w-4 h-4 text-red-600" /> } }
   const submitted = items.filter((i) => i.status === 'submitted').length
   const errors = items.filter((i) => i.status === 'error').length
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3"><FileUp className="w-6 h-6 text-amber-400" /><h2 className="text-xl font-bold text-[#1d1d1f]">Batch Import</h2></div>
-        <button onClick={handleDownloadTemplate} className="flex items-center gap-2 px-3 py-2 text-sm bg-white hover:bg-black/[0.04] text-[#1d1d1f] rounded-lg transition-colors border border-[#d2d2d7]"><Download className="w-4 h-4" /> Download Template</button>
-      </div>
+      <PageHeader
+        title="Batch Import"
+        description="Import multiple VMs from YAML or JSON"
+        actions={
+          <button onClick={handleDownloadTemplate} className="zf-btn zf-btn-ghost">
+            <Download className="w-4 h-4" /> Download Template
+          </button>
+        }
+      />
 
       {!previewing ? (
         <div className="space-y-4">
           <div onDragOver={(e) => { e.preventDefault(); setDragOver(true) }} onDragLeave={() => setDragOver(false)} onDrop={handleFileDrop} onClick={() => fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragOver ? 'border-amber-400 bg-amber-400/5' : 'border-[#d2d2d7] hover:border-[#6e6e73] bg-white'}`}>
-            <Upload className="w-8 h-8 text-[#6e6e73] mx-auto mb-3" />
-            <p className="text-sm text-[#6e6e73]">Drag & drop a <span className="text-amber-400 font-medium">.yaml</span> or <span className="text-amber-400 font-medium">.json</span> file, or click to browse</p>
+            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragOver ? 'border-[var(--zf-ink)] bg-black/[0.04]' : 'border-[var(--zf-hairline)] hover:border-[var(--zf-muted)] bg-white'}`}>
+            <Upload className="w-8 h-8 text-[var(--zf-muted)] mx-auto mb-3" />
+            <p className="text-sm text-[var(--zf-muted)]">Drag & drop a <span className="text-[var(--zf-ink)] font-medium">.yaml</span> or <span className="text-[var(--zf-ink)] font-medium">.json</span> file, or click to browse</p>
             <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="hidden" onChange={handleFileSelect} />
           </div>
-          <div><label className="block text-sm font-medium text-[#6e6e73] mb-2">Or paste YAML/JSON directly</label>
-            <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={12} className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4 text-sm text-[#1d1d1f] font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-y" placeholder={exampleYAML} />
+          <div><label className="block text-sm font-medium text-[var(--zf-muted)] mb-2">Or paste YAML/JSON directly</label>
+            <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={12} className="w-full bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg p-4 text-sm text-[var(--zf-ink)] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--zf-ink)]/20 resize-y" placeholder={exampleYAML} />
           </div>
           {parseError && (
             <ErrorBanner title="Could not parse input" headline={parseError} />
           )}
-          <button onClick={handlePreview} disabled={!inputText.trim()} className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-[#e8e8ed] disabled:text-[#6e6e73] text-[#1d1d1f] font-medium rounded-lg transition-colors"><Eye className="w-4 h-4" /> Preview</button>
+          <button onClick={handlePreview} disabled={!inputText.trim()} className="zf-btn zf-btn-primary"><Eye className="w-4 h-4" /> Preview</button>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center gap-4 p-3 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg text-sm">
-            <span className="text-[#6e6e73]"><FileText className="w-4 h-4 inline mr-1" />{items.length} VMs</span>
+          <div className="flex items-center gap-4 p-3 bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg text-sm">
+            <span className="text-[var(--zf-muted)]"><FileText className="w-4 h-4 inline mr-1" />{items.length} VMs</span>
             {submitted > 0 && <span className="text-emerald-600"><CheckCircle className="w-4 h-4 inline mr-1" />{submitted} submitted</span>}
             {errors > 0 && <span className="text-red-600"><XCircle className="w-4 h-4 inline mr-1" />{errors} failed</span>}
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl overflow-hidden">
-            <table className="w-full text-sm"><thead><tr className="border-b border-[#d2d2d7] bg-[#f5f5f7]"><th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Status</th><th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">VM Name</th><th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">CPUs</th><th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Memory</th><th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Image</th></tr></thead>
+          <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-xl overflow-hidden">
+            <table className="w-full text-sm"><thead><tr className="border-b border-[var(--zf-hairline)] bg-[var(--zf-canvas)]"><th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Status</th><th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">VM Name</th><th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">CPUs</th><th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Memory</th><th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Image</th></tr></thead>
             <tbody>{items.map((item, idx) => (
-              <tr key={idx} className="border-b border-[#d2d2d7] last:border-0 hover:bg-[#f5f5f7]">
-                <td className="px-4 py-3"><div className="flex items-center gap-2">{statusIcon(item.status)}<span className="text-xs text-[#6e6e73] capitalize">{item.status}</span></div></td>
-                <td className="px-4 py-3 text-[#1d1d1f] font-medium">{item.name}</td>
-                <td className="px-4 py-3 text-[#6e6e73]">{item.cpus}</td>
-                <td className="px-4 py-3 text-[#6e6e73]">{item.memory}</td>
-                <td className="px-4 py-3 text-[#6e6e73] font-mono text-xs">{item.image}{item.error && <p className="text-red-600 mt-1">{item.error}</p>}</td>
+              <tr key={idx} className="border-b border-[var(--zf-hairline)] last:border-0 hover:bg-[var(--zf-canvas)]">
+                <td className="px-4 py-3"><div className="flex items-center gap-2">{statusIcon(item.status)}<span className="text-xs text-[var(--zf-muted)] capitalize">{item.status}</span></div></td>
+                <td className="px-4 py-3 text-[var(--zf-ink)] font-medium">{item.name}</td>
+                <td className="px-4 py-3 text-[var(--zf-muted)]">{item.cpus}</td>
+                <td className="px-4 py-3 text-[var(--zf-muted)]">{item.memory}</td>
+                <td className="px-4 py-3 text-[var(--zf-muted)] font-mono text-xs">{item.image}{item.error && <p className="text-red-600 mt-1">{item.error}</p>}</td>
               </tr>
             ))}</tbody></table>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleSubmitAll} disabled={submitting || items.every((i) => i.status === 'submitted')} className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-[#e8e8ed] disabled:text-[#6e6e73] text-white font-medium rounded-lg transition-colors">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}{submitting ? 'Submitting...' : 'Submit All'}</button>
-            <button onClick={() => { setPreviewing(false); setItems([]) }} disabled={submitting} className="px-4 py-2.5 text-sm text-[#6e6e73] hover:text-[#1d1d1f] bg-white hover:bg-black/[0.04] rounded-lg transition-colors">Back to Editor</button>
+            <button onClick={handleSubmitAll} disabled={submitting || items.every((i) => i.status === 'submitted')} className="zf-btn zf-btn-primary">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}{submitting ? 'Submitting...' : 'Submit All'}</button>
+            <button onClick={() => { setPreviewing(false); setItems([]) }} disabled={submitting} className="zf-btn zf-btn-ghost">Back to Editor</button>
           </div>
         </div>
       )}

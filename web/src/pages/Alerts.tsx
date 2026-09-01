@@ -14,22 +14,22 @@ import { useToastContext } from '../contexts/ToastContext'
 function severityBorderClass(severity: string): string {
   switch (severity) {
     case 'critical':
-      return 'border-l-red-500'
+      return 'border-l-[var(--zf-danger)]'
     case 'warning':
-      return 'border-l-amber-500'
+      return 'border-l-[var(--zf-warning)]'
     default:
-      return 'border-l-blue-500'
+      return 'border-l-[var(--zf-link)]'
   }
 }
 
 function severityBadgeClasses(severity: string): string {
   switch (severity) {
     case 'critical':
-      return 'bg-red-500/20 text-red-600'
+      return 'text-red-700 bg-red-50 border border-red-200'
     case 'warning':
-      return 'bg-amber-500/20 text-amber-400'
+      return 'text-amber-800 bg-amber-50 border border-amber-200'
     default:
-      return 'bg-blue-500/20 text-[#0066cc]'
+      return 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]'
   }
 }
 
@@ -92,8 +92,8 @@ export default function Alerts() {
     return (
       <div className="space-y-6">
         <PageHeader title="Alerts" description="System alerts and notification rules" />
-        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
-          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+        <div className="flex items-center justify-center h-64 text-[var(--zf-muted)]">
+          <div className="animate-spin w-6 h-6 border-2 border-[var(--zf-ink)] border-t-transparent rounded-full mr-3" />
           Loading alerts…
         </div>
       </div>
@@ -117,7 +117,7 @@ export default function Alerts() {
         />
       )}
       {refreshError && !loadError && (
-        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+        <div className="bg-amber-50 rounded-lg border border-amber-200 px-4 py-2 text-xs text-amber-800">
           {refreshError} — showing last known data
         </div>
       )}
@@ -125,24 +125,24 @@ export default function Alerts() {
       {!loadError && (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
-              <div className="text-xs text-[#6e6e73] mb-1">Active Alerts</div>
-              <div className="text-2xl font-bold text-[#1d1d1f]">{activeCount}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]">
+              <div className="text-xs text-[var(--zf-muted)] mb-1">Active Alerts</div>
+              <div className="text-2xl font-bold text-[var(--zf-ink)]">{activeCount}</div>
             </div>
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
-              <div className="text-xs text-[#6e6e73] mb-1">Critical</div>
-              <div className="text-2xl font-bold text-red-600">{criticalCount}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]">
+              <div className="text-xs text-[var(--zf-muted)] mb-1">Critical</div>
+              <div className="text-2xl font-bold text-red-700">{criticalCount}</div>
             </div>
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
-              <div className="text-xs text-[#6e6e73] mb-1">Warning</div>
-              <div className="text-2xl font-bold text-amber-400">{warningCount}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]">
+              <div className="text-xs text-[var(--zf-muted)] mb-1">Warning</div>
+              <div className="text-2xl font-bold text-amber-800">{warningCount}</div>
             </div>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-[#1d1d1f] mb-3">Active Alerts</h2>
+            <h2 className="text-lg font-semibold text-[var(--zf-ink)] mb-3">Active Alerts</h2>
             {alerts.length === 0 ? (
-              <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
+              <div className="bg-[var(--zf-canvas)] rounded-xl p-10 border border-[var(--zf-hairline)] flex flex-col items-center justify-center text-[var(--zf-muted)] gap-3">
                 <span className="text-sm">No active alerts</span>
               </div>
             ) : (
@@ -150,7 +150,7 @@ export default function Alerts() {
                 {alerts.map((alert: any, idx: number) => (
                   <div
                     key={alert.id ?? idx}
-                    className={`bg-[#f5f5f7] rounded-xl p-4 border border-[#d2d2d7] border-l-4 ${severityBorderClass(alert.severity)}`}
+                    className={`bg-[var(--zf-canvas)] rounded-xl p-4 border border-[var(--zf-hairline)] border-l-4 ${severityBorderClass(alert.severity)}`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <span
@@ -158,16 +158,16 @@ export default function Alerts() {
                       >
                         {alert.severity}
                       </span>
-                      <span className="text-xs text-[#6e6e73]">
+                      <span className="text-xs text-[var(--zf-muted)]">
                         {alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}
                       </span>
                     </div>
-                    <div className="text-sm font-semibold text-[#1d1d1f] mb-1">
+                    <div className="text-sm font-semibold text-[var(--zf-ink)] mb-1">
                       {alert.title ?? alert.name ?? 'Alert'}
                     </div>
-                    <div className="text-sm text-[#6e6e73]">{alert.message}</div>
+                    <div className="text-sm text-[var(--zf-muted)]">{alert.message}</div>
                     {alert.value !== undefined && (
-                      <div className="text-xs text-[#6e6e73] mt-2">Value: {alert.value}</div>
+                      <div className="text-xs text-[var(--zf-muted)] mt-2">Value: {alert.value}</div>
                     )}
                   </div>
                 ))}
@@ -177,24 +177,24 @@ export default function Alerts() {
 
           {rules.length > 0 && (
             <div>
-              <h2 className="text-lg font-semibold text-[#1d1d1f] mb-3">Alert Rules</h2>
-              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+              <h2 className="text-lg font-semibold text-[var(--zf-ink)] mb-3">Alert Rules</h2>
+              <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[#d2d2d7]">
-                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
+                    <tr className="border-b border-[var(--zf-hairline)]">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">
                         Name
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">
                         Condition
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">
                         Threshold
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">
                         Severity
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">
                         Enabled
                       </th>
                     </tr>
@@ -203,11 +203,11 @@ export default function Alerts() {
                     {rules.map((rule: any, idx: number) => (
                       <tr
                         key={rule.name ?? idx}
-                        className="border-b border-[#d2d2d7]/60 hover:bg-black/[0.04] transition-colors"
+                        className="border-b border-[var(--zf-hairline)]/60 hover:bg-black/[0.04] transition-colors"
                       >
-                        <td className="px-4 py-3 text-[#1d1d1f] font-medium">{rule.name}</td>
-                        <td className="px-4 py-3 text-[#1d1d1f]">{rule.condition}</td>
-                        <td className="px-4 py-3 text-[#1d1d1f]">{rule.threshold}</td>
+                        <td className="px-4 py-3 text-[var(--zf-ink)] font-medium">{rule.name}</td>
+                        <td className="px-4 py-3 text-[var(--zf-ink)]">{rule.condition}</td>
+                        <td className="px-4 py-3 text-[var(--zf-ink)]">{rule.threshold}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${severityBadgeClasses(rule.severity)}`}
@@ -217,7 +217,7 @@ export default function Alerts() {
                         </td>
                         <td className="px-4 py-3">
                           <span
-                            className={`text-xs font-medium ${rule.enabled ? 'text-emerald-600' : 'text-[#6e6e73]'}`}
+                            className={`text-xs font-medium ${rule.enabled ? 'text-emerald-600' : 'text-[var(--zf-muted)]'}`}
                           >
                             {rule.enabled ? 'Yes' : 'No'}
                           </span>

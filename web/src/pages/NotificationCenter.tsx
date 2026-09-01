@@ -21,17 +21,17 @@ interface Notification {
 }
 
 const typeConfig: Record<Notification['type'], { bg: string; border: string; icon: string; label: string }> = {
-  vm_started: { bg: 'bg-green-500/10', border: 'border-green-500/30', icon: '\u2713', label: 'VM Started' },
-  vm_stopped: { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: '\u2717', label: 'VM Stopped' },
-  alert: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: '\u26A0', label: 'Alert' },
-  warning: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', icon: '\u24D8', label: 'System Warning' },
+  vm_started: { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: '\u2713', label: 'VM Started' },
+  vm_stopped: { bg: 'bg-red-50', border: 'border-red-200', icon: '\u2717', label: 'VM Stopped' },
+  alert: { bg: 'bg-amber-50', border: 'border-amber-200', icon: '\u26A0', label: 'Alert' },
+  warning: { bg: 'bg-blue-50', border: 'border-blue-100', icon: '\u24D8', label: 'System Warning' },
 }
 
 const typeTextColor: Record<Notification['type'], string> = {
-  vm_started: 'text-emerald-600',
-  vm_stopped: 'text-red-600',
-  alert: 'text-amber-400',
-  warning: 'text-[#0066cc]',
+  vm_started: 'text-emerald-700',
+  vm_stopped: 'text-red-700',
+  alert: 'text-amber-800',
+  warning: 'text-[var(--zf-link)]',
 }
 
 function formatTimeAgo(date: Date): string {
@@ -125,17 +125,17 @@ export default function NotificationCenter() {
         description="VM events, alerts, and system warnings"
         actions={
           notifications.length > 0 ? (
-            <button onClick={clearAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
+            <button onClick={clearAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-[var(--zf-canvas)] transition-colors">
               Clear All
             </button>
           ) : undefined
         }
       />
       {unreadCount > 0 && (
-        <div className="text-xs text-[#6e6e73]">{unreadCount} unread</div>
+        <div className="text-xs text-[var(--zf-muted)]">{unreadCount} unread</div>
       )}
       {pollError && (
-        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+        <div className="bg-amber-50 rounded-lg border border-amber-200 px-4 py-2 text-xs text-amber-800">
           {pollError} — alert polling paused until next retry
         </div>
       )}
@@ -153,9 +153,9 @@ export default function NotificationCenter() {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-12 text-center">
-          <p className="text-[#6e6e73] text-sm">No notifications yet.</p>
-          <p className="text-[#6e6e73] text-xs mt-1">VM events, alerts, and warnings will appear here.</p>
+        <div className="zf-panel-muted p-12 text-center">
+          <p className="text-[var(--zf-muted)] text-sm">No notifications yet.</p>
+          <p className="text-[var(--zf-muted)] text-xs mt-1">VM events, alerts, and warnings will appear here.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -168,14 +168,14 @@ export default function NotificationCenter() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-semibold ${typeTextColor[n.type]}`}>{cfg.label}</span>
-                    {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
+                    {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--zf-link)]" />}
                   </div>
-                  <p className="text-sm text-[#1d1d1f] mt-0.5">{n.message}</p>
-                  {n.detail && <p className="text-xs text-[#6e6e73] mt-0.5 truncate">{n.detail}</p>}
-                  <p className="text-xs text-[#6e6e73] mt-1">{formatTimeAgo(n.timestamp)}</p>
+                  <p className="text-sm text-[var(--zf-ink)] mt-0.5">{n.message}</p>
+                  {n.detail && <p className="text-xs text-[var(--zf-muted)] mt-0.5 truncate">{n.detail}</p>}
+                  <p className="text-xs text-[var(--zf-muted)] mt-1">{formatTimeAgo(n.timestamp)}</p>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
-                  className="text-[#6e6e73] hover:text-[#6e6e73] transition-colors p-1" title="Dismiss">
+                  className="text-[var(--zf-muted)] hover:text-[var(--zf-muted)] transition-colors p-1" title="Dismiss">
                   <X className="w-4 h-4" />
                 </button>
               </div>

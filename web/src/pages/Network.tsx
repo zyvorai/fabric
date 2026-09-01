@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
-import { Network as NetworkIcon, RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu, Globe, ScanSearch } from 'lucide-react'
+import { RefreshCw, Server, Layers, Cable, Terminal, Link2, Settings, FileText, ArrowRightLeft, Radio, Cpu, Globe, ScanSearch } from 'lucide-react'
 import * as api from '../api/networkd'
 import * as cloudApi from '../api/network-cloud'
 import { useConfirm } from '../hooks/useConfirm'
@@ -43,6 +43,7 @@ import { useSilentPoll } from '../hooks/useSilentPoll'
 import { usePermissions } from '../hooks/usePermissions'
 import { ReadOnlyProvider } from '../contexts/ReadOnlyContext'
 import ReadOnlyNotice from '../components/ReadOnlyNotice'
+import { PageHeader } from '../components/ui'
 
 type Tab = 'bridges' | 'bonds' | 'vlans' | 'macvtap' | 'taps' | 'netfiles' | 'linkfiles' | 'portforwards' | 'vxlan' | 'sriov' | 'floatingips' | 'status'
 type Modal = 'bridge' | 'bond' | 'vlan' | 'macvtap' | 'tap' | 'netfile' | 'linkfile' | 'portforward' | 'vxlan' | 'sriov' | 'floatingip'
@@ -342,24 +343,24 @@ export default function Network() {
     <div className="space-y-6">
       <SubsystemBanner subsystem="vm_driver" title="Network stack" />
       {!canWrite && <ReadOnlyNotice />}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <NetworkIcon className="w-8 h-8" />
-          Network Configuration
-        </h1>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowScanModal(true)} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition">
-            <ScanSearch className="w-4 h-4" />
-            Scan Configs
-          </button>
-          {canWrite && (
-            <button onClick={handleReload} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition">
-              <RefreshCw className="w-4 h-4" />
-              Reload networkd
+      <PageHeader
+        title="Network"
+        description="Bridges, bonds, VLANs, and other systemd-networkd configuration"
+        actions={
+          <>
+            <button onClick={() => setShowScanModal(true)} className="zf-btn zf-btn-ghost zf-btn-sm">
+              <ScanSearch className="w-3.5 h-3.5" />
+              Scan Configs
             </button>
-          )}
-        </div>
-      </div>
+            {canWrite && (
+              <button onClick={handleReload} className="zf-btn zf-btn-ghost zf-btn-sm">
+                <RefreshCw className="w-3.5 h-3.5" />
+                Reload networkd
+              </button>
+            )}
+          </>
+        }
+      />
 
       {error && (
         <ErrorBanner
@@ -372,53 +373,53 @@ export default function Network() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-3">
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Bridges</div>
-          <div className="text-2xl font-bold text-[#0066cc]">{bridges.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Bridges</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{bridges.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Bonds</div>
-          <div className="text-2xl font-bold text-cyan-400">{bonds.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Bonds</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{bonds.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">VLANs</div>
-          <div className="text-2xl font-bold text-purple-400">{vlans.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">VLANs</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{vlans.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Macvtap</div>
-          <div className="text-2xl font-bold text-emerald-600">{macvtaps.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Macvtap</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{macvtaps.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Tap</div>
-          <div className="text-2xl font-bold text-orange-400">{taps.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Tap</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{taps.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Interfaces</div>
-          <div className="text-2xl font-bold text-amber-600">{netfileCounts.total}</div>
-          <div className="text-[10px] text-[#6e6e73] mt-0.5">
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Interfaces</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{netfileCounts.total}</div>
+          <div className="text-[10px] text-[var(--zf-muted)] mt-0.5">
             {netfileCounts.physical} phys · {netfileCounts.container} ctr
           </div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Link Files</div>
-          <div className="text-2xl font-bold text-pink-400">{linkfiles.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Link Files</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{linkfiles.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">Port Forwards</div>
-          <div className="text-2xl font-bold text-red-600">{portForwards.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">Port Forwards</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{portForwards.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">VXLAN</div>
-          <div className="text-2xl font-bold text-indigo-400">{vxlans.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">VXLAN</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{vxlans.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-xs mb-1">SR-IOV</div>
-          <div className="text-2xl font-bold text-violet-400">{sriov.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-xs mb-1">SR-IOV</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{sriov.length}</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-[#d2d2d7]">
+      <div className="border-b border-[var(--zf-hairline)]">
         <div className="flex gap-1">
           {tabs.map(t => (
             <button
@@ -426,8 +427,8 @@ export default function Network() {
               onClick={() => setActiveTab(t.key)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
                 activeTab === t.key
-                  ? 'border-blue-500 text-[#0066cc]'
-                  : 'border-transparent text-[#6e6e73] hover:text-[#1d1d1f]'
+                  ? 'border-[var(--zf-link)] text-[var(--zf-link)]'
+                  : 'border-transparent text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
               }`}
             >
               {t.icon}
@@ -438,7 +439,7 @@ export default function Network() {
       </div>
 
       {loading ? (
-        <div className="text-center text-[#6e6e73] py-12">Loading...</div>
+        <div className="text-center text-[var(--zf-muted)] py-12">Loading...</div>
       ) : (
         <>
           {activeTab === 'bridges' && (
@@ -600,25 +601,25 @@ function ScanConfigsModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalWrapper title="Scanned Host Configs" onClose={onClose}>
       <div className="space-y-3">
-        {loading && <p className="text-[#6e6e73] text-sm">Scanning host configuration files…</p>}
-        {err && <p className="text-red-600 text-sm">{err}</p>}
-        {data && data.length === 0 && <p className="text-[#6e6e73] text-sm">No existing config files found on host.</p>}
+        {loading && <p className="text-[var(--zf-muted)] text-sm">Scanning host configuration files…</p>}
+        {err && <p className="text-[var(--zf-danger)] text-sm">{err}</p>}
+        {data && data.length === 0 && <p className="text-[var(--zf-muted)] text-sm">No existing config files found on host.</p>}
         {data && data.map(f => (
-          <div key={f.filename} className="border border-[#d2d2d7] rounded-lg">
+          <div key={f.filename} className="border border-[var(--zf-hairline)] rounded-lg">
             <button
               type="button"
               onClick={() => toggle(f.filename)}
-              className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.03] transition"
+              className="w-full flex items-center justify-between p-3 text-left hover:bg-black/[0.04] transition"
             >
-              <span className="font-mono text-sm">{f.filename}</span>
-              <span className="text-xs text-[#6e6e73]">{f.file_type}</span>
+              <span className="font-mono text-sm text-[var(--zf-ink)]">{f.filename}</span>
+              <span className="text-xs text-[var(--zf-muted)]">{f.file_type}</span>
             </button>
             {expanded.has(f.filename) && (
               <div className="px-3 pb-3 space-y-2">
                 {f.sections.map((s, i) => (
                   <div key={i} className="text-xs">
-                    <div className="text-[#6e6e73] font-medium mb-1">[{s.name}]</div>
-                    <div className="pl-3 space-y-0.5 font-mono text-[#6e6e73]">
+                    <div className="text-[var(--zf-muted)] font-medium mb-1">[{s.name}]</div>
+                    <div className="pl-3 space-y-0.5 font-mono text-[var(--zf-muted)]">
                       {s.entries.map(([k, v], j) => <div key={j}>{k}={v}</div>)}
                     </div>
                   </div>

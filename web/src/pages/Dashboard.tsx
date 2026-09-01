@@ -33,36 +33,36 @@ function subsystemPhaseStyle(phase: SubsystemPhase | undefined): {
     case 'live':
       return {
         label: 'Live',
-        className: 'text-[#1d1d1f]',
-        pill: 'bg-[#e8f5e9] text-[#1b5e20] border-[#c8e6c9]',
+        className: 'text-[var(--zf-ink)]',
+        pill: 'text-emerald-700 bg-emerald-50 border-emerald-200',
       }
     case 'unreachable':
       return {
         label: 'Unreachable',
-        className: 'text-[#1d1d1f]',
-        pill: 'bg-[#fff3e0] text-[#e65100] border-[#ffe0b2]',
+        className: 'text-[var(--zf-ink)]',
+        pill: 'text-amber-800 bg-amber-50 border-amber-200',
       }
     case 'off':
       return {
         label: 'Off',
-        className: 'text-[#1d1d1f]',
-        pill: 'bg-[#f5f5f7] text-[#6e6e73] border-[#d2d2d7]',
+        className: 'text-[var(--zf-ink)]',
+        pill: 'bg-[var(--zf-canvas)] text-[var(--zf-muted)] border-[var(--zf-hairline)]',
       }
     default:
       return {
         label: 'Checking…',
-        className: 'text-[#6e6e73]',
-        pill: 'bg-[#f5f5f7] text-[#6e6e73] border-[#d2d2d7]',
+        className: 'text-[var(--zf-muted)]',
+        pill: 'bg-[var(--zf-canvas)] text-[var(--zf-muted)] border-[var(--zf-hairline)]',
       }
   }
 }
 
 const CHART_TOOLTIP_STYLE = {
-  backgroundColor: '#ffffff',
-  border: '1px solid #d2d2d7',
+  backgroundColor: 'var(--zf-surface)',
+  border: '1px solid var(--zf-hairline)',
   borderRadius: '12px',
   fontSize: '12px',
-  color: '#1d1d1f',
+  color: 'var(--zf-ink)',
 }
 
 export default function Dashboard() {
@@ -157,26 +157,20 @@ export default function Dashboard() {
         </div>
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-[#0066cc] uppercase tracking-[0.04em] mb-1">{greeting}</p>
-            <h1 className="text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-[-0.022em] leading-none">
+            <p className="text-xs font-semibold text-[var(--zf-link)] uppercase tracking-[0.04em] mb-1">{greeting}</p>
+            <h1 className="text-[32px] sm:text-[40px] font-semibold text-[var(--zf-ink)] tracking-[-0.022em] leading-none">
               Zyvor Fabric
             </h1>
-            <p className="text-[17px] text-[#333336] mt-2 max-w-md tracking-[-0.022em] leading-snug">
+            <p className="text-[17px] text-[var(--zf-secondary)] mt-2 max-w-md tracking-[-0.022em] leading-snug">
               {stats.total === 0
                 ? 'Your infrastructure control plane is ready — spin up the first VM to get going.'
                 : `Watching ${stats.total} VM${stats.total === 1 ? '' : 's'} across your fabric. ${stats.running} running right now.`}
             </p>
             <div className="flex items-center gap-3 mt-4">
-              <Link
-                to="/app/create"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white text-sm font-medium rounded-lg transition-colors"
-              >
+              <Link to="/app/create" className="zf-btn zf-btn-primary">
                 <Plus className="w-4 h-4" /> Create VM
               </Link>
-              <button
-                onClick={loadVMs}
-                className="px-4 py-2 bg-white hover:bg-black/[0.04] text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors"
-              >
+              <button onClick={loadVMs} className="zf-btn zf-btn-ghost">
                 Refresh
               </button>
             </div>
@@ -185,7 +179,7 @@ export default function Dashboard() {
             <div className="shrink-0 flex items-center gap-3 self-center">
               <RadialGauge
                 percent={fleetHealthPct}
-                color={fleetHealthPct >= 70 ? '#34d399' : fleetHealthPct >= 30 ? '#fbbf24' : '#f87171'}
+                color={fleetHealthPct >= 70 ? 'var(--zf-success)' : fleetHealthPct >= 30 ? 'var(--zf-warning)' : 'var(--zf-danger)'}
                 label="fleet up"
               />
             </div>
@@ -244,9 +238,9 @@ export default function Dashboard() {
           return (
             <div
               key={title}
-              className="rounded-[12px] border border-[#d2d2d7] bg-[#f5f5f7] p-4"
+              className="rounded-[12px] border border-[var(--zf-hairline)] bg-[var(--zf-canvas)] p-4"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#0066cc]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--zf-link)]">
                 {title}
               </p>
               <p className="mt-2">
@@ -256,7 +250,7 @@ export default function Dashboard() {
                   {capsLoading && !capabilities ? '…' : phase.label}
                 </span>
               </p>
-              <p className="text-[14px] text-[#333336] mt-2 leading-snug tracking-[-0.016em]">
+              <p className="text-[14px] text-[var(--zf-secondary)] mt-2 leading-snug tracking-[-0.016em]">
                 {status?.detail || subtitle}
               </p>
             </div>
@@ -266,72 +260,72 @@ export default function Dashboard() {
 
       {/* Stat Cards - matching hypersdk exactly */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total VMs - Blue */}
-        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] p-5 card-glow transition-all hover:scale-[1.02]">
+        {/* Total VMs */}
+        <div className="stat-card-blue rounded-xl border border-[var(--zf-hairline)] p-5 transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Server className="h-5 w-5 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-md">
+              <Server className="h-5 w-5 text-[var(--zf-ink)]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-[#0066cc]">total</span>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--zf-canvas)] text-[var(--zf-muted)]">total</span>
           </div>
-          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">{totalCount}</div>
-          <div className="text-[13px] text-[#333336] mt-1">Total VMs</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)] tabular-nums">{totalCount}</div>
+          <div className="text-[13px] text-[var(--zf-secondary)] mt-1">Total VMs</div>
         </div>
 
-        {/* Running - Green */}
-        <div className="stat-card-green rounded-xl border border-[#d2d2d7] p-5 card-glow-green transition-all hover:scale-[1.02]">
+        {/* Running */}
+        <div className="stat-card-green rounded-xl border border-[var(--zf-hairline)] p-5 transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-green-500/20">
-              <Activity className="h-5 w-5 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-md">
+              <Activity className="h-5 w-5 text-[var(--zf-ink)]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-emerald-600">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
               {stats.total > 0 ? `${Math.round((stats.running / stats.total) * 100)}%` : '0%'}
             </span>
           </div>
-          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">{runningCount}</div>
-          <div className="text-[13px] text-[#333336] mt-1">Running</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)] tabular-nums">{runningCount}</div>
+          <div className="text-[13px] text-[var(--zf-secondary)] mt-1">Running</div>
         </div>
 
-        {/* Stopped - Red */}
-        <div className="stat-card-red rounded-xl border border-[#d2d2d7] p-5 card-glow transition-all hover:scale-[1.02]">
+        {/* Stopped */}
+        <div className="stat-card-red rounded-xl border border-[var(--zf-hairline)] p-5 transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/20">
-              <Power className="h-5 w-5 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-md">
+              <Power className="h-5 w-5 text-[var(--zf-ink)]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-600">stopped</span>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">stopped</span>
           </div>
-          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">{stoppedCount}</div>
-          <div className="text-[13px] text-[#333336] mt-1">Stopped</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)] tabular-nums">{stoppedCount}</div>
+          <div className="text-[13px] text-[var(--zf-secondary)] mt-1">Stopped</div>
         </div>
 
-        {/* Resources - Purple */}
-        <div className="stat-card-purple rounded-xl border border-[#d2d2d7] p-5 card-glow-purple transition-all hover:scale-[1.02]">
+        {/* Resources */}
+        <div className="stat-card-purple rounded-xl border border-[var(--zf-hairline)] p-5 transition-all hover:scale-[1.02]">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <Cpu className="h-5 w-5 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-md">
+              <Cpu className="h-5 w-5 text-[var(--zf-ink)]" />
             </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--zf-canvas)] text-[var(--zf-muted)]">
               {stats.totalCPU} vCPU
             </span>
           </div>
-          <div className="text-2xl font-bold text-[#1d1d1f] tabular-nums">
+          <div className="text-2xl font-bold text-[var(--zf-ink)] tabular-nums">
             {memCount}
-            <span className="text-sm text-[#6e6e73] font-medium ml-1">{stats.totalMem >= 1024 ? 'GB' : 'MB'}</span>
+            <span className="text-sm text-[var(--zf-muted)] font-medium ml-1">{stats.totalMem >= 1024 ? 'GB' : 'MB'}</span>
           </div>
-          <div className="text-[13px] text-[#333336] mt-1">Total Memory</div>
+          <div className="text-[13px] text-[var(--zf-secondary)] mt-1">Total Memory</div>
         </div>
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CPU Chart */}
-        <div className="bg-[#f5f5f7] rounded-xl p-5 border border-[#d2d2d7]">
+        <div className="bg-[var(--zf-canvas)] rounded-xl p-5 border border-[var(--zf-hairline)]">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <TrendingUp className="w-4 h-4 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-sm">
+              <TrendingUp className="w-4 h-4 text-[var(--zf-ink)]" />
             </div>
-            <h3 className="text-base font-semibold text-[#1d1d1f]">CPU Usage</h3>
-            <span className={`ml-auto text-lg font-semibold tabular-nums ${latestCpu > 80 ? 'text-red-600' : latestCpu > 50 ? 'text-amber-600' : 'text-[#0066cc]'}`}>
+            <h3 className="text-base font-semibold text-[var(--zf-ink)]">CPU Usage</h3>
+            <span className={`ml-auto text-lg font-semibold tabular-nums ${latestCpu > 80 ? 'text-red-600' : latestCpu > 50 ? 'text-amber-600' : 'text-[var(--zf-link)]'}`}>
               {metricsHistory.length > 0 ? `${latestCpu}%` : '--'}
             </span>
           </div>
@@ -339,26 +333,26 @@ export default function Dashboard() {
             <AreaChart data={metricsHistory}>
               <defs>
                 <linearGradient id="gradCpu" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--zf-link)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="var(--zf-link)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d2d2d7" />
-              <XAxis dataKey="time" stroke="#6e6e73" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#6e6e73" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--zf-hairline)" />
+              <XAxis dataKey="time" stroke="var(--zf-muted)" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="var(--zf-muted)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'CPU']} />
-              <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#gradCpu)" dot={false} />
+              <Area type="monotone" dataKey="cpu" stroke="var(--zf-link)" strokeWidth={2} fillOpacity={1} fill="url(#gradCpu)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         {/* Memory Chart */}
-        <div className="bg-[#f5f5f7] rounded-xl p-5 border border-[#d2d2d7]">
+        <div className="bg-[var(--zf-canvas)] rounded-xl p-5 border border-[var(--zf-hairline)]">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <HardDrive className="w-4 h-4 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-sm">
+              <HardDrive className="w-4 h-4 text-[var(--zf-ink)]" />
             </div>
-            <h3 className="text-base font-semibold text-[#1d1d1f]">Memory Usage</h3>
+            <h3 className="text-base font-semibold text-[var(--zf-ink)]">Memory Usage</h3>
             <span className={`ml-auto text-lg font-semibold tabular-nums ${latestMem > 80 ? 'text-red-600' : latestMem > 50 ? 'text-amber-600' : 'text-emerald-600'}`}>
               {metricsHistory.length > 0 ? `${latestMem}%` : '--'}
             </span>
@@ -367,15 +361,15 @@ export default function Dashboard() {
             <AreaChart data={metricsHistory}>
               <defs>
                 <linearGradient id="gradMem" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--zf-ink)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--zf-ink)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d2d2d7" />
-              <XAxis dataKey="time" stroke="#6e6e73" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#6e6e73" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--zf-hairline)" />
+              <XAxis dataKey="time" stroke="var(--zf-muted)" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="var(--zf-muted)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'Memory']} />
-              <Area type="monotone" dataKey="memory" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#gradMem)" dot={false} />
+              <Area type="monotone" dataKey="memory" stroke="var(--zf-ink)" strokeWidth={2} fillOpacity={1} fill="url(#gradMem)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -385,17 +379,17 @@ export default function Dashboard() {
       {vms.length === 0 ? (
         <GettingStarted />
       ) : (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#d2d2d7] flex items-center justify-between">
+      <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--zf-hairline)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-700 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Server className="w-4 h-4 text-[#1d1d1f]" />
+            <div className="icon-tile icon-tile-sm">
+              <Server className="w-4 h-4 text-[var(--zf-ink)]" />
             </div>
-            <h2 className="text-base font-semibold text-[#1d1d1f]">Virtual Machines</h2>
+            <h2 className="text-base font-semibold text-[var(--zf-ink)]">Virtual Machines</h2>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-[#6e6e73] bg-[#e8e8ed] px-2.5 py-1 rounded-full">{vms.length} VMs</span>
-            <Link to="/app/vms" className="flex items-center gap-1 text-xs text-[#0066cc] hover:text-blue-300 transition-colors">
+            <span className="text-xs font-medium text-[var(--zf-muted)] bg-[var(--zf-canvas)] px-2.5 py-1 rounded-full">{vms.length} VMs</span>
+            <Link to="/app/vms" className="flex items-center gap-1 text-xs text-[var(--zf-link)] hover:text-[var(--zf-link-hover)] transition-colors">
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -403,24 +397,24 @@ export default function Dashboard() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#d2d2d7]">
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">CPU</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Memory</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">IP</th>
+              <tr className="border-b border-[var(--zf-hairline)]">
+                <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">CPU</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Memory</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">IP</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#d2d2d7]/30">
+            <tbody className="divide-y divide-[var(--zf-hairline)]/30">
               {vms.slice(0, 8).map((vm) => (
                 <tr key={vm.name} className="table-row-hover transition-colors">
                   <td className="px-5 py-3">
-                    <Link to={`/app/vms/${vm.name}`} className="font-medium text-[#1d1d1f] hover:text-[#0066cc] transition-colors">{vm.name}</Link>
+                    <Link to={`/app/vms/${vm.name}`} className="font-medium text-[var(--zf-ink)] hover:text-[var(--zf-link)] transition-colors">{vm.name}</Link>
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={vm.state} /></td>
-                  <td className="px-4 py-3 text-[#6e6e73] tabular-nums">{vm.cpus} vCPU</td>
-                  <td className="px-4 py-3 text-[#6e6e73] tabular-nums">{vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}</td>
-                  <td className="px-4 py-3 text-[#6e6e73] font-mono text-xs">{vm.ip || '-'}</td>
+                  <td className="px-4 py-3 text-[var(--zf-muted)] tabular-nums">{vm.cpus} vCPU</td>
+                  <td className="px-4 py-3 text-[var(--zf-muted)] tabular-nums">{vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`}</td>
+                  <td className="px-4 py-3 text-[var(--zf-muted)] font-mono text-xs">{vm.ip || '-'}</td>
                 </tr>
               ))}
             </tbody>

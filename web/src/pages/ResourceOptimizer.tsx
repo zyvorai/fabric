@@ -33,10 +33,10 @@ interface OptimizationResult {
 
 function impactColor(impact: string): string {
   switch (impact?.toLowerCase()) {
-    case 'high': return 'bg-red-500/20 text-red-600 border-red-500/30'
-    case 'medium': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-    case 'low': return 'bg-blue-500/20 text-[#0066cc] border-blue-500/30'
-    default: return 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]'
+    case 'high': return 'text-red-700 bg-red-50 border-red-200'
+    case 'medium': return 'text-amber-800 bg-amber-50 border-amber-200'
+    case 'low': return 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
+    default: return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 }
 
@@ -92,8 +92,8 @@ export default function ResourceOptimizer() {
     return (
       <div className="space-y-6">
         <PageHeader title="Resource Optimizer" description="Right-sizing recommendations for your VMs" />
-        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
-          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+        <div className="flex items-center justify-center h-64 text-[var(--zf-muted)]">
+          <div className="animate-spin w-6 h-6 border-2 border-[var(--zf-ink)] border-t-transparent rounded-full mr-3" />
           Analyzing resources…
         </div>
       </div>
@@ -111,52 +111,52 @@ export default function ResourceOptimizer() {
       <PageLoadBanner title="Could not load recommendations" headline={loadError} onRetry={() => void fetchRecommendations()} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{optimizations.length}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">VMs Analyzed</div>
+        <div className="stat-card-blue rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{optimizations.length}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">VMs Analyzed</div>
         </div>
-        <div className="stat-card-purple rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{totalRecs}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Recommendations</div>
+        <div className="stat-card-purple rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{totalRecs}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Recommendations</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{highImpact}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">High Impact</div>
+        <div className="stat-card-red rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{highImpact}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">High Impact</div>
         </div>
-        <div className="stat-card-orange rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{medImpact}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Medium Impact</div>
+        <div className="stat-card-orange rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{medImpact}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Medium Impact</div>
         </div>
       </div>
 
       {optimizations.length === 0 ? (
-        <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-10 text-center">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-10 text-center">
           <CheckCircle className="w-10 h-10 text-emerald-600 mx-auto mb-3" />
           <p className="text-sm text-emerald-600 font-medium">All VMs are optimally configured</p>
-          <p className="text-xs text-[#6e6e73] mt-1">No right-sizing recommendations at this time</p>
+          <p className="text-xs text-[var(--zf-muted)] mt-1">No right-sizing recommendations at this time</p>
         </div>
       ) : (
         <div className="space-y-4">
           {optimizations.map((opt) => {
             const result = results[opt.vm_name]
             return (
-              <div key={opt.vm_name} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
-                <div className="px-5 py-4 border-b border-[#d2d2d7] flex items-center justify-between">
+              <div key={opt.vm_name} className="bg-[var(--zf-surface)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
+                <div className="px-5 py-4 border-b border-[var(--zf-hairline)] flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-base font-semibold text-[#1d1d1f]">{opt.vm_name}</h3>
-                    <span className="text-xs font-medium text-[#6e6e73] bg-[#e8e8ed] px-2.5 py-1 rounded-full">{opt.recommendations.length} recommendations</span>
+                    <h3 className="text-base font-semibold text-[var(--zf-ink)]">{opt.vm_name}</h3>
+                    <span className="text-xs font-medium text-[var(--zf-muted)] bg-[var(--zf-canvas)] px-2.5 py-1 rounded-full">{opt.recommendations.length} recommendations</span>
                   </div>
                   <button
                     onClick={() => applyOptimization(opt.vm_name)}
                     disabled={applying === opt.vm_name || !!result}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-yellow-600 to-amber-600 text-white hover:from-yellow-500 hover:to-amber-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-yellow-600/20"
+                    className="zf-btn zf-btn-primary zf-btn-sm"
                   >
                     {applying === opt.vm_name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
                     {result ? 'Applied' : applying === opt.vm_name ? 'Applying...' : 'Auto-Optimize'}
                   </button>
                 </div>
 
-                <div className="divide-y divide-[#d2d2d7]/30">
+                <div className="divide-y divide-[var(--zf-hairline)]/30">
                   {opt.recommendations.map((rec, idx) => (
                     <div key={idx} className="px-5 py-3 flex items-start gap-4">
                       <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium ${impactColor(rec.impact)}`}>
@@ -164,17 +164,17 @@ export default function ResourceOptimizer() {
                         {rec.impact}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-[#1d1d1f] capitalize">{rec.resource}</div>
-                        <div className="text-xs text-[#6e6e73] mt-0.5">{rec.reason}</div>
+                        <div className="text-sm font-medium text-[var(--zf-ink)] capitalize">{rec.resource}</div>
+                        <div className="text-xs text-[var(--zf-muted)] mt-0.5">{rec.reason}</div>
                         <div className="flex items-center gap-3 mt-2">
-                          <div className="bg-white rounded-lg px-3 py-1.5">
-                            <div className="text-[10px] text-[#6e6e73]">Current</div>
-                            <div className="text-xs font-semibold text-[#1d1d1f]">{rec.current_value}</div>
+                          <div className="bg-[var(--zf-canvas)] rounded-lg px-3 py-1.5">
+                            <div className="text-[10px] text-[var(--zf-muted)]">Current</div>
+                            <div className="text-xs font-semibold text-[var(--zf-ink)]">{rec.current_value}</div>
                           </div>
-                          <span className="text-[#6e6e73]">&rarr;</span>
-                          <div className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-1.5">
-                            <div className="text-[10px] text-emerald-600/70">Recommended</div>
-                            <div className="text-xs font-semibold text-emerald-600">{rec.recommended_value}</div>
+                          <span className="text-[var(--zf-muted)]">&rarr;</span>
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                            <div className="text-[10px] text-emerald-700">Recommended</div>
+                            <div className="text-xs font-semibold text-emerald-700">{rec.recommended_value}</div>
                           </div>
                         </div>
                       </div>
@@ -183,10 +183,10 @@ export default function ResourceOptimizer() {
                 </div>
 
                 {result && (
-                  <div className="px-5 py-3 bg-[#f5f5f7] border-t border-[#d2d2d7]">
+                  <div className="px-5 py-3 bg-[var(--zf-canvas)] border-t border-[var(--zf-hairline)]">
                     <div className="flex items-center gap-2 text-xs">
-                      {result.applied.length > 0 && <span className="text-emerald-600"><CheckCircle className="w-3.5 h-3.5 inline mr-1" />{result.applied.length} applied</span>}
-                      {result.skipped.length > 0 && <span className="text-amber-400"><AlertTriangle className="w-3.5 h-3.5 inline mr-1" />{result.skipped.length} skipped</span>}
+                      {result.applied.length > 0 && <span className="text-emerald-700"><CheckCircle className="w-3.5 h-3.5 inline mr-1" />{result.applied.length} applied</span>}
+                      {result.skipped.length > 0 && <span className="text-amber-700"><AlertTriangle className="w-3.5 h-3.5 inline mr-1" />{result.skipped.length} skipped</span>}
                     </div>
                   </div>
                 )}

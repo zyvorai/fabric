@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect } from 'react'
-import { HardDrive, Plus, Play, Square, Trash2, RefreshCw, Server, Folder, AlertCircle, CheckCircle, Database } from 'lucide-react'
+import { HardDrive, Plus, Play, Square, Trash2, RefreshCw, Server, Folder, AlertCircle, CheckCircle, Database, X } from 'lucide-react'
 import {
   listStoragePools,
   createNfsPool,
@@ -25,6 +25,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import { useToastContext } from '../contexts/ToastContext'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader, Card, Modal } from '../components/ui'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -158,18 +159,18 @@ export default function StoragePools() {
   const getStateColor = (state: string) => {
     switch (state) {
       case 'Active':
-        return 'text-green-500'
+        return 'text-emerald-700'
       case 'Inactive':
-        return 'text-[#6e6e73]'
+        return 'text-[var(--zf-muted)]'
       case 'Starting':
       case 'Stopping':
-        return 'text-yellow-500'
+        return 'text-amber-800'
       case 'Degraded':
-        return 'text-orange-500'
+        return 'text-[var(--zf-warning)]'
       case 'Failed':
-        return 'text-red-500'
+        return 'text-[var(--zf-danger)]'
       default:
-        return 'text-[#6e6e73]'
+        return 'text-[var(--zf-muted)]'
     }
   }
 
@@ -177,13 +178,13 @@ export default function StoragePools() {
     if (!health) return null
 
     if (health.status === 'Healthy') {
-      return <CheckCircle className="w-4 h-4 text-green-500" />
+      return <CheckCircle className="w-4 h-4 text-emerald-600" />
     }
-    return <AlertCircle className="w-4 h-4 text-red-500" />
+    return <AlertCircle className="w-4 h-4 text-[var(--zf-danger)]" />
   }
 
   if (loading) {
-    return <div className="p-8">Loading storage pools...</div>
+    return <div className="p-8 text-[var(--zf-muted)]">Loading storage pools...</div>
   }
 
   return (
@@ -196,50 +197,50 @@ export default function StoragePools() {
           onRetry={loadPools}
         />
       )}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Storage Pools</h1>
-          <p className="text-[#6e6e73]">Manage local and network storage pools</p>
-        </div>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded transition"
-        >
-          <Plus className="w-4 h-4" />
-          Create Pool
-        </button>
-      </div>
+      <PageHeader
+        title="Storage Pools"
+        description="Manage local and network storage pools"
+        primaryAction={
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="zf-btn zf-btn-primary"
+          >
+            <Plus className="w-4 h-4" />
+            Create Pool
+          </button>
+        }
+      />
 
       {/* Statistics */}
       <div className="grid grid-cols-4 gap-3 mb-6">
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Total Pools</div>
-          <div className="text-2xl font-bold">{pools.length}</div>
-        </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Active Pools</div>
-          <div className="text-2xl font-bold text-green-500">
+        <Card><div className="px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Total Pools</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{pools.length}</div>
+        </div></Card>
+        <Card><div className="px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Active Pools</div>
+          <div className="text-2xl font-bold text-emerald-700">
             {pools.filter((p) => p.state === 'Active').length}
           </div>
-        </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Total Capacity</div>
-          <div className="text-2xl font-bold">
+        </div></Card>
+        <Card><div className="px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Total Capacity</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">
             {formatBytes(pools.reduce((sum, p) => sum + p.capacity, 0))}
           </div>
-        </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Available</div>
-          <div className="text-2xl font-bold">
+        </div></Card>
+        <Card><div className="px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Available</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">
             {formatBytes(pools.reduce((sum, p) => sum + p.available, 0))}
           </div>
-        </div>
+        </div></Card>
       </div>
 
       {/* Pools List */}
-      <div className="bg-[#f5f5f7] rounded-lg overflow-hidden">
+      <Card className="overflow-hidden">
         {pools.length > 0 && (
-          <div className="p-4 border-b border-[#d2d2d7]">
+          <div className="p-4 border-b border-[var(--zf-hairline)]">
             <TableSearch
               value={poolQuery}
               onChange={setPoolQuery}
@@ -251,8 +252,8 @@ export default function StoragePools() {
           </div>
         )}
         <table className="w-full">
-          <thead className="bg-white">
-            <tr className="text-left text-[#6e6e73] text-sm">
+          <thead className="bg-[var(--zf-surface)]">
+            <tr className="text-left text-[var(--zf-muted)] text-sm">
               <th className="p-4">Name</th>
               <th className="p-4">Type</th>
               <th className="p-4">Path</th>
@@ -267,13 +268,13 @@ export default function StoragePools() {
           <tbody>
             {pools.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-[#6e6e73]">
+                <td colSpan={9} className="p-8 text-center text-[var(--zf-muted)]">
                   No storage pools configured. Create one to get started.
                 </td>
               </tr>
             ) : filteredPools.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-[#6e6e73]">
+                <td colSpan={9} className="p-8 text-center text-[var(--zf-muted)]">
                   No storage pools match "{poolQuery}"
                 </td>
               </tr>
@@ -283,41 +284,41 @@ export default function StoragePools() {
                   pool.capacity > 0 ? ((pool.capacity - pool.available) / pool.capacity) * 100 : 0
 
                 return (
-                  <tr key={pool.id} className="border-t border-[#d2d2d7] hover:bg-white">
+                  <tr key={pool.id} className="border-t border-[var(--zf-hairline)] hover:bg-black/[0.03]">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {typeof pool.pool_type === 'object' && 'NFS' in pool.pool_type ? (
-                          <Server className="w-4 h-4 text-[#0066cc]" />
+                          <Server className="w-4 h-4 text-[var(--zf-link)]" />
                         ) : (
-                          <Folder className="w-4 h-4 text-[#6e6e73]" />
+                          <Folder className="w-4 h-4 text-[var(--zf-muted)]" />
                         )}
-                        <span className="font-medium">{pool.name}</span>
+                        <span className="font-medium text-[var(--zf-ink)]">{pool.name}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-sm text-[#6e6e73]">{getPoolTypeDisplay(pool)}</td>
-                    <td className="p-4 text-sm text-[#6e6e73] font-mono">
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">{getPoolTypeDisplay(pool)}</td>
+                    <td className="p-4 text-sm text-[var(--zf-muted)] font-mono">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate max-w-[16rem]">{pool.path}</span>
                         <CopyButton text={pool.path} iconOnly successMessage="Path copied" />
                       </div>
                     </td>
-                    <td className="p-4 text-sm">{formatBytes(pool.capacity)}</td>
-                    <td className="p-4 text-sm">{formatBytes(pool.available)}</td>
+                    <td className="p-4 text-sm text-[var(--zf-ink)]">{formatBytes(pool.capacity)}</td>
+                    <td className="p-4 text-sm text-[var(--zf-ink)]">{formatBytes(pool.available)}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-white rounded-full h-2 overflow-hidden">
+                        <div className="flex-1 bg-[var(--zf-canvas)] rounded-full h-2 overflow-hidden">
                           <div
                             className={`h-full ${
                               usagePercent > 90
-                                ? 'bg-red-500'
+                                ? 'bg-[var(--zf-danger)]'
                                 : usagePercent > 75
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
+                                ? 'bg-[var(--zf-warning)]'
+                                : 'bg-[var(--zf-success)]'
                             }`}
                             style={{ width: `${Math.min(usagePercent, 100)}%` }}
                           />
                         </div>
-                        <span className="text-sm text-[#6e6e73] w-12 text-right">
+                        <span className="text-sm text-[var(--zf-muted)] w-12 text-right">
                           {usagePercent.toFixed(0)}%
                         </span>
                       </div>
@@ -331,10 +332,10 @@ export default function StoragePools() {
                       {getHealthIcon(nfsHealth.get(pool.name))}
                       {cephHealth.has(pool.name) && (
                         cephHealth.get(pool.name)?.status === 'Ok'
-                          ? <CheckCircle className="w-4 h-4 text-green-500" />
+                          ? <CheckCircle className="w-4 h-4 text-emerald-600" />
                           : cephHealth.get(pool.name)?.status === 'Warn'
-                          ? <AlertCircle className="w-4 h-4 text-yellow-500" />
-                          : <AlertCircle className="w-4 h-4 text-red-500" />
+                          ? <AlertCircle className="w-4 h-4 text-amber-600" />
+                          : <AlertCircle className="w-4 h-4 text-[var(--zf-danger)]" />
                       )}
                     </td>
                     <td className="p-4">
@@ -342,45 +343,45 @@ export default function StoragePools() {
                         {pool.state === 'Inactive' ? (
                           <button
                             onClick={() => handleStart(pool.name)}
-                            className="p-2 hover:bg-white/[0.03] rounded transition"
+                            className="p-2 hover:bg-black/[0.04] rounded transition"
                             title="Start pool"
                           >
-                            <Play className="w-4 h-4 text-green-500" />
+                            <Play className="w-4 h-4 text-emerald-600" />
                           </button>
                         ) : pool.state === 'Active' ? (
                           <button
                             onClick={() => handleStop(pool.name)}
-                            className="p-2 hover:bg-white/[0.03] rounded transition"
+                            className="p-2 hover:bg-black/[0.04] rounded transition"
                             title="Stop pool"
                           >
-                            <Square className="w-4 h-4 text-yellow-500" />
+                            <Square className="w-4 h-4 text-amber-600" />
                           </button>
                         ) : null}
                         {typeof pool.pool_type === 'object' && 'Ceph' in pool.pool_type && (
                           <button
                             onClick={() => setRbdPool(pool)}
-                            className="p-2 hover:bg-white/[0.03] rounded transition"
+                            className="p-2 hover:bg-black/[0.04] rounded transition"
                             title="Manage RBD images"
                           >
-                            <Database className="w-4 h-4 text-purple-400" />
+                            <Database className="w-4 h-4 text-[var(--zf-muted)]" />
                           </button>
                         )}
                         <button
                           onClick={() => handleRefresh(pool.name)}
-                          className="p-2 hover:bg-white/[0.03] rounded transition"
+                          className="p-2 hover:bg-black/[0.04] rounded transition"
                           title="Refresh stats"
                         >
-                          <RefreshCw className="w-4 h-4 text-blue-500" />
+                          <RefreshCw className="w-4 h-4 text-[var(--zf-link)]" />
                         </button>
                         <button
                           onClick={() => handleDelete(pool.name)}
-                          className="p-2 hover:bg-white/[0.03] rounded transition"
+                          className="p-2 hover:bg-black/[0.04] rounded transition"
                           title="Delete pool"
                           disabled={pool.state === 'Active'}
                         >
                           <Trash2
                             className={`w-4 h-4 ${
-                              pool.state === 'Active' ? 'text-[#6e6e73]' : 'text-red-500'
+                              pool.state === 'Active' ? 'text-[var(--zf-muted)]' : 'text-[var(--zf-danger)]'
                             }`}
                           />
                         </button>
@@ -392,7 +393,7 @@ export default function StoragePools() {
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {/* Create Pool Dialog */}
       {showCreateDialog && (
@@ -494,257 +495,255 @@ function CreatePoolDialog({ onClose, onCreated }: CreatePoolDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-2xl">
-        <h2 className="text-2xl font-bold mb-6">Create Storage Pool</h2>
+    <Modal open onClose={onClose} className="max-w-2xl">
+      <h2 className="text-2xl font-bold mb-6 text-[var(--zf-ink)]">Create Storage Pool</h2>
 
-        <form onSubmit={handleSubmit}>
-          {/* Pool Type */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Pool Type</label>
-            <div className="grid grid-cols-3 gap-3">
-              {([
-                { key: 'local' as const, label: 'Local', desc: 'Local filesystem', Icon: HardDrive },
-                { key: 'nfs' as const, label: 'NFS', desc: 'Network file system', Icon: Server },
-                { key: 'lvm' as const, label: 'LVM', desc: 'LVM volume group', Icon: HardDrive },
-                { key: 'lvm-thin' as const, label: 'LVM-thin', desc: 'Thin provisioned LVM', Icon: HardDrive },
-                { key: 'zfs' as const, label: 'ZFS', desc: 'ZFS pool/dataset', Icon: HardDrive },
-                { key: 'ceph' as const, label: 'Ceph', desc: 'Ceph RBD pool', Icon: Server },
-              ]).map(({ key, label, desc, Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setPoolType(key)}
-                  className={`p-3 rounded border-2 transition text-center ${
-                    poolType === key
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-[#d2d2d7] hover:border-[#d2d2d7]'
-                  }`}
-                >
-                  <Icon className="w-5 h-5 mx-auto mb-1" />
-                  <div className="font-medium text-sm">{label}</div>
-                  <div className="text-xs text-[#6e6e73]">{desc}</div>
-                </button>
-              ))}
-            </div>
+      <form onSubmit={handleSubmit}>
+        {/* Pool Type */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Pool Type</label>
+          <div className="grid grid-cols-3 gap-3">
+            {([
+              { key: 'local' as const, label: 'Local', desc: 'Local filesystem', Icon: HardDrive },
+              { key: 'nfs' as const, label: 'NFS', desc: 'Network file system', Icon: Server },
+              { key: 'lvm' as const, label: 'LVM', desc: 'LVM volume group', Icon: HardDrive },
+              { key: 'lvm-thin' as const, label: 'LVM-thin', desc: 'Thin provisioned LVM', Icon: HardDrive },
+              { key: 'zfs' as const, label: 'ZFS', desc: 'ZFS pool/dataset', Icon: HardDrive },
+              { key: 'ceph' as const, label: 'Ceph', desc: 'Ceph RBD pool', Icon: Server },
+            ]).map(({ key, label, desc, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPoolType(key)}
+                className={`p-3 rounded border-2 transition text-center ${
+                  poolType === key
+                    ? 'border-[var(--zf-ink)] bg-black/[0.04]'
+                    : 'border-[var(--zf-hairline)] hover:border-[var(--zf-muted)]'
+                }`}
+              >
+                <Icon className="w-5 h-5 mx-auto mb-1 text-[var(--zf-ink)]" />
+                <div className="font-medium text-sm text-[var(--zf-ink)]">{label}</div>
+                <div className="text-xs text-[var(--zf-muted)]">{desc}</div>
+              </button>
+            ))}
           </div>
+        </div>
 
-          {/* Common Fields */}
+        {/* Common Fields */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Pool Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input-field"
+            placeholder="storage-pool-1"
+            required
+          />
+        </div>
+
+        {poolType === 'local' ? (
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Pool Name</label>
+            <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Local Path</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
-              placeholder="storage-pool-1"
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              className="input-field font-mono"
+              placeholder="/var/lib/zyvor-fabricd/storage"
               required
             />
           </div>
-
-          {poolType === 'local' ? (
+        ) : poolType === 'lvm' || poolType === 'lvm-thin' ? (
+          <>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Local Path</label>
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Volume Group</label>
               <input
                 type="text"
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                placeholder="/var/lib/zyvor-fabricd/storage"
+                value={volumeGroup}
+                onChange={(e) => setVolumeGroup(e.target.value)}
+                className="input-field font-mono"
+                placeholder="vg0"
                 required
               />
             </div>
-          ) : poolType === 'lvm' || poolType === 'lvm-thin' ? (
-            <>
+            {poolType === 'lvm-thin' && (
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Volume Group</label>
+                <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Thin Pool</label>
                 <input
                   type="text"
-                  value={volumeGroup}
-                  onChange={(e) => setVolumeGroup(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="vg0"
+                  value={thinPool}
+                  onChange={(e) => setThinPool(e.target.value)}
+                  className="input-field font-mono"
+                  placeholder="thinpool0"
                   required
                 />
               </div>
-              {poolType === 'lvm-thin' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Thin Pool</label>
-                  <input
-                    type="text"
-                    value={thinPool}
-                    onChange={(e) => setThinPool(e.target.value)}
-                    className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                    placeholder="thinpool0"
-                    required
-                  />
-                </div>
-              )}
-            </>
-          ) : poolType === 'zfs' ? (
-            <>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">ZFS Pool</label>
-                <input
-                  type="text"
-                  value={zpool}
-                  onChange={(e) => setZpool(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="tank"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Dataset (optional)</label>
-                <input
-                  type="text"
-                  value={dataset}
-                  onChange={(e) => setDataset(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="vms"
-                />
-              </div>
-            </>
-          ) : poolType === 'ceph' ? (
-            <>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Monitor Addresses</label>
-                <input
-                  type="text"
-                  value={cephMonitors}
-                  onChange={(e) => setCephMonitors(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="10.0.0.1, 10.0.0.2, 10.0.0.3"
-                  required
-                />
-                <div className="text-xs text-[#6e6e73] mt-1">Comma-separated list of Ceph monitor addresses</div>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Ceph Pool Name</label>
-                <input
-                  type="text"
-                  value={cephPoolName}
-                  onChange={(e) => setCephPoolName(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="rbd"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">User (optional)</label>
-                <input
-                  type="text"
-                  value={cephUser}
-                  onChange={(e) => setCephUser(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="admin"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Keyring Path (optional)</label>
-                <input
-                  type="text"
-                  value={cephKeyring}
-                  onChange={(e) => setCephKeyring(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="/etc/ceph/ceph.client.admin.keyring"
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">NFS Server</label>
-                <input
-                  type="text"
-                  value={nfsServer}
-                  onChange={(e) => setNfsServer(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
-                  placeholder="192.168.1.100"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Export Path</label>
-                <input
-                  type="text"
-                  value={nfsExportPath}
-                  onChange={(e) => setNfsExportPath(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="/export/vm-storage"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Mount Path</label>
-                <input
-                  type="text"
-                  value={nfsMountPath}
-                  onChange={(e) => setNfsMountPath(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono"
-                  placeholder="/mnt/nfs-pool"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">NFS Version</label>
-                <select
-                  value={nfsVersion}
-                  onChange={(e) => setNfsVersion(e.target.value as any)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2"
-                >
-                  <option value="V3">NFSv3</option>
-                  <option value="V4">NFSv4</option>
-                  <option value="V4_1">NFSv4.1</option>
-                  <option value="V4_2">NFSv4.2</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Mount Options</label>
-                <input
-                  type="text"
-                  value={mountOptions}
-                  onChange={(e) => setMountOptions(e.target.value)}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-4 py-2 font-mono text-sm"
-                  placeholder="rw,hard,intr,rsize=8192,wsize=8192"
-                />
-                <div className="text-xs text-[#6e6e73] mt-1">
-                  Comma-separated mount options
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="mb-6">
-            <label className="flex items-center gap-2">
+            )}
+          </>
+        ) : poolType === 'zfs' ? (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">ZFS Pool</label>
               <input
-                type="checkbox"
-                checked={autoStart}
-                onChange={(e) => setAutoStart(e.target.checked)}
-                className="rounded"
+                type="text"
+                value={zpool}
+                onChange={(e) => setZpool(e.target.value)}
+                className="input-field font-mono"
+                placeholder="tank"
+                required
               />
-              <span className="text-sm">Auto-start pool on daemon startup</span>
-            </label>
-          </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Dataset (optional)</label>
+              <input
+                type="text"
+                value={dataset}
+                onChange={(e) => setDataset(e.target.value)}
+                className="input-field font-mono"
+                placeholder="vms"
+              />
+            </div>
+          </>
+        ) : poolType === 'ceph' ? (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Monitor Addresses</label>
+              <input
+                type="text"
+                value={cephMonitors}
+                onChange={(e) => setCephMonitors(e.target.value)}
+                className="input-field font-mono"
+                placeholder="10.0.0.1, 10.0.0.2, 10.0.0.3"
+                required
+              />
+              <div className="text-xs text-[var(--zf-muted)] mt-1">Comma-separated list of Ceph monitor addresses</div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Ceph Pool Name</label>
+              <input
+                type="text"
+                value={cephPoolName}
+                onChange={(e) => setCephPoolName(e.target.value)}
+                className="input-field font-mono"
+                placeholder="rbd"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">User (optional)</label>
+              <input
+                type="text"
+                value={cephUser}
+                onChange={(e) => setCephUser(e.target.value)}
+                className="input-field font-mono"
+                placeholder="admin"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Keyring Path (optional)</label>
+              <input
+                type="text"
+                value={cephKeyring}
+                onChange={(e) => setCephKeyring(e.target.value)}
+                className="input-field font-mono"
+                placeholder="/etc/ceph/ceph.client.admin.keyring"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">NFS Server</label>
+              <input
+                type="text"
+                value={nfsServer}
+                onChange={(e) => setNfsServer(e.target.value)}
+                className="input-field"
+                placeholder="192.168.1.100"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Export Path</label>
+              <input
+                type="text"
+                value={nfsExportPath}
+                onChange={(e) => setNfsExportPath(e.target.value)}
+                className="input-field font-mono"
+                placeholder="/export/vm-storage"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Mount Path</label>
+              <input
+                type="text"
+                value={nfsMountPath}
+                onChange={(e) => setNfsMountPath(e.target.value)}
+                className="input-field font-mono"
+                placeholder="/mnt/nfs-pool"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">NFS Version</label>
+              <select
+                value={nfsVersion}
+                onChange={(e) => setNfsVersion(e.target.value as any)}
+                className="input-field"
+              >
+                <option value="V3">NFSv3</option>
+                <option value="V4">NFSv4</option>
+                <option value="V4_1">NFSv4.1</option>
+                <option value="V4_2">NFSv4.2</option>
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-[var(--zf-ink)]">Mount Options</label>
+              <input
+                type="text"
+                value={mountOptions}
+                onChange={(e) => setMountOptions(e.target.value)}
+                className="input-field font-mono text-sm"
+                placeholder="rw,hard,intr,rsize=8192,wsize=8192"
+              />
+              <div className="text-xs text-[var(--zf-muted)] mt-1">
+                Comma-separated mount options
+              </div>
+            </div>
+          </>
+        )}
 
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded transition"
-            >
-              Create Pool
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="mb-6">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={autoStart}
+              onChange={(e) => setAutoStart(e.target.checked)}
+              className="rounded border-[var(--zf-hairline)]"
+            />
+            <span className="text-sm text-[var(--zf-ink)]">Auto-start pool on daemon startup</span>
+          </label>
+        </div>
+
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="zf-btn zf-btn-ghost flex-1"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="zf-btn zf-btn-primary flex-1"
+          >
+            Create Pool
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -811,48 +810,48 @@ function RbdImagesModal({ pool, onClose }: RbdImagesModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-lg max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
+    <>
+      <Modal open onClose={onClose} className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-bold">RBD Images</h2>
-            <p className="text-sm text-[#6e6e73] mt-0.5">Pool: {pool.name}</p>
+            <h2 className="text-xl font-bold text-[var(--zf-ink)]">RBD Images</h2>
+            <p className="text-sm text-[var(--zf-muted)] mt-0.5">Pool: {pool.name}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
-            <span className="text-2xl">&times;</span>
+          <button onClick={onClose} className="p-2 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] rounded transition">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="space-y-4">
           {loadError && (
             <ErrorBanner title="Could not load RBD images" headline={loadError} onRetry={load} />
           )}
 
           <form onSubmit={handleCreate} className="flex items-end gap-2">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-[#6e6e73] mb-1">Image name</label>
+              <label className="block text-xs font-medium text-[var(--zf-muted)] mb-1">Image name</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-image"
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2 text-sm"
+                className="input-field text-sm"
               />
             </div>
             <div className="w-28">
-              <label className="block text-xs font-medium text-[#6e6e73] mb-1">Size (MB)</label>
+              <label className="block text-xs font-medium text-[var(--zf-muted)] mb-1">Size (MB)</label>
               <input
                 type="number"
                 min={1}
                 value={newSizeMb}
                 onChange={(e) => setNewSizeMb(Number(e.target.value))}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2 text-sm"
+                className="input-field text-sm"
               />
             </div>
             <button
               type="submit"
               disabled={creating}
-              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg text-sm transition disabled:opacity-50"
+              className="zf-btn zf-btn-primary zf-btn-sm"
             >
               {creating ? 'Creating…' : 'Create'}
             </button>
@@ -860,18 +859,18 @@ function RbdImagesModal({ pool, onClose }: RbdImagesModalProps) {
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-[var(--zf-hairline)] border-t-[var(--zf-ink)] rounded-full animate-spin" />
             </div>
           ) : images.length === 0 ? (
-            <p className="text-sm text-[#6e6e73] text-center py-6">No RBD images in this pool.</p>
+            <p className="text-sm text-[var(--zf-muted)] text-center py-6">No RBD images in this pool.</p>
           ) : (
             <div className="space-y-1.5">
               {images.map((image) => (
-                <div key={image} className="flex items-center justify-between bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-3 py-2">
-                  <span className="text-sm font-mono truncate">{image}</span>
+                <div key={image} className="flex items-center justify-between bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-3 py-2">
+                  <span className="text-sm font-mono truncate text-[var(--zf-ink)]">{image}</span>
                   <button
                     onClick={() => handleDelete(image)}
-                    className="p-1.5 text-[#6e6e73] hover:text-red-600 hover:bg-red-500/10 rounded transition"
+                    className="p-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-danger)] hover:bg-red-50 rounded transition"
                     title="Delete image"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -881,7 +880,7 @@ function RbdImagesModal({ pool, onClose }: RbdImagesModalProps) {
             </div>
           )}
         </div>
-      </div>
+      </Modal>
 
       {confirmState && (
         <ConfirmDialog
@@ -893,6 +892,6 @@ function RbdImagesModal({ pool, onClose }: RbdImagesModalProps) {
           onCancel={cancel}
         />
       )}
-    </div>
+    </>
   )
 }

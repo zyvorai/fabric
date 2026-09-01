@@ -24,22 +24,15 @@ interface Plugin {
 
 function statusColor(status: string): string {
   switch (status) {
-    case 'running': return 'bg-green-500/20 text-emerald-600'
-    case 'stopped': return 'bg-black/[0.06] text-[#6e6e73]'
-    case 'error': return 'bg-red-500/20 text-red-600'
-    default: return 'bg-black/[0.06] text-[#6e6e73]'
+    case 'running': return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+    case 'stopped': return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
+    case 'error': return 'text-red-700 bg-red-50 border-red-200'
+    default: return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 }
 
-function typeColor(type: string): string {
-  switch (type?.toLowerCase()) {
-    case 'storage': return 'bg-blue-500/20 text-[#0066cc] border-blue-500/30'
-    case 'network': return 'bg-teal-500/20 text-teal-400 border-teal-500/30'
-    case 'security': return 'bg-red-500/20 text-red-600 border-red-500/30'
-    case 'monitoring': return 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-    case 'backup': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-    default: return 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]'
-  }
+function typeColor(_type: string): string {
+  return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
 }
 
 export default function PluginManager() {
@@ -94,8 +87,8 @@ export default function PluginManager() {
     return (
       <div className="space-y-6">
         <PageHeader title="Plugin Manager" description="Manage server extensions and integrations" />
-        <div className="flex items-center justify-center h-64 text-[#6e6e73]">
-          <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
+        <div className="flex items-center justify-center h-64 text-[var(--zf-muted)]">
+          <div className="animate-spin w-6 h-6 border-2 border-[var(--zf-ink)] border-t-transparent rounded-full mr-3" />
           Loading plugins…
         </div>
       </div>
@@ -120,58 +113,58 @@ export default function PluginManager() {
         />
       )}
       {actionError && (
-        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-sm text-amber-400">{actionError}</div>
+        <div className="bg-amber-50 rounded-lg border border-amber-200 px-4 py-2 text-sm text-amber-800">{actionError}</div>
       )}
 
       {!loadError && (
       <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="stat-card-blue rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{plugins.length}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Total Plugins</div>
+        <div className="stat-card-blue rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{plugins.length}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Total Plugins</div>
         </div>
-        <div className="stat-card-green rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{runningCount}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Running</div>
+        <div className="stat-card-green rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow-green transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{runningCount}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Running</div>
         </div>
-        <div className="stat-card-red rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{errorCount}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Errors</div>
+        <div className="stat-card-red rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{errorCount}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Errors</div>
         </div>
-        <div className="stat-card-purple rounded-xl border border-[#d2d2d7] px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
-          <div className="text-2xl font-bold text-[#1d1d1f]">{new Set(plugins.map(p => p.type)).size}</div>
-          <div className="text-xs text-[#6e6e73] mt-1">Types</div>
+        <div className="stat-card-purple rounded-xl border border-[var(--zf-hairline)] px-4 py-3 card-glow-purple transition-all hover:scale-[1.02]">
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{new Set(plugins.map(p => p.type)).size}</div>
+          <div className="text-xs text-[var(--zf-muted)] mt-1">Types</div>
         </div>
       </div>
 
       {plugins.length === 0 ? (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73]"><Package className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No plugins installed</p></div>
+        <div className="bg-[var(--zf-canvas)] rounded-xl p-10 border border-[var(--zf-hairline)] text-center text-[var(--zf-muted)]"><Package className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">No plugins installed</p></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {plugins.map(plugin => (
-            <div key={plugin.name} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5 card-glow transition-all hover:scale-[1.01]">
+            <div key={plugin.name} className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] p-5 card-glow transition-all hover:scale-[1.01]">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20 border border-[#d2d2d7] flex items-center justify-center">
-                    <Package className="w-5 h-5 text-pink-400" />
+                  <div className="icon-tile icon-tile-md">
+                    <Package className="w-5 h-5 text-[var(--zf-ink)]" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-[#1d1d1f]">{plugin.name}</h3>
+                    <h3 className="text-sm font-semibold text-[var(--zf-ink)]">{plugin.name}</h3>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-[#6e6e73]">v{plugin.version}</span>
+                      <span className="text-xs text-[var(--zf-muted)]">v{plugin.version}</span>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border capitalize ${typeColor(plugin.type)}`}>{plugin.type}</span>
                     </div>
                   </div>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(plugin.status)}`}>{plugin.status}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(plugin.status)}`}>{plugin.status}</span>
               </div>
 
-              <p className="text-xs text-[#6e6e73] mb-3">{plugin.description}</p>
-              {plugin.author && <p className="text-[10px] text-[#6e6e73] mb-3">by {plugin.author}</p>}
+              <p className="text-xs text-[var(--zf-muted)] mb-3">{plugin.description}</p>
+              {plugin.author && <p className="text-[10px] text-[var(--zf-muted)] mb-3">by {plugin.author}</p>}
 
-              <div className="flex items-center justify-between pt-3 border-t border-[#d2d2d7]/60">
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--zf-hairline)]/60">
                 <button onClick={() => togglePlugin(plugin.name, plugin.enabled)} disabled={toggling === plugin.name}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${plugin.enabled ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-500/20' : 'bg-green-500/10 text-emerald-600 hover:bg-green-500/20 border border-green-500/20'}`}>
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${plugin.enabled ? 'text-red-700 bg-red-50 border-red-200 hover:bg-red-100' : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'}`}>
                   {toggling === plugin.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}
                   {plugin.enabled ? 'Disable' : 'Enable'}
                 </button>

@@ -12,10 +12,10 @@ import { usePageLoader } from '../hooks/usePageLoader'
 
 function stateColor(state: string): string {
   const s = (state || '').toLowerCase()
-  if (s === 'running') return 'bg-emerald-500/10 text-emerald-600'
-  if (s === 'stopped' || s === 'shutoff') return 'bg-red-500/10 text-red-600'
-  if (s === 'paused') return 'bg-amber-500/10 text-amber-400'
-  return 'bg-black/[0.04] text-[#6e6e73]'
+  if (s === 'running') return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+  if (s === 'stopped' || s === 'shutoff') return 'text-red-700 bg-red-50 border-red-200'
+  if (s === 'paused') return 'text-amber-800 bg-amber-50 border-amber-200'
+  return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
 }
 
 /** `mib` is a VM's allocated memory in MiB (`VM.memory`'s actual unit). */
@@ -59,25 +59,25 @@ export default function VMBrowser() {
       <PageLoadBanner title="Could not load VMs" headline={loadError} onRetry={() => void loadVMs()} />
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6e6e73]" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--zf-muted)]" />
         <input type="text" placeholder="Search VMs by name, state, or image..." aria-label="Search VMs" value={search} onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+          className="w-full pl-10 pr-4 py-2.5 bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg text-[var(--zf-ink)] placeholder-[var(--zf-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--zf-ink)]/10 focus:border-[var(--zf-ink)] text-sm" />
       </div>
 
       {loading && !loadError ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-[#f5f5f7] animate-pulse" />)}</div>
+        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-[var(--zf-canvas)] animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73]"><Monitor className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">{vms.length === 0 ? 'No VMs found' : 'No VMs match your search'}</p></div>
+        <div className="bg-[var(--zf-canvas)] rounded-xl p-10 border border-[var(--zf-hairline)] text-center text-[var(--zf-muted)]"><Monitor className="w-10 h-10 mx-auto mb-3 opacity-50" /><p className="text-sm">{vms.length === 0 ? 'No VMs found' : 'No VMs match your search'}</p></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(vm => (
-            <Link key={vm.name} to={`/app/vms/${vm.name}`} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-4 transition-all hover:scale-[1.01] card-glow block">
+            <Link key={vm.name} to={`/app/vms/${vm.name}`} className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] p-4 transition-all hover:scale-[1.01] card-glow block">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-[#1d1d1f] truncate">{vm.name}</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${stateColor(vm.state)}`}>{vm.state || 'unknown'}</span>
+                <span className="text-sm font-semibold text-[var(--zf-ink)] truncate">{vm.name}</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${stateColor(vm.state)}`}>{vm.state || 'unknown'}</span>
               </div>
-              {vm.image && <div className="text-[10px] text-[#6e6e73] truncate mb-3 font-mono">{vm.image}</div>}
-              <div className="flex items-center gap-4 text-xs text-[#6e6e73]">
+              {vm.image && <div className="text-[10px] text-[var(--zf-muted)] truncate mb-3 font-mono">{vm.image}</div>}
+              <div className="flex items-center gap-4 text-xs text-[var(--zf-muted)]">
                 <span className="flex items-center gap-1"><Cpu className="h-3 w-3" />{vm.cpus || 0} vCPU</span>
                 <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" />{fmtMem(vm.memory || 0)}</span>
                 {vm.ip && <span className="font-mono">{vm.ip}</span>}

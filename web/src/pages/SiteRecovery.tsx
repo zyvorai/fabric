@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, Play, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Play, AlertTriangle } from 'lucide-react'
 import {
   listPlans,
   createPlan,
@@ -22,6 +22,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { PageHeader } from '../components/ui'
 
 export default function SiteRecovery() {
   const toast = useToastContext()
@@ -83,38 +84,36 @@ export default function SiteRecovery() {
 
   const getStatusColor = (status: string) => {
     const m: Record<string, string> = {
-      ready: 'bg-green-100 text-green-800', not_ready: 'bg-red-100 text-red-800',
-      running: 'bg-blue-100 text-blue-800', completed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800', cancelled: 'bg-black/[0.06] text-[#6e6e73]',
-      rolling_back: 'bg-yellow-100 text-yellow-800', pending: 'bg-black/[0.06] text-[#6e6e73]',
-      skipped: 'bg-black/[0.06] text-[#6e6e73]',
+      ready: 'text-emerald-700 bg-emerald-50 border-emerald-200', not_ready: 'text-red-700 bg-red-50 border-red-200',
+      running: 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]', completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      failed: 'text-red-700 bg-red-50 border-red-200', cancelled: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+      rolling_back: 'text-amber-800 bg-amber-50 border-amber-200', pending: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+      skipped: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
     }
-    return m[status] || 'bg-black/[0.06] text-[#6e6e73]'
+    return m[status] || 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 
 
   return (
     <div className="p-6">
-      <PageLoadBanner title="Could not load site recovery data" headline={loadError} onRetry={() => void loadData()} />
-
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Site Recovery</h1>
-        <div className="flex gap-2">
-          <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded disabled:opacity-50">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-          <button onClick={() => setShowCreatePlan(true)}
-            className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+      <PageHeader
+        title="Site Recovery"
+        onRefresh={() => void loadData()}
+        refreshing={loading}
+        primaryAction={
+          <button onClick={() => setShowCreatePlan(true)} className="zf-btn zf-btn-primary">
             <Plus className="w-4 h-4" /> Create Plan
           </button>
-        </div>
-      </div>
+        }
+      />
+
+      <PageLoadBanner title="Could not load site recovery data" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-[#f5f5f7] rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-[var(--zf-canvas)] rounded-lg p-1">
         {(['dashboard', 'plans', 'executions'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[var(--zf-ink)] text-white' : 'text-[var(--zf-muted)] hover:bg-black/[0.04]'}`}>
             {tab === 'executions' ? 'Execution History' : tab === 'plans' ? 'Recovery Plans' : 'DR Dashboard'}
           </button>
         ))}
@@ -122,7 +121,7 @@ export default function SiteRecovery() {
 
       {/* DR Dashboard */}
       {activeTab === 'dashboard' && !dashboard && !loading && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-8 text-center text-[#6e6e73]">
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg p-8 text-center text-[var(--zf-muted)]">
           No site recovery data available.
         </div>
       )}
@@ -130,58 +129,58 @@ export default function SiteRecovery() {
       {activeTab === 'dashboard' && dashboard && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-              <div className="text-[#6e6e73] text-sm mb-1">Protected VMs</div>
+            <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+              <div className="text-[var(--zf-muted)] text-sm mb-1">Protected VMs</div>
               <div className="text-2xl font-bold text-emerald-600">{dashboard.total_protected_vms}</div>
-              <div className="text-xs text-[#6e6e73] mt-1">{dashboard.total_unprotected_vms} unprotected</div>
+              <div className="text-xs text-[var(--zf-muted)] mt-1">{dashboard.total_unprotected_vms} unprotected</div>
             </div>
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-              <div className="text-[#6e6e73] text-sm mb-1">Avg RTO</div>
+            <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+              <div className="text-[var(--zf-muted)] text-sm mb-1">Avg RTO</div>
               <div className="text-2xl font-bold">{(dashboard.avg_rto_seconds / 60).toFixed(0)} min</div>
             </div>
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-              <div className="text-[#6e6e73] text-sm mb-1">Avg RPO</div>
+            <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+              <div className="text-[var(--zf-muted)] text-sm mb-1">Avg RPO</div>
               <div className="text-2xl font-bold">{dashboard.avg_rpo_minutes.toFixed(0)} min</div>
             </div>
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-              <div className="text-[#6e6e73] text-sm mb-1">Plans Ready</div>
+            <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+              <div className="text-[var(--zf-muted)] text-sm mb-1">Plans Ready</div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-emerald-600">{dashboard.plans_tested}</span>
-                <span className="text-[#6e6e73]">/</span>
-                <span className="text-xl text-[#6e6e73]">{dashboard.total_plans}</span>
+                <span className="text-[var(--zf-muted)]">/</span>
+                <span className="text-xl text-[var(--zf-muted)]">{dashboard.total_plans}</span>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+            <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Sites</h3>
               <div className="space-y-2">
                 {dashboard.sites.map(site => (
-                  <div key={site.site_id} className="flex items-center justify-between p-3 bg-[#f5f5f7] rounded">
+                  <div key={site.site_id} className="flex items-center justify-between p-3 bg-[var(--zf-canvas)] rounded">
                     <div className="flex items-center gap-3">
-                      <div className={`w-3.5 h-3.5 rounded-full ${site.status === 'connected' || site.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <div className={`w-3.5 h-3.5 rounded-full ${site.status === 'connected' || site.status === 'active' ? 'bg-[var(--zf-success)]' : 'bg-[var(--zf-danger)]'}`} />
                       <span className="font-medium">{site.site_name}</span>
                     </div>
-                    <span className="text-sm text-[#6e6e73]">{site.protected_vms} VMs | {site.plans} plans</span>
+                    <span className="text-sm text-[var(--zf-muted)]">{site.protected_vms} VMs | {site.plans} plans</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+            <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Recent Executions</h3>
               {dashboard.recent_executions.length === 0 ? (
-                <div className="text-[#6e6e73] text-sm">No recent executions.</div>
+                <div className="text-[var(--zf-muted)] text-sm">No recent executions.</div>
               ) : (
                 <div className="space-y-2">
                   {dashboard.recent_executions.slice(0, 5).map(exec => (
-                    <div key={exec.id} className="flex items-center justify-between p-3 bg-[#f5f5f7] rounded">
+                    <div key={exec.id} className="flex items-center justify-between p-3 bg-[var(--zf-canvas)] rounded">
                       <div>
                         <span className="font-medium">{exec.plan_name}</span>
                         <span className="ml-2 text-xs px-2 py-0.5 bg-white rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(exec.status)}`}>{exec.status}</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(exec.status)}`}>{exec.status}</span>
                     </div>
                   ))}
                 </div>
@@ -193,10 +192,10 @@ export default function SiteRecovery() {
 
       {/* Plans Tab */}
       {activeTab === 'plans' && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-          <table className="min-w-full divide-y divide-[#d2d2d7]">
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
+          <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
             <thead>
-              <tr className="text-left text-xs text-[#6e6e73] uppercase">
+              <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                 <th className="p-4">Plan</th>
                 <th className="p-4">VM Groups</th>
                 <th className="p-4">Status</th>
@@ -205,28 +204,28 @@ export default function SiteRecovery() {
                 <th className="p-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#d2d2d7]">
+            <tbody className="divide-y divide-[var(--zf-hairline)]">
               {plans.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No recovery plans.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-[var(--zf-muted)]">No recovery plans.</td></tr>
               ) : plans.map(plan => (
                 <tr key={plan.id} className="hover:bg-white">
                   <td className="p-4">
                     <div className="font-medium">{plan.name}</div>
-                    {plan.description && <div className="text-xs text-[#6e6e73]">{plan.description}</div>}
+                    {plan.description && <div className="text-xs text-[var(--zf-muted)]">{plan.description}</div>}
                   </td>
                   <td className="p-4 text-sm">
                     {plan.vm_groups.length} groups ({plan.vm_groups.reduce((s, g) => s + g.vm_ids.length, 0)} VMs)
                   </td>
                   <td className="p-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(plan.status)}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(plan.status)}`}>
                       {plan.status}
                     </span>
                   </td>
-                  <td className="p-4 text-sm text-[#6e6e73]">{plan.last_tested ? new Date(plan.last_tested).toLocaleDateString() : 'Never'}</td>
-                  <td className="p-4 text-sm text-[#6e6e73]">{plan.last_executed ? new Date(plan.last_executed).toLocaleDateString() : 'Never'}</td>
+                  <td className="p-4 text-sm text-[var(--zf-muted)]">{plan.last_tested ? new Date(plan.last_tested).toLocaleDateString() : 'Never'}</td>
+                  <td className="p-4 text-sm text-[var(--zf-muted)]">{plan.last_executed ? new Date(plan.last_executed).toLocaleDateString() : 'Never'}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setShowExecute(plan.id)} className="text-[#0066cc] hover:text-blue-300 p-1" title="Execute">
+                      <button onClick={() => setShowExecute(plan.id)} className="text-[var(--zf-link)] hover:text-[var(--zf-link-hover)] p-1" title="Execute">
                         <Play className="w-4 h-4" />
                       </button>
                       <button onClick={() => handleDeletePlan(plan.id)} className="text-red-600 hover:text-red-800 p-1">
@@ -243,41 +242,41 @@ export default function SiteRecovery() {
 
       {/* Executions Tab */}
       {activeTab === 'executions' && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
           {executions.length === 0 ? (
-            <div className="p-8 text-center text-[#6e6e73]">No execution history.</div>
+            <div className="p-8 text-center text-[var(--zf-muted)]">No execution history.</div>
           ) : (
-            <div className="divide-y divide-[#d2d2d7]">
+            <div className="divide-y divide-[var(--zf-hairline)]">
               {executions.map(exec => (
                 <div key={exec.id} className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold">{exec.plan_name}</span>
                       <span className="text-xs px-2 py-0.5 bg-white rounded">{exec.execution_type.replace(/_/g, ' ')}</span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(exec.status)}`}>{exec.status}</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(exec.status)}`}>{exec.status}</span>
                     </div>
-                    <div className="text-sm text-[#6e6e73]">
+                    <div className="text-sm text-[var(--zf-muted)]">
                       {exec.vms_recovered}/{exec.vms_total} VMs
                       {exec.rto_actual_seconds && ` | RTO: ${(exec.rto_actual_seconds / 60).toFixed(1)} min`}
                     </div>
                   </div>
                   <div className="mb-2">
-                    <div className="flex justify-between text-xs text-[#6e6e73] mb-1">
+                    <div className="flex justify-between text-xs text-[var(--zf-muted)] mb-1">
                       <span>Progress: {exec.current_step}</span>
                       <span>{exec.progress_pct}%</span>
                     </div>
                     <div className="w-full bg-white rounded-full h-2">
-                      <div className="h-2 rounded-full bg-blue-500" style={{ width: `${exec.progress_pct}%` }} />
+                      <div className="h-2 rounded-full bg-[var(--zf-link)]" style={{ width: `${exec.progress_pct}%` }} />
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {exec.steps.map((step, i) => (
-                      <div key={i} className={`text-xs px-2 py-1 rounded ${getStatusColor(step.status)}`}>
+                      <div key={i} className={`text-xs px-2 py-1 rounded border ${getStatusColor(step.status)}`}>
                         {step.name}
                       </div>
                     ))}
                   </div>
-                  <div className="text-xs text-[#6e6e73] mt-2">
+                  <div className="text-xs text-[var(--zf-muted)] mt-2">
                     Started: {new Date(exec.started_at).toLocaleString()}
                     {exec.completed_at && ` | Completed: ${new Date(exec.completed_at).toLocaleString()}`}
                   </div>
@@ -290,28 +289,28 @@ export default function SiteRecovery() {
 
       {/* Execute Modal */}
       {showExecute && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
+        <div className="modal-backdrop">
+          <div className="modal-card w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Execute Recovery Plan</h2>
             <div className="space-y-3">
               <button onClick={() => handleExecute(showExecute, 'test_failover')}
-                className="w-full p-3 bg-[#0066cc] hover:bg-[#0077ed] rounded text-left">
-                <div className="font-medium">Test Failover</div>
-                <div className="text-xs text-blue-200">Non-destructive test using isolated network</div>
+                className="w-full p-3 rounded-lg text-left border border-[var(--zf-hairline)] bg-[var(--zf-canvas)] hover:bg-black/[0.04] transition">
+                <div className="font-medium text-[var(--zf-ink)]">Test Failover</div>
+                <div className="text-xs text-[var(--zf-muted)]">Non-destructive test using isolated network</div>
               </button>
               <button onClick={() => handleExecute(showExecute, 'planned_migration')}
-                className="w-full p-3 bg-yellow-600 hover:bg-yellow-700 rounded text-left">
-                <div className="font-medium">Planned Migration</div>
-                <div className="text-xs text-yellow-200">Graceful migration with zero data loss</div>
+                className="w-full p-3 rounded-lg text-left border border-amber-200 bg-amber-50 hover:bg-amber-100 transition">
+                <div className="font-medium text-amber-900">Planned Migration</div>
+                <div className="text-xs text-amber-700">Graceful migration with zero data loss</div>
               </button>
               <button onClick={() => handleExecute(showExecute, 'disaster_recovery')}
-                className="w-full p-3 bg-red-600 hover:bg-red-700 rounded text-left">
-                <div className="font-medium flex items-center gap-2">
+                className="w-full p-3 rounded-lg text-left border border-red-200 bg-red-50 hover:bg-red-100 transition">
+                <div className="font-medium flex items-center gap-2 text-red-800">
                   <AlertTriangle className="w-4 h-4" /> Disaster Recovery
                 </div>
-                <div className="text-xs text-red-200">Emergency failover - some data loss possible</div>
+                <div className="text-xs text-red-700">Emergency failover - some data loss possible</div>
               </button>
-              <button onClick={() => setShowExecute(null)} className="w-full px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
+              <button onClick={() => setShowExecute(null)} className="zf-btn zf-btn-ghost w-full">Cancel</button>
             </div>
           </div>
         </div>
@@ -358,45 +357,45 @@ function CreatePlanModal({ onClose, onCreated }: { onClose: () => void; onCreate
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Recovery Plan</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Plan Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
             <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Source Site ID</label>
               <input type="text" value={sourceSite} onChange={e => setSourceSite(e.target.value)}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+                className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" required />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Target Site ID</label>
               <input type="text" value={targetSite} onChange={e => setTargetSite(e.target.value)}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+                className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" required />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">VM Group Name</label>
             <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">VM IDs (comma-separated)</label>
             <input type="text" value={vmIds} onChange={e => setVmIds(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" required />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+            <button type="submit" className="zf-btn zf-btn-primary flex-1">Create</button>
           </div>
         </form>
       </div>

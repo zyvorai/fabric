@@ -145,9 +145,9 @@ export default function BulkOperations() {
   const statusIcon = (status: TaskStatus) => {
     switch (status) {
       case 'pending':
-        return <Clock className="w-4 h-4 text-[#6e6e73]" />
+        return <Clock className="w-4 h-4 text-[var(--zf-muted)]" />
       case 'running':
-        return <Loader2 className="w-4 h-4 text-[#0066cc] animate-spin" />
+        return <Loader2 className="w-4 h-4 text-[var(--zf-link)] animate-spin" />
       case 'done':
         return <CheckCircle className="w-4 h-4 text-emerald-600" />
       case 'error':
@@ -159,7 +159,7 @@ export default function BulkOperations() {
     const s = state?.toLowerCase() || ''
     if (s === 'running') return 'text-emerald-600'
     if (s === 'paused') return 'text-amber-600'
-    return 'text-[#6e6e73]'
+    return 'text-[var(--zf-muted)]'
   }
 
   return (
@@ -181,14 +181,14 @@ export default function BulkOperations() {
       )}
 
       {someSelected && (
-        <div className="flex items-center gap-3 bg-[#0066cc]/10 border border-blue-500/30 rounded-xl px-4 py-3">
-          <span className="text-sm text-[#0066cc] font-medium">{selected.size} selected</span>
+        <div className="flex items-center gap-3 bg-[var(--zf-link)]/10 border border-[var(--zf-link)]/30 rounded-xl px-4 py-3">
+          <span className="text-sm text-[var(--zf-link)] font-medium">{selected.size} selected</span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => runBulkAction('start')}
             disabled={running}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-500/20 hover:bg-green-500/30 text-emerald-600 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
           >
             <Play className="w-3.5 h-3.5" /> Start
           </button>
@@ -196,7 +196,7 @@ export default function BulkOperations() {
             type="button"
             onClick={() => runBulkAction('stop')}
             disabled={running}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500/20 hover:bg-red-500/30 text-red-600 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
           >
             <Power className="w-3.5 h-3.5" /> Stop
           </button>
@@ -204,7 +204,7 @@ export default function BulkOperations() {
             type="button"
             onClick={() => runBulkAction('restart')}
             disabled={running}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Restart
           </button>
@@ -212,14 +212,14 @@ export default function BulkOperations() {
             type="button"
             onClick={() => runBulkAction('snapshot')}
             disabled={running}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[var(--zf-ink)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] hover:bg-white transition-colors disabled:opacity-50"
           >
             <Camera className="w-3.5 h-3.5" /> Snapshot
           </button>
           <button
             type="button"
             onClick={deselectAll}
-            className="px-3 py-1.5 rounded-lg text-sm text-[#6e6e73] hover:text-[#1d1d1f] transition-colors"
+            className="px-3 py-1.5 rounded-lg text-sm text-[var(--zf-muted)] hover:text-[var(--zf-ink)] transition-colors"
           >
             Clear
           </button>
@@ -228,20 +228,20 @@ export default function BulkOperations() {
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6e6e73]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--zf-muted)]" />
           <input
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder="Filter VMs…"
             aria-label="Filter VMs"
-            className="w-full bg-white border border-[#d2d2d7] rounded-lg pl-10 pr-4 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-white border border-[var(--zf-hairline)] rounded-lg pl-10 pr-4 py-2 text-sm text-[var(--zf-ink)] placeholder-[var(--zf-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--zf-link)]"
           />
         </div>
         <button
           type="button"
           onClick={allFilteredSelected ? deselectAll : selectAll}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-white transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-white transition-colors"
         >
           {allFilteredSelected ? <MinusSquare className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
           {allFilteredSelected ? 'Deselect All' : 'Select All'}
@@ -250,11 +250,11 @@ export default function BulkOperations() {
 
       {loading && !loadError ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 text-[#0066cc] animate-spin" />
-          <span className="ml-3 text-sm text-[#6e6e73]">Loading VMs…</span>
+          <Loader2 className="w-6 h-6 text-[var(--zf-link)] animate-spin" />
+          <span className="ml-3 text-sm text-[var(--zf-muted)]">Loading VMs…</span>
         </div>
       ) : !loadError && filtered.length === 0 ? (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
+        <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)]">
           <EmptyState
             icon={<Monitor className="w-10 h-10" />}
             title={vms.length === 0 ? 'No VMs found' : 'No VMs match the filter'}
@@ -262,17 +262,17 @@ export default function BulkOperations() {
           />
         </div>
       ) : !loadError ? (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl overflow-hidden">
+        <div className="zf-panel-muted overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#d2d2d7]">
+              <tr className="border-b border-[var(--zf-hairline)]">
                 <th className="px-4 py-3 text-left w-10">
                   <span className="sr-only">Select</span>
                 </th>
-                <th className="px-4 py-3 text-left text-[#6e6e73] font-medium">Name</th>
-                <th className="px-4 py-3 text-left text-[#6e6e73] font-medium">State</th>
-                <th className="px-4 py-3 text-left text-[#6e6e73] font-medium hidden md:table-cell">CPU</th>
-                <th className="px-4 py-3 text-left text-[#6e6e73] font-medium hidden md:table-cell">Memory</th>
+                <th className="px-4 py-3 text-left text-[var(--zf-muted)] font-medium">Name</th>
+                <th className="px-4 py-3 text-left text-[var(--zf-muted)] font-medium">State</th>
+                <th className="px-4 py-3 text-left text-[var(--zf-muted)] font-medium hidden md:table-cell">CPU</th>
+                <th className="px-4 py-3 text-left text-[var(--zf-muted)] font-medium hidden md:table-cell">Memory</th>
               </tr>
             </thead>
             <tbody>
@@ -282,28 +282,28 @@ export default function BulkOperations() {
                   <tr
                     key={vm.name}
                     onClick={() => toggleSelect(vm.name)}
-                    className={`border-b border-[#d2d2d7]/60 cursor-pointer transition-colors ${
-                      isSelected ? 'bg-[#0066cc]/10' : 'hover:bg-[#f5f5f7]'
+                    className={`border-b border-[var(--zf-hairline)]/60 cursor-pointer transition-colors ${
+                      isSelected ? 'bg-[var(--zf-link)]/10' : 'hover:bg-[var(--zf-canvas)]'
                     }`}
                   >
                     <td className="px-4 py-3">
                       {isSelected ? (
-                        <CheckSquare className="w-4 h-4 text-[#0066cc]" />
+                        <CheckSquare className="w-4 h-4 text-[var(--zf-link)]" />
                       ) : (
-                        <Square className="w-4 h-4 text-[#6e6e73]" />
+                        <Square className="w-4 h-4 text-[var(--zf-muted)]" />
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Monitor className="w-4 h-4 text-[#6e6e73]" />
-                        <span className="text-[#1d1d1f] font-medium">{vm.name}</span>
+                        <Monitor className="w-4 h-4 text-[var(--zf-muted)]" />
+                        <span className="text-[var(--zf-ink)] font-medium">{vm.name}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`font-medium ${stateColor(vm.state)}`}>{vm.state || 'unknown'}</span>
                     </td>
-                    <td className="px-4 py-3 text-[#6e6e73] hidden md:table-cell">{vm.cpus ?? '-'}</td>
-                    <td className="px-4 py-3 text-[#6e6e73] hidden md:table-cell">
+                    <td className="px-4 py-3 text-[var(--zf-muted)] hidden md:table-cell">{vm.cpus ?? '-'}</td>
+                    <td className="px-4 py-3 text-[var(--zf-muted)] hidden md:table-cell">
                       {vm.memory ? `${vm.memory} MB` : '-'}
                     </td>
                   </tr>
@@ -315,17 +315,17 @@ export default function BulkOperations() {
       ) : null}
 
       {tasks.length > 0 && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-[#1d1d1f] mb-3">
+        <div className="zf-panel-muted p-4">
+          <h3 className="text-sm font-semibold text-[var(--zf-ink)] mb-3">
             Batch Progress
-            {running && <Loader2 className="inline-block w-4 h-4 ml-2 text-[#0066cc] animate-spin" />}
+            {running && <Loader2 className="inline-block w-4 h-4 ml-2 text-[var(--zf-link)] animate-spin" />}
           </h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {tasks.map((t) => (
-              <div key={t.vmName} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#f5f5f7]">
+              <div key={t.vmName} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--zf-canvas)]">
                 {statusIcon(t.status)}
-                <span className="text-sm text-[#1d1d1f] font-medium flex-1">{t.vmName}</span>
-                <span className="text-xs text-[#6e6e73] capitalize">{t.action}</span>
+                <span className="text-sm text-[var(--zf-ink)] font-medium flex-1">{t.vmName}</span>
+                <span className="text-xs text-[var(--zf-muted)] capitalize">{t.action}</span>
                 {t.message && (
                   <span className={`text-xs max-w-[40%] truncate ${t.status === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
                     {t.message}
@@ -338,7 +338,7 @@ export default function BulkOperations() {
             <button
               type="button"
               onClick={() => setTasks([])}
-              className="mt-3 text-xs text-[#6e6e73] hover:text-[#1d1d1f] transition-colors"
+              className="mt-3 text-xs text-[var(--zf-muted)] hover:text-[var(--zf-ink)] transition-colors"
             >
               Clear results
             </button>

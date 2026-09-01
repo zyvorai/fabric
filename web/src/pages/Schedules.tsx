@@ -109,11 +109,11 @@ export default function Schedules() {
 
   const getActionColor = (action: string): string => {
     switch (action) {
-      case 'start': return 'bg-green-600'
-      case 'stop': return 'bg-red-600'
-      case 'restart': return 'bg-yellow-600'
-      case 'snapshot': return 'bg-[#0066cc]'
-      default: return 'bg-[#e8e8ed]'
+      case 'start': return 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+      case 'stop': return 'text-red-700 bg-red-50 border border-red-200'
+      case 'restart': return 'text-amber-800 bg-amber-50 border border-amber-200'
+      case 'snapshot': return 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]'
+      default: return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]'
     }
   }
 
@@ -151,18 +151,14 @@ export default function Schedules() {
           <>
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-                showHistory
-                  ? 'bg-[#0066cc] text-white'
-                  : 'bg-[#f5f5f7] border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f]'
-              }`}
+              className={showHistory ? 'zf-btn zf-btn-primary' : 'zf-btn zf-btn-ghost'}
             >
               <Clock className="w-4 h-4" />
               History
             </button>
             <button
               onClick={() => setShowCreateDialog(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+              className="zf-btn zf-btn-primary"
             >
               <Plus className="w-4 h-4" />
               Create Schedule
@@ -175,13 +171,13 @@ export default function Schedules() {
       {!showHistory && (
         <>
           {schedules.length === 0 ? (
-            <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-              <Calendar className="w-16 h-16 text-[#6e6e73] mx-auto mb-4" />
-              <p className="text-xl text-[#6e6e73] mb-4">No schedules configured</p>
-              <p className="text-[#6e6e73] mb-6">Create schedules to automate VM operations</p>
+            <div className="text-center py-12 bg-[var(--zf-canvas)] rounded-lg border border-[var(--zf-hairline)]">
+              <Calendar className="w-16 h-16 text-[var(--zf-muted)] mx-auto mb-4" />
+              <p className="text-xl text-[var(--zf-muted)] mb-4">No schedules configured</p>
+              <p className="text-[var(--zf-muted)] mb-6">Create schedules to automate VM operations</p>
               <button
                 onClick={() => setShowCreateDialog(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+                className="zf-btn zf-btn-primary"
               >
                 <Plus className="w-4 h-4" />
                 Create First Schedule
@@ -198,12 +194,12 @@ export default function Schedules() {
                 className="max-w-sm"
               />
               {filteredSchedules.length === 0 && (
-                <p className="text-sm text-[#6e6e73] py-8 text-center">No schedules match "{scheduleQuery}"</p>
+                <p className="text-sm text-[var(--zf-muted)] py-8 text-center">No schedules match "{scheduleQuery}"</p>
               )}
               {filteredSchedules.map((schedule) => (
                 <div
                   key={schedule.id}
-                  className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-6"
+                  className="bg-[var(--zf-canvas)] rounded-lg border border-[var(--zf-hairline)] p-6"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -211,10 +207,10 @@ export default function Schedules() {
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-bold">{schedule.name}</h3>
                         <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
+                          className={`px-2 py-1 rounded text-xs font-medium border ${
                             schedule.enabled
-                              ? 'bg-green-600 text-white'
-                              : 'bg-[#e8e8ed] text-[#1d1d1f]'
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
                           }`}
                         >
                           {schedule.enabled ? 'Enabled' : 'Disabled'}
@@ -223,19 +219,19 @@ export default function Schedules() {
                           {schedule.action.toUpperCase()}
                         </span>
                       </div>
-                      <p className="text-sm text-[#6e6e73] mb-1">
-                        VM: <span className="text-[#1d1d1f] font-medium">{schedule.vm_name}</span>
+                      <p className="text-sm text-[var(--zf-muted)] mb-1">
+                        VM: <span className="text-[var(--zf-ink)] font-medium">{schedule.vm_name}</span>
                       </p>
-                      <p className="text-sm text-[#6e6e73] mb-1">
+                      <p className="text-sm text-[var(--zf-muted)] mb-1">
                         Schedule: {getScheduleTypeText(schedule)}
                       </p>
                       {schedule.next_run && (
-                        <p className="text-sm text-[#0066cc]">
+                        <p className="text-sm text-[var(--zf-link)]">
                           Next run: <RelativeTime date={schedule.next_run} />
                         </p>
                       )}
                       {schedule.last_run && (
-                        <p className="text-xs text-[#6e6e73]">
+                        <p className="text-xs text-[var(--zf-muted)]">
                           Last run: <RelativeTime date={schedule.last_run} />
                         </p>
                       )}
@@ -245,17 +241,17 @@ export default function Schedules() {
                       <button
                         onClick={() => handleRunNow(schedule)}
                         disabled={!schedule.enabled}
-                        className="p-2 bg-purple-600 hover:bg-purple-700 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-ink)] hover:bg-black/[0.04] transition disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Run Now"
                       >
                         <Play className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleToggleEnabled(schedule)}
-                        className={`p-2 rounded transition ${
+                        className={`p-2 rounded-lg border transition ${
                           schedule.enabled
-                            ? 'bg-yellow-600 hover:bg-yellow-700'
-                            : 'bg-green-600 hover:bg-green-700'
+                            ? 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100'
+                            : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
                         }`}
                         title={schedule.enabled ? 'Disable' : 'Enable'}
                       >
@@ -267,14 +263,14 @@ export default function Schedules() {
                       </button>
                       <button
                         onClick={() => setEditingSchedule(schedule)}
-                        className="p-2 bg-[#0066cc] hover:bg-[#0077ed] rounded transition"
+                        className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-link)] hover:bg-black/[0.04] transition"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(schedule.id)}
-                        className="p-2 bg-red-600 hover:bg-red-700 rounded transition"
+                        className="p-2 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -290,38 +286,38 @@ export default function Schedules() {
 
       {/* History */}
       {showHistory && (
-        <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-          <div className="p-4 border-b border-[#d2d2d7]">
+        <div className="bg-[var(--zf-canvas)] rounded-lg border border-[var(--zf-hairline)]">
+          <div className="p-4 border-b border-[var(--zf-hairline)]">
             <h2 className="text-lg font-bold">Execution History</h2>
-            <p className="text-sm text-[#6e6e73]">Latest 20 executions</p>
+            <p className="text-sm text-[var(--zf-muted)]">Latest 20 executions</p>
           </div>
           <div className="overflow-x-auto">
             {history.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-[#6e6e73]">No execution history yet</p>
+                <p className="text-[var(--zf-muted)]">No execution history yet</p>
               </div>
             ) : (
               <table className="w-full">
                 <thead className="bg-white">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                       Schedule
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                       VM
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                       Action
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                       Executed At
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#d2d2d7]">
+                <tbody className="divide-y divide-[var(--zf-hairline)]">
                   {history.map((item, idx) => (
                     <tr key={idx} className="hover:bg-white">
                       <td className="px-4 py-3 text-sm">{item.schedule_name}</td>
@@ -331,15 +327,15 @@ export default function Schedules() {
                           {item.action.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#6e6e73]">
+                      <td className="px-4 py-3 text-sm text-[var(--zf-muted)]">
                         <RelativeTime date={item.executed_at} />
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
+                          className={`px-2 py-1 rounded text-xs font-medium border ${
                             item.status === 'success'
-                              ? 'bg-green-600 text-white'
-                              : 'bg-red-600 text-white'
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              : 'text-red-700 bg-red-50 border-red-200'
                           }`}
                         >
                           {item.status.toUpperCase()}

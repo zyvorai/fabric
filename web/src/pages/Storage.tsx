@@ -3,13 +3,14 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { HardDrive, Trash2, RefreshCw, Database, Plus, Link2, Link2Off, Maximize2 } from 'lucide-react'
+import { HardDrive, Trash2, Database, Plus, Link2, Link2Off, Maximize2 } from 'lucide-react'
 import { apiGet } from '../api/client'
 import { listVolumes, createVolume, deleteVolume, resizeVolume, attachVolume, detachVolume, type Volume } from '../api/volumes'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ErrorBanner from '../components/ErrorBanner'
+import { PageHeader, Card, Modal } from '../components/ui'
 import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -120,25 +121,25 @@ export default function Storage() {
   }
 
   const getUsageColor = (percentage: number) => {
-    if (percentage < 50) return 'bg-green-500'
-    if (percentage < 80) return 'bg-yellow-500'
-    return 'bg-red-500'
+    if (percentage < 50) return 'bg-[var(--zf-success)]'
+    if (percentage < 80) return 'bg-[var(--zf-warning)]'
+    return 'bg-[var(--zf-danger)]'
   }
 
   const getTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'local': case 'directory': return 'bg-blue-500/10 text-[#0066cc] border-blue-500/20'
-      case 'lvm': case 'lvm-thin': return 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-      case 'zfs': return 'bg-green-500/10 text-emerald-600 border-green-500/20'
-      case 'nfs': return 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-      case 'ceph': return 'bg-red-500/10 text-red-600 border-red-500/20'
-      default: return 'bg-black/[0.04] text-[#6e6e73] border-[#d2d2d7]'
+      case 'local': case 'directory': return 'text-[var(--zf-link)] bg-[var(--zf-link)]/10 border-[var(--zf-link)]/20'
+      case 'lvm': case 'lvm-thin': return 'text-[var(--zf-ink)] bg-black/[0.04] border-[var(--zf-hairline)]'
+      case 'zfs': return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+      case 'nfs': return 'text-amber-800 bg-amber-50 border-amber-200'
+      case 'ceph': return 'text-red-700 bg-red-50 border-red-200'
+      default: return 'text-[var(--zf-muted)] bg-black/[0.04] border-[var(--zf-hairline)]'
     }
   }
 
 
   if (loading) {
-    return <div className="text-center text-[#6e6e73] py-12">Loading storage data...</div>
+    return <div className="text-center text-[var(--zf-muted)] py-12">Loading storage data...</div>
   }
 
   const totalCapacity = pools.reduce((sum, p) => sum + p.capacity, 0)
@@ -156,44 +157,39 @@ export default function Storage() {
           onRetry={loadData}
         />
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <HardDrive className="w-8 h-8" />
-          Storage Management
-        </h1>
-        <button onClick={loadData} className="flex items-center gap-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] py-2 px-4 rounded-lg transition">
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Storage Management"
+        onRefresh={loadData}
+        refreshing={loading}
+      />
 
       {/* Storage Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-2">Total Capacity</div>
-          <div className="text-2xl font-bold text-[#0066cc]">{formatBytes(totalCapacity)}</div>
-        </div>
-        <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-2">Used</div>
-          <div className="text-2xl font-bold text-orange-400">{formatBytes(totalUsed)}</div>
-        </div>
-        <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-2">Volumes</div>
-          <div className="text-2xl font-bold text-emerald-600">{volumes.length}</div>
-        </div>
-        <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-2">Pools</div>
-          <div className="text-2xl font-bold text-purple-400">{pools.length}</div>
-        </div>
+        <Card><div className="p-6">
+          <div className="text-[var(--zf-muted)] text-sm mb-2">Total Capacity</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{formatBytes(totalCapacity)}</div>
+        </div></Card>
+        <Card><div className="p-6">
+          <div className="text-[var(--zf-muted)] text-sm mb-2">Used</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{formatBytes(totalUsed)}</div>
+        </div></Card>
+        <Card><div className="p-6">
+          <div className="text-[var(--zf-muted)] text-sm mb-2">Volumes</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{volumes.length}</div>
+        </div></Card>
+        <Card><div className="p-6">
+          <div className="text-[var(--zf-muted)] text-sm mb-2">Pools</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{pools.length}</div>
+        </div></Card>
       </div>
 
       {/* Storage Pools */}
-      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-        <div className="p-6 border-b border-[#d2d2d7]">
-          <h2 className="text-xl font-semibold">Storage Pools</h2>
+      <Card>
+        <div className="p-6 border-b border-[var(--zf-hairline)]">
+          <h2 className="text-xl font-semibold text-[var(--zf-ink)]">Storage Pools</h2>
         </div>
         {pools.length === 0 ? (
-          <div className="p-12 text-center text-[#6e6e73]">No storage pools configured. Create one from the Storage Pools page.</div>
+          <div className="p-12 text-center text-[var(--zf-muted)]">No storage pools configured. Create one from the Storage Pools page.</div>
         ) : (
           <div className="p-6 space-y-4">
             {pools.map((pool) => {
@@ -201,35 +197,35 @@ export default function Storage() {
               const percentage = pool.capacity > 0 ? Math.round((used / pool.capacity) * 100) : 0
               const typeStr = getPoolTypeString(pool.pool_type)
               return (
-                <div key={pool.id} className="bg-white rounded-lg p-4">
+                <div key={pool.id} className="bg-[var(--zf-canvas)] rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <Database className="w-5 h-5 text-[#0066cc] shrink-0" />
+                      <Database className="w-5 h-5 text-[var(--zf-muted)] shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium text-lg truncate">{pool.name}</div>
-                        <div className="text-sm text-[#6e6e73] font-mono truncate">{pool.path}</div>
+                        <div className="font-medium text-lg truncate text-[var(--zf-ink)]">{pool.name}</div>
+                        <div className="text-sm text-[var(--zf-muted)] font-mono truncate">{pool.path}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getTypeColor(typeStr)}`}>
                         {typeStr.toUpperCase()}
                       </span>
-                      <span className={`text-sm font-medium ${pool.state === 'Active' ? 'text-emerald-600' : 'text-[#6e6e73]'}`}>
+                      <span className={`text-sm font-medium ${pool.state === 'Active' ? 'text-emerald-700' : 'text-[var(--zf-muted)]'}`}>
                         {pool.state}
                       </span>
-                      <button onClick={() => setShowCreateVolume(pool.name)} className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0066cc]/20 text-[#0066cc] hover:bg-[#0066cc]/30 rounded text-xs font-medium">
+                      <button onClick={() => setShowCreateVolume(pool.name)} className="zf-btn zf-btn-ghost zf-btn-sm">
                         <Plus className="w-3.5 h-3.5" /> Add Volume Record
                       </button>
                     </div>
                   </div>
                   <div className="mb-2">
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-[#6e6e73]">{formatBytes(used)} / {formatBytes(pool.capacity)}</span>
-                      <span className={`font-bold ${percentage > 80 ? 'text-red-600' : percentage > 50 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      <span className="text-[var(--zf-muted)]">{formatBytes(used)} / {formatBytes(pool.capacity)}</span>
+                      <span className={`font-bold ${percentage > 80 ? 'text-red-700' : percentage > 50 ? 'text-amber-800' : 'text-emerald-700'}`}>
                         {percentage}%
                       </span>
                     </div>
-                    <div className="w-full bg-[#e8e8ed] rounded-full h-2">
+                    <div className="w-full bg-[var(--zf-hairline)] rounded-full h-2">
                       <div
                         className={`h-2 rounded-full transition-all ${getUsageColor(percentage)}`}
                         style={{ width: `${percentage}%` }}
@@ -241,63 +237,63 @@ export default function Storage() {
             })}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Volumes */}
-      <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-        <div className="p-6 border-b border-[#d2d2d7]">
-          <h2 className="text-xl font-semibold">Volumes</h2>
-          <p className="text-xs text-[#6e6e73] mt-1">
+      <Card>
+        <div className="p-6 border-b border-[var(--zf-hairline)]">
+          <h2 className="text-xl font-semibold text-[var(--zf-ink)]">Volumes</h2>
+          <p className="text-xs text-[var(--zf-muted)] mt-1">
             A manual tracking ledger — records here don't create or resize real disk images. Use them to track volumes you've provisioned elsewhere.
           </p>
         </div>
         {volumes.length === 0 ? (
-          <div className="p-12 text-center text-[#6e6e73]">No volume records.</div>
+          <div className="p-12 text-center text-[var(--zf-muted)]">No volume records.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-white">
+              <thead className="bg-[var(--zf-surface)]">
                 <tr>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Pool</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Size</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Attached To</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Name</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Pool</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Size</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Attached To</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {volumes.map((volume) => (
-                  <tr key={volume.id} className="hover:bg-white/[0.03] transition">
+                  <tr key={volume.id} className="hover:bg-black/[0.03] transition">
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <HardDrive className="w-4 h-4 text-[#6e6e73]" />
-                        <span className="font-mono text-sm">{volume.name}</span>
+                        <HardDrive className="w-4 h-4 text-[var(--zf-muted)]" />
+                        <span className="font-mono text-sm text-[var(--zf-ink)]">{volume.name}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-[#6e6e73]">{volume.pool}</td>
-                    <td className="p-4"><span className="font-mono text-sm">{volume.size}</span></td>
+                    <td className="p-4 text-[var(--zf-muted)]">{volume.pool}</td>
+                    <td className="p-4"><span className="font-mono text-sm text-[var(--zf-ink)]">{volume.size}</span></td>
                     <td className="p-4">
                       {volume.vm_attached ? (
-                        <span className="text-[#0066cc]">{volume.vm_attached}</span>
+                        <span className="text-[var(--zf-link)]">{volume.vm_attached}</span>
                       ) : (
-                        <span className="text-[#6e6e73] italic">Not attached</span>
+                        <span className="text-[var(--zf-muted)] italic">Not attached</span>
                       )}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setResizeTarget(volume)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Resize record">
+                        <button onClick={() => setResizeTarget(volume)} className="p-2 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] rounded transition" title="Resize record">
                           <Maximize2 className="w-4 h-4" />
                         </button>
                         {volume.vm_attached ? (
-                          <button onClick={() => void handleDetach(volume)} disabled={busyVolume === volume.id} className="p-2 hover:bg-white/[0.06] rounded transition disabled:opacity-50" title="Detach">
+                          <button onClick={() => void handleDetach(volume)} disabled={busyVolume === volume.id} className="p-2 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] rounded transition disabled:opacity-50" title="Detach">
                             <Link2Off className="w-4 h-4" />
                           </button>
                         ) : (
-                          <button onClick={() => setAttachTarget(volume)} className="p-2 hover:bg-white/[0.06] rounded transition" title="Attach to VM">
+                          <button onClick={() => setAttachTarget(volume)} className="p-2 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] rounded transition" title="Attach to VM">
                             <Link2 className="w-4 h-4" />
                           </button>
                         )}
-                        <button onClick={() => handleDeleteVolume(volume.pool, volume.id)} className="p-2 hover:bg-red-600 rounded transition" title="Delete">
+                        <button onClick={() => handleDeleteVolume(volume.pool, volume.id)} className="p-2 text-[var(--zf-muted)] hover:text-white hover:bg-[var(--zf-danger)] rounded transition" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -308,7 +304,7 @@ export default function Storage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
       {showCreateVolume && (
         <CreateVolumeModal pool={showCreateVolume} onClose={() => setShowCreateVolume(null)} onCreated={() => { setShowCreateVolume(null); void loadData() }} />
@@ -357,29 +353,27 @@ function CreateVolumeModal({ pool, onClose, onCreated }: { pool: string; onClose
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-1">Add Volume Record</h2>
-        <p className="text-sm text-[#6e6e73] mb-4">Pool: {pool}</p>
-        <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
-          This creates a tracking record only — it does not provision a real disk image.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="my-volume" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Size</label>
-            <input value={size} onChange={e => setSize(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="20GB" />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" disabled={creating} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{creating ? 'Creating…' : 'Create'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-1 text-[var(--zf-ink)]">Add Volume Record</h2>
+      <p className="text-sm text-[var(--zf-muted)] mb-4">Pool: {pool}</p>
+      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+        This creates a tracking record only — it does not provision a real disk image.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input value={name} onChange={e => setName(e.target.value)} className="input-field" placeholder="my-volume" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Size</label>
+          <input value={size} onChange={e => setSize(e.target.value)} className="input-field" placeholder="20GB" />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+          <button type="submit" disabled={creating} className="zf-btn zf-btn-primary flex-1">{creating ? 'Creating…' : 'Create'}</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -404,25 +398,23 @@ function AttachVolumeModal({ volume, onClose, onAttached }: { volume: VolumeRow;
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-1">Attach Volume</h2>
-        <p className="text-sm text-[#6e6e73] mb-4">{volume.name} ({volume.pool})</p>
-        <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
-          This only updates the tracking record — it does not attach a real disk to the VM's configuration.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">VM Name</label>
-            <input value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="my-vm" />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" disabled={attaching} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{attaching ? 'Attaching…' : 'Attach'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-1 text-[var(--zf-ink)]">Attach Volume</h2>
+      <p className="text-sm text-[var(--zf-muted)] mb-4">{volume.name} ({volume.pool})</p>
+      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+        This only updates the tracking record — it does not attach a real disk to the VM's configuration.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">VM Name</label>
+          <input value={vmName} onChange={e => setVmName(e.target.value)} className="input-field" placeholder="my-vm" />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+          <button type="submit" disabled={attaching} className="zf-btn zf-btn-primary flex-1">{attaching ? 'Attaching…' : 'Attach'}</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -447,24 +439,22 @@ function ResizeVolumeModal({ volume, onClose, onResized }: { volume: VolumeRow; 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-1">Resize Volume Record</h2>
-        <p className="text-sm text-[#6e6e73] mb-4">{volume.name} ({volume.pool})</p>
-        <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
-          This only updates the tracking record — it does not resize a real disk image.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">New Size</label>
-            <input value={size} onChange={e => setSize(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="40GB" />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" disabled={resizing} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{resizing ? 'Saving…' : 'Save'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-1 text-[var(--zf-ink)]">Resize Volume Record</h2>
+      <p className="text-sm text-[var(--zf-muted)] mb-4">{volume.name} ({volume.pool})</p>
+      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+        This only updates the tracking record — it does not resize a real disk image.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">New Size</label>
+          <input value={size} onChange={e => setSize(e.target.value)} className="input-field" placeholder="40GB" />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+          <button type="submit" disabled={resizing} className="zf-btn zf-btn-primary flex-1">{resizing ? 'Saving…' : 'Save'}</button>
+        </div>
+      </form>
+    </Modal>
   )
 }

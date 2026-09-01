@@ -60,7 +60,7 @@ export default function MigrationTemplates() {
             type="button"
             onClick={() => setShowAdd(!showAdd)}
             title="Create new template"
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors"
+            className="zf-btn zf-btn-primary"
           >
             <Plus className="w-4 h-4" /> New Template
           </button>
@@ -68,20 +68,20 @@ export default function MigrationTemplates() {
       />
 
       {showAdd && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">New Template</h3>
+        <div className="zf-panel p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-[var(--zf-ink)]">New Template</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-xs text-[#6e6e73] mb-1">Name</label><input type="text" value={newTemplate.name || ''} onChange={e => setNewTemplate(p => ({ ...p, name: e.target.value }))} placeholder="My Template" className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-indigo-500" /></div>
-            <div><label className="block text-xs text-[#6e6e73] mb-1">Description</label><input type="text" value={newTemplate.description || ''} onChange={e => setNewTemplate(p => ({ ...p, description: e.target.value }))} placeholder="Description" className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-indigo-500" /></div>
-            <div><label className="block text-xs text-[#6e6e73] mb-1">Format</label><select value={newTemplate.format} onChange={e => setNewTemplate(p => ({ ...p, format: e.target.value }))} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:border-indigo-500"><option value="qcow2">QCOW2</option><option value="raw">RAW</option><option value="vmdk">VMDK</option></select></div>
+            <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Name</label><input type="text" value={newTemplate.name || ''} onChange={e => setNewTemplate(p => ({ ...p, name: e.target.value }))} placeholder="My Template" className="input-field" /></div>
+            <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Description</label><input type="text" value={newTemplate.description || ''} onChange={e => setNewTemplate(p => ({ ...p, description: e.target.value }))} placeholder="Description" className="input-field" /></div>
+            <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Format</label><select value={newTemplate.format} onChange={e => setNewTemplate(p => ({ ...p, format: e.target.value }))} className="input-field"><option value="qcow2">QCOW2</option><option value="raw">RAW</option><option value="vmdk">VMDK</option></select></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-xs text-[#6e6e73] mb-1">vCPUs</label><input type="number" value={newTemplate.cpus} onChange={e => setNewTemplate(p => ({ ...p, cpus: Number(e.target.value) }))} min={1} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:border-indigo-500" /></div>
-              <div><label className="block text-xs text-[#6e6e73] mb-1">Memory MB</label><input type="number" value={newTemplate.memory} onChange={e => setNewTemplate(p => ({ ...p, memory: Number(e.target.value) }))} min={256} step={256} className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:border-indigo-500" /></div>
+              <div><label className="block text-xs text-[var(--zf-muted)] mb-1">vCPUs</label><input type="number" value={newTemplate.cpus} onChange={e => setNewTemplate(p => ({ ...p, cpus: Number(e.target.value) }))} min={1} className="input-field" /></div>
+              <div><label className="block text-xs text-[var(--zf-muted)] mb-1">Memory MB</label><input type="number" value={newTemplate.memory} onChange={e => setNewTemplate(p => ({ ...p, memory: Number(e.target.value) }))} min={256} step={256} className="input-field" /></div>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleAdd} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[#1d1d1f] text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4 inline mr-1" />Add</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm text-[#6e6e73] hover:text-[#1d1d1f] bg-white hover:bg-black/[0.04] rounded-lg transition-colors">Cancel</button>
+            <button onClick={handleAdd} className="zf-btn zf-btn-primary zf-btn-sm"><Plus className="w-4 h-4" />Add</button>
+            <button onClick={() => setShowAdd(false)} className="zf-btn zf-btn-ghost zf-btn-sm">Cancel</button>
           </div>
         </div>
       )}
@@ -90,23 +90,23 @@ export default function MigrationTemplates() {
         {allTemplates.map(tmpl => {
           const isBuiltin = tmpl.id.startsWith('builtin-')
           return (
-            <div key={tmpl.id} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5 card-glow transition-all hover:scale-[1.01]">
+            <div key={tmpl.id} className="zf-panel p-5">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="text-sm font-semibold text-[#1d1d1f]">{tmpl.name}</h3>
-                  {isBuiltin && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-[#0066cc]">Built-in</span>}
+                  <h3 className="text-sm font-semibold text-[var(--zf-ink)]">{tmpl.name}</h3>
+                  {isBuiltin && <span className="text-[10px] px-1.5 py-0.5 rounded text-[var(--zf-muted)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]">Built-in</span>}
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => handleCopy(tmpl)} title="Copy config" className="p-1.5 text-[#6e6e73] hover:text-[#1d1d1f] transition-colors">{copied === tmpl.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}</button>
-                  {!isBuiltin && <button onClick={() => handleDelete(tmpl.id, tmpl.name)} title="Delete template" className="p-1.5 text-[#6e6e73] hover:text-red-600 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
+                  <button onClick={() => handleCopy(tmpl)} title="Copy config" className="p-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] transition-colors">{copied === tmpl.id ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}</button>
+                  {!isBuiltin && <button onClick={() => handleDelete(tmpl.id, tmpl.name)} title="Delete template" className="p-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-danger)] transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </div>
               </div>
-              {tmpl.description && <p className="text-xs text-[#6e6e73] mb-3">{tmpl.description}</p>}
+              {tmpl.description && <p className="text-xs text-[var(--zf-muted)] mb-3">{tmpl.description}</p>}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-white rounded-lg px-2 py-1.5"><span className="text-[#6e6e73]">Format</span><div className="text-[#1d1d1f] font-medium">{tmpl.format.toUpperCase()}</div></div>
-                <div className="bg-white rounded-lg px-2 py-1.5"><span className="text-[#6e6e73]">CPU</span><div className="text-[#1d1d1f] font-medium">{tmpl.cpus} vCPU</div></div>
-                <div className="bg-white rounded-lg px-2 py-1.5"><span className="text-[#6e6e73]">Memory</span><div className="text-[#1d1d1f] font-medium">{tmpl.memory} MB</div></div>
-                <div className="bg-white rounded-lg px-2 py-1.5"><span className="text-[#6e6e73]">Network</span><div className="text-[#1d1d1f] font-medium capitalize">{tmpl.network}</div></div>
+                <div className="bg-[var(--zf-canvas)] rounded-lg px-2 py-1.5"><span className="text-[var(--zf-muted)]">Format</span><div className="text-[var(--zf-ink)] font-medium">{tmpl.format.toUpperCase()}</div></div>
+                <div className="bg-[var(--zf-canvas)] rounded-lg px-2 py-1.5"><span className="text-[var(--zf-muted)]">CPU</span><div className="text-[var(--zf-ink)] font-medium">{tmpl.cpus} vCPU</div></div>
+                <div className="bg-[var(--zf-canvas)] rounded-lg px-2 py-1.5"><span className="text-[var(--zf-muted)]">Memory</span><div className="text-[var(--zf-ink)] font-medium">{tmpl.memory} MB</div></div>
+                <div className="bg-[var(--zf-canvas)] rounded-lg px-2 py-1.5"><span className="text-[var(--zf-muted)]">Network</span><div className="text-[var(--zf-ink)] font-medium capitalize">{tmpl.network}</div></div>
               </div>
             </div>
           )

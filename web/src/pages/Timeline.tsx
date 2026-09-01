@@ -23,10 +23,10 @@ interface TimelineEntry {
 type FilterType = 'all' | 'action' | 'alert' | 'deploy' | 'error'
 
 const typeConfig: Record<TimelineEntry['type'], { icon: typeof Clock; color: string; bg: string; border: string }> = {
-  action: { icon: Upload, color: 'text-[#0066cc]', bg: 'bg-blue-500/20', border: 'border-blue-500/40' },
-  alert: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/40' },
-  deploy: { icon: Rocket, color: 'text-emerald-600', bg: 'bg-green-500/20', border: 'border-green-500/40' },
-  error: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-500/20', border: 'border-red-500/40' },
+  action: { icon: Upload, color: 'text-[var(--zf-link)]', bg: 'bg-[var(--zf-canvas)]', border: 'border-[var(--zf-hairline)]' },
+  alert: { icon: AlertTriangle, color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-200' },
+  deploy: { icon: Rocket, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  error: { icon: XCircle, color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
 }
 
 function classifyEntry(entry: Record<string, unknown>): TimelineEntry['type'] {
@@ -152,21 +152,21 @@ export default function Timeline() {
         />
       )}
       {refreshError && !loadError && (
-        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+        <div className="bg-amber-50 rounded-lg border border-amber-200 px-4 py-2 text-xs text-amber-800">
           {refreshError} — showing last known data
         </div>
       )}
 
       <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-[#6e6e73]" />
+        <Filter className="w-4 h-4 text-[var(--zf-muted)]" />
         {filters.map((f) => (
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
               filter === f.value
-                ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
-                : 'text-[#6e6e73] hover:text-[#1d1d1f] bg-[#f5f5f7] border border-[#d2d2d7] hover:border-[#d2d2d7]'
+                ? 'bg-[var(--zf-ink)] text-white border border-[var(--zf-ink)]'
+                : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] hover:border-[var(--zf-hairline)]'
             }`}
           >
             {f.label}
@@ -176,16 +176,16 @@ export default function Timeline() {
 
       {loading && !loadError ? (
         <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[var(--zf-ink)] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-[#6e6e73]">
+        <div className="text-center py-16 text-[var(--zf-muted)]">
           <Clock className="w-10 h-10 mx-auto mb-3 opacity-50" />
           <p className="text-sm">No activity found{filter !== 'all' ? ` for "${filter}" filter` : ''}.</p>
         </div>
       ) : (
         <div className="relative">
-          <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-[#d2d2d7]" />
+          <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-[var(--zf-hairline)]" />
 
           <div className="space-y-1">
             {filtered.map((entry) => {
@@ -198,9 +198,9 @@ export default function Timeline() {
                   </div>
 
                   <div className="flex-1 min-w-0 pt-1">
-                    <p className="text-sm text-[#1d1d1f] leading-snug">{entry.description}</p>
+                    <p className="text-sm text-[var(--zf-ink)] leading-snug">{entry.description}</p>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-[#6e6e73]">{formatTimestamp(entry.timestamp)}</span>
+                      <span className="text-xs text-[var(--zf-muted)]">{formatTimestamp(entry.timestamp)}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${config.bg} ${config.color} capitalize`}>
                         {entry.type}
                       </span>

@@ -76,9 +76,9 @@ export default function Quotas() {
   }
 
   const getUsageColor = (percent: number): string => {
-    if (percent >= 90) return 'bg-red-500'
-    if (percent >= 75) return 'bg-yellow-500'
-    return 'bg-green-500'
+    if (percent >= 90) return 'bg-[var(--zf-danger)]'
+    if (percent >= 75) return 'bg-[var(--zf-warning)]'
+    return 'bg-[var(--zf-success)]'
   }
 
 
@@ -92,7 +92,7 @@ export default function Quotas() {
         actions={
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+            className="zf-btn zf-btn-primary"
           >
             <Plus className="w-4 h-4" />
             Create Quota
@@ -103,12 +103,12 @@ export default function Quotas() {
       <PageLoadBanner title="Could not load quotas" headline={loadError} onRetry={() => void loadData()} />
 
       {quotas.length === 0 ? (
-        <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-          <p className="text-xl text-[#6e6e73] mb-4">No quotas configured</p>
-          <p className="text-[#6e6e73] mb-6">Create quotas to limit resource usage</p>
+        <div className="text-center py-12 zf-panel">
+          <p className="text-xl text-[var(--zf-muted)] mb-4">No quotas configured</p>
+          <p className="text-[var(--zf-muted)] mb-6">Create quotas to limit resource usage</p>
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+            className="zf-btn zf-btn-primary"
           >
             <Plus className="w-4 h-4" />
             Create First Quota
@@ -123,26 +123,26 @@ export default function Quotas() {
             return (
               <div
                 key={quota.id}
-                className={`bg-[#f5f5f7] rounded-lg border ${
-                  isExceeded ? 'border-red-500' : 'border-[#d2d2d7]'
+                className={`bg-[var(--zf-surface)] rounded-[var(--zf-radius)] border ${
+                  isExceeded ? 'border-[var(--zf-danger)]' : 'border-[var(--zf-hairline)]'
                 } p-6`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold">{quota.name}</h3>
+                      <h3 className="text-xl font-bold text-[var(--zf-ink)]">{quota.name}</h3>
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
+                        className={`px-2 py-1 rounded text-xs font-medium border ${
                           quota.enabled
-                            ? 'bg-green-600 text-white'
-                            : 'bg-[#e8e8ed] text-[#1d1d1f]'
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                            : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
                         }`}
                       >
                         {quota.enabled ? 'Enabled' : 'Disabled'}
                       </span>
                       {isExceeded && (
-                        <span className="flex items-center gap-1 px-2 py-1 bg-red-600 rounded text-xs font-medium">
+                        <span className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border text-red-700 bg-red-50 border-red-200">
                           <AlertTriangle className="w-3.5 h-3.5" />
                           Exceeded
                         </span>
@@ -150,18 +150,18 @@ export default function Quotas() {
                     </div>
                     {quota.tags && quota.tags.length > 0 && (
                       <div className="flex gap-2 mb-2">
-                        <span className="text-sm text-[#6e6e73]">Tags:</span>
+                        <span className="text-sm text-[var(--zf-muted)]">Tags:</span>
                         {quota.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="px-2 py-0.5 bg-white rounded text-xs"
+                            className="px-2 py-0.5 rounded text-xs border text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]"
                           >
                             {tag}
                           </span>
                         ))}
                       </div>
                     )}
-                    <p className="text-sm text-[#6e6e73]">
+                    <p className="text-sm text-[var(--zf-muted)]">
                       Created: {new Date(quota.created).toLocaleDateString()}
                     </p>
                   </div>
@@ -169,10 +169,10 @@ export default function Quotas() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleToggleEnabled(quota)}
-                      className={`p-2 rounded transition ${
+                      className={`p-2 rounded border transition ${
                         quota.enabled
-                          ? 'bg-yellow-600 hover:bg-yellow-700'
-                          : 'bg-green-600 hover:bg-green-700'
+                          ? 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100'
+                          : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
                       }`}
                       title={quota.enabled ? 'Disable' : 'Enable'}
                     >
@@ -184,17 +184,17 @@ export default function Quotas() {
                     </button>
                     <button
                       onClick={() => setEditingQuota(quota)}
-                      className="p-2 bg-[#0066cc] hover:bg-[#0077ed] rounded transition"
+                      className="zf-btn zf-btn-ghost zf-btn-sm"
                       title="Edit"
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(quota.id)}
-                      className="p-2 bg-red-600 hover:bg-red-700 rounded transition"
+                      className="zf-btn zf-btn-danger zf-btn-sm"
                       title="Delete"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -204,12 +204,12 @@ export default function Quotas() {
                   {/* CPUs */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-[#6e6e73]">CPUs</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--zf-muted)]">CPUs</span>
+                      <span className="text-sm font-medium text-[var(--zf-ink)]">
                         {quota.used_cpus} / {quota.max_cpus}
                       </span>
                     </div>
-                    <div className="h-2 bg-white rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--zf-canvas)] rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.cpu_percent || 0)}`}
                         style={{
@@ -218,7 +218,7 @@ export default function Quotas() {
                       />
                     </div>
                     {quotaUsage && (
-                      <p className="text-xs text-[#6e6e73] mt-1">
+                      <p className="text-xs text-[var(--zf-muted)] mt-1">
                         {quotaUsage.cpu_percent.toFixed(1)}% used
                       </p>
                     )}
@@ -227,12 +227,12 @@ export default function Quotas() {
                   {/* Memory */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-[#6e6e73]">Memory</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--zf-muted)]">Memory</span>
+                      <span className="text-sm font-medium text-[var(--zf-ink)]">
                         {quota.used_memory}MB / {quota.max_memory}MB
                       </span>
                     </div>
-                    <div className="h-2 bg-white rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--zf-canvas)] rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.memory_percent || 0)}`}
                         style={{
@@ -241,7 +241,7 @@ export default function Quotas() {
                       />
                     </div>
                     {quotaUsage && (
-                      <p className="text-xs text-[#6e6e73] mt-1">
+                      <p className="text-xs text-[var(--zf-muted)] mt-1">
                         {quotaUsage.memory_percent.toFixed(1)}% used
                       </p>
                     )}
@@ -250,12 +250,12 @@ export default function Quotas() {
                   {/* Disk */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-[#6e6e73]">Disk</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--zf-muted)]">Disk</span>
+                      <span className="text-sm font-medium text-[var(--zf-ink)]">
                         {quota.used_disk}GB / {quota.max_disk}GB
                       </span>
                     </div>
-                    <div className="h-2 bg-white rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--zf-canvas)] rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.disk_percent || 0)}`}
                         style={{
@@ -264,7 +264,7 @@ export default function Quotas() {
                       />
                     </div>
                     {quotaUsage && (
-                      <p className="text-xs text-[#6e6e73] mt-1">
+                      <p className="text-xs text-[var(--zf-muted)] mt-1">
                         {quotaUsage.disk_percent.toFixed(1)}% used
                       </p>
                     )}
@@ -273,12 +273,12 @@ export default function Quotas() {
                   {/* VMs */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-[#6e6e73]">VMs</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--zf-muted)]">VMs</span>
+                      <span className="text-sm font-medium text-[var(--zf-ink)]">
                         {quota.used_vms} / {quota.max_vms}
                       </span>
                     </div>
-                    <div className="h-2 bg-white rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--zf-canvas)] rounded-full overflow-hidden">
                       <div
                         className={`h-full ${getUsageColor(quotaUsage?.vms_percent || 0)}`}
                         style={{
@@ -287,7 +287,7 @@ export default function Quotas() {
                       />
                     </div>
                     {quotaUsage && (
-                      <p className="text-xs text-[#6e6e73] mt-1">
+                      <p className="text-xs text-[var(--zf-muted)] mt-1">
                         {quotaUsage.vms_percent.toFixed(1)}% used
                       </p>
                     )}
@@ -296,14 +296,14 @@ export default function Quotas() {
 
                 {/* Exceeded Resources Warning */}
                 {isExceeded && quotaUsage && quotaUsage.exceeded_resources.length > 0 && (
-                  <div className="mt-4 p-3 bg-red-900/20 border border-red-500 rounded flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-[var(--zf-danger)] flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-red-600">
+                      <p className="text-sm font-medium text-red-700">
                         Quota exceeded for:{' '}
                         {quotaUsage.exceeded_resources.join(', ')}
                       </p>
-                      <p className="text-xs text-red-300 mt-1">
+                      <p className="text-xs text-red-700 mt-1">
                         New VMs matching this quota cannot be created until resources are freed
                       </p>
                     </div>

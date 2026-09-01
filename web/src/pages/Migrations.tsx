@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useEffect, useState } from 'react'
-import { ArrowRightLeft, Plus, XCircle, RefreshCw } from 'lucide-react'
+import { ArrowRightLeft, Plus, XCircle } from 'lucide-react'
 import {
   listMigrations,
   startMigration,
@@ -20,6 +20,7 @@ import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Migrations() {
   const toast = useToastContext()
@@ -66,7 +67,7 @@ export default function Migrations() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--zf-ink)]"></div>
       </div>
     )
   }
@@ -88,28 +89,20 @@ export default function Migrations() {
           onRetry={loadMigrations}
         />
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <ArrowRightLeft className="w-8 h-8" />
-          VM Migrations
-        </h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => void loadMigrations()}
-            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
+      <PageHeader
+        title="Migrations"
+        description="Move VMs between hosts for load balancing or maintenance"
+        onRefresh={() => void loadMigrations()}
+        primaryAction={
           <button
             onClick={() => setShowStartDialog(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition"
+            className="zf-btn zf-btn-primary zf-btn-sm"
           >
             <Plus className="w-4 h-4" />
             Start Migration
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Active Migrations */}
       {activeMigrations.length > 0 && (
@@ -129,40 +122,40 @@ export default function Migrations() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Migration History</h2>
         {completedMigrations.length === 0 && activeMigrations.length === 0 ? (
-          <div className="text-center py-12 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-            <ArrowRightLeft className="w-16 h-16 mx-auto mb-4 text-[#6e6e73]" />
-            <p className="text-xl text-[#6e6e73] mb-4">No migrations yet</p>
-            <p className="text-[#6e6e73] mb-6">Migrate VMs between hosts for load balancing or maintenance</p>
+          <div className="text-center py-12 bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)]">
+            <ArrowRightLeft className="w-16 h-16 mx-auto mb-4 text-[var(--zf-muted)]" />
+            <p className="text-xl text-[var(--zf-muted)] mb-4">No migrations yet</p>
+            <p className="text-[var(--zf-muted)] mb-6">Migrate VMs between hosts for load balancing or maintenance</p>
             <button
               onClick={() => setShowStartDialog(true)}
-              className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition"
+              className="zf-btn zf-btn-primary"
             >
               Start Migration
             </button>
           </div>
         ) : (
-          <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+          <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)]">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-white">
                   <tr>
-                    <th className="text-left p-4 font-medium text-[#1d1d1f]">VM</th>
-                    <th className="text-left p-4 font-medium text-[#1d1d1f]">Target Host</th>
-                    <th className="text-left p-4 font-medium text-[#1d1d1f]">Type</th>
-                    <th className="text-left p-4 font-medium text-[#1d1d1f]">Status</th>
-                    <th className="text-left p-4 font-medium text-[#1d1d1f]">Started</th>
+                    <th className="text-left p-4 font-medium text-[var(--zf-ink)]">VM</th>
+                    <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Target Host</th>
+                    <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Type</th>
+                    <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Status</th>
+                    <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Started</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#d2d2d7]">
+                <tbody className="divide-y divide-[var(--zf-hairline)]">
                   {completedMigrations.map(migration => (
-                    <tr key={migration.id} className="hover:bg-white/[0.03] transition">
+                    <tr key={migration.id} className="hover:bg-black/[0.03] transition">
                       <td className="p-4 font-medium">{migration.vm_name}</td>
-                      <td className="p-4 font-mono text-sm text-[#6e6e73]">{migration.target_host}</td>
+                      <td className="p-4 font-mono text-sm text-[var(--zf-muted)]">{migration.target_host}</td>
                       <td className="p-4 capitalize">{migration.migration_type}</td>
                       <td className="p-4">
                         <StatusBadge state={migration.state} />
                       </td>
-                      <td className="p-4 text-sm text-[#6e6e73]">
+                      <td className="p-4 text-sm text-[var(--zf-muted)]">
                         {new Date(migration.started).toLocaleString()}
                       </td>
                     </tr>
@@ -201,13 +194,13 @@ export default function Migrations() {
 
 function StatusBadge({ state }: { state: string }) {
   const styles: Record<string, string> = {
-    pending: 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]',
-    precheck: 'bg-blue-500/20 text-[#0066cc] border-blue-500/30',
-    syncing: 'bg-yellow-500/20 text-amber-600 border-yellow-500/30',
-    switching: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    completed: 'bg-green-500/20 text-emerald-600 border-green-500/30',
-    failed: 'bg-red-500/20 text-red-600 border-red-500/30',
-    cancelled: 'bg-black/[0.06] text-[#6e6e73] border-[#d2d2d7]',
+    pending: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+    precheck: 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+    syncing: 'text-amber-800 bg-amber-50 border-amber-200',
+    switching: 'text-amber-800 bg-amber-50 border-amber-200',
+    completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    failed: 'text-red-700 bg-red-50 border-red-200',
+    cancelled: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
   }
 
   return (
@@ -225,11 +218,11 @@ function MigrationCard({
   onCancel: () => void
 }) {
   return (
-    <div className="bg-[#f5f5f7] rounded-lg p-6 border border-[#d2d2d7]">
+    <div className="bg-[var(--zf-surface)] rounded-lg p-6 border border-[var(--zf-hairline)]">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold">{migration.vm_name}</h3>
-          <p className="text-sm text-[#6e6e73]">
+          <p className="text-sm text-[var(--zf-muted)]">
             To: <span className="font-mono">{migration.target_host}</span>
             {' '}&middot;{' '}
             <span className="capitalize">{migration.migration_type}</span> migration
@@ -239,7 +232,7 @@ function MigrationCard({
           <StatusBadge state={migration.state} />
           <button
             onClick={onCancel}
-            className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 rounded transition text-sm"
+            className="zf-btn zf-btn-danger zf-btn-sm"
           >
             <XCircle className="w-4 h-4" />
             Cancel
@@ -248,13 +241,13 @@ function MigrationCard({
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-white rounded-full h-2 mb-2">
+      <div className="w-full bg-[var(--zf-canvas)] rounded-full h-2 mb-2">
         <div
-          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+          className="bg-[var(--zf-link)] h-2 rounded-full transition-all duration-500"
           style={{ width: `${migration.progress_percent}%` }}
         />
       </div>
-      <div className="flex justify-between text-xs text-[#6e6e73]">
+      <div className="flex justify-between text-xs text-[var(--zf-muted)]">
         <span>{migration.progress_percent}% complete</span>
         {migration.bytes_transferred > 0 && (
           <span>{(migration.bytes_transferred / (1024 * 1024)).toFixed(1)} MB transferred</span>
@@ -262,7 +255,7 @@ function MigrationCard({
       </div>
 
       {migration.error && (
-        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded text-sm text-red-600">
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
           {migration.error}
         </div>
       )}
@@ -314,21 +307,21 @@ function StartMigrationDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
+      <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)] w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--zf-hairline)]">
           <h2 className="text-xl font-bold">Start Migration</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition">
+          <button onClick={onClose} className="p-2 hover:bg-black/[0.04] rounded transition">
             <span className="text-2xl">&times;</span>
           </button>
         </div>
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">VM</label>
+            <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">VM</label>
             <select
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="input-field"
             >
               <option value="">Select a VM</option>
               {vms.map(vm => (
@@ -338,22 +331,22 @@ function StartMigrationDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Target Host</label>
+            <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">Target Host</label>
             <input
               type="text"
               value={targetHost}
               onChange={(e) => setTargetHost(e.target.value)}
               placeholder="hostname or IP address"
-              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="input-field"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">Migration Type</label>
+            <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">Migration Type</label>
             <select
               value={migrationType}
               onChange={(e) => setMigrationType(e.target.value as MigrationType)}
-              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="input-field"
             >
               <option value="offline">Offline - Stop VM, copy data, start on target</option>
               <option value="live">Live - Minimal downtime migration</option>
@@ -362,18 +355,18 @@ function StartMigrationDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 p-6 border-t border-[#d2d2d7]">
+        <div className="flex justify-end gap-2 p-6 border-t border-[var(--zf-hairline)]">
           <button
             onClick={onClose}
             disabled={isStarting}
-            className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition disabled:opacity-50"
+            className="zf-btn zf-btn-ghost"
           >
             Cancel
           </button>
           <button
             onClick={handleStart}
             disabled={isStarting}
-            className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50"
+            className="zf-btn zf-btn-primary"
           >
             {isStarting ? 'Starting...' : 'Start Migration'}
           </button>

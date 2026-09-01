@@ -126,10 +126,10 @@ export default function Backups() {
 
   const getJobStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="w-5 h-5 text-green-500" />
-      case 'failed': return <XCircle className="w-5 h-5 text-red-500" />
-      case 'running': return <Loader className="w-5 h-5 text-blue-500 animate-spin" />
-      default: return <Clock className="w-5 h-5 text-[#6e6e73]" />
+      case 'completed': return <CheckCircle className="w-5 h-5 text-emerald-600" />
+      case 'failed': return <XCircle className="w-5 h-5 text-red-600" />
+      case 'running': return <Loader className="w-5 h-5 text-[var(--zf-link)] animate-spin" />
+      default: return <Clock className="w-5 h-5 text-[var(--zf-muted)]" />
     }
   }
 
@@ -154,7 +154,7 @@ export default function Backups() {
         actions={
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+            className="zf-btn zf-btn-primary zf-btn-sm"
           >
             <Plus className="w-4 h-4" />
             Create Backup
@@ -165,41 +165,41 @@ export default function Backups() {
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-[#6e6e73]">Total Backups</p>
+                <p className="text-sm text-[var(--zf-muted)]">Total Backups</p>
                 <p className="text-2xl font-bold">{stats.total_backups}</p>
               </div>
-              <HardDrive className="w-8 h-8 text-blue-500" />
+              <HardDrive className="w-8 h-8 text-[var(--zf-muted)]" />
             </div>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
+          <div className="bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-[#6e6e73]">Total Size</p>
+                <p className="text-sm text-[var(--zf-muted)]">Total Size</p>
                 <p className="text-2xl font-bold">{formatBytes(stats.total_size_bytes)}</p>
               </div>
-              <Save className="w-8 h-8 text-green-500" />
+              <Save className="w-8 h-8 text-[var(--zf-muted)]" />
             </div>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+          <div className="bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg p-4">
             <div>
-              <p className="text-sm text-[#6e6e73] mb-2">By Type</p>
+              <p className="text-sm text-[var(--zf-muted)] mb-2">By Type</p>
               <div className="space-y-1">
                 {Object.entries(stats.by_type).map(([type, count]) => (
                   <div key={type} className="flex justify-between text-sm">
-                    <span className="text-[#6e6e73] capitalize">{type}</span>
+                    <span className="text-[var(--zf-muted)] capitalize">{type}</span>
                     <span className="font-medium">{count}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+          <div className="bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg p-4">
             <div>
-              <p className="text-sm text-[#6e6e73] mb-2">Latest</p>
-              <p className="text-xs text-[#6e6e73]">
+              <p className="text-sm text-[var(--zf-muted)] mb-2">Latest</p>
+              <p className="text-xs text-[var(--zf-muted)]">
                 {new Date(stats.newest_backup).toLocaleString()}
               </p>
             </div>
@@ -209,24 +209,24 @@ export default function Backups() {
 
       {/* Active Jobs */}
       {jobs.filter(j => j.status === 'running' || j.status === 'queued').length > 0 && (
-        <div className="mb-6 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+        <div className="mb-6 bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg p-4">
           <h2 className="text-lg font-bold mb-4">Active Jobs</h2>
           <div className="space-y-3">
             {jobs.filter(j => j.status === 'running' || j.status === 'queued').map((job) => (
-              <div key={job.id} className="flex items-center gap-3 p-3 bg-[#f5f5f7] rounded">
+              <div key={job.id} className="flex items-center gap-3 p-3 bg-[var(--zf-surface)] rounded">
                 {getJobStatusIcon(job.status)}
                 <div className="flex-1">
                   <p className="font-medium">{job.vm_name}</p>
-                  <p className="text-sm text-[#6e6e73] capitalize">{job.operation}</p>
+                  <p className="text-sm text-[var(--zf-muted)] capitalize">{job.operation}</p>
                 </div>
                 <div className="w-32">
-                  <div className="h-2 bg-white rounded-full overflow-hidden">
+                  <div className="h-2 bg-[var(--zf-canvas)] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-500 transition-all"
+                      className="h-full bg-[var(--zf-ink)] transition-all"
                       style={{ width: `${job.progress}%` }}
                     />
                   </div>
-                  <p className="text-xs text-[#6e6e73] mt-1">{job.progress}%</p>
+                  <p className="text-xs text-[var(--zf-muted)] mt-1">{job.progress}%</p>
                 </div>
               </div>
             ))}
@@ -235,8 +235,8 @@ export default function Backups() {
       )}
 
       {/* Backups List */}
-      <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-        <div className="p-4 border-b border-[#d2d2d7] flex items-center justify-between gap-4">
+      <div className="bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg">
+        <div className="p-4 border-b border-[var(--zf-hairline)] flex items-center justify-between gap-4">
           <h2 className="text-lg font-bold shrink-0">Available Backups</h2>
           {backups.length > 0 && (
             <TableSearch value={query} onChange={setQuery} placeholder="Search by VM, type, status..." resultCount={filteredBackups.length} totalCount={backups.length} className="w-full max-w-sm" />
@@ -244,12 +244,12 @@ export default function Backups() {
         </div>
         {backups.length === 0 ? (
           <div className="text-center py-12">
-            <HardDrive className="w-16 h-16 text-[#6e6e73] mx-auto mb-4" />
-            <p className="text-xl text-[#6e6e73] mb-4">No backups found</p>
-            <p className="text-[#6e6e73] mb-6">Create your first backup to get started</p>
+            <HardDrive className="w-16 h-16 text-[var(--zf-muted)] mx-auto mb-4" />
+            <p className="text-xl text-[var(--zf-muted)] mb-4">No backups found</p>
+            <p className="text-[var(--zf-muted)] mb-6">Create your first backup to get started</p>
             <button
               onClick={() => setShowCreateDialog(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+              className="zf-btn zf-btn-primary"
             >
               <Plus className="w-4 h-4" />
               Create Backup
@@ -260,19 +260,19 @@ export default function Backups() {
             <table className="w-full">
               <thead className="bg-white">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">VM</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Size</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Created</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Expires</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#6e6e73] uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">VM</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Size</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Created</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Expires</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--zf-muted)] uppercase">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {filteredBackups.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#6e6e73]">
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--zf-muted)]">
                       No backups match "{query}"
                     </td>
                   </tr>
@@ -281,24 +281,22 @@ export default function Backups() {
                   <tr key={backup.id} className="hover:bg-white">
                     <td className="px-4 py-3 text-sm font-medium">{backup.vm_name}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        backup.backup_type === 'full' ? 'bg-[#0066cc]' : 'bg-purple-600'
-                      }`}>
+                      <span className="px-2 py-1 rounded text-xs font-medium border text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]">
                         {backup.backup_type.toUpperCase()}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm">{formatBytes(backup.size_bytes)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6e6e73]">
+                    <td className="px-4 py-3 text-sm text-[var(--zf-muted)]">
                       <RelativeTime date={backup.created} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#6e6e73]">
+                    <td className="px-4 py-3 text-sm text-[var(--zf-muted)]">
                       {backup.expires_at ? <RelativeTime date={backup.expires_at} /> : 'Never'}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        backup.status === 'completed' ? 'bg-green-600' :
-                        backup.status === 'in_progress' ? 'bg-yellow-600' :
-                        'bg-red-600'
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                        backup.status === 'completed' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' :
+                        backup.status === 'in_progress' ? 'text-amber-800 bg-amber-50 border-amber-200' :
+                        'text-red-700 bg-red-50 border-red-200'
                       }`}>
                         {backup.status.toUpperCase()}
                       </span>
@@ -308,14 +306,14 @@ export default function Backups() {
                         <button
                           onClick={() => setShowRestoreDialog(backup)}
                           disabled={backup.status !== 'completed'}
-                          className="p-2 bg-green-600 hover:bg-green-700 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-emerald-700 hover:bg-emerald-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Restore"
                         >
                           <RotateCcw className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteBackup(backup.id)}
-                          className="p-2 bg-red-600 hover:bg-red-700 rounded transition"
+                          className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-red-700 hover:bg-red-50 transition"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -375,8 +373,8 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
-        <div className="p-6 border-b border-[#d2d2d7]">
+      <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)] w-full max-w-md">
+        <div className="p-6 border-b border-[var(--zf-hairline)]">
           <h2 className="text-xl font-bold">Create Backup</h2>
         </div>
         <div className="p-6 space-y-4">
@@ -385,7 +383,7 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
             <select
               value={vmName}
               onChange={(e) => setVmName(e.target.value)}
-              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="input-field"
             >
               {vms.map((vm: VM) => (
                 <option key={vm.name} value={vm.name}>{vm.name}</option>
@@ -397,23 +395,23 @@ function CreateBackupDialog({ vms, onClose, onCreate }: CreateBackupDialogProps)
             <select
               value={backupType}
               onChange={(e) => setBackupType(e.target.value as 'full' | 'incremental')}
-              className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="input-field"
             >
               <option value="full">Full Backup</option>
               <option value="incremental">Incremental Backup</option>
             </select>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-[#d2d2d7]">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--zf-hairline)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition"
+            className="zf-btn zf-btn-ghost"
           >
             Cancel
           </button>
           <button
             onClick={() => onCreate(vmName, backupType)}
-            className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded-lg transition"
+            className="zf-btn zf-btn-primary"
           >
             Create Backup
           </button>
@@ -436,15 +434,15 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-md">
-        <div className="p-6 border-b border-[#d2d2d7]">
+      <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)] w-full max-w-md">
+        <div className="p-6 border-b border-[var(--zf-hairline)]">
           <h2 className="text-xl font-bold">Restore from Backup</h2>
         </div>
         <div className="p-6 space-y-4">
-          <div className="p-3 bg-[#f5f5f7] rounded border border-[#d2d2d7]">
-            <p className="text-sm text-[#6e6e73]">Source VM</p>
+          <div className="p-3 bg-[var(--zf-surface)] rounded border border-[var(--zf-hairline)]">
+            <p className="text-sm text-[var(--zf-muted)]">Source VM</p>
             <p className="font-medium">{backup.vm_name}</p>
-            <p className="text-xs text-[#6e6e73] mt-1">
+            <p className="text-xs text-[var(--zf-muted)] mt-1">
               {new Date(backup.created).toLocaleString()}
             </p>
           </div>
@@ -454,7 +452,7 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
               id="create-new"
               checked={createNew}
               onChange={(e) => setCreateNew(e.target.checked)}
-              className="w-4 h-4 bg-[#f5f5f7] border-[#d2d2d7] rounded focus:ring-blue-500"
+              className="w-4 h-4 bg-[var(--zf-surface)] border-[var(--zf-hairline)] rounded focus:ring-[var(--zf-ink)]"
             />
             <label htmlFor="create-new" className="text-sm font-medium">
               Restore to new VM
@@ -468,22 +466,22 @@ function RestoreDialog({ backup, onClose, onRestore }: RestoreDialogProps) {
                 value={targetName}
                 onChange={(e) => setTargetName(e.target.value)}
                 placeholder={`${backup.vm_name}-restored`}
-                className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500"
+                className="input-field"
               />
             </div>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-[#d2d2d7]">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--zf-hairline)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition"
+            className="zf-btn zf-btn-ghost"
           >
             Cancel
           </button>
           <button
             onClick={() => onRestore(backup, createNew ? targetName : undefined)}
             disabled={createNew && !targetName}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition disabled:opacity-50"
+            className="zf-btn zf-btn-primary"
           >
             Restore
           </button>

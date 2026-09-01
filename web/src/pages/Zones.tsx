@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Globe, Zap, Plus, Trash2, PowerOff } from 'lucide-react'
+import { Zap, Plus, Trash2, PowerOff } from 'lucide-react'
 import {
   listZones,
   createZone,
@@ -21,17 +21,18 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { toastFailure } from '../utils/toastError'
+import { PageHeader } from '../components/ui'
 
 const statusColor: Record<AvailabilityZone['status'], string> = {
-  available: 'bg-green-500/10 text-emerald-600 border-green-500/20',
-  degraded: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  unavailable: 'bg-red-500/10 text-red-600 border-red-500/20',
+  available: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  degraded: 'text-amber-800 bg-amber-50 border-amber-200',
+  unavailable: 'text-red-700 bg-red-50 border-red-200',
 }
 
 const spotStatusColor: Record<SpotInstance['status'], string> = {
-  running: 'bg-green-500/10 text-emerald-600 border-green-500/20',
-  evicted: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  terminated: 'bg-black/[0.04] text-[#6e6e73] border-[#d2d2d7]',
+  running: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  evicted: 'text-amber-800 bg-amber-50 border-amber-200',
+  terminated: 'bg-[var(--zf-canvas)] text-[var(--zf-muted)] border-[var(--zf-hairline)]',
 }
 
 export default function Zones() {
@@ -91,46 +92,45 @@ export default function Zones() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <Globe className="w-7 h-7" />
-          Availability Zones
-        </h1>
-      </div>
+      <PageHeader
+        title="Availability Zones"
+        onRefresh={() => void loadData()}
+        refreshing={loading}
+      />
 
       <PageLoadBanner title="Could not load availability zones" headline={loadError} onRetry={() => void loadData()} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-1">Zones</div>
+        <div className="bg-[var(--zf-canvas)] rounded-lg px-4 py-3 border border-[var(--zf-hairline)]">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Zones</div>
           <div className="text-2xl font-bold">{zones.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-1">Running Spot Instances</div>
-          <div className="text-2xl font-bold text-emerald-600">{spots.filter(s => s.status === 'running').length}</div>
+        <div className="bg-[var(--zf-canvas)] rounded-lg px-4 py-3 border border-[var(--zf-hairline)]">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Running Spot Instances</div>
+          <div className="text-2xl font-bold text-emerald-700">{spots.filter(s => s.status === 'running').length}</div>
         </div>
-        <div className="bg-[#f5f5f7] rounded-lg px-4 py-3 border border-[#d2d2d7]">
-          <div className="text-[#6e6e73] text-sm mb-1">Evicted</div>
-          <div className="text-2xl font-bold text-amber-400">{spots.filter(s => s.status === 'evicted').length}</div>
+        <div className="bg-[var(--zf-canvas)] rounded-lg px-4 py-3 border border-[var(--zf-hairline)]">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Evicted</div>
+          <div className="text-2xl font-bold text-amber-800">{spots.filter(s => s.status === 'evicted').length}</div>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-[#d2d2d7]">
-        <button onClick={() => setTab('zones')} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${tab === 'zones' ? 'border-blue-500 text-[#0066cc]' : 'border-transparent text-[#6e6e73] hover:text-[#1d1d1f]'}`}>Zones</button>
-        <button onClick={() => setTab('spot')} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${tab === 'spot' ? 'border-blue-500 text-[#0066cc]' : 'border-transparent text-[#6e6e73] hover:text-[#1d1d1f]'}`}>Spot Instances</button>
+      <div className="flex gap-2 border-b border-[var(--zf-hairline)]">
+        <button onClick={() => setTab('zones')} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${tab === 'zones' ? 'border-[var(--zf-ink)] text-[var(--zf-ink)]' : 'border-transparent text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'}`}>Zones</button>
+        <button onClick={() => setTab('spot')} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${tab === 'spot' ? 'border-[var(--zf-ink)] text-[var(--zf-ink)]' : 'border-transparent text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'}`}>Spot Instances</button>
       </div>
 
       {tab === 'zones' && (
         <div>
           <div className="flex justify-end mb-4">
-            <button onClick={() => setShowCreateZone(true)} className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+            <button onClick={() => setShowCreateZone(true)} className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Create Zone
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Region</th>
                   <th className="p-4">Status</th>
@@ -138,18 +138,18 @@ export default function Zones() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {loading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">Loading…</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">Loading…</td></tr>
                 ) : zones.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">No availability zones.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">No availability zones.</td></tr>
                 ) : zones.map(z => (
                   <tr key={z.id} className="hover:bg-white">
                     <td className="p-4">
                       <div className="font-medium">{z.name}</div>
-                      {z.description && <div className="text-xs text-[#6e6e73]">{z.description}</div>}
+                      {z.description && <div className="text-xs text-[var(--zf-muted)]">{z.description}</div>}
                     </td>
-                    <td className="p-4 text-sm text-[#6e6e73]">{z.region}</td>
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">{z.region}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium border ${statusColor[z.status]}`}>{z.status}</span>
                     </td>
@@ -170,14 +170,14 @@ export default function Zones() {
       {tab === 'spot' && (
         <div>
           <div className="flex justify-end mb-4">
-            <button onClick={() => setShowCreateSpot(true)} className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+            <button onClick={() => setShowCreateSpot(true)} className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Request Spot Instance
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">VM</th>
                   <th className="p-4">Max Price/hr</th>
                   <th className="p-4">Priority</th>
@@ -186,11 +186,11 @@ export default function Zones() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {loading ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">Loading…</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-[var(--zf-muted)]">Loading…</td></tr>
                 ) : spots.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No spot instances.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-[var(--zf-muted)]">No spot instances.</td></tr>
                 ) : spots.map(s => (
                   <tr key={s.id} className="hover:bg-white">
                     <td className="p-4 font-medium">{s.vm_name}</td>
@@ -203,7 +203,7 @@ export default function Zones() {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {s.status === 'running' && (
-                          <button onClick={() => void handleEvict(s)} className="text-amber-500 hover:text-amber-400" title="Evict">
+                          <button onClick={() => void handleEvict(s)} className="text-amber-700 hover:text-amber-800" title="Evict">
                             <PowerOff className="w-4 h-4" />
                           </button>
                         )}
@@ -264,25 +264,25 @@ function CreateZoneModal({ onClose, onCreated }: { onClose: () => void; onCreate
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Create Availability Zone</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="us-east-1a" />
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" placeholder="us-east-1a" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
-            <input value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
+            <input value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Region</label>
-            <input value={region} onChange={e => setRegion(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="default" />
+            <input value={region} onChange={e => setRegion(e.target.value)} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" placeholder="default" />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" disabled={creating} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{creating ? 'Creating…' : 'Create'}</button>
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+            <button type="submit" disabled={creating} className="zf-btn zf-btn-primary flex-1">{creating ? 'Creating…' : 'Create'}</button>
           </div>
         </form>
       </div>
@@ -322,23 +322,23 @@ function CreateSpotModal({ onClose, onCreated, zones }: { onClose: () => void; o
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Zap className="w-5 h-5 text-amber-400" /> Request Spot Instance</h2>
-        <p className="text-xs text-[#6e6e73] mb-4">The VM must already exist. Eviction (manual or automatic) applies the chosen policy to it immediately.</p>
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-md">
+        <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Zap className="w-5 h-5 text-[var(--zf-muted)]" /> Request Spot Instance</h2>
+        <p className="text-xs text-[var(--zf-muted)] mb-4">The VM must already exist. Eviction (manual or automatic) applies the chosen policy to it immediately.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">VM Name</label>
-            <input value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="my-vm" />
+            <input value={vmName} onChange={e => setVmName(e.target.value)} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" placeholder="my-vm" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Max Price/hr ($)</label>
-              <input type="number" min={0.01} step={0.01} value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
+              <input type="number" min={0.01} step={0.01} value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Priority</label>
-              <select value={priority} onChange={e => setPriority(e.target.value as 'low' | 'regular')} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
+              <select value={priority} onChange={e => setPriority(e.target.value as 'low' | 'regular')} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2">
                 <option value="low">Low</option>
                 <option value="regular">Regular</option>
               </select>
@@ -347,14 +347,14 @@ function CreateSpotModal({ onClose, onCreated, zones }: { onClose: () => void; o
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Zone (optional)</label>
-              <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
+              <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2">
                 <option value="">Any</option>
                 {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Eviction Policy</label>
-              <select value={evictionPolicy} onChange={e => setEvictionPolicy(e.target.value as 'stop' | 'delete' | 'deallocate')} className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
+              <select value={evictionPolicy} onChange={e => setEvictionPolicy(e.target.value as 'stop' | 'delete' | 'deallocate')} className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2">
                 <option value="stop">Stop</option>
                 <option value="deallocate">Deallocate</option>
                 <option value="delete">Delete</option>
@@ -362,8 +362,8 @@ function CreateSpotModal({ onClose, onCreated, zones }: { onClose: () => void; o
             </div>
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" disabled={creating} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{creating ? 'Requesting…' : 'Request'}</button>
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+            <button type="submit" disabled={creating} className="zf-btn zf-btn-primary flex-1">{creating ? 'Requesting…' : 'Request'}</button>
           </div>
         </form>
       </div>

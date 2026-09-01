@@ -110,12 +110,12 @@ export default function LiveMetrics() {
   const netTxData = history.map(h => h.net_tx)
 
   const metrics = [
-    { label: 'CPU Usage', value: `${latest.cpu.toFixed(1)}%`, data: cpuData, color: '#3b82f6', icon: <Cpu className="w-4 h-4 text-[#0066cc]" />, max: 100 },
+    { label: 'CPU Usage', value: `${latest.cpu.toFixed(1)}%`, data: cpuData, color: 'var(--zf-link)', icon: <Cpu className="w-4 h-4 text-[var(--zf-link)]" />, max: 100 },
     { label: 'Memory Usage', value: `${latest.memory.toFixed(1)}%`, data: memData, color: '#a855f7', icon: <Database className="w-4 h-4 text-purple-400" />, max: 100 },
     { label: 'Disk Read', value: `${fmtB(latest.disk_read)}/s`, data: diskReadData, color: '#06b6d4', icon: <HardDrive className="w-4 h-4 text-cyan-400" /> },
-    { label: 'Disk Write', value: `${fmtB(latest.disk_write)}/s`, data: diskWriteData, color: '#f59e0b', icon: <HardDrive className="w-4 h-4 text-amber-400" /> },
-    { label: 'Network RX', value: `${fmtB(latest.net_rx)}/s`, data: netRxData, color: '#22c55e', icon: <Network className="w-4 h-4 text-emerald-600" /> },
-    { label: 'Network TX', value: `${fmtB(latest.net_tx)}/s`, data: netTxData, color: '#ef4444', icon: <Network className="w-4 h-4 text-red-600" /> },
+    { label: 'Disk Write', value: `${fmtB(latest.disk_write)}/s`, data: diskWriteData, color: 'var(--zf-warning)', icon: <HardDrive className="w-4 h-4 text-amber-600" /> },
+    { label: 'Network RX', value: `${fmtB(latest.net_rx)}/s`, data: netRxData, color: 'var(--zf-success)', icon: <Network className="w-4 h-4 text-emerald-600" /> },
+    { label: 'Network TX', value: `${fmtB(latest.net_tx)}/s`, data: netTxData, color: 'var(--zf-danger)', icon: <Network className="w-4 h-4 text-red-600" /> },
   ]
 
   return (
@@ -125,13 +125,13 @@ export default function LiveMetrics() {
         description={`Real-time system performance (1s interval, ${MAX_POINTS}s window)`}
         actions={
         <div className="flex items-center gap-3">
-          <button onClick={() => setPaused(!paused)} title={paused ? 'Resume metrics streaming' : 'Pause metrics streaming'} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${paused ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f]'}`}>
+          <button onClick={() => setPaused(!paused)} title={paused ? 'Resume metrics streaming' : 'Pause metrics streaming'} className={`zf-btn zf-btn-sm ${paused ? 'zf-btn-primary' : 'zf-btn-ghost'}`}>
             {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
             {paused ? 'Resume' : 'Pause'}
           </button>
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${paused ? 'bg-amber-400' : loadError || refreshError ? 'bg-red-400' : 'bg-green-400 animate-pulse'}`} />
-            <span className="text-xs text-[#6e6e73]">{paused ? 'Paused' : loadError || refreshError ? 'Error' : 'Streaming'}</span>
+            <span className={`w-2 h-2 rounded-full ${paused ? 'bg-amber-500' : loadError || refreshError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+            <span className="text-xs text-[var(--zf-muted)]">{paused ? 'Paused' : loadError || refreshError ? 'Error' : 'Streaming'}</span>
           </div>
         </div>
         }
@@ -146,25 +146,25 @@ export default function LiveMetrics() {
       )}
 
       {refreshError && !loadError && (
-        <div className="bg-amber-500/10 rounded-lg border border-amber-500/30 px-4 py-2 text-xs text-amber-400">
+        <div className="bg-amber-50 rounded-lg border border-amber-200 px-4 py-2 text-xs text-amber-800">
           Refresh failed: {refreshError} — showing last known data
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {metrics.map(m => (
-          <div key={m.label} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-4 card-glow transition-all hover:scale-[1.01]">
+          <div key={m.label} className="bg-[var(--zf-surface)] rounded-xl border border-[var(--zf-hairline)] p-4 card-glow transition-all hover:scale-[1.01]">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 {m.icon}
-                <span className="text-xs text-[#6e6e73]">{m.label}</span>
+                <span className="text-xs text-[var(--zf-muted)]">{m.label}</span>
               </div>
-              <span className="text-lg font-bold text-[#1d1d1f] tabular-nums">{m.value}</span>
+              <span className="text-lg font-bold text-[var(--zf-ink)] tabular-nums">{m.value}</span>
             </div>
-            <div className="bg-white rounded-lg p-2">
+            <div className="bg-[var(--zf-canvas)] rounded-lg p-2">
               <MiniChart data={m.data} color={m.color} max={m.max} />
             </div>
-            <div className="flex justify-between mt-1.5 text-[10px] text-[#6e6e73]">
+            <div className="flex justify-between mt-1.5 text-[10px] text-[var(--zf-muted)]">
               <span>{MAX_POINTS}s ago</span>
               <span>now</span>
             </div>
@@ -173,7 +173,7 @@ export default function LiveMetrics() {
       </div>
 
       {history.length === 0 && !loadError && (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] text-center text-[#6e6e73] text-sm">Waiting for metrics data...</div>
+        <div className="bg-[var(--zf-surface)] rounded-xl p-10 border border-[var(--zf-hairline)] text-center text-[var(--zf-muted)] text-sm">Waiting for metrics data...</div>
       )}
     </div>
   )

@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Search, Disc } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
-import { PageHeader, EmptyState } from '../components/ui'
+import { PageHeader, EmptyState, Card } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -127,68 +127,70 @@ export default function ISOImages() {
       )}
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6e6e73]" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--zf-muted)]" />
         <input
           type="text"
           placeholder="Search ISOs by name or path…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search ISOs"
-          className="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500/50"
+          className="input-field pl-10"
         />
       </div>
 
       {loading && !loadError ? (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
-          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
-          <span className="text-sm">Scanning for ISO images…</span>
-        </div>
+        <Card>
+          <div className="p-10 flex flex-col items-center justify-center text-[var(--zf-muted)] gap-3">
+            <div className="w-6 h-6 border-2 border-[var(--zf-hairline)] border-t-[var(--zf-ink)] rounded-full animate-spin" />
+            <span className="text-sm">Scanning for ISO images…</span>
+          </div>
+        </Card>
       ) : !loadError && filtered.length === 0 ? (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
+        <Card>
           <EmptyState
             icon={<Disc className="w-10 h-10" />}
             title={isos.length === 0 ? 'No ISO images found' : 'No ISOs match your search'}
             description="Place ISO files in the configured images directory on the host"
           />
-        </div>
+        </Card>
       ) : !loadError ? (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#d2d2d7]">
-                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Name</th>
-                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Path</th>
-                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Size</th>
-                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Modified</th>
-                <th className="text-left p-3 text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Attached VMs</th>
+              <tr className="border-b border-[var(--zf-hairline)]">
+                <th className="text-left p-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Name</th>
+                <th className="text-left p-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Path</th>
+                <th className="text-left p-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Size</th>
+                <th className="text-left p-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Modified</th>
+                <th className="text-left p-3 text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider">Attached VMs</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#d2d2d7]/30">
+            <tbody className="divide-y divide-[var(--zf-hairline)]/30">
               {filtered.map((iso) => (
                 <tr key={iso.path} className="hover:bg-black/[0.04] transition-colors">
                   <td className="p-3">
-                    <div className="font-medium text-[#1d1d1f] flex items-center gap-2">
+                    <div className="font-medium text-[var(--zf-ink)] flex items-center gap-2">
                       {iso.name}
                       {isVirtioWin(iso.name) && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded text-[var(--zf-muted)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]">
                           virtio-win
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="p-3 text-[#6e6e73] font-mono text-xs truncate max-w-xs" title={iso.path}>
+                  <td className="p-3 text-[var(--zf-muted)] font-mono text-xs truncate max-w-xs" title={iso.path}>
                     {iso.path}
                   </td>
-                  <td className="p-3 text-[#1d1d1f] whitespace-nowrap">{formatSize(iso.size_bytes)}</td>
-                  <td className="p-3 text-[#6e6e73] text-xs whitespace-nowrap">{formatDate(iso.mod_time)}</td>
-                  <td className="p-3 text-[#6e6e73] text-xs">
+                  <td className="p-3 text-[var(--zf-ink)] whitespace-nowrap">{formatSize(iso.size_bytes)}</td>
+                  <td className="p-3 text-[var(--zf-muted)] text-xs whitespace-nowrap">{formatDate(iso.mod_time)}</td>
+                  <td className="p-3 text-[var(--zf-muted)] text-xs">
                     {(isoVMMap[iso.path] || []).join(', ') || '-'}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       ) : null}
     </div>
   )

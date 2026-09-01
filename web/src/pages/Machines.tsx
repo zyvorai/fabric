@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   Server, Terminal, Key, Download, Power, RotateCw, XCircle,
-  HardDrive, RefreshCw, Trash2, CheckCircle2, Ban, FolderInput,
+  HardDrive, Trash2, CheckCircle2, Ban, FolderInput,
   Copy, Pencil, Lock, Unlock, Sparkles, X, Monitor,
 } from 'lucide-react'
 import {
@@ -25,6 +25,7 @@ import { hintsForError } from '../utils/daemonHints'
 import SubsystemBanner from '../components/SubsystemBanner'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { PageHeader } from '../components/ui'
 
 export default function Machines() {
   const navigate = useNavigate()
@@ -221,7 +222,7 @@ export default function Machines() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--zf-ink)]"></div>
       </div>
     )
   }
@@ -237,22 +238,18 @@ export default function Machines() {
           onRetry={loadData}
         />
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <Server className="w-8 h-8" />
-          Machines
-        </h1>
-        <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded-lg transition">
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Machines"
+        description="Running machines and pulled images"
+        onRefresh={loadData}
+      />
 
       {/* Tabs */}
-      <div className="border-b border-[#d2d2d7] flex gap-4">
-        <button onClick={() => setActiveTab('machines')} className={`px-4 py-3 border-b-2 transition ${activeTab === 'machines' ? 'border-blue-500 text-[#0066cc]' : 'border-transparent text-[#6e6e73]'}`}>
-          Running Machines ({machines.length})
+      <div className="border-b border-[var(--zf-hairline)] flex gap-4">
+        <button onClick={() => setActiveTab('machines')} className={`px-4 py-3 border-b-2 transition ${activeTab === 'machines' ? 'border-[var(--zf-ink)] text-[var(--zf-ink)] font-medium' : 'border-transparent text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'}`}>
+          <Server className="w-4 h-4 inline mr-2" />Running Machines ({machines.length})
         </button>
-        <button onClick={() => setActiveTab('images')} className={`px-4 py-3 border-b-2 transition ${activeTab === 'images' ? 'border-blue-500 text-[#0066cc]' : 'border-transparent text-[#6e6e73]'}`}>
+        <button onClick={() => setActiveTab('images')} className={`px-4 py-3 border-b-2 transition ${activeTab === 'images' ? 'border-[var(--zf-ink)] text-[var(--zf-ink)] font-medium' : 'border-transparent text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'}`}>
           <HardDrive className="w-4 h-4 inline mr-2" />Images ({images.length})
         </button>
       </div>
@@ -262,15 +259,15 @@ export default function Machines() {
           {/* Machine list */}
           <div className="space-y-3">
             {machines.length === 0 ? (
-              <div className="text-center py-8 bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
-                <Server className="w-12 h-12 mx-auto mb-3 text-[#6e6e73]" />
-                <p className="text-[#6e6e73]">No running machines</p>
+              <div className="text-center py-8 bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)]">
+                <Server className="w-12 h-12 mx-auto mb-3 text-[var(--zf-muted)]" />
+                <p className="text-[var(--zf-muted)]">No running machines</p>
               </div>
             ) : machines.map(m => (
               <button key={m.name} onClick={() => selectMachine(m.name)}
-                className={`w-full text-left p-4 rounded-lg border transition ${selectedMachine === m.name ? 'bg-blue-500/10 border-blue-500/30' : 'bg-[#f5f5f7] border-[#d2d2d7] hover:border-[#d2d2d7]'}`}>
+                className={`w-full text-left p-4 rounded-lg border transition ${selectedMachine === m.name ? 'bg-black/[0.04] border-[var(--zf-ink)]' : 'bg-[var(--zf-surface)] border-[var(--zf-hairline)] hover:border-[var(--zf-ink)]'}`}>
                 <div className="font-bold">{m.name}</div>
-                <div className="text-xs text-[#6e6e73]">{m.class} / {m.service}</div>
+                <div className="text-xs text-[var(--zf-muted)]">{m.class} / {m.service}</div>
               </button>
             ))}
           </div>
@@ -279,42 +276,42 @@ export default function Machines() {
           {selectedMachine && (
             <div className="lg:col-span-2 space-y-4">
               {/* Actions */}
-              <div className="bg-[#f5f5f7] rounded-lg p-4 border border-[#d2d2d7]">
+              <div className="bg-[var(--zf-surface)] rounded-lg p-4 border border-[var(--zf-hairline)]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-lg">{selectedMachine}</h3>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => navigate(`/app/vms/${selectedMachine}/console`)}
-                      className="px-3 py-1 bg-[#e8e8ed] hover:bg-[#d2d2d7] rounded text-sm flex items-center gap-1"><Terminal className="w-3.5 h-3.5" />Terminal</button>
+                      className="zf-btn zf-btn-ghost zf-btn-sm"><Terminal className="w-3.5 h-3.5" />Terminal</button>
                     <button onClick={() => navigate(`/app/vms/${selectedMachine}/console?mode=vnc`)}
-                      className="px-3 py-1 bg-[#e8e8ed] hover:bg-[#d2d2d7] rounded text-sm flex items-center gap-1"><Monitor className="w-3.5 h-3.5" />VNC</button>
+                      className="zf-btn zf-btn-ghost zf-btn-sm"><Monitor className="w-3.5 h-3.5" />VNC</button>
                     <button onClick={handleReboot}
-                      className="px-3 py-1 bg-[#0066cc] hover:bg-[#0077ed] rounded text-sm flex items-center gap-1"><RotateCw className="w-3.5 h-3.5" />Reboot</button>
+                      className="zf-btn zf-btn-primary zf-btn-sm"><RotateCw className="w-3.5 h-3.5" />Reboot</button>
                     <button onClick={handlePoweroff}
-                      className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm flex items-center gap-1"><Power className="w-3.5 h-3.5" />Poweroff</button>
+                      className="zf-btn zf-btn-ghost zf-btn-sm"><Power className="w-3.5 h-3.5" />Poweroff</button>
                     <button onClick={handleTerminate}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Kill</button>
+                      className="zf-btn zf-btn-danger zf-btn-sm"><XCircle className="w-3.5 h-3.5" />Kill</button>
                     <button onClick={handleEnable} title="Enable at boot"
-                      className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Enable</button>
+                      className="zf-btn zf-btn-ghost zf-btn-sm"><CheckCircle2 className="w-3.5 h-3.5" />Enable</button>
                     <button onClick={handleDisable} title="Disable at boot"
-                      className="px-3 py-1 bg-[#e8e8ed] hover:bg-[#d2d2d7] rounded text-sm flex items-center gap-1"><Ban className="w-3.5 h-3.5" />Disable</button>
+                      className="zf-btn zf-btn-ghost zf-btn-sm"><Ban className="w-3.5 h-3.5" />Disable</button>
                   </div>
                 </div>
 
                 {/* SSH info */}
-                <div className="bg-[#f5f5f7] rounded p-3 mb-3">
-                  <div className="text-xs text-[#6e6e73] mb-1 flex items-center gap-1"><Key className="w-3.5 h-3.5" /> SSH</div>
+                <div className="bg-[var(--zf-canvas)] rounded p-3 mb-3">
+                  <div className="text-xs text-[var(--zf-muted)] mb-1 flex items-center gap-1"><Key className="w-3.5 h-3.5" /> SSH</div>
                   {sshInfo?.ssh_command ? (
                     <div className="flex items-center gap-2">
                       <code className="text-sm text-emerald-600 font-mono flex-1">{sshInfo.ssh_command}</code>
                       <button
                         onClick={() => { navigator.clipboard.writeText(sshInfo.ssh_command!); toast.success('Copied') }}
-                        title="Copy" className="p-1.5 hover:bg-white/[0.05] rounded transition-colors text-[#6e6e73] hover:text-[#1d1d1f]"
+                        title="Copy" className="p-1.5 hover:bg-black/[0.04] rounded transition-colors text-[var(--zf-muted)] hover:text-[var(--zf-ink)]"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ) : (
-                    <p className="text-sm text-[#6e6e73]">
+                    <p className="text-sm text-[var(--zf-muted)]">
                       No SSH address yet — this VM has no host-routable IP (NAT networking with no port
                       forward, or bridged networking still waiting on a DHCP lease).
                     </p>
@@ -326,7 +323,7 @@ export default function Machines() {
                   {['State', 'Leader', 'Class', 'Service', 'VSockCID'].map(key => (
                     machineProps[key] && (
                       <div key={key}>
-                        <span className="text-[#6e6e73]">{key}: </span>
+                        <span className="text-[var(--zf-muted)]">{key}: </span>
                         <span className="font-mono">{machineProps[key]}</span>
                       </div>
                     )
@@ -335,39 +332,39 @@ export default function Machines() {
               </div>
 
               {/* Shell */}
-              <div className="bg-[#f5f5f7] rounded-lg p-4 border border-[#d2d2d7]">
+              <div className="bg-[var(--zf-surface)] rounded-lg p-4 border border-[var(--zf-hairline)]">
                 <h4 className="font-medium mb-3 flex items-center gap-2"><Terminal className="w-4 h-4" /> Shell</h4>
                 <div className="flex gap-2 mb-3">
                   <input value={shellCmd} onChange={e => setShellCmd(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && runShell()}
-                    placeholder="Enter command..." className="flex-1 bg-[#f5f5f7] border border-[#d2d2d7] rounded px-3 py-2 font-mono text-sm focus:outline-none focus:border-blue-500" />
-                  <button onClick={runShell} className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm">Run</button>
+                    placeholder="Enter command..." className="flex-1 input-field font-mono text-sm" />
+                  <button onClick={runShell} className="zf-btn zf-btn-primary zf-btn-sm">Run</button>
                 </div>
                 {shellOutput && (
-                  <div className="bg-[#f5f5f7] rounded p-3 font-mono text-xs max-h-64 overflow-auto">
-                    {shellOutput.stdout && <pre className="text-[#1d1d1f] whitespace-pre-wrap">{shellOutput.stdout}</pre>}
+                  <div className="bg-[var(--zf-canvas)] rounded p-3 font-mono text-xs max-h-64 overflow-auto">
+                    {shellOutput.stdout && <pre className="text-[var(--zf-ink)] whitespace-pre-wrap">{shellOutput.stdout}</pre>}
                     {shellOutput.stderr && <pre className="text-red-600 whitespace-pre-wrap">{shellOutput.stderr}</pre>}
-                    <div className="text-[#6e6e73] mt-2 border-t border-[#d2d2d7] pt-1">exit code: {shellOutput.exit_code}</div>
+                    <div className="text-[var(--zf-muted)] mt-2 border-t border-[var(--zf-hairline)] pt-1">exit code: {shellOutput.exit_code}</div>
                   </div>
                 )}
               </div>
 
               {/* File transfer */}
-              <div className="bg-[#f5f5f7] rounded-lg p-4 border border-[#d2d2d7]">
+              <div className="bg-[var(--zf-surface)] rounded-lg p-4 border border-[var(--zf-hairline)]">
                 <h4 className="font-medium mb-3 flex items-center gap-2"><FolderInput className="w-4 h-4" /> Files</h4>
-                <div className="flex gap-1 mb-3 bg-white rounded-lg p-1 w-fit">
+                <div className="flex gap-1 mb-3 bg-[var(--zf-canvas)] rounded-lg p-1 w-fit">
                   {(['copy-to', 'copy-from', 'bind'] as const).map(m => (
                     <button key={m} onClick={() => setFileMode(m)}
-                      className={`px-3 py-1.5 rounded text-xs font-medium ${fileMode === m ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
+                      className={`px-3 py-1.5 rounded text-xs font-medium ${fileMode === m ? 'bg-[var(--zf-ink)] text-white' : 'text-[var(--zf-muted)] hover:bg-black/[0.04]'}`}>
                       {m === 'copy-to' ? 'Copy to VM' : m === 'copy-from' ? 'Copy from VM' : 'Bind Mount'}
                     </button>
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <input value={hostPath} onChange={e => setHostPath(e.target.value)} placeholder="Host path"
-                    className="bg-[#f5f5f7] border border-[#d2d2d7] rounded px-3 py-2 font-mono text-sm focus:outline-none focus:border-blue-500" />
+                    className="input-field font-mono text-sm" />
                   <input value={machinePath} onChange={e => setMachinePath(e.target.value)} placeholder="Machine path"
-                    className="bg-[#f5f5f7] border border-[#d2d2d7] rounded px-3 py-2 font-mono text-sm focus:outline-none focus:border-blue-500" />
+                    className="input-field font-mono text-sm" />
                 </div>
                 {fileMode === 'bind' && (
                   <label className="flex items-center gap-2 mb-2 text-sm">
@@ -376,7 +373,7 @@ export default function Machines() {
                   </label>
                 )}
                 <button onClick={handleFileTransfer} disabled={!hostPath.trim() || !machinePath.trim()}
-                  className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded text-sm disabled:opacity-50">
+                  className="zf-btn zf-btn-primary zf-btn-sm">
                   {fileMode === 'bind' ? 'Bind' : 'Copy'}
                 </button>
               </div>
@@ -388,62 +385,62 @@ export default function Machines() {
       {activeTab === 'images' && (
         <div className="space-y-4">
           {/* Pull image */}
-          <div className="bg-[#f5f5f7] rounded-lg p-4 border border-[#d2d2d7]">
+          <div className="bg-[var(--zf-surface)] rounded-lg p-4 border border-[var(--zf-hairline)]">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-medium flex items-center gap-2"><Download className="w-4 h-4" /> Pull Image</h3>
-              <button onClick={handleCleanImages} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-[#d2d2d7] text-[#1d1d1f] hover:text-[#1d1d1f] hover:border-[#d2d2d7] rounded-lg transition-colors">
+              <button onClick={handleCleanImages} className="zf-btn zf-btn-ghost zf-btn-sm">
                 <Sparkles className="w-3.5 h-3.5" />
                 Clean unused
               </button>
             </div>
             <div className="flex gap-2">
               <input value={pullUrl} onChange={e => setPullUrl(e.target.value)} placeholder="Image URL (https://...)"
-                className="flex-1 bg-white border border-[#d2d2d7] rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                className="flex-1 input-field text-sm" />
               <input value={pullName} onChange={e => setPullName(e.target.value)} placeholder="Name"
-                className="w-48 bg-white border border-[#d2d2d7] rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                className="w-48 input-field text-sm" />
               <button onClick={handlePullImage} disabled={!pullUrl || !pullName}
-                className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded text-sm disabled:opacity-50">Pull</button>
+                className="zf-btn zf-btn-primary zf-btn-sm">Pull</button>
             </div>
           </div>
 
           {/* Image list */}
-          <div className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7]">
+          <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)]">
             <table className="w-full">
               <thead className="bg-white">
                 <tr>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Name</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Type</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Size</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Read-Only</th>
-                  <th className="text-left p-4 font-medium text-[#1d1d1f]">Actions</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Name</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Type</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Size</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Read-Only</th>
+                  <th className="text-left p-4 font-medium text-[var(--zf-ink)]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {images.map(img => (
-                  <tr key={img.name} className="hover:bg-white/[0.03]/50">
+                  <tr key={img.name} className="hover:bg-black/[0.03]">
                     <td className="p-4 font-medium">{img.name}</td>
-                    <td className="p-4 text-[#6e6e73]">{img.image_type}</td>
+                    <td className="p-4 text-[var(--zf-muted)]">{img.image_type}</td>
                     <td className="p-4 font-mono text-sm">{img.size}</td>
                     <td className="p-4">{img.read_only ? 'Yes' : 'No'}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => setImageAction({ mode: 'clone', name: img.name })}
-                          title="Clone" className="p-2 bg-[#e8e8ed] hover:bg-[#d2d2d7] rounded"><Copy className="w-3.5 h-3.5" /></button>
+                          title="Clone" className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] transition"><Copy className="w-3.5 h-3.5" /></button>
                         <button onClick={() => setImageAction({ mode: 'rename', name: img.name })}
-                          title="Rename" className="p-2 bg-[#e8e8ed] hover:bg-[#d2d2d7] rounded"><Pencil className="w-3.5 h-3.5" /></button>
+                          title="Rename" className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] transition"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleToggleReadOnly(img)}
                           title={img.read_only ? 'Make writable' : 'Make read-only'}
-                          className="p-2 bg-[#e8e8ed] hover:bg-[#d2d2d7] rounded">
+                          className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-[var(--zf-ink)] hover:bg-black/[0.04] transition">
                           {img.read_only ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                         </button>
                         <button onClick={() => handleRemoveImage(img.name)}
-                          title="Remove" className="p-2 bg-red-600 hover:bg-red-700 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                          title="Remove" className="p-2 rounded-lg border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-red-700 hover:bg-red-50 transition"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {images.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">No images found. Pull one above to get started.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">No images found. Pull one above to get started.</td></tr>
                 )}
               </tbody>
             </table>
@@ -483,28 +480,28 @@ function ImageActionModal({ mode, sourceName, onClose, onSubmit }: {
   const [name, setName] = useState('')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#f5f5f7] rounded-lg shadow-2xl border border-[#d2d2d7] w-full max-w-sm">
-        <div className="flex items-center justify-between p-6 border-b border-[#d2d2d7]">
-          <h2 className="text-lg font-bold text-[#1d1d1f]">{mode === 'clone' ? 'Clone' : 'Rename'} '{sourceName}'</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/[0.03] rounded transition text-[#6e6e73] hover:text-[#1d1d1f]">
+      <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)] w-full max-w-sm">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--zf-hairline)]">
+          <h2 className="text-lg font-bold text-[var(--zf-ink)]">{mode === 'clone' ? 'Clone' : 'Rename'} '{sourceName}'</h2>
+          <button onClick={onClose} className="p-2 hover:bg-black/[0.04] rounded transition text-[var(--zf-muted)] hover:text-[var(--zf-ink)]">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1f] mb-2">{mode === 'clone' ? 'New Image Name' : 'New Name'}</label>
+            <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">{mode === 'clone' ? 'New Image Name' : 'New Name'}</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && name) onSubmit(name) }}
-              className="w-full bg-white border border-[#d2d2d7] rounded-lg py-2 px-4 text-[#1d1d1f] font-mono text-sm focus:outline-none focus:border-blue-500/50"
+              className="input-field font-mono text-sm"
               autoFocus
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-white hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition">Cancel</button>
-            <button type="button" onClick={() => onSubmit(name)} disabled={!name} className="px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] text-white rounded-lg transition disabled:opacity-50">
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost">Cancel</button>
+            <button type="button" onClick={() => onSubmit(name)} disabled={!name} className="zf-btn zf-btn-primary">
               {mode === 'clone' ? 'Clone' : 'Rename'}
             </button>
           </div>

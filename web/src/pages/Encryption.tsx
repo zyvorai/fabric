@@ -23,7 +23,7 @@ import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { PageHeader } from '../components/ui'
+import { PageHeader, Modal } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 
@@ -91,14 +91,14 @@ export default function Encryption() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      connected: 'bg-green-100 text-green-800',
-      disconnected: 'bg-red-100 text-red-800',
-      error: 'bg-red-100 text-red-800',
-      encrypted: 'bg-green-100 text-green-800',
-      encrypting: 'bg-blue-100 text-blue-800',
-      decrypting: 'bg-yellow-100 text-yellow-800',
+      connected: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      disconnected: 'text-red-700 bg-red-50 border-red-200',
+      error: 'text-red-700 bg-red-50 border-red-200',
+      encrypted: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      encrypting: 'text-amber-800 bg-amber-50 border-amber-200',
+      decrypting: 'text-amber-800 bg-amber-50 border-amber-200',
     }
-    return colors[status] || 'bg-black/[0.06] text-[#6e6e73]'
+    return colors[status] || 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 
 
@@ -114,37 +114,37 @@ export default function Encryption() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="flex items-center gap-2 text-[#6e6e73] text-sm mb-1">
+        <div className="zf-panel-muted px-4 py-3">
+          <div className="flex items-center gap-2 text-[var(--zf-muted)] text-sm mb-1">
             <Key className="w-4 h-4" /> Key Providers
           </div>
-          <div className="text-2xl font-bold">{providers.length}</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{providers.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="flex items-center gap-2 text-[#6e6e73] text-sm mb-1">
+        <div className="zf-panel-muted px-4 py-3">
+          <div className="flex items-center gap-2 text-[var(--zf-muted)] text-sm mb-1">
             <Shield className="w-4 h-4" /> Policies
           </div>
-          <div className="text-2xl font-bold">{policies.length}</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{policies.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Encrypted VMs</div>
-          <div className="text-2xl font-bold text-emerald-600">
+        <div className="zf-panel-muted px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Encrypted VMs</div>
+          <div className="text-2xl font-bold text-emerald-700">
             {encryptedVMs.filter(v => v.encrypted).length}
           </div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Connected Providers</div>
-          <div className="text-2xl font-bold">
+        <div className="zf-panel-muted px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Connected Providers</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">
             {providers.filter(p => p.status === 'connected').length}
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-[#f5f5f7] rounded-lg p-1">
+      <div className="flex gap-1 mb-4 zf-panel-muted p-1">
         {(['providers', 'policies', 'vms'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize transition-colors ${activeTab === tab ? 'bg-[var(--zf-ink)] text-white' : 'text-[var(--zf-ink)] hover:bg-black/[0.04]'}`}>
             {tab === 'providers' ? 'Key Providers' : tab === 'vms' ? 'Encrypted VMs' : 'Policies'}
           </button>
         ))}
@@ -155,14 +155,14 @@ export default function Encryption() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateProvider(true)}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+              className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Add Provider
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="zf-panel">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Type</th>
                   <th className="p-4">Endpoint</th>
@@ -170,21 +170,21 @@ export default function Encryption() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {providers.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">No key providers registered.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">No key providers registered.</td></tr>
                 ) : providers.map(prov => (
-                  <tr key={prov.id} className="hover:bg-white">
-                    <td className="p-4 font-medium">{prov.name}</td>
-                    <td className="p-4 text-sm">{prov.provider_type}</td>
-                    <td className="p-4 text-sm font-mono text-[#6e6e73]">{prov.endpoint}</td>
+                  <tr key={prov.id} className="hover:bg-black/[0.02]">
+                    <td className="p-4 font-medium text-[var(--zf-ink)]">{prov.name}</td>
+                    <td className="p-4 text-sm text-[var(--zf-ink)]">{prov.provider_type}</td>
+                    <td className="p-4 text-sm font-mono text-[var(--zf-muted)]">{prov.endpoint}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(prov.status)}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(prov.status)}`}>
                         {prov.status}
                       </span>
                     </td>
                     <td className="p-4">
-                      <button onClick={() => handleRemoveProvider(prov.id)} className="text-red-600 hover:text-red-800">
+                      <button onClick={() => handleRemoveProvider(prov.id)} className="text-[var(--zf-danger)] hover:opacity-70">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
@@ -201,14 +201,14 @@ export default function Encryption() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreatePolicy(true)}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+              className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Create Policy
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="zf-panel">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Provider</th>
                   <th className="p-4">Algorithm</th>
@@ -216,19 +216,19 @@ export default function Encryption() {
                   <th className="p-4">Auto Rotate</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {policies.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-[#6e6e73]">No encryption policies.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-[var(--zf-muted)]">No encryption policies.</td></tr>
                 ) : policies.map(pol => (
-                  <tr key={pol.id} className="hover:bg-white">
+                  <tr key={pol.id} className="hover:bg-black/[0.02]">
                     <td className="p-4">
-                      <div className="font-medium">{pol.name}</div>
-                      {pol.description && <div className="text-xs text-[#6e6e73]">{pol.description}</div>}
+                      <div className="font-medium text-[var(--zf-ink)]">{pol.name}</div>
+                      {pol.description && <div className="text-xs text-[var(--zf-muted)]">{pol.description}</div>}
                     </td>
-                    <td className="p-4 text-sm text-[#6e6e73]">{providers.find(p => p.id === pol.key_provider_id)?.name || pol.key_provider_id}</td>
-                    <td className="p-4 text-sm font-mono">{pol.algorithm}</td>
-                    <td className="p-4 text-sm">{pol.encrypt_vmotion ? 'Yes' : 'No'}</td>
-                    <td className="p-4 text-sm">{pol.auto_rotate_days ? `Every ${pol.auto_rotate_days} days` : 'No'}</td>
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">{providers.find(p => p.id === pol.key_provider_id)?.name || pol.key_provider_id}</td>
+                    <td className="p-4 text-sm font-mono text-[var(--zf-ink)]">{pol.algorithm}</td>
+                    <td className="p-4 text-sm text-[var(--zf-ink)]">{pol.encrypt_vmotion ? 'Yes' : 'No'}</td>
+                    <td className="p-4 text-sm text-[var(--zf-ink)]">{pol.auto_rotate_days ? `Every ${pol.auto_rotate_days} days` : 'No'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -243,14 +243,14 @@ export default function Encryption() {
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowEncryptVM(true)} disabled={policies.length === 0}
               title={policies.length === 0 ? 'Create an encryption policy first' : undefined}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="zf-btn zf-btn-primary">
               <Lock className="w-4 h-4" /> Encrypt VM
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="zf-panel">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">VM</th>
                   <th className="p-4">Encrypted</th>
                   <th className="p-4">Policy</th>
@@ -259,31 +259,31 @@ export default function Encryption() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {encryptedVMs.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No encrypted VMs.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-[var(--zf-muted)]">No encrypted VMs.</td></tr>
                 ) : encryptedVMs.map(vm => (
-                  <tr key={vm.vm_name} className="hover:bg-white">
-                    <td className="p-4 font-medium">{vm.vm_name}</td>
+                  <tr key={vm.vm_name} className="hover:bg-black/[0.02]">
+                    <td className="p-4 font-medium text-[var(--zf-ink)]">{vm.vm_name}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${vm.encrypted ? 'bg-green-100 text-green-800' : 'bg-black/[0.06] text-[#6e6e73]'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${vm.encrypted ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'}`}>
                         {vm.encrypted ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td className="p-4 text-sm text-[#6e6e73]">{policies.find(p => p.id === vm.policy_id)?.name || vm.policy_id || '-'}</td>
-                    <td className="p-4 text-sm font-mono">{vm.algorithm || '-'}</td>
-                    <td className="p-4 text-sm text-[#6e6e73]">
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">{policies.find(p => p.id === vm.policy_id)?.name || vm.policy_id || '-'}</td>
+                    <td className="p-4 text-sm font-mono text-[var(--zf-ink)]">{vm.algorithm || '-'}</td>
+                    <td className="p-4 text-sm text-[var(--zf-muted)]">
                       {vm.last_key_rotation ? new Date(vm.last_key_rotation).toLocaleDateString() : 'Never'}
                     </td>
                     <td className="p-4">
                       {vm.encrypted && (
                         <div className="flex items-center gap-3">
                           <button onClick={() => handleRotateKey(vm.vm_name)}
-                            className="flex items-center gap-1 text-[#0066cc] hover:text-blue-300 text-sm">
+                            className="flex items-center gap-1 text-[var(--zf-link)] hover:text-[var(--zf-link-hover)] text-sm">
                             <RefreshCw className="w-3.5 h-3.5" /> Rotate Key
                           </button>
                           <button onClick={() => handleDecrypt(vm.vm_name)}
-                            className="flex items-center gap-1 text-red-600 hover:text-red-300 text-sm">
+                            className="flex items-center gap-1 text-[var(--zf-danger)] hover:opacity-70 text-sm">
                             <Unlock className="w-3.5 h-3.5" /> Decrypt
                           </button>
                         </div>
@@ -348,37 +348,35 @@ function CreateProviderModal({ onClose, onCreated }: { onClose: () => void; onCr
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Register Key Provider</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Type</label>
-            <select value={providerType} onChange={e => setProviderType(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
-              <option value="kmip">KMIP</option>
-              <option value="local">Local (software-based)</option>
-              <option value="vault_transit">HashiCorp Vault (Transit)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Endpoint</label>
-            <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2"
-              placeholder="https://kms.example.com:5696" required />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Register</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Register Key Provider</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Type</label>
+          <select value={providerType} onChange={e => setProviderType(e.target.value)}
+            className="input-field">
+            <option value="kmip">KMIP</option>
+            <option value="local">Local (software-based)</option>
+            <option value="vault_transit">HashiCorp Vault (Transit)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Endpoint</label>
+          <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)}
+            className="input-field"
+            placeholder="https://kms.example.com:5696" required />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+          <button type="submit" className="zf-btn zf-btn-primary flex-1">Register</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -405,58 +403,56 @@ function CreatePolicyModal({ providers, onClose, onCreated }: { providers: KeyPr
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Create Encryption Policy</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Create Encryption Policy</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Description</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+            className="input-field" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Key Provider</label>
+          <select value={keyProviderId} onChange={e => setKeyProviderId(e.target.value)}
+            className="input-field">
+            {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Algorithm</label>
+          <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}
+            className="input-field">
+            <option value="aes256_xts">AES-256-XTS</option>
+            <option value="aes256_cbc">AES-256-CBC</option>
+            <option value="cha_cha20_poly1305">ChaCha20-Poly1305</option>
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-[var(--zf-ink)]">
+          <input type="checkbox" checked={encryptVmotion} onChange={e => setEncryptVmotion(e.target.checked)} />
+          <span className="text-sm">Encrypt vMotion traffic</span>
+        </label>
+        <label className="flex items-center gap-2 text-[var(--zf-ink)]">
+          <input type="checkbox" checked={autoRotate} onChange={e => setAutoRotate(e.target.checked)} />
+          <span className="text-sm">Auto-rotate keys</span>
+        </label>
+        {autoRotate && (
           <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Rotation Interval (days)</label>
+            <input type="number" value={rotationDays} onChange={e => setRotationDays(Number(e.target.value))}
+              className="input-field" min={1} />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Key Provider</label>
-            <select value={keyProviderId} onChange={e => setKeyProviderId(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
-              {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Algorithm</label>
-            <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
-              <option value="aes256_xts">AES-256-XTS</option>
-              <option value="aes256_cbc">AES-256-CBC</option>
-              <option value="cha_cha20_poly1305">ChaCha20-Poly1305</option>
-            </select>
-          </div>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={encryptVmotion} onChange={e => setEncryptVmotion(e.target.checked)} />
-            <span className="text-sm">Encrypt vMotion traffic</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={autoRotate} onChange={e => setAutoRotate(e.target.checked)} />
-            <span className="text-sm">Auto-rotate keys</span>
-          </label>
-          {autoRotate && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Rotation Interval (days)</label>
-              <input type="number" value={rotationDays} onChange={e => setRotationDays(Number(e.target.value))}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" min={1} />
-            </div>
-          )}
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        )}
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+          <button type="submit" className="zf-btn zf-btn-primary flex-1">Create</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -478,38 +474,36 @@ function EncryptVMModal({ vms, policies, onClose, onEncrypted }: { vms: VM[]; po
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Encrypt Virtual Machine</h2>
-        {vms.length === 0 ? (
-          <>
-            <p className="text-sm text-[#6e6e73] mb-4">All VMs are already encrypted, or no VMs exist yet.</p>
-            <button onClick={onClose} className="w-full px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Close</button>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">VM</label>
-              <select value={vmName} onChange={e => setVmName(e.target.value)}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
-                {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Encryption Policy</label>
-              <select value={policyId} onChange={e => setPolicyId(e.target.value)}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
-                {policies.map(p => <option key={p.id} value={p.id}>{p.name} ({p.algorithm})</option>)}
-              </select>
-            </div>
-            <p className="text-xs text-[#6e6e73]">The VM's disk will be encrypted using the selected policy's key provider and algorithm.</p>
-            <div className="flex gap-3">
-              <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-              <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">{submitting ? 'Encrypting...' : 'Encrypt'}</button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Encrypt Virtual Machine</h2>
+      {vms.length === 0 ? (
+        <>
+          <p className="text-sm text-[var(--zf-muted)] mb-4">All VMs are already encrypted, or no VMs exist yet.</p>
+          <button onClick={onClose} className="zf-btn zf-btn-ghost w-full">Close</button>
+        </>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">VM</label>
+            <select value={vmName} onChange={e => setVmName(e.target.value)}
+              className="input-field">
+              {vms.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Encryption Policy</label>
+            <select value={policyId} onChange={e => setPolicyId(e.target.value)}
+              className="input-field">
+              {policies.map(p => <option key={p.id} value={p.id}>{p.name} ({p.algorithm})</option>)}
+            </select>
+          </div>
+          <p className="text-xs text-[var(--zf-muted)]">The VM's disk will be encrypted using the selected policy's key provider and algorithm.</p>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+            <button type="submit" disabled={submitting} className="zf-btn zf-btn-primary flex-1">{submitting ? 'Encrypting...' : 'Encrypt'}</button>
+          </div>
+        </form>
+      )}
+    </Modal>
   )
 }

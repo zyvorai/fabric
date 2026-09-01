@@ -3,7 +3,7 @@
 // https://zyvor.dev · info@zyvor.dev
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, RefreshCw, ShieldCheck, CheckCircle, XCircle, ArrowRightLeft } from 'lucide-react'
+import { Plus, Trash2, ShieldCheck, CheckCircle, XCircle, ArrowRightLeft } from 'lucide-react'
 import {
   listDistributedPools,
   createDistributedPool,
@@ -28,6 +28,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { PageHeader } from '../components/ui'
 
 export default function DistributedStorage() {
   const toast = useToastContext()
@@ -97,59 +98,58 @@ export default function DistributedStorage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      online: 'bg-green-100 text-green-800',
-      healthy: 'bg-green-100 text-green-800',
-      degraded: 'bg-yellow-100 text-yellow-800',
-      offline: 'bg-red-100 text-red-800',
-      compliant: 'bg-green-100 text-green-800',
-      non_compliant: 'bg-red-100 text-red-800',
-      completed: 'bg-green-100 text-green-800',
-      in_progress: 'bg-blue-100 text-blue-800',
-      pending: 'bg-black/[0.06] text-[#6e6e73]',
-      failed: 'bg-red-100 text-red-800',
+      online: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      healthy: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      degraded: 'text-amber-800 bg-amber-50 border-amber-200',
+      offline: 'text-red-700 bg-red-50 border-red-200',
+      compliant: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      non_compliant: 'text-red-700 bg-red-50 border-red-200',
+      completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      in_progress: 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+      pending: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+      failed: 'text-red-700 bg-red-50 border-red-200',
     }
-    return colors[status] || 'bg-black/[0.06] text-[#6e6e73]'
+    return colors[status] || 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 
 
   return (
     <div className="p-6">
-      <PageLoadBanner title="Could not load distributed storage" headline={loadError} onRetry={() => void loadData()} />
+      <PageHeader
+        title="Distributed Storage"
+        onRefresh={() => void loadData()}
+        refreshing={loading}
+      />
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Distributed Storage</h1>
-        <button onClick={() => void loadData()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </button>
-      </div>
+      <PageLoadBanner title="Could not load distributed storage" headline={loadError} onRetry={() => void loadData()} />
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Storage Pools</div>
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Storage Pools</div>
           <div className="text-2xl font-bold">{pools.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Total Capacity</div>
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Total Capacity</div>
           <div className="text-2xl font-bold">{formatGB(pools.reduce((s, p) => s + p.total_capacity_gb, 0))}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Policies</div>
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Policies</div>
           <div className="text-2xl font-bold">{policies.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Active Migrations</div>
-          <div className="text-2xl font-bold text-[#0066cc]">
+        <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Active Migrations</div>
+          <div className="text-2xl font-bold text-[var(--zf-link)]">
             {migrations.filter(m => m.status === 'in_progress').length}
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-[#f5f5f7] rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-[var(--zf-canvas)] rounded-lg p-1">
         {(['pools', 'policies', 'migrations', 'clusters'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[#0066cc]' : 'hover:bg-white/[0.03]'}`}>
+            className={`flex-1 px-4 py-2 rounded text-sm font-medium capitalize ${activeTab === tab ? 'bg-[var(--zf-ink)] text-white' : 'text-[var(--zf-muted)] hover:bg-black/[0.04]'}`}>
             {tab === 'clusters' ? 'Datastore Clusters' : tab}
           </button>
         ))}
@@ -160,41 +160,41 @@ export default function DistributedStorage() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreatePool(true)}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+              className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Create Pool
             </button>
           </div>
           <div className="space-y-4">
             {pools.length === 0 ? (
-              <div className="text-center py-12 text-[#6e6e73] bg-[#f5f5f7] rounded-lg">No storage pools configured.</div>
+              <div className="text-center py-12 text-[var(--zf-muted)] bg-[var(--zf-canvas)] rounded-lg">No storage pools configured.</div>
             ) : pools.map(pool => {
               const usedPct = pool.total_capacity_gb > 0 ? (pool.used_capacity_gb / pool.total_capacity_gb * 100) : 0
               return (
-                <div key={pool.id} className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+                <div key={pool.id} className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold text-lg">{pool.name}</span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(pool.status)}`}>
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(pool.status)}`}>
                         {pool.status}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-[#6e6e73]">{pool.hosts.length} hosts | RF: {pool.replication_factor}</span>
+                      <span className="text-sm text-[var(--zf-muted)]">{pool.hosts.length} hosts | RF: {pool.replication_factor}</span>
                       <button onClick={() => handleDeletePool(pool.id)} className="text-red-600 hover:text-red-800 p-1">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                   <div className="mb-2">
-                    <div className="flex justify-between text-sm text-[#6e6e73] mb-1">
+                    <div className="flex justify-between text-sm text-[var(--zf-muted)] mb-1">
                       <span>Used: {formatGB(pool.used_capacity_gb)}</span>
                       <span>Total: {formatGB(pool.total_capacity_gb)}</span>
                     </div>
                     <div className="w-full bg-white rounded-full h-3">
-                      <div className={`h-3 rounded-full ${usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-blue-500'}`}
+                      <div className={`h-3 rounded-full ${usedPct > 90 ? 'bg-[var(--zf-danger)]' : usedPct > 75 ? 'bg-[var(--zf-warning)]' : 'bg-[var(--zf-link)]'}`}
                         style={{ width: `${Math.min(usedPct, 100)}%` }} />
                     </div>
-                    <div className="text-right text-xs text-[#6e6e73] mt-1">
+                    <div className="text-right text-xs text-[var(--zf-muted)] mt-1">
                       {formatGB(pool.free_capacity_gb)} free ({(100 - usedPct).toFixed(1)}%)
                     </div>
                   </div>
@@ -210,14 +210,14 @@ export default function DistributedStorage() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreatePolicy(true)}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+              className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Create Policy
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Tier</th>
                   <th className="p-4">RF</th>
@@ -227,19 +227,19 @@ export default function DistributedStorage() {
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {policies.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-[#6e6e73]">No storage policies.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-[var(--zf-muted)]">No storage policies.</td></tr>
                 ) : policies.map(pol => (
                   <tr key={pol.id} className="hover:bg-white">
                     <td className="p-4">
                       <div className="font-medium">{pol.name}</div>
-                      {pol.description && <div className="text-xs text-[#6e6e73]">{pol.description}</div>}
+                      {pol.description && <div className="text-xs text-[var(--zf-muted)]">{pol.description}</div>}
                     </td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        pol.tier === 'gold' ? 'bg-amber-100 text-amber-800' :
-                        pol.tier === 'bronze' ? 'bg-black/[0.06] text-[#6e6e73]' : 'bg-blue-100 text-blue-800'
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                        pol.tier === 'gold' ? 'text-amber-800 bg-amber-50 border-amber-200' :
+                        pol.tier === 'bronze' ? 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]' : 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
                       }`}>{pol.tier}</span>
                     </td>
                     <td className="p-4 text-sm">{pol.replication_factor}</td>
@@ -248,7 +248,7 @@ export default function DistributedStorage() {
                     <td className="p-4 text-sm">{pol.iops_limit ?? '—'}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setComplianceModalPolicy(pol)} className="text-[#0066cc] hover:text-blue-300" title="Check compliance">
+                        <button onClick={() => setComplianceModalPolicy(pol)} className="text-[var(--zf-link)] hover:text-[var(--zf-link-hover)]" title="Check compliance">
                           <ShieldCheck className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleDeletePolicy(pol.id)} className="text-red-600 hover:text-red-800">
@@ -270,14 +270,14 @@ export default function DistributedStorage() {
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowStartMigration(true)} disabled={pools.length < 2 || vms.length === 0}
               title={pools.length < 2 ? 'Need at least 2 storage pools' : vms.length === 0 ? 'No VMs to migrate' : undefined}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="zf-btn zf-btn-primary">
               <ArrowRightLeft className="w-4 h-4" /> Start Migration
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-          <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
+          <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
             <thead>
-              <tr className="text-left text-xs text-[#6e6e73] uppercase">
+              <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                 <th className="p-4">VM</th>
                 <th className="p-4">From</th>
                 <th className="p-4">To</th>
@@ -286,25 +286,25 @@ export default function DistributedStorage() {
                 <th className="p-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#d2d2d7]">
+            <tbody className="divide-y divide-[var(--zf-hairline)]">
               {migrations.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No storage migrations.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-[var(--zf-muted)]">No storage migrations.</td></tr>
               ) : migrations.map(mig => (
                 <tr key={mig.id} className="hover:bg-white">
                   <td className="p-4 font-medium">{mig.vm_name}</td>
-                  <td className="p-4 text-sm text-[#6e6e73]">{mig.source_pool_name}</td>
-                  <td className="p-4 text-sm text-[#6e6e73]">{mig.target_pool_name}</td>
+                  <td className="p-4 text-sm text-[var(--zf-muted)]">{mig.source_pool_name}</td>
+                  <td className="p-4 text-sm text-[var(--zf-muted)]">{mig.target_pool_name}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <div className="w-24 bg-white rounded-full h-2">
-                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${mig.progress_pct}%` }} />
+                        <div className="h-2 rounded-full bg-[var(--zf-link)]" style={{ width: `${mig.progress_pct}%` }} />
                       </div>
-                      <span className="text-xs text-[#6e6e73]">{mig.progress_pct}%</span>
+                      <span className="text-xs text-[var(--zf-muted)]">{mig.progress_pct}%</span>
                     </div>
                   </td>
                   <td className="p-4 text-sm">{formatBytes(mig.bytes_migrated)} / {formatBytes(mig.bytes_total)}</td>
                   <td className="p-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(mig.status)}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(mig.status)}`}>
                       {mig.status}
                     </span>
                   </td>
@@ -321,14 +321,14 @@ export default function DistributedStorage() {
         <div>
           <div className="flex justify-end mb-4">
             <button onClick={() => setShowCreateCluster(true)}
-              className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2">
+              className="zf-btn zf-btn-primary">
               <Plus className="w-4 h-4" /> Create Cluster
             </button>
           </div>
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
-            <table className="min-w-full divide-y divide-[#d2d2d7]">
+          <div className="bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg">
+            <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
               <thead>
-                <tr className="text-left text-xs text-[#6e6e73] uppercase">
+                <tr className="text-left text-xs text-[var(--zf-muted)] uppercase">
                   <th className="p-4">Name</th>
                   <th className="p-4">Datastores</th>
                   <th className="p-4">SDRS</th>
@@ -337,9 +337,9 @@ export default function DistributedStorage() {
                   <th className="p-4">Automation</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d2d2d7]">
+              <tbody className="divide-y divide-[var(--zf-hairline)]">
                 {dsClusters.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-[#6e6e73]">No datastore clusters.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-[var(--zf-muted)]">No datastore clusters.</td></tr>
                 ) : dsClusters.map(cl => (
                   <tr key={cl.id} className="hover:bg-white">
                     <td className="p-4 font-medium">{cl.name}</td>
@@ -543,8 +543,8 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">{title}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           {fields.map(f => (
@@ -552,7 +552,7 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
               <label className="block text-sm font-medium mb-1">{f.label}</label>
               {f.type === 'select' ? (
                 <select value={values[f.name]} onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
+                  className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2">
                   {f.options?.map(o => <option key={o} value={o}>{f.optionLabels?.[o] ?? o}</option>)}
                 </select>
               ) : f.type === 'multiselect' ? (
@@ -567,25 +567,25 @@ function ModalForm({ title, fields, onClose, onSubmit }: {
                             ...v,
                             [f.name]: isSel ? selected.filter(x => x !== o) : [...selected, o],
                           }))}
-                          className={`px-2.5 py-1 rounded text-xs transition ${isSel ? 'bg-[#0066cc] text-white' : 'bg-white text-[#6e6e73] border border-[#d2d2d7]'}`}>
+                          className={`px-2.5 py-1 rounded text-xs transition ${isSel ? 'bg-[var(--zf-link)] text-white' : 'bg-white text-[var(--zf-muted)] border border-[var(--zf-hairline)]'}`}>
                           {f.optionLabels?.[o] ?? o}
                         </button>
                       )
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-[#6e6e73]">Nothing available to select yet.</p>
+                  <p className="text-xs text-[var(--zf-muted)]">Nothing available to select yet.</p>
                 )
               ) : (
                 <input type={f.type} value={values[f.name]}
                   onChange={e => setValues(v => ({ ...v, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value }))}
-                  className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required={f.required} />
+                  className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" required={f.required} />
               )}
             </div>
           ))}
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Cancel</button>
+            <button type="submit" className="zf-btn zf-btn-primary flex-1">Create</button>
           </div>
         </form>
       </div>
@@ -619,35 +619,35 @@ function ComplianceCheckModal({ policy, pools, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-md">
         <h2 className="text-xl font-bold mb-1">Check Compliance</h2>
-        <p className="text-sm text-[#6e6e73] mb-4">Against policy "{policy.name}"</p>
+        <p className="text-sm text-[var(--zf-muted)] mb-4">Against policy "{policy.name}"</p>
         <form onSubmit={handleCheck} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">VM Name</label>
             <input value={vmName} onChange={e => setVmName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" placeholder="my-vm" />
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2" placeholder="my-vm" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Storage Pool</label>
             <select value={poolId} onChange={e => setPoolId(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2">
+              className="w-full bg-white border border-[var(--zf-hairline)] rounded px-3 py-2">
               {pools.length === 0 && <option value="">No pools available</option>}
               {pools.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
 
           {report && (
-            <div className={`rounded-lg border p-3 ${report.compliant ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-              <div className={`flex items-center gap-2 text-sm font-medium ${report.compliant ? 'text-emerald-600' : 'text-red-600'}`}>
+            <div className={`rounded-lg border p-3 ${report.compliant ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+              <div className={`flex items-center gap-2 text-sm font-medium ${report.compliant ? 'text-emerald-700' : 'text-red-700'}`}>
                 {report.compliant ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                 {report.compliant ? 'Compliant' : `${report.violations.length} violation(s)`}
               </div>
               {!report.compliant && (
-                <ul className="mt-2 space-y-1 text-xs text-[#1d1d1f] list-disc list-inside">
+                <ul className="mt-2 space-y-1 text-xs text-[var(--zf-ink)] list-disc list-inside">
                   {report.violations.map((v, i) => (
-                    <li key={i} className="text-amber-400">{v}</li>
+                    <li key={i} className="text-amber-800">{v}</li>
                   ))}
                 </ul>
               )}
@@ -655,8 +655,8 @@ function ComplianceCheckModal({ policy, pools, onClose }: {
           )}
 
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Close</button>
-            <button type="submit" disabled={checking || pools.length === 0} className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded disabled:opacity-50">
+            <button type="button" onClick={onClose} className="zf-btn zf-btn-ghost flex-1">Close</button>
+            <button type="submit" disabled={checking || pools.length === 0} className="zf-btn zf-btn-primary flex-1">
               {checking ? 'Checking…' : 'Check'}
             </button>
           </div>

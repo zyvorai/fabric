@@ -559,6 +559,18 @@ textarea.input-field {
 [class*="bg-green-5"].text-white,
 [class*="bg-emerald-5"].text-white,
 [class*="bg-emerald-6"].text-white,
+[class*="bg-amber-5"].text-white,
+[class*="bg-amber-6"].text-white,
+/* CSS-variable form of the same solid-fill backgrounds (e.g. `bg-[var(--zf-ink)]
+   text-white`) — the literal-hex/Tailwind-color selectors above don't match this
+   syntax, so without these the text silently becomes invisible-on-dark via the
+   blanket `.text-white { color: var(--zf-ink) !important }` rule above. Found
+   live: an empty-looking active tab pill on the Certificates page. */
+[class*="bg-[var(--zf-ink)]"].text-white,
+[class*="bg-[var(--zf-link)]"].text-white,
+[class*="bg-[var(--zf-danger)]"].text-white,
+[class*="bg-[var(--zf-success)]"].text-white,
+[class*="bg-[var(--zf-warning)]"].text-white,
 .bg-\[\#0066cc\],
 .bg-\[\#1d1d1f\],
 .bg-black {

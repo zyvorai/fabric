@@ -94,18 +94,18 @@ export default function Analytics() {
 
   const getSeverityColor = (severity: string): string => {
     switch (severity) {
-      case 'critical': return 'bg-red-600'
-      case 'warning': return 'bg-yellow-600'
-      case 'info': return 'bg-[#0066cc]'
-      default: return 'bg-[#e8e8ed]'
+      case 'critical': return 'text-red-700 bg-red-50 border border-red-200'
+      case 'warning': return 'text-amber-800 bg-amber-50 border border-amber-200'
+      case 'info': return 'text-[var(--zf-link)] bg-blue-50 border border-blue-100'
+      default: return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]'
     }
   }
 
   const getUtilizationColor = (value: number): string => {
     if (value >= 90) return 'bg-red-500'
-    if (value >= 75) return 'bg-yellow-500'
-    if (value >= 50) return 'bg-blue-500'
-    return 'bg-green-500'
+    if (value >= 75) return 'bg-amber-500'
+    if (value >= 50) return 'bg-[var(--zf-link)]'
+    return 'bg-emerald-500'
   }
 
   if (loading) {
@@ -124,7 +124,7 @@ export default function Analytics() {
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-              className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-2 text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+              className="zf-panel-muted px-4 py-2 text-[var(--zf-ink)] focus:outline-none focus:border-[var(--zf-link)]"
             >
               <option value="1h">Last Hour</option>
               <option value="6h">Last 6 Hours</option>
@@ -136,14 +136,14 @@ export default function Analytics() {
               <button
                 onClick={() => document.getElementById('export-analytics')?.classList.toggle('hidden')}
                 disabled={exporting}
-                className="flex items-center gap-2 px-4 py-2 bg-[#f5f5f7] border border-[#d2d2d7] hover:bg-white/[0.03] rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 zf-panel-muted hover:bg-white/[0.03] transition disabled:opacity-50"
               >
                 <Download className="w-4 h-4" />
                 Export
               </button>
               <div
                 id="export-analytics"
-                className="hidden absolute right-0 mt-2 w-48 bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg shadow-xl z-10"
+                className="hidden absolute right-0 mt-2 w-48 zf-panel-muted z-10"
               >
                 <button
                   onClick={() => { handleExport('pdf'); document.getElementById('export-analytics')?.classList.add('hidden') }}
@@ -175,10 +175,10 @@ export default function Analytics() {
       {/* Resource Utilization Overview */}
       {utilization && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+          <div className="zf-panel-muted p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#6e6e73]">CPU Utilization</span>
-              <Activity className="w-5 h-5 text-blue-500" />
+              <span className="text-sm text-[var(--zf-muted)]">CPU Utilization</span>
+              <Activity className="w-5 h-5 text-[var(--zf-muted)]" />
             </div>
             <div className="mb-2">
               <p className="text-2xl font-bold">{utilization.cpu_utilization.toFixed(1)}%</p>
@@ -191,10 +191,10 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+          <div className="zf-panel-muted p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#6e6e73]">Memory Utilization</span>
-              <Activity className="w-5 h-5 text-purple-500" />
+              <span className="text-sm text-[var(--zf-muted)]">Memory Utilization</span>
+              <Activity className="w-5 h-5 text-[var(--zf-muted)]" />
             </div>
             <div className="mb-2">
               <p className="text-2xl font-bold">{utilization.memory_utilization.toFixed(1)}%</p>
@@ -207,10 +207,10 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+          <div className="zf-panel-muted p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#6e6e73]">Disk Utilization</span>
-              <Activity className="w-5 h-5 text-green-500" />
+              <span className="text-sm text-[var(--zf-muted)]">Disk Utilization</span>
+              <Activity className="w-5 h-5 text-[var(--zf-muted)]" />
             </div>
             <div className="mb-2">
               <p className="text-2xl font-bold">{utilization.disk_utilization.toFixed(1)}%</p>
@@ -223,10 +223,10 @@ export default function Analytics() {
             </div>
           </div>
 
-          <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+          <div className="zf-panel-muted p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#6e6e73]">Network Utilization</span>
-              <Activity className="w-5 h-5 text-cyan-500" />
+              <span className="text-sm text-[var(--zf-muted)]">Network Utilization</span>
+              <Activity className="w-5 h-5 text-[var(--zf-muted)]" />
             </div>
             <div className="mb-2">
               <p className="text-2xl font-bold">{utilization.network_utilization.toFixed(1)}%</p>
@@ -245,14 +245,14 @@ export default function Analytics() {
       {insights.length > 0 && (
         <div className="mb-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+            <AlertTriangle className="w-5 h-5 text-[var(--zf-warning)]" />
             Performance Insights
           </h2>
           <div className="space-y-3">
             {insights.slice(0, 5).map((insight, idx) => (
               <div
                 key={idx}
-                className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4"
+                className="zf-panel-muted p-4"
               >
                 <div className="flex items-start gap-3">
                   <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(insight.severity)}`}>
@@ -262,7 +262,7 @@ export default function Analytics() {
                     <p className="font-medium mb-1">
                       {insight.vm_name}: {insight.resource} at {insight.value.toFixed(1)}%
                     </p>
-                    <p className="text-sm text-[#6e6e73]">{insight.recommendation}</p>
+                    <p className="text-sm text-[var(--zf-muted)]">{insight.recommendation}</p>
                   </div>
                 </div>
               </div>
@@ -273,9 +273,9 @@ export default function Analytics() {
 
       {/* Top VMs by Resource */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+        <div className="zf-panel-muted p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-500" />
+            <TrendingUp className="w-5 h-5 text-[var(--zf-muted)]" />
             Top VMs by CPU
           </h3>
           <div className="space-y-3">
@@ -285,11 +285,11 @@ export default function Analytics() {
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-2 bg-white rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-500"
+                      className="h-full bg-[var(--zf-ink)]"
                       style={{ width: `${vm.value}%` }}
                     />
                   </div>
-                  <span className="text-sm text-[#6e6e73] w-12 text-right">
+                  <span className="text-sm text-[var(--zf-muted)] w-12 text-right">
                     {vm.value.toFixed(1)}%
                   </span>
                 </div>
@@ -298,9 +298,9 @@ export default function Analytics() {
           </div>
         </div>
 
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+        <div className="zf-panel-muted p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-500" />
+            <TrendingUp className="w-5 h-5 text-[var(--zf-muted)]" />
             Top VMs by Memory
           </h3>
           <div className="space-y-3">
@@ -310,11 +310,11 @@ export default function Analytics() {
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-2 bg-white rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-purple-500"
+                      className="h-full bg-[var(--zf-ink)]"
                       style={{ width: `${vm.value}%` }}
                     />
                   </div>
-                  <span className="text-sm text-[#6e6e73] w-12 text-right">
+                  <span className="text-sm text-[var(--zf-muted)] w-12 text-right">
                     {vm.value.toFixed(1)}%
                   </span>
                 </div>
@@ -323,9 +323,9 @@ export default function Analytics() {
           </div>
         </div>
 
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-4">
+        <div className="zf-panel-muted p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-cyan-500" />
+            <TrendingUp className="w-5 h-5 text-[var(--zf-muted)]" />
             Top VMs by Network
           </h3>
           <div className="space-y-3">
@@ -335,11 +335,11 @@ export default function Analytics() {
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-2 bg-white rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-cyan-500"
+                      className="h-full bg-[var(--zf-ink)]"
                       style={{ width: `${Math.min(vm.value, 100)}%` }}
                     />
                   </div>
-                  <span className="text-sm text-[#6e6e73] w-12 text-right">
+                  <span className="text-sm text-[var(--zf-muted)] w-12 text-right">
                     {vm.value.toFixed(0)} Mbps
                   </span>
                 </div>
@@ -350,81 +350,82 @@ export default function Analytics() {
       </div>
 
       {/* System Performance Chart Placeholder */}
-      <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg p-6">
+      <div className="zf-panel-muted p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <Clock className="w-5 h-5 text-blue-500" />
+            <Clock className="w-5 h-5 text-[var(--zf-muted)]" />
             System Performance Over Time
           </h2>
-          <p className="text-sm text-[#6e6e73]">{timeRange.toUpperCase()}</p>
+          <p className="text-sm text-[var(--zf-muted)]">{timeRange.toUpperCase()}</p>
         </div>
         {systemPerf.length > 0 ? (
           <ResponsiveContainer width="100%" height={256}>
             <AreaChart data={systemPerf}>
               <defs>
                 <linearGradient id="colorSysCpu" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="var(--zf-link)" stopOpacity={0.35}/>
+                  <stop offset="95%" stopColor="var(--zf-link)" stopOpacity={0}/>
                 </linearGradient>
                 <linearGradient id="colorSysMem" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="var(--zf-ink)" stopOpacity={0.25}/>
+                  <stop offset="95%" stopColor="var(--zf-ink)" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--zf-hairline)" />
               <XAxis
                 dataKey="timestamp"
-                stroke="#9ca3af"
+                stroke="var(--zf-muted)"
                 fontSize={12}
                 tickFormatter={(v) => new Date(v).toLocaleTimeString()}
               />
-              <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 100]} />
+              <YAxis stroke="var(--zf-muted)" fontSize={12} domain={[0, 100]} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
+                  backgroundColor: 'var(--zf-surface)',
+                  border: '1px solid var(--zf-hairline)',
                   borderRadius: '0.5rem',
+                  color: 'var(--zf-ink)',
                 }}
                 labelFormatter={(v) => new Date(v).toLocaleString()}
               />
-              <Area type="monotone" dataKey="total_cpu_usage" name="CPU %" stroke="#3b82f6" fillOpacity={1} fill="url(#colorSysCpu)" />
-              <Area type="monotone" dataKey="total_memory_usage" name="Memory %" stroke="#a855f7" fillOpacity={1} fill="url(#colorSysMem)" />
+              <Area type="monotone" dataKey="total_cpu_usage" name="CPU %" stroke="var(--zf-link)" fillOpacity={1} fill="url(#colorSysCpu)" />
+              <Area type="monotone" dataKey="total_memory_usage" name="Memory %" stroke="var(--zf-ink)" fillOpacity={1} fill="url(#colorSysMem)" />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-64 flex items-center justify-center bg-[#f5f5f7] rounded border border-[#d2d2d7]">
+          <div className="h-64 flex items-center justify-center bg-[var(--zf-canvas)] rounded border border-[var(--zf-hairline)]">
             <div className="text-center">
-              <Activity className="w-12 h-12 text-[#6e6e73] mx-auto mb-2" />
-              <p className="text-[#6e6e73]">No performance data available</p>
+              <Activity className="w-12 h-12 text-[var(--zf-muted)] mx-auto mb-2" />
+              <p className="text-[var(--zf-muted)]">No performance data available</p>
             </div>
           </div>
         )}
         <div className="grid grid-cols-4 gap-4 mt-4 text-center text-sm">
           <div>
-            <p className="text-[#6e6e73]">Avg CPU</p>
-            <p className="font-bold text-[#0066cc]">
+            <p className="text-[var(--zf-muted)]">Avg CPU</p>
+            <p className="font-bold text-[var(--zf-link)]">
               {systemPerf.length > 0
                 ? (systemPerf.reduce((sum, p) => sum + p.total_cpu_usage, 0) / systemPerf.length).toFixed(1)
                 : 0}%
             </p>
           </div>
           <div>
-            <p className="text-[#6e6e73]">Avg Memory</p>
-            <p className="font-bold text-purple-400">
+            <p className="text-[var(--zf-muted)]">Avg Memory</p>
+            <p className="font-bold text-[var(--zf-ink)]">
               {systemPerf.length > 0
                 ? (systemPerf.reduce((sum, p) => sum + p.total_memory_usage, 0) / systemPerf.length).toFixed(1)
                 : 0}%
             </p>
           </div>
           <div>
-            <p className="text-[#6e6e73]">Total VMs</p>
-            <p className="font-bold text-emerald-600">
+            <p className="text-[var(--zf-muted)]">Total VMs</p>
+            <p className="font-bold text-[var(--zf-ink)]">
               {systemPerf.length > 0 ? systemPerf[systemPerf.length - 1].total_vms : 0}
             </p>
           </div>
           <div>
-            <p className="text-[#6e6e73]">Running VMs</p>
-            <p className="font-bold text-cyan-400">
+            <p className="text-[var(--zf-muted)]">Running VMs</p>
+            <p className="font-bold text-[var(--zf-ink)]">
               {systemPerf.length > 0 ? systemPerf[systemPerf.length - 1].running_vms : 0}
             </p>
           </div>

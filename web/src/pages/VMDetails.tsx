@@ -128,9 +128,9 @@ export default function VMDetails() {
           />
         )}
         <div className="text-center py-16">
-          <div className="text-[#6e6e73] text-6xl font-bold mb-3">?</div>
-          <p className="text-[#6e6e73] mb-4">{loadError ? 'VM unavailable' : 'VM not found'}</p>
-          <Link to="/app/vms" className="text-sm text-[#0066cc] hover:text-blue-300">
+          <div className="text-[var(--zf-muted)] text-6xl font-bold mb-3">?</div>
+          <p className="text-[var(--zf-muted)] mb-4">{loadError ? 'VM unavailable' : 'VM not found'}</p>
+          <Link to="/app/vms" className="text-sm text-[var(--zf-link)] hover:text-[var(--zf-link-hover)]">
             Back to Virtual Machines
           </Link>
         </div>
@@ -160,7 +160,7 @@ export default function VMDetails() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <h1 className="text-2xl font-bold text-[#1d1d1f]">{vm.name}</h1>
+            <h1 className="text-2xl font-bold text-[var(--zf-ink)]">{vm.name}</h1>
             <StatusBadge status={vm.state} />
             <CopyButton text={vm.name} label="Copy name" successMessage="VM name copied" />
             <CopyButton
@@ -169,7 +169,7 @@ export default function VMDetails() {
               successMessage="API path copied"
             />
           </div>
-          <div className="flex items-center gap-3 text-sm text-[#6e6e73]">
+          <div className="flex items-center gap-3 text-sm text-[var(--zf-muted)]">
             <span className="flex items-center gap-1.5">
               <Cpu className="w-3.5 h-3.5" />
               {vm.cpus} vCPU{vm.cpus !== 1 ? 's' : ''}
@@ -201,13 +201,13 @@ export default function VMDetails() {
                   <ActionBtn onClick={handleRestart} color="blue" icon={RotateCw} label="Restart" />
                 </>
               )}
-              <div className="w-px h-6 bg-white mx-1" />
+              <div className="w-px h-6 bg-[var(--zf-hairline)] mx-1" />
               <ActionBtn onClick={() => setShowCloneDialog(true)} color="purple" icon={Copy} label="Clone" />
             </>
           )}
           <Link
             to={`/app/vms/${vm.name}/console`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-[#d2d2d7] text-[#1d1d1f] hover:text-[#1d1d1f] hover:border-[#d2d2d7] transition-colors"
+            className="zf-btn zf-btn-ghost zf-btn-sm"
           >
             <Terminal className="w-3.5 h-3.5" />
             Console
@@ -215,7 +215,7 @@ export default function VMDetails() {
           {canWrite && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="p-1.5 rounded-lg text-[#6e6e73] hover:text-red-600 hover:bg-red-400/10 transition-colors"
+              className="p-1.5 rounded-lg text-[var(--zf-muted)] hover:text-[var(--zf-danger)] hover:bg-red-50 transition-colors"
               title="Delete VM"
             >
               <Trash2 className="w-4 h-4" />
@@ -225,7 +225,7 @@ export default function VMDetails() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-[#d2d2d7]">
+      <div className="border-b border-[var(--zf-hairline)]">
         <div className="flex gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon
@@ -236,14 +236,14 @@ export default function VMDetails() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
                   isActive
-                    ? 'text-[#0066cc]'
-                    : 'text-[#6e6e73] hover:text-[#1d1d1f]'
+                    ? 'text-[var(--zf-link)]'
+                    : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
                 {isActive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--zf-link)] rounded-full" />
                 )}
               </button>
             )
@@ -295,11 +295,11 @@ function ActionBtn({ onClick, color, icon: Icon, label }: {
   label: string
 }) {
   const colors: Record<string, string> = {
-    green: 'bg-green-600/15 text-emerald-600 hover:bg-green-600/25',
-    red: 'bg-red-600/15 text-red-600 hover:bg-red-600/25',
-    yellow: 'bg-yellow-600/15 text-amber-600 hover:bg-yellow-600/25',
-    blue: 'bg-[#0066cc]/15 text-[#0066cc] hover:bg-[#0066cc]/25',
-    purple: 'bg-purple-600/15 text-purple-400 hover:bg-purple-600/25',
+    green: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+    red: 'bg-red-50 text-[var(--zf-danger)] hover:bg-red-100',
+    yellow: 'bg-amber-50 text-amber-800 hover:bg-amber-100',
+    blue: 'bg-[var(--zf-link)]/15 text-[var(--zf-link)] hover:bg-[var(--zf-link)]/25',
+    purple: 'bg-black/[0.04] text-[var(--zf-ink)] hover:bg-black/[0.06]',
   }
 
   return (
@@ -315,9 +315,9 @@ function ActionBtn({ onClick, color, icon: Icon, label }: {
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-[#d2d2d7]/50 last:border-b-0">
-      <dt className="text-sm text-[#6e6e73]">{label}</dt>
-      <dd className={`text-sm text-[#1d1d1f] ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
+    <div className="flex items-center justify-between py-2.5 border-b border-[var(--zf-hairline)]/50 last:border-b-0">
+      <dt className="text-sm text-[var(--zf-muted)]">{label}</dt>
+      <dd className={`text-sm text-[var(--zf-ink)] ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
     </div>
   )
 }
@@ -336,8 +336,8 @@ function OverviewTab({ vm, onRetryStart }: { vm: VM; onRetryStart: () => void })
           />
         </div>
       )}
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
-        <h3 className="text-sm font-medium text-[#6e6e73] mb-3">Configuration</h3>
+      <div className="zf-panel p-5">
+        <h3 className="text-sm font-medium text-[var(--zf-muted)] mb-3">Configuration</h3>
         <dl>
           <InfoRow label="Name" value={vm.name} />
           <InfoRow label="State" value={vm.state} />
@@ -347,19 +347,19 @@ function OverviewTab({ vm, onRetryStart }: { vm: VM; onRetryStart: () => void })
         </dl>
       </div>
 
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
-        <h3 className="text-sm font-medium text-[#6e6e73] mb-3">Resources</h3>
+      <div className="zf-panel p-5">
+        <h3 className="text-sm font-medium text-[var(--zf-muted)] mb-3">Resources</h3>
         <dl>
           <InfoRow label="vCPUs" value={`${vm.cpus}`} />
           <InfoRow label="Memory" value={vm.memory >= 1024 ? `${(vm.memory / 1024).toFixed(1)} GB` : `${vm.memory} MB`} />
         </dl>
 
         {vm.tags && vm.tags.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-[#d2d2d7]">
-            <span className="text-sm text-[#6e6e73] block mb-2">Tags</span>
+          <div className="mt-4 pt-3 border-t border-[var(--zf-hairline)]">
+            <span className="text-sm text-[var(--zf-muted)] block mb-2">Tags</span>
             <div className="flex flex-wrap gap-1.5">
               {vm.tags.map((tag) => (
-                <span key={tag} className="px-2 py-0.5 rounded text-xs font-medium bg-white text-[#6e6e73]">
+                <span key={tag} className="px-2 py-0.5 rounded text-xs font-medium bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] text-[var(--zf-muted)]">
                   {tag}
                 </span>
               ))}
@@ -405,18 +405,19 @@ function MetricsTab({ vm }: { vm: VM }) {
 
   if (vm.state !== 'running') {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <Activity className="w-10 h-10 text-[#6e6e73] mx-auto mb-3" />
-        <p className="text-[#6e6e73] text-sm">Metrics are only available for running VMs</p>
+      <div className="zf-panel p-8 text-center">
+        <Activity className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
+        <p className="text-[var(--zf-muted)] text-sm">Metrics are only available for running VMs</p>
       </div>
     )
   }
 
   const tooltipStyle = {
-    backgroundColor: '#111827',
-    border: '1px solid rgba(255,255,255,0.08)',
+    backgroundColor: 'var(--zf-surface)',
+    border: '1px solid var(--zf-hairline)',
     borderRadius: '0.5rem',
     fontSize: '12px',
+    color: 'var(--zf-ink)',
   }
 
   return (
@@ -431,37 +432,37 @@ function MetricsTab({ vm }: { vm: VM }) {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
-          <h3 className="text-sm font-medium text-[#6e6e73] mb-3">CPU Usage</h3>
+        <div className="zf-panel p-5">
+          <h3 className="text-sm font-medium text-[var(--zf-muted)] mb-3">CPU Usage</h3>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history}>
               <defs>
                 <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--zf-link)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="var(--zf-link)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="time" stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis domain={[0, 100]} stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+              <XAxis dataKey="time" stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 100]} stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'CPU']} />
-              <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={1.5} fill="url(#cpuGrad)" dot={false} />
+              <Area type="monotone" dataKey="cpu" stroke="var(--zf-link)" strokeWidth={1.5} fill="url(#cpuGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
-          <h3 className="text-sm font-medium text-[#6e6e73] mb-3">Memory Usage</h3>
+        <div className="zf-panel p-5">
+          <h3 className="text-sm font-medium text-[var(--zf-muted)] mb-3">Memory Usage</h3>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history}>
               <defs>
                 <linearGradient id="memGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--zf-success)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="var(--zf-success)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="time" stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis domain={[0, 100]} stroke="rgba(255,255,255,0.1)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+              <XAxis dataKey="time" stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 100]} stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'Memory']} />
-              <Area type="monotone" dataKey="memory" stroke="#10b981" strokeWidth={1.5} fill="url(#memGrad)" dot={false} />
+              <Area type="monotone" dataKey="memory" stroke="var(--zf-success)" strokeWidth={1.5} fill="url(#memGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -471,16 +472,16 @@ function MetricsTab({ vm }: { vm: VM }) {
 }
 
 function MetricStat({ label, value, color }: { label: string; value: string; color: string }) {
-  const bgMap: Record<string, string> = {
-    blue: 'bg-blue-500/10 text-[#0066cc]',
-    emerald: 'bg-emerald-500/10 text-emerald-600',
-    purple: 'bg-purple-500/10 text-purple-400',
-    orange: 'bg-orange-500/10 text-orange-400',
+  const textMap: Record<string, string> = {
+    blue: 'text-[var(--zf-link)]',
+    emerald: 'text-emerald-700',
+    purple: 'text-[var(--zf-ink)]',
+    orange: 'text-amber-800',
   }
   return (
-    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] px-4 py-3">
-      <div className="text-xs text-[#6e6e73] mb-1">{label}</div>
-      <div className={`text-xl font-bold tabular-nums ${bgMap[color]?.split(' ')[1] || 'text-[#1d1d1f]'}`}>{value}</div>
+    <div className="zf-panel px-4 py-3">
+      <div className="text-xs text-[var(--zf-muted)] mb-1">{label}</div>
+      <div className={`text-xl font-bold tabular-nums ${textMap[color] || 'text-[var(--zf-ink)]'}`}>{value}</div>
     </div>
   )
 }
@@ -508,18 +509,18 @@ function DisksTab({ vm }: { vm: VM }) {
 
   if (loading) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <Loader2 className="w-6 h-6 text-[#6e6e73] mx-auto mb-2 animate-spin" />
-        <p className="text-[#6e6e73] text-sm">Loading disk information...</p>
+      <div className="zf-panel p-8 text-center">
+        <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
+        <p className="text-[var(--zf-muted)] text-sm">Loading disk information...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <AlertCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
-        <p className="text-red-600 text-sm">{error}</p>
+      <div className="zf-panel p-8 text-center">
+        <AlertCircle className="w-6 h-6 text-[var(--zf-danger)] mx-auto mb-2" />
+        <p className="text-[var(--zf-danger)] text-sm">{error}</p>
       </div>
     )
   }
@@ -541,21 +542,21 @@ function DisksTab({ vm }: { vm: VM }) {
 
   if (disks.length === 0) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <HardDrive className="w-10 h-10 text-[#6e6e73] mx-auto mb-3" />
-        <p className="text-[#6e6e73] text-sm">No disk information available</p>
+      <div className="zf-panel p-8 text-center">
+        <HardDrive className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
+        <p className="text-[var(--zf-muted)] text-sm">No disk information available</p>
         {vm.image && (
-          <p className="text-[#6e6e73] text-xs mt-2 font-mono">{vm.image}</p>
+          <p className="text-[var(--zf-muted)] text-xs mt-2 font-mono">{vm.image}</p>
         )}
       </div>
     )
   }
 
   return (
-    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+    <div className="zf-panel overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-medium text-[#6e6e73] uppercase tracking-wider border-b border-[#d2d2d7]">
+          <tr className="text-left text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider border-b border-[var(--zf-hairline)]">
             <th className="py-3 px-5">Device</th>
             <th className="py-3 px-4">Path</th>
             <th className="py-3 px-4">Size</th>
@@ -565,16 +566,16 @@ function DisksTab({ vm }: { vm: VM }) {
         </thead>
         <tbody>
           {disks.map((disk) => (
-            <tr key={disk.name} className="border-t border-[#d2d2d7]/50 hover:bg-white/[0.02] transition-colors">
-              <td className="py-3 px-5 font-medium text-[#1d1d1f]">{disk.name}</td>
-              <td className="py-3 px-4 font-mono text-xs text-[#6e6e73] max-w-[300px] truncate">{disk.path}</td>
-              <td className="py-3 px-4 text-[#6e6e73]">{disk.size}</td>
+            <tr key={disk.name} className="border-t border-[var(--zf-hairline)]/50 hover:bg-black/[0.03] transition-colors">
+              <td className="py-3 px-5 font-medium text-[var(--zf-ink)]">{disk.name}</td>
+              <td className="py-3 px-4 font-mono text-xs text-[var(--zf-muted)] max-w-[300px] truncate">{disk.path}</td>
+              <td className="py-3 px-4 text-[var(--zf-muted)]">{disk.size}</td>
               <td className="py-3 px-4">
-                <span className="px-2 py-0.5 text-[11px] font-medium rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                <span className="px-2 py-0.5 text-[11px] font-medium rounded text-[var(--zf-muted)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]">
                   {disk.format.toUpperCase()}
                 </span>
               </td>
-              <td className="py-3 px-4 text-[#6e6e73]">{disk.bus}</td>
+              <td className="py-3 px-4 text-[var(--zf-muted)]">{disk.bus}</td>
             </tr>
           ))}
         </tbody>
@@ -606,9 +607,9 @@ function NetworkTab({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
 
   if (loading) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <Loader2 className="w-6 h-6 text-[#6e6e73] mx-auto mb-2 animate-spin" />
-        <p className="text-[#6e6e73] text-sm">Loading network information...</p>
+      <div className="zf-panel p-8 text-center">
+        <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
+        <p className="text-[var(--zf-muted)] text-sm">Loading network information...</p>
       </div>
     )
   }
@@ -620,9 +621,9 @@ function NetworkTab({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
     // Ephemera-side instance yet to query properties from.
     return (
       <div className="space-y-6">
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-          <AlertCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
-          <p className="text-red-600 text-sm">{error}</p>
+        <div className="zf-panel p-8 text-center">
+          <AlertCircle className="w-6 h-6 text-[var(--zf-danger)] mx-auto mb-2" />
+          <p className="text-[var(--zf-danger)] text-sm">{error}</p>
         </div>
         <PortForwardsSection vm={vm} onUpdated={onUpdated} />
       </div>
@@ -667,16 +668,16 @@ function NetworkTabContent({
   }
 
   const interfacesSection = interfaces.length === 0 ? (
-    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-      <Network className="w-10 h-10 text-[#6e6e73] mx-auto mb-3" />
-      <p className="text-[#6e6e73] text-sm">No network information available</p>
-      <p className="text-[#6e6e73] text-xs mt-2">VM is not running or has no network interfaces configured</p>
+    <div className="zf-panel p-8 text-center">
+      <Network className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
+      <p className="text-[var(--zf-muted)] text-sm">No network information available</p>
+      <p className="text-[var(--zf-muted)] text-xs mt-2">VM is not running or has no network interfaces configured</p>
     </div>
   ) : (
-    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+    <div className="zf-panel overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-medium text-[#6e6e73] uppercase tracking-wider border-b border-[#d2d2d7]">
+          <tr className="text-left text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider border-b border-[var(--zf-hairline)]">
             <th className="py-3 px-5">Interface</th>
             <th className="py-3 px-4">MAC Address</th>
             <th className="py-3 px-4">IP Address</th>
@@ -686,11 +687,11 @@ function NetworkTabContent({
         </thead>
         <tbody>
           {interfaces.map((iface) => (
-            <tr key={iface.name} className="border-t border-[#d2d2d7]/50 hover:bg-white/[0.02] transition-colors">
-              <td className="py-3 px-5 font-medium text-[#1d1d1f]">{iface.name}</td>
-              <td className="py-3 px-4 font-mono text-xs text-[#6e6e73]">{iface.mac}</td>
-              <td className="py-3 px-4 font-mono text-xs text-[#1d1d1f]">{iface.ip}</td>
-              <td className="py-3 px-4 text-[#6e6e73]">{iface.model}</td>
+            <tr key={iface.name} className="border-t border-[var(--zf-hairline)]/50 hover:bg-black/[0.03] transition-colors">
+              <td className="py-3 px-5 font-medium text-[var(--zf-ink)]">{iface.name}</td>
+              <td className="py-3 px-4 font-mono text-xs text-[var(--zf-muted)]">{iface.mac}</td>
+              <td className="py-3 px-4 font-mono text-xs text-[var(--zf-ink)]">{iface.ip}</td>
+              <td className="py-3 px-4 text-[var(--zf-muted)]">{iface.model}</td>
               <td className="py-3 px-4">
                 <StatusBadge status={iface.state === 'up' ? 'running' : 'stopped'} />
               </td>
@@ -773,9 +774,9 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
 
   if (vm.network_tap) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5">
-        <h3 className="text-sm font-semibold text-[#1d1d1f] mb-1">Bridged Networking</h3>
-        <p className="text-xs text-[#6e6e73]">
+      <div className="zf-panel p-5">
+        <h3 className="text-sm font-semibold text-[var(--zf-ink)] mb-1">Bridged Networking</h3>
+        <p className="text-xs text-[var(--zf-muted)]">
           {vm.network_static_ip
             ? "This VM's IP was configured statically via cloud-init — see the interface table above once it's booted. No port forwards needed."
             : "This VM has its own real, externally-reachable IP via DHCP — see the interface table above once it's booted and leased an address. No port forwards needed."}
@@ -785,18 +786,18 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
   }
 
   return (
-    <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
-      <div className="p-5 border-b border-[#d2d2d7] flex items-center justify-between">
+    <div className="zf-panel overflow-hidden">
+      <div className="p-5 border-b border-[var(--zf-hairline)] flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">Exposed Ports</h3>
-          <p className="text-xs text-[#6e6e73] mt-0.5">
+          <h3 className="text-sm font-semibold text-[var(--zf-ink)]">Exposed Ports</h3>
+          <p className="text-xs text-[var(--zf-muted)] mt-0.5">
             This VM uses NAT networking — forwards here are the only way to reach it (e.g. SSH) from outside the host.
           </p>
         </div>
         {canWrite && !showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-[#d2d2d7] text-[#1d1d1f] hover:text-[#1d1d1f] hover:border-[#d2d2d7] transition-colors"
+            className="zf-btn zf-btn-ghost zf-btn-sm"
           >
             <Plug className="w-3.5 h-3.5" />
             Expose Port
@@ -805,7 +806,7 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
       </div>
 
       {showForm && (
-        <div className="p-5 border-b border-[#d2d2d7] bg-[#f5f5f7] space-y-3">
+        <div className="p-5 border-b border-[var(--zf-hairline)] bg-[var(--zf-canvas)] space-y-3">
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -814,9 +815,9 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
               placeholder="Host port"
               min={1}
               max={65535}
-              className="w-28 px-2.5 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500/50"
+              className="input-field w-28 py-1.5"
             />
-            <span className="text-[#6e6e73] text-sm">→</span>
+            <span className="text-[var(--zf-muted)] text-sm">→</span>
             <input
               type="number"
               value={guestPort}
@@ -824,34 +825,34 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
               placeholder="Guest port"
               min={1}
               max={65535}
-              className="w-28 px-2.5 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500/50"
+              className="input-field w-28 py-1.5"
             />
             <select
               value={protocol}
               onChange={(e) => setProtocol(e.target.value as 'tcp' | 'udp')}
-              className="px-2 py-1.5 bg-white border border-[#d2d2d7] rounded-md text-sm text-[#1d1d1f]"
+              className="input-field w-auto py-1.5"
             >
               <option value="tcp">TCP</option>
               <option value="udp">UDP</option>
             </select>
           </div>
           {vm.state === 'running' && (
-            <p className="text-xs text-amber-400/80">
+            <p className="text-xs text-amber-700/80">
               This VM is running — adding a forward requires restarting it to apply.
             </p>
           )}
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
+          {formError && <p className="text-[var(--zf-danger)] text-sm">{formError}</p>}
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
               disabled={submitting}
-              className="px-4 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+              className="zf-btn zf-btn-primary zf-btn-sm"
             >
               {submitting ? 'Applying…' : 'Add'}
             </button>
             <button
               onClick={() => { setShowForm(false); setFormError('') }}
-              className="px-4 py-1.5 bg-white border border-[#d2d2d7] text-[#1d1d1f] text-sm rounded-lg transition-colors"
+              className="zf-btn zf-btn-ghost zf-btn-sm"
             >
               Cancel
             </button>
@@ -860,11 +861,11 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
       )}
 
       {forwards.length === 0 ? (
-        <div className="p-8 text-center text-[#6e6e73] text-sm">No ports exposed.</div>
+        <div className="p-8 text-center text-[var(--zf-muted)] text-sm">No ports exposed.</div>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs font-medium text-[#6e6e73] uppercase tracking-wider border-b border-[#d2d2d7]">
+            <tr className="text-left text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider border-b border-[var(--zf-hairline)]">
               <th className="py-3 px-5">Host Port</th>
               <th className="py-3 px-4">Guest Port</th>
               <th className="py-3 px-4">Protocol</th>
@@ -873,11 +874,11 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
           </thead>
           <tbody>
             {forwards.map((f, i) => (
-              <tr key={i} className="border-t border-[#d2d2d7] hover:bg-white/[0.02] transition-colors">
-                <td className="py-3 px-5 font-mono text-[#1d1d1f]">{f.host_port}</td>
-                <td className="py-3 px-4 font-mono text-[#1d1d1f]">{f.guest_port}</td>
+              <tr key={i} className="border-t border-[var(--zf-hairline)] hover:bg-black/[0.03] transition-colors">
+                <td className="py-3 px-5 font-mono text-[var(--zf-ink)]">{f.host_port}</td>
+                <td className="py-3 px-4 font-mono text-[var(--zf-ink)]">{f.guest_port}</td>
                 <td className="py-3 px-4">
-                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-[#0066cc] border border-blue-500/20 uppercase">
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-[var(--zf-link)]/10 text-[var(--zf-link)] border border-[var(--zf-link)]/20 uppercase">
                     {f.protocol}
                   </span>
                 </td>
@@ -887,7 +888,7 @@ function PortForwardsSection({ vm, onUpdated }: { vm: VM; onUpdated: () => void 
                       onClick={() => handleRemove(f.host_port)}
                       disabled={removingPort === f.host_port}
                       title="Remove port forward"
-                      className="p-1.5 rounded-md text-[#6e6e73] hover:text-red-600 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                      className="p-1.5 rounded-md text-[var(--zf-muted)] hover:text-[var(--zf-danger)] hover:bg-red-50 disabled:opacity-50 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -986,21 +987,21 @@ function SnapshotsTab({ vm }: { vm: VM }) {
 
   if (loading) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <Loader2 className="w-6 h-6 text-[#6e6e73] mx-auto mb-2 animate-spin" />
-        <p className="text-[#6e6e73] text-sm">Loading snapshots...</p>
+      <div className="zf-panel p-8 text-center">
+        <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
+        <p className="text-[var(--zf-muted)] text-sm">Loading snapshots...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-        <AlertCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
-        <p className="text-red-600 text-sm mb-3">{error}</p>
+      <div className="zf-panel p-8 text-center">
+        <AlertCircle className="w-6 h-6 text-[var(--zf-danger)] mx-auto mb-2" />
+        <p className="text-[var(--zf-danger)] text-sm mb-3">{error}</p>
         <button
           onClick={() => { setLoading(true); loadSnapshots() }}
-          className="flex items-center gap-1.5 mx-auto px-3 py-1.5 bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg text-sm transition-colors"
+          className="zf-btn zf-btn-ghost zf-btn-sm mx-auto"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Retry
@@ -1014,14 +1015,14 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       <div className="flex justify-between items-center">
         <button
           onClick={() => { setLoading(true); loadSnapshots() }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[#6e6e73] hover:text-[#1d1d1f] text-sm transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] text-sm transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh
         </button>
         <button
           onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-[#0066cc]/15 text-[#0066cc] hover:bg-[#0066cc]/25 rounded-lg transition-colors text-sm font-medium"
+          className="zf-btn zf-btn-primary zf-btn-sm"
         >
           <Plus className="w-3.5 h-3.5" />
           Create Snapshot
@@ -1029,25 +1030,25 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       </div>
 
       {showCreateForm && (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-5 space-y-3">
-          <h3 className="text-sm font-medium text-[#1d1d1f]">New Snapshot</h3>
+        <div className="zf-panel p-5 space-y-3">
+          <h3 className="text-sm font-medium text-[var(--zf-ink)]">New Snapshot</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-[#6e6e73] mb-1">Name</label>
+              <label className="block text-xs text-[var(--zf-muted)] mb-1">Name</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="snapshot-name"
-                className="w-full px-3 py-1.5 bg-white border border-[#d2d2d7] rounded-lg text-sm text-[#1d1d1f] placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                className="input-field py-1.5"
               />
             </div>
             <div>
-              <label className="block text-xs text-[#6e6e73] mb-1">Type</label>
+              <label className="block text-xs text-[var(--zf-muted)] mb-1">Type</label>
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as 'Disk' | 'Full')}
-                className="w-full px-3 py-1.5 bg-white border border-[#d2d2d7] rounded-lg text-sm text-[#1d1d1f] focus:outline-none focus:border-blue-500"
+                className="input-field py-1.5"
               >
                 <option value="Full">Full</option>
                 <option value="Disk">Disk Only</option>
@@ -1055,26 +1056,26 @@ function SnapshotsTab({ vm }: { vm: VM }) {
             </div>
           </div>
           <div>
-            <label className="block text-xs text-[#6e6e73] mb-1">Description (optional)</label>
+            <label className="block text-xs text-[var(--zf-muted)] mb-1">Description (optional)</label>
             <input
               type="text"
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               placeholder="Description of this snapshot"
-              className="w-full px-3 py-1.5 bg-white border border-[#d2d2d7] rounded-lg text-sm text-[#1d1d1f] placeholder-slate-600 focus:outline-none focus:border-blue-500"
+              className="input-field py-1.5"
             />
           </div>
           <div className="flex justify-end gap-2">
             <button
               onClick={() => { setShowCreateForm(false); setNewName(''); setNewDescription('') }}
-              className="px-3 py-1.5 text-sm text-[#6e6e73] hover:text-[#1d1d1f] transition-colors"
+              className="zf-btn zf-btn-ghost zf-btn-sm"
             >
               Cancel
             </button>
             <button
               onClick={handleCreate}
               disabled={creating || !newName.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0077ed] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+              className="zf-btn zf-btn-primary zf-btn-sm"
             >
               {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {creating ? 'Creating...' : 'Create'}
@@ -1084,16 +1085,16 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       )}
 
       {snapshots.length === 0 ? (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-          <Camera className="w-10 h-10 text-[#6e6e73] mx-auto mb-3" />
-          <p className="text-[#6e6e73] text-sm">No snapshots found</p>
-          <p className="text-[#6e6e73] text-xs mt-1">Create a snapshot to save the current state of this VM</p>
+        <div className="zf-panel p-8 text-center">
+          <Camera className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
+          <p className="text-[var(--zf-muted)] text-sm">No snapshots found</p>
+          <p className="text-[var(--zf-muted)] text-xs mt-1">Create a snapshot to save the current state of this VM</p>
         </div>
       ) : (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+        <div className="zf-panel overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-medium text-[#6e6e73] uppercase tracking-wider border-b border-[#d2d2d7]">
+              <tr className="text-left text-xs font-medium text-[var(--zf-muted)] uppercase tracking-wider border-b border-[var(--zf-hairline)]">
                 <th className="py-3 px-5">Name</th>
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4">Created</th>
@@ -1103,33 +1104,33 @@ function SnapshotsTab({ vm }: { vm: VM }) {
             </thead>
             <tbody>
               {snapshots.map((snap) => (
-                <tr key={snap.id} className="border-t border-[#d2d2d7]/50 hover:bg-white/[0.02] transition-colors group">
+                <tr key={snap.id} className="border-t border-[var(--zf-hairline)]/50 hover:bg-black/[0.03] transition-colors group">
                   <td className="py-3 px-5">
-                    <div className="font-medium text-[#1d1d1f]">{snap.name}</div>
+                    <div className="font-medium text-[var(--zf-ink)]">{snap.name}</div>
                     {snap.description && (
-                      <div className="text-xs text-[#6e6e73] mt-0.5">{snap.description}</div>
+                      <div className="text-xs text-[var(--zf-muted)] mt-0.5">{snap.description}</div>
                     )}
                   </td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 text-[11px] font-medium rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    <span className="px-2 py-0.5 text-[11px] font-medium rounded text-[var(--zf-muted)] bg-[var(--zf-canvas)] border border-[var(--zf-hairline)]">
                       {snap.snapshot_type === 'Disk' ? 'disk-only' : 'full'}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-[#6e6e73]">{new Date(snap.created).toLocaleString()}</td>
-                  <td className="py-3 px-4 text-[#6e6e73] tabular-nums">{formatSize(snap.size_bytes)}</td>
+                  <td className="py-3 px-4 text-[var(--zf-muted)]">{new Date(snap.created).toLocaleString()}</td>
+                  <td className="py-3 px-4 text-[var(--zf-muted)] tabular-nums">{formatSize(snap.size_bytes)}</td>
                   <td className="py-3 px-4">
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleRevert(snap)}
                         disabled={actionInProgress === snap.id}
-                        className="px-2.5 py-1 bg-[#0066cc]/15 text-[#0066cc] hover:bg-[#0066cc]/25 disabled:opacity-50 rounded text-xs font-medium transition-colors"
+                        className="px-2.5 py-1 bg-[var(--zf-link)]/15 text-[var(--zf-link)] hover:bg-[var(--zf-link)]/25 disabled:opacity-50 rounded text-xs font-medium transition-colors"
                       >
                         {actionInProgress === snap.id ? 'Working...' : 'Restore'}
                       </button>
                       <button
                         onClick={() => handleDelete(snap)}
                         disabled={actionInProgress === snap.id}
-                        className="px-2.5 py-1 bg-red-600/15 text-red-600 hover:bg-red-600/25 disabled:opacity-50 rounded text-xs font-medium transition-colors"
+                        className="px-2.5 py-1 bg-red-50 text-[var(--zf-danger)] hover:bg-red-100 disabled:opacity-50 rounded text-xs font-medium transition-colors"
                       >
                         Delete
                       </button>
@@ -1146,11 +1147,11 @@ function SnapshotsTab({ vm }: { vm: VM }) {
 }
 
 const LOG_PRIORITY_STYLE: Record<string, string> = {
-  emerg: 'text-red-600', alert: 'text-red-600', crit: 'text-red-600',
-  err: 'text-red-600', error: 'text-red-600',
-  warning: 'text-amber-400', warn: 'text-amber-400',
-  notice: 'text-cyan-400', info: 'text-[#1d1d1f]',
-  debug: 'text-[#6e6e73]',
+  emerg: 'text-[var(--zf-danger)]', alert: 'text-[var(--zf-danger)]', crit: 'text-[var(--zf-danger)]',
+  err: 'text-[var(--zf-danger)]', error: 'text-[var(--zf-danger)]',
+  warning: 'text-amber-700', warn: 'text-amber-700',
+  notice: 'text-[var(--zf-link)]', info: 'text-[var(--zf-ink)]',
+  debug: 'text-[var(--zf-muted)]',
 }
 
 function LogsTab({ vm }: { vm: VM }) {
@@ -1195,11 +1196,11 @@ function LogsTab({ vm }: { vm: VM }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${
-            vm.state === 'running' ? 'bg-emerald-400 animate-pulse'
-              : vm.state === 'starting' ? 'bg-amber-400 animate-pulse'
-              : vm.state === 'failed' ? 'bg-red-400' : 'bg-[#e8e8ed]'
+            vm.state === 'running' ? 'bg-emerald-500 animate-pulse'
+              : vm.state === 'starting' ? 'bg-amber-500 animate-pulse'
+              : vm.state === 'failed' ? 'bg-red-500' : 'bg-[var(--zf-hairline)]'
           }`} />
-          <span className="text-sm text-[#6e6e73]">
+          <span className="text-sm text-[var(--zf-muted)]">
             {vm.state === 'starting' ? 'Booting — watching console output live' : `VM is ${vm.state}`}
           </span>
         </div>
@@ -1209,20 +1210,20 @@ function LogsTab({ vm }: { vm: VM }) {
             value={grep}
             onChange={(e) => setGrep(e.target.value)}
             placeholder="Filter…"
-            className="px-3 py-1.5 bg-white border border-[#d2d2d7] rounded-lg text-sm text-[#1d1d1f] placeholder-[#6e6e73] focus:outline-none focus:border-blue-500/50 w-40"
+            className="input-field py-1.5 w-40"
           />
           <button
             onClick={() => setAutoRefresh((v) => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              autoRefresh ? 'bg-[#0066cc]/20 text-[#0066cc] border border-blue-500/30' : 'bg-white border border-[#d2d2d7] text-[#6e6e73] hover:text-[#1d1d1f]'
+              autoRefresh ? 'bg-[var(--zf-link)]/20 text-[var(--zf-link)] border border-[var(--zf-link)]/30' : 'bg-white border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
             }`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-blue-400 animate-pulse' : 'bg-[#e8e8ed]'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-[var(--zf-link)] animate-pulse' : 'bg-[var(--zf-hairline)]'}`} />
             Live
           </button>
           <button
             onClick={() => loadLogs()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[#6e6e73] hover:text-[#1d1d1f] text-sm transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-ink)] text-sm transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -1231,12 +1232,12 @@ function LogsTab({ vm }: { vm: VM }) {
       </div>
 
       {error && (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-          <AlertCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
-          <p className="text-red-600 text-sm mb-3">{error}</p>
+        <div className="zf-panel p-8 text-center">
+          <AlertCircle className="w-6 h-6 text-[var(--zf-danger)] mx-auto mb-2" />
+          <p className="text-[var(--zf-danger)] text-sm mb-3">{error}</p>
           <button
             onClick={() => loadLogs()}
-            className="flex items-center gap-1.5 mx-auto px-3 py-1.5 bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg text-sm transition-colors"
+            className="zf-btn zf-btn-ghost zf-btn-sm mx-auto"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Retry
@@ -1245,16 +1246,16 @@ function LogsTab({ vm }: { vm: VM }) {
       )}
 
       {!error && loading && logs.length === 0 && (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-          <Loader2 className="w-6 h-6 text-[#6e6e73] mx-auto mb-2 animate-spin" />
-          <p className="text-[#6e6e73] text-sm">Loading console output...</p>
+        <div className="zf-panel p-8 text-center">
+          <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
+          <p className="text-[var(--zf-muted)] text-sm">Loading console output...</p>
         </div>
       )}
 
       {!error && !loading && logs.length === 0 && (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-8 text-center">
-          <Terminal className="w-10 h-10 text-[#6e6e73] mx-auto mb-3" />
-          <p className="text-[#6e6e73] text-sm">
+        <div className="zf-panel p-8 text-center">
+          <Terminal className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
+          <p className="text-[var(--zf-muted)] text-sm">
             {vm.state === 'stopped'
               ? "No console output captured yet — it appears here once this VM has booted at least once."
               : 'No console output yet — this can take a few seconds right after boot.'}
@@ -1263,15 +1264,15 @@ function LogsTab({ vm }: { vm: VM }) {
       )}
 
       {logs.length > 0 && (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+        <div className="zf-panel overflow-hidden">
           <div className="font-mono text-xs max-h-[32rem] overflow-y-auto">
             {logs.map((log, i) => (
-              <div key={i} className="flex gap-4 px-5 py-1.5 hover:bg-white/[0.03] transition-colors">
-                <span className="text-[#6e6e73] shrink-0 tabular-nums">
+              <div key={i} className="flex gap-4 px-5 py-1.5 hover:bg-black/[0.04] transition-colors">
+                <span className="text-[var(--zf-muted)] shrink-0 tabular-nums">
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>
-                {log.unit && <span className="text-[#6e6e73] shrink-0 max-w-[8rem] truncate">{log.unit}</span>}
-                <span className={`break-all ${LOG_PRIORITY_STYLE[log.priority?.toLowerCase()] || 'text-[#1d1d1f]'}`}>
+                {log.unit && <span className="text-[var(--zf-muted)] shrink-0 max-w-[8rem] truncate">{log.unit}</span>}
+                <span className={`break-all ${LOG_PRIORITY_STYLE[log.priority?.toLowerCase()] || 'text-[var(--zf-ink)]'}`}>
                   {log.message}
                 </span>
               </div>
@@ -1283,28 +1284,28 @@ function LogsTab({ vm }: { vm: VM }) {
       <div>
         <button
           onClick={() => setShowActivity((v) => !v)}
-          className="text-xs text-[#6e6e73] hover:text-[#6e6e73] transition-colors"
+          className="text-xs text-[var(--zf-muted)] hover:text-[var(--zf-ink)] transition-colors"
         >
           {showActivity ? '▾' : '▸'} Activity (create/start/stop history)
         </button>
         {showActivity && (
-          <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden mt-2">
+          <div className="zf-panel overflow-hidden mt-2">
             {activity.length === 0 ? (
-              <p className="text-[#6e6e73] text-sm p-4">No activity recorded for this VM.</p>
+              <p className="text-[var(--zf-muted)] text-sm p-4">No activity recorded for this VM.</p>
             ) : (
               <div className="font-mono text-xs">
                 {activity.map((log) => (
-                  <div key={log.id} className="flex gap-4 px-5 py-2 hover:bg-white/[0.02] transition-colors border-b border-[#d2d2d7] last:border-b-0">
-                    <span className="text-[#6e6e73] shrink-0 tabular-nums">
+                  <div key={log.id} className="flex gap-4 px-5 py-2 hover:bg-black/[0.03] transition-colors border-b border-[var(--zf-hairline)] last:border-b-0">
+                    <span className="text-[var(--zf-muted)] shrink-0 tabular-nums">
                       {new Date(log.timestamp).toLocaleTimeString()}
                     </span>
-                    <span className={`shrink-0 w-16 uppercase ${log.status === 'success' ? 'text-cyan-400' : 'text-red-600'}`}>
+                    <span className={`shrink-0 w-16 uppercase ${log.status === 'success' ? 'text-[var(--zf-link)]' : 'text-[var(--zf-danger)]'}`}>
                       {log.status === 'success' ? 'INFO' : 'ERROR'}
                     </span>
-                    <span className="text-[#6e6e73] shrink-0 w-20">{log.action}</span>
-                    <span className="text-[#1d1d1f]">
+                    <span className="text-[var(--zf-muted)] shrink-0 w-20">{log.action}</span>
+                    <span className="text-[var(--zf-ink)]">
                       {log.details || `${log.action} by ${log.user}`}
-                      {log.error && <span className="text-red-600 ml-2">({log.error})</span>}
+                      {log.error && <span className="text-[var(--zf-danger)] ml-2">({log.error})</span>}
                     </span>
                   </div>
                 ))}

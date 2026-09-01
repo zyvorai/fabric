@@ -7,7 +7,7 @@ import { Network, Server } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import { listBridges, listLinks, type BridgeConfig, type LinkInfo } from '../api/networkd'
 import ErrorBanner from '../components/ErrorBanner'
-import { PageHeader, EmptyState } from '../components/ui'
+import { PageHeader, EmptyState, Card } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -191,21 +191,23 @@ export default function NetworkTopology() {
       )}
 
       {loading && !loadError ? (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
-          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
-          <span className="text-sm">Loading network topology…</span>
-        </div>
+        <Card>
+          <div className="p-10 flex flex-col items-center justify-center text-[var(--zf-muted)] gap-3">
+            <div className="w-6 h-6 border-2 border-[var(--zf-hairline)] border-t-[var(--zf-ink)] rounded-full animate-spin" />
+            <span className="text-sm">Loading network topology…</span>
+          </div>
+        </Card>
       ) : !loadError && !hasContent ? (
-        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
+        <Card>
           <EmptyState
             icon={<Network className="w-10 h-10" />}
             title="No networks or VMs found"
             description="Configure bridges and attach VM interfaces to see topology"
           />
-        </div>
+        </Card>
       ) : !loadError ? (
         <div className="flex flex-col gap-6">
-          <div className="flex items-center justify-between text-xs text-[#6e6e73]">
+          <div className="flex items-center justify-between text-xs text-[var(--zf-muted)]">
             <span>
               {networks.length} virtual network{networks.length !== 1 ? 's' : ''} · {bridges.length} host bridge
               {bridges.length !== 1 ? 's' : ''} · {vms.length} VM{vms.length !== 1 ? 's' : ''}
@@ -214,7 +216,7 @@ export default function NetworkTopology() {
 
           {hostNodes.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--zf-ink)] mb-3 flex items-center gap-2">
                 <Server className="w-4 h-4" />
                 Host interfaces
               </h2>
@@ -222,19 +224,19 @@ export default function NetworkTopology() {
                 {hostNodes.map(node => (
                   <div
                     key={node.name}
-                    className="bg-[#f5f5f7] rounded-lg border border-[#d2d2d7] p-3"
+                    className="zf-panel p-3"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-[#1d1d1f]">{node.name}</span>
+                      <span className="font-medium text-[var(--zf-ink)]">{node.name}</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${
-                        node.isBridge ? 'bg-blue-500/10 text-[#0066cc]' : 'bg-black/[0.04] text-[#6e6e73]'
+                        node.isBridge ? 'bg-[var(--zf-link)]/10 text-[var(--zf-link)]' : 'bg-black/[0.04] text-[var(--zf-muted)]'
                       }`}>
                         {node.isBridge ? 'bridge' : node.kind}
                       </span>
                     </div>
-                    <div className="text-xs text-[#6e6e73] mt-1">{node.operational_state}</div>
+                    <div className="text-xs text-[var(--zf-muted)] mt-1">{node.operational_state}</div>
                     {node.addresses.length > 0 && (
-                      <div className="text-xs font-mono text-[#6e6e73] mt-1">{node.addresses.join(', ')}</div>
+                      <div className="text-xs font-mono text-[var(--zf-muted)] mt-1">{node.addresses.join(', ')}</div>
                     )}
                   </div>
                 ))}
@@ -244,10 +246,10 @@ export default function NetworkTopology() {
 
           {attachmentEdges.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3">VM → network connections</h2>
-              <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+              <h2 className="text-sm font-semibold text-[var(--zf-ink)] mb-3">VM → network connections</h2>
+              <Card className="overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-white text-[#6e6e73] text-xs">
+                  <thead className="bg-[var(--zf-surface)] text-[var(--zf-muted)] text-xs">
                     <tr>
                       <th className="text-left p-3 font-medium">VM</th>
                       <th className="text-left p-3 font-medium w-8" />
@@ -256,62 +258,62 @@ export default function NetworkTopology() {
                       <th className="text-left p-3 font-medium">MAC</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#d2d2d7]">
+                  <tbody className="divide-y divide-[var(--zf-hairline)]">
                     {attachmentEdges.map((e, i) => (
-                      <tr key={`${e.vm}-${e.network}-${i}`} className="hover:bg-white/[0.03]">
+                      <tr key={`${e.vm}-${e.network}-${i}`} className="hover:bg-black/[0.03]">
                         <td className="p-3">
-                          <span className="font-medium text-[#1d1d1f]">{e.vm}</span>
-                          <span className="text-xs text-[#6e6e73] ml-2">{e.vmState}</span>
+                          <span className="font-medium text-[var(--zf-ink)]">{e.vm}</span>
+                          <span className="text-xs text-[var(--zf-muted)] ml-2">{e.vmState}</span>
                         </td>
-                        <td className="p-3 text-[#6e6e73]">→</td>
-                        <td className="p-3 font-medium text-[#0066cc]">{e.network}</td>
-                        <td className="p-3 text-[#6e6e73]">{e.ifaceType}</td>
-                        <td className="p-3 font-mono text-xs text-[#6e6e73]">{e.mac}</td>
+                        <td className="p-3 text-[var(--zf-muted)]">→</td>
+                        <td className="p-3 font-medium text-[var(--zf-link)]">{e.network}</td>
+                        <td className="p-3 text-[var(--zf-muted)]">{e.ifaceType}</td>
+                        <td className="p-3 font-mono text-xs text-[var(--zf-muted)]">{e.mac}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Card>
             </section>
           )}
 
           <section>
-            <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3">VM attachments</h2>
+            <h2 className="text-sm font-semibold text-[var(--zf-ink)] mb-3">VM attachments</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {networkNames.map(netName => {
                 const netVMs = vmsByNetwork[netName] || []
                 const netInfo = networks.find(n => n.name === netName)
                 const hostBridge = bridges.find(b => b.name === netName)
                 return (
-                  <div key={netName} className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-4">
+                  <div key={netName} className="zf-panel p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-[#1d1d1f] capitalize">
+                      <h3 className="text-sm font-semibold text-[var(--zf-ink)] capitalize">
                         {netName === 'unattached' ? 'Unattached VMs' : netName}
                       </h3>
                       {netInfo && (
-                        <span className="text-xs text-[#6e6e73]">
+                        <span className="text-xs text-[var(--zf-muted)]">
                           {netInfo.state} · autostart {netInfo.autostart}
                         </span>
                       )}
                       {!netInfo && hostBridge && (
-                        <span className="text-xs text-[#0066cc]">host bridge · {hostBridge.operational_state ?? '—'}</span>
+                        <span className="text-xs text-[var(--zf-link)]">host bridge · {hostBridge.operational_state ?? '—'}</span>
                       )}
                     </div>
                     {netVMs.length === 0 ? (
-                      <p className="text-xs text-[#6e6e73]">No VMs on this network</p>
+                      <p className="text-xs text-[var(--zf-muted)]">No VMs on this network</p>
                     ) : (
                       <ul className="space-y-2">
                         {netVMs.map(vm => (
                           <li
                             key={vm.name}
-                            className="text-sm bg-[#f5f5f7] rounded-lg px-3 py-2 border border-[#d2d2d7]/60"
+                            className="text-sm bg-[var(--zf-canvas)] rounded-lg px-3 py-2 border border-[var(--zf-hairline)]/60"
                           >
-                            <div className="font-medium text-[#1d1d1f]">{vm.name}</div>
-                            <div className="text-xs text-[#6e6e73] mt-0.5">{vm.state}</div>
+                            <div className="font-medium text-[var(--zf-ink)]">{vm.name}</div>
+                            <div className="text-xs text-[var(--zf-muted)] mt-0.5">{vm.state}</div>
                             {vm.interfaces?.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {vm.interfaces.map((iface, i) => (
-                                  <div key={i} className="text-[11px] text-[#6e6e73] font-mono">
+                                  <div key={i} className="text-[11px] text-[var(--zf-muted)] font-mono">
                                     {iface.type} → {iface.source || '—'} · {iface.model} · {iface.mac || 'no MAC'}
                                   </div>
                                 ))}

@@ -27,7 +27,7 @@ import {
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { PageHeader } from '../components/ui'
+import { PageHeader, Modal } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { toastFailure } from '../utils/toastError'
@@ -152,12 +152,12 @@ export default function Datacenters() {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      Connected: 'bg-green-100 text-green-800',
-      Disconnected: 'bg-red-100 text-red-800',
-      Maintenance: 'bg-yellow-100 text-yellow-800',
-      Active: 'bg-green-100 text-green-800',
+      Connected: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      Disconnected: 'text-red-700 bg-red-50 border-red-200',
+      Maintenance: 'text-amber-800 bg-amber-50 border-amber-200',
+      Active: 'text-emerald-700 bg-emerald-50 border-emerald-200',
     }
-    return colors[status] || 'bg-black/[0.06] text-[#6e6e73]'
+    return colors[status] || 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 
   return (
@@ -169,7 +169,7 @@ export default function Datacenters() {
         actions={
           <button
             onClick={() => setShowCreateDC(true)}
-            className="bg-[#0066cc] text-white px-4 py-2 rounded hover:bg-[#0077ed] flex items-center gap-2"
+            className="zf-btn zf-btn-primary"
           >
             <Plus className="w-4 h-4" />
             Create Datacenter
@@ -183,35 +183,35 @@ export default function Datacenters() {
       />
 
       {loading && !loadError ? (
-        <div className="text-center py-8 text-[#6e6e73]">Loading…</div>
+        <div className="text-center py-8 text-[var(--zf-muted)]">Loading…</div>
       ) : !loadError ? (
       <>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Datacenters</div>
-          <div className="text-2xl font-bold">{datacenters.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Datacenters</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{datacenters.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Clusters</div>
-          <div className="text-2xl font-bold">{clusters.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Clusters</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{clusters.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Hosts</div>
-          <div className="text-2xl font-bold">{hosts.length}</div>
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Hosts</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">{hosts.length}</div>
         </div>
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg px-4 py-3">
-          <div className="text-[#6e6e73] text-sm mb-1">Total VMs</div>
-          <div className="text-2xl font-bold">
+        <div className="zf-panel px-4 py-3">
+          <div className="text-[var(--zf-muted)] text-sm mb-1">Total VMs</div>
+          <div className="text-2xl font-bold text-[var(--zf-ink)]">
             {hosts.reduce((s, h) => s + h.vm_count, 0)}
           </div>
         </div>
       </div>
 
       {/* Tree View */}
-      <div className="bg-[#f5f5f7] border border-[#d2d2d7] rounded-lg">
+      <div className="zf-panel">
         {datacenters.length === 0 ? (
-          <div className="text-center py-12 text-[#6e6e73]">
+          <div className="text-center py-12 text-[var(--zf-muted)]">
             No datacenters configured. Create one to get started.
           </div>
         ) : (
@@ -221,17 +221,17 @@ export default function Datacenters() {
             const isExpanded = expandedDCs.has(dc.id)
 
             return (
-              <div key={dc.id} className="border-b border-[#d2d2d7] last:border-b-0">
+              <div key={dc.id} className="border-b border-[var(--zf-hairline)] last:border-b-0">
                 <div
-                  className="flex items-center justify-between p-4 hover:bg-white cursor-pointer"
+                  className="flex items-center justify-between p-4 hover:bg-black/[0.03] cursor-pointer"
                   onClick={() => toggleDC(dc.id)}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {isExpanded ? <ChevronDown className="w-5 h-5 shrink-0" /> : <ChevronRight className="w-5 h-5 shrink-0" />}
-                    <Server className="w-5 h-5 text-[#0066cc] shrink-0" />
-                    <span className="font-semibold text-lg truncate">{dc.name}</span>
+                    {isExpanded ? <ChevronDown className="w-5 h-5 shrink-0 text-[var(--zf-muted)]" /> : <ChevronRight className="w-5 h-5 shrink-0 text-[var(--zf-muted)]" />}
+                    <Server className="w-5 h-5 text-[var(--zf-link)] shrink-0" />
+                    <span className="font-semibold text-lg truncate text-[var(--zf-ink)]">{dc.name}</span>
                     {summary && (
-                      <span className="text-sm text-[#6e6e73] ml-2 truncate">
+                      <span className="text-sm text-[var(--zf-muted)] ml-2 truncate">
                         {summary.cluster_count} clusters, {summary.host_count} hosts, {summary.vm_count} VMs
                         {summary.total_cpus > 0 && ` | ${summary.total_cpus} CPUs`}
                         {summary.total_memory_mb > 0 && ` | ${(summary.total_memory_mb / 1024).toFixed(1)} GB RAM`}
@@ -241,20 +241,20 @@ export default function Datacenters() {
                   <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => setShowCreateCluster(dc.id)}
-                      className="text-[#0066cc] hover:text-blue-300 text-sm px-2 py-1"
+                      className="text-[var(--zf-link)] hover:text-[var(--zf-link-hover)] text-sm px-2 py-1"
                     >
                       + Cluster
                     </button>
                     <button
                       onClick={() => setEditDC(dc)}
-                      className="p-1 text-[#6e6e73] hover:text-[#1d1d1f]"
+                      className="p-1 text-[var(--zf-muted)] hover:text-[var(--zf-ink)]"
                       title="Edit datacenter"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteDC(dc.id)}
-                      className="text-red-600 hover:text-red-800 p-1"
+                      className="text-[var(--zf-danger)] hover:opacity-70 p-1"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -268,13 +268,13 @@ export default function Datacenters() {
                   return (
                     <div key={cl.id} className="ml-8">
                       <div
-                        className="flex items-center justify-between p-3 hover:bg-white cursor-pointer border-t border-[#d2d2d7]"
+                        className="flex items-center justify-between p-3 hover:bg-black/[0.03] cursor-pointer border-t border-[var(--zf-hairline)]"
                         onClick={() => toggleCluster(cl.id)}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {clExpanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
-                          <span className="font-medium truncate">{cl.name}</span>
-                          <span className="text-xs text-[#6e6e73] truncate">
+                          {clExpanded ? <ChevronDown className="w-4 h-4 shrink-0 text-[var(--zf-muted)]" /> : <ChevronRight className="w-4 h-4 shrink-0 text-[var(--zf-muted)]" />}
+                          <span className="font-medium truncate text-[var(--zf-ink)]">{cl.name}</span>
+                          <span className="text-xs text-[var(--zf-muted)] truncate">
                             {clHosts.length} hosts |
                             HA: {cl.ha_enabled ? 'On' : 'Off'} |
                             DRS: {cl.drs_enabled ? cl.drs_mode : 'Off'}
@@ -283,20 +283,20 @@ export default function Datacenters() {
                         <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => setShowRegisterHost(cl.id)}
-                            className="text-[#0066cc] hover:text-blue-300 text-sm px-2 py-1"
+                            className="text-[var(--zf-link)] hover:text-[var(--zf-link-hover)] text-sm px-2 py-1"
                           >
                             + Host
                           </button>
                           <button
                             onClick={() => setEditCluster(cl)}
-                            className="p-1 text-[#6e6e73] hover:text-[#1d1d1f]"
+                            className="p-1 text-[var(--zf-muted)] hover:text-[var(--zf-ink)]"
                             title="Edit cluster"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteCluster(cl.id)}
-                            className="text-red-600 hover:text-red-800 p-1"
+                            className="text-[var(--zf-danger)] hover:opacity-70 p-1"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -304,10 +304,10 @@ export default function Datacenters() {
                       </div>
 
                       {clExpanded && clHosts.length > 0 && (
-                        <div className="ml-8 border-t border-[#d2d2d7]">
-                          <table className="min-w-full divide-y divide-[#d2d2d7]">
+                        <div className="ml-8 border-t border-[var(--zf-hairline)]">
+                          <table className="min-w-full divide-y divide-[var(--zf-hairline)]">
                             <thead>
-                              <tr className="text-left text-xs text-[#6e6e73]">
+                              <tr className="text-left text-xs text-[var(--zf-muted)]">
                                 <th className="p-2">Hostname</th>
                                 <th className="p-2">Address</th>
                                 <th className="p-2">CPUs</th>
@@ -319,38 +319,38 @@ export default function Datacenters() {
                                 <th className="p-2">Actions</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-[#d2d2d7]">
+                            <tbody className="divide-y divide-[var(--zf-hairline)]">
                               {clHosts.map(host => (
-                                <tr key={host.id} className="hover:bg-white">
-                                  <td className="p-2 font-medium">{host.hostname}</td>
-                                  <td className="p-2 font-mono text-sm text-[#6e6e73]">{host.address}</td>
-                                  <td className="p-2 text-sm">{host.cpus}</td>
-                                  <td className="p-2 text-sm">{(host.memory_mb / 1024).toFixed(1)} GB</td>
+                                <tr key={host.id} className="hover:bg-black/[0.03]">
+                                  <td className="p-2 font-medium text-[var(--zf-ink)]">{host.hostname}</td>
+                                  <td className="p-2 font-mono text-sm text-[var(--zf-muted)]">{host.address}</td>
+                                  <td className="p-2 text-sm text-[var(--zf-ink)]">{host.cpus}</td>
+                                  <td className="p-2 text-sm text-[var(--zf-ink)]">{(host.memory_mb / 1024).toFixed(1)} GB</td>
                                   <td className="p-2">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-16 bg-white rounded-full h-2">
+                                      <div className="w-16 bg-[var(--zf-canvas)] rounded-full h-2">
                                         <div
-                                          className={`h-2 rounded-full ${host.cpu_usage_pct > 80 ? 'bg-red-500' : host.cpu_usage_pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                          className={`h-2 rounded-full ${host.cpu_usage_pct > 80 ? 'bg-[var(--zf-danger)]' : host.cpu_usage_pct > 60 ? 'bg-[var(--zf-warning)]' : 'bg-[var(--zf-success)]'}`}
                                           style={{ width: `${host.cpu_usage_pct}%` }}
                                         />
                                       </div>
-                                      <span className="text-xs text-[#6e6e73]">{host.cpu_usage_pct}%</span>
+                                      <span className="text-xs text-[var(--zf-muted)]">{host.cpu_usage_pct}%</span>
                                     </div>
                                   </td>
                                   <td className="p-2">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-16 bg-white rounded-full h-2">
+                                      <div className="w-16 bg-[var(--zf-canvas)] rounded-full h-2">
                                         <div
-                                          className={`h-2 rounded-full ${host.memory_usage_pct > 80 ? 'bg-red-500' : host.memory_usage_pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                          className={`h-2 rounded-full ${host.memory_usage_pct > 80 ? 'bg-[var(--zf-danger)]' : host.memory_usage_pct > 60 ? 'bg-[var(--zf-warning)]' : 'bg-[var(--zf-success)]'}`}
                                           style={{ width: `${host.memory_usage_pct}%` }}
                                         />
                                       </div>
-                                      <span className="text-xs text-[#6e6e73]">{host.memory_usage_pct}%</span>
+                                      <span className="text-xs text-[var(--zf-muted)]">{host.memory_usage_pct}%</span>
                                     </div>
                                   </td>
-                                  <td className="p-2 text-sm">{host.vm_count}</td>
+                                  <td className="p-2 text-sm text-[var(--zf-ink)]">{host.vm_count}</td>
                                   <td className="p-2">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(host.status)}`}>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadge(host.status)}`}>
                                       {host.status}
                                     </span>
                                   </td>
@@ -358,14 +358,14 @@ export default function Datacenters() {
                                     <div className="flex items-center gap-1">
                                       <button
                                         onClick={() => handleToggleMaintenance(host)}
-                                        className="p-1 hover:bg-white/[0.03] rounded"
+                                        className="p-1 hover:bg-black/[0.04] rounded"
                                         title={host.status === 'Maintenance' ? 'Exit maintenance' : 'Enter maintenance'}
                                       >
-                                        <Wrench className={`w-4 h-4 ${host.status === 'Maintenance' ? 'text-yellow-500' : 'text-[#6e6e73]'}`} />
+                                        <Wrench className={`w-4 h-4 ${host.status === 'Maintenance' ? 'text-[var(--zf-warning)]' : 'text-[var(--zf-muted)]'}`} />
                                       </button>
                                       <button
                                         onClick={() => handleRemoveHost(host.id)}
-                                        className="text-red-600 hover:text-red-800 p-1"
+                                        className="text-[var(--zf-danger)] hover:opacity-70 p-1"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>
@@ -379,14 +379,14 @@ export default function Datacenters() {
                       )}
 
                       {clExpanded && clHosts.length === 0 && (
-                        <div className="ml-8 p-4 text-[#6e6e73] text-sm">No hosts registered in this cluster.</div>
+                        <div className="ml-8 p-4 text-[var(--zf-muted)] text-sm">No hosts registered in this cluster.</div>
                       )}
                     </div>
                   )
                 })}
 
                 {isExpanded && dcClusters.length === 0 && (
-                  <div className="ml-8 p-4 text-[#6e6e73] text-sm">No clusters in this datacenter.</div>
+                  <div className="ml-8 p-4 text-[var(--zf-muted)] text-sm">No clusters in this datacenter.</div>
                 )}
               </div>
             )
@@ -472,27 +472,25 @@ function CreateDCModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Create Datacenter</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Create Datacenter</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Description</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+            className="input-field" />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 zf-btn zf-btn-ghost">Cancel</button>
+          <button type="submit" className="flex-1 zf-btn zf-btn-primary">Create</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -510,27 +508,25 @@ function CreateClusterModal({ datacenterId, onClose, onCreated }: { datacenterId
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Create Cluster</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Cluster Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Create</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Create Cluster</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Cluster Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Description</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+            className="input-field" />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 zf-btn zf-btn-ghost">Cancel</button>
+          <button type="submit" className="flex-1 zf-btn zf-btn-primary">Create</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -550,39 +546,37 @@ function RegisterHostModal({ clusterId, onClose, onCreated }: { clusterId: strin
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Register Host</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">Register Host</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Hostname</label>
+          <input type="text" value={hostname} onChange={e => setHostname(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">IP Address</label>
+          <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Hostname</label>
-            <input type="text" value={hostname} onChange={e => setHostname(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">CPUs</label>
+            <input type="number" value={cpus} onChange={e => setCpus(Number(e.target.value))}
+              className="input-field" min={1} required />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">IP Address</label>
-            <input type="text" value={address} onChange={e => setAddress(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
+            <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Memory (MB)</label>
+            <input type="number" value={memoryMb} onChange={e => setMemoryMb(Number(e.target.value))}
+              className="input-field" min={512} required />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">CPUs</label>
-              <input type="number" value={cpus} onChange={e => setCpus(Number(e.target.value))}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" min={1} required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Memory (MB)</label>
-              <input type="number" value={memoryMb} onChange={e => setMemoryMb(Number(e.target.value))}
-                className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" min={512} required />
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Register</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 zf-btn zf-btn-ghost">Cancel</button>
+          <button type="submit" className="flex-1 zf-btn zf-btn-primary">Register</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -598,26 +592,24 @@ function EditNameModal({ title, name: initialName, description: initialDescripti
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#f5f5f7] rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">{title}</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full bg-white border border-[#d2d2d7] rounded px-3 py-2" />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-white hover:bg-[#d2d2d7] rounded">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-[#0066cc] hover:bg-[#0077ed] rounded">Save</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} className="max-w-md">
+      <h2 className="text-xl font-bold mb-4 text-[var(--zf-ink)]">{title}</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            className="input-field" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Description</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+            className="input-field" />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 zf-btn zf-btn-ghost">Cancel</button>
+          <button type="submit" className="flex-1 zf-btn zf-btn-primary">Save</button>
+        </div>
+      </form>
+    </Modal>
   )
 }

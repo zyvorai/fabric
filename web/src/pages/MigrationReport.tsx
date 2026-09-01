@@ -35,13 +35,13 @@ interface ReportData {
 function statusColor(status: string): string {
   switch (status.toLowerCase()) {
     case 'completed':
-      return 'bg-green-500/20 text-emerald-600'
+      return 'text-emerald-700 bg-emerald-50 border-emerald-200'
     case 'failed':
-      return 'bg-red-500/20 text-red-600'
+      return 'text-red-700 bg-red-50 border-red-200'
     case 'running':
-      return 'bg-blue-500/20 text-[#0066cc]'
+      return 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
     default:
-      return 'bg-black/[0.06] text-[#6e6e73]'
+      return 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
   }
 }
 
@@ -114,7 +114,7 @@ export default function MigrationReport() {
                 type="button"
                 onClick={handleCopy}
                 title="Copy report to clipboard"
-                className="px-4 py-2 text-xs bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition-colors"
+                className="zf-btn zf-btn-ghost zf-btn-sm"
               >
                 {copied ? 'Copied!' : 'Copy Report'}
               </button>
@@ -122,7 +122,7 @@ export default function MigrationReport() {
                 type="button"
                 onClick={() => window.print()}
                 title="Print report"
-                className="px-4 py-2 text-xs bg-[#e8e8ed] hover:bg-[#d2d2d7] text-[#1d1d1f] rounded-lg transition-colors"
+                className="zf-btn zf-btn-ghost zf-btn-sm"
               >
                 Print
               </button>
@@ -141,37 +141,37 @@ export default function MigrationReport() {
       )}
 
       {loading && !loadError ? (
-        <div className="bg-[#f5f5f7] rounded-xl p-10 border border-[#d2d2d7] flex flex-col items-center justify-center text-[#6e6e73] gap-3">
-          <div className="w-6 h-6 border-2 border-[#d2d2d7] border-t-[#0066cc] rounded-full animate-spin" />
+        <div className="bg-[var(--zf-canvas)] rounded-xl p-10 border border-[var(--zf-hairline)] flex flex-col items-center justify-center text-[var(--zf-muted)] gap-3">
+          <div className="w-6 h-6 border-2 border-[var(--zf-hairline)] border-t-[var(--zf-link)] rounded-full animate-spin" />
           <span className="text-sm">Generating migration report…</span>
         </div>
       ) : report && !loadError ? (
         <div className="flex flex-col gap-4 print:gap-2">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
-              <div className="text-xs text-[#6e6e73] mb-1">Total</div>
-              <div className="text-2xl font-bold text-[#1d1d1f]">{report.total}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]">
+              <div className="text-xs text-[var(--zf-muted)] mb-1">Total</div>
+              <div className="text-2xl font-bold text-[var(--zf-ink)]">{report.total}</div>
             </div>
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-green-700/30">
-              <div className="text-xs text-emerald-600 mb-1">Successful</div>
-              <div className="text-2xl font-bold text-emerald-600">{report.successful}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-emerald-200">
+              <div className="text-xs text-emerald-700 mb-1">Successful</div>
+              <div className="text-2xl font-bold text-emerald-700">{report.successful}</div>
             </div>
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-red-700/30">
-              <div className="text-xs text-red-600 mb-1">Failed</div>
-              <div className="text-2xl font-bold text-red-600">{report.failed}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-red-200">
+              <div className="text-xs text-red-700 mb-1">Failed</div>
+              <div className="text-2xl font-bold text-red-700">{report.failed}</div>
             </div>
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-blue-700/30">
-              <div className="text-xs text-[#0066cc] mb-1">Running</div>
-              <div className="text-2xl font-bold text-[#0066cc]">{report.running}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]">
+              <div className="text-xs text-[var(--zf-link)] mb-1">Running</div>
+              <div className="text-2xl font-bold text-[var(--zf-link)]">{report.running}</div>
             </div>
-            <div className="bg-[#f5f5f7] rounded-xl px-4 py-3 border border-[#d2d2d7]">
-              <div className="text-xs text-[#6e6e73] mb-1">Avg Duration</div>
-              <div className="text-xl font-bold text-[#1d1d1f]">{report.avg_duration || '--'}</div>
+            <div className="bg-[var(--zf-canvas)] rounded-xl px-4 py-3 border border-[var(--zf-hairline)]">
+              <div className="text-xs text-[var(--zf-muted)] mb-1">Avg Duration</div>
+              <div className="text-xl font-bold text-[var(--zf-ink)]">{report.avg_duration || '--'}</div>
             </div>
           </div>
 
           {report.migrations.length === 0 ? (
-            <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7]">
+            <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)]">
               <EmptyState
                 icon={<FileText className="w-12 h-12" />}
                 title="No migration data"
@@ -179,11 +179,11 @@ export default function MigrationReport() {
               />
             </div>
           ) : (
-            <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] overflow-hidden">
+            <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-black/[0.04] text-xs font-semibold text-[#6e6e73] uppercase tracking-wider">
+                    <tr className="bg-black/[0.04] text-xs font-semibold text-[var(--zf-muted)] uppercase tracking-wider">
                       <th className="text-left px-4 py-3">Name</th>
                       <th className="text-left px-4 py-3">VM</th>
                       <th className="text-left px-4 py-3">Status</th>
@@ -192,25 +192,25 @@ export default function MigrationReport() {
                       <th className="text-left px-4 py-3">Error</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#d2d2d7]">
+                  <tbody className="divide-y divide-[var(--zf-hairline)]">
                     {report.migrations.map((m, idx) => (
                       <tr key={idx} className="hover:bg-black/[0.04] transition-colors">
-                        <td className="px-4 py-3 text-[#1d1d1f] font-medium">{m.name || m.id}</td>
-                        <td className="px-4 py-3 text-[#1d1d1f] font-mono text-xs max-w-[200px] truncate">
+                        <td className="px-4 py-3 text-[var(--zf-ink)] font-medium">{m.name || m.id}</td>
+                        <td className="px-4 py-3 text-[var(--zf-ink)] font-mono text-xs max-w-[200px] truncate">
                           {m.vm_name || '--'}
                         </td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(m.status)}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(m.status)}`}
                           >
                             {m.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-[#6e6e73] text-xs">{m.duration || '--'}</td>
-                        <td className="px-4 py-3 text-[#6e6e73] font-mono text-xs max-w-[200px] truncate">
+                        <td className="px-4 py-3 text-[var(--zf-muted)] text-xs">{m.duration || '--'}</td>
+                        <td className="px-4 py-3 text-[var(--zf-muted)] font-mono text-xs max-w-[200px] truncate">
                           {m.output_path || '--'}
                         </td>
-                        <td className="px-4 py-3 text-red-600 text-xs max-w-[200px] truncate">
+                        <td className="px-4 py-3 text-red-700 text-xs max-w-[200px] truncate">
                           {m.error || '--'}
                         </td>
                       </tr>
