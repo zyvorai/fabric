@@ -384,7 +384,7 @@ sudo iptables -t nat -L PREROUTING -n -v
 sudo wg show
 
 # NAT rules
-sudo nft list table ip vmspawnd_nat
+sudo nft list table ip zyvor-fabricd_nat
 
 # Mirror rules
 sudo tc -s qdisc show

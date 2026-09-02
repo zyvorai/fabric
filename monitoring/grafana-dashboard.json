@@ -7,7 +7,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "vmspawnd_vms_total",
+            "expr": "zyvor_fabricd_vms_total",
             "legendFormat": "Total VMs"
           }
         ]
@@ -17,7 +17,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "vmspawnd_vms_running",
+            "expr": "zyvor_fabricd_vms_running",
             "legendFormat": "Running"
           }
         ]
@@ -27,11 +27,11 @@
         "type": "piechart",
         "targets": [
           {
-            "expr": "vmspawnd_vms_running",
+            "expr": "zyvor_fabricd_vms_running",
             "legendFormat": "Running"
           },
           {
-            "expr": "vmspawnd_vms_stopped",
+            "expr": "zyvor_fabricd_vms_stopped",
             "legendFormat": "Stopped"
           }
         ]
@@ -41,19 +41,19 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "rate(vmspawnd_vm_starts_total[5m])",
+            "expr": "rate(zyvor_fabricd_vm_starts_total[5m])",
             "legendFormat": "Starts"
           },
           {
-            "expr": "rate(vmspawnd_vm_stops_total[5m])",
+            "expr": "rate(zyvor_fabricd_vm_stops_total[5m])",
             "legendFormat": "Stops"
           },
           {
-            "expr": "rate(vmspawnd_vm_creates_total[5m])",
+            "expr": "rate(zyvor_fabricd_vm_creates_total[5m])",
             "legendFormat": "Creates"
           },
           {
-            "expr": "rate(vmspawnd_vm_deletes_total[5m])",
+            "expr": "rate(zyvor_fabricd_vm_deletes_total[5m])",
             "legendFormat": "Deletes"
           }
         ]

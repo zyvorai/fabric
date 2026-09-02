@@ -64,7 +64,7 @@ fn discover_nft_set_identities() -> Result<Vec<DiscoveredHostIdentity>> {
 fn skip_table(table: &str) -> bool {
     matches!(
         table,
-        "zyvor-fabricd" | "vmspawnd6" | "vmspawnd_policy" | "vmspawnd_nat" | "vmspawnd_dnat"
+        "zyvor-fabricd" | "zyvor-fabricd6" | "zyvor-fabricd_policy" | "zyvor-fabricd_nat" | "zyvor-fabricd_dnat"
     )
 }
 
@@ -241,12 +241,12 @@ mod tests {
     }
 
     #[test]
-    fn skips_vmspawnd_sets() {
+    fn skips_zyvor_fabricd_sets() {
         let json: serde_json::Value = serde_json::json!({
             "nftables": [{
                 "set": {
                     "family": "ip",
-                    "table": "vmspawnd_policy",
+                    "table": "zyvor-fabricd_policy",
                     "name": "identity_256",
                     "type": "ipv4_addr",
                     "elem": ["10.0.0.5"]

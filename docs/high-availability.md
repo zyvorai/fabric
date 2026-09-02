@@ -214,9 +214,9 @@ curl http://localhost:9095/metrics | grep cluster
 ```
 
 Key metrics:
-- `vmspawnd_cluster_nodes_total` -- Total cluster node count
-- `vmspawnd_cluster_leader{node="..."}` -- Current leader
-- `vmspawnd_cluster_node_health{node="..."}` -- Per-node health status
+- `zyvor_fabricd_cluster_nodes_total` -- Total cluster node count
+- `zyvor_fabricd_cluster_leader{node="..."}` -- Current leader
+- `zyvor_fabricd_cluster_node_health{node="..."}` -- Per-node health status
 
 ### Prometheus Alert Rules
 
@@ -225,13 +225,13 @@ groups:
   - name: Zyvor Fabric-cluster
     rules:
       - alert: ClusterLeaderDown
-        expr: vmspawnd_cluster_leader == 0
+        expr: zyvor_fabricd_cluster_leader == 0
         for: 1m
         annotations:
           summary: "No cluster leader elected"
 
       - alert: ClusterNodeUnhealthy
-        expr: vmspawnd_cluster_node_health == 0
+        expr: zyvor_fabricd_cluster_node_health == 0
         for: 2m
         annotations:
           summary: "Cluster node {{ $labels.node }} is unhealthy"

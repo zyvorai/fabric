@@ -11,7 +11,7 @@ use crate::models::*;
 ///
 /// nftables structure:
 /// ```text
-/// table ip vmspawnd_policy {
+/// table ip zyvor-fabricd_policy {
 ///     set identity_256 { type ipv4_addr; elements = { 10.0.0.5, 10.0.0.6 } }
 ///     chain policy_forward {
 ///         type filter hook forward priority 0; policy drop;
@@ -24,7 +24,7 @@ pub struct PolicyEnforcer {
     allocator: IdentityAllocator,
 }
 
-const TABLE_NAME: &str = "vmspawnd_policy";
+const TABLE_NAME: &str = "zyvor-fabricd_policy";
 
 impl PolicyEnforcer {
     pub fn new(allocator: IdentityAllocator) -> Self {

@@ -110,7 +110,7 @@ Enterprise management features for large-scale VM deployments.
 | Crate                 | Path                           | Description                                              |
 |-----------------------|--------------------------------|----------------------------------------------------------|
 | `cloud-init`          | `backend/cloud-init`           | Cloud-init configuration generation. User-data, meta-data, network-config for NoCloud datasource. SSH key injection, package installation. |
-| `prometheus-exporter` | `backend/prometheus-exporter`  | Prometheus metrics. Exposes `vmspawnd_vms_total`, `vmspawnd_vms_running`, `vmspawnd_vm_starts_total`, etc. via `/metrics` endpoint. |
+| `prometheus-exporter` | `backend/prometheus-exporter`  | Prometheus metrics. Exposes `zyvor_fabricd_vms_total`, `zyvor_fabricd_vms_running`, `zyvor_fabricd_vm_starts_total`, etc. via `/metrics` endpoint. |
 | `vnc-proxy`           | `backend/vnc-proxy`            | WebSocket-to-VNC proxy. Bridges browser-based noVNC client to QEMU VNC server for graphical VM console. |
 | `ova-tools`           | `backend/ova-tools`            | OVA/OVF export and import. Builds OVA archives from VM disk images and metadata, parses OVF descriptors for import. |
 

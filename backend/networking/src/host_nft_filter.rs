@@ -45,7 +45,7 @@ fn parse_filter_chains(json: &serde_json::Value) -> Vec<DiscoveredNftFilterChain
             .and_then(|t| t.as_str())
             .unwrap_or("")
             .to_string();
-        if table == "zyvor-fabricd" || table == "vmspawnd6" {
+        if table == "zyvor-fabricd" || table == "zyvor-fabricd6" {
             continue;
         }
         let hook = chain.get("hook").and_then(|h| h.as_str()).unwrap_or("");
@@ -74,7 +74,7 @@ fn parse_filter_chains(json: &serde_json::Value) -> Vec<DiscoveredNftFilterChain
             .and_then(|t| t.as_str())
             .unwrap_or("")
             .to_string();
-        if table == "zyvor-fabricd" || table == "vmspawnd6" {
+        if table == "zyvor-fabricd" || table == "zyvor-fabricd6" {
             continue;
         }
         let chain = rule

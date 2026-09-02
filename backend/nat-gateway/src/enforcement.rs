@@ -53,13 +53,13 @@ fn validate_nat_action(action: &str) -> Result<()> {
 }
 
 /// nftables table name for NAT.
-const TABLE_NAME: &str = "vmspawnd_nat";
+const TABLE_NAME: &str = "zyvor-fabricd_nat";
 
-/// Generates and applies nftables rules in the `vmspawnd_nat` table.
+/// Generates and applies nftables rules in the `zyvor-fabricd_nat` table.
 ///
 /// nftables structure:
 /// ```text
-/// table ip vmspawnd_nat {
+/// table ip zyvor-fabricd_nat {
 ///     chain nat_prerouting { type nat hook prerouting priority -100; }
 ///     chain nat_postrouting { type nat hook postrouting priority 100; }
 /// }

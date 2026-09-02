@@ -105,5 +105,5 @@ async fn test_metrics_endpoint() {
 
     assert_eq!(resp.status(), 200);
     let body = resp.text().await.unwrap();
-    assert!(body.contains("vmspawnd_"));
+    assert!(body.contains("zyvor_fabricd_"));
 }

@@ -14,7 +14,7 @@ pub struct NftManager;
 
 const TABLE_NAME: &str = "zyvor-fabricd";
 const TABLE_FAMILY: &str = "ip";
-const TABLE_NAME_V6: &str = "vmspawnd6";
+const TABLE_NAME_V6: &str = "zyvor-fabricd6";
 const TABLE_FAMILY_V6: &str = "ip6";
 
 impl NftManager {
@@ -22,7 +22,7 @@ impl NftManager {
         Self
     }
 
-    /// Create `table ip zyvor-fabricd` and `table ip6 vmspawnd6` if they do not already exist.
+    /// Create `table ip zyvor-fabricd` and `table ip6 zyvor-fabricd6` if they do not already exist.
     pub fn ensure_table(&self) -> Result<()> {
         // `add table` is idempotent in nftables — it won't fail if the table
         // already exists.

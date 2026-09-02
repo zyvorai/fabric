@@ -12,7 +12,7 @@ groups:
           description: "zyvor-fabricd has been down for more than 1 minute"
 
       - alert: HighVMCount
-        expr: vmspawnd_vms_total > 100
+        expr: zyvor_fabricd_vms_total > 100
         for: 5m
         labels:
           severity: warning
@@ -21,7 +21,7 @@ groups:
           description: "VM count ({{ $value }}) is above 100"
 
       - alert: NoRunningVMs
-        expr: vmspawnd_vms_running == 0 and vmspawnd_vms_total > 0
+        expr: zyvor_fabricd_vms_running == 0 and zyvor_fabricd_vms_total > 0
         for: 5m
         labels:
           severity: warning

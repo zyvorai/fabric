@@ -501,13 +501,13 @@ Available metrics:
 
 | Metric                        | Type    | Description                    |
 |-------------------------------|---------|--------------------------------|
-| `vmspawnd_vms_total`          | Gauge   | Total number of VMs            |
-| `vmspawnd_vms_running`        | Gauge   | Number of running VMs          |
-| `vmspawnd_vms_stopped`        | Gauge   | Number of stopped VMs          |
-| `vmspawnd_vm_starts_total`    | Counter | Total VM start operations      |
-| `vmspawnd_vm_stops_total`     | Counter | Total VM stop operations       |
-| `vmspawnd_vm_creates_total`   | Counter | Total VM create operations     |
-| `vmspawnd_vm_deletes_total`   | Counter | Total VM delete operations     |
+| `zyvor_fabricd_vms_total`          | Gauge   | Total number of VMs            |
+| `zyvor_fabricd_vms_running`        | Gauge   | Number of running VMs          |
+| `zyvor_fabricd_vms_stopped`        | Gauge   | Number of stopped VMs          |
+| `zyvor_fabricd_vm_starts_total`    | Counter | Total VM start operations      |
+| `zyvor_fabricd_vm_stops_total`     | Counter | Total VM stop operations       |
+| `zyvor_fabricd_vm_creates_total`   | Counter | Total VM create operations     |
+| `zyvor_fabricd_vm_deletes_total`   | Counter | Total VM delete operations     |
 
 ### Prometheus Configuration
 
@@ -546,7 +546,7 @@ groups:
           summary: "Zyvor Fabric is unreachable"
 
       - alert: HighVMCount
-        expr: vmspawnd_vms_running > 100
+        expr: zyvor_fabricd_vms_running > 100
         for: 5m
         labels:
           severity: warning

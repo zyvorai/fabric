@@ -215,11 +215,11 @@ curl http://localhost:9095/api/vms/myvm/migrate/stats
 ### Prometheus Metrics
 
 ```
-vmspawnd_migration_duration_seconds
-vmspawnd_migration_downtime_seconds
-vmspawnd_migration_total_bytes
-vmspawnd_migration_success_total
-vmspawnd_migration_failure_total
+zyvor_fabricd_migration_duration_seconds
+zyvor_fabricd_migration_downtime_seconds
+zyvor_fabricd_migration_total_bytes
+zyvor_fabricd_migration_success_total
+zyvor_fabricd_migration_failure_total
 ```
 
 ---

@@ -9,19 +9,19 @@ use prometheus::{
 
 lazy_static! {
     pub static ref VMS_TOTAL: IntGauge =
-        register_int_gauge!("vmspawnd_vms_total", "Total number of VMs").unwrap();
+        register_int_gauge!("zyvor_fabricd_vms_total", "Total number of VMs").unwrap();
     pub static ref VMS_RUNNING: IntGauge =
-        register_int_gauge!("vmspawnd_vms_running", "Number of running VMs").unwrap();
+        register_int_gauge!("zyvor_fabricd_vms_running", "Number of running VMs").unwrap();
     pub static ref VMS_STOPPED: IntGauge =
-        register_int_gauge!("vmspawnd_vms_stopped", "Number of stopped VMs").unwrap();
+        register_int_gauge!("zyvor_fabricd_vms_stopped", "Number of stopped VMs").unwrap();
     pub static ref VM_START_COUNT: IntCounter =
-        register_int_counter!("vmspawnd_vm_starts_total", "Total VM starts").unwrap();
+        register_int_counter!("zyvor_fabricd_vm_starts_total", "Total VM starts").unwrap();
     pub static ref VM_STOP_COUNT: IntCounter =
-        register_int_counter!("vmspawnd_vm_stops_total", "Total VM stops").unwrap();
+        register_int_counter!("zyvor_fabricd_vm_stops_total", "Total VM stops").unwrap();
     pub static ref VM_CREATE_COUNT: IntCounter =
-        register_int_counter!("vmspawnd_vm_creates_total", "Total VM creates").unwrap();
+        register_int_counter!("zyvor_fabricd_vm_creates_total", "Total VM creates").unwrap();
     pub static ref VM_DELETE_COUNT: IntCounter =
-        register_int_counter!("vmspawnd_vm_deletes_total", "Total VM deletes").unwrap();
+        register_int_counter!("zyvor_fabricd_vm_deletes_total", "Total VM deletes").unwrap();
 }
 
 pub async fn metrics_handler() -> impl IntoResponse {

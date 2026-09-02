@@ -385,7 +385,7 @@ State transitions:
 5. VM model is created with state=Stopped, timestamps set
 6. State persisted to /var/lib/zyvor-fabricd/vms/{name}.json
 7. Cloud-init ISO generated if hostname/user-data provided
-8. Prometheus counter incremented (vmspawnd_vm_creates_total)
+8. Prometheus counter incremented (zyvor_fabricd_vm_creates_total)
 9. SSE event emitted: { type: "vm_created", name: "..." }
 10. JSON response returned with full VM object
 ```

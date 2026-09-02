@@ -6,13 +6,13 @@ use tracing;
 
 use crate::models::*;
 
-const TABLE_NAME: &str = "vmspawnd_firewall";
+const TABLE_NAME: &str = "zyvor-fabricd_firewall";
 
 /// Generates and applies per-VM nftables firewall rules.
 ///
 /// nftables structure:
 /// ```text
-/// table ip vmspawnd_firewall {
+/// table ip zyvor-fabricd_firewall {
 ///     chain vm_web1_in {
 ///         ct state established,related accept
 ///         tcp dport 80 accept

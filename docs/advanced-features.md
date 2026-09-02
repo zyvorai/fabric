@@ -193,7 +193,7 @@ Declarative VM provisioning via HashiCorp Terraform.
 ```hcl
 provider "Zyvor Fabric" {
   url   = "http://localhost:9095"
-  token = var.vmspawnd_token
+  token = var.zyvor_fabricd_token
 }
 
 resource "zyvor_fabric_vm" "web" {
@@ -227,21 +227,21 @@ See [terraform-provider/README.md](../terraform-provider/README.md) for full doc
 
 | Metric | Description |
 |--------|-------------|
-| `vmspawnd_vms_total` | Total VM count |
-| `vmspawnd_vms_running` | Running VM count |
-| `vmspawnd_vm_cpu_usage` | Per-VM CPU utilization |
-| `vmspawnd_vm_memory_usage` | Per-VM memory utilization |
-| `vmspawnd_vm_disk_read_bytes` | Per-VM disk read throughput |
-| `vmspawnd_vm_disk_write_bytes` | Per-VM disk write throughput |
-| `vmspawnd_vm_network_rx_bytes` | Per-VM network receive |
-| `vmspawnd_vm_network_tx_bytes` | Per-VM network transmit |
+| `zyvor_fabricd_vms_total` | Total VM count |
+| `zyvor_fabricd_vms_running` | Running VM count |
+| `zyvor_fabricd_vm_cpu_usage` | Per-VM CPU utilization |
+| `zyvor_fabricd_vm_memory_usage` | Per-VM memory utilization |
+| `zyvor_fabricd_vm_disk_read_bytes` | Per-VM disk read throughput |
+| `zyvor_fabricd_vm_disk_write_bytes` | Per-VM disk write throughput |
+| `zyvor_fabricd_vm_network_rx_bytes` | Per-VM network receive |
+| `zyvor_fabricd_vm_network_tx_bytes` | Per-VM network transmit |
 
 ### API Metrics
 
 | Metric | Description |
 |--------|-------------|
-| `vmspawnd_api_requests_total` | Total API requests (by method, path) |
-| `vmspawnd_api_request_duration_seconds` | Request latency histogram |
+| `zyvor_fabricd_api_requests_total` | Total API requests (by method, path) |
+| `zyvor_fabricd_api_request_duration_seconds` | Request latency histogram |
 
 ### Prometheus Configuration
 

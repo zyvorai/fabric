@@ -6,13 +6,13 @@ use tracing;
 
 use crate::models::*;
 
-const TABLE_NAME: &str = "vmspawnd_services";
+const TABLE_NAME: &str = "zyvor-fabricd_services";
 
 /// Generates and applies nftables DNAT rules for service load balancing.
 ///
 /// nftables structure:
 /// ```text
-/// table ip vmspawnd_services {
+/// table ip zyvor-fabricd_services {
 ///     chain svc_dnat {
 ///         type nat hook prerouting priority -100;
 ///         ip daddr 10.0.0.100 tcp dport 80 dnat to numgen inc mod 2 map { 0: 10.0.0.5, 1: 10.0.0.6 }

@@ -224,7 +224,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - SNAT with IP address pools
 - DNAT for inbound port forwarding
 - Hairpin NAT for internal loopback
-- nftables-based enforcement (`vmspawnd_nat` table)
+- nftables-based enforcement (`zyvor-fabricd_nat` table)
 
 ### Network Monitor
 
